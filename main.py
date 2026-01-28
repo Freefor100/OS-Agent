@@ -1,5 +1,6 @@
 # main.py
 import os
+import re
 import sys
 from datetime import datetime
 
@@ -67,6 +68,40 @@ def _build_base_context(repo_url: str, output_dir: str, is_prep_stage: bool = Fa
 - 论证要"可追溯"：提到结论时，给出对应文件路径、关键结构体/函数名（必要时用 read_code_segment 引用片段）。
 - 默认忽略 vendor/；只有当分析依赖实现细节时才进入 vendor。
 - 输出使用 Markdown，面向"懂 OS 的读者"，每个小节都要解释组件原理 + 在本仓库的具体实现方式。
+
+**Markdown 格式规范**（严格遵守）：
+1. **标题层级**：
+   - 本章节已有一级标题（由系统自动添加），请从二级标题（##）开始
+   - 禁止重复一级标题（#）
+   - 标题层级递进：## → ### → ####，不要跳级
+   - 禁止使用错误格式如 `### ##`
+
+2. **正文输出**：
+   - 直接输出分析内容，不要包含"现在我开始..."、"让我总结..."等思考过程
+   - 不要输出分析前的准备文字
+
+3. **代码块**：
+   - 使用三个反引号包围，并标注语言（如 ```rust、```c）
+   - 代码片段控制在50行以内，过长时使用注释省略
+
+4. **列表**：
+   - 有序列表使用 `1.`、`2.`，无序列表使用 `-` 或 `*`
+   - 保持同级列表标记一致
+
+5. **文件路径引用**：
+   - 使用反引号包围：`arceos/modules/axtask/src/task.rs`
+   - 在分析时总是给出完整相对路径
+
+6. **代码元素引用**：
+   - 结构体/函数/变量使用反引号：`TaskInner`、`spawn_task()`
+   - 配置项使用反引号：`sched_fifo`
+
+7. **图表引用**：
+   - 使用标准 Markdown 格式：`![描述](charts/filename.png)`
+
+8. **专业性**：
+   - 使用准确的OS术语（如"页表"非"分页表"、"互斥锁"非"互斥"）
+   - 中英文混排时注意空格（`进程 (Process)`）
 """
 
 
@@ -480,50 +515,48 @@ STAGES = [
     },
     {
         "id": "15_final",
-        "title": "执行摘要与报告整合",
-        "prompt": """目标：生成执行摘要，并将前面所有章节整合成完整报告。
+        "title": "执行摘要与总结评价",
+        "prompt": """目标：基于前面所有章节的分析，生成执行摘要和项目总结评价。
 
-**重要**：前面每个阶段已经按照最终报告的章节格式输出了内容。你只需要：
-1. 阅读下面 [前面阶段的分析内容] 部分
-2. 提取关键发现，生成执行摘要（3-5 条核心结论）
-3. 生成目录
-4. 将各章内容按顺序组织
+你已经完成了对该OS项目的详细分析（包括：项目概览、启动流程、内存管理、进程调度、中断系统调用、文件系统、设备驱动、同步IPC、多核支持、安全机制、网络协议栈、调试机制、测试框架、开发历史等）。
 
-输出格式：
+现在需要你输出两个部分：
 
-# [项目名] 操作系统技术分析报告
+## 1. 执行摘要（Executive Summary）
 
-## 执行摘要
-（基于下面内容提取 3-5 条核心发现：项目性质、技术特点、设计亮点）
+用200-300字概括：
+- 项目定位与目标（教学OS/实验OS/微内核等）
+- 技术栈概览（编程语言、目标架构、关键技术）
+- 核心特性与亮点（列出3-5项最突出的特性）
+- 实现完成度评估（核心功能是否完整）
 
-## 目录
-1. 项目概览与技术栈
-2. 启动流程与架构初始化
-3. 内存管理
-4. 进程与调度
-5. 中断与系统调用
-6. 文件系统
-7. 设备驱动
-8. 同步与IPC
-9. 多核支持与并行机制
-10. 安全机制与权限模型
-11. 网络子系统与协议栈
-12. 调试机制与错误处理
-13. 测试框架与验证机制
-14. 开发历史与里程碑
-15. 总结与评价
+## 2. 项目总结与评价
+
+### 技术成熟度
+评估实现完整度、代码质量、文档完善度等
+
+### 设计亮点
+列举2-3个突出的架构设计或技术实现
+
+### 不足与改进空间
+客观指出可优化的地方（如性能、功能、代码规范等）
+
+### 适用场景
+说明这个项目适合什么场景使用或学习
 
 ---
-（然后直接输出下面各章的内容，保持原有格式，在最后添加"总结与评价"章节）
 
-**重要**：
-- 执行摘要必须基于下面的实际分析内容
-- 各章内容保持原样，不要修改
-- 在最后添加一个"## 15. 总结与评价"章节，综合评价项目质量
-- 不要调用任何工具
+**输出要求**：
+1. 只输出上述两个部分（执行摘要 + 项目总结与评价）
+2. 不要重复前面章节的内容
+3. 基于实际分析内容，不要臆测或夸大
+4. 语气专业客观，类似技术评审报告
+5. 使用严格的Markdown格式
+
+**前面阶段的分析内容将附在下面供参考...**
 """,
         "needs_previous_sections": True,
-        "skip_in_report": True,  # 这个阶段的输出直接作为最终报告，不再重复包含
+        "skip_in_report": False,  # 改为False，要保存到sections并包含在最终报告中
     },
 ]
 
@@ -614,8 +647,16 @@ def _format_tool_result_summary(tool_name: str, content: str) -> str:
         return f"返回 {content_len} 字符 ({line_count} 行)"
 
 
-def print_step(step_num: int, node_name: str, state: dict):
-    """打印每一步的执行信息（简洁的 agent 风格）"""
+def print_step(step_num: int, node_name: str, state: dict, stage_step_num: int = 0, max_steps: int = 500):
+    """打印每一步的执行信息（简洁的 agent 风格）
+    
+    Args:
+        step_num: 全局步骤号
+        node_name: 节点名称
+        state: 状态字典
+        stage_step_num: 阶段内步骤号
+        max_steps: 递归限制（最大步数）
+    """
     messages = state.get("messages", [])
     if not messages:
         return
@@ -631,9 +672,13 @@ def print_step(step_num: int, node_name: str, state: dict):
             content = msg.content or ""
             tool_calls = getattr(msg, "tool_calls", None) or []
             
+            # 显示步骤进度
+            if stage_step_num > 0:
+                print(f"\n【步骤 {stage_step_num}/{max_steps}】", end=" ")
+            
             # 如果有工具调用，简洁显示
             if tool_calls:
-                print(f"\n🔧 调用工具:")
+                print(f"🔧 调用工具:")
                 for tc in tool_calls:
                     if isinstance(tc, dict):
                         tool_name = tc.get("name", "unknown")
@@ -651,15 +696,17 @@ def print_step(step_num: int, node_name: str, state: dict):
                 preview = content.strip()[:200]
                 if len(content) > 200:
                     preview += "..."
-                print(f"\n🤔 Agent: {preview}")
+                print(f"🤔 Agent: {preview}")
             
-            # 打印 Token Usage（简洁版）
+            # 打印 Token Usage
             metadata = getattr(msg, "response_metadata", {})
             usage = metadata.get("token_usage", {})
             if usage:
-                total = usage.get("total_tokens", 0)
-                if total > 0:
-                    print(f"   � Tokens: {total}")
+                total_this_call = usage.get("total_tokens", 0)
+                if total_this_call > 0:
+                    input_tokens = usage.get("prompt_tokens", 0)
+                    output_tokens = usage.get("completion_tokens", 0)
+                    print(f"   📄 Tokens: {total_this_call:,} (输入:{input_tokens:,} + 输出:{output_tokens:,})")
         
         elif isinstance(msg, ToolMessage):
             tool_name = getattr(msg, "name", "unknown")
@@ -698,15 +745,28 @@ def main():
 
     all_section_paths = []
     overall_step_count = 0
+    total_tokens_used = 0  # 累计token使用量
     start_time = datetime.now()
+    
+    # 计算有效章节数（用于文件命名）
+    chapter_counter = 0  # 实际章节计数器
 
     for idx, stage in enumerate(STAGES, 1):
         stage_id = stage["id"]
         title = stage["title"]
         prompt = stage["prompt"]
-
-        # 文件命名：只用 title 的 slug，避免重复编号
-        section_name = f"{idx:02d}_{_slug(title)}.md"
+        
+        # 检查是否跳过此阶段
+        skip_in_report = stage.get("skip_in_report", False)
+        
+        # 只有非skip阶段才计入章节号
+        if not skip_in_report:
+            chapter_counter += 1
+            section_name = f"{chapter_counter:02d}_{_slug(title)}.md"
+        else:
+            # skip阶段使用idx作为前缀（避免冲突，但不会保存）
+            section_name = f"00_{_slug(title)}.md"
+        
         section_path = os.path.join(sections_dir, section_name)
 
         # 简单的断点续传：如果文件已存在且内容看起来正常（>200字节），则跳过
@@ -716,7 +776,8 @@ def main():
                 print(f"⏭️  阶段 {idx}/{len(STAGES)}：{title} (已存在，跳过)")
                 print(f"   文件: {section_path}")
                 print("=" * 80)
-                all_section_paths.append(section_path)
+                if not skip_in_report:
+                    all_section_paths.append(section_path)
                 continue
             else:
                 print(f"♻️  检测到残留的失败文件 (Size: {os.path.getsize(section_path)} bytes)，将删除并重试: {section_name}")
@@ -796,14 +857,20 @@ def main():
         print("\\n" + "=" * 80)
         print(f"🧩 阶段 {idx}/{len(STAGES)}：{title}")
         print("=" * 80)
+        print(f"🚀 开始执行 Agent (模型: {os.getenv('MODEL_NAME')})...")
+        sys.stdout.flush()  # 强制刷新输出缓冲区
 
         final_state = None
+        stage_step_count = 0  # 阶段内步骤计数
+        recursion_limit = 500
+        
         try:
             # 增加 recursion_limit 防止复杂任务因步数过多而中断
-            for event in agent.stream(inputs, config={"recursion_limit": 500}):
+            for event in agent.stream(inputs, config={"recursion_limit": recursion_limit}):
                 overall_step_count += 1
+                stage_step_count += 1
                 for node_name, state in event.items():
-                    print_step(overall_step_count, node_name, state)
+                    print_step(overall_step_count, node_name, state, stage_step_count, recursion_limit)
                     final_state = state
         except KeyboardInterrupt:
             print("\\n\\n⚠️  用户中断执行")
@@ -870,8 +937,9 @@ def main():
                         followup_inputs = {"messages": messages + [followup_msg]}
                         for event in agent.stream(followup_inputs, config={"recursion_limit": 10}):
                             overall_step_count += 1
+                            stage_step_count += 1
                             for node_name, state in event.items():
-                                print_step(overall_step_count, node_name, state)
+                                print_step(overall_step_count, node_name, state, stage_step_count, recursion_limit)
                                 # 提取追问后的回复
                                 if state.get("messages"):
                                     for m in reversed(state["messages"]):
@@ -899,36 +967,158 @@ def main():
              stage_text = "> ⚠️ **生成警告**: Agent 未返回有效内容。"
 
         # 保存阶段结果（除非标记为 skip_in_report）
-        skip_in_report = stage.get("skip_in_report", False)
+        # skip_in_report 在前面文件命名时已经获取
         if skip_in_report:
             print(f"\n⏭️  阶段 {idx} 标记为 skip_in_report，不写入报告")
         else:
             try:
                 with open(section_path, "w", encoding="utf-8") as f:
-                    f.write(f"# {title}\n\n")
+                    # 不添加一级标题，由拼接时统一添加
+                    # LLM输出应从二级标题开始
                     f.write(stage_text.strip() + "\n")
                 all_section_paths.append(section_path)
                 print(f"\n✅ 已保存阶段输出: {section_path}")
             except Exception as e:
                 print(f"\n⚠️  无法写入阶段文件 {section_path}: {e}")
+        
+        # 统计本阶段的token使用（从final_state中的所有AIMessage累加）
+        stage_tokens = 0
+        if final_state and final_state.get("messages"):
+            for msg in final_state["messages"]:
+                if isinstance(msg, AIMessage):
+                    metadata = getattr(msg, "response_metadata", {})
+                    usage = metadata.get("token_usage", {})
+                    if usage:
+                        stage_tokens += usage.get("total_tokens", 0)
+        
+        total_tokens_used += stage_tokens
+        if stage_tokens > 0:
+            print(f"\n{'='*80}")
+            print(f"📊 阶段总结:")
+            print(f"   - 步骤数: {stage_step_count}")
+            print(f"   - Token使用: {stage_tokens:,} (累加{stage_step_count}次LLM调用)")
+            print(f"   - 全局累计: {total_tokens_used:,}")
+            print(f"{'='*80}")
+            sys.stdout.flush()
 
-    # 合并总报告（简单拼接；最终质量可在 15_final 阶段内由模型完成）
-    final_report_path = os.path.join(repo_output_dir, "report.md")
+    # 合并总报告 - 生成专业的、类似人类撰写的技术文档
+    final_report_path = os.path.join(repo_output_dir, f"OS技术分析报告_{repo_name}.md")
     try:
-        with open(final_report_path, "w", encoding="utf-8") as out:
-            out.write(f"# {repo_name} OS 项目技术分析报告\\n\\n")
-            out.write("## 目录\\n\\n")
-            for p in all_section_paths:
-                t = os.path.splitext(os.path.basename(p))[0]
-                out.write(f"- {t}\\n")
-            out.write("\\n---\\n\\n")
-            for p in all_section_paths:
-                out.write(f"\\n\\n---\\n\\n")
+        # 查找第15阶段的内容（执行摘要和总结评价）
+        executive_summary = ""
+        project_evaluation = ""
+        final_stage_path = None
+        
+        for p in all_section_paths:
+            if "15_" in os.path.basename(p) or "执行摘要" in os.path.basename(p):
+                final_stage_path = p
                 with open(p, "r", encoding="utf-8", errors="ignore") as f:
-                    out.write(f.read())
-        print(f"\\n📄 已生成总报告: {final_report_path}")
+                    final_content = f.read()
+                    # 提取执行摘要和总结评价部分（使用正则表达式支持多种格式）
+                    if "执行摘要" in final_content and "项目总结与评价" in final_content:
+                        # 按"项目总结与评价"分割，支持一级标题(#)或二级标题(##)
+                        parts = re.split(r'##?\s*项目总结与评价', final_content, maxsplit=1)
+                        if len(parts) >= 2:
+                            # 移除顶部的"执行摘要与总结评价"标题（支持 # 或 ##）
+                            executive_summary = re.sub(r'##?\s*执行摘要与总结评价', '', parts[0]).strip()
+                            # 保留"## 项目总结与评价"标题
+                            project_evaluation = "## 项目总结与评价" + parts[1]
+                        else:
+                            # 如果分割失败，整个内容作为执行摘要
+                            executive_summary = final_content
+                    elif "执行摘要" in final_content:
+                        # 只有执行摘要，没有项目总结与评价
+                        executive_summary = re.sub(r'##?\s*执行摘要与总结评价', '', final_content).strip()
+                    else:
+                        # 都没有，整个内容作为执行摘要
+                        executive_summary = final_content
+                break
+        
+        # 其他章节（排除第15阶段）
+        content_sections = [p for p in all_section_paths if p != final_stage_path]
+        
+        with open(final_report_path, "w", encoding="utf-8") as out:
+            # 标题和元数据
+            out.write(f"# {repo_name} 操作系统技术分析报告\n\n")
+            out.write(f"> **仓库地址**: {repo_url}\n")
+            out.write(f"> **分析日期**: {datetime.now().strftime('%Y年%m月%d日')}\n")
+            out.write(f"> **分析工具**: OS-Agent-D\n\n")
+            out.write("---\n\n")
+            
+            # 执行摘要
+            if executive_summary:
+                out.write(executive_summary + "\n\n")
+                out.write("---\n\n")
+            
+            # 目录
+            out.write("## 目录\n\n")
+            for i, p in enumerate(content_sections, 1):
+                # 从文件名提取章节标题（因为section文件不再包含一级标题）
+                try:
+                    # 文件名格式：01_项目概览与技术栈.md
+                    filename = os.path.basename(p)
+                    # 去除编号前缀和.md后缀
+                    title = os.path.splitext(filename)[0]
+                    if '_' in title:
+                        title = title.split('_', 1)[1]  # 去除 "01_" 前缀
+                    # 将下划线替换为空格（如果有）
+                    title = title.replace('_', ' ')
+                    out.write(f"{i}. {title}\n")
+                except Exception:
+                    filename = os.path.splitext(os.path.basename(p))[0]
+                    out.write(f"{i}. {filename}\n")
+            
+            # 添加总结评价到目录
+            if project_evaluation:
+                out.write(f"{len(content_sections) + 1}. 项目总结与评价\n")
+            
+            out.write("\n---\n\n")
+            
+            # 正文：依次输出各章节内容
+            for i, p in enumerate(content_sections, 1):
+                try:
+                    # 从文件名提取标题
+                    filename = os.path.basename(p)
+                    chapter_title = os.path.splitext(filename)[0]
+                    if '_' in chapter_title:
+                        chapter_title = chapter_title.split('_', 1)[1]
+                    chapter_title = chapter_title.replace('_', ' ')
+                    
+                    with open(p, "r", encoding="utf-8", errors="ignore") as f:
+                        content = f.read().strip()
+                        
+                        # 添加章节标题（一级标题）
+                        out.write(f"\n# {chapter_title}\n\n")
+                        
+                        # 内容应该从二级标题开始，直接写入
+                        # 如果LLM错误地输出了一级标题，降级处理
+                        if content.startswith("# "):
+                            # 将一级标题转为二级标题
+                            content = "##" + content[1:]
+                        
+                        out.write(content + "\n\n")
+                        out.write("---\n\n")
+                except Exception as e:
+                    print(f"  ⚠️  无法读取章节 {p}: {e}")
+            
+            # 总结评价
+            if project_evaluation:
+                out.write(f"\n# 项目总结与评价\n\n")
+                out.write(project_evaluation + "\n\n")
+                out.write("---\n\n")
+            
+            # 页脚
+            out.write(f"\n---\n\n")
+            out.write(f"*本报告由 OS-Agent-D 自动生成*  \n")
+            out.write(f"*生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*  \n")
+            out.write(f"*分析耗时: {(datetime.now() - start_time).total_seconds()/60:.1f} 分钟*\n")
+        
+        print(f"\n📄 已生成最终报告: {final_report_path}")
+        print(f"   报告包含 {len(content_sections)} 个主要章节{'+ 执行摘要和总结' if executive_summary else ''}")
     except Exception as e:
-        print(f"\\n⚠️  无法生成总报告: {e}")
+        print(f"\n⚠️  无法生成总报告: {e}")
+        import traceback
+        traceback.print_exc()
 
     end_time = datetime.now()
     elapsed = (end_time - start_time).total_seconds()
@@ -936,6 +1126,7 @@ def main():
     print("\\n" + "=" * 80)
     print("✅ 多阶段任务完成！")
     print(f"   总步数: {overall_step_count}")
+    print(f"   总Token使用: {total_tokens_used:,}")
     print(f"   耗时: {elapsed:.2f} 秒 ({elapsed/60:.2f} 分钟)")
     print(f"⏰ 结束时间: {end_time.strftime('%Y-%m-%d %H:%M:%S')}")
     print("=" * 80)

@@ -8,16 +8,16 @@ def main():
     # 1. Load environment variables
     load_dotenv()
     
-    api_key = os.getenv("OPENAI_API_KEY")
-    api_base = os.getenv("OPENAI_API_BASE")
+    api_key = os.getenv("DEEPSEEK_API_KEY")
+    api_base = os.getenv("DEEPSEEK_API_BASE")
     
     
     if not api_key:
-        print("Error: OPENAI_API_KEY not found in .env")
+        print("Error: DEEPSEEK_API_KEY not found in .env")
         return
 
     # 2. Select Model
-    default_model = "qwen/qwen3-coder"
+    default_model = "deepseek-chat"
     if len(sys.argv) > 1:
         model_name = sys.argv[1]
     else:
