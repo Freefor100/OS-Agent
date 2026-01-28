@@ -170,7 +170,7 @@ python evaluate.py output/my-os/report.md repos/my-os --model gpt-4o
    🔧 read_file(report.md)
    🔧 read_file(README.md)
    🔧 read_file(设计文档.md)
-   📝 Agent 输出: {"overall_score": 85, ...
+   📝 Agent 输出: {"overall_score": 85, ...}
 ----------------------------------------
    完成，共 12 步
 
@@ -209,13 +209,14 @@ OS-Agent/
 ├── score_describe.py    # 简单相似度评分（旧版）
 ├── api_test.py          # API 测试工具
 ├── requirements.txt     # Python 依赖
-├── .env                 # 环境变量配置
+├── .env                 # 环境变量配置（需自行创建）
+├── .env.example         # 环境变量配置模板
 ├── core/
 │   └── agent_builder.py # Agent 构建器
 ├── tools/
-│   ├── file_ops.py      # 文件操作工具
-│   ├── git_ops.py       # Git 操作工具
-│   └── describe_ops.py  # 分析描述工具
+│   ├── file_ops.py      # 文件操作工具（含安全限制）
+│   ├── git_ops.py       # Git 操作与图表生成
+│   └── describe_ops.py  # 仓库分析工具
 ├── repos/               # 克隆的 OS 仓库
 └── output/              # 输出目录（按项目名划分）
     └── <os-name>/
@@ -245,7 +246,33 @@ OS-Agent/
 - `prompt`: 分析提示词
 - `skip_in_report`: 是否跳过写入最终报告
 
----
+### 支持的 CPU 架构
+
+`find_os_core_modules` 工具支持自动识别以下架构相关代码：
+
+| 类型 | 架构 |
+|------|------|
+| **国际架构** | x86, x86_64, ARM, ARM64, RISC-V, MIPS |
+| **国产架构** | 龙芯 (LoongArch)、申威 (Sunway)、飞腾 (Phytium)、鲲鹏 (Kunpeng)、海光 (Hygon)、兆芯 (Zhaoxin)、玄铁 (XuanTie) |
+
+### 工具限制说明
+
+为防止 Token 溢出和确保安全，各工具有以下限制：
+
+| 工具 | 限制 | 说明 |
+|------|------|------|
+| `read_code_segment` | 最大 100,000 字符 | 只能访问 `repos/` 和 `output/` 目录 |
+| `read_file` (评估) | 最大 50,000 字符 | 只能访问仓库和 output 目录 |
+| `list_repo_structure` | 默认 4 层深度 | 可通过 `max_depth` 调整 |
+| `analyze_code_architecture` | 最多 20 个文件 | 每文件最多显示 10 个结构体/函数 |
+| `get_dev_history_by_module` | 最多 150 条提交 | 每模块最多显示 20 条 |
+
+**截断提示**：所有工具在输出被截断时会明确告知 LLM，例如：
+```
+📊 统计: 分析了 20 个文件，共 45 个结构体，128 个函数
+⚠️ [文件数限制] 只分析了前 20/35 个文件
+⚠️ [显示限制] 还有 12 个结构体和 56 个函数未显示
+```
 
 ## 🔧 常见问题
 
