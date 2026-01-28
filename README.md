@@ -52,28 +52,33 @@ pip install -r requirements.txt
 
 ### 2. 配置环境变量
 
-创建 `.env` 文件：
+创建 `.env` 文件（可复制 `.env.example`）：
 
 ```env
-# API 配置
+# API 配置（必需）
 OPENAI_API_KEY=your_api_key_here
 OPENAI_API_BASE=https://api.openai.com/v1
 
-# 模型配置（可选，默认 deepseek/deepseek-v3.2）
+# 模型配置（可选）
 MODEL_NAME=deepseek/deepseek-v3.2
 
-# 仓库 URL（可选，也可在命令行指定）
+# 要分析的 OS 仓库地址（必需）
 REPO_URL=https://github.com/example/os-project.git
 ```
+
+#### 配置项说明
+
+| 配置项 | 必需 | 说明 |
+|--------|------|------|
+| `OPENAI_API_KEY` | ✅ | OpenAI 兼容 API 的密钥 |
+| `OPENAI_API_BASE` | ✅ | API 地址（支持 OpenRouter、DeepSeek 等） |
+| `MODEL_NAME` | ❌ | LLM 模型名称，默认 `deepseek/deepseek-v3.2` |
+| `REPO_URL` | ✅ | 要分析的 OS 仓库 Git 地址 |
 
 ### 3. 运行分析
 
 ```bash
-# 直接运行（使用 .env 中的 REPO_URL）
-python main.py
-
-# 或指定仓库 URL
-export REPO_URL="https://github.com/example/os-project.git"
+# 直接运行（使用 .env 中的配置）
 python main.py
 ```
 

@@ -190,17 +190,36 @@ def get_dev_history_by_module(repo_path: str, max_commits: int = 150) -> str:
                 by_module[m].append((dt, msg, add, dec, diff_sum))
         # 每个模块按时间正序，标记 初步 / 较大改动
         out = []
+        total_commits_shown = 0
+        max_commits_per_module = 20  # 每个模块最多显示的提交数
+        truncated_modules = 0
+        
         for mod in sorted(by_module.keys()):
             rows = by_module[mod]
             rows.sort(key=lambda x: x[0])
             diffs = [r[4] for r in rows]
             thresh = max(diffs) * 0.5 if diffs else 0
-            out.append(f"\n## 模块 [{mod}]\n")
-            for i, (dt, msg, add, dec, _) in enumerate(rows):
+            out.append(f"\n## 模块 [{mod}] ({len(rows)} 条提交)\n")
+            
+            rows_to_show = rows[:max_commits_per_module]
+            for i, (dt, msg, add, dec, _) in enumerate(rows_to_show):
                 is_initial = i == 0
                 is_major = rows[i][4] >= thresh and rows[i][4] > 20
                 tag = "【初步】" if is_initial else ("【较大改动】" if is_major else "")
                 out.append(f"  {dt}  +{add} -{dec}  {tag} {msg}\n")
+                total_commits_shown += 1
+            
+            if len(rows) > max_commits_per_module:
+                out.append(f"  ... 还有 {len(rows) - max_commits_per_module} 条提交未显示\n")
+                truncated_modules += 1
+        
+        # 添加统计信息
+        out.append(f"\n📊 统计: 分析了 {len(commits)} 条提交，涉及 {len(by_module)} 个模块")
+        if len(commits) >= max_commits:
+            out.append(f"\n⚠️ [提交数限制] 只分析了最近 {max_commits} 条提交")
+        if truncated_modules > 0:
+            out.append(f"\n⚠️ [显示限制] {truncated_modules} 个模块的提交记录被截断（每模块最多显示 {max_commits_per_module} 条）")
+        
         return "".join(out) if out else "No module history."
     except Exception as e:
         return f"Error: {str(e)}"
