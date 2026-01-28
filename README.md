@@ -206,7 +206,6 @@ python evaluate.py output/my-os/report.md repos/my-os --model gpt-4o
 OS-Agent/
 ├── main.py              # 主分析程序
 ├── evaluate.py          # 报告评估程序
-├── score_describe.py    # 简单相似度评分（旧版）
 ├── api_test.py          # API 测试工具
 ├── requirements.txt     # Python 依赖
 ├── .env                 # 环境变量配置（需自行创建）

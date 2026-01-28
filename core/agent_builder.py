@@ -77,7 +77,12 @@ def build_agent(model: str = None):
     ]
     
     model_name = model or get_model_name()
-    llm = ChatOpenAI(model=model_name, temperature=0)
+    llm = ChatOpenAI(
+        model=model_name, 
+        temperature=0,
+        request_timeout=120,  # 120秒超时，防止请求卡住
+        max_retries=2  # 失败后重试2次
+    )
     
     # 兼容旧版本 langgraph，不使用 state_modifier
     agent = create_react_agent(llm, tools)
