@@ -73,7 +73,7 @@ def create_restricted_tools(repo_path: str, output_path: str):
             max_depth: 最大递归深度（默认 2）
         
         Returns:
-            目录结构的文本表示
+            目录结构的文本表示（如果内容过多会截断并标注）
         """
         if not _is_path_allowed(path, allowed_roots):
             return f"❌ 错误：不允许访问路径 '{path}'。只能访问仓库目录和 output 目录。"
@@ -82,9 +82,17 @@ def create_restricted_tools(repo_path: str, output_path: str):
             return f"❌ 错误：'{path}' 不是有效目录。"
         
         result = []
+        stats = {"dirs": 0, "files": 0, "truncated_dirs": 0}
         
         def walk(current_path: str, depth: int, prefix: str = ""):
             if depth > max_depth:
+                # 统计被截断的子目录
+                try:
+                    subdirs = [n for n in os.listdir(current_path) 
+                               if os.path.isdir(os.path.join(current_path, n)) and n not in skip_dirs]
+                    stats["truncated_dirs"] += len(subdirs)
+                except:
+                    pass
                 return
             
             try:
@@ -94,6 +102,11 @@ def create_restricted_tools(repo_path: str, output_path: str):
             
             # 过滤掉不需要的目录
             skip_dirs = {".git", "__pycache__", "node_modules", "target", "vendor", ".venv"}
+            
+            dirs_in_level = [i for i in items if os.path.isdir(os.path.join(current_path, i)) and i not in skip_dirs]
+            files_in_level = [i for i in items if os.path.isfile(os.path.join(current_path, i))]
+            stats["dirs"] += len(dirs_in_level)
+            stats["files"] += len(files_in_level)
             
             for i, item in enumerate(items):
                 item_path = os.path.join(current_path, item)
@@ -120,21 +133,35 @@ def create_restricted_tools(repo_path: str, output_path: str):
                         size_str = "?"
                     result.append(f"{prefix}{connector}{item} ({size_str})")
         
+        skip_dirs = {".git", "__pycache__", "node_modules", "target", "vendor", ".venv"}
         result.append(f"{os.path.basename(path)}/")
         walk(path, 0, "")
-        return "\n".join(result[:200])  # 限制输出行数
+        
+        # 添加统计信息
+        total_lines = len(result)
+        max_lines = 200
+        
+        if total_lines > max_lines:
+            result = result[:max_lines]
+            result.append(f"\n⚠️ [已截断] 显示了前 {max_lines}/{total_lines} 行")
+        
+        result.append(f"\n📊 统计: {stats['dirs']} 个目录, {stats['files']} 个文件 (深度: {max_depth} 层)")
+        if stats["truncated_dirs"] > 0:
+            result.append(f"⚠️ [深度限制] 还有约 {stats['truncated_dirs']} 个子目录未展开")
+        
+        return "\n".join(result)
     
     @tool
-    def read_file(file_path: str, max_chars: int = 20000) -> str:
+    def read_file(file_path: str, max_chars: int = 50000) -> str:
         """
         读取文件内容。支持 .md, .txt, .rst, .pdf 等格式。
         
         Args:
             file_path: 文件路径
-            max_chars: 最大读取字符数（默认 20000）
+            max_chars: 最大读取字符数（默认 50000）
         
         Returns:
-            文件内容
+            文件内容（如果超过 max_chars 会被截断并标注）
         """
         if not _is_path_allowed(file_path, allowed_roots):
             return f"❌ 错误：不允许访问文件 '{file_path}'。只能访问仓库目录和 output 目录。"
@@ -228,7 +255,10 @@ def create_restricted_tools(repo_path: str, output_path: str):
         if not found:
             return f"未找到匹配的文档文件。"
         
-        return f"找到 {len(found)} 个文档文件:\n" + "\n".join(found[:50])
+        total = len(found)
+        if total > 50:
+            return f"找到 {total} 个文档文件（显示前 50 个）:\n" + "\n".join(found[:50]) + f"\n\n⚠️ [已截断] 还有 {total - 50} 个文件未显示"
+        return f"找到 {total} 个文档文件:\n" + "\n".join(found)
     
     return [list_directory, read_file, find_documents]
 

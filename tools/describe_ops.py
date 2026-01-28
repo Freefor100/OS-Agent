@@ -52,8 +52,18 @@ def list_repo_structure(repo_path: str, exclude_vendor: bool = True, max_depth: 
         except Exception:
             return ""
 
+    # 统计信息
+    stats = {"dirs": 0, "files": 0, "truncated_dirs": 0}
+    
     def _tree(d: str, prefix: str, depth: int) -> List[str]:
         if depth <= 0:
+            # 检查是否还有子目录被截断
+            try:
+                subdirs = [n for n in os.listdir(d) if os.path.isdir(os.path.join(d, n)) and n not in exclude]
+                if subdirs:
+                    stats["truncated_dirs"] += len(subdirs)
+            except OSError:
+                pass
             return []
         lines = []
         try:
@@ -62,6 +72,10 @@ def list_repo_structure(repo_path: str, exclude_vendor: bool = True, max_depth: 
             return []
         dirs = [n for n in names if os.path.isdir(os.path.join(d, n)) and n not in exclude]
         files = [n for n in names if os.path.isfile(os.path.join(d, n))]
+        
+        stats["dirs"] += len(dirs)
+        stats["files"] += len(files)
+        
         for i, n in enumerate(dirs):
             last = (i == len(dirs) - 1) and not files
             add = "└── " if last else "├── "
@@ -97,6 +111,12 @@ def list_repo_structure(repo_path: str, exclude_vendor: bool = True, max_depth: 
                 docs.append(os.path.basename(p))
     if docs:
         out.append("\n根目录文档: " + ", ".join(sorted(set(docs))))
+    
+    # 添加统计信息和截断提示
+    out.append(f"\n📊 统计: {stats['dirs']} 个目录, {stats['files']} 个文件 (深度限制: {max_depth} 层)")
+    if stats["truncated_dirs"] > 0:
+        out.append(f"⚠️ [深度截断] 还有约 {stats['truncated_dirs']} 个子目录未展开。如需查看更深层级，请增加 max_depth 参数。")
+    
     return "\n".join(out)
 
 
@@ -186,32 +206,92 @@ def convert_md_to_pdf(md_path: str, pdf_path: Optional[str] = None) -> str:
 def find_os_core_modules(repo_path: str) -> str:
     """
     查找并分析 OS 核心模块（进程管理、内存管理、文件系统、网络、设备驱动等）。
-    通过目录名、文件名、代码内容识别关键模块。
+    通过目录名、文件名识别关键模块。
+    
+    注意：此工具通过关键词匹配识别模块，可能遗漏非标准命名的模块。
+    建议结合 list_repo_structure 手动检查未识别的目录。
 
     Args:
         repo_path: 本地仓库路径
 
     Returns:
-        核心模块列表，每个模块包含：模块名、路径、功能描述（基于目录/文件名推断）
+        核心模块列表 + 未识别的顶层目录（供手动检查）
     """
     if not os.path.isdir(repo_path):
         return f"Error: Path not found: {repo_path}"
 
-    # OS 核心模块关键词映射
+    # OS 核心模块关键词映射（扩展版：包含拼音、缩写、变体）
     module_keywords = {
-        "进程管理": ["process", "task", "scheduler", "thread", "proc", "pid"],
-        "内存管理": ["mm", "memory", "alloc", "page", "heap", "vm"],
-        "文件系统": ["fs", "filesystem", "vfs", "ext", "fat", "procfs", "devfs", "tmpfs"],
-        "网络": ["net", "network", "tcp", "udp", "socket", "ip", "ethernet"],
-        "设备驱动": ["driver", "device", "dev", "pci", "usb", "block"],
-        "系统调用": ["syscall", "sys", "api"],
-        "中断处理": ["irq", "interrupt", "exception", "trap"],
-        "同步原语": ["sync", "mutex", "lock", "semaphore", "spinlock"],
-        "启动/初始化": ["boot", "init", "entry", "startup"],
+        "进程管理": [
+            "process", "task", "scheduler", "thread", "proc", "pid", "sched",
+            "jincheng", "renwu", "diaodu",  # 拼音
+            "pcb", "tcb", "context",  # 缩写/术语
+        ],
+        "内存管理": [
+            "mm", "memory", "alloc", "page", "heap", "vm", "vmm", "pmm",
+            "neicun", "fenye", "duizhan",  # 拼音
+            "frame", "paging", "mmap", "buddy", "slab",  # 术语
+        ],
+        "文件系统": [
+            "fs", "filesystem", "vfs", "ext", "fat", "procfs", "devfs", "tmpfs",
+            "wenjian", "file",  # 拼音/英文
+            "inode", "dentry", "super", "rootfs",  # 术语
+        ],
+        "网络": [
+            "net", "network", "tcp", "udp", "socket", "ip", "ethernet",
+            "wangluo", "sock",  # 拼音/缩写
+            "nic", "arp", "icmp", "dhcp",  # 协议
+        ],
+        "设备驱动": [
+            "driver", "device", "dev", "pci", "usb", "block", "char",
+            "qudong", "shebei",  # 拼音
+            "uart", "gpio", "i2c", "spi", "dma", "mmio",  # 硬件接口
+        ],
+        "系统调用": [
+            "syscall", "sys", "api", "uapi",
+            "xitong", "diaoyon",  # 拼音
+            "svc", "ecall", "trap_handler",  # 架构相关
+        ],
+        "中断处理": [
+            "irq", "interrupt", "exception", "trap", "handler",
+            "zhongduan", "yichang",  # 拼音
+            "idt", "gdt", "isr", "vector", "plic", "clint",  # 术语
+        ],
+        "同步原语": [
+            "sync", "mutex", "lock", "semaphore", "spinlock", "rwlock",
+            "tongbu", "suo",  # 拼音
+            "condvar", "barrier", "atomic", "futex",  # 术语
+        ],
+        "启动/初始化": [
+            "boot", "init", "entry", "startup", "loader",
+            "qidong", "chushi",  # 拼音
+            "bootloader", "bios", "uefi", "main", "start",  # 术语
+        ],
+        "内核核心": [
+            "kernel", "core", "arch", "platform", "hal",
+            "neihe",  # 拼音
+            # 国际架构
+            "cpu", "riscv", "x86", "x86_64", "arm", "arm64", "aarch64", "mips",
+            # 国产架构
+            "loongarch", "longarch", "la64", "la32",  # 龙芯
+            "sunway", "sw64", "sw_64", "shenwei",  # 申威
+            "phytium", "ft2000", "ft2500", "feiteng",  # 飞腾
+            "kunpeng", "hisilicon", "kunpeng920", "kunpeng930",  # 鲲鹏/华为
+            "hygon", "haiguang", "dhyana",  # 海光
+            "zhaoxin", "centaur",  # 兆芯
+            "c910", "c906", "thead", "xuantie",  # 平头哥玄铁
+        ],
+        "用户空间": [
+            "user", "ulib", "libc", "userspace", "app",
+            "yonghu", "yingyong",  # 拼音
+            "shell", "init", "bin",  # 术语
+        ],
     }
 
     found_modules = {}
-    exclude = {"vendor", ".git", ".github", "target", "node_modules", ".devcontainer"}
+    all_matched_paths = set()
+    top_level_dirs = []
+    exclude = {"vendor", ".git", ".github", "target", "node_modules", ".devcontainer", "__pycache__"}
 
     def _scan_dir(d: str, depth: int = 0, max_depth: int = 3):
         if depth > max_depth:
@@ -222,20 +302,29 @@ def find_os_core_modules(repo_path: str) -> str:
             return
 
         for item in items:
-            if item in exclude:
+            if item in exclude or item.startswith("."):
                 continue
             item_path = os.path.join(d, item)
             rel_path = os.path.relpath(item_path, repo_path).replace("\\", "/")
 
+            # 记录顶层目录
+            if depth == 0 and os.path.isdir(item_path):
+                top_level_dirs.append(rel_path)
+
             # 检查目录名和文件名
             item_lower = item.lower()
+            matched = False
             for mod_type, keywords in module_keywords.items():
                 for kw in keywords:
                     if kw in item_lower:
                         if mod_type not in found_modules:
                             found_modules[mod_type] = []
                         found_modules[mod_type].append(rel_path)
+                        all_matched_paths.add(rel_path)
+                        matched = True
                         break
+                if matched:
+                    break
 
             # 递归扫描目录
             if os.path.isdir(item_path):
@@ -243,17 +332,34 @@ def find_os_core_modules(repo_path: str) -> str:
 
     _scan_dir(repo_path)
 
-    if not found_modules:
-        return "未找到明显的 OS 核心模块（可能命名不标准）"
+    lines = []
+    
+    if found_modules:
+        lines.append("## 🔍 识别到的 OS 核心模块\n")
+        for mod_type in sorted(found_modules.keys()):
+            paths = sorted(set(found_modules[mod_type]))[:10]
+            lines.append(f"\n### {mod_type}")
+            for p in paths:
+                lines.append(f"  - {p}")
+            if len(found_modules[mod_type]) > 10:
+                lines.append(f"  ... 还有 {len(found_modules[mod_type]) - 10} 个相关路径")
+    else:
+        lines.append("## ⚠️ 未找到明显的 OS 核心模块")
+        lines.append("可能原因：命名不标准、使用拼音/编号、或项目结构特殊")
 
-    lines = ["发现的 OS 核心模块：\n"]
-    for mod_type in sorted(found_modules.keys()):
-        paths = sorted(set(found_modules[mod_type]))[:10]  # 每个模块最多显示10个路径
-        lines.append(f"\n## {mod_type}")
-        for p in paths:
-            lines.append(f"  - {p}")
-        if len(found_modules[mod_type]) > 10:
-            lines.append(f"  ... 还有 {len(found_modules[mod_type]) - 10} 个相关路径")
+    # 找出未匹配的顶层目录
+    unmatched_dirs = [d for d in top_level_dirs if d not in all_matched_paths]
+    if unmatched_dirs:
+        lines.append(f"\n## ❓ 未识别的顶层目录（共 {len(unmatched_dirs)} 个）")
+        lines.append("以下目录未被自动识别，可能包含重要模块，建议手动检查：")
+        for d in sorted(unmatched_dirs)[:15]:
+            lines.append(f"  - {d}/")
+        if len(unmatched_dirs) > 15:
+            lines.append(f"  ... 还有 {len(unmatched_dirs) - 15} 个")
+        lines.append("\n💡 提示：使用 list_repo_structure 或 read_code_segment 查看这些目录的具体内容")
+
+    # 统计信息
+    lines.append(f"\n📊 统计: 识别了 {len(found_modules)} 个模块类型，匹配了 {len(all_matched_paths)} 个路径")
 
     return "\n".join(lines)
 
@@ -326,7 +432,7 @@ def analyze_code_architecture(repo_path: str, module_path: str) -> str:
     else:
         return f"Error: {module_path} is neither file nor directory"
 
-    for fpath in files_to_analyze[:10]:  # 最多分析10个文件
+    for fpath in files_to_analyze[:20]:  # 最多分析20个文件
         info = _analyze_file(fpath)
         if info:
             results.append(info)
@@ -335,14 +441,43 @@ def analyze_code_architecture(repo_path: str, module_path: str) -> str:
         return f"未在 {module_path} 中找到可分析的代码结构"
 
     lines = [f"代码架构分析：{module_path}\n"]
+    
+    total_structs = 0
+    total_functions = 0
+    truncated_structs = 0
+    truncated_functions = 0
+    
     for r in results:
         lines.append(f"\n### {r['file']}")
         if r["structs"]:
-            lines.append(f"  结构体/枚举: {', '.join(r['structs'][:10])}")
+            total_structs += len(r["structs"])
+            shown = r['structs'][:10]
+            if len(r["structs"]) > 10:
+                truncated_structs += len(r["structs"]) - 10
+                lines.append(f"  结构体/枚举: {', '.join(shown)} ... (+{len(r['structs']) - 10} 个)")
+            else:
+                lines.append(f"  结构体/枚举: {', '.join(shown)}")
         if r["functions"]:
-            lines.append(f"  关键函数: {', '.join(r['functions'][:10])}")
+            total_functions += len(r["functions"])
+            shown = r['functions'][:10]
+            if len(r["functions"]) > 10:
+                truncated_functions += len(r["functions"]) - 10
+                lines.append(f"  关键函数: {', '.join(shown)} ... (+{len(r['functions']) - 10} 个)")
+            else:
+                lines.append(f"  关键函数: {', '.join(shown)}")
         if r.get("imports"):
-            lines.append(f"  主要依赖: {', '.join(r['imports'][:5])}")
+            shown = r['imports'][:5]
+            if len(r["imports"]) > 5:
+                lines.append(f"  主要依赖: {', '.join(shown)} ... (+{len(r['imports']) - 5} 个)")
+            else:
+                lines.append(f"  主要依赖: {', '.join(shown)}")
+
+    # 添加统计
+    lines.append(f"\n📊 统计: 分析了 {len(results)} 个文件，共 {total_structs} 个结构体，{total_functions} 个函数")
+    if len(files_to_analyze) > 20:
+        lines.append(f"⚠️ [文件数限制] 只分析了前 20/{len(files_to_analyze)} 个文件")
+    if truncated_structs > 0 or truncated_functions > 0:
+        lines.append(f"⚠️ [显示限制] 还有 {truncated_structs} 个结构体和 {truncated_functions} 个函数未显示")
 
     return "\n".join(lines)
 
@@ -428,12 +563,18 @@ def analyze_tech_stack(repo_path: str) -> str:
     if tech_info["config_files"]:
         lines.append(f"\n配置文件: {', '.join(tech_info['config_files'])}")
     if tech_info["dependencies"]:
-        lines.append(f"\n主要依赖（前20个）:")
+        total_deps = len(tech_info["dependencies"])
+        lines.append(f"\n主要依赖:")
         for dep in tech_info["dependencies"][:20]:
             lines.append(f"  - {dep}")
+        if total_deps > 20:
+            lines.append(f"  ... 还有 {total_deps - 20} 个依赖未显示")
     if ext_counts:
         lines.append(f"\n代码文件统计:")
+        total_langs = len(ext_counts)
         for lang, count in sorted(ext_counts.items(), key=lambda x: -x[1])[:10]:
             lines.append(f"  {lang}: {count} 个文件")
+        if total_langs > 10:
+            lines.append(f"  ... 还有 {total_langs - 10} 种语言未显示")
 
     return "\n".join(lines) if lines else "未检测到明显的技术栈信息"

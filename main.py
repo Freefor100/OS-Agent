@@ -669,11 +669,13 @@ def print_step(step_num: int, node_name: str, state: dict):
 
 
 def main():
-    repo_url = os.environ.get(
-        "REPO_URL",
-        "https://gitlab.eduxiji.net/educg-group-36002-2710490/T202510003995291-2331.git",
-    )
-    # repo_url = input("请输入 OS 仓库的 URL: ").strip() or repo_url
+    repo_url = os.environ.get("REPO_URL", "").strip()
+    
+    if not repo_url:
+        print("❌ 错误：未设置 REPO_URL 环境变量")
+        print("   请在 .env 文件中设置 REPO_URL，或通过命令行设置：")
+        print("   export REPO_URL=\"https://github.com/example/os-project.git\"")
+        sys.exit(1)
 
     repo_name = _repo_name_from_url(repo_url)
     
@@ -735,7 +737,7 @@ def main():
             sections_texts = []
             
             # 限制每个 section 的最大字符数，避免 "lost in the middle" 问题
-            MAX_CHARS_PER_SECTION = 10000  # 每个 section 最多 10000 字符
+            MAX_CHARS_PER_SECTION = 15000  # 每个 section 最多 15000 字符
             total_chars = 0
             
             for sp in all_section_paths:
