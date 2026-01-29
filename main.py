@@ -52,6 +52,18 @@ def _build_base_context(repo_url: str, output_dir: str, is_prep_stage: bool = Fa
     else:
         repo_hint = f"**仓库已就绪**: 直接使用 repo_path = \"{repo_path}\"，无需调用 clone_repository。"
     
+    if is_prep_stage:
+        return f"""你是一个操作系统项目的技术分析 Agent。
+
+基础信息：
+- 仓库 URL: {repo_url}
+- 本地路径 repo_path: {repo_path}
+
+{repo_hint}
+
+请只完成 Prompt 指定的任务（repo 准备），不需要生成长篇报告。输出要极其简练。
+"""
+
     return f"""你是一个操作系统项目的技术分析 Agent。请严格基于仓库中的代码与文档输出结论，避免空泛。
 
 基础信息：
@@ -647,7 +659,7 @@ def _format_tool_result_summary(tool_name: str, content: str) -> str:
         return f"返回 {content_len} 字符 ({line_count} 行)"
 
 
-def print_step(step_num: int, node_name: str, state: dict, stage_step_num: int = 0, max_steps: int = 500):
+def print_step(step_num: int, node_name: str, state: dict, stage_step_num: int = 0, max_steps: int = 500) -> int:
     """打印每一步的执行信息（简洁的 agent 风格）
     
     Args:
@@ -655,11 +667,15 @@ def print_step(step_num: int, node_name: str, state: dict, stage_step_num: int =
         node_name: 节点名称
         state: 状态字典
         stage_step_num: 阶段内步骤号
-        max_steps: 递归限制（最大步数）
+        max_steps: 全局最大步数限制
+        
+    Returns:
+        int: 本次步骤消耗的 token 数量
     """
+    token_count = 0
     messages = state.get("messages", [])
     if not messages:
-        return
+        return 0
     
     # 只显示新增的消息（避免重复）
     if step_num == 1:
@@ -673,8 +689,8 @@ def print_step(step_num: int, node_name: str, state: dict, stage_step_num: int =
             tool_calls = getattr(msg, "tool_calls", None) or []
             
             # 显示步骤进度
-            if stage_step_num > 0:
-                print(f"\n【步骤 {stage_step_num}/{max_steps}】", end=" ")
+            if step_num > 0:
+                print(f"\n【步骤 {step_num}/{max_steps}】(阶段进度: {stage_step_num})", end=" ")
             
             # 如果有工具调用，简洁显示
             if tool_calls:
@@ -704,6 +720,7 @@ def print_step(step_num: int, node_name: str, state: dict, stage_step_num: int =
             if usage:
                 total_this_call = usage.get("total_tokens", 0)
                 if total_this_call > 0:
+                    token_count += total_this_call
                     input_tokens = usage.get("prompt_tokens", 0)
                     output_tokens = usage.get("completion_tokens", 0)
                     print(f"   📄 Tokens: {total_this_call:,} (输入:{input_tokens:,} + 输出:{output_tokens:,})")
@@ -713,6 +730,8 @@ def print_step(step_num: int, node_name: str, state: dict, stage_step_num: int =
             content = msg.content or ""
             summary = _format_tool_result_summary(tool_name, content)
             print(f"   ✅ {tool_name}: {summary}")
+            
+    return token_count
 
 
 def main():
@@ -750,6 +769,8 @@ def main():
     
     # 计算有效章节数（用于文件命名）
     chapter_counter = 0  # 实际章节计数器
+    
+    GLOBAL_MAX_STEPS = 800  # 全局最大步数限制（用于显示）
 
     for idx, stage in enumerate(STAGES, 1):
         stage_id = stage["id"]
@@ -864,13 +885,16 @@ def main():
         stage_step_count = 0  # 阶段内步骤计数
         recursion_limit = 500
         
+        stage_tokens = 0  # 阶段内 token 计数
+        
         try:
             # 增加 recursion_limit 防止复杂任务因步数过多而中断
             for event in agent.stream(inputs, config={"recursion_limit": recursion_limit}):
                 overall_step_count += 1
                 stage_step_count += 1
                 for node_name, state in event.items():
-                    print_step(overall_step_count, node_name, state, stage_step_count, recursion_limit)
+                    step_tokens = print_step(overall_step_count, node_name, state, stage_step_count, GLOBAL_MAX_STEPS)
+                    stage_tokens += step_tokens
                     final_state = state
         except KeyboardInterrupt:
             print("\\n\\n⚠️  用户中断执行")
@@ -917,8 +941,8 @@ def main():
                     if len(stage_text) < 500 and len(all_ai_content) > 1:
                         stage_text = "\n\n---\n\n".join(all_ai_content)
                 
-                # 如果仍然没有内容，发送追问消息让 Agent 生成报告
-                if not stage_text or len(stage_text) < 100:
+                # 如果仍然没有内容，且该阶段需要生成报告，则发送追问消息
+                if (not stage_text or len(stage_text) < 100) and not skip_in_report:
                     print(f"\n🔄 内容不足，发送追问消息请求生成报告...")
                     followup_msg = HumanMessage(content=f"""你已经收集了关于"{title}"的信息。
 
@@ -939,7 +963,8 @@ def main():
                             overall_step_count += 1
                             stage_step_count += 1
                             for node_name, state in event.items():
-                                print_step(overall_step_count, node_name, state, stage_step_count, recursion_limit)
+                                step_tokens = print_step(overall_step_count, node_name, state, stage_step_count, GLOBAL_MAX_STEPS)
+                                stage_tokens += step_tokens
                                 # 提取追问后的回复
                                 if state.get("messages"):
                                     for m in reversed(state["messages"]):
@@ -981,15 +1006,9 @@ def main():
             except Exception as e:
                 print(f"\n⚠️  无法写入阶段文件 {section_path}: {e}")
         
-        # 统计本阶段的token使用（从final_state中的所有AIMessage累加）
-        stage_tokens = 0
-        if final_state and final_state.get("messages"):
-            for msg in final_state["messages"]:
-                if isinstance(msg, AIMessage):
-                    metadata = getattr(msg, "response_metadata", {})
-                    usage = metadata.get("token_usage", {})
-                    if usage:
-                        stage_tokens += usage.get("total_tokens", 0)
+        
+        # 统计本阶段的token使用（已在 print_step 中累加）
+        # stage_tokens 已准备好
         
         total_tokens_used += stage_tokens
         if stage_tokens > 0:
