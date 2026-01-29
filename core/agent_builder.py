@@ -80,7 +80,7 @@ def build_agent(model: str = None):
     llm = ChatOpenAI(
         model=model_name, 
         temperature=0,
-        request_timeout=120,  # 120秒超时，防止请求卡住
+        request_timeout=240,  # 240秒超时，防止请求卡住
         max_retries=2  # 失败后重试2次
     )
     
