@@ -31,9 +31,11 @@
 | 14 | 开发历史与里程碑（含图表） |
 | 15 | 执行摘要与报告整合 |
 
-### 2. 报告评估 (`evaluate.py`)
+### 2. 报告评估 (`evaluate.py`) [🚧 实验性功能]
 
-使用 Agent 将自动生成的报告与仓库内人类撰写的文档进行对比评估：
+使用 Agent 将自动生成的报告与仓库内人类撰写的文档进行对比评估。
+
+> **注意**：评估模块目前处于早期开发阶段，评分逻辑和覆盖度检测仍在持续优化中，结果仅供参考。
 
 - **5 维度评分**: 覆盖度、准确性、技术深度、结构、证据引用
 - **亮点分析**: 发现 Agent 比人类文档更详细的地方
@@ -99,7 +101,9 @@ output/
 
 ---
 
-## 📊 评估报告（evaluate.py）
+## 📊 评估报告（evaluate.py）[实验性]
+
+> **功能提示**：本功能旨在辅助验证 Agent 报告的质量，但由于 LLM 的不确定性，评估结果可能存在波动。我们正在改进对比算法以提高准确性。
 
 ### 功能说明
 
@@ -205,13 +209,14 @@ python evaluate.py output/my-os/report.md repos/my-os --model gpt-4o
 ```
 OS-Agent/
 ├── main.py              # 主分析程序
-├── evaluate.py          # 报告评估程序
-├── api_test.py          # API 测试工具
+├── evaluate.py          # 报告评估程序（实验性/WIP）
 ├── requirements.txt     # Python 依赖
 ├── .env                 # 环境变量配置（需自行创建）
 ├── .env.example         # 环境变量配置模板
 ├── core/
 │   └── agent_builder.py # Agent 构建器
+├── docs/                # 文档目录
+│   └── markdown_format_guide.md # Markdown 格式指南
 ├── tools/
 │   ├── file_ops.py      # 文件操作工具（含安全限制）
 │   ├── git_ops.py       # Git 操作与图表生成
@@ -264,7 +269,7 @@ OS-Agent/
 | `read_file` (评估) | 最大 50,000 字符 | 只能访问仓库和 output 目录 |
 | `list_repo_structure` | 默认 4 层深度 | 可通过 `max_depth` 调整 |
 | `analyze_code_architecture` | 最多 20 个文件 | 每文件最多显示 10 个结构体/函数 |
-| `get_dev_history_by_module` | 最多 150 条提交 | 每模块最多显示 20 条 |
+| `get_dev_history_by_module` | 最多 200 条提交 | 每模块最多显示 20 条 |
 
 **截断提示**：所有工具在输出被截断时会明确告知 LLM，例如：
 ```
