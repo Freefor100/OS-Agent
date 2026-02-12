@@ -91,7 +91,7 @@ def create_restricted_tools(repo_path: str, output_path: str):
         
         try:
             items = os.listdir(path)
-            items = [i for i in items if i not in {".git", "__pycache__", "target", "node_modules"}]
+            items = [i for i in items if i not in {".git", "__pycache__", "target", "node_modules", ".venv", "deps"}]
             items.sort()
             result = []
             for item in items[:50]:
@@ -109,7 +109,11 @@ def create_restricted_tools(repo_path: str, output_path: str):
     @tool
     def find_documents(path: str, keywords: str) -> str:
         """
-        在指定目录下搜索包含关键词的文档文件 (.md, .txt, .pdf, .rst)。
+        在指定目录下搜索文档文件。
+        会返回：
+        1. 匹配关键词 (.md, .txt, .rst, .doc) 的文件
+        2. 所有的 PDF 文件 (通常是参赛文档)
+        3. 根目录下的 README 或 Design 文档
         
         Args:
             path: 搜索根目录
@@ -120,35 +124,82 @@ def create_restricted_tools(repo_path: str, output_path: str):
             
         kw_list = keywords.lower().split()
         found = []
-        doc_exts = {".md", ".txt", ".rst", ".pdf", ".doc"}
+        # 普通文档后缀
+        text_exts = {".md", ".txt", ".rst", ".doc", ".docx"}
+        # 全局重要文档 (PDF通常包含完整内容)
+        global_exts = {".pdf"} 
         
         for root, _, files in os.walk(path):
-            if ".git" in root: continue
+            if ".git" in root or "node_modules" in root or "target" in root: continue
             
             for f in files:
                 ext = os.path.splitext(f)[1].lower()
-                if ext not in doc_exts: continue
-                
-                # 检查文件名是否包含关键词
                 f_lower = f.lower()
-                if any(k in f_lower for k in kw_list) or f_lower in ["readme.md", "design.md"]:
-                    rel = os.path.relpath(os.path.join(root, f), path)
-                    found.append(rel)
+                full_path = os.path.join(root, f)
+                rel_path = os.path.relpath(full_path, path)
+                
+                # 1. 总是包含 PDF (极大概率是参赛文档)
+                if ext in global_exts:
+                    found.append(f"[Global/PDF] {rel_path}")
+                    continue
+                    
+                # 2. 总是包含 README / DESIGN
+                if f_lower in ["readme.md", "design.md", "documentation.md", "guide.md"]:
+                    found.append(f"[Global/Doc] {rel_path}")
+                    continue
+                
+                # 3. 关键词匹配其他文本文件
+                if ext in text_exts:
+                    if any(k in f_lower for k in kw_list):
+                        found.append(f"[Match] {rel_path}")
                     
         if not found:
-            return "未找到相关文档。"
-        return "\n".join(found[:20])
+            return "未找到相关文档 (无 PDF, README 或 关键词匹配文件)。"
+        
+        # 去重并排序 (让 Global 排在前面)
+        found = sorted(list(set(found)), key=lambda x: (not x.startswith("[Global"), x))
+        return "\n".join(found[:30])
 
     @tool
     def read_file(file_path: str, max_chars: int = 50000) -> str:
-        """读取文件内容。"""
+        """读取文件内容 (支持 .md, .txt, .pdf 等)。"""
         if not _is_path_allowed(file_path, allowed_roots):
             return f"❌ 错误：不允许访问文件 '{file_path}'。"
+        
         try:
-            with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-                content = f.read()
+            ext = os.path.splitext(file_path)[1].lower()
+            
+            # PDF 处理
+            if ext == ".pdf":
+                try:
+                    import PyPDF2
+                    text_content = []
+                    with open(file_path, "rb") as f:
+                        reader = PyPDF2.PdfReader(f)
+                        # 限制页数以防过大，或读取全部
+                        # 考虑到 Context Window，读取前 50 页或 全部
+                        max_pages = 50 
+                        num_pages = len(reader.pages)
+                        read_limit = min(num_pages, max_pages)
+                        
+                        text_content.append(f"--- PDF Content (Pages 1-{read_limit} of {num_pages}) ---")
+                        for i in range(read_limit):
+                            page_text = reader.pages[i].extract_text()
+                            if page_text:
+                                text_content.append(page_text)
+                                
+                    content = "\n".join(text_content)
+                except ImportError:
+                    return "❌ 错误: 未安装 PyPDF2 库，无法读取 PDF。请告知用户安装。"
+                except Exception as e:
+                    return f"❌ 读取 PDF 失败: {e}"
+            else:
+                # 普通文本处理
+                with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+                    content = f.read()
+
             if len(content) > max_chars:
-                return content[:max_chars] + f"\n\n... [已截断，原文 {len(content)} 字符]"
+                return content[:max_chars] + f"\n\n... [已截断，原文共 {len(content)} 字符]"
             return content
         except Exception as e:
             return f"Error: {e}"
@@ -183,32 +234,45 @@ class SectionEvaluator:
         llm = ChatOpenAI(model=self.model_name, temperature=0)
         agent = create_react_agent(llm, self.tools)
         
-        # 3. 构建 Prompt
+        # 3. 构建 Prompt (以人类文档为基准 - Ground Truth Approach)
         prompt = f"""
-你是一个严格的 OS 技术文档评审专家。现在的任务是评估 Agent 生成的报告中【{section_name}】这一章节的质量。
+你是一个严格的 OS 评分员。你的目标是对比【人类写的原始文档】和【Agent 生成的分析报告】，以人类文档为标准答案，给 Agent 的报告打分。
 
-## 任务目标
-1. 阅读 Agent 生成的章节报告：`{section_file}`
-2. 在仓库 `{self.repo_path}` 中搜索与该章节主题（{kw_str}）相关的人类文档（README, docs/ 等）。
-3. 对比分析：Agent 的报告是否准确？是否遗漏了重要设计？
-4. 注意：你只需要关注本章节的主题，不要管其他模块。
+## 评估目标章节：{section_name}
+（关键词提示：{kw_str}）
+
+## 你的工作流程（必须严格遵守）
+1.  **第一步：确立标准答案（Ground Truth）**
+    - 使用 `find_documents` 和 `read_file` 找到并阅读仓库里的人类核心文档（优先看 PDF、README、Design 文档）。
+    - *切记*：如果存在全篇的 PDF/MD 文档，请务必读取它（通常包含所有章节）。
+    - 从人类文档中提炼出关于【{section_name}】这一模块的所有关键设计点、算法名称、文件结构描述。
+
+2.  **第二步：批改试卷（Verify）**
+    - 读取 Agent 生成的章节报告：`{section_file}`
+    - 检查 Agent 的报告是否准确复述了人类文档中的设计点。
+
+3.  **第三步：打分与对比**
+    - 评分的核心标准是：**Agent 报告与人类文档的接近程度 (Closeness)**。
+    - 如果人类文档提到了某个特性（如 Slab 分配器），但 Agent没写 -> 扣分（覆盖率不足）。
+    - 如果人类文档没提，但 Agent 瞎编了 -> 扣分（准确性不足）。
+    - 如果人类文档很简略，但 Agent 通过代码分析补充了细节 -> 加分（深度）。
 
 ## 评分维度 (0-100)
-- coverage: 是否覆盖了人类文档提到的该模块关键设计？
-- accuracy: 描述是否准确？
-- depth: 是否深入代码细节？
-- citations: 是否引用了代码/文件？
+- **metrics**: 接近度 (Closeness) - 内容与人类文档的重合度。
+- **accuracy**: 准确性 - 是否没有事实错误。
+- **depth**: 深度 - 是否在人类文档基础上挖掘了代码细节。
 
 ## 输出格式
 请输出如下 JSON：
 ```json
 {{
     "score": <0-100 总分>,
-    "dimensions": {{ "coverage": <分>, "accuracy": <分>, "depth": <分>, "citations": <分> }},
-    "highlights": ["<亮点1>", "<亮点2>"],
-    "missing": ["<缺失点1>", "<缺失点2>"],
-    "errors": ["<错误1>"],
-    "summary": "<简短评价>"
+    "dimensions": {{ "metrics": <分>, "accuracy": <分>, "depth": <分> }},
+    "ground_truth_points": ["<人类文档提到的关键点1>", "<人类文档提到的关键点2>"],
+    "highlights": ["<Agent分析对的地方/亮点>"],
+    "missing": ["<人类有但Agent没写的点1>", "<人类有但Agent没写的点2>"],
+    "errors": ["<错误描述>"],
+    "summary": "<评价总结>"
 }}
 ```
 """
