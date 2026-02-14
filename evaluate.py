@@ -392,10 +392,10 @@ def _print_eval_step(
             tool_calls = getattr(msg, "tool_calls", None) or []
 
             if step_num > 0:
-                print(f"\n【步骤 {step_num}/{max_steps}】", end=" ")
+                print(f"\n【Step {step_num}/{max_steps}】", end=" ")
 
             if tool_calls:
-                print("🔧 调用工具:")
+                print("🔧 Tool Calls:")
                 for tc in tool_calls:
                     tool_name = tc.get("name", "unknown") if isinstance(tc, dict) else getattr(tc, "name", "unknown")
                     tool_args = tc.get("args", {}) if isinstance(tc, dict) else getattr(tc, "args", {})
@@ -462,9 +462,9 @@ def _build_section_prompt(
 
 ## 你必须执行的工作流
 1. 用 find_human_docs(repo_path="{repo_path}", keywords="{keywords}") 找到人类文档。
-2. 用 read_human_doc 阅读人类文档（优先 PDF、README、Design），提炼本模块的**所有关键设计点**。
+2. 用 read_human_doc 阅读人类文档（优先 PDF、README、Design），提炼本模块的**所有关键设计点**。若文档提示 [TRUNCATED] 或仅读取了部分页面，请通过调整 start_page 参数分页阅读。若 PDF 较大（>20页），务必分段阅读，确保不遗漏后续章节中的关键设计点。注意人类文档中"已实现"和"计划实现"的区别。
 3. 用 read_human_doc 阅读生成报告：{section_path}
-4. 对生成报告中的**每个重要技术论断**，用 grep_in_repo 或 verify_claim_in_source 在源码中验证；对于**文件数量、技术栈**等统计类论断，使用 analyze_tech_stack 验证。{extra_instructions}
+4. 对生成报告中的**每个重要技术论断**，用 grep_in_repo 或 verify_claim_in_source 在源码中验证；对于**文件数量、技术栈**等统计类论断，使用 analyze_tech_stack 验证。对于每个验证结果，必须标注 "verified": "true"|"false"|"partial"。**禁止出现未经验证的 "verified": "false" 条目**——如果时间不够，优先验证疑似错误的论断。{extra_instructions}
 5. 按以下细则打分，并在最后输出**唯一一条 JSON 消息**（不要其他任何文字）。
 
 ## 打分细则（严格执行，防止虚高）
@@ -480,6 +480,7 @@ def _build_section_prompt(
 - 描述模糊或部分错误：每处扣 8 分
 - 细微不准确（参数顺序、常量值）：每处扣 3 分
 - 无依据捏造（人类+源码均无）：每处扣 12 分
+- 捏造具体数据结构字段/函数签名（代码中完全不存在的命名）：每处扣 18 分
 - 必须列出：errors（含 desc、severity、verified、source_ref）、fabrications
 
 ### depth（0-100）
@@ -503,6 +504,12 @@ def _build_section_prompt(
 
 ### weighted_total
 weighted_total = coverage*0.25 + accuracy*0.35 + depth*0.20 + citations*0.10 + highlights*0.10
+
+## 自检清单（输出 JSON 前必须确认）
+- coverage: missing_points 中的每个点是否确实在生成报告中找不到？
+- accuracy: 每个 error 是否都有 source_ref 引用？verified 字段是否已如实填写？
+- accuracy: 是否检查了生成报告中所有结构体/函数名在源码中的真实存在性？
+- highlights: 加分项是否有具体 evidence？
 
 ## 输出要求
 完成所有工具调用后，你的**最后一条消息**必须且仅包含一个符合以下结构的 JSON 对象（可参考 schema，不要包含其他说明文字）：
@@ -829,6 +836,29 @@ def _aggregate_summary(section_results: List[Dict[str, Any]]) -> Dict[str, Any]:
         for k, v in dim_scores.items()
     }
 
+    # 生成改进建议
+    improvement_suggestions = []
+    # 基于最低分维度
+    if dim_avgs:
+        weakest_dim = min(dim_avgs, key=dim_avgs.get)
+        improvement_suggestions.append(f"最薄弱维度: {weakest_dim} ({dim_avgs[weakest_dim]}分), 建议优先改进")
+    # 基于缺失项频次
+    if all_missing:
+        from collections import Counter
+        missing_sections = Counter(m.get("section") for m in all_missing)
+        top_missing = missing_sections.most_common(3)
+        for sec, cnt in top_missing:
+            improvement_suggestions.append(f"章节 {sec} 有 {cnt} 个缺失项, 需重点补充")
+    # 基于捏造项
+    fab_count = sum(1 for e in all_errors if "捏造" in str(e.get("desc", "")) or "fabricat" in str(e.get("desc", "")).lower())
+    if fab_count > 0:
+        improvement_suggestions.append(f"发现 {fab_count} 处捏造, 建议增强描述模块的源码验证要求")
+
+    # 标记最低分章节
+    section_scores_list = [{"name": r.get("section_name"), "score": r.get("weighted_total")} for r in section_results]
+    valid_scores = [s for s in section_scores_list if isinstance(s.get("score"), (int, float)) and s["score"] > 0]
+    weakest_sections = sorted(valid_scores, key=lambda x: x["score"])[:3] if valid_scores else []
+
     return {
         "overall_score": avg,
         "section_count": n,
@@ -837,7 +867,9 @@ def _aggregate_summary(section_results: List[Dict[str, Any]]) -> Dict[str, Any]:
         "all_missing": all_missing,
         "all_errors": all_errors,
         "all_highlights": all_highlights,
-        "section_scores": [{"name": r.get("section_name"), "score": r.get("weighted_total")} for r in section_results],
+        "section_scores": section_scores_list,
+        "improvement_suggestions": improvement_suggestions,
+        "weakest_sections": weakest_sections,
     }
 
 
@@ -915,15 +947,49 @@ def _generate_report_md(
         lines.append("---")
         lines.append("")
 
+    # 各章节维度评分表格
+    lines.extend(["", "## 各章节维度评分", ""])
+    lines.append("| 章节 | 综合 | coverage | accuracy | depth | citations | highlights |")
+    lines.append("|------|------|----------|----------|-------|-----------|------------|")
+    for r in section_results:
+        name = r.get("section_name", "?")[:20]
+        wt = r.get("weighted_total", 0)
+        cov_s = r.get("coverage", {}).get("score", "-") if isinstance(r.get("coverage"), dict) else r.get("coverage", "-")
+        acc_s = r.get("accuracy", {}).get("score", "-") if isinstance(r.get("accuracy"), dict) else r.get("accuracy", "-")
+        dep_s = r.get("depth", {}).get("score", "-") if isinstance(r.get("depth"), dict) else r.get("depth", "-")
+        cit_s = r.get("citations", {}).get("score", "-") if isinstance(r.get("citations"), dict) else r.get("citations", "-")
+        hl_s = r.get("highlights", {}).get("score", "-") if isinstance(r.get("highlights"), dict) else r.get("highlights", "-")
+        lines.append(f"| {name} | {wt} | {cov_s} | {acc_s} | {dep_s} | {cit_s} | {hl_s} |")
+    lines.append("")
+
     lines.extend([
+        "---",
+        "",
         "## 汇总",
         "",
         f"- **缺失项总数**: {len(summary.get('all_missing', []))}",
         f"- **错误/捏造总数**: {len(summary.get('all_errors', []))}",
         f"- **亮点总数**: {len(summary.get('all_highlights', []))}",
         "",
-        "*本报告由 OS-Agent D 评估模块生成*",
     ])
+
+    # 改进建议
+    suggestions = summary.get("improvement_suggestions", [])
+    if suggestions:
+        lines.extend(["## 改进建议", ""])
+        for i, sug in enumerate(suggestions, 1):
+            lines.append(f"{i}. {sug}")
+        lines.append("")
+
+    # 最低分章节
+    weakest = summary.get("weakest_sections", [])
+    if weakest:
+        lines.extend(["## 最需改进的章节", ""])
+        for ws in weakest:
+            lines.append(f"- **{ws.get('name', '?')}**: {ws.get('score', 0)} 分")
+        lines.append("")
+
+    lines.append("*本报告由 OS-Agent D 评估模块生成*")
     return "\n".join(lines)
 
 
@@ -954,16 +1020,24 @@ def run_evaluation(
     os.makedirs(eval_dir, exist_ok=True)
     log_file = os.path.join(eval_dir, "evaluation.log")
 
-    # 配置日志处理器（同时输出到文件和控制台）
-    logging.basicConfig(
-        level=logging.DEBUG,  # 提升到 DEBUG 级别以获取更详细信息
-        format="%(asctime)s [%(levelname)-8s] %(name)s - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-        handlers=[
-            logging.FileHandler(log_file, encoding="utf-8"),
-            logging.StreamHandler(sys.stdout)  # 同时输出到控制台
-        ]
-    )
+    # 配置日志处理器（文件保存详细 DEBUG，控制台只显示核心 INFO）
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)
+
+    # 1. 文件处理器 (Detailed DEBUG)
+    file_handler = logging.FileHandler(log_file, encoding="utf-8")
+    file_handler.setLevel(logging.DEBUG)
+    file_handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)-8s] %(name)s - %(message)s"))
+
+    # 2. 控制台处理器 (Concise INFO)
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(logging.INFO)
+    console_handler.setFormatter(logging.Formatter("%(message)s")) # 控制台只输出消息内容，干净利落
+
+    # 清理已有 handlers 并添加新 handler
+    logger.handlers.clear()
+    logger.addHandler(file_handler)
+    logger.addHandler(console_handler)
 
     logging.info("=" * 60)
     logging.info(f"评估任务启动: {repo_name}")
@@ -1030,9 +1104,7 @@ def run_evaluation(
             skip_count += 1
             continue
 
-        print(f"\n{'=' * 60}")
-        print(f"📊 进度: [{idx}/{len(sections)}] 评估中...")
-        print(f"{'=' * 60}")
+        logging.info(f"\n📊 进度: [{idx}/{len(sections)}] 评估中: {sec_name}")
 
         try:
             # 调用增强版评估函数
@@ -1061,11 +1133,9 @@ def run_evaluation(
             try:
                 with open(out_path, "w", encoding="utf-8") as f:
                     json.dump(result, f, ensure_ascii=False, indent=2)
-                print(f"   📄 已保存: {out_path}")
-                logging.debug(f"保存章节结果: {out_path}")
+                logging.info(f"   📄 已保存结果: {out_name}")
             except Exception as e:
-                logging.error(f"保存章节结果失败 {out_path}: {e}")
-                print(f"   ⚠️  保存失败: {e}")
+                logging.error(f"   ⚠️  保存报告章节失败 {out_path}: {e}")
 
         except KeyboardInterrupt:
             logging.warning("用户中断评估")

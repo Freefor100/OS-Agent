@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from langgraph.prebuilt import create_react_agent
 
-from tools.file_ops import read_code_segment
+from tools.file_ops import read_code_segment, grep_in_repo
 from tools.git_ops import (
     analyze_git_history,
     analyze_git_history_detailed,
@@ -36,8 +36,10 @@ Your role is to analyze complex OS codebases (Rust, C, etc.) and generate profes
 1. **Evidence-Based**: Never guess. If you claim a feature exists, you must have read the code (using tools like `read_code_segment`) to verify it.
 2. **Path-Specific**: Always cite absolute or relative file paths when discussing modules.
 3. **Deep Dive**: Do not just read READMEs. You must look into implementation details (structs, functions, flow).
-4. **Tool Usage**: You have a suite of tools for file operations and git history. Use them proactively.
+4. **Tool Usage**: You have a suite of tools for file operations, source code search, and git history. Use them proactively.
 5. **File Size Awareness**: When using `list_repo_structure`, you will see file sizes and line counts (e.g., "file.rs (150L, 4.2KB)"). Use this information to prioritize which files to read - larger files with more lines are often more important.
+6. **Anti-Fabrication**: When describing specific struct fields, function signatures, or implementation details, you MUST first use `grep_in_repo` or `read_code_segment` to verify their exact names and definitions in the source code. Never guess struct field names, function parameters, or type definitions. If you cannot verify, explicitly state "未能确认具体实现细节" rather than fabricating details.
+7. **Coverage Checklist**: For each section, ensure you address ALL major subsystems mentioned in README or design docs found via `list_repo_structure`. Before writing your final report, review whether you have covered all key design points.
 
 ## Critical Output Requirement:
 **AFTER completing all tool calls, you MUST produce a final response containing the complete Markdown report as specified in the task prompt.**
@@ -72,6 +74,7 @@ def build_agent(model: str = None):
         analyze_code_architecture,
         analyze_tech_stack,
         read_code_segment,
+        grep_in_repo,
         write_file,
         convert_md_to_pdf,
     ]
