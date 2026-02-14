@@ -1,0 +1,56 @@
+{
+  "section_name": "08_同步互斥与进程间通信",
+  "coverage": {
+    "score": 80,
+    "human_doc_point_count": 9,
+    "covered_points": [
+      "自旋锁实现（kspin库）",
+      "睡眠互斥锁（RawMutex）",
+      "等待队列（WaitQueue）",
+      "管道（Pipe）实现",
+      "信号（Signal）处理",
+      "共享内存（Shared Memory）",
+      "Futex实现",
+      "关中断实现",
+      "kernel_guard保护"
+    ],
+    "missing_points": [],
+    "deduction_reasons": []
+  },
+  "accuracy": {
+    "score": 92,
+    "errors": [
+      {
+        "desc": "x86_64关中断实现描述不完整，缺少#[cfg(not(target_os = \"none\"))]分支",
+        "severity": "medium",
+        "verified": "true",
+        "source_ref": "arceos/modules/axhal/src/arch/x86_64/mod.rs"
+      }
+    ],
+    "fabrications": []
+  },
+  "depth": {
+    "score": 70,
+    "reason": "有代码引用和机制分析，但缺少完整的代码追踪流程"
+  },
+  "citations": {
+    "score": 40,
+    "file_refs": 8,
+    "code_refs": 5
+  },
+  "highlights": {
+    "score": 85,
+    "items": [
+      {
+        "desc": "补充了互斥锁等待机制、管道阻塞语义等代码级分析",
+        "evidence": "RawMutex的compare_exchange_weak实现、Pipe的非阻塞语义处理"
+      },
+      {
+        "desc": "提供了开发历史图表分析",
+        "evidence": "charts/modules_activity.png"
+      }
+    ]
+  },
+  "weighted_total": 78.7,
+  "summary": "覆盖全面，准确度较高，但引用缺乏行号，x86_64关中断实现描述不完整。"
+}

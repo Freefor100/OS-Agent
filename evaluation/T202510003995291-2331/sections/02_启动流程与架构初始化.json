@@ -1,0 +1,91 @@
+{
+  "section_name": "02_启动流程与架构初始化",
+  "coverage": {
+    "score": 70,
+    "human_doc_point_count": 12,
+    "covered_points": [
+      "基于ArceOS的模块化设计",
+      "支持多架构（RISC-V、x86_64、AArch64、LoongArch64）",
+      "链接脚本linker.lds.S定义内存布局",
+      "Multiboot协议支持（x86_64）",
+      "SMP多核启动支持",
+      "设备树（DTB）传递",
+      "渐进式初始化流程",
+      "启动页表初始化"
+    ],
+    "missing_points": [
+      "GRUB引导的具体实现",
+      "Raspberry Pi 4等具体平台的启动差异",
+      "内存扩展配置机制",
+      "条件编译和特性选择的具体实现"
+    ],
+    "deduction_reasons": [
+      {
+        "point": "GRUB引导的具体实现",
+        "severity": "major",
+        "deduct": 5
+      },
+      {
+        "point": "具体平台的启动差异",
+        "severity": "major",
+        "deduct": 5
+      },
+      {
+        "point": "内存扩展配置机制",
+        "severity": "minor",
+        "deduct": 2
+      },
+      {
+        "point": "条件编译和特性选择",
+        "severity": "minor",
+        "deduct": 2
+      }
+    ]
+  },
+  "accuracy": {
+    "score": 88,
+    "errors": [
+      {
+        "desc": "生成报告提到'LoongArch64启动代码'但未提供具体文件路径引用",
+        "severity": "minor",
+        "verified": "true",
+        "source_ref": "arceos/modules/axhal/src/platform/loongarch64_qemu_virt/boot.rs"
+      },
+      {
+        "desc": "生成报告中的RISC-V汇编代码引用缺少完整上下文",
+        "severity": "minor",
+        "verified": "true",
+        "source_ref": "arceos/modules/axhal/src/platform/riscv64_qemu_virt/boot.rs"
+      }
+    ],
+    "fabrications": []
+  },
+  "depth": {
+    "score": 85,
+    "reason": "有详细的代码级分析，包含具体函数和汇编代码片段，但对完整调用链的追踪不够深入"
+  },
+  "citations": {
+    "score": 75,
+    "file_refs": 8,
+    "code_refs": 6
+  },
+  "highlights": {
+    "score": 75,
+    "items": [
+      {
+        "desc": "详细分析了四种架构的启动入口差异",
+        "evidence": "对比了RISC-V、x86_64、AArch64、LoongArch64的_start实现"
+      },
+      {
+        "desc": "补充了rust_main函数的完整初始化流程",
+        "evidence": "从ax_println!到axhal::platform_init的完整调用链分析"
+      },
+      {
+        "desc": "分析了启动页表的具体映射关系",
+        "evidence": "BOOT_PT_SV39数组的页表项设置分析"
+      }
+    ]
+  },
+  "weighted_total": 78.4,
+  "summary": "报告覆盖了启动流程的主要方面，对多架构支持分析详细，代码引用准确。但缺少GRUB引导、具体平台差异等细节，深度分析可进一步加强。"
+}
