@@ -62,6 +62,24 @@
   - 错误类型分布统计
   - 评估耗时记录
 
+#### 🆕 **v2.1 评估精度提升**（2025-02-14）
+
+- **🔍 描述模块增强**
+  - 新增 `grep_in_repo` 源码搜索工具，减少捏造
+  - 系统 prompt 增加反捏造要求和覆盖度检查
+  - 低分章节（安全、网络、测试、文件系统）prompt 增加针对性搜索指引
+
+- **📊 评估 prompt 强化**
+  - 强制验证：所有声明必须标注验证状态
+  - 捏造加重扣分（12→18 分/处）
+  - PDF 大文档分页阅读指令
+  - 输出前自检清单
+
+- **📄 报告增强**
+  - 各章节维度评分汇总表格
+  - 自动生成改进建议
+  - 标记最需改进的章节
+
 #### 核心特性
 
 - **5 维度评分**: 覆盖度、准确性、技术深度、引用规范、亮点发现
@@ -174,13 +192,13 @@ python evaluate.py --model gpt-4o
 
 ### 评估维度
 
-| 维度 | 说明 |
-|------|------|
-| **coverage** | 内容覆盖度 - Agent 覆盖了人类文档多少关键技术点 |
-| **accuracy** | 准确性 - Agent 描述与人类文档/代码是否一致 |
-| **depth** | 技术深度 - 是否深入到代码实现层面 |
-| **structure** | 结构完整性 - 报告结构是否清晰、完整 |
-| **citations** | 证据引用 - 是否引用具体文件路径、代码片段 |
+| 维度 | 权重 | 说明 |
+|------|------|------|
+| **coverage** | 25% | 内容覆盖度 - Agent 覆盖了人类文档多少关键技术点 |
+| **accuracy** | 35% | 准确性 - Agent 描述与人类文档/代码是否一致，捏造严重扣分 |
+| **depth** | 20% | 技术深度 - 是否深入到代码实现层面 |
+| **citations** | 10% | 证据引用 - 是否引用具体文件路径、代码片段 |
+| **highlights** | 10% | 亮点发现 - Agent 超越人类文档的源码级洞察 |
 
 ### 输出文件（增强版）
 
@@ -267,26 +285,32 @@ evaluation/
 ```
 OS-Agent/
 ├── os_agent_d.py          # OS描述/分析程序 (OS-Agent-D)
-├── evaluate.py          # 报告评估程序（实验性/WIP）
-├── requirements.txt     # Python 依赖
-├── .env                 # 环境变量配置（需自行创建）
-├── .env.example         # 环境变量配置模板
+├── evaluate.py            # 报告评估程序 (v2.1)
+├── requirements.txt       # Python 依赖
+├── .env                   # 环境变量配置（需自行创建）
+├── .env.example           # 环境变量配置模板
 ├── core/
-│   └── agent_builder.py # Agent 构建器
-├── docs/                # 文档目录
+│   └── agent_builder.py   # Agent 构建器（含 grep_in_repo 工具）
+├── docs/                  # 文档目录
 │   └── markdown_format_guide.md # Markdown 格式指南
 ├── tools/
-│   ├── file_ops.py      # 文件操作工具（含安全限制）
-│   ├── git_ops.py       # Git 操作与图表生成
-│   └── describe_ops.py  # 仓库分析工具
-├── repos/               # 克隆的 OS 仓库
-└── output/              # 输出目录（按项目名划分）
+│   ├── file_ops.py        # 文件操作工具（read_code_segment, grep_in_repo）
+│   ├── git_ops.py         # Git 操作与图表生成
+│   ├── describe_ops.py    # 仓库分析工具（描述模块专用）
+│   └── eval_ops.py        # 评估专用工具（人类文档搜索、声明验证）
+├── repos/                 # 克隆的 OS 仓库
+├── output/                # 描述模块输出（按项目名划分）
+│   └── <os-name>/
+│       ├── sections/      # 分段报告
+│       ├── charts/        # 图表
+│       └── report.md      # 完整报告
+└── evaluation/            # 评估模块输出（按项目名划分）
     └── <os-name>/
-        ├── sections/    # 分段报告
-        ├── charts/      # 图表
-        ├── report.md    # 完整报告
-        ├── evaluation.md    # 评估报告
-        └── evaluation.json  # 评估数据
+        ├── evaluation.log          # 详细日志
+        ├── error_report.json       # 错误报告
+        ├── summary.json            # 汇总结果
+        ├── evaluation_report.md    # Markdown 报告（含维度表格与改进建议）
+        └── sections/               # 各章节评估 JSON
 ```
 
 ---
@@ -323,7 +347,8 @@ OS-Agent/
 
 | 工具 | 限制 | 说明 |
 |------|------|------|
-| `read_code_segment` | 最大 100,000 字符 | 只能访问 `repos/` 和 `output/` 目录 |
+| `read_code_segment` | 最大 100,000 字符 | 只能访问 `repos/`、`output/`、`evaluation/` 目录 |
+| `grep_in_repo` | 最多 20 条匹配 | 在源码中搜索关键词/正则，验证技术声明 |
 | `read_file` (评估) | 最大 50,000 字符 | 只能访问仓库和 output 目录 |
 | `list_repo_structure` | 默认 4 层深度 | 可通过 `max_depth` 调整 |
 | `analyze_code_architecture` | 最多 20 个文件 | 每文件最多显示 10 个结构体/函数 |
