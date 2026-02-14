@@ -94,16 +94,18 @@ def find_human_docs(repo_path: str, keywords: str = "") -> str:
 
 
 @tool
-def read_human_doc(file_path: str, max_chars: int = 80000) -> str:
+def read_human_doc(file_path: str, max_chars: int = 80000, start_page: int = 0) -> str:
     """
     读取人类文档内容（支持 .md, .txt, .pdf 等）。
+    对于 PDF，使用 LLM 优化的提取引擎，保留表格和标题结构。
 
     Args:
         file_path: 文档文件路径
         max_chars: 最大读取字符数，默认 80000
+        start_page: PDF 起始读取页码（0-indexed），默认 0
 
     Returns:
-        文档文本内容
+        包含元数据的文档文本内容
     """
     if not _is_path_allowed(file_path):
         return f"❌ 错误：不允许访问文件 '{file_path}'。"
@@ -112,32 +114,62 @@ def read_human_doc(file_path: str, max_chars: int = 80000) -> str:
 
     try:
         ext = os.path.splitext(file_path)[1].lower()
+        content = ""
+        meta_info = f"--- Document: {os.path.basename(file_path)} ---\n"
 
         if ext == ".pdf":
+            # 尝试使用 pymupdf4llm (2025 SOTA for LLM RAG)
             try:
-                import PyPDF2
-                text_parts = []
-                with open(file_path, "rb") as f:
-                    reader = PyPDF2.PdfReader(f)
-                    num_pages = len(reader.pages)
-                    max_pages = min(num_pages, 80)
-                    text_parts.append(f"--- PDF ({max_pages}/{num_pages} pages) ---")
-                    for i in range(max_pages):
-                        page_text = reader.pages[i].extract_text()
-                        if page_text:
-                            text_parts.append(page_text)
-                content = "\n".join(text_parts)
+                import pymupdf4llm
+                import fitz  # PyMuPDF
+                
+                doc = fitz.open(file_path)
+                total_pages = len(doc)
+                # 每次读取 20 页以保证质量
+                end_page = min(start_page + 20, total_pages)
+                
+                md_text = pymupdf4llm.to_markdown(file_path, pages=list(range(start_page, end_page)))
+                
+                meta_info += f"Type: PDF (Engine: PyMuPDF4LLM)\n"
+                meta_info += f"Pages: {start_page + 1} to {end_page} of {total_pages}\n"
+                if end_page < total_pages:
+                    meta_info += f"Note: Only partial pages read. Use start_page={end_page} to read more.\n"
+                
+                content = md_text
+                doc.close()
             except ImportError:
-                return "❌ 未安装 PyPDF2，无法读取 PDF。"
-            except Exception as e:
-                return f"❌ PDF 读取失败: {e}"
+                # 退回到 PyPDF2
+                try:
+                    import PyPDF2
+                    text_parts = []
+                    with open(file_path, "rb") as f:
+                        reader = PyPDF2.PdfReader(f)
+                        num_pages = len(reader.pages)
+                        max_pages = min(num_pages - start_page, 40)
+                        end_p = start_page + max_pages
+                        
+                        meta_info += f"Type: PDF (Engine: PyPDF2 - Legacy)\n"
+                        meta_info += f"Pages: {start_page + 1} to {end_p} of {num_pages}\n"
+                        
+                        for i in range(start_page, end_p):
+                            page_text = reader.pages[i].extract_text()
+                            if page_text:
+                                text_parts.append(page_text)
+                    content = "\n".join(text_parts)
+                except ImportError:
+                    return "❌ 未安装解析库 (pymupdf4llm/PyPDF2)，无法读取 PDF。"
         else:
             with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
                 content = f.read()
+                meta_info += f"Type: Text/Markdown\n"
 
-        if len(content) > max_chars:
-            return content[:max_chars] + f"\n\n... [已截断，原文共 {len(content)} 字符]"
-        return content
+        # 截断处理与感知
+        full_output = meta_info + "--------------------------------------\n\n" + content
+        if len(full_output) > max_chars:
+            truncated_msg = f"\n\n[!!! WARNING: DOCUMENT TRUNCATED AT {max_chars} CHARS. TOTAL SIZE: {len(full_output)} !!!]\n"
+            return full_output[:max_chars - len(truncated_msg)] + truncated_msg
+        
+        return full_output
 
     except Exception as e:
         return f"❌ 读取失败: {e}"
