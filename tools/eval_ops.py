@@ -321,3 +321,40 @@ def list_section_files(output_dir: str) -> str:
         result.append(f"  {f} ({size_kb:.1f} KB)")
 
     return f"找到 {len(files)} 个章节:\n" + "\n".join(result)
+
+
+@tool
+def read_generated_section(file_path: str, max_chars: int = 100000) -> str:
+    """
+    读取 Agent 生成的章节报告（.md 文件），用于与人类文档对比评估。
+
+    此工具专门用于读取 output/ 目录下的生成报告，与 read_human_doc 分离职责，
+    帮助你清晰区分「人类文档」和「Agent 生成报告」。
+
+    Args:
+        file_path: 生成报告的文件路径（如 output/T.../sections/04_进程线程与调度机制.md）
+        max_chars: 最大读取字符数，默认 100000
+
+    Returns:
+        报告内容文本
+    """
+    if not _is_path_allowed(file_path):
+        return f"❌ 错误：不允许访问路径 '{file_path}'。"
+    if not os.path.isfile(file_path):
+        return f"❌ 错误：文件不存在 '{file_path}'。"
+    if not file_path.endswith(".md"):
+        return f"❌ 错误：此工具仅支持 .md 文件，收到 '{file_path}'。"
+
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            content = f.read(max_chars)
+        
+        total_chars = os.path.getsize(file_path)
+        header = f"📄 生成报告: {os.path.basename(file_path)} ({total_chars} 字符)\n"
+        
+        if total_chars > max_chars:
+            header += f"⚠️ 文件较大，仅显示前 {max_chars} 字符\n"
+        
+        return header + "---\n" + content
+    except Exception as e:
+        return f"❌ 读取失败: {e}"
