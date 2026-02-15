@@ -1,4 +1,4 @@
-# evaluate.py
+# os_agent_d_evaluate.py
 """
 OS-Agent D 评估模块（增强版：重试机制 + 错误追溯 + 鲁棒性）
 
@@ -721,7 +721,7 @@ def evaluate_section(
 
     if not json_text:
         logging.warning(f"[{section_name}] 未找到 JSON 响应")
-        # 尝试追问机制（类似 os_agent_d.py）
+        # 尝试追问机制（类似 os_agent_d_describe.py）
         json_text = _try_followup_for_json(agent, messages, section_name, RECURSION_LIMIT)
 
     result = _parse_section_json(json_text)

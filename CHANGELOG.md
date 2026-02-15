@@ -4,7 +4,7 @@
 
 ### ✨ 新增功能
 
-#### 评估程序增强版 (evaluate.py v2.0)
+#### 评估程序增强版 (os_agent_d_evaluate.py v2.0)
 
 **智能重试机制**
 - 实现指数退避策略（2s → 4s → 8s，最大 60s）
@@ -84,10 +84,10 @@
 
 ### ✨ 初始版本
 
-- OS 仓库自动分析功能 (os_agent_d.py)
+- OS 仓库自动分析功能 (os_agent_d_describe.py)
 - 16 阶段技术分析
 - Git 历史分析和图表生成
-- 基础评估功能 (evaluate.py)
+- 基础评估功能 (os_agent_d_evaluate.py)
 - 5 维度评分体系
 - Markdown 报告生成
 

@@ -8,7 +8,7 @@
 
 ## 📋 功能特性
 
-### 1. 自动分析 (`os_agent_d.py`)
+### 1. 自动分析 (`os_agent_d_describe.py`)
 
 对 OS 仓库进行 **16 阶段**的深度技术分析：
 
@@ -128,7 +128,7 @@ REPO_URL=https://github.com/example/os-project.git
 
 ```bash
 # 直接运行（使用 .env 中的配置）
-python os_agent_d.py
+python os_agent_d_describe.py
 ```
 
 输出目录结构：
@@ -148,7 +148,7 @@ output/
 
 ---
 
-## 📊 评估报告（evaluate.py）✨ **增强版 v2.0**
+## 📊 评估报告（os_agent_d_evaluate.py）✨ **增强版 v2.0**
 
 > **v2.0 更新**（2025-02-14）：新增智能重试、完整错误追溯、鲁棒性大幅提升！评估过程更稳定，失败可追溯。
 
@@ -169,16 +169,16 @@ output/
 
 ```bash
 # 基本用法（使用 .env 中的 REPO_URL）
-python evaluate.py
+python os_agent_d_evaluate.py
 
 # 指定仓库 URL
-python evaluate.py --repo-url https://gitlab.educg.net/xxx/os-project.git
+python os_agent_d_evaluate.py --repo-url https://gitlab.educg.net/xxx/os-project.git
 
 # 指定仓库路径和输出目录
-python evaluate.py --repo-path repos/my-os --output-dir output/my-os
+python os_agent_d_evaluate.py --repo-path repos/my-os --output-dir output/my-os
 
 # 使用不同的 LLM 模型
-python evaluate.py --model gpt-4o
+python os_agent_d_evaluate.py --model gpt-4o
 ```
 
 ### 命令行参数
@@ -284,8 +284,8 @@ evaluation/
 
 ```
 OS-Agent/
-├── os_agent_d.py          # OS描述/分析程序 (OS-Agent-D)
-├── evaluate.py            # 报告评估程序 (v2.1)
+├── os_agent_d_describe.py          # OS描述/分析程序 (OS-Agent-D)
+├── os_agent_d_evaluate.py            # 报告评估程序 (v2.1)
 ├── requirements.txt       # Python 依赖
 ├── .env                   # 环境变量配置（需自行创建）
 ├── .env.example           # 环境变量配置模板
@@ -326,7 +326,7 @@ OS-Agent/
 
 ### 自定义分析阶段
 
-可以在 `os_agent_d.py` 的 `STAGES` 列表中添加或修改分析阶段。每个阶段包含：
+可以在 `os_agent_d_describe.py` 的 `STAGES` 列表中添加或修改分析阶段。每个阶段包含：
 - `id`: 阶段 ID
 - `title`: 阶段标题
 - `prompt`: 分析提示词
@@ -369,14 +369,14 @@ OS-Agent/
 
 ### Q: 如何评估已有的报告？
 
-使用 `evaluate.py` 直接评估：
+使用 `os_agent_d_evaluate.py` 直接评估：
 
 ```bash
 # 使用 .env 中的 REPO_URL
-python evaluate.py
+python os_agent_d_evaluate.py
 
 # 或指定仓库 URL
-python evaluate.py --repo-url https://gitlab.educg.net/xxx/os-project.git
+python os_agent_d_evaluate.py --repo-url https://gitlab.educg.net/xxx/os-project.git
 ```
 
 ### Q: 评估失败怎么办？
