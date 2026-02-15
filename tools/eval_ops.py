@@ -1,5 +1,5 @@
 """
-评估专用工具 — 供评估模块 (evaluate.py) 使用
+评估专用工具 — 供评估模块 (os_agent_d_evaluate.py) 使用
 
 复用 file_ops 中的 read_code_segment / grep_in_repo，
 新增面向评估场景的文档搜索和源码验证工具。

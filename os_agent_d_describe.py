@@ -1,4 +1,4 @@
-# os_agent_d.py
+# os_agent_d_describe.py
 import os
 import re
 import sys
@@ -723,7 +723,7 @@ def _format_tool_result_summary(tool_name: str, content: str) -> str:
         return f"返回 {content_len} 字符 ({line_count} 行)"
 
 
-def print_step(step_num: int, node_name: str, state: dict, stage_step_num: int = 0, max_steps: int = 500) -> int:
+def print_step(step_num: int, node_name: str, state: dict, stage_step_num: int = 0, max_steps: int = 1000, stage_limit: int = 500) -> int:
     """打印每一步的执行信息（简洁的 agent 风格）
     
     Args:
@@ -731,7 +731,8 @@ def print_step(step_num: int, node_name: str, state: dict, stage_step_num: int =
         node_name: 节点名称
         state: 状态字典
         stage_step_num: 阶段内步骤号
-        max_steps: 全局最大步数限制
+        max_steps: 全局最大步数估计（仅显示用）
+        stage_limit: 阶段递归步数限制
         
     Returns:
         int: 本次步骤消耗的 token 数量
@@ -753,7 +754,7 @@ def print_step(step_num: int, node_name: str, state: dict, stage_step_num: int =
             tool_calls = getattr(msg, "tool_calls", None) or []
             
             if step_num > 0:
-                print(f"\n【Step {step_num}/{max_steps}】(Stage: {stage_step_num})", end=" ")
+                print(f"\n【Step {step_num}/{max_steps}】(Stage: {stage_step_num}/{stage_limit})", end=" ")
 
             if tool_calls:
                 print("🔧 Tool Calls:")
@@ -832,7 +833,9 @@ def main():
     # 计算有效章节数（用于文件命名）
     chapter_counter = 0  # 实际章节计数器
     
-    GLOBAL_MAX_STEPS = 800  # 全局最大步数限制（用于显示）
+    GLOBAL_ESTIMATED_STEPS = 1000  # 全局估计总步数（用于显示进度条分母）
+    
+
 
     for idx, stage in enumerate(STAGES, 1):
         stage_id = stage["id"]
@@ -955,7 +958,7 @@ def main():
                 overall_step_count += 1
                 stage_step_count += 1
                 for node_name, state in event.items():
-                    step_tokens = print_step(overall_step_count, node_name, state, stage_step_count, GLOBAL_MAX_STEPS)
+                    step_tokens = print_step(overall_step_count, node_name, state, stage_step_count, GLOBAL_ESTIMATED_STEPS, recursion_limit)
                     stage_tokens += step_tokens
                     final_state = state
         except KeyboardInterrupt:
@@ -1025,7 +1028,7 @@ def main():
                             overall_step_count += 1
                             stage_step_count += 1
                             for node_name, state in event.items():
-                                step_tokens = print_step(overall_step_count, node_name, state, stage_step_count, GLOBAL_MAX_STEPS)
+                                step_tokens = print_step(overall_step_count, node_name, state, stage_step_count, GLOBAL_ESTIMATED_STEPS, recursion_limit)
                                 stage_tokens += step_tokens
                                 # 提取追问后的回复
                                 if state.get("messages"):
@@ -1059,6 +1062,7 @@ def main():
             print(f"\n⏭️  阶段 {idx} 标记为 skip_in_report，不写入报告")
         else:
             try:
+                os.makedirs(os.path.dirname(section_path), exist_ok=True)
                 with open(section_path, "w", encoding="utf-8") as f:
                     # 不添加一级标题，由拼接时统一添加
                     # LLM输出应从二级标题开始
