@@ -1,31 +1,52 @@
 # OS-Agent D 依赖包
 # Python >= 3.10 recommended
+# 最后更新: 2025-02-14 (评估程序增强版 v2.0)
 
 # ===== 核心框架 =====
+# LangChain - LLM 应用框架
 langchain>=0.1.0
 langchain-core>=0.1.0
 langchain-openai>=0.1.0
+
+# LangGraph - Agent 编排框架（支持工具调用、重试机制）
 langgraph>=0.0.40
 
 # ===== LLM API =====
+# OpenAI API（支持 OpenRouter、DeepSeek 等兼容服务）
 openai>=1.0.0
 
 # ===== Git 操作 =====
+# Git 仓库操作与历史分析
 gitpython>=3.1.0
 
 # ===== 环境配置 =====
+# 环境变量管理
 python-dotenv>=1.0.0
 
-# ===== 数据处理 =====
-
-
 # ===== 可视化 =====
+# 图表生成（开发历史图表）
 matplotlib>=3.7.0
 
 # ===== 文档处理 =====
+# Markdown 处理
 markdown>=3.4.0
+
+# PDF 读取（评估程序读取人类文档）
+# PyPDF2 作为备选兼容
 PyPDF2>=3.0.0
-# weasyprint>=60.0  # 可选：PDF 生成（需要系统级依赖）
+# pymupdf4llm (2025 SOTA) 及其依赖
+pymupdf4llm>=0.0.17
+pymupdf>=1.24.0
+
+# 可选：PDF 生成（需要系统级依赖 GTK+ 等）
+# weasyprint>=60.0
+
+# ===== 评估增强功能（v2.0 新增）=====
+# 以下功能使用 Python 标准库实现，无需额外依赖：
+# - 智能重试机制（time, enum）
+# - 错误追溯（traceback, logging, json）
+# - 输入验证（os, sys）
+# - 超时控制（集成在 openai 包中）
 
 # ===== 开发工具（可选）=====
 # ipython>=8.0.0

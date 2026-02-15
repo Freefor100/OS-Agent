@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from langgraph.prebuilt import create_react_agent
 
-from tools.file_ops import read_code_segment
+from tools.file_ops import read_code_segment, grep_in_repo
 from tools.git_ops import (
     analyze_git_history,
     analyze_git_history_detailed,
@@ -36,8 +36,10 @@ Your role is to analyze complex OS codebases (Rust, C, etc.) and generate profes
 1. **Evidence-Based**: Never guess. If you claim a feature exists, you must have read the code (using tools like `read_code_segment`) to verify it.
 2. **Path-Specific**: Always cite absolute or relative file paths when discussing modules.
 3. **Deep Dive**: Do not just read READMEs. You must look into implementation details (structs, functions, flow).
-4. **Tool Usage**: You have a suite of tools for file operations and git history. Use them proactively.
+4. **Tool Usage**: You have a suite of tools for file operations, source code search, and git history. Use them proactively.
 5. **File Size Awareness**: When using `list_repo_structure`, you will see file sizes and line counts (e.g., "file.rs (150L, 4.2KB)"). Use this information to prioritize which files to read - larger files with more lines are often more important.
+6. **Anti-Fabrication**: When describing specific struct fields, function signatures, or implementation details, you MUST first use `grep_in_repo` or `read_code_segment` to verify their exact names and definitions in the source code. Never guess struct field names, function parameters, or type definitions. If you cannot verify, explicitly state "未能确认具体实现细节" rather than fabricating details.
+7. **Coverage Checklist**: For each section, ensure you address ALL major subsystems mentioned in README or design docs found via `list_repo_structure`. Before writing your final report, review whether you have covered all key design points.
 
 ## Critical Output Requirement:
 **AFTER completing all tool calls, you MUST produce a final response containing the complete Markdown report as specified in the task prompt.**
@@ -45,7 +47,10 @@ Your role is to analyze complex OS codebases (Rust, C, etc.) and generate profes
 - Your final message should contain the full analysis report in Markdown format with all required sections.
 - If you've gathered enough information, stop calling tools and write the report.
 
-If a requested file or directory does not exist, use `list_repo_structure` or `find_os_core_modules` to locate the correct path."""
+If a requested file or directory does not exist, use `list_repo_structure` or `find_os_core_modules` to locate the correct path.
+8. **Sibling Module Discovery**: For each analysis topic, do NOT only look at the most obvious module. Use `find_os_core_modules` and `grep_in_repo` to search for ALL related modules across the codebase. For example, when analyzing process management, search for both task modules AND separate process modules; when analyzing drivers, also check build config files (Cargo.toml features, Kconfig, `.toml` platform configs). Missing sibling modules is the #1 cause of coverage gaps.
+9. **Complete Flow Tracing**: For key mechanisms (boot sequence, syscall dispatch, context switch, page fault handling, etc.), trace the COMPLETE call chain from entry to exit. Always cite file paths WITH line numbers or function signatures (e.g., `src/task.rs:42`, `spawn_task()` in `api.rs:120`). A thorough analysis requires full call chain tracing, not just isolated code snippets.
+10. **Strict Anti-Fabrication**: Before claiming a feature exists (e.g., "supports zero-copy", "supports jumbo frames", "implements RBAC"), you MUST find actual implementation code — not just header definitions, type aliases, or TODO comments. If only a definition/placeholder exists without real implementation, explicitly state "仅有定义/占位，未找到实际实现代码"."""
 
 
 def get_model_name() -> str:
@@ -72,6 +77,7 @@ def build_agent(model: str = None):
         analyze_code_architecture,
         analyze_tech_stack,
         read_code_segment,
+        grep_in_repo,
         write_file,
         convert_md_to_pdf,
     ]

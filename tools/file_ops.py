@@ -3,9 +3,10 @@
 """
 from langchain.tools import tool
 import os
+import re
 
 # 允许访问的根目录（相对于工作目录）
-ALLOWED_ROOTS = ["./repos", "./output", "repos", "output"]
+ALLOWED_ROOTS = ["./repos", "./output", "./evaluation", "repos", "output", "evaluation"]
 
 # 最大读取字符数
 MAX_FILE_CHARS = 100000
@@ -28,7 +29,7 @@ def read_code_segment(file_path: str, start_line: int = None, end_line: int = No
     """
     读取代码文件的指定片段。
     
-    安全限制：只能访问 repos/ 和 output/ 目录下的文件。
+    安全限制：只能访问 repos/、output/、evaluation/ 目录下的文件。
     
     Args:
         file_path: 文件路径（相对于工作目录或绝对路径）
@@ -94,4 +95,116 @@ def read_code_segment(file_path: str, start_line: int = None, end_line: int = No
         
     except Exception as e:
         return f"Error reading file: {str(e)}"
+
+
+@tool
+def grep_in_repo(repo_path: str, pattern: str, max_results: int = 20, file_extensions: str = None) -> str:
+    """
+    在仓库源代码中搜索关键词或正则模式。
+    用于验证技术断言：如函数名、结构体名、算法名是否真实存在于源代码中。
+
+    安全限制：只能搜索 repos/ 目录下的文件。
+
+    Args:
+        repo_path: 仓库本地路径（如 repos/my-os）
+        pattern: 搜索模式（支持正则表达式，如 "struct PageTable" 或 "buddy|slab"）
+        max_results: 最多返回的匹配数，默认 20
+        file_extensions: 可选，用逗号分隔的文件扩展名过滤（如 "rs,c,h,S"），不含点号
+
+    Returns:
+        匹配结果列表，每条含：文件路径、行号、匹配行内容。
+        如结果被截断会标注。
+    """
+    try:
+        # 安全检查
+        if not _is_path_allowed(repo_path):
+            return (
+                f"❌ 安全限制：不允许访问 '{repo_path}'。\n"
+                f"只能搜索 repos/ 目录下的仓库。"
+            )
+
+        if not os.path.isdir(repo_path):
+            return f"Error: 目录不存在: {repo_path}"
+
+        # 解析扩展名过滤
+        ext_filter = None
+        if file_extensions:
+            ext_filter = set("." + e.strip().lstrip(".") for e in file_extensions.split(","))
+
+        # 编译正则
+        try:
+            regex = re.compile(pattern, re.IGNORECASE)
+        except re.error as e:
+            return f"Error: 无效正则表达式 '{pattern}': {e}"
+
+        exclude_dirs = {".git", ".github", "target", "node_modules", "vendor",
+                        "__pycache__", ".devcontainer", "build", ".vscode"}
+
+        # 默认搜索的代码文件扩展名
+        default_code_exts = {
+            ".rs", ".c", ".cpp", ".h", ".hpp", ".cc", ".cxx",
+            ".s", ".S", ".asm",
+            ".py", ".go", ".js", ".ts",
+            ".toml", ".yaml", ".yml", ".json", ".md", ".txt",
+            ".ld", ".x",  # 链接脚本
+            ".mk", ".cmake",
+        }
+
+        results = []
+        files_searched = 0
+        total_matches = 0
+
+        for root, dirs, files in os.walk(repo_path):
+            # 排除无关目录
+            dirs[:] = [d for d in dirs if d not in exclude_dirs]
+
+            for fname in files:
+                fpath = os.path.join(root, fname)
+                _, ext = os.path.splitext(fname)
+                ext_lower = ext.lower()
+
+                # 扩展名过滤
+                if ext_filter:
+                    if ext_lower not in ext_filter:
+                        continue
+                elif ext_lower not in default_code_exts:
+                    continue
+
+                # 跳过过大文件（>2MB）
+                try:
+                    if os.path.getsize(fpath) > 2 * 1024 * 1024:
+                        continue
+                except OSError:
+                    continue
+
+                files_searched += 1
+
+                try:
+                    with open(fpath, "r", encoding="utf-8", errors="ignore") as f:
+                        for line_num, line in enumerate(f, 1):
+                            if regex.search(line):
+                                total_matches += 1
+                                if len(results) < max_results:
+                                    rel_path = os.path.relpath(fpath, repo_path).replace("\\", "/")
+                                    line_text = line.rstrip()
+                                    if len(line_text) > 200:
+                                        line_text = line_text[:200] + "..."
+                                    results.append(f"{rel_path}:{line_num}: {line_text}")
+                except Exception:
+                    continue
+
+        if not results:
+            return f"未找到匹配 '{pattern}' 的内容 (已搜索 {files_searched} 个文件)"
+
+        output_lines = [f"搜索 '{pattern}' 的结果 ({total_matches} 个匹配, 搜索了 {files_searched} 个文件):\n"]
+        output_lines.extend(results)
+
+        if total_matches > max_results:
+            output_lines.append(f"\n⚠️ [已截断] 显示了前 {max_results}/{total_matches} 个匹配")
+
+        return "\n".join(output_lines)
+
+    except Exception as e:
+        return f"Error: {str(e)}"
+
 

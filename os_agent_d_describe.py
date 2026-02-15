@@ -1,4 +1,4 @@
-# main.py
+# os_agent_d_describe.py
 import os
 import re
 import sys
@@ -75,11 +75,14 @@ def _build_base_context(repo_url: str, output_dir: str, is_prep_stage: bool = Fa
 
 {repo_hint}
 
-全局要求：
-- 必须使用工具获取证据：结构用 list_repo_structure / find_os_core_modules / analyze_code_architecture；细节用 read_code_segment；历史用 analyze_git_history_detailed / get_dev_history_by_module / generate_dev_history_charts。
-- 论证要"可追溯"：提到结论时，给出对应文件路径、关键结构体/函数名（必要时用 read_code_segment 引用片段）。
-- 默认忽略 vendor/；只有当分析依赖实现细节时才进入 vendor。
-- 输出使用 Markdown，面向"懂 OS 的读者"，每个小节都要解释组件原理 + 在本仓库的具体实现方式。
+全局要求（严格遵守）：
+1. **反向证据原则**：如果未找到某功能的实现代码，你必须明确说明“未发现”或“未实现”。**严禁**仅仅因为它是“操作系统”就假设它实现了某些标准功能（如分页、多户）。
+2. **证据引用**：描述任何关键结论（如“支持分页”）时，必须附带文件路径或代码片段引用（如 `mm/page.rs: map_page()`）。
+3. **深度优先分析**：对于关键机制，要求追踪完整的函数调用链（Call Chain），而不仅仅是列出函数名。
+4. **多模块搜索**：不要局限于单一目录。使用 `find_os_core_modules` 寻找分散的实现（例如驱动可能在 `drivers/` 也可能在 `modules/`）。
+5. **区分规划与实现**：README 中提到的功能可能是“画饼”，必须通过代码验证。未能验证的特性即使出现在文档中，也必须标注为“文档提及但未见代码”。
+
+输出使用 Markdown，面向"懂 OS 的读者"，每个小节都要解释组件原理 + 在本仓库的具体实现方式。
 
 **Markdown 格式规范**（严格遵守）：
 1. **标题层级**：
@@ -134,21 +137,38 @@ STAGES = [
     {
         "id": "01_overview",
         "title": "项目概览与技术栈",
-        "prompt": """目标：建立"这是什么 OS、怎么构建、关键入口在哪"。
+        "prompt": """目标：建立"这是什么 OS、怎么构建、关键入口在哪"及"核心子系统概览"。
+
+**严格注意**：区分项目本身名称（如 Undefined OS）与底层框架（如 ArceOS）。如果项目是基于 ArceOS 修改的，必须明确说明"基于 ArceOS 开发"，不能直接把 ArceOS 当作项目名称。
 
 请按顺序完成（仓库已克隆到 repo_path，直接使用即可）：
 1) analyze_tech_stack(repo_path)：总结语言/构建/依赖。
 2) list_repo_structure(repo_path, max_depth=5)：总结关键目录。注意输出中的文件行数和大小信息。
 3) read_code_segment 读取并总结：README.md、Cargo.toml、Makefile（如存在）。
+4) **寻找内核入口与架构支持**：
+   - **架构扫描**：检查 `arch/` 或 `platform/` 目录，列出所有支持的架构（x86_64, aarch64, riscv64, loongarch64 等）。
+   - **寻找入口**：
+     - **严禁假设** `src/main.rs` 是入口。
+     - 在 Rust 项目中，搜索 `#[entry]`、`_start` 或 `rust_main`。
+     - 使用 grep_in_repo 搜索 `entry|start_kernel|rust_main`。
+     - 对于每个支持的架构，分别指出其启动入口文件。
+5) **子系统概览（必须验证代码存在性）**：
+   - **内存管理**：简述是否支持分页/CoW/Lazy（**必须grep verify**）。
+   - **进程管理**：简述支持线程/进程/调度算法。
+   - **文件系统**：简述支持的 FS 类型（fat32/ext4/ramfs）。
+   - **网络**：简述是否支持网络栈（smoltcp/lwip）。
+   - **如果某项仅在 README 提及但未找到代码，明确写“文档提及但未见代码实现”**。
 
 输出格式：
-- ## 结论摘要（3-5 条）
+- ## 结论摘要（3-5 条，明确项目与框架关系）
 - ## 技术栈与构建（含关键命令/入口文件）
 - ## 目录结构导读（列出"子系统→目录→入口文件"）
+- ## 核心子系统概览（内存/进程/FS/网络，务必区分"已实现"与"计划中"）
 - ## 证据列表（文件路径清单）
 
 **重要**：完成所有工具调用后，你必须输出一个完整的 Markdown 格式分析报告。
 """,
+
     },
     {
         "id": "01_boot_arch",
@@ -161,16 +181,23 @@ STAGES = [
 - 关键寄存器设置（栈指针 SP、页表基址 SATP/CR3、中断向量表 stvec 等）。
 - 它是如何跳转到 Rust/C 入口函数的？
 - 早期初始化做了什么（BSS 清零、早期串口打印、设备树解析）？
+- **多平台适配**：
+    - **StarFive VisionFive2**：搜索 `visionfive` 或 `jh7110`，分析其启动流程特异性（SBI -> U-Boot）。
+    - **LoongArch**：搜索 `loongarch`，分析其启动流程。
+- **平台与构建配置**：使用 grep_in_repo 搜索 `.toml`/`defconfig`/`Kconfig` 配置文件，分析构建系统如何选择编译目标和平台参数。
 
 要求：
-- 使用 grep_search 或 list_repo_structure 查找 entry.S/start.S/linker.ld。
-- 重点关注 arch/ 目录下的初始化代码。
+- 使用 grep_in_repo 或 list_repo_structure 查找 entry.S/start.S/linker.ld。
+- 重点关注 arch/、platform/、boot/ 目录下的初始化代码。
 - 必须引用 entry 汇编代码片段和 Rust/C main 函数入口。
+- **完整追踪**：从 `_start` 到内核 main 函数的每一步调用链，引用文件路径和行号。
 
 输出格式：
 - ## 启动入口与链接脚本分析
 - ## 架构初始化流程（关键寄存器与模式切换）
-- ## 到达内核主函数的路径
+- ## 到达内核主函数的路径（完整调用链）
+- ## 多平台启动流程（StarFive/LoongArch 等）
+- ## 平台配置与构建机制
 - ## 关键代码片段分析
 
 **重要**：完成所有工具调用后，你必须输出一个完整的 Markdown 格式分析报告。
@@ -181,23 +208,32 @@ STAGES = [
         "title": "内存管理（物理/虚拟/分配器）",
         "prompt": """目标：深挖“物理内存管理 + 虚拟内存管理 + 堆/页分配器”。
 
-必须回答：
+必须回答（并在源码中找到对应实现）：
 - 物理内存管理：使用什么算法（Bitmap/Buddy System）？FrameAllocator 接口在哪里？
 - 虚拟内存管理：页表如何操作（PageTable 结构、walk/map/unmap 实现）？
 - 内核与用户地址空间设计：是否独立？内核重映射？
 - 堆分配器：使用了什么 Allocator（GlobalAlloc, slab, buddy）？
-- 缺页异常（Page Fault）处理逻辑（如有）。
+- 缺页异常（Page Fault）处理逻辑（如有）。**追踪 handle_page_fault 调用链**。
+- **高级特性验证**（必须使用 grep_in_repo 搜索实现代码，而不仅仅是特质定义）：
+  - 写时复制（Copy-on-Write）：搜索 `cow|copy_on_write`，确认是否在 page fault 中处理了 CoW。
+  - 懒分配（Lazy Allocation）：搜索 `lazy`，确认是否推迟了物理页分配。
+  - 共享内存管理（SharedMem）：是否有 `shm` 相关系统调用和数据结构？
+  - 交换区/页面置换（Swap）：是否实现了 `swap_out`/`swap_in`？
+  - **大页支持（Huge Page）**：在页表映射中是否处理了 2M/1G 页面？搜索 `HugePage|MapSize::2M|MapSize::1G`。
+  - **零拷贝与 mmap**：搜索 `mmap` 实现，验证是否支持文件映射？是否支持零拷贝IO（sendfile/splice）？
 
-要求：
-- 定位 mm/memory 相关入口，使用 read_code_segment 读取 FrameAllocator 和 PageTable 实现。
-- 分析堆初始化逻辑（heap_init）。
+**强制要求**：
+- 对于上述每一个特性，如果支持，必须引用代码文件和行号。
+- 如果不支持，必须明确写“未发现实现”。
+- 追踪一个完整的 `page fault` -> `alloc_frame` -> `map_page` 流程。
 
 输出格式：
-- ## 物理内存管理实现
-- ## 虚拟内存与页表操作
+- ## 物理内存管理实现（代码引用）
+- ## 虚拟内存与页表操作（代码引用）
 - ## 地址空间布局（内核 vs 用户）
 - ## 堆分配器解析
-- ## 关键代码片段
+- ## 高级内存特性清单（CoW/Lazy/Swap/HugePage - 已实现/未实现）
+- ## 关键代码片段与调用链分析
 
 **重要**：完成所有工具调用后，你必须输出一个完整的 Markdown 格式分析报告。
 """,
@@ -209,23 +245,34 @@ STAGES = [
 
 必须回答：
 - 执行实体：Process/Thread/Task 结构体包含哪些字段（Context, State, TrapFrame）？
-- 调度策略：算法是什么（FIFO, RR, Priority, Stride）？Scheduler 实现细节。
-- 状态流转：Ready/Running/Video/Zombine 状态机。
+- **任务模型扩展**：使用 grep_in_repo 搜索 `Process|ProcessGroup|Session|process`，检查是否存在进程组、会话管理以及 PID/TID 分配机制。
+- 调度策略：算法是什么（FIFO, RR, Priority, Stride, CFS）？Scheduler 实现细节。
+- 状态流转：Ready/Running/Blocked/Exited 状态机。
 - 上下文切换：switch.S 或类似汇编代码，保存了哪些寄存器？
-- 进程创建：fork/exec/spawn 的实现逻辑。
-- 安全与权限：是否有 Capability、ACL 或 User/Group 权限模型？
+- **高级特性验证**：
+    - **信号机制 (Signal)**：使用 grep_in_repo 搜索 `signal|sigaction|kill`，确认是否实现了信号注册与分发？
+    - **Futex**：搜索 `futex|wait_queue`，是否支持快速用户态互斥锁？
+- **深度调用链追踪（必须）**：
+    - `fork()`: 追踪从系统调用到 `clone_task` / `copy_task` 的完整流程。是否复制了地址空间？是否复制了文件表？
+    - `exec()`: 如何加载 ELF？如何重建地址空间？
+    - `schedule()`: 调度器被谁调用（时钟中断？yield？exit？）？
+    - `exit()`: 资源回收流程，父进程通知。
+- 进程与线程的区别：代码中是否区分了 TCB 和 PCB？还是只有 Task？
 
 要求：
 - 查找 Task/Process 结构体定义。
+- **重要**：不要只看一个模块！用 find_os_core_modules 或 grep_in_repo 搜索所有进程/线程相关模块。
 - 查找调度器 run/schedule 函数。
 - 查找 context_switch 汇编代码。
 
 输出格式：
 - ## 任务模型与核心数据结构
-- ## 调度算法与策略
+- ## 调度算法与策略（代码证据）
 - ## 任务状态机
 - ## 上下文切换实现（汇编分析）
-- ## 进程创建流程
+- ## 进程间通信与同步（Signal/Futex）
+- ## 关键流程追踪（Fork/Exec/Schedule/Exit）
+- ## 进程/线程管理模块扩展
 
 **重要**：完成所有工具调用后，你必须输出一个完整的 Markdown 格式分析报告。
 """,
@@ -235,16 +282,21 @@ STAGES = [
         "title": "中断、异常与系统调用",
         "prompt": """目标：分析“Trap 处理流程 + 系统调用分发”。
 
+**注意**：不要假设所有代码都在 `src/` 下。如果基于 ArceOS，Trap 和 Syscall 可能在 `modules/axhal` 或 `modules/axruntime` 中。
+
 必须回答：
 - Trap 入口：trap_handler / trap_vector 在哪里？如何区分中断（Interrupt）和异常（Exception）？
 - 上下文保存：TrapFrame 结构，如何保存/恢复用户态寄存器？
-- 系统调用（Syscall）：
-    - 用户态 ecall/syscall 指令封装。
-    - 内核态 syscall 分发函数（syscall_handler）。
-    - 3-5 个关键 syscall 实现分析（如 write, yield, exit）。
-- 外部中断处理：时钟中断（Timer）、外部设备中断处理流程。
+- **系统调用分发追踪**：
+    - 用户态 `ecall`/`syscall` 指令。
+    - 内核态 `syscall_handler` 分发逻辑。
+    - **必须找到分发表**（syscall table 或 match 语句）。
+    - 选择一个具体 syscall（如 `sys_write`）追踪其从 Trap 到真正处理逻辑的路径。
+- **外部中断流**：详细分析时钟中断（Timer）处理流程与外部设备中断（如 PLIC/APIC）的分发处理。
+- 信号（Signal）支持：是否在 Trap 返回前处理信号？（grep `handle_signal`）。
 
 要求：
+- 使用 grep_in_repo 搜索 `trap_handler|trap_return|syscall_handler|handle_syscall` 确定真实位置。
 - 找到 trap.S / trap.rs。
 - 分析 syscall 分发表。
 - 引用关键的 Trap 处理代码。
@@ -252,9 +304,10 @@ STAGES = [
 输出格式：
 - ## Trap 处理流程（用户态 <-> 内核态）
 - ## 异常向量表与入口
-- ## 系统调用分发机制
-- ## 核心 Syscall 实现分析
-- ## 中断处理（时钟/外设）
+- ## 系统调用分发机制（追踪 sys_write）
+- ## 核心 Syscall 实现列表
+- ## 中断处理与信号关联
+- ## 关键代码片段
 
 **重要**：完成所有工具调用后，你必须输出一个完整的 Markdown 格式分析报告。
 """,
@@ -262,26 +315,36 @@ STAGES = [
     {
         "id": "05_fs_vfs",
         "title": "文件系统（VFS + 具体 FS）",
-        "prompt": """目标：深挖“VFS 抽象 + 挂载 + 具体文件系统实现”。
+        "prompt": """目标：深挖"VFS 抽象 + 挂载 + 具体文件系统实现"。
 
 必须回答：
 - VFS 抽象层：File/Inode/Dentry Traits 定义。
-- 具体文件系统：支持哪些 FS（fat32, ext4, simple-fs, host-fs）？
-- 根文件系统：如何挂载 RootFS？
-- 文件操作：open/read/write/close 的内核路径。
-- 特殊文件系统：是否有 stdio/stdout, pipe, socket？
+- **具体文件系统（必须代码验证）**：
+  - FAT32/Ext4：是否自己实现了？还是用的 crate？（check Cargo.toml）
+  - RamFS/TmpFS：是否有内存文件系统？
+- **伪文件系统**：使用 grep_in_repo 搜索 `devfs|procfs|sysfs` 检查是否实现了伪文件系统。若有，分析其实现方式。
+- 文件描述符表：Global 还是 Per-Process？`fd_table` 结构在哪？
+- **功能细节**：
+  - 是否支持 `pipe`？
+  - 是否支持 `socket`？
+  - 是否支持 `mmap`？**注意**：如果支持 mmap，必须验证是“零拷贝”（基于页表映射）还是“假实现”（内存拷贝）。搜索 `MapArea` 或 `PageTable::map` 相关调用。
+  - 是否有 Page Cache / Buffer Cache？
+  - **如果上述功能未找到代码，明确写“未实现”**。
 
 要求：
 - 定位 fs/vfs 模块。
 - 分析 File trait 或类似接口。
 - 深入一个具体 FS 的实现。
+- 使用 grep_in_repo 搜索 "FdTable|FileDescriptor|fd_table" 确认文件描述符表实际命名。
 
 输出格式：
 - ## VFS 架构与接口设计
-- ## 具体文件系统支持情况
-- ## 根文件系统挂载流程
-- ## 文件操作核心路径
-- ## 特殊文件系统与 IPC 支持
+- ## 具体文件系统支持情况（FAT32/Ext4/RamFS）
+- ## 文件描述符与进程关联
+- ## 管道(Pipe)与套接字(Socket)支持情况
+- ## 缓存机制（Block/Page Cache）
+- ## 零拷贝映射验证（mmap 实现分析）
+- ## 关键代码验证
 
 **重要**：完成所有工具调用后，你必须输出一个完整的 Markdown 格式分析报告。
 """,
@@ -291,9 +354,13 @@ STAGES = [
         "title": "设备驱动与硬件抽象",
         "prompt": """目标：分析“设备树/总线 + 驱动框架 + 具体设备驱动”。
 
+**注意**：如果是组件化 OS（如 ArceOS），驱动可能位于 `modules/axdriver` 或独立的 crate 中，不要只在 `drivers/` 目录下找。
+
 必须回答：
 - 设备发现：Device Tree (DTS) 解析或 PCI/Bus 扫描？
 - 驱动框架：Driver Trait，如何注册/初始化驱动？
+- **组件化与配置**：搜索构建配置文件（Cargo.toml 的 features、Kconfig、条件编译宏），分析如何通过编译选项选择不同的驱动/模块实现。
+- **平台适配**：搜索 `platform/` 或 `boards/` 目录，列出所有支持的目标平台/开发板及其特有驱动，分析项目如何适配不同硬件。
 - 常见设备：
     - UART/Serial（控制台输出）
     - Block Device（磁盘读写，VirtIO-Blk）
@@ -302,15 +369,19 @@ STAGES = [
 - 中断控制器：PLIC/CLINT/APIC 驱动。
 
 要求：
-- 搜索 drivers/ 目录。
-- 分析 VirtIO 或 UART 驱动实现。
-- 查看设备初始化链。
+- 使用 grep_in_repo 搜索 `axdriver` 或 `driver::` 查找驱动框架定义。
+- 搜索 `Serial|Block|Net` 相关 Trait 实现。
+- 查看设备初始化链（完整追踪 init_drivers 调用链）。
+- 使用 grep_in_repo 搜索构建配置中的 feature flags。
 
 输出格式：
 - ## 驱动框架与设备发现
+- ## 组件化设计与配置机制
 - ## 字符设备驱动（UART/Console）
 - ## 块设备驱动（VirtIO-Blk等）
+- ## 网络设备驱动
 - ## 中断控制器驱动
+- ## 目标平台适配情况
 - ## 其他外设支持
 
 **重要**：完成所有工具调用后，你必须输出一个完整的 Markdown 格式分析报告。
@@ -319,26 +390,30 @@ STAGES = [
     {
         "id": "07_sync_ipc",
         "title": "同步互斥与进程间通信",
-        "prompt": """目标：分析“内核锁机制 + IPC 机制”。
+        "prompt": """目标：分析“同步原语 + 锁机制 + IPC”。
 
 必须回答：
-- 同步原语：SpinLock, Mutex, Semaphore, CondVar 的实现。
-- 关中断与原子操作：如何保证单核/多核并发安全？
-- IPC 机制：
-    - Pipe（管道）实现。
-    - Signal（信号）处理。
-    - Shared Mem（共享内存）或 Message Queue（如有）。
+- 锁机制：SpinLock / Mutex / Semaphore / RwLock 实现。
+    - **原子操作**：是使用 Rust `core::sync::atomic` 还是自定义汇编？(grep `ldxr/stxr`, `lock xchg`)
+    - **等待队列 (WaitQueue)**：线程获取锁失败时如何挂起？（find `WaitQueue`, `sleep`, `block`）
+- **IPC 机制（必须代码验证）**：
+    - 管道 (Pipe)：环形缓冲区实现？
+    - 消息队列 (MessageQueue)：**检查由 stub 实现还是真实实现**（grep `sys_msgget`，查看是否返回 ENOSYS 或空实现）。
+    - 共享内存 (SharedMem)：结合内存管理章节分析。
+    - 信号量 (Semaphore)：PV 操作实现。
 
 要求：
-- 搜索 sync/ 或 lock/ 模块。
-- 分析 SpinLock 实现（是否关中断）。
-- 查找 IPC 相关 syscall 实现。
+- 搜索 sync/、ipc/ 模块。
+- 查找 Mutex/SpinLock 结构体与 `lock()` 实现。
+- 分析 Pipe 的 `read/write`。
+- **验证消息队列**：务必检查是否为“画饼”功能（仅有系统调用号但无实现）。
 
 输出格式：
-- ## 同步互斥原语（锁与原子操作）
-- ## 并发安全机制（关中断/CPU核心）
-- ## 进程间通信（Pipe/Signal等）
-- ## 关键代码实现分析
+- ## 同步与互斥原语（锁与原子操作）
+- ## 等待队列实现机制
+- ## 进程间通信（Pipe/MsgQueue/Sem）
+- ## 关键代码片段
+- ## 未实现/桩函数功能列表
 
 **重要**：完成所有工具调用后，你必须输出一个完整的 Markdown 格式分析报告。
 """,
@@ -373,79 +448,109 @@ STAGES = [
 """,
     },
     {
-        "id": "08_security",
+        "id": "09_security",
         "title": "安全机制与权限模型",
         "prompt": """目标：分析安全隔离与权限控制机制。
 
+**严格反幻觉要求**：
+1. **证据为王**：描述任何特性（如 Seccomp, Audit, ACL）必须附带 `[Source: path/to/file:L1-L10]` 引用。
+2. **否定确认**：如果搜索不到相关关键词，你必须明确地写“**未发现实现**”。
+3. **禁止臆测**：禁止将 Linux 通用机制套用到当前 OS。
+
 必须回答：
-- 用户态/内核态隔离如何实现（页表隔离、特权级切换）？
-- 权限检查点在哪里（syscall 入口、文件访问、内存访问）？
-- 是否有 Capability/ACL/RBAC 权限模型？
-- 进程间隔离机制（地址空间隔离、资源限制）。
-- 是否有沙箱（Sandbox）或容器支持？
-- 安全启动/可信启动支持（如有）。
+- 用户态/内核态隔离：页表隔离（KPTI）、SMEP/SMAP 是否开启？
+- **权限模型深度验证（关键）**：
+    - **用户/组（UID/GID）**：不仅要看 `Task` 结构体是否有 `uid` 字段，**必须验证**这些字段是否在 `open/write/exec` 等系统调用中被用于权限检查！（grep `check_perm`, `inode_permission`）。如果仅有字段但无检查逻辑，必须注明“**仅有定义但未强制执行**”。
+    - **Capability/ACL**：搜索 `capability`, `acl`。
+- **安全沙箱 (Seccomp/Prctl)**：
+    - 搜索 `prctl` 或 `seccomp`。
+    - **必须检查实现**：是返回 `ENOSYS`（未实现），还是直接返回 `0`（假装成功），还是真的解析了 BPF 规则？
+    - 如未找到，明确写“未实现安全沙箱”。
+- **审计与安全启动**：
+    - 搜索 `audit`（审计日志）、`secure_boot`、`signature`（签名验证）。
+- **内存安全**：
+    - 用户指针验证：搜索 `UserInPtr`, `verify_area`, `access_ok`。确认系统调用入口是否严格检查了用户指针？
+    - 缓冲区溢出保护：是否有 `stack_guard`, `canary`？
+
+输出格式：
+- ## 隔离机制（用户/内核）
+- ## 权限控制模型（UID/GID 验证结果）
+- ## 内存安全与指针检查
+- ## 安全沙箱与审计机制 (Seccomp/Audit)
+- ## 关键代码片段与调用链
+- ## 未实现功能清单
 
 要求：
 - 搜索 security/、auth/、permission/、capability 相关模块。
 - 查找 syscall 入口处的权限检查逻辑。
 - 分析用户/组/权限位的实现。
+- 使用 grep_in_repo 搜索 "seccomp|sandbox|filter|capability|prctl" 确认安全沙箱是否有实际实现。
 
 输出格式：
 - ## 特权级与隔离机制
 - ## 权限检查与访问控制
 - ## 用户/组/权限模型
-- ## 进程间隔离
-- ## 其他安全特性（如有）
+- ## 进程间隔离与资源限制
+- ## 安全沙箱与过滤机制（如无则写“未发现”）
+- ## 审计与安全启动机制（如无则写“未发现”）
+- ## 内存安全与系统调用检查
 - ## 关键代码片段
 
 **重要**：如果项目安全机制较简单，请如实描述。完成所有工具调用后，你必须输出一个完整的 Markdown 格式分析报告。
 """,
     },
     {
-        "id": "08_network",
+        "id": "10_network",
         "title": "网络子系统与协议栈",
         "prompt": """目标：深入分析网络子系统与 TCP/IP 协议栈实现。
 
 必须回答：
-- 网络协议栈架构：自实现还是使用 smoltcp/lwip 等库？
-- Socket 接口实现：socket/bind/listen/accept/connect/send/recv。
-- 网络设备抽象：NetDevice Trait 或接口定义。
-- 协议层实现：
-    - 链路层（Ethernet）
-    - 网络层（IP/ARP/ICMP）
-    - 传输层（TCP/UDP）
-- 数据包收发流程：从网卡中断到用户态 recv。
-- 网络配置：IP 地址配置、路由表（如有）。
+- 网络协议栈架构：自实现还是使用 `smoltcp`/`lwip` 等库？（**检查 Cargo.toml 依赖**）
+- Socket 接口实现：是否有 `socket`/`bind`/`connect` 等 syscall？还是仅有 Loopback？
+- **网卡驱动细节**：
+  - 搜索 `drivers/net/`, `virtio-drivers`, `ixgbe` 等。
+  - 列出支持的网卡类型（VirtIO, E1000, RTL8139, Intel 82599 等）。
+  - **PHY/MAC 层抽象**：是否存在独立的 PHY 驱动层？
+  - **错误处理**：描述一个网络操作失败（如 connect timeout）时的错误码传递流程。
+- **高级特性验证（必须 grep 代码）**：
+  - 零拷贝（Zero Copy）：搜索 `zero_copy`，是否有 sk_buff/mbuf 传递机制？
+  - 多队列（Multi-queue）：是否有 RSS 支持？
+  - **协议支持**：DHCP, DNS, ARP, ICMP, TCP, UDP。
+  - **如果未找到代码，明确说明“不支持”**。
+- 数据包收发流程：追踪从 `virtio-net` 中断到 `tcp_recv` 的路径。
 
 要求：
 - 搜索 net/、network/、socket/、tcp/ 相关模块。
 - 查找 Socket syscall 实现。
 - 分析数据包处理流程。
+- **严格区分**：使用了网络库（如 smoltcp）vs 自己实现了协议栈。
 
 输出格式：
-- ## 网络子系统架构
-- ## Socket 接口实现
-- ## 协议栈层次分析
-- ## 数据包收发流程
-- ## 网络配置与路由
-- ## 关键代码片段
+- ## 网络子系统架构（自研 vs 第三方库）
+- ## Socket 接口与系统调用
+- ## 协议栈支持详情（TCP/UDP/IP/Ethernet）
+- ## 数据包收发流程追踪
+- ## 高级特性支持验证（零拷贝等）
 
 **重要**：如果项目不支持网络功能，请明确说明。完成所有工具调用后，你必须输出一个完整的 Markdown 格式分析报告。
 """,
     },
     {
-        "id": "08_debug_error",
+        "id": "11_debug_error",
         "title": "调试机制与错误处理",
         "prompt": """目标：分析调试支持、日志系统与错误处理机制。
 
 必须回答：
 - 日志系统：print/log 宏如何实现？日志级别设计？
 - Panic 处理：panic! 触发后的流程（栈回溯、寄存器 dump、停机）。
+- **栈回溯 (Backtrace)**：是否支持 `dwarf` 解析或基于 FramePointer 的回溯？
 - 异常处理：未处理异常的默认行为。
 - 调试接口：
+    - **交互式 Shell**: 是否提供 Monitor/Shell？支持哪些命令（`ps`, `ls`, `help`）？
     - GDB stub 支持（如有）
     - 调试控制台/Monitor
     - 内核调试选项
+    - 是否支持 `perf` 或 `ftrace` 类似的性能监控机制？
 - 错误码设计：Result/Error 类型定义。
 - 断言与检查：debug_assert、运行时检查。
 
@@ -453,12 +558,13 @@ STAGES = [
 - 搜索 panic、log、debug、error 相关实现。
 - 查找 print!/println! 或类似宏的定义。
 - 分析 panic_handler 实现。
+- 使用 grep_in_repo 搜索 `gdb|monitor|perf|trace` 确认调试工具支持。
 
 输出格式：
 - ## 日志与打印系统
-- ## Panic 处理流程
+- ## Panic 处理与栈回溯
 - ## 错误码与 Result 设计
-- ## 调试接口与工具
+- ## 调试接口与交互式 Shell
 - ## 断言与运行时检查
 - ## 关键代码片段
 
@@ -466,39 +572,47 @@ STAGES = [
 """,
     },
     {
-        "id": "08_test_ci",
+        "id": "12_test_ci",
         "title": "测试框架与验证机制",
-        "prompt": """目标：分析测试框架、测试用例与持续集成配置。
+        "prompt": """目标：分析项目的测试系统、CI/CD 流程及测试覆盖率。
 
 必须回答：
-- 测试框架：使用什么测试框架（#[test]、自定义测试框架）？
-- 测试类型：
-    - 单元测试（模块级）
-    - 集成测试（系统级）
-    - 用户程序测试
-- 测试用例分析：关键测试用例覆盖了哪些功能？
-- QEMU/模拟器测试：如何在模拟器中运行测试？
-- CI/CD 配置：.github/workflows、.gitlab-ci.yml 等。
-- 测试覆盖度：是否有覆盖率统计？
+- 单元测试：`#[test]` / `#[cfg(test)]` 的使用情况。
+- 集成测试：tests/ 目录或独立的测试 APP。
+- **真实的测试结果**：使用 read_file 读取 `run_log.txt` (如果存在)，并分析其中的 `LTP` 或 `test` 关键字，统计**通过/失败**的用例数量。不要捏造“测试全部通过”。
+- **CI/CD 配置**：
+    - 检查 `.github/workflows/` (GitHub Actions)。
+    - 检查 `.gitlab-ci.yml` (GitLab CI)。
+    - 检查 `Jenkinsfile` 或 `Makefile` 中的 `test` 目标。
+    - **如果找不到 CI 配置文件，请明确写“未发现 CI/CD 配置”**。
+- 测试脚本：分析 `scripts/` 下的测试运行脚本（如 `test.sh`, `runner.py`）。
+- **模糊测试 (Fuzzing)**：
+    - 是否引入了 `afl`, `honggfuzz`, `libfuzzer`？
+    - 内存安全检测：是否开启 `Sanitizer` (AddressSanitizer/ThreadSanitizer)？
+- **性能基准测试 (Benchmark)**：
+    - 是否移植了 `Lmbench`, `UnixBench`, `Netperf`？
+    - 是否有自定义的性能测试脚本？
 
 要求：
-- 搜索 tests/、test、spec 目录。
-- 查找 CI 配置文件。
-- 分析 Makefile 中的 test 目标。
+- 使用 list_dir 和 find_by_name 查找测试相关文件。
+- 读取 run_log.txt 获取真实测试数据。
+- 搜索 `LTP|ltp` 确认是否有 LTP 测试移植。
+- **否定确认**：如果找不到 CI 配置文件，必须在报告中明确陈述“未发现”。
 
 输出格式：
-- ## 测试框架与运行方式
-- ## 单元测试分析
-- ## 集成测试与系统测试
-- ## 用户程序测试
-- ## CI/CD 配置分析
-- ## 测试覆盖与质量评估
+- ## 单元测试与集成测试框架
+- ## CI/CD 流程与配置（或“未发现”）
+- ## 自动化测试脚本分析
+- ## 性能基准与模糊测试
+- ## 测试结果数据统计（基于 run_log.txt）
+- ## 关键代码与测试用例
 
 **重要**：完成所有工具调用后，你必须输出一个完整的 Markdown 格式分析报告。
 """,
     },
+
     {
-        "id": "14_history",
+        "id": "13_history",
         "title": "开发历史与里程碑（含图表）",
         "prompt": """目标：给出"按模块的开发时间线"和"活跃度图表解释"。
 
@@ -526,7 +640,7 @@ STAGES = [
 """,
     },
     {
-        "id": "15_final",
+        "id": "14_final",
         "title": "执行摘要与总结评价",
         "prompt": """目标：基于前面所有章节的分析，生成执行摘要和项目总结评价。
 
@@ -574,56 +688,58 @@ STAGES = [
 
 
 def _format_tool_call_summary(tool_name: str, tool_args: dict) -> str:
-    """格式化工具调用为简洁的摘要，模仿现代 agent 风格"""
-    # 针对不同工具类型生成简洁摘要
-    if tool_name in ("read_code_segment", "read_file"):
+    """格式化工具调用为简洁摘要"""
+    if tool_name in ("read_code_segment", "read_file", "read_human_doc"):
         file_path = tool_args.get("file_path", tool_args.get("path", "?"))
-        start = tool_args.get("start_line", tool_args.get("start", ""))
+        start = tool_args.get("start_line", tool_args.get("start", tool_args.get("start_page", "")))
         end = tool_args.get("end_line", tool_args.get("end", ""))
-        # 显示完整路径
         if start and end:
             return f"{file_path} L{start}-L{end}"
         elif start:
             return f"{file_path} L{start}"
-        else:
-            return file_path
-    
-    elif tool_name in ("list_repo_structure", "list_directory"):
-        path = tool_args.get("repo_path", tool_args.get("path", "?"))
-        depth = tool_args.get("max_depth", "")
-        dirname = os.path.basename(path.rstrip("/\\")) if path else "?"
-        return f"{dirname}/" + (f" (depth={depth})" if depth else "")
-    
-    elif tool_name == "grep_search":
-        pattern = tool_args.get("pattern", tool_args.get("query", "?"))
-        path = tool_args.get("path", tool_args.get("repo_path", ""))
-        dirname = os.path.basename(path.rstrip("/\\")) if path else ""
-        pattern_short = pattern[:30] + "..." if len(str(pattern)) > 30 else pattern
-        return f'"{pattern_short}"' + (f" in {dirname}/" if dirname else "")
-    
+        return file_path or "?"
+
+    elif tool_name in ("list_repo_structure", "list_directory", "list_section_files"):
+        path = tool_args.get("repo_path", tool_args.get("path", tool_args.get("output_dir", "?")))
+        dirname = os.path.basename(str(path).rstrip("/\\")) if path else "?"
+        return f"{dirname}/"
+
+    elif tool_name == "find_human_docs":
+        path = tool_args.get("repo_path", "?")
+        kw = tool_args.get("keywords", "")[:30]
+        dirname = os.path.basename(str(path).rstrip("/\\")) if path else "?"
+        return f"{dirname}/" + (f' "{kw}"' if kw else "")
+
+    elif tool_name == "verify_claim_in_source":
+        claim = str(tool_args.get("claim", ""))[:40]
+        return f'"{claim}..."' if len(claim) >= 40 else f'"{claim}"'
+
+    elif tool_name in ("grep_search", "grep_in_repo"):
+        pattern = str(tool_args.get("pattern", tool_args.get("query", "?")))[:30]
+        path = tool_args.get("repo_path", tool_args.get("path", ""))
+        dirname = os.path.basename(str(path).rstrip("/\\")) if path else ""
+        return f'"{pattern}"' + (f" in {dirname}/" if dirname else "")
+
     elif tool_name == "clone_repository":
         url = tool_args.get("repo_url", "?")
         repo_name = url.rstrip("/").split("/")[-1] if url else "?"
         return repo_name
-    
+
     elif tool_name in ("analyze_tech_stack", "find_os_core_modules", "analyze_code_architecture"):
         path = tool_args.get("repo_path", tool_args.get("path", "?"))
-        dirname = os.path.basename(path.rstrip("/\\")) if path else "?"
+        dirname = os.path.basename(str(path).rstrip("/\\")) if path else "?"
         return f"{dirname}/"
-    
+
     elif tool_name in ("analyze_git_history_detailed", "get_dev_history_by_module", "generate_dev_history_charts"):
         path = tool_args.get("repo_path", "?")
         max_commits = tool_args.get("max_commits", "")
-        dirname = os.path.basename(path.rstrip("/\\")) if path else "?"
+        dirname = os.path.basename(str(path).rstrip("/\\")) if path else "?"
         return f"{dirname}/" + (f" (max={max_commits})" if max_commits else "")
-    
+
     else:
-        # 对于其他工具，显示第一个参数的简短版本
         if tool_args:
             first_key = list(tool_args.keys())[0]
-            first_val = str(tool_args[first_key])
-            if len(first_val) > 40:
-                first_val = first_val[:40] + "..."
+            first_val = str(tool_args[first_key])[:40]
             return f"{first_key}={first_val}"
         return ""
 
@@ -631,22 +747,24 @@ def _format_tool_call_summary(tool_name: str, tool_args: dict) -> str:
 def _format_tool_result_summary(tool_name: str, content: str) -> str:
     """格式化工具返回结果为简洁摘要"""
     content_len = len(content)
-    lines = content.split("\n") if content else []
-    line_count = len(lines)
-    
-    # 根据工具类型生成不同的摘要
-    if tool_name in ("read_code_segment", "read_file"):
-        return f"返回 {line_count} 行代码 ({content_len} 字符)"
-    
-    elif tool_name in ("list_repo_structure", "list_directory"):
-        # 尝试统计目录和文件数量
-        dir_count = content.count("/\n") + content.count("/,")
-        return f"返回目录结构 ({line_count} 项)"
-    
-    elif tool_name == "grep_search":
+    line_count = len(content.split("\n")) if content else 0
+
+    if tool_name in ("read_code_segment", "read_file", "read_human_doc"):
+        return f"返回 {line_count} 行 ({content_len} 字符)"
+    elif tool_name in ("list_repo_structure", "list_directory", "list_section_files"):
+        return f"返回 {line_count} 项"
+    elif tool_name == "find_human_docs":
+        doc_count = content.count("[PDF") + content.count("[DOC") + content.count("[MATCH]")
+        return f"找到 {doc_count} 个文档" if doc_count else f"返回 {content_len} 字符"
+    elif tool_name == "verify_claim_in_source":
+        if "✅" in content or "找到" in content:
+            return "✓ 源码有匹配"
+        if "❌" in content:
+            return "✗ 源码无匹配"
+        return f"返回 {content_len} 字符"
+    elif tool_name in ("grep_search", "grep_in_repo"):
         match_count = content.count("\n") if content.strip() else 0
         return f"找到 {match_count} 个匹配"
-    
     elif tool_name == "clone_repository":
         if "成功" in content or "success" in content.lower() or "cloned" in content.lower():
             return "✓ 克隆成功"
@@ -654,12 +772,17 @@ def _format_tool_result_summary(tool_name: str, content: str) -> str:
             return "✓ 仓库已存在"
         else:
             return f"返回 {content_len} 字符"
-    
+    elif tool_name == "analyze_tech_stack":
+        if "代码文件统计" in content or "Rust" in content:
+            return "返回技术栈与文件统计"
+        return f"返回 {content_len} 字符"
+    elif tool_name in ("get_dev_history_by_module", "analyze_git_history_detailed"):
+        return f"返回开发历史 ({line_count} 行)"
     else:
         return f"返回 {content_len} 字符 ({line_count} 行)"
 
 
-def print_step(step_num: int, node_name: str, state: dict, stage_step_num: int = 0, max_steps: int = 500) -> int:
+def print_step(step_num: int, node_name: str, state: dict, stage_step_num: int = 0, max_steps: int = 1000, stage_limit: int = 500) -> int:
     """打印每一步的执行信息（简洁的 agent 风格）
     
     Args:
@@ -667,7 +790,8 @@ def print_step(step_num: int, node_name: str, state: dict, stage_step_num: int =
         node_name: 节点名称
         state: 状态字典
         stage_step_num: 阶段内步骤号
-        max_steps: 全局最大步数限制
+        max_steps: 全局最大步数估计（仅显示用）
+        stage_limit: 阶段递归步数限制
         
     Returns:
         int: 本次步骤消耗的 token 数量
@@ -688,13 +812,11 @@ def print_step(step_num: int, node_name: str, state: dict, stage_step_num: int =
             content = msg.content or ""
             tool_calls = getattr(msg, "tool_calls", None) or []
             
-            # 显示步骤进度
             if step_num > 0:
-                print(f"\n【步骤 {step_num}/{max_steps}】(阶段进度: {stage_step_num})", end=" ")
-            
-            # 如果有工具调用，简洁显示
+                print(f"\n【Step {step_num}/{max_steps}】(Stage: {stage_step_num}/{stage_limit})", end=" ")
+
             if tool_calls:
-                print(f"🔧 调用工具:")
+                print("🔧 Tool Calls:")
                 for tc in tool_calls:
                     if isinstance(tc, dict):
                         tool_name = tc.get("name", "unknown")
@@ -770,7 +892,9 @@ def main():
     # 计算有效章节数（用于文件命名）
     chapter_counter = 0  # 实际章节计数器
     
-    GLOBAL_MAX_STEPS = 800  # 全局最大步数限制（用于显示）
+    GLOBAL_ESTIMATED_STEPS = 1000  # 全局估计总步数（用于显示进度条分母）
+    
+
 
     for idx, stage in enumerate(STAGES, 1):
         stage_id = stage["id"]
@@ -893,7 +1017,7 @@ def main():
                 overall_step_count += 1
                 stage_step_count += 1
                 for node_name, state in event.items():
-                    step_tokens = print_step(overall_step_count, node_name, state, stage_step_count, GLOBAL_MAX_STEPS)
+                    step_tokens = print_step(overall_step_count, node_name, state, stage_step_count, GLOBAL_ESTIMATED_STEPS, recursion_limit)
                     stage_tokens += step_tokens
                     final_state = state
         except KeyboardInterrupt:
@@ -963,7 +1087,7 @@ def main():
                             overall_step_count += 1
                             stage_step_count += 1
                             for node_name, state in event.items():
-                                step_tokens = print_step(overall_step_count, node_name, state, stage_step_count, GLOBAL_MAX_STEPS)
+                                step_tokens = print_step(overall_step_count, node_name, state, stage_step_count, GLOBAL_ESTIMATED_STEPS, recursion_limit)
                                 stage_tokens += step_tokens
                                 # 提取追问后的回复
                                 if state.get("messages"):
@@ -997,6 +1121,7 @@ def main():
             print(f"\n⏭️  阶段 {idx} 标记为 skip_in_report，不写入报告")
         else:
             try:
+                os.makedirs(os.path.dirname(section_path), exist_ok=True)
                 with open(section_path, "w", encoding="utf-8") as f:
                     # 不添加一级标题，由拼接时统一添加
                     # LLM输出应从二级标题开始
