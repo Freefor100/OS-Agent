@@ -161,16 +161,22 @@ STAGES = [
 - 关键寄存器设置（栈指针 SP、页表基址 SATP/CR3、中断向量表 stvec 等）。
 - 它是如何跳转到 Rust/C 入口函数的？
 - 早期初始化做了什么（BSS 清零、早期串口打印、设备树解析）？
+- 若项目基于某个已有框架/内核（如 ArceOS、rCore、xv6 等），该框架提供了什么核心能力？项目代码与框架代码如何协作？
+- 是否存在平台配置文件机制？用 grep_in_repo 搜索 `.toml`/`defconfig`/`Kconfig` 配置文件，分析构建系统如何选择编译目标和平台参数。
+- 若支持多种硬件平台/开发板，不同平台的启动流程有何区别？
 
 要求：
-- 使用 grep_search 或 list_repo_structure 查找 entry.S/start.S/linker.ld。
-- 重点关注 arch/ 目录下的初始化代码。
+- 使用 grep_in_repo 或 list_repo_structure 查找 entry.S/start.S/linker.ld。
+- 重点关注 arch/、platform/、boot/ 目录下的初始化代码。
 - 必须引用 entry 汇编代码片段和 Rust/C main 函数入口。
+- **完整追踪**：从 `_start` 到内核 main 函数的每一步调用链，引用文件路径和行号。
 
 输出格式：
 - ## 启动入口与链接脚本分析
 - ## 架构初始化流程（关键寄存器与模式切换）
-- ## 到达内核主函数的路径
+- ## 到达内核主函数的路径（完整调用链）
+- ## 框架与项目关系（如适用）
+- ## 平台配置机制（如适用）
 - ## 关键代码片段分析
 
 **重要**：完成所有工具调用后，你必须输出一个完整的 Markdown 格式分析报告。
@@ -187,16 +193,25 @@ STAGES = [
 - 内核与用户地址空间设计：是否独立？内核重映射？
 - 堆分配器：使用了什么 Allocator（GlobalAlloc, slab, buddy）？
 - 缺页异常（Page Fault）处理逻辑（如有）。
+- **高级特性**：使用 grep_in_repo 搜索以下特性是否已实现（搜索关键词 `cow|CoW|copy_on_write|lazy|SharedMemory|shm|mmap|swap|huge_page|reverse_map`）：
+  - 写时复制（Copy-on-Write）
+  - 懒分配（Lazy Allocation）
+  - 共享内存管理（生命周期、映射机制）
+  - 交换区/页面置换
+  - 大页支持
+  - 反向映射
 
 要求：
 - 定位 mm/memory 相关入口，使用 read_code_segment 读取 FrameAllocator 和 PageTable 实现。
 - 分析堆初始化逻辑（heap_init）。
+- 对于上述高级特性，如找到实现代码则详细分析；如仅有定义/占位则明确说明。
 
 输出格式：
 - ## 物理内存管理实现
 - ## 虚拟内存与页表操作
 - ## 地址空间布局（内核 vs 用户）
 - ## 堆分配器解析
+- ## 高级内存特性（CoW/懒分配/共享内存等）
 - ## 关键代码片段
 
 **重要**：完成所有工具调用后，你必须输出一个完整的 Markdown 格式分析报告。
@@ -209,23 +224,29 @@ STAGES = [
 
 必须回答：
 - 执行实体：Process/Thread/Task 结构体包含哪些字段（Context, State, TrapFrame）？
-- 调度策略：算法是什么（FIFO, RR, Priority, Stride）？Scheduler 实现细节。
-- 状态流转：Ready/Running/Video/Zombine 状态机。
+- **兄弟模块搜索**：除了主要的任务/线程模块外，使用 grep_in_repo 搜索 `Process|ProcessGroup|Session|process` 检查是否存在独立的进程管理模块。若存在，分析其与任务模块的关系。
+- 进程/线程层次结构设计（如有）：进程组、会话等概念。
+- PID/TID 分配与管理机制。
+- 进程与线程的数据分离设计（各自持有什么资源）。
+- 调度策略：算法是什么（FIFO, RR, Priority, Stride, CFS）？Scheduler 实现细节。
+- 状态流转：Ready/Running/Blocked/Exited 状态机。
 - 上下文切换：switch.S 或类似汇编代码，保存了哪些寄存器？
-- 进程创建：fork/exec/spawn 的实现逻辑。
+- 进程创建：fork/exec/spawn 的实现逻辑。完整追踪 fork 调用链。
 - 安全与权限：是否有 Capability、ACL 或 User/Group 权限模型？
 
 要求：
 - 查找 Task/Process 结构体定义。
+- **重要**：不要只看一个模块！用 find_os_core_modules 或 grep_in_repo 搜索所有进程/线程相关模块。
 - 查找调度器 run/schedule 函数。
 - 查找 context_switch 汇编代码。
 
 输出格式：
 - ## 任务模型与核心数据结构
+- ## 进程管理模块（如独立存在）
 - ## 调度算法与策略
 - ## 任务状态机
 - ## 上下文切换实现（汇编分析）
-- ## 进程创建流程
+- ## 进程创建流程（完整调用链）
 
 **重要**：完成所有工具调用后，你必须输出一个完整的 Markdown 格式分析报告。
 """,
@@ -267,10 +288,12 @@ STAGES = [
 必须回答：
 - VFS 抽象层：File/Inode/Dentry Traits 定义。
 - 具体文件系统：支持哪些 FS（fat32, ext4, simple-fs, host-fs）？
+- **伪文件系统**：使用 grep_in_repo 搜索 `devfs|procfs|sysfs|tmpfs|ramfs` 检查是否实现了伪文件系统。若有，分析其实现方式。
 - 根文件系统：如何挂载 RootFS？
 - 文件操作：open/read/write/close 的内核路径。
 - 特殊文件系统：是否有 stdio/stdout, pipe, socket？
 - 文件描述符表：全局 / 进程级 FD 管理实现。
+- **缓存机制**：是否有文件系统缓存（page cache、block cache、目录项缓存）？
 
 要求：
 - 定位 fs/vfs 模块。
@@ -282,9 +305,11 @@ STAGES = [
 输出格式：
 - ## VFS 架构与接口设计
 - ## 具体文件系统支持情况
+- ## 伪文件系统（devfs/procfs/sysfs 等）
 - ## 根文件系统挂载流程
 - ## 文件操作核心路径
 - ## 文件描述符表与进程关联
+- ## 缓存机制（如有）
 - ## 特殊文件系统与 IPC 支持
 
 **重要**：完成所有工具调用后，你必须输出一个完整的 Markdown 格式分析报告。
@@ -298,23 +323,30 @@ STAGES = [
 必须回答：
 - 设备发现：Device Tree (DTS) 解析或 PCI/Bus 扫描？
 - 驱动框架：Driver Trait，如何注册/初始化驱动？
+- **组件化/可配置设计**：搜索构建配置文件（Cargo.toml 的 features、Kconfig、条件编译宏），分析如何通过编译选项选择不同的驱动/模块实现。
+- **平台配置机制**：搜索 `.toml`/`.yaml`/`.dts` 等配置文件，分析平台参数（内存布局、设备地址、中断号）如何配置。
 - 常见设备：
     - UART/Serial（控制台输出）
     - Block Device（磁盘读写，VirtIO-Blk）
     - Net Device（网卡，VirtIO-Net）及网络协议栈（TCP/IP, smoltcp 等实现）
     - GPU/Input（如有）
 - 中断控制器：PLIC/CLINT/APIC 驱动。
+- **目标平台适配**：搜索 `platform/` 或 `boards/` 目录，列出所有支持的目标平台/开发板及其特有驱动。
 
 要求：
-- 搜索 drivers/ 目录。
+- 搜索 drivers/、platform/、boards/ 目录。
 - 分析 VirtIO 或 UART 驱动实现。
-- 查看设备初始化链。
+- 查看设备初始化链（完整追踪 init_drivers 调用链）。
+- 使用 grep_in_repo 搜索构建配置中的 feature flags。
 
 输出格式：
 - ## 驱动框架与设备发现
+- ## 组件化设计与配置机制
 - ## 字符设备驱动（UART/Console）
 - ## 块设备驱动（VirtIO-Blk等）
+- ## 网络设备驱动
 - ## 中断控制器驱动
+- ## 目标平台适配情况
 - ## 其他外设支持
 
 **重要**：完成所有工具调用后，你必须输出一个完整的 Markdown 格式分析报告。
@@ -388,7 +420,8 @@ STAGES = [
 - 进程间隔离机制（地址空间隔离、资源限制）。
 - 是否有沙箱（Sandbox）或容器支持？如有 seccomp 相关实现，需区分"有实际过滤逻辑"还是"仅有 /proc 静态数据"。
 - 安全启动/可信启动支持（如有）。
-- 内存保护机制（CoW、懒分配、用户指针检查）是否在安全层面发挥作用。
+- **内存安全特性**：使用 grep_in_repo 搜索 `cow|CoW|copy_on_write|lazy_alloc|UserInPtr|UserOutPtr|check_ptr|verify_area`，分析内存保护机制（CoW、懒分配、用户指针验证）如何在安全层面发挥作用。
+- **系统调用接口安全设计**：搜索系统调用参数验证、边界检查、接口与实现分离的设计模式。
 - Rust 语言自身的安全特性如何在项目中体现（unsafe 使用情况等）。
 
 要求：
@@ -396,7 +429,6 @@ STAGES = [
 - 查找 syscall 入口处的权限检查逻辑。
 - 分析用户/组/权限位的实现。
 - 使用 grep_in_repo 搜索 "seccomp|sandbox|filter|capability|prctl" 确认安全沙箱是否有实际实现（不仅仅是定义）。
-- 检查人类文档（如有 PDF 参赛文档）中提到的安全特性，确保全部覆盖。
 - 特别注意：区分"仅有定义/头文件"和"有实际实现"，如实汇报。
 
 输出格式：
@@ -432,9 +464,9 @@ STAGES = [
 要求：
 - 搜索 net/、network/、socket/、tcp/ 相关模块。
 - 查找 Socket syscall 实现。
-- 分析数据包处理流程。
+- 分析数据包处理流程（完整追踪：从网卡中断到用户态 recv）。
 - 使用 grep_in_repo 搜索 "iperf|netperf|ltp|bench|test_net" 检查是否有网络性能测试工具集成。
-- 对于声称支持的特性（如零拷贝、多网卡路由、地址复用），必须找到实际实现代码验证，不能仅凭头文件定义。
+- **严格反捌造**：对于声称支持的高级特性（如零拷贝、多网卡路由、地址复用、Jumbo Frame、多队列 RSS），必须找到**实际实现代码**验证，不能仅凭头文件定义或类型别名。如仅有定义而无实现，明确说明"仅有定义/占位，未找到实际实现代码"。
 - 明确区分"通过 smoltcp 间接支持"和"项目自身实现"。
 
 输出格式：
@@ -498,6 +530,7 @@ STAGES = [
 - CI/CD 配置：.github/workflows、.gitlab-ci.yml 等。
 - 测试覆盖度：是否有覆盖率统计？
 - 网络性能测试工具（iperf/netperf 等）的验证方式。
+- **测试通过率**：搜索测试日志/结果文件（如 `run_log.txt`、`test_result`、`*.log`），区分“已集成测试套件”和“测试实际通过”的差别。
 
 要求：
 - 搜索 tests/、test、spec 目录。
@@ -505,12 +538,13 @@ STAGES = [
 - 分析 Makefile 中的 test 目标。
 - 使用 grep_in_repo 搜索 "ltp|libc-test|busybox|iperf|oscomp_test" 确认是否集成标准测试套件。
 - 验证 Makefile 中的每个 test target 是否真实存在并可运行（使用 read_code_segment 查看 Makefile 相关部分）。
+- **重要**：搜索所有测试脚本（`*.sh`、`*.py`）并分析测试覆盖范围。
 
 输出格式：
 - ## 测试框架与运行方式
 - ## 单元测试分析
 - ## 集成测试与系统测试
-- ## 标准测试套件集成情况
+- ## 标准测试套件集成与通过情况
 - ## 用户程序测试
 - ## CI/CD 配置分析
 - ## 测试覆盖与质量评估
@@ -595,56 +629,58 @@ STAGES = [
 
 
 def _format_tool_call_summary(tool_name: str, tool_args: dict) -> str:
-    """格式化工具调用为简洁的摘要，模仿现代 agent 风格"""
-    # 针对不同工具类型生成简洁摘要
-    if tool_name in ("read_code_segment", "read_file"):
+    """格式化工具调用为简洁摘要"""
+    if tool_name in ("read_code_segment", "read_file", "read_human_doc"):
         file_path = tool_args.get("file_path", tool_args.get("path", "?"))
-        start = tool_args.get("start_line", tool_args.get("start", ""))
+        start = tool_args.get("start_line", tool_args.get("start", tool_args.get("start_page", "")))
         end = tool_args.get("end_line", tool_args.get("end", ""))
-        # 显示完整路径
         if start and end:
             return f"{file_path} L{start}-L{end}"
         elif start:
             return f"{file_path} L{start}"
-        else:
-            return file_path
-    
-    elif tool_name in ("list_repo_structure", "list_directory"):
-        path = tool_args.get("repo_path", tool_args.get("path", "?"))
-        depth = tool_args.get("max_depth", "")
-        dirname = os.path.basename(path.rstrip("/\\")) if path else "?"
-        return f"{dirname}/" + (f" (depth={depth})" if depth else "")
-    
-    elif tool_name == "grep_search":
-        pattern = tool_args.get("pattern", tool_args.get("query", "?"))
-        path = tool_args.get("path", tool_args.get("repo_path", ""))
-        dirname = os.path.basename(path.rstrip("/\\")) if path else ""
-        pattern_short = pattern[:30] + "..." if len(str(pattern)) > 30 else pattern
-        return f'"{pattern_short}"' + (f" in {dirname}/" if dirname else "")
-    
+        return file_path or "?"
+
+    elif tool_name in ("list_repo_structure", "list_directory", "list_section_files"):
+        path = tool_args.get("repo_path", tool_args.get("path", tool_args.get("output_dir", "?")))
+        dirname = os.path.basename(str(path).rstrip("/\\")) if path else "?"
+        return f"{dirname}/"
+
+    elif tool_name == "find_human_docs":
+        path = tool_args.get("repo_path", "?")
+        kw = tool_args.get("keywords", "")[:30]
+        dirname = os.path.basename(str(path).rstrip("/\\")) if path else "?"
+        return f"{dirname}/" + (f' "{kw}"' if kw else "")
+
+    elif tool_name == "verify_claim_in_source":
+        claim = str(tool_args.get("claim", ""))[:40]
+        return f'"{claim}..."' if len(claim) >= 40 else f'"{claim}"'
+
+    elif tool_name in ("grep_search", "grep_in_repo"):
+        pattern = str(tool_args.get("pattern", tool_args.get("query", "?")))[:30]
+        path = tool_args.get("repo_path", tool_args.get("path", ""))
+        dirname = os.path.basename(str(path).rstrip("/\\")) if path else ""
+        return f'"{pattern}"' + (f" in {dirname}/" if dirname else "")
+
     elif tool_name == "clone_repository":
         url = tool_args.get("repo_url", "?")
         repo_name = url.rstrip("/").split("/")[-1] if url else "?"
         return repo_name
-    
+
     elif tool_name in ("analyze_tech_stack", "find_os_core_modules", "analyze_code_architecture"):
         path = tool_args.get("repo_path", tool_args.get("path", "?"))
-        dirname = os.path.basename(path.rstrip("/\\")) if path else "?"
+        dirname = os.path.basename(str(path).rstrip("/\\")) if path else "?"
         return f"{dirname}/"
-    
+
     elif tool_name in ("analyze_git_history_detailed", "get_dev_history_by_module", "generate_dev_history_charts"):
         path = tool_args.get("repo_path", "?")
         max_commits = tool_args.get("max_commits", "")
-        dirname = os.path.basename(path.rstrip("/\\")) if path else "?"
+        dirname = os.path.basename(str(path).rstrip("/\\")) if path else "?"
         return f"{dirname}/" + (f" (max={max_commits})" if max_commits else "")
-    
+
     else:
-        # 对于其他工具，显示第一个参数的简短版本
         if tool_args:
             first_key = list(tool_args.keys())[0]
-            first_val = str(tool_args[first_key])
-            if len(first_val) > 40:
-                first_val = first_val[:40] + "..."
+            first_val = str(tool_args[first_key])[:40]
             return f"{first_key}={first_val}"
         return ""
 
@@ -652,22 +688,24 @@ def _format_tool_call_summary(tool_name: str, tool_args: dict) -> str:
 def _format_tool_result_summary(tool_name: str, content: str) -> str:
     """格式化工具返回结果为简洁摘要"""
     content_len = len(content)
-    lines = content.split("\n") if content else []
-    line_count = len(lines)
-    
-    # 根据工具类型生成不同的摘要
-    if tool_name in ("read_code_segment", "read_file"):
-        return f"返回 {line_count} 行代码 ({content_len} 字符)"
-    
-    elif tool_name in ("list_repo_structure", "list_directory"):
-        # 尝试统计目录和文件数量
-        dir_count = content.count("/\n") + content.count("/,")
-        return f"返回目录结构 ({line_count} 项)"
-    
-    elif tool_name == "grep_search":
+    line_count = len(content.split("\n")) if content else 0
+
+    if tool_name in ("read_code_segment", "read_file", "read_human_doc"):
+        return f"返回 {line_count} 行 ({content_len} 字符)"
+    elif tool_name in ("list_repo_structure", "list_directory", "list_section_files"):
+        return f"返回 {line_count} 项"
+    elif tool_name == "find_human_docs":
+        doc_count = content.count("[PDF") + content.count("[DOC") + content.count("[MATCH]")
+        return f"找到 {doc_count} 个文档" if doc_count else f"返回 {content_len} 字符"
+    elif tool_name == "verify_claim_in_source":
+        if "✅" in content or "找到" in content:
+            return "✓ 源码有匹配"
+        if "❌" in content:
+            return "✗ 源码无匹配"
+        return f"返回 {content_len} 字符"
+    elif tool_name in ("grep_search", "grep_in_repo"):
         match_count = content.count("\n") if content.strip() else 0
         return f"找到 {match_count} 个匹配"
-    
     elif tool_name == "clone_repository":
         if "成功" in content or "success" in content.lower() or "cloned" in content.lower():
             return "✓ 克隆成功"
@@ -675,7 +713,12 @@ def _format_tool_result_summary(tool_name: str, content: str) -> str:
             return "✓ 仓库已存在"
         else:
             return f"返回 {content_len} 字符"
-    
+    elif tool_name == "analyze_tech_stack":
+        if "代码文件统计" in content or "Rust" in content:
+            return "返回技术栈与文件统计"
+        return f"返回 {content_len} 字符"
+    elif tool_name in ("get_dev_history_by_module", "analyze_git_history_detailed"):
+        return f"返回开发历史 ({line_count} 行)"
     else:
         return f"返回 {content_len} 字符 ({line_count} 行)"
 
@@ -709,13 +752,11 @@ def print_step(step_num: int, node_name: str, state: dict, stage_step_num: int =
             content = msg.content or ""
             tool_calls = getattr(msg, "tool_calls", None) or []
             
-            # 显示步骤进度
             if step_num > 0:
-                print(f"\n【步骤 {step_num}/{max_steps}】(阶段进度: {stage_step_num})", end=" ")
-            
-            # 如果有工具调用，简洁显示
+                print(f"\n【Step {step_num}/{max_steps}】(Stage: {stage_step_num})", end=" ")
+
             if tool_calls:
-                print(f"🔧 调用工具:")
+                print("🔧 Tool Calls:")
                 for tc in tool_calls:
                     if isinstance(tc, dict):
                         tool_name = tc.get("name", "unknown")

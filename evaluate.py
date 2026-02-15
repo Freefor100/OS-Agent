@@ -39,6 +39,7 @@ from tools.eval_ops import (
     verify_claim_in_source,
     list_section_files,
     list_directory,
+    read_generated_section,
 )
 from tools.file_ops import read_code_segment, grep_in_repo
 from tools.describe_ops import analyze_tech_stack
@@ -251,6 +252,7 @@ DIMENSION_WEIGHTS = {
 EVAL_TOOLS = [
     find_human_docs,
     read_human_doc,
+    read_generated_section,
     verify_claim_in_source,
     list_section_files,
     list_directory,
@@ -463,9 +465,11 @@ def _build_section_prompt(
 ## 你必须执行的工作流
 1. 用 find_human_docs(repo_path="{repo_path}", keywords="{keywords}") 找到人类文档。
 2. 用 read_human_doc 阅读人类文档（优先 PDF、README、Design），提炼本模块的**所有关键设计点**。若文档提示 [TRUNCATED] 或仅读取了部分页面，请通过调整 start_page 参数分页阅读。若 PDF 较大（>20页），务必分段阅读，确保不遗漏后续章节中的关键设计点。注意人类文档中"已实现"和"计划实现"的区别。
-3. 用 read_human_doc 阅读生成报告：{section_path}
-4. 对生成报告中的**每个重要技术论断**，用 grep_in_repo 或 verify_claim_in_source 在源码中验证；对于**文件数量、技术栈**等统计类论断，使用 analyze_tech_stack 验证。对于每个验证结果，必须标注 "verified": "true"|"false"|"partial"。**禁止出现未经验证的 "verified": "false" 条目**——如果时间不够，优先验证疑似错误的论断。{extra_instructions}
-5. 按以下细则打分，并在最后输出**唯一一条 JSON 消息**（不要其他任何文字）。
+   **完成后，将关键设计点编号列成清单**（如 P1: xxx, P2: xxx, ...），便于后续逐条检查。
+3. 用 read_generated_section(file_path="{section_path}") 阅读 Agent 生成的章节报告。
+4. **结构化对照检查**：对照步骤 2 的关键点清单，逐条在生成报告中搜索是否覆盖。对于每个点，标注「已覆盖」或「缺失」。
+5. 对生成报告中的**每个重要技术论断**，用 grep_in_repo 或 verify_claim_in_source 在源码中验证；对于**文件数量、技术栈**等统计类论断，使用 analyze_tech_stack 验证。对于每个验证结果，必须标注 "verified": "true"|"false"|"partial"。**禁止出现未经验证的 "verified": "false" 条目**——如果时间不够，优先验证疑似错误的论断。{extra_instructions}
+6. 按以下细则打分，并在最后输出**唯一一条 JSON 消息**（不要其他任何文字）。
 
 ## 打分细则（严格执行，防止虚高）
 
@@ -473,6 +477,7 @@ def _build_section_prompt(
 - 人类文档关键点总数 N，报告中覆盖 M 个：基础分 = (M/N)*80
 - 重要点（架构、核心算法）未覆盖：每点扣 5 分
 - 次要点（配置、可选特性）未覆盖：每点扣 2 分
+- **一致性保护**：如果 missing_points 为空（即全部覆盖），score 不得低于 (M/N)*80
 - 必须列出：covered_points、missing_points、human_doc_point_count、deduction_reasons
 
 ### accuracy（0-100）
@@ -507,9 +512,11 @@ weighted_total = coverage*0.25 + accuracy*0.35 + depth*0.20 + citations*0.10 + h
 
 ## 自检清单（输出 JSON 前必须确认）
 - coverage: missing_points 中的每个点是否确实在生成报告中找不到？
+- coverage: **一致性检查**——如果 missing_points 为空，score 是否 >= (M/N)*80？
 - accuracy: 每个 error 是否都有 source_ref 引用？verified 字段是否已如实填写？
 - accuracy: 是否检查了生成报告中所有结构体/函数名在源码中的真实存在性？
 - highlights: 加分项是否有具体 evidence？
+- weighted_total: 是否按公式 coverage*0.25 + accuracy*0.35 + depth*0.20 + citations*0.10 + highlights*0.10 计算？
 
 ## 输出要求
 完成所有工具调用后，你的**最后一条消息**必须且仅包含一个符合以下结构的 JSON 对象（可参考 schema，不要包含其他说明文字）：
@@ -601,6 +608,7 @@ def evaluate_section(
     RECURSION_LIMIT = 500
     final_state = None
     stage_step_count = 0
+    stage_tokens = 0
     retry_count = 0
     last_exception = None
 
@@ -633,11 +641,22 @@ def evaluate_section(
             for event in agent.stream(inputs, config={"recursion_limit": RECURSION_LIMIT}):
                 stage_step_count += 1
                 for node_name, state in event.items():
-                    _print_eval_step(stage_step_count, node_name, state, RECURSION_LIMIT)
+                    step_tokens = _print_eval_step(stage_step_count, node_name, state, RECURSION_LIMIT)
+                    stage_tokens += step_tokens
                     final_state = state
 
             # 成功执行完成，跳出重试循环
             logging.info(f"[{section_name}] Agent 执行成功（步骤数: {stage_step_count}）")
+
+            # 打印章节 Token 统计
+            if stage_tokens > 0:
+                print(f"\n{'='*60}")
+                print(f"📊 章节评估总结: {section_name}")
+                print(f"   - 步骤数: {stage_step_count}")
+                print(f"   - Token使用: {stage_tokens:,}")
+                print(f"{'='*60}")
+                sys.stdout.flush()
+
             break
 
         except KeyboardInterrupt:
@@ -721,6 +740,7 @@ def evaluate_section(
         }
     else:
         result.setdefault("section_name", section_name)
+        result["tokens_used"] = stage_tokens
         score = result.get("weighted_total", 0)
         logging.info(f"[{section_name}] 评估成功, 分数={score:.1f}")
         print(f"   ✅ {section_name}: {score:.1f} 分 - {result.get('summary', '')[:60]}...")
@@ -1025,7 +1045,7 @@ def run_evaluation(
     logger.setLevel(logging.DEBUG)
 
     # 1. 文件处理器 (Detailed DEBUG)
-    file_handler = logging.FileHandler(log_file, encoding="utf-8")
+    file_handler = logging.FileHandler(log_file, mode="w", encoding="utf-8")
     file_handler.setLevel(logging.DEBUG)
     file_handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)-8s] %(name)s - %(message)s"))
 
@@ -1093,6 +1113,7 @@ def run_evaluation(
     success_count = 0
     fail_count = 0
     skip_count = 0
+    total_tokens_used = 0
 
     for idx, sec_path in enumerate(sections, 1):
         sec_name = os.path.basename(sec_path)
@@ -1119,6 +1140,10 @@ def run_evaluation(
             section_results.append(result)
 
             # 判断是否成功
+            # 累计 token
+            section_tokens = result.get("tokens_used", 0)
+            total_tokens_used += section_tokens
+
             if result.get("error"):
                 fail_count += 1
                 logging.warning(f"章节评估失败: {sec_name}")
@@ -1217,6 +1242,7 @@ def run_evaluation(
     print(f"      - 成功: {success_count}")
     print(f"      - 失败: {fail_count}")
     print(f"      - 跳过: {skip_count}")
+    print(f"      - Token累计: {total_tokens_used:,}")
     if section_results:
         print(f"   🎯 综合评分: {summary.get('overall_score', 0):.1f} / 100")
     print(f"   ⏱️  耗时: {elapsed:.2f} 秒 ({elapsed / 60:.2f} 分钟)")
