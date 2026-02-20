@@ -193,6 +193,26 @@ class LSPClient:
                 except Exception:
                     pass
 
+
+def _resolve_lsp_binary(name: str) -> str:
+    """Resolve LSP binary path, falling back to common installation locations on Windows."""
+    import shutil
+    found = shutil.which(name)
+    if found:
+        return found
+    # Common fallback paths on Windows
+    home = os.path.expanduser("~")
+    candidates = [
+        os.path.join(home, ".cargo", "bin", f"{name}.exe"),          # rustup
+        os.path.join(home, "AppData", "Local", name, f"{name}.exe"), # standalone
+        os.path.join(home, ".local", "bin", name),                   # Linux/Mac
+    ]
+    for c in candidates:
+        if os.path.isfile(c):
+            logger.info(f"Resolved {name} via fallback: {c}")
+            return c
+    return name  # last resort: let subprocess try and fail with a clear error
+
 class MultiplexingLSPGateway:
     def __init__(self):
         self.clients: Dict[str, LSPClient] = {}
@@ -211,13 +231,13 @@ class MultiplexingLSPGateway:
 
             cmd = []
             if lang in ["c", "cpp"]:
-                cmd = ["clangd"]
+                cmd = [_resolve_lsp_binary("clangd")]
             elif lang == "rust":
-                cmd = ["rust-analyzer"]
+                cmd = [_resolve_lsp_binary("rust-analyzer")]
             elif lang == "go":
-                cmd = ["gopls"]
+                cmd = [_resolve_lsp_binary("gopls")]
             elif lang == "zig":
-                cmd = ["zls"]
+                cmd = [_resolve_lsp_binary("zls")]
             else:
                 return None
 
@@ -477,3 +497,117 @@ def lsp_get_references(repo_path: str, file_path: str, symbol: str) -> str:
         _lsp_loop
     )
     return future.result(timeout=25.0)
+
+
+
+# --- 阶段 5：文件大纲提取 (Document Symbol Outline) ---
+async def _async_lsp_document_symbols(repo_path: str, file_path: str) -> str:
+    ext = os.path.splitext(file_path)[1].lower()
+    lang_map = {
+        '.c': 'c', '.cpp': 'cpp', '.cc': 'cpp', '.h': 'c', '.hpp': 'cpp',
+        '.rs': 'rust',
+        '.go': 'go',
+        '.zig': 'zig'
+    }
+    lang = lang_map.get(ext)
+    
+    if not lang:
+        return f"Error: 当前文件类型不被 LSP Outline 支持 '{ext}'"
+
+    abs_file = os.path.abspath(os.path.join(repo_path, file_path))
+    if not os.path.exists(abs_file):
+        return f"Error: 文件未找到 {file_path}"
+        
+    client = await _gateway.get_client(repo_path, lang)
+    if not client:
+        return "Error: LSP client failed to start."
+
+    uri = f"file://{abs_file.replace(chr(92), '/')}"
+    
+    try:
+        with open(abs_file, 'r', encoding='utf-8') as f:
+            text = f.read()
+            
+        did_open = {
+            "jsonrpc": "2.0",
+            "method": "textDocument/didOpen",
+            "params": {
+                "textDocument": {
+                    "uri": uri,
+                    "languageId": "cpp" if lang in ["c", "cpp"] else lang,
+                    "version": 1,
+                    "text": text
+                }
+            }
+        }
+        await client.send_notification(did_open)
+        import asyncio
+        await asyncio.sleep(0.3)
+    except Exception:
+        pass
+
+    req = {
+        "jsonrpc": "2.0",
+        "id": client._next_id(),
+        "method": "textDocument/documentSymbol",
+        "params": {
+            "textDocument": {"uri": uri}
+        }
+    }
+
+    try:
+        result = await client.send_request(req)
+        if "error" in result:
+             raise RuntimeError(f"LSP Error: {result['error']}")
+             
+        symbols = result.get('result', [])
+        if not symbols:
+             return "此文件为空或 LSP 无法提取任何结构大纲。"
+             
+        kind_map = {
+            1: 'File', 2: 'Module', 3: 'Namespace', 4: 'Pkg', 5: 'Class', 
+            6: 'Method', 7: 'Prop', 8: 'Field', 9: 'Constructor', 10: 'Enum', 
+            11: 'Interface', 12: 'Function', 13: 'Var', 14: 'Const', 22: 'EnumMem', 
+            23: 'Struct'
+        }
+             
+        def format_symbols(syms, indent=""):
+            out = []
+            for s in syms:
+                name = s.get('name', 'Unknown')
+                # Some servers return DocumentSymbol (with children), some return SymbolInformation (with location)
+                start_l = 0
+                if 'range' in s:
+                    start_l = s['range'].get('start', {}).get('line', 0) + 1
+                elif 'location' in s:
+                    start_l = s['location'].get('range', {}).get('start', {}).get('line', 0) + 1
+                    
+                kind_id = s.get('kind', 0)
+                kind_str = kind_map.get(kind_id, str(kind_id))
+                
+                out.append(f"{indent}- [{kind_str}] {name} (Line {start_l})")
+                if 'children' in s and s['children']:
+                    out.extend(format_symbols(s['children'], indent + "  "))
+            return out
+            
+        lines = format_symbols(symbols)
+        return f"[{file_path} 文件精确大纲] (LSP AST Parsed):\n" + "\n".join(lines)
+    except Exception as e:
+         return f"LSP Outline 提取失败: {e}"
+
+@tool
+def lsp_get_document_outline(repo_path: str, file_path: str) -> str:
+    """
+    调用底层的真正的 Language Server 提取文件的精确 AST 结构大纲（返回该文件中存在的所有 Struct、Function、Class 及其起始行号）。
+    对于动辄千行的内核代码文件，你可以优先调用此工具，获取文件中所有代码模块的全貌分布，再决定去精准读取哪一行的实现。
+    
+    Args:
+        repo_path: 仓库绝对或相对根路径 (e.g. repos/my-os)
+        file_path: 解析目标的相对文件路径
+    """
+    import asyncio
+    future = asyncio.run_coroutine_threadsafe(
+        _async_lsp_document_symbols(repo_path, file_path),
+        _lsp_loop
+    )
+    return future.result(timeout=15.0)

@@ -356,7 +356,7 @@ def find_os_core_modules(repo_path: str) -> str:
             lines.append(f"  - {d}/")
         if len(unmatched_dirs) > 15:
             lines.append(f"  ... 还有 {len(unmatched_dirs) - 15} 个")
-        lines.append("\n💡 提示：使用 list_repo_structure 或 read_code_segment 查看这些目录的具体内容")
+        lines.append("\n💡 提示：使用 `lsp_get_document_outline` 查看文件结构，`lsp_get_definition` 定位符号，或 `read_code_segment` 读取具体内容")
 
     # 统计信息
     lines.append(f"\n📊 统计: 识别了 {len(found_modules)} 个模块类型，匹配了 {len(all_matched_paths)} 个路径")

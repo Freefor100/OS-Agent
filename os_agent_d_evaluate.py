@@ -44,7 +44,7 @@ from tools.eval_ops import (
 from tools.file_ops import read_code_segment, grep_in_repo
 from tools.describe_ops import analyze_tech_stack
 from tools.git_ops import get_dev_history_by_module
-from tools.lsp_ops import lsp_get_definition, lsp_get_references
+from tools.lsp_ops import lsp_get_definition, lsp_get_references, lsp_get_document_outline
 
 load_dotenv()
 
@@ -263,6 +263,7 @@ EVAL_TOOLS = [
     get_dev_history_by_module,
     lsp_get_definition,
     lsp_get_references,
+    lsp_get_document_outline,
 ]
 
 # JSON Schema 示例（供 LLM 输出参考）
@@ -343,6 +344,10 @@ def _format_tool_call_summary(tool_name: str, tool_args: dict) -> str:
         file_path = str(tool_args.get("file_path", "?"))
         return f"{symbol} in {os.path.basename(file_path)}"
 
+    elif tool_name == "lsp_get_document_outline":
+        file_path = str(tool_args.get("file_path", "?"))
+        return f"{os.path.basename(file_path)}"
+
     else:
         if tool_args:
             first_key = list(tool_args.keys())[0]
@@ -372,7 +377,7 @@ def _format_tool_result_summary(tool_name: str, content: str) -> str:
     elif tool_name == "grep_in_repo":
         match_count = content.count("\n") if content.strip() else 0
         return f"找到 {match_count} 个匹配"
-    elif tool_name in ("lsp_get_definition", "lsp_get_references"):
+    elif tool_name in ("lsp_get_definition", "lsp_get_references", "lsp_get_document_outline"):
         return f"返回 {line_count} 行关联信息"
     elif tool_name == "analyze_tech_stack":
         if "代码文件统计" in content or "Rust" in content:
@@ -465,14 +470,24 @@ def _build_section_prompt(
 
     return f'''你是一个严格的 OS 报告评分员。你的任务是：对比【人类文档】和【Agent 生成报告】，以【OS 源码】为冲突时的最终权威，对生成报告进行非对称评估。
 
+**术语约定（贯穿全文）**：
+- 【人类文档】= 仓库中已有的人工撰写文档（PDF/README/Design Doc）
+- 【生成报告】= Agent 自动分析源码后生成的章节 Markdown
+- 在 accuracy.errors.desc 中描述问题时，必须明确指出是"生成报告"还是"人类文档"的问题（例如："生成报告称15个，实际源码中为12个"）
+
 ## 重要规则（必须遵守）
-1. **冲突裁决**：人类文档说 A、生成报告说 B 时，必须用 grep_in_repo 或 verify_claim_in_source 在源码中验证，以源码为准。
+1. **冲突裁决**：人类文档说 A、生成报告说 B 时，必须在源码中验证，以源码为准。优先使用 `lsp_get_definition` 定位符号的真实定义；辅以 `verify_claim_in_source` 或 `grep_in_repo` 搜索关键词。
 2. **缺失判别**：
    - 如果人类文档提到某功能（如“计划支持网络”），但源码未实现，而生成报告正确指出“未实现”，**不扣 Accuracy 分，但可能扣 Coverage 分（如果该功能是 OS 核心必需）**。
    - 如果人类文档未提到，但生成报告通过代码分析发现了隐藏特性，**加 Highlights 分**。
 3. **幻觉重罚**：
    - 如果生成报告声称实现了某高级特性（如 CoW、零拷贝），但源码中根本找不到对应实现（仅有定义或 TODO），视为**严重幻觉（Fabrication）**，必须重罚。
-   - **强制验证**：对于报告中提到的每一个“高级特性”，你必须调用 `verify_claim_in_source` 或 `lsp_get_definition`。如果验证失败，直接判定为幻觉。
+   - **强制验证**：对于报告中提到的每一个"高级特性"，你必须调用工具验证。**工具选择指南**：
+     - 验证某函数/结构体是否存在 → `lsp_get_definition`（最精确）
+     - 验证某功能关键词是否出现在源码中 → `verify_claim_in_source` 或 `grep_in_repo`
+     - 验证调用链是否真实 → `lsp_get_references` 追踪调用者
+     - 快速查看某文件有哪些函数 → `lsp_get_document_outline`
+     如果验证失败，直接判定为幻觉。
 
 ## 评估目标
 - 章节文件：{section_path}
@@ -486,9 +501,12 @@ def _build_section_prompt(
    **完成后，将关键设计点编号列成清单**（如 P1: xxx, P2: xxx, ...），便于后续逐条检查。
 3. 用 read_generated_section(file_path="{section_path}") 阅读 Agent 生成的章节报告。
 4. **结构化对照检查**：对照步骤 2 的关键点清单，逐条在生成报告中搜索是否覆盖。对于每个点，标注「已覆盖」或「缺失」。
-5. **核心论断验证（关键步骤）**：
-   - 对生成报告中的**每个重要技术论断**（尤其是涉及“支持 xxx”、“实现 xxx”的描述），必须用 `verify_claim_in_source` 或通过 `lsp_get_definition` 等深层代码探查工具验证。
-   - 必须特别验证：报告中引用的**函数名**、**结构体名**是否存在？报告描述的**调用链**是否真实存在？建议使用 `lsp_get_references` 追溯函数调用。
+5. **核心论断验证（关键步骤 — 必须使用 LSP 工具）**：
+   - 对生成报告中的**每个重要技术论断**，按以下方式验证：
+     - **函数/结构体名是否存在？** → 用 `lsp_get_definition(符号名)` 验证。如果 LSP 返回定义位置则存在（verified=true），返回空则不存在（fabrication）。
+     - **调用链是否真实？** → 用 `lsp_get_references(函数名)` 验证调用者列表，确认 A→B→C 的链路每一跳都真实存在。
+     - **文件中是否包含某功能？** → 用 `lsp_get_document_outline` 查看该文件的所有函数，比对报告描述。
+     - **关键词级别验证** → 用 `verify_claim_in_source` 或 `grep_in_repo` 搜索。
    - 对于每个验证结果，必须标注 "verified": "true"|"false"|"partial"。**禁止出现未经验证的 "verified": "false" 条目**。
    - **重要逻辑修正**：
      - 如果验证结果为 "verified": "true"（即报告所述与源码一致），**绝对不要**将其列入 `errors` 列表。
@@ -504,10 +522,11 @@ def _build_section_prompt(
 - 次要点（配置、可选特性）未覆盖：每点扣 2 分
 - **一致性保护**：如果 missing_points 为空（即全部覆盖），score 不得低于 (M/N)*80
 - 必须列出：covered_points、missing_points、human_doc_point_count、deduction_reasons
+- **章节边界规则（重要）**：某些特性可能跨章节（如 Futex 同时涉及"同步互斥"和"多核并行"）。评估覆盖率时，仅扣当前章节的**本职核心内容**缺失。如果某特性的主要分析已在其他章节充分完成，当前章节未重复不应扣分。
 
 ### accuracy（0-100）
 - **严重幻觉（Fabrication）**：声称实现了源码中不存在的功能（如“支持 CoW”验证失败）：每处 **扣 20 分**。
-- **捏造细节**：编造不存在的函数名、结构体字段：每处 **扣 25 分**。
+- **捏造细节**：编造不存在的函数名、结构体字段（用 `lsp_get_definition` 验证不存在）：每处 **扣 25 分**。
 - **事实错误**：与源码明显矛盾（如说是微内核其实是宏内核）：每处 **扣 15 分**。
 - 描述模糊或部分错误：每处扣 8 分
 - 细微不准确（参数顺序、常量值）：每处扣 3 分
@@ -517,7 +536,7 @@ def _build_section_prompt(
 - 仅复述人类文档：30 分
 - 有代码级分析但无引用：50 分
 - 引用具体文件/函数/行号：70 分
-- **深度追踪**：对关键流程（如 Trap, PageFault, Fork）有完整的**函数调用链追踪**（A->B->C）且验证属实：**90-100 分**
+- **深度追踪**：对关键流程（如 Trap, PageFault, Fork）有完整的**函数调用链追踪**（A->B->C）且用 `lsp_get_references` 验证属实：**90-100 分**
 
 ### citations（0-100）
 - 无路径引用：0 分
@@ -1085,6 +1104,9 @@ def run_evaluation(
     logger.addHandler(file_handler)
     logger.addHandler(console_handler)
 
+    # 屏蔽 httpx 的 DEBUG 请求日志（解决终端显示 HTTP Request 刷屏问题）
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+
     logging.info("=" * 60)
     logging.info(f"评估任务启动: {repo_name}")
     logging.info(f"时间: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
@@ -1107,8 +1129,10 @@ def run_evaluation(
         print(f"❌ {error_msg}")
         sys.exit(1)
 
-    # 查找章节文件
-    sections = sorted(glob.glob(os.path.join(sections_dir, "*.md")))
+    # 查找章节文件，并过滤掉非标准的额外生成文件（只保留 01_xxx.md 格式）
+    import re
+    all_md_files = glob.glob(os.path.join(sections_dir, "*.md"))
+    sections = sorted([f for f in all_md_files if re.match(r"^\d{2}_", os.path.basename(f))])
     if not sections:
         error_msg = f"sections 目录为空: {sections_dir}"
         logging.error(error_msg)
