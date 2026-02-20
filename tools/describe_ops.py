@@ -367,8 +367,9 @@ def find_os_core_modules(repo_path: str) -> str:
 @tool
 def analyze_code_architecture(repo_path: str, module_path: str) -> str:
     """
-    分析指定模块的代码架构：主要函数、数据结构、依赖关系、设计模式等。
-    通过解析代码文件（.rs, .c, .h, .cpp, .hpp）提取关键信息。
+    [DEPRECATED - 已废弃] 该工具采用纯文本正则/AST 解析，容易遗漏复杂结构。
+    请优先使用新加入的 `lsp_get_definition` 和 `lsp_get_references` 等 LSP 工具来获取精准符号信息和调用图。
+    如果一定需要粗略浏览，此工具仍可返回架构分析结果：主要结构体/类、关键函数、依赖关系。
 
     Args:
         repo_path: 仓库根路径

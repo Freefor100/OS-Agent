@@ -92,6 +92,24 @@
   - **准确性 (Accuracy)**：对“幻觉”（即源码中不存在的功能）实施重罚（-20分/处）。
   - **深度 (Depth)**：奖励对代码调用链的完整追踪分析。
 
+#### 🆕 **v2.3 评估提示词增强与流程优化**（2026-02-20）
+
+- **🛡️ 严格审查与桩代码检测**
+  - **预防幻觉**：要求 Agent 严格检查 `unimplemented!()`, `todo!()`, `ENOSYS` 等桩代码，并标注为“桩函数”或“未实现”。
+  - **深度真实性验证**：强制代码验证 FPU 初始化、模式切换、完整系统调用及 IPC（真实队列/缓冲区）逻辑。
+  - **路径合法性验证**：在引用文件路径前，**必须**确保该文件真实存在。
+
+- **🚀 本地执行缓存优化**
+  - **加速分析流程**：`00_repo_prep` 阶段优化，当环境本地已存在目标分析仓库时直接跳过克隆，有效减少重复耗时执行与无效 LLM 请求。
+
+#### 🆕 **v2.4 语言服务器原生整合（2026-02-20）**
+
+- **🧠 原生 AST 智能解析体系**
+  - **LSP 多路复用**：引入 `clangd` / `rust-analyzer` / `gopls` 等原生语言服务器，彻底告别正则文本扫描带来的信息残缺（幻觉断层）。
+  - **自动 Polyfill**：当环境缺乏 `compile_commands.json` 或 `Cargo.toml` 时，支持基于编译头文件特征的动态挂载，自动补全底层 AST 依赖库环境。
+  - **汇编自动降级**：对 `.s`, `.asm` 的汇编代码以及发生超时的 LSP 查询默认实施正则解析（ASMLexicalParser）降级保护机制。
+  - **全链路替换分析网关**：全面下线 `analyze_code_architecture` 工具，重构其底层的调用分析体系，彻底释放由于其低匹配精确性造成的评测分偏低问题。
+
 #### 核心特性
 
 - **5 维度评分**: 覆盖度、准确性、技术深度、引用规范、亮点发现
@@ -302,12 +320,13 @@ OS-Agent/
 ├── .env                   # 环境变量配置（需自行创建）
 ├── .env.example           # 环境变量配置模板
 ├── core/
-│   └── agent_builder.py   # Agent 构建器（含 grep_in_repo 工具）
+│   └── agent_builder.py   # Agent 构建器（含 grep_in_repo 等工具）
 ├── docs/                  # 文档目录
 │   └── markdown_format_guide.md # Markdown 格式指南
 ├── tools/
 │   ├── file_ops.py        # 文件操作工具（read_code_segment, grep_in_repo）
 │   ├── git_ops.py         # Git 操作与图表生成
+│   ├── lsp_ops.py         # 语言服务器协议(LSP)封装，AST解析
 │   ├── describe_ops.py    # 仓库分析工具（描述模块专用）
 │   └── eval_ops.py        # 评估专用工具（人类文档搜索、声明验证）
 ├── repos/                 # 克隆的 OS 仓库
@@ -363,7 +382,7 @@ OS-Agent/
 | `grep_in_repo` | 最多 20 条匹配 | 在源码中搜索关键词/正则，验证技术声明 |
 | `read_file` (评估) | 最大 50,000 字符 | 只能访问仓库和 output 目录 |
 | `list_repo_structure` | 默认 4 层深度 | 可通过 `max_depth` 调整 |
-| `analyze_code_architecture` | 最多 20 个文件 | 每文件最多显示 10 个结构体/函数 |
+| `lsp_get_definition` / `lsp_get_references` | 本地化跨文件追踪 | 不受文件切片截断影响，提供 AST 真实函数映射与依赖拓扑 |
 | `get_dev_history_by_module` | 最多 200 条提交 | 每模块最多显示 20 条 |
 
 **截断提示**：所有工具在输出被截断时会明确告知 LLM，例如：

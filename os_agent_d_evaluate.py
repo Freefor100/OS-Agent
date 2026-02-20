@@ -44,6 +44,7 @@ from tools.eval_ops import (
 from tools.file_ops import read_code_segment, grep_in_repo
 from tools.describe_ops import analyze_tech_stack
 from tools.git_ops import get_dev_history_by_module
+from tools.lsp_ops import lsp_get_definition, lsp_get_references
 
 load_dotenv()
 
@@ -260,6 +261,8 @@ EVAL_TOOLS = [
     grep_in_repo,
     analyze_tech_stack,
     get_dev_history_by_module,
+    lsp_get_definition,
+    lsp_get_references,
 ]
 
 # JSON Schema 示例（供 LLM 输出参考）
@@ -335,6 +338,11 @@ def _format_tool_call_summary(tool_name: str, tool_args: dict) -> str:
         dirname = os.path.basename(str(path).rstrip("/\\")) if path else "?"
         return f"{dirname}/"
 
+    elif tool_name in ("lsp_get_definition", "lsp_get_references"):
+        symbol = str(tool_args.get("symbol", "?"))
+        file_path = str(tool_args.get("file_path", "?"))
+        return f"{symbol} in {os.path.basename(file_path)}"
+
     else:
         if tool_args:
             first_key = list(tool_args.keys())[0]
@@ -364,6 +372,8 @@ def _format_tool_result_summary(tool_name: str, content: str) -> str:
     elif tool_name == "grep_in_repo":
         match_count = content.count("\n") if content.strip() else 0
         return f"找到 {match_count} 个匹配"
+    elif tool_name in ("lsp_get_definition", "lsp_get_references"):
+        return f"返回 {line_count} 行关联信息"
     elif tool_name == "analyze_tech_stack":
         if "代码文件统计" in content or "Rust" in content:
             return "返回技术栈与文件统计"
@@ -462,7 +472,7 @@ def _build_section_prompt(
    - 如果人类文档未提到，但生成报告通过代码分析发现了隐藏特性，**加 Highlights 分**。
 3. **幻觉重罚**：
    - 如果生成报告声称实现了某高级特性（如 CoW、零拷贝），但源码中根本找不到对应实现（仅有定义或 TODO），视为**严重幻觉（Fabrication）**，必须重罚。
-   - **强制验证**：对于报告中提到的每一个“高级特性”，你必须调用 `verify_claim_in_source`。如果验证失败，直接判定为幻觉。
+   - **强制验证**：对于报告中提到的每一个“高级特性”，你必须调用 `verify_claim_in_source` 或 `lsp_get_definition`。如果验证失败，直接判定为幻觉。
 
 ## 评估目标
 - 章节文件：{section_path}
@@ -477,8 +487,8 @@ def _build_section_prompt(
 3. 用 read_generated_section(file_path="{section_path}") 阅读 Agent 生成的章节报告。
 4. **结构化对照检查**：对照步骤 2 的关键点清单，逐条在生成报告中搜索是否覆盖。对于每个点，标注「已覆盖」或「缺失」。
 5. **核心论断验证（关键步骤）**：
-   - 对生成报告中的**每个重要技术论断**（尤其是涉及“支持 xxx”、“实现 xxx”的描述），必须用 `verify_claim_in_source` 或 `grep_in_repo` 在源码中验证。
-   - 必须特别验证：报告中引用的**函数名**、**结构体名**是否存在？报告描述的**调用链**是否真实存在？
+   - 对生成报告中的**每个重要技术论断**（尤其是涉及“支持 xxx”、“实现 xxx”的描述），必须用 `verify_claim_in_source` 或通过 `lsp_get_definition` 等深层代码探查工具验证。
+   - 必须特别验证：报告中引用的**函数名**、**结构体名**是否存在？报告描述的**调用链**是否真实存在？建议使用 `lsp_get_references` 追溯函数调用。
    - 对于每个验证结果，必须标注 "verified": "true"|"false"|"partial"。**禁止出现未经验证的 "verified": "false" 条目**。
    - **重要逻辑修正**：
      - 如果验证结果为 "verified": "true"（即报告所述与源码一致），**绝对不要**将其列入 `errors` 列表。
