@@ -912,8 +912,6 @@ def main():
     os.makedirs(charts_dir, exist_ok=True)
     os.makedirs(sections_dir, exist_ok=True)
 
-    agent = build_agent()
-
     print("=" * 80)
     print("📋 多阶段任务：开始")
     print(f"Repo: {repo_name}")
@@ -1051,6 +1049,8 @@ def main():
         print(f"🚀 开始执行 Agent (模型: {os.getenv('MODEL_NAME')})...")
         sys.stdout.flush()  # 强制刷新输出缓冲区
 
+        agent = build_agent(stage_id=stage_id)
+        
         final_state = None
         stage_step_count = 0  # 阶段内步骤计数
         recursion_limit = 500

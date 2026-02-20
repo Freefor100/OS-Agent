@@ -61,31 +61,41 @@ def get_model_name() -> str:
     return os.environ.get("MODEL_NAME", DEFAULT_MODEL)
 
 
-def build_agent(model: str = None):
+def build_agent(model: str = None, stage_id: str = ""):
     """
     构建分析 Agent
     
     Args:
         model: 模型名称，如果不指定则从环境变量 MODEL_NAME 读取，默认 deepseek/deepseek-v3.2
+        stage_id: 当前分析阶段的 ID，用于动态分配工具
     """
-    tools = [
+    # 基础代码阅读与通用工具（所有阶段可用）
+    base_tools = [
         clone_repository,
         get_repo_local_path,
-        analyze_git_history,
-        analyze_git_history_detailed,
-        get_dev_history_by_module,
-        generate_dev_history_charts,
         list_repo_structure,
         find_os_core_modules,
         analyze_tech_stack,
         read_code_segment,
         grep_in_repo,
-        write_file,
         convert_md_to_pdf,
         lsp_get_definition,
         lsp_get_references,
     ]
     
+    # 历史分析专用工具（仅在历史阶段可用）
+    history_tools = [
+        analyze_git_history,
+        analyze_git_history_detailed,
+        get_dev_history_by_module,
+        generate_dev_history_charts,
+    ]
+    
+    tools = base_tools.copy()
+    if "13_history" in stage_id:
+        tools.extend(history_tools)
+    
+
     model_name = model or get_model_name()
     llm = ChatOpenAI(
         model=model_name, 
