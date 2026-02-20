@@ -1,5 +1,22 @@
 # 更新日志 (Changelog)
 
+## [2.4.0] - 2026-02-20
+
+### ✨ 新增功能
+
+#### 语言服务器原生整合 (LSP Integration)
+
+**原生 AST 智能解析体系**
+- **LSP 多路复用**：引入 `clangd` / `rust-analyzer` / `gopls` 等原生语言服务器，彻底告别正则文本扫描带来的信息残缺（幻觉断层）。
+- **自动 Polyfill**：当环境缺乏 `compile_commands.json` 或 `Cargo.toml` 时，支持基于编译头文件特征的动态挂载，自动补全底层 AST 依赖库环境。
+- **汇编自动降级**：对 `.s`, `.asm` 的汇编代码以及发生超时的 LSP 查询默认实施正则解析（ASMLexicalParser）降级保护机制。
+
+**全链路替换分析网关**
+- 全面下线 `analyze_code_architecture` 工具，重构了 `describe_ops` 和 `evaluate` 模块底层的调用分析提示词。
+- 强制大模型在验证高级特性（如 CoW、零拷贝）以及调用链时，使用 `lsp_get_definition` 和 `lsp_get_references` 获取精准结构实体，防止产生捏造的调用链逻辑。
+
+---
+
 ## [2.3.0] - 2026-02-20
 
 ### ✨ 新增功能

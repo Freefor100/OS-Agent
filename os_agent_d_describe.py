@@ -753,7 +753,7 @@ def _format_tool_call_summary(tool_name: str, tool_args: dict) -> str:
         repo_name = url.rstrip("/").split("/")[-1] if url else "?"
         return repo_name
 
-    elif tool_name in ("analyze_tech_stack", "find_os_core_modules", "analyze_code_architecture"):
+    elif tool_name in ("analyze_tech_stack", "find_os_core_modules"):
         path = tool_args.get("repo_path", tool_args.get("path", "?"))
         dirname = os.path.basename(str(path).rstrip("/\\")) if path else "?"
         return f"{dirname}/"
@@ -763,6 +763,11 @@ def _format_tool_call_summary(tool_name: str, tool_args: dict) -> str:
         max_commits = tool_args.get("max_commits", "")
         dirname = os.path.basename(str(path).rstrip("/\\")) if path else "?"
         return f"{dirname}/" + (f" (max={max_commits})" if max_commits else "")
+
+    elif tool_name in ("lsp_get_definition", "lsp_get_references"):
+        symbol = str(tool_args.get("symbol", "?"))
+        file_path = str(tool_args.get("file_path", "?"))
+        return f"{symbol} in {os.path.basename(file_path)}"
 
     else:
         if tool_args:
@@ -793,6 +798,9 @@ def _format_tool_result_summary(tool_name: str, content: str) -> str:
     elif tool_name in ("grep_search", "grep_in_repo"):
         match_count = content.count("\n") if content.strip() else 0
         return f"找到 {match_count} 个匹配"
+    elif tool_name in ("lsp_get_definition", "lsp_get_references"):
+        lines = len(content.split("\n")) if content else 0
+        return f"返回 {lines} 行关联信息"
     elif tool_name == "clone_repository":
         if "成功" in content or "success" in content.lower() or "cloned" in content.lower():
             return "✓ 克隆成功"
