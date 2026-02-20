@@ -53,7 +53,7 @@ def _build_base_context(repo_url: str, output_dir: str, is_prep_stage: bool = Fa
         repo_hint = f"**仓库已就绪**: 直接使用 repo_path = \"{repo_path}\"，无需调用 clone_repository。"
     
     if is_prep_stage:
-        return f"""你是一个操作系统项目的技术分析 Agent。
+        return f"""你是一个操作系统内核的技术分析 Agent。
 
 基础信息：
 - 仓库 URL: {repo_url}
@@ -81,6 +81,14 @@ def _build_base_context(repo_url: str, output_dir: str, is_prep_stage: bool = Fa
 3. **深度优先分析**：对于关键机制，要求追踪完整的函数调用链（Call Chain），而不仅仅是列出函数名。
 4. **多模块搜索**：不要局限于单一目录。使用 `find_os_core_modules` 寻找分散的实现（例如驱动可能在 `drivers/` 也可能在 `modules/`）。
 5. **区分规划与实现**：README 中提到的功能可能是“画饼”，必须通过代码验证。未能验证的特性即使出现在文档中，也必须标注为“文档提及但未见代码”。
+6. **桩代码检测（Strict Stub Detection）**：
+   - 遇到函数体为空、返回 `unimplemented!()`、`todo!()`、`ENOSYS` 或仅有一行 `Ok(0)` 的情况，**必须**标注为 **“桩函数”** 或 **“未实现”**。
+   - **严禁**将桩函数描述为“已实现功能”。如果一个系统调用仅返回 0 而无实际逻辑（如 `sys_getuid` 始终返回 0），必须指出“仅有接口无实现”。
+7. **文件路径验证（Anti-Hallucination）**：
+   - 在引用文件路径前，**必须**确保该文件在 `list_repo_structure` 或 `find_by_name` 的结果中真实存在。
+   - **严禁**捏造不存在的文件路径（如声称 `riscv/boot.rs` 存在但实际不在）。如果不确定，不要写路径。
+8. **头文件 vs 实现**：
+   - 不要把头文件（`.h`）或 Trait 定义（`.rs` 中的 `trait`）作为功能已实现的证据。必须找到对应的 C 文件（`.c`）或 Rust `impl` 代码块。
 
 输出使用 Markdown，面向"懂 OS 的读者"，每个小节都要解释组件原理 + 在本仓库的具体实现方式。
 
@@ -158,6 +166,7 @@ STAGES = [
    - **文件系统**：简述支持的 FS 类型（fat32/ext4/ramfs）。
    - **网络**：简述是否支持网络栈（smoltcp/lwip）。
    - **如果某项仅在 README 提及但未找到代码，明确写“文档提及但未见代码实现”**。
+   - **README vs Code**：如果 README 声称不仅有“高级调度器”但代码只有 FIFO，必须如实报告代码现状。
 
 输出格式：
 - ## 结论摘要（3-5 条，明确项目与框架关系）
@@ -177,10 +186,11 @@ STAGES = [
 
 必须回答：
 - 启动入口在哪里？（汇编文件如 entry.S 或 head.S，链接脚本 linker.ld 中的 ENTRY）
-- CPU 模式切换与初始化（如 RISC-V M-Mode -> S-Mode，x86实模式->保护模式->长模式）。
+- CPU 模式切换与初始化（如 RISC-V M-Mode -> S-Mode，x86实模式->保护模式->长模式）。**必须验证是否真的发生了模式切换（查找 sstatus.spp, mstatus.mpp, cr0 等寄存器操作）。**
 - 关键寄存器设置（栈指针 SP、页表基址 SATP/CR3、中断向量表 stvec 等）。
 - 它是如何跳转到 Rust/C 入口函数的？
 - 早期初始化做了什么（BSS 清零、早期串口打印、设备树解析）？
+- **浮点单元 (FPU) 初始化**：搜索 `sstatus.fs` (RISC-V) 或 `cpacr_el1` (AArch64) 或 `cr4` (x86_64)。如果没有找到相关代码，**必须明确说明未启用 FPU**。
 - **多平台适配**：
     - **StarFive VisionFive2**：搜索 `visionfive` 或 `jh7110`，分析其启动流程特异性（SBI -> U-Boot）。
     - **LoongArch**：搜索 `loongarch`，分析其启动流程。
@@ -191,10 +201,18 @@ STAGES = [
 - 重点关注 arch/、platform/、boot/ 目录下的初始化代码。
 - 必须引用 entry 汇编代码片段和 Rust/C main 函数入口。
 - **完整追踪**：从 `_start` 到内核 main 函数的每一步调用链，引用文件路径和行号。
+- **严禁幻觉**：
+    1. **汇编入口**：先在 `arch/` 或 `platform/` 下找 `entry.S`, `head.S`, `start.S`。
+    2. **Rust入口**：如果找不到汇编入口，可能是通过 SBI/U-Boot 直接跳转到 Rust 入口，请寻找 `#[entry]`。
+    3. **路径验证**：写下任何文件路径前，必须确认该文件真实存在。
+- **FPU/模式切换验证**：
+    - RISC-V: 搜索 `sstatus.fs` 或 `FS:` 常量。
+    - AArch64: 搜索 `cpacr_el1` 或 `CPACR`。
+    - x86_64: 搜索 `cr0`, `cr4` 寄存器位操作。
 
 输出格式：
 - ## 启动入口与链接脚本分析
-- ## 架构初始化流程（关键寄存器与模式切换）
+- ## 架构初始化流程（模式切换/FPU/MMU）
 - ## 到达内核主函数的路径（完整调用链）
 - ## 多平台启动流程（StarFive/LoongArch 等）
 - ## 平台配置与构建机制
@@ -220,12 +238,16 @@ STAGES = [
   - 共享内存管理（SharedMem）：是否有 `shm` 相关系统调用和数据结构？
   - 交换区/页面置换（Swap）：是否实现了 `swap_out`/`swap_in`？
   - **大页支持（Huge Page）**：在页表映射中是否处理了 2M/1G 页面？搜索 `HugePage|MapSize::2M|MapSize::1G`。
-  - **零拷贝与 mmap**：搜索 `mmap` 实现，验证是否支持文件映射？是否支持零拷贝IO（sendfile/splice）？
+  - **零拷贝与 mmap**：搜索 `mmap` 实现，验证是否支持文件映射？是否支持零拷贝IO（sendfile/splice）？**注意：如果是 `mmap` 系统调用，检查它是否真的实现了 MAP_FIXED/MAP_ANON 等标志的处理，还是仅仅是一个空壳？**
 
 **强制要求**：
 - 对于上述每一个特性，如果支持，必须引用代码文件和行号。
 - 如果不支持，必须明确写“未发现实现”。
 - 追踪一个完整的 `page fault` -> `alloc_frame` -> `map_page` 流程。
+- **防幻觉检查**：
+    - **mmap**: 不要看到 `Mmap` 结构体就认为实现了 mmap。检查系统调用入口 `sys_mmap`。
+    - **Stub检测**：如果 `sys_mmap` 只是返回 `0` 或 `Ok`，没有处理 `MAP_FIXED` / `MAP_ANON` 等标志，必须标记为 **Stub**。
+    - **Swap**: 必须找到 `swap_out` / `swap_in` 的实际逻辑，而不仅仅是特质定义。
 
 输出格式：
 - ## 物理内存管理实现（代码引用）
@@ -253,9 +275,9 @@ STAGES = [
     - **信号机制 (Signal)**：使用 grep_in_repo 搜索 `signal|sigaction|kill`，确认是否实现了信号注册与分发？
     - **Futex**：搜索 `futex|wait_queue`，是否支持快速用户态互斥锁？
 - **深度调用链追踪（必须）**：
-    - `fork()`: 追踪从系统调用到 `clone_task` / `copy_task` 的完整流程。是否复制了地址空间？是否复制了文件表？
+    - `fork()`: 追踪从系统调用到 `clone_task` / `copy_task` 的完整流程。**必须验证**是否真的复制了地址空间（`memory_set.copy()`）和文件表？
     - `exec()`: 如何加载 ELF？如何重建地址空间？
-    - `schedule()`: 调度器被谁调用（时钟中断？yield？exit？）？
+    - `schedule()`: 调度器被谁调用？**验证优先级**：`pick_next_task` 是否真的使用了 `priority` / `stride`，还是仅仅 FIFO？
     - `exit()`: 资源回收流程，父进程通知。
 - 进程与线程的区别：代码中是否区分了 TCB 和 PCB？还是只有 Task？
 
@@ -291,6 +313,7 @@ STAGES = [
     - 用户态 `ecall`/`syscall` 指令。
     - 内核态 `syscall_handler` 分发逻辑。
     - **必须找到分发表**（syscall table 或 match 语句）。
+    - **Stub验证**：检查 `sys_clone`, `sys_exec`, `sys_write` 等是否直接返回错误或 0？只有包含具体逻辑才算实现。
     - 选择一个具体 syscall（如 `sys_write`）追踪其从 Trap 到真正处理逻辑的路径。
 - **外部中断流**：详细分析时钟中断（Timer）处理流程与外部设备中断（如 PLIC/APIC）的分发处理。
 - 信号（Signal）支持：是否在 Trap 返回前处理信号？（grep `handle_signal`）。
@@ -327,8 +350,8 @@ STAGES = [
 - **功能细节**：
   - 是否支持 `pipe`？
   - 是否支持 `socket`？
-  - 是否支持 `mmap`？**注意**：如果支持 mmap，必须验证是“零拷贝”（基于页表映射）还是“假实现”（内存拷贝）。搜索 `MapArea` 或 `PageTable::map` 相关调用。
-  - 是否有 Page Cache / Buffer Cache？
+  - 是否支持 `mmap`？**注意**：必须检查 `sys_mmap` 实现。如果是 **零拷贝**，必须看到 `VmArea` 结构体中有 `shared` 字段或 `MAP_SHARED` 处理逻辑。
+  - **高级特性**：`poll`/`select` 是否实现？搜索 `sys_poll` / `sys_select`，检查是一律返回 Ready 还是真的检查了文件状态？
   - **如果上述功能未找到代码，明确写“未实现”**。
 
 要求：
@@ -357,7 +380,7 @@ STAGES = [
 **注意**：如果是组件化 OS（如 ArceOS），驱动可能位于 `modules/axdriver` 或独立的 crate 中，不要只在 `drivers/` 目录下找。
 
 必须回答：
-- 设备发现：Device Tree (DTS) 解析或 PCI/Bus 扫描？
+- 设备发现：Device Tree (DTS) 解析或 PCI/Bus 扫描？**必须验证**是否真的解析了 `.dtb` 文件，还是硬编码了地址？
 - 驱动框架：Driver Trait，如何注册/初始化驱动？
 - **组件化与配置**：搜索构建配置文件（Cargo.toml 的 features、Kconfig、条件编译宏），分析如何通过编译选项选择不同的驱动/模块实现。
 - **平台适配**：搜索 `platform/` 或 `boards/` 目录，列出所有支持的目标平台/开发板及其特有驱动，分析项目如何适配不同硬件。
@@ -396,24 +419,26 @@ STAGES = [
 - 锁机制：SpinLock / Mutex / Semaphore / RwLock 实现。
     - **原子操作**：是使用 Rust `core::sync::atomic` 还是自定义汇编？(grep `ldxr/stxr`, `lock xchg`)
     - **等待队列 (WaitQueue)**：线程获取锁失败时如何挂起？（find `WaitQueue`, `sleep`, `block`）
-- **IPC 机制（必须代码验证）**：
-    - 管道 (Pipe)：环形缓冲区实现？
-    - 消息队列 (MessageQueue)：**检查由 stub 实现还是真实实现**（grep `sys_msgget`，查看是否返回 ENOSYS 或空实现）。
+- **IPC 机制（必须代码验证，谨防桩代码）**：
+    - 管道 (Pipe)：**实现验证**：是否使用了环形缓冲区 (Ring Buffer)？
+    - 消息队列 (MessageQueue)：**必须检查实现**。grep `sys_msgget` 或 `msgget`。
+        - 如果函数体为空或 `Ok(0)` 但没有队列逻辑，标记为 **桩函数**。
+        - 只有看到了队列结构体操作（push/pop），才可标记为 **已实现**。
     - 共享内存 (SharedMem)：结合内存管理章节分析。
-    - 信号量 (Semaphore)：PV 操作实现。
+    - 信号量 (Semaphore)：PV 操作实现。同样需要检查 `sys_semget`, `semop` 是否为桩代码。
 
 要求：
 - 搜索 sync/、ipc/ 模块。
 - 查找 Mutex/SpinLock 结构体与 `lock()` 实现。
 - 分析 Pipe 的 `read/write`。
-- **验证消息队列**：务必检查是否为“画饼”功能（仅有系统调用号但无实现）。
+- **验证消息队列与信号量**：务必区分 Stub（桩）与 Real Implementation（真实实现）。
 
 输出格式：
 - ## 同步与互斥原语（锁与原子操作）
 - ## 等待队列实现机制
 - ## 进程间通信（Pipe/MsgQueue/Sem）
 - ## 关键代码片段
-- ## 未实现/桩函数功能列表
+- ## 未实现/桩函数功能列表（明确列出哪些是“画饼”）
 
 **重要**：完成所有工具调用后，你必须输出一个完整的 Markdown 格式分析报告。
 """,
@@ -425,8 +450,9 @@ STAGES = [
 
 必须回答：
 - 是否支持多核？架构设计是 SMP 还是 AMP？
-- Secondary CPU 启动流程（如 smp_boot、cpu_up）。
-- 核间中断（IPI - Inter-Processor Interrupt）实现。
+- Secondary CPU 启动流程：**必须代码验证**。搜索 `smp_boot`, `__cpu_up`。如果找不到启动其他核的代码，那就是单核。
+- 核间中断 (IPI)：搜索 `send_ipi`, `ipi_handler`。
+- **锁的实现**：SpinLock 是否禁用了中断？Mutex 是否支持优先级继承？
 - Per-CPU 变量设计与访问方式。
 - 多核调度策略：负载均衡、CPU 亲和性（affinity）。
 - 自旋锁/RCU 在多核下的实现差异。
@@ -465,6 +491,7 @@ STAGES = [
 - **安全沙箱 (Seccomp/Prctl)**：
     - 搜索 `prctl` 或 `seccomp`。
     - **必须检查实现**：是返回 `ENOSYS`（未实现），还是直接返回 `0`（假装成功），还是真的解析了 BPF 规则？
+    - **Stub判断**：如果 `sys_prctl` 只是 returning 0 without doing anything，标记为 **Stub/Bypass**。
     - 如未找到，明确写“未实现安全沙箱”。
 - **审计与安全启动**：
     - 搜索 `audit`（审计日志）、`secure_boot`、`signature`（签名验证）。
@@ -513,7 +540,7 @@ STAGES = [
   - **PHY/MAC 层抽象**：是否存在独立的 PHY 驱动层？
   - **错误处理**：描述一个网络操作失败（如 connect timeout）时的错误码传递流程。
 - **高级特性验证（必须 grep 代码）**：
-  - 零拷贝（Zero Copy）：搜索 `zero_copy`，是否有 sk_buff/mbuf 传递机制？
+  - 零拷贝（Zero Copy）：搜索 `DMA` 或 `shared` buffer。只有在驱动层看到 DMA 描述符操作，或者协议栈层有 `mbuf` 传递引用，才算零拷贝。
   - 多队列（Multi-queue）：是否有 RSS 支持？
   - **协议支持**：DHCP, DNS, ARP, ICMP, TCP, UDP。
   - **如果未找到代码，明确说明“不支持”**。
@@ -543,14 +570,14 @@ STAGES = [
 必须回答：
 - 日志系统：print/log 宏如何实现？日志级别设计？
 - Panic 处理：panic! 触发后的流程（栈回溯、寄存器 dump、停机）。
-- **栈回溯 (Backtrace)**：是否支持 `dwarf` 解析或基于 FramePointer 的回溯？
+- **栈回溯 (Backtrace)**：是否支持 `dwarf` 解析或基于 FramePointer 的回溯？使用 grep 搜索 `backtrace` 或 `unwind`。**注意不要被 panic 时的简单 PC 打印误导，Backtrace 指的是打印完整的函数调用栈。**
 - 异常处理：未处理异常的默认行为。
 - 调试接口：
     - **交互式 Shell**: 是否提供 Monitor/Shell？支持哪些命令（`ps`, `ls`, `help`）？
-    - GDB stub 支持（如有）
+    - GDB stub 支持（如有）：**严格检查**。搜索 `handle_gdb_packet`。如果找不到数据包解析循环，就不是 GDB Stub。
     - 调试控制台/Monitor
     - 内核调试选项
-    - 是否支持 `perf` 或 `ftrace` 类似的性能监控机制？
+    - 是否支持 `perf` 或 `ftrace`？**Tracepoints** 是否插入到了关键路径？
 - 错误码设计：Result/Error 类型定义。
 - 断言与检查：debug_assert、运行时检查。
 
@@ -558,13 +585,14 @@ STAGES = [
 - 搜索 panic、log、debug、error 相关实现。
 - 查找 print!/println! 或类似宏的定义。
 - 分析 panic_handler 实现。
-- 使用 grep_in_repo 搜索 `gdb|monitor|perf|trace` 确认调试工具支持。
+- 使用 grep_in_repo 搜索 `gdbstub|monitor|perf|trace` 确认调试工具支持。
 
 输出格式：
 - ## 日志与打印系统
-- ## Panic 处理与栈回溯
+- ## Panic 处理与栈回溯（明确是否支持 Backtrace）
 - ## 错误码与 Result 设计
 - ## 调试接口与交互式 Shell
+- ## GDB Stub 支持情况（验证代码，排除配置文件干扰）
 - ## 断言与运行时检查
 - ## 关键代码片段
 
@@ -577,13 +605,13 @@ STAGES = [
         "prompt": """目标：分析项目的测试系统、CI/CD 流程及测试覆盖率。
 
 必须回答：
-- 单元测试：`#[test]` / `#[cfg(test)]` 的使用情况。
+- 单元测试：**必须准确检测**。Rust 项目搜索 `#[test]`、`#[cfg(test)]`。C 项目搜索 `CuTest`, `GTest`, `Unity`。
 - 集成测试：tests/ 目录或独立的测试 APP。
-- **真实的测试结果**：使用 read_file 读取 `run_log.txt` (如果存在)，并分析其中的 `LTP` 或 `test` 关键字，统计**通过/失败**的用例数量。不要捏造“测试全部通过”。
-- **CI/CD 配置**：
+- **真实的测试结果**：使用 read_file 读取 `run_log.txt` (如果存在)，并分析其中的 `LTP` 或 `test` 关键字，统计**通过/失败**的用例数量。
+- **CI/CD 配置（必须验证）**：
     - 检查 `.github/workflows/` (GitHub Actions)。
     - 检查 `.gitlab-ci.yml` (GitLab CI)。
-    - 检查 `Jenkinsfile` 或 `Makefile` 中的 `test` 目标。
+    - **递归搜索**：如果根目录没有，使用 `find_by_name` 搜索 `*.yml`，查看是否在 `bi-direction-copy` 目录或其他子目录？
     - **如果找不到 CI 配置文件，请明确写“未发现 CI/CD 配置”**。
 - 测试脚本：分析 `scripts/` 下的测试运行脚本（如 `test.sh`, `runner.py`）。
 - **模糊测试 (Fuzzing)**：
@@ -901,6 +929,16 @@ def main():
         title = stage["title"]
         prompt = stage["prompt"]
         
+        # 特殊处理 00_repo_prep：如果仓库已存在则跳过
+        if stage_id == "00_repo_prep":
+            repo_local_path = os.path.normpath(os.path.join("./repos", repo_name))
+            if os.path.exists(repo_local_path) and os.path.isdir(repo_local_path) and os.listdir(repo_local_path):
+                print("\n" + "=" * 80)
+                print(f"⏭️  阶段 {idx}/{len(STAGES)}：{title} (仓库已存在，跳过)")
+                print(f"   路径: {repo_local_path}")
+                print("=" * 80)
+                continue
+
         # 检查是否跳过此阶段
         skip_in_report = stage.get("skip_in_report", False)
         
