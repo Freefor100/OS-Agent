@@ -31,7 +31,7 @@
 | 14 | 开发历史与里程碑（含图表） |
 | 15 | 执行摘要与报告整合 |
 
-### 2. 报告评估 (`evaluate.py`) ✨ **增强版**
+### 2. 报告评估 (`os_agent_d_evaluate.py`) ✨ **增强版**
 
 使用 Agent 将自动生成的报告与仓库内人类撰写的文档进行对比评估。
 
@@ -71,7 +71,7 @@
 
 - **📊 评估 prompt 强化**
   - 强制验证：所有声明必须标注验证状态
-  - 捏造加重扣分（12→18 分/处）
+  - 捏造加重扣分（幻觉 -20 分/处，细节捏造 -25 分/处）
   - PDF 大文档分页阅读指令
   - 输出前自检清单
 
@@ -102,13 +102,35 @@
 - **🚀 本地执行缓存优化**
   - **加速分析流程**：`00_repo_prep` 阶段优化，当环境本地已存在目标分析仓库时直接跳过克隆，有效减少重复耗时执行与无效 LLM 请求。
 
-#### 🆕 **v2.4 语言服务器原生整合（2026-02-20）**
+#### 🆕 **v2.4 语言服务器原生整合**（2026-02-20）
 
 - **🧠 原生 AST 智能解析体系**
   - **LSP 多路复用**：引入 `clangd` / `rust-analyzer` / `gopls` 等原生语言服务器，彻底告别正则文本扫描带来的信息残缺（幻觉断层）。
   - **自动 Polyfill**：当环境缺乏 `compile_commands.json` 或 `Cargo.toml` 时，支持基于编译头文件特征的动态挂载，自动补全底层 AST 依赖库环境。
   - **汇编自动降级**：对 `.s`, `.asm` 的汇编代码以及发生超时的 LSP 查询默认实施正则解析（ASMLexicalParser）降级保护机制。
   - **全链路替换分析网关**：全面下线 `analyze_code_architecture` 工具，重构其底层的调用分析体系，彻底释放由于其低匹配精确性造成的评测分偏低问题。
+
+#### 🆕 **v2.5 评估驱动的提示词精修 + 环境完善**（2026-02-21）
+
+- **🔬 评估反馈驱动的 Stage Prompt 修正**
+  - 基于 13 章评估结果的 6 类共性问题，针对性修改了 6 个 stage prompt
+  - 内存管理新增 brk/sbrk、用户指针安全、进程级映射管理
+  - 中断系统调用要求精确统计 TrapFrame 字节数，新增接口/实现分离模式
+  - 文件系统新增具体 FS 抽象层、文件打开调用链、路径精确性约束
+  - 同步 IPC 新增信号作为 IPC、Futex 跨文件调用链
+  - 安全机制强制多架构覆盖；测试框架要求精确计数
+
+- **📝 评估术语规范**
+  - 评估 prompt 新增术语约定，明确区分【人类文档】与【生成报告】
+  - `accuracy.errors.desc` 必须标明问题归属
+
+- **🧰 新增 `lsp_get_document_outline` 工具**
+  - 基于 `textDocument/documentSymbol`，快速获取文件内所有函数/结构体/枚举的名称与行号
+  - 已注册到描述 Agent 和评估 Agent
+
+- **🔧 LSP 环境配置**
+  - 安装 clangd v21.1.8、rust-analyzer v0.3.2795、gopls v0.21.1
+  - 修复 `lsp_ops.py` 中 `builtins.open` 引用错误
 
 #### 核心特性
 
@@ -123,13 +145,33 @@
 
 ## 🚀 快速开始
 
-### 1. 安装依赖
+### 1. 安装 Python 依赖
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. 配置环境变量
+### 2. 安装 Language Servers（LSP 工具依赖）
+
+> LSP 工具（`lsp_get_definition`、`lsp_get_references`、`lsp_get_document_outline`）需要本地安装对应语言的 Language Server。未安装时会自动降级为正则解析，但精度大幅下降。
+
+| 语言 | Language Server | 安装方式 |
+|------|----------------|----------|
+| C/C++ | clangd | `winget install LLVM.LLVM` 或从 [GitHub Releases](https://github.com/clangd/clangd/releases) 下载 |
+| Rust | rust-analyzer | `rustup component add rust-analyzer` 或从 [GitHub Releases](https://github.com/rust-lang/rust-analyzer/releases) 下载 standalone 版 |
+| Go | gopls | `go install golang.org/x/tools/gopls@latest` |
+| Zig | zls | 从 [GitHub Releases](https://github.com/zigtools/zls/releases) 下载 |
+
+安装后验证：
+```bash
+clangd --version          # 例如: clangd version 21.1.8
+rust-analyzer --version   # 例如: rust-analyzer 0.3.2795-standalone
+gopls version             # 例如: golang.org/x/tools/gopls v0.21.1
+```
+
+> **注意**：如果系统中同时存在 rustup 的 rust-analyzer shim 和 standalone 版本，需确保 standalone 版本在 PATH 中优先。可通过将 standalone 目录放在 PATH 前端解决。
+
+### 3. 配置环境变量
 
 创建 `.env` 文件（可复制 `.env.example`）：
 
@@ -154,7 +196,7 @@ REPO_URL=https://github.com/example/os-project.git
 | `MODEL_NAME` | ❌ | LLM 模型名称，默认 `deepseek/deepseek-v3.2` |
 | `REPO_URL` | ✅ | 要分析的 OS 仓库 Git 地址 |
 
-### 3. 运行分析
+### 4. 运行分析
 
 ```bash
 # 直接运行（使用 .env 中的配置）
@@ -178,7 +220,7 @@ output/
 
 ---
 
-## 📊 评估报告（os_agent_d_evaluate.py）✨ **增强版 v2.0**
+## 📊 评估报告（os_agent_d_evaluate.py）✨ **增强版 v2.5**
 
 > **v2.0 更新**（2025-02-14）：新增智能重试、完整错误追溯、鲁棒性大幅提升！评估过程更稳定，失败可追溯。
 
@@ -257,7 +299,7 @@ evaluation/
    output_dir: C:\...\output\my-os
    评估输出: C:\...\evaluation\my-os
    模型: deepseek/deepseek-v3.2
-   章节总数: 15
+   章节总数: 13
    日志文件: C:\...\evaluation\my-os\evaluation.log
    重试配置: 最大3次, 退避2-60秒
 ============================================================
@@ -297,7 +339,7 @@ evaluation/
 ============================================================
 ✅ 评估任务完成
    📊 统计:
-      - 总章节数: 15
+      - 总章节数: 13
       - 成功: 12
       - 失败: 1
       - 跳过: 2
@@ -315,12 +357,12 @@ evaluation/
 ```
 OS-Agent/
 ├── os_agent_d_describe.py          # OS描述/分析程序 (OS-Agent-D)
-├── os_agent_d_evaluate.py            # 报告评估程序 (v2.1)
+├── os_agent_d_evaluate.py            # 报告评估程序 (v2.5)
 ├── requirements.txt       # Python 依赖
 ├── .env                   # 环境变量配置（需自行创建）
 ├── .env.example           # 环境变量配置模板
 ├── core/
-│   └── agent_builder.py   # Agent 构建器（含 grep_in_repo 等工具）
+│   └── agent_builder.py   # Agent 构建器（含 LSP 工具、grep_in_repo 等）
 ├── docs/                  # 文档目录
 │   └── markdown_format_guide.md # Markdown 格式指南
 ├── tools/
@@ -383,6 +425,7 @@ OS-Agent/
 | `read_file` (评估) | 最大 50,000 字符 | 只能访问仓库和 output 目录 |
 | `list_repo_structure` | 默认 4 层深度 | 可通过 `max_depth` 调整 |
 | `lsp_get_definition` / `lsp_get_references` | 本地化跨文件追踪 | 不受文件切片截断影响，提供 AST 真实函数映射与依赖拓扑 |
+| `lsp_get_document_outline` | 文件大纲提取 | 快速获取文件中所有函数/结构体/枚举的名称与行号 |
 | `get_dev_history_by_module` | 最多 200 条提交 | 每模块最多显示 20 条 |
 
 **截断提示**：所有工具在输出被截断时会明确告知 LLM，例如：

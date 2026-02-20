@@ -1,5 +1,53 @@
 # 更新日志 (Changelog)
 
+## [2.5.0] - 2026-02-21
+
+### ✨ 新增功能
+
+#### 评估驱动的 Stage Prompt 精修
+
+基于 13 章评估结果归纳的 6 类共性问题，针对性修改了 6 个 stage prompt：
+
+- **内存管理** (`02_mem_mgmt`)：新增 brk/sbrk 惰性机制、用户指针安全验证、进程级映射管理（VmAreaStruct/rmap）
+- **中断与系统调用** (`04_trap_syscall`)：要求精确统计 TrapFrame 字节数，新增接口/实现分离模式（`_impl` 后缀）、UserInPtr 语义化包装
+- **文件系统** (`05_fs_vfs`)：新增具体 FS 抽象层結构分析（FatFilesystemInner 等）、文件打开完整调用链、路径精确性约束
+- **同步 IPC** (`07_sync_ipc`)：新增信号作为 IPC 机制、Futex 跨文件调用链追踪
+- **安全机制** (`09_security`)：强制多架构覆盖要求
+- **测试框架** (`12_test_ci`)：要求精确计数测试用例，与 grep 结果一致
+
+#### 评估程序术语规范
+
+- 评估 prompt 新增"术语约定"段落，明确区分【人类文档】与【生成报告】
+- `accuracy.errors.desc` 中必须标明问题归属
+
+#### 新增 `lsp_get_document_outline` 工具
+
+- 基于 `textDocument/documentSymbol` 协议，快速提取文件中所有函数、结构体、枚举的名称与行号
+- 已注册到 `build_agent` 的 `base_tools` 和评估程序的 `EVAL_TOOLS`
+- 描述和评估的 format 函数已支持该工具的输出格式化
+
+### 🔧 环境配置
+
+#### Language Server 安装
+
+- 安装 clangd v21.1.8（通过 LLVM winget）
+- 安装 rust-analyzer v0.3.2795-standalone（直接下载，修复了与 rustup shim 的 PATH 冲突）
+- 安装 gopls v0.21.1（通过 `go install`）
+- README 新增 Language Server 安装指南
+
+### 🐛 Bug 修复
+
+- 修复 `lsp_ops.py` 中 `builtins.open` 未导入的引用错误（改为直接使用内置 `open`）
+
+### 📝 文档更新
+
+- README 新增 v2.5 版本说明
+- README 快速开始新增"安装 Language Servers"步骤（含安装命令与验证方法）
+- README 工具限制表新增 `lsp_get_document_outline`
+- CHANGELOG 新增 v2.5.0 条目
+
+---
+
 ## [2.4.0] - 2026-02-20
 
 ### ✨ 新增功能
@@ -139,4 +187,4 @@
 
 ---
 
-*最后更新: 2026-02-20*
+*最后更新: 2026-02-21*
