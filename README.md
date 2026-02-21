@@ -112,13 +112,27 @@
 
 #### 🆕 **v2.5 评估驱动的提示词精修 + 环境完善**（2026-02-21）
 
-- **🔬 评估反馈驱动的 Stage Prompt 修正**
+- **🔬 Round 1: 评估反馈驱动的 Stage Prompt 修正**
   - 基于 13 章评估结果的 6 类共性问题，针对性修改了 6 个 stage prompt
   - 内存管理新增 brk/sbrk、用户指针安全、进程级映射管理
   - 中断系统调用要求精确统计 TrapFrame 字节数，新增接口/实现分离模式
   - 文件系统新增具体 FS 抽象层、文件打开调用链、路径精确性约束
   - 同步 IPC 新增信号作为 IPC、Futex 跨文件调用链
   - 安全机制强制多架构覆盖；测试框架要求精确计数
+
+- **🔬 Round 2: 评分 86.8 后的定向优化**（基于完整评估跑分结果）
+  - §01 概览：强制搜索 arceos 子模块（解决漏检 Lazy Allocation/CFS 问题）
+  - §02 启动：新增 SBI→U-Boot→OS 固件级启动链 + MMU 前后串口地址切换
+  - §03 内存：新增 B树 shm 优化 + rmap 反向映射表检查
+  - §04 进程：新增 PGID/SID 层次 ID 规则 + 16 种 POSIX 资源限制
+  - §05 中断：新增 CoW/Lazy↔缺页关联 + 信号三粒度 + SIGSEGV + 跳板代码
+  - §07 驱动：新增 MMU 前后串口地址切换
+  - §08 同步：新增信号处理时机（Trap 返回前）
+  - §09 多核：新增跨章节交叉引用（解决 18%→94.7% 的覆盖率问题）
+  - §11 网络：新增功能限制声明要求
+  - §13 测试：强化 CI/CD 检测（.github/workflows 解决方案）
+  - SYSTEM_PROMPT：新增子模块探索规则（Rule 11）
+  - 评估 prompt：新增章节边界评分规则
 
 - **📝 评估术语规范**
   - 评估 prompt 新增术语约定，明确区分【人类文档】与【生成报告】
@@ -131,6 +145,7 @@
 - **🔧 LSP 环境配置**
   - 安装 clangd v21.1.8、rust-analyzer v0.3.2795、gopls v0.21.1
   - 修复 `lsp_ops.py` 中 `builtins.open` 引用错误
+  - **新增 `_resolve_lsp_binary` 路径探测**：Conda 环境下自动搜索 `~/.cargo/bin/`、`~/AppData/Local/` 等常见安装位置
 
 #### 核心特性
 
@@ -145,7 +160,20 @@
 
 ## 🚀 快速开始
 
-### 1. 安装 Python 依赖
+### 1. 创建 Python 环境
+
+推荐使用 conda 创建独立环境：
+
+```bash
+# 创建 conda 环境
+conda create -n os_agent python=3.11 -y
+conda activate os_agent
+
+# 安装依赖
+pip install -r requirements.txt
+```
+
+如果不使用 conda，也可以直接安装：
 
 ```bash
 pip install -r requirements.txt
@@ -153,7 +181,7 @@ pip install -r requirements.txt
 
 ### 2. 安装 Language Servers（LSP 工具依赖）
 
-> LSP 工具（`lsp_get_definition`、`lsp_get_references`、`lsp_get_document_outline`）需要本地安装对应语言的 Language Server。未安装时会自动降级为正则解析，但精度大幅下降。
+> LSP 工具（`lsp_get_definition`、`lsp_get_references`、`lsp_get_document_outline`）需要本地安装对应语言的 Language Server。未安装时会自动降级为正则解析，但**精度大幅下降**。
 
 | 语言 | Language Server | 安装方式 |
 |------|----------------|----------|
@@ -169,7 +197,15 @@ rust-analyzer --version   # 例如: rust-analyzer 0.3.2795-standalone
 gopls version             # 例如: golang.org/x/tools/gopls v0.21.1
 ```
 
-> **注意**：如果系统中同时存在 rustup 的 rust-analyzer shim 和 standalone 版本，需确保 standalone 版本在 PATH 中优先。可通过将 standalone 目录放在 PATH 前端解决。
+> **❗ Windows + Conda 用户注意**：Conda 环境的 PATH 可能不包含 `~/.cargo/bin/` 或 `~/AppData/Local/rust-analyzer/` 等目录，导致启动时报 `[WinError 2] 系统找不到指定的文件`。程序已内置自动路径探测（`_resolve_lsp_binary`），会自动搜索以下位置：
+>
+> | 搜索路径 | 来源 |
+> |----------|------|
+> | `~/.cargo/bin/{name}.exe` | rustup 安装 |
+> | `~/AppData/Local/{name}/{name}.exe` | 独立安装版 |
+> | `~/.local/bin/{name}` | Linux/Mac |
+>
+> 如果仍然找不到，请将 Language Server 的安装目录添加到系统 PATH 中。
 
 ### 3. 配置环境变量
 
