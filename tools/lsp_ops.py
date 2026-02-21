@@ -195,23 +195,59 @@ class LSPClient:
 
 
 def _resolve_lsp_binary(name: str) -> str:
-    """Resolve LSP binary path, falling back to common installation locations on Windows."""
+    """Resolve LSP binary path with cross-platform fallback.
+    
+    Search order:
+    1. shutil.which() — current PATH
+    2. Platform-specific common installation directories
+    3. Return bare name as last resort (subprocess will report clear error)
+    """
     import shutil
+    import platform
+    
     found = shutil.which(name)
     if found:
         return found
-    # Common fallback paths on Windows
+    
     home = os.path.expanduser("~")
-    candidates = [
-        os.path.join(home, ".cargo", "bin", f"{name}.exe"),          # rustup
-        os.path.join(home, "AppData", "Local", name, f"{name}.exe"), # standalone
-        os.path.join(home, ".local", "bin", name),                   # Linux/Mac
-    ]
+    system = platform.system()  # 'Windows', 'Linux', 'Darwin'
+    ext = ".exe" if system == "Windows" else ""
+    
+    candidates = []
+    
+    # --- Cross-platform: cargo/rustup ---
+    candidates.append(os.path.join(home, ".cargo", "bin", f"{name}{ext}"))
+    
+    if system == "Windows":
+        # Windows standalone installers often use AppData/Local
+        candidates.append(os.path.join(home, "AppData", "Local", name, f"{name}.exe"))
+        # Scoop
+        candidates.append(os.path.join(home, "scoop", "shims", f"{name}.exe"))
+    elif system == "Darwin":
+        # Homebrew (Apple Silicon & Intel)
+        candidates.append(f"/opt/homebrew/bin/{name}")
+        candidates.append(f"/usr/local/bin/{name}")
+    else:
+        # Linux: common paths
+        candidates.append(f"/usr/bin/{name}")
+        candidates.append(f"/usr/local/bin/{name}")
+        candidates.append(os.path.join(home, ".local", "bin", name))
+        # Snap / Nix
+        candidates.append(f"/snap/bin/{name}")
+        candidates.append(os.path.join(home, ".nix-profile", "bin", name))
+    
     for c in candidates:
         if os.path.isfile(c):
-            logger.info(f"Resolved {name} via fallback: {c}")
+            logger.info(f"Resolved {name} via fallback path: {c}")
             return c
-    return name  # last resort: let subprocess try and fail with a clear error
+    
+    logger.warning(
+        f"LSP binary '{name}' not found in PATH or common locations. "
+        f"Install it for better code analysis accuracy. "
+        f"Searched: PATH + {len(candidates)} fallback paths. "
+        f"See README.md '安装 Language Servers' section for instructions."
+    )
+    return name  # let subprocess fail with a clear error
 
 class MultiplexingLSPGateway:
     def __init__(self):
