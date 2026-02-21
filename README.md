@@ -160,18 +160,22 @@
 
 ## 🚀 快速开始
 
-### 1. 创建 Python 环境
+### 1. 自动环境配置（推荐）
 
-推荐使用 conda 创建独立环境：
+本项目依赖多种底层分析工具（如 `rust-analyzer`, `clangd` 等）。我们提供了全自动的依赖安装脚本：
 
-```bash
-# 创建 conda 环境
-conda create -n os_agent python=3.11 -y
-conda activate os_agent
-
-# 安装依赖
-pip install -r requirements.txt
+**Windows (PowerShell):**
+```powershell
+.\setup_env.ps1
 ```
+
+**Linux / macOS:**
+```bash
+chmod +x setup_env.sh
+./setup_env.sh
+```
+
+*(如果脚本因网络原因失败，可参考脚本内容手动安装所需依赖。我们推荐使用 Conda 隔离 Python 环境：`conda create -n os_agent python=3.10`)*
 
 如果不使用 conda，也可以直接安装：
 
