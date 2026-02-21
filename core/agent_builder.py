@@ -9,7 +9,6 @@ from tools.file_ops import read_code_segment, grep_in_repo
 from tools.git_ops import (
     analyze_git_history,
     analyze_git_history_detailed,
-    clone_repository,
     generate_dev_history_charts,
     get_dev_history_by_module,
     get_repo_local_path,
@@ -78,7 +77,6 @@ def build_agent(model: str = None, stage_id: str = ""):
     """
     # 基础代码阅读与通用工具（所有阶段可用）
     base_tools = [
-        clone_repository,
         get_repo_local_path,
         list_repo_structure,
         find_os_core_modules,
