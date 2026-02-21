@@ -78,8 +78,19 @@ class LSPClient:
         self.request_id = 0
         self.pending_requests: Dict[int, asyncio.Future] = {}
         self.initialized_event = asyncio.Event()
+        self._dead = False  # marked True when reader_loop exits
+
+    @property
+    def is_alive(self) -> bool:
+        """Check if the LSP subprocess is still running."""
+        if self._dead:
+            return False
+        if self.process is None:
+            return False
+        return self.process.returncode is None
 
     async def start(self):
+        self._dead = False
         self.process = await asyncio.create_subprocess_exec(
             *self.cmd,
             cwd=self.cwd,
@@ -91,17 +102,33 @@ class LSPClient:
         await self._initialize()
 
     async def _initialize(self):
+        # Build proper file URI — Windows needs file:///C:/... (3 slashes)
+        abs_cwd = os.path.abspath(self.cwd).replace(chr(92), '/')
+        if not abs_cwd.startswith('/'):
+            abs_cwd = '/' + abs_cwd  # Windows: /C:/Users/...
+        root_uri = f"file://{abs_cwd}"
+        
         init_req = {
             "jsonrpc": "2.0",
             "id": self._next_id(),
             "method": "initialize",
             "params": {
                 "processId": os.getpid(),
-                "rootUri": f"file://{os.path.abspath(self.cwd).replace(chr(92), '/')}",
+                "rootUri": root_uri,
                 "capabilities": {}
             }
         }
         await self.send_request(init_req)
+        
+        # LSP spec REQUIRES 'initialized' notification after initialize response
+        await self.send_notification({
+            "jsonrpc": "2.0",
+            "method": "initialized",
+            "params": {}
+        })
+        
+        # Give server time to start workspace indexing (rust-analyzer needs this for cargo workspaces)
+        await asyncio.sleep(5.0)
         self.initialized_event.set()
 
     def _next_id(self) -> int:
@@ -113,32 +140,43 @@ class LSPClient:
             try:
                 line = await self.process.stdout.readline()
                 if not line:
-                    break
+                    break  # EOF — process exited
                 
                 line_str = line.decode('utf-8').strip()
                 if not line_str.startswith("Content-Length:"):
-                    continue
+                    continue  # skip non-header lines (stderr leakage, etc.)
                 
                 content_length = int(line_str.split(":")[1].strip())
                 
-                # 读取接下来的空行 
-                await self.process.stdout.readline()
+                # Read remaining headers until empty line
+                while True:
+                    header_line = await self.process.stdout.readline()
+                    if not header_line or header_line.strip() == b'':
+                        break
                 
-                # 读取 Body，严格按 Content-Length 读取
+                # Read Body strictly by Content-Length
                 body = await self.process.stdout.readexactly(content_length)
                 response = json.loads(body.decode('utf-8'))
                 
                 res_id = response.get("id")
                 if res_id is not None and res_id in self.pending_requests:
                     self.pending_requests[res_id].set_result(response)
+                # else: server notification (progress, diagnostics, etc.) — ignore
                     
             except asyncio.IncompleteReadError:
-                break
+                break  # pipe closed
+            except (ConnectionError, BrokenPipeError, OSError):
+                break  # connection lost
+            except json.JSONDecodeError as e:
+                logger.debug(f"LSP reader: malformed JSON, skipping: {e}")
+                continue  # don't die on one bad message
             except Exception as e:
-                logger.error(f"LSP reader loop error: {e}")
-                break
+                logger.warning(f"LSP reader loop error (non-fatal): {e}")
+                continue  # keep reading — don't kill connection on transient errors
                 
-        # 异常清理所有挂起的请求，防止阻塞
+        # 标记客户端已死亡，清理所有挂起的请求
+        self._dead = True
+        logger.warning(f"LSP process {self.cmd[0]} exited (reader_loop ended). Marking client as dead.")
         for fut in self.pending_requests.values():
             if not fut.done():
                 fut.set_exception(RuntimeError("LSP process terminated unexpectedly"))
@@ -165,8 +203,8 @@ class LSPClient:
 
         if msg_id is not None:
             try:
-                # 严格限制 LSP 的响应时间，防止超时挂起
-                res = await asyncio.wait_for(fut, timeout=12.0)
+                # rust-analyzer needs time for large cargo workspaces with git deps
+                res = await asyncio.wait_for(fut, timeout=30.0)
                 return res
             except asyncio.TimeoutError:
                 raise TimeoutError("LSP request timed out")
@@ -259,8 +297,18 @@ class MultiplexingLSPGateway:
         key = f"{abs_repo}_{lang}"
         
         async with self.lock:
+            # Check cache — evict dead clients
             if key in self.clients:
-                return self.clients[key]
+                existing = self.clients[key]
+                if existing.is_alive:
+                    return existing
+                else:
+                    logger.warning(f"Evicting dead LSP client for {lang}, will restart.")
+                    try:
+                        await existing.stop()
+                    except Exception:
+                        pass
+                    del self.clients[key]
 
             scan_res = _pre_flight_workspace_scan(abs_repo)
             _polyfill_context(abs_repo, scan_res)
@@ -280,7 +328,10 @@ class MultiplexingLSPGateway:
             try:
                 client = LSPClient(cmd, abs_repo)
                 await client.start()
+                # Give rust-analyzer time to start indexing (large workspaces)
+                await asyncio.sleep(2.0)
                 self.clients[key] = client
+                logger.info(f"LSP {cmd[0]} started successfully for {abs_repo}")
                 return client
             except Exception as e:
                 logger.error(f"Failed to start LSP {cmd[0]}: {e}")
@@ -415,6 +466,18 @@ async def _async_lsp_request(repo_path: str, file_path: str, symbol: str, method
 
     uri = f"file://{abs_file.replace(chr(92), '/')}"
     
+    # 检查客户端是否还活着
+    if not client.is_alive:
+        logger.warning(f"LSP client for {lang} is dead before request. Triggering reconnect.")
+        # Evict dead client and get a fresh one
+        client = await _gateway.get_client(repo_path, lang)
+        if not client:
+            logger.warning(f"LSP reconnect failed for {lang}. Falling back.")
+            if method == "textDocument/definition":
+                return ASMLexicalParser.fallback_definition(repo_path, file_path, symbol)
+            else:
+                return ASMLexicalParser.fallback_references(repo_path, file_path, symbol)
+    
     # 通过模拟打开文档，强制 LSP 构建该文件的 AST 分析缓存
     try:
         with open(abs_file, 'r', encoding='utf-8') as f:
@@ -434,7 +497,22 @@ async def _async_lsp_request(repo_path: str, file_path: str, symbol: str, method
         }
         await client.send_notification(did_open)
         # 提供几百毫秒的预缓冲时间让 LSP 消费 AST
-        await asyncio.sleep(0.3)
+        await asyncio.sleep(0.5)
+    except (BrokenPipeError, ConnectionError, OSError) as e:
+        # Pipe broken = LSP process died during didOpen, trigger reconnect
+        logger.warning(f"LSP pipe broken during didOpen: {e}. Reconnecting...")
+        client = await _gateway.get_client(repo_path, lang)
+        if not client or not client.is_alive:
+            if method == "textDocument/definition":
+                return ASMLexicalParser.fallback_definition(repo_path, file_path, symbol)
+            else:
+                return ASMLexicalParser.fallback_references(repo_path, file_path, symbol)
+        # Retry didOpen on fresh client
+        try:
+            await client.send_notification(did_open)
+            await asyncio.sleep(0.5)
+        except Exception:
+            pass
     except Exception:
         pass
 
@@ -560,6 +638,12 @@ async def _async_lsp_document_symbols(repo_path: str, file_path: str) -> str:
 
     uri = f"file://{abs_file.replace(chr(92), '/')}"
     
+    # Health check before request
+    if not client.is_alive:
+        client = await _gateway.get_client(repo_path, lang)
+        if not client:
+            return "Error: LSP client failed to restart."
+    
     try:
         with open(abs_file, 'r', encoding='utf-8') as f:
             text = f.read()
@@ -577,8 +661,17 @@ async def _async_lsp_document_symbols(repo_path: str, file_path: str) -> str:
             }
         }
         await client.send_notification(did_open)
-        import asyncio
-        await asyncio.sleep(0.3)
+        await asyncio.sleep(0.5)
+    except (BrokenPipeError, ConnectionError, OSError) as e:
+        logger.warning(f"LSP pipe broken during outline didOpen: {e}. Reconnecting...")
+        client = await _gateway.get_client(repo_path, lang)
+        if not client:
+            return f"Error: LSP reconnect failed for outline."
+        try:
+            await client.send_notification(did_open)
+            await asyncio.sleep(0.5)
+        except Exception:
+            pass
     except Exception:
         pass
 
