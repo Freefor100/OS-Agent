@@ -32,13 +32,12 @@ def _slug(s: str) -> str:
     return out[:60] if out else "section"
 
 
-def _build_base_context(repo_url: str, output_dir: str, is_prep_stage: bool = False) -> str:
+def _build_base_context(repo_url: str, output_dir: str) -> str:
     """构建基础上下文信息。
     
     Args:
         repo_url: 仓库 URL
         output_dir: 输出目录
-        is_prep_stage: 是否是仓库准备阶段（第0阶段）
     """
     repo_name = _repo_name_from_url(repo_url)
     # 与 tools.git_ops.get_repo_local_path 保持一致：./repos/<repo_name>
@@ -46,23 +45,8 @@ def _build_base_context(repo_url: str, output_dir: str, is_prep_stage: bool = Fa
     charts_dir = os.path.normpath(os.path.join(output_dir, "charts"))
     sections_dir = os.path.normpath(os.path.join(output_dir, "sections"))
     
-    # 准备阶段需要克隆，后续阶段直接使用 repo_path
-    if is_prep_stage:
-        repo_hint = f"请使用 clone_repository(repo_url) 克隆仓库，仓库 URL: {repo_url}"
-    else:
-        repo_hint = f"**仓库已就绪**: 直接使用 repo_path = \"{repo_path}\"，无需调用 clone_repository。"
-    
-    if is_prep_stage:
-        return f"""你是一个操作系统内核的技术分析 Agent。
-
-基础信息：
-- 仓库 URL: {repo_url}
-- 本地路径 repo_path: {repo_path}
-
-{repo_hint}
-
-请只完成 Prompt 指定的任务（repo 准备），不需要生成长篇报告。输出要极其简练。
-"""
+    # 后续阶段直接使用 repo_path
+    repo_hint = f"**仓库已就绪**: 直接使用 repo_path = \"{repo_path}\"。"
 
     return f"""你是一个操作系统项目的技术分析 Agent。请严格基于仓库中的代码与文档输出结论，避免空泛。
 
@@ -129,19 +113,6 @@ def _build_base_context(repo_url: str, output_dir: str, is_prep_stage: bool = Fa
 
 
 STAGES = [
-    {
-        "id": "00_repo_prep",
-        "title": "仓库准备",
-        "prompt": """目标：克隆仓库并确认本地路径。
-
-请完成：
-1) clone_repository(repo_url)：克隆仓库到本地。
-2) 确认 repo_path 路径正确（工具会返回本地路径）。
-
-输出：简短确认仓库已就绪，包含 repo_path。
-""",
-        "skip_in_report": True,
-    },
     {
         "id": "01_overview",
         "title": "项目概览与技术栈",
@@ -369,7 +340,7 @@ STAGES = [
 必须回答：
 - VFS 抽象层：File/Inode/Dentry Traits 定义。
 - **具体文件系统（必须代码验证）**：
-  - FAT32/Ext4：是否自己实现了？还是用的 crate？（check Cargo.toml）
+  - FAT32/Ext4：是否自己实现了？还是用的 crate？（check Cargo.toml）。**注意：对于组件化的 OS（如 ArceOS），具体的文件系统实现可能独立于 VFS 存在于诸如 `arceos/modules/axfs-ng/src/fs/fat/` 或 `ext4/` 目录中，务必使用搜索功能仔细查找，绝对不要仅仅因为特定目录下没有就断言未实现！**
   - **具体 FS 的抽象层结构**：搜索 `FatFilesystemInner|Ext4Filesystem|FatFileNode|FatDirNode` 等，分析各层如何实现 VFS trait。这是文件系统架构的核心。
   - RamFS/TmpFS：是否有内存文件系统？
 - **伪文件系统**：使用 grep_in_repo 搜索 `devfs|procfs|sysfs` 检查是否实现了伪文件系统。若有，分析其实现方式。
@@ -525,6 +496,7 @@ STAGES = [
 
 必须回答：
 - **多架构覆盖要求**：本章分析必须覆盖项目支持的所有架构（riscv64, aarch64, x86_64, loongarch64 等），不得仅以某一个架构为视角描述。
+- **Rust 安全性机制**：如果项目使用 Rust 编写，必须指出 RAII、所有权分析、基于生命周期的锁等机制带来的安全性。
 - 用户态/内核态隔离：页表隔离（KPTI）、SMEP/SMAP 是否开启？
 - **权限模型深度验证（关键）**：
     - **用户/组（UID/GID）**：不仅要看 `Task` 结构体是否有 `uid` 字段，**必须验证**这些字段是否在 `open/write/exec` 等系统调用中被用于权限检查！（grep `check_perm`, `inode_permission`）。如果仅有字段但无检查逻辑，必须注明“**仅有定义但未强制执行**”。
@@ -559,10 +531,11 @@ STAGES = [
 - ## 特权级与隔离机制
 - ## 权限检查与访问控制
 - ## 用户/组/权限模型
-- ## 进程间隔离与资源限制
+- ## 进程间隔离与资源限制（追踪检查链路）
 - ## 安全沙箱与过滤机制（如无则写“未发现”）
 - ## 审计与安全启动机制（如无则写“未发现”）
 - ## 内存安全与系统调用检查
+- ## Rust 语言级安全性机制（如适用）
 - ## 关键代码片段
 
 **重要**：如果项目安全机制较简单，请如实描述。完成所有工具调用后，你必须输出一个完整的 Markdown 格式分析报告。
@@ -793,12 +766,6 @@ def _format_tool_call_summary(tool_name: str, tool_args: dict) -> str:
         path = tool_args.get("repo_path", tool_args.get("path", ""))
         dirname = os.path.basename(str(path).rstrip("/\\")) if path else ""
         return f'"{pattern}"' + (f" in {dirname}/" if dirname else "")
-
-    elif tool_name == "clone_repository":
-        url = tool_args.get("repo_url", "?")
-        repo_name = url.rstrip("/").split("/")[-1] if url else "?"
-        return repo_name
-
     elif tool_name in ("analyze_tech_stack", "find_os_core_modules"):
         path = tool_args.get("repo_path", tool_args.get("path", "?"))
         dirname = os.path.basename(str(path).rstrip("/\\")) if path else "?"
@@ -851,13 +818,6 @@ def _format_tool_result_summary(tool_name: str, content: str) -> str:
     elif tool_name in ("lsp_get_definition", "lsp_get_references", "lsp_get_document_outline"):
         lines = len(content.split("\n")) if content else 0
         return f"返回 {lines} 行关联信息"
-    elif tool_name == "clone_repository":
-        if "成功" in content or "success" in content.lower() or "cloned" in content.lower():
-            return "✓ 克隆成功"
-        elif "已存在" in content or "exists" in content.lower():
-            return "✓ 仓库已存在"
-        else:
-            return f"返回 {content_len} 字符"
     elif tool_name == "analyze_tech_stack":
         if "代码文件统计" in content or "Rust" in content:
             return "返回技术栈与文件统计"
@@ -980,20 +940,24 @@ def main():
     
 
 
+    # 在此处增加直接克隆逻辑
+    repo_local_path = os.path.normpath(os.path.join("./repos", repo_name))
+    print("\n" + "=" * 80)
+    print(f"📦 阶段 0：仓库准备 (直接执行，无需 LLM)")
+    print("=" * 80)
+    if os.path.exists(repo_local_path) and os.path.isdir(repo_local_path) and os.listdir(repo_local_path):
+        print(f"⏭️  仓库已存在，跳过克隆。 路径: {repo_local_path}")
+    else:
+        print(f"🚀 正在克隆仓库: {repo_url} ...")
+        from tools.git_ops import clone_repository
+        result = clone_repository(repo_url)
+        print(f"✅ 克隆结果: {result}")
+    
     for idx, stage in enumerate(STAGES, 1):
         stage_id = stage["id"]
         title = stage["title"]
         prompt = stage["prompt"]
-        
-        # 特殊处理 00_repo_prep：如果仓库已存在则跳过
-        if stage_id == "00_repo_prep":
-            repo_local_path = os.path.normpath(os.path.join("./repos", repo_name))
-            if os.path.exists(repo_local_path) and os.path.isdir(repo_local_path) and os.listdir(repo_local_path):
-                print("\n" + "=" * 80)
-                print(f"⏭️  阶段 {idx}/{len(STAGES)}：{title} (仓库已存在，跳过)")
-                print(f"   路径: {repo_local_path}")
-                print("=" * 80)
-                continue
+
 
         # 检查是否跳过此阶段
         skip_in_report = stage.get("skip_in_report", False)
@@ -1026,9 +990,8 @@ def main():
                     pass
 
 
-        # 每个阶段构建 base_ctx，仓库准备阶段需要克隆，后续阶段直接使用 repo_path
-        is_prep_stage = "prep" in stage_id.lower()
-        base_ctx = _build_base_context(repo_url=repo_url, output_dir=repo_output_dir, is_prep_stage=is_prep_stage)
+        # 每个阶段构建 base_ctx
+        base_ctx = _build_base_context(repo_url=repo_url, output_dir=repo_output_dir)
         
         # 如果是最后整合阶段，需要读取前面所有 section 的内容
         previous_sections_content = ""
