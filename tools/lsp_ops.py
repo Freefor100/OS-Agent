@@ -27,6 +27,57 @@ def _pre_flight_workspace_scan(repo_path: str) -> Dict[str, bool]:
         "go.mod": os.path.exists(os.path.join(repo_path, "go.mod")),
     }
 
+def _ensure_cargo_fetched(repo_path: str):
+    """Run `cargo fetch` once per repo so rust-analyzer can resolve all dependencies.
+    
+    Without this, rust-analyzer crashes when Cargo.toml has git dependencies
+    that haven't been downloaded yet. Uses a marker file to avoid re-fetching.
+    """
+    import subprocess
+    import shutil
+    
+    marker = os.path.join(repo_path, ".lsp_cargo_fetched")
+    if os.path.exists(marker):
+        return  # already fetched
+    
+    cargo = shutil.which("cargo")
+    if not cargo:
+        # Try common fallback paths
+        home = os.path.expanduser("~")
+        for candidate in [os.path.join(home, ".cargo", "bin", "cargo.exe"),
+                         os.path.join(home, ".cargo", "bin", "cargo")]:
+            if os.path.isfile(candidate):
+                cargo = candidate
+                break
+    
+    if not cargo:
+        logger.warning("cargo not found — skipping cargo fetch. rust-analyzer may fail on git dependencies.")
+        return
+    
+    logger.info(f"Running 'cargo fetch' in {repo_path} (first-time LSP setup, may take 1-2 minutes)...")
+    try:
+        result = subprocess.run(
+            [cargo, "fetch"],
+            cwd=repo_path,
+            capture_output=True,
+            text=True,
+            timeout=180  # 3 minutes max for large workspaces with git deps
+        )
+        if result.returncode == 0:
+            # Write marker so we don't fetch again
+            try:
+                with open(marker, 'w') as f:
+                    f.write("ok")
+            except Exception:
+                pass
+            logger.info(f"cargo fetch completed successfully in {repo_path}")
+        else:
+            logger.warning(f"cargo fetch failed (rc={result.returncode}): {result.stderr[:300]}")
+    except subprocess.TimeoutExpired:
+        logger.warning("cargo fetch timed out after 180s — continuing without full dependency resolution")
+    except Exception as e:
+        logger.warning(f"cargo fetch error: {e} — continuing anyway")
+
 # --- 阶段 2：编译上下文的动态生成 (Dynamic Context Polyfill) ---
 def _polyfill_context(repo_path: str, scan_results: Dict[str, bool]):
     # C/C++ (clangd) 补全逻辑
@@ -68,6 +119,10 @@ def _polyfill_context(repo_path: str, scan_results: Dict[str, bool]):
                         f.write('[package]\nname = "os_kernel_dummy"\nversion = "0.1.0"\nedition = "2021"\n')
                 except Exception as e:
                     logger.error(f"Failed to generate Cargo.toml: {e}")
+    
+    # Rust: cargo fetch — 让 rust-analyzer 能解析 git 远程依赖
+    if scan_results["Cargo.toml"] or os.path.exists(os.path.join(repo_path, "Cargo.toml")):
+        _ensure_cargo_fetched(repo_path)
 
 # --- 阶段 3：多路复用 LSP 客户端构建 (Multiplexing LSP Gateway) ---
 class LSPClient:
