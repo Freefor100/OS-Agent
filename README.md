@@ -183,29 +183,35 @@ pip install -r requirements.txt
 
 > LSP 工具（`lsp_get_definition`、`lsp_get_references`、`lsp_get_document_outline`）需要本地安装对应语言的 Language Server。未安装时会自动降级为正则解析，但**精度大幅下降**。
 
-| 语言 | Language Server | 安装方式 |
-|------|----------------|----------|
-| C/C++ | clangd | `winget install LLVM.LLVM` 或从 [GitHub Releases](https://github.com/clangd/clangd/releases) 下载 |
-| Rust | rust-analyzer | `rustup component add rust-analyzer` 或从 [GitHub Releases](https://github.com/rust-lang/rust-analyzer/releases) 下载 standalone 版 |
-| Go | gopls | `go install golang.org/x/tools/gopls@latest` |
-| Zig | zls | 从 [GitHub Releases](https://github.com/zigtools/zls/releases) 下载 |
+**按需安装**（只需安装你要分析的 OS 使用的语言）：
 
-安装后验证：
+| 语言 | Language Server | Windows | Linux | macOS |
+|------|----------------|---------|-------|-------|
+| **Rust** | rust-analyzer | `rustup component add rust-analyzer` | 同左，或 `apt install rust-analyzer` | `brew install rust-analyzer` |
+| **C/C++** | clangd | `winget install LLVM.LLVM` | `apt install clangd` / `pacman -S clang` | `brew install llvm` |
+| **Go** | gopls | `go install golang.org/x/tools/gopls@latest` | 同左 | 同左 |
+| **Zig** | zls | 从 [Releases](https://github.com/zigtools/zls/releases) 下载 | 同左 | 同左 |
+
+安装后验证（推荐一键检查）：
 ```bash
-clangd --version          # 例如: clangd version 21.1.8
-rust-analyzer --version   # 例如: rust-analyzer 0.3.2795-standalone
-gopls version             # 例如: golang.org/x/tools/gopls v0.21.1
+python check_env.py
 ```
 
-> **❗ Windows + Conda 用户注意**：Conda 环境的 PATH 可能不包含 `~/.cargo/bin/` 或 `~/AppData/Local/rust-analyzer/` 等目录，导致启动时报 `[WinError 2] 系统找不到指定的文件`。程序已内置自动路径探测（`_resolve_lsp_binary`），会自动搜索以下位置：
+手动验证：
+```bash
+rust-analyzer --version   # 例如: rust-analyzer 0.3.2795-standalone
+clangd --version          # 例如: clangd version 21.1.8
+```
+
+> **❗ Conda / venv 用户注意**：虚拟环境的 PATH 可能不包含系统工具目录。程序已内置 `_resolve_lsp_binary` 路径探测：
 >
-> | 搜索路径 | 来源 |
-> |----------|------|
-> | `~/.cargo/bin/{name}.exe` | rustup 安装 |
-> | `~/AppData/Local/{name}/{name}.exe` | 独立安装版 |
-> | `~/.local/bin/{name}` | Linux/Mac |
+> | 平台 | 自动搜索路径 |
+> |------|-------------|
+> | Windows | `~/.cargo/bin/`, `~/AppData/Local/{name}/`, `~/scoop/shims/` |
+> | macOS | `~/.cargo/bin/`, `/opt/homebrew/bin/`, `/usr/local/bin/` |
+> | Linux | `~/.cargo/bin/`, `/usr/bin/`, `~/.local/bin/`, `/snap/bin/` |
 >
-> 如果仍然找不到，请将 Language Server 的安装目录添加到系统 PATH 中。
+> 如果仍然报错，请将 Language Server 安装目录手动加入系统 PATH。
 
 ### 3. 配置环境变量
 
