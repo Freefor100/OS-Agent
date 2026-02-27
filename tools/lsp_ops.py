@@ -316,6 +316,9 @@ def _resolve_lsp_binary(name: str) -> str:
         candidates.append(os.path.join(home, "AppData", "Local", name, f"{name}.exe"))
         # Scoop
         candidates.append(os.path.join(home, "scoop", "shims", f"{name}.exe"))
+        # winget default for LLVM (clangd)
+        if name == "clangd":
+            candidates.append(r"C:\Program Files\LLVM\bin\clangd.exe")
     elif system == "Darwin":
         # Homebrew (Apple Silicon & Intel)
         candidates.append(f"/opt/homebrew/bin/{name}")
