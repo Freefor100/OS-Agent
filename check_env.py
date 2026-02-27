@@ -8,6 +8,7 @@ import sys
 import shutil
 import os
 import platform
+import subprocess
 
 def _check(label: str, ok: bool, detail: str = ""):
     status = "✅" if ok else "❌"
@@ -38,12 +39,30 @@ def main():
         "matplotlib": "matplotlib",
         "pymupdf4llm": "pymupdf4llm",
     }
+    # First check if we have a requirements.txt to install from
+    req_path = "requirements.txt"
+    if os.path.isfile(req_path):
+        _check("requirements.txt", True)
+        try:
+            print(f"  正在通过 {req_path} 安装依赖...")
+            subprocess.run([sys.executable, "-m", "pip", "install", "-r", req_path], check=True)
+            _check("requirements.txt 依赖安装", True)
+        except subprocess.CalledProcessError:
+            all_ok = False
+            _check("requirements.txt 依赖安装", False, "请手动运行 pip install -r requirements.txt")
+    
     for imp, pip_name in pkgs.items():
         try:
             __import__(imp)
             _check(pip_name, True)
         except ImportError:
-            all_ok &= _check(pip_name, False, f"pip install {pip_name}")
+            _check(pip_name, False, f"未找到，正在自动安装 pip install {pip_name}...")
+            try:
+                subprocess.run([sys.executable, "-m", "pip", "install", pip_name], check=True)
+                _check(f"{pip_name} (自动安装成功)", True)
+            except subprocess.CalledProcessError:
+                all_ok = False
+                _check(f"{pip_name} (自动安装失败)", False, f"请手动运行 pip install {pip_name}")
 
     # --- .env file ---
     print("\n⚙️  配置文件:")
@@ -62,7 +81,7 @@ def main():
 
     lsp_tools = {
         "rust-analyzer": {"required": "Rust OS 分析必需", "install": {
-            "Windows": "winget install rust-analyzer  或  rustup component add rust-analyzer",
+            "Windows": "rustup component add rust-analyzer",
             "Linux":   "rustup component add rust-analyzer  或  apt install rust-analyzer",
             "Darwin":  "brew install rust-analyzer  或  rustup component add rust-analyzer",
         }},
@@ -75,6 +94,11 @@ def main():
             "Windows": "go install golang.org/x/tools/gopls@latest",
             "Linux":   "go install golang.org/x/tools/gopls@latest",
             "Darwin":  "go install golang.org/x/tools/gopls@latest",
+        }},
+        "zls": {"required": "Zig 分析可选", "install": {
+            "Windows": "请参考 https://github.com/zigtools/zls",
+            "Linux":   "请参考 https://github.com/zigtools/zls",
+            "Darwin":  "请参考 https://github.com/zigtools/zls",
         }},
     }
 
@@ -93,7 +117,58 @@ def main():
             _check(name, True, path_info)
         else:
             install_hint = info["install"].get(sys_name, info["install"]["Linux"])
-            all_ok &= _check(name, False, f'{info["required"]} — {install_hint}')
+            _check(name, False, f'{info["required"]} — 未找到，准备自动执行: {install_hint}')
+            
+            # Special auto-handle for rust-analyzer if rustup is missing
+            if name == "rust-analyzer" and shutil.which("rustup") is None:
+                if sys_name == "Windows":
+                    print("  [+] 未找到 rustup，开始下载 rustup-init...")
+                    try:
+                        import urllib.request
+                        urllib.request.urlretrieve("https://win.rustup.rs", "rustup-init.exe")
+                        print("  [+] 正在静默安装 rustup...")
+                        subprocess.run([".\\rustup-init.exe", "-y", "--default-toolchain", "stable"], check=True)
+                        os.remove("rustup-init.exe")
+                        # Update PATH locally so subprocess can find rustup
+                        rust_bin = os.path.expanduser("~/.cargo/bin")
+                        os.environ["PATH"] += os.pathsep + rust_bin
+                    except Exception as e:
+                        all_ok = False
+                        _check("rustup 下载/安装", False, f"错误: {e}")
+                        continue
+                else: # Linux or Darwin
+                    print("  [+] 未找到 rustup，正在通过 curl 安装...")
+                    try:
+                        subprocess.run("curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y", shell=True, check=True)
+                        # Update PATH locally so subprocess can find rustup
+                        rust_bin = os.path.expanduser("~/.cargo/bin")
+                        os.environ["PATH"] += os.pathsep + rust_bin
+                    except Exception as e:
+                        all_ok = False
+                        _check("rustup 下载/安装", False, f"错误: {e}")
+                        continue
+                
+                # Make sure default stable is set after any fresh rustup install
+                try:
+                    print("  [+] 设置 default stable toolchain...")
+                    subprocess.run(["rustup", "default", "stable"], check=True)
+                except Exception:
+                    pass
+                
+                print("  [+] 安装 rust-analyzer...")
+
+            # Skip auto-install for zls as it requires manual build/binary download
+            if name == "zls":
+                all_ok = False
+                _check(f"{name} (无法自动安装)", False, f"{install_hint}")
+                continue
+
+            try:
+                subprocess.run(install_hint, shell=True, check=True)
+                _check(f"{name} (自动安装成功)", True, "可能需要重新运行脚本或重启终端使 PATH 生效")
+            except subprocess.CalledProcessError:
+                all_ok = False
+                _check(f"{name} (自动安装失败)", False, f"请手动运行: {install_hint}")
 
     # --- Summary ---
     print("\n" + "=" * 60)
