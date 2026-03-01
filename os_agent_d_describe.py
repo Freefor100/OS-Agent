@@ -2,6 +2,8 @@
 import os
 import re
 import sys
+import time
+import logging
 from datetime import datetime
 
 import langchain
@@ -9,16 +11,13 @@ from dotenv import load_dotenv
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage, SystemMessage
 
 from core.agent_builder import build_agent, SYSTEM_PROMPT
+from core.utils import repo_name_from_url, format_tool_call_summary, format_tool_result_summary
+from core.error_handling import ErrorType, RetryConfig, classify_error, calculate_backoff, ErrorTracker
 
 langchain.debug = True
 load_dotenv()
 
 OUTPUT_DIR = "./output"
-
-
-def _repo_name_from_url(repo_url: str) -> str:
-    name = repo_url.rstrip("/").split("/")[-1]
-    return name[:-4] if name.endswith(".git") else name
 
 
 def _slug(s: str) -> str:
@@ -39,7 +38,7 @@ def _build_base_context(repo_url: str, output_dir: str) -> str:
         repo_url: 仓库 URL
         output_dir: 输出目录
     """
-    repo_name = _repo_name_from_url(repo_url)
+    repo_name = repo_name_from_url(repo_url)
     # 与 tools.git_ops.get_repo_local_path 保持一致：./repos/<repo_name>
     repo_path = os.path.normpath(os.path.join("./repos", repo_name))
     charts_dir = os.path.normpath(os.path.join(output_dir, "charts"))
@@ -733,99 +732,7 @@ STAGES = [
     },
 ]
 
-
-def _format_tool_call_summary(tool_name: str, tool_args: dict) -> str:
-    """格式化工具调用为简洁摘要"""
-    if tool_name in ("read_code_segment", "read_file", "read_human_doc"):
-        file_path = tool_args.get("file_path", tool_args.get("path", "?"))
-        start = tool_args.get("start_line", tool_args.get("start", tool_args.get("start_page", "")))
-        end = tool_args.get("end_line", tool_args.get("end", ""))
-        if start and end:
-            return f"{file_path} L{start}-L{end}"
-        elif start:
-            return f"{file_path} L{start}"
-        return file_path or "?"
-
-    elif tool_name in ("list_repo_structure", "list_directory", "list_section_files"):
-        path = tool_args.get("repo_path", tool_args.get("path", tool_args.get("output_dir", "?")))
-        dirname = os.path.basename(str(path).rstrip("/\\")) if path else "?"
-        return f"{dirname}/"
-
-    elif tool_name == "find_human_docs":
-        path = tool_args.get("repo_path", "?")
-        kw = tool_args.get("keywords", "")[:30]
-        dirname = os.path.basename(str(path).rstrip("/\\")) if path else "?"
-        return f"{dirname}/" + (f' "{kw}"' if kw else "")
-
-    elif tool_name == "verify_claim_in_source":
-        claim = str(tool_args.get("claim", ""))[:40]
-        return f'"{claim}..."' if len(claim) >= 40 else f'"{claim}"'
-
-    elif tool_name in ("grep_search", "grep_in_repo"):
-        pattern = str(tool_args.get("pattern", tool_args.get("query", "?")))[:30]
-        path = tool_args.get("repo_path", tool_args.get("path", ""))
-        dirname = os.path.basename(str(path).rstrip("/\\")) if path else ""
-        return f'"{pattern}"' + (f" in {dirname}/" if dirname else "")
-    elif tool_name in ("analyze_tech_stack", "find_os_core_modules"):
-        path = tool_args.get("repo_path", tool_args.get("path", "?"))
-        dirname = os.path.basename(str(path).rstrip("/\\")) if path else "?"
-        return f"{dirname}/"
-
-    elif tool_name in ("analyze_git_history_detailed", "get_dev_history_by_module", "generate_dev_history_charts"):
-        path = tool_args.get("repo_path", "?")
-        max_commits = tool_args.get("max_commits", "")
-        dirname = os.path.basename(str(path).rstrip("/\\")) if path else "?"
-        return f"{dirname}/" + (f" (max={max_commits})" if max_commits else "")
-
-    elif tool_name in ("lsp_get_definition", "lsp_get_references"):
-        symbol = str(tool_args.get("symbol", "?"))
-        file_path = str(tool_args.get("file_path", "?"))
-        return f"{symbol} in {os.path.basename(file_path)}"
-
-    elif tool_name == "lsp_get_document_outline":
-        file_path = str(tool_args.get("file_path", "?"))
-        return f"{os.path.basename(file_path)}"
-
-    else:
-        if tool_args:
-            first_key = list(tool_args.keys())[0]
-            first_val = str(tool_args[first_key])[:40]
-            return f"{first_key}={first_val}"
-        return ""
-
-
-def _format_tool_result_summary(tool_name: str, content: str) -> str:
-    """格式化工具返回结果为简洁摘要"""
-    content_len = len(content)
-    line_count = len(content.split("\n")) if content else 0
-
-    if tool_name in ("read_code_segment", "read_file", "read_human_doc"):
-        return f"返回 {line_count} 行 ({content_len} 字符)"
-    elif tool_name in ("list_repo_structure", "list_directory", "list_section_files"):
-        return f"返回 {line_count} 项"
-    elif tool_name == "find_human_docs":
-        doc_count = content.count("[PDF") + content.count("[DOC") + content.count("[MATCH]")
-        return f"找到 {doc_count} 个文档" if doc_count else f"返回 {content_len} 字符"
-    elif tool_name == "verify_claim_in_source":
-        if "✅" in content or "找到" in content:
-            return "✓ 源码有匹配"
-        if "❌" in content:
-            return "✗ 源码无匹配"
-        return f"返回 {content_len} 字符"
-    elif tool_name in ("grep_search", "grep_in_repo"):
-        match_count = content.count("\n") if content.strip() else 0
-        return f"找到 {match_count} 个匹配"
-    elif tool_name in ("lsp_get_definition", "lsp_get_references", "lsp_get_document_outline"):
-        lines = len(content.split("\n")) if content else 0
-        return f"返回 {lines} 行关联信息"
-    elif tool_name == "analyze_tech_stack":
-        if "代码文件统计" in content or "Rust" in content:
-            return "返回技术栈与文件统计"
-        return f"返回 {content_len} 字符"
-    elif tool_name in ("get_dev_history_by_module", "analyze_git_history_detailed"):
-        return f"返回开发历史 ({line_count} 行)"
-    else:
-        return f"返回 {content_len} 字符 ({line_count} 行)"
+# _format_tool_call_summary 和 _format_tool_result_summary 已移至 core.utils 模块
 
 
 def print_step(step_num: int, node_name: str, state: dict, stage_step_num: int = 0, max_steps: int = 1000, stage_limit: int = 500) -> int:
@@ -871,7 +778,7 @@ def print_step(step_num: int, node_name: str, state: dict, stage_step_num: int =
                         tool_name = getattr(tc, "name", "unknown")
                         tool_args = getattr(tc, "args", {})
                     
-                    summary = _format_tool_call_summary(tool_name, tool_args)
+                    summary = format_tool_call_summary(tool_name, tool_args)
                     print(f"   {tool_name}({summary})")
             
             # 如果有思考内容且没有工具调用，显示思考（这通常是最终输出）
@@ -896,7 +803,7 @@ def print_step(step_num: int, node_name: str, state: dict, stage_step_num: int =
         elif isinstance(msg, ToolMessage):
             tool_name = getattr(msg, "name", "unknown")
             content = msg.content or ""
-            summary = _format_tool_result_summary(tool_name, content)
+            summary = format_tool_result_summary(tool_name, content)
             print(f"   ✅ {tool_name}: {summary}")
             
     return token_count
@@ -911,7 +818,7 @@ def main():
         print("   export REPO_URL=\"https://github.com/example/os-project.git\"")
         sys.exit(1)
 
-    repo_name = _repo_name_from_url(repo_url)
+    repo_name = repo_name_from_url(repo_url)
     
     # 按 OS 名称创建独立的输出目录
     repo_output_dir = os.path.join(OUTPUT_DIR, repo_name)
@@ -937,7 +844,9 @@ def main():
     chapter_counter = 0  # 实际章节计数器
     
     GLOBAL_ESTIMATED_STEPS = 1000  # 全局估计总步数（用于显示进度条分母）
-    
+
+    # 初始化错误追踪器
+    error_tracker = ErrorTracker(output_dir=repo_output_dir)
 
 
     # 在此处增加直接克隆逻辑
@@ -950,7 +859,7 @@ def main():
     else:
         print(f"🚀 正在克隆仓库: {repo_url} ...")
         from tools.git_ops import clone_repository
-        result = clone_repository(repo_url)
+        result = clone_repository.invoke({"repo_url": repo_url})
         print(f"✅ 克隆结果: {result}")
     
     for idx, stage in enumerate(STAGES, 1):
@@ -1069,24 +978,79 @@ def main():
         recursion_limit = 500
         
         stage_tokens = 0  # 阶段内 token 计数
+        retry_count = 0
+        last_exception = None
         
-        try:
-            # 增加 recursion_limit 防止复杂任务因步数过多而中断
-            for event in agent.stream(inputs, config={"recursion_limit": recursion_limit}):
-                overall_step_count += 1
-                stage_step_count += 1
-                for node_name, state in event.items():
-                    step_tokens = print_step(overall_step_count, node_name, state, stage_step_count, GLOBAL_ESTIMATED_STEPS, recursion_limit)
-                    stage_tokens += step_tokens
-                    final_state = state
-        except KeyboardInterrupt:
-            print("\\n\\n⚠️  用户中断执行")
-            sys.exit(1)
-        except Exception as e:
-            print(f"\\n\\n❌ 执行出错: {e}")
-            # 不直接退出，而是尝试保存已有的部分（如果有）或错误信息
-            import traceback
-            traceback.print_exc()
+        # 智能重试循环
+        while retry_count <= RetryConfig.MAX_RETRIES:
+            try:
+                if retry_count > 0:
+                    # 分类错误并决定是否重试
+                    error_type = classify_error(last_exception)
+                    
+                    if not RetryConfig.RETRYABLE_ERRORS.get(error_type, False):
+                        logging.warning(
+                            f"[{title}] 错误类型 {error_type.value} 不适合重试，跳过"
+                        )
+                        break
+                    
+                    # 计算退避时间
+                    backoff = calculate_backoff(retry_count - 1)
+                    print(f"   🔄 正在重试 ({retry_count}/{RetryConfig.MAX_RETRIES})...")
+                    print(f"   ⏱️  等待 {backoff} 秒后重试（{error_type.value}）...")
+                    time.sleep(backoff)
+                    
+                    logging.info(
+                        f"[{title}] 第 {retry_count} 次重试 "
+                        f"(错误类型: {error_type.value}, 退避: {backoff}s)"
+                    )
+                
+                # 执行 agent
+                for event in agent.stream(inputs, config={"recursion_limit": recursion_limit}):
+                    overall_step_count += 1
+                    stage_step_count += 1
+                    for node_name, state in event.items():
+                        step_tokens = print_step(overall_step_count, node_name, state, stage_step_count, GLOBAL_ESTIMATED_STEPS, recursion_limit)
+                        stage_tokens += step_tokens
+                        final_state = state
+                
+                # 成功执行完成，跳出重试循环
+                logging.info(f"[{title}] Agent 执行成功（步骤数: {stage_step_count}）")
+                break
+                
+            except KeyboardInterrupt:
+                print("\\n\\n⚠️  用户中断执行")
+                error_tracker.save_error_report(filename="describe_error_report.json")
+                sys.exit(1)
+            except Exception as e:
+                last_exception = e
+                error_type = classify_error(e)
+                
+                # 记录错误到追踪器
+                error_tracker.record_error(
+                    section_name=title,
+                    error_type=error_type,
+                    exception=e,
+                    retry_count=retry_count,
+                    context={
+                        "stage_id": stage_id,
+                        "step_count": stage_step_count,
+                        "model": os.getenv('MODEL_NAME'),
+                        "recursion_limit": recursion_limit,
+                    }
+                )
+                
+                print(f"\n   ❌ {error_type.value}: {type(e).__name__}: {e}")
+                retry_count += 1
+                
+                if retry_count > RetryConfig.MAX_RETRIES:
+                    error_msg = f"超过最大重试次数 {RetryConfig.MAX_RETRIES}"
+                    logging.critical(
+                        f"[{title}] {error_msg} - 最后错误: {type(e).__name__}: {e}"
+                    )
+                    import traceback
+                    traceback.print_exc()
+                    # 不退出，继续下一阶段
 
         stage_text = ""
         is_complete = False
@@ -1140,8 +1104,14 @@ def main():
 请现在输出报告：""")
                     
                     try:
+                        # 必须清理掉末尾带有未解析 tool_calls 的 AIMessage，否则大模型会抛出验证错误
+                        # 并导致部分模型（如 Qwen）重置上下文。
+                        safe_messages = messages.copy()
+                        while safe_messages and isinstance(safe_messages[-1], AIMessage) and getattr(safe_messages[-1], "tool_calls", None):
+                            safe_messages.pop()
+                            
                         # 继续对话，追加 followup 消息
-                        followup_inputs = {"messages": messages + [followup_msg]}
+                        followup_inputs = {"messages": safe_messages + [followup_msg]}
                         for event in agent.stream(followup_inputs, config={"recursion_limit": 10}):
                             overall_step_count += 1
                             stage_step_count += 1
@@ -1323,6 +1293,12 @@ def main():
         import traceback
         traceback.print_exc()
 
+    # 保存错误报告（如果有错误）
+    error_tracker.save_error_report(filename="describe_error_report.json")
+    if error_tracker.errors:
+        print(f"\n⚠️  运行过程中发生 {len(error_tracker.errors)} 个错误")
+        print(error_tracker.generate_error_summary())
+
     end_time = datetime.now()
     elapsed = (end_time - start_time).total_seconds()
 
@@ -1331,6 +1307,8 @@ def main():
     print(f"   总步数: {overall_step_count}")
     print(f"   总Token使用: {total_tokens_used:,}")
     print(f"   耗时: {elapsed:.2f} 秒 ({elapsed/60:.2f} 分钟)")
+    if error_tracker.errors:
+        print(f"   错误数: {len(error_tracker.errors)} (详见 describe_error_report.json)")
     print(f"⏰ 结束时间: {end_time.strftime('%Y-%m-%d %H:%M:%S')}")
     print("=" * 80)
 

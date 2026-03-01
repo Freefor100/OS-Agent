@@ -8,9 +8,9 @@
 
 ## 📋 功能特性
 
-### 1. 自动分析 (`os_agent_d_describe.py`)
+### 1. 自动分析 (`os_agent_d_describe.py`) ✨ **增强版**
 
-对 OS 仓库进行 **16 阶段**的深度技术分析：
+对 OS 仓库进行 **16 阶段**的深度技术分析，内置智能重试与错误追踪机制：
 
 | 阶段 | 内容 |
 |------|------|
@@ -146,6 +146,35 @@
   - 安装 clangd v21.1.8、rust-analyzer v0.3.2795、gopls v0.21.1
   - 修复 `lsp_ops.py` 中 `builtins.open` 引用错误
   - **新增 `_resolve_lsp_binary` 路径探测**：Conda 环境下自动搜索 `~/.cargo/bin/`、`~/AppData/Local/` 等常见安装位置
+
+#### 🆕 **v2.6 代码架构重构 + 描述模块鲁棒性增强**（2026-03-01）
+
+- **♻️ 公共模块抽取**
+  - **新增 `core/utils.py`**：从 `os_agent_d_describe.py` 和 `os_agent_d_evaluate.py` 提取重复的工具格式化函数（`format_tool_call_summary`、`format_tool_result_summary`、`repo_name_from_url`），合并为超集版本
+  - **新增 `core/error_handling.py`**：从 `os_agent_d_evaluate.py` 提取错误处理体系（`ErrorType`、`RetryConfig`、`classify_error`、`calculate_backoff`、`ErrorTracker`），供两个模块共享
+  - 净减少约 87 行重复代码，确保错误处理和格式化逻辑的单一来源
+
+- **🔄 描述模块（`os_agent_d_describe.py`）智能重试**
+  - 新增 **指数退避重试机制**（与评估模块一致）：每阶段最多重试 3 次，退避时间 2s→4s→8s
+  - 新增 **`ErrorTracker` 错误追踪**：记录所有阶段执行中的错误，运行结束生成 `describe_error_report.json`
+  - 错误自动分类（网络/API/超时/解析/工具/未知），解析错误不做无意义重试
+  - 用户中断（Ctrl+C）时自动保存已记录的错误报告
+  - 运行结束输出错误摘要统计
+
+- **🛡️ Git 克隆鲁棒性增强**
+  - `clone_repository` 新增 Windows NTFS 非法字符（如冒号 `:`）容错
+  - 克隆失败时自动设置 `core.protectNTFS=false` 并强制 checkout
+  - 空目录检测：避免对空目录误判为已存在仓库
+
+- **🧠 LSP 稳定性大幅提升**
+  - `rust-analyzer` **自动安装**：当 `rustup component` 缺少时自动执行 `rustup component add rust-analyzer`
+  - `Cargo.toml` 自动修复：当 manifest 缺少 target 文件（`src/lib.rs`、`src/main.rs`）时自动创建空占位文件
+  - 新增 `disable_build_scripts` 选项：通过环境变量禁用 build scripts，减少 `FetchWorkspaceError`
+  - stderr 读取循环独立管理，防止 LSP 进程死锁
+  - `_resolve_lsp_binary` 支持 `cwd` 参数，优先在项目 toolchain 中查找
+
+- **🔧 其他修复**
+  - `agent_builder.py`：修复历史阶段工具匹配条件（`13_history` → `_history`），确保阶段 ID 变化后仍能正确加载 Git 历史工具
 
 #### 核心特性
 
@@ -402,28 +431,31 @@ evaluation/
 
 ```
 OS-Agent/
-├── os_agent_d_describe.py          # OS描述/分析程序 (OS-Agent-D)
-├── os_agent_d_evaluate.py            # 报告评估程序 (v2.5)
-├── requirements.txt       # Python 依赖
-├── .env                   # 环境变量配置（需自行创建）
-├── .env.example           # 环境变量配置模板
+├── os_agent_d_describe.py          # OS描述/分析程序（含智能重试与错误追踪）
+├── os_agent_d_evaluate.py          # 报告评估程序 (v2.6)
+├── requirements.txt                # Python 依赖
+├── .env                            # 环境变量配置（需自行创建）
+├── .env.example                    # 环境变量配置模板
 ├── core/
-│   └── agent_builder.py   # Agent 构建器（含 LSP 工具、grep_in_repo 等）
-├── docs/                  # 文档目录
-│   └── markdown_format_guide.md # Markdown 格式指南
+│   ├── agent_builder.py            # Agent 构建器（含 LSP 工具、grep_in_repo 等）
+│   ├── utils.py                    # 🆕 公共工具函数（格式化、仓库名解析）
+│   └── error_handling.py           # 🆕 错误处理模块（分类、重试、追踪）
+├── docs/                           # 文档目录
+│   └── markdown_format_guide.md    # Markdown 格式指南
 ├── tools/
-│   ├── file_ops.py        # 文件操作工具（read_code_segment, grep_in_repo）
-│   ├── git_ops.py         # Git 操作与图表生成
-│   ├── lsp_ops.py         # 语言服务器协议(LSP)封装，AST解析
-│   ├── describe_ops.py    # 仓库分析工具（描述模块专用）
-│   └── eval_ops.py        # 评估专用工具（人类文档搜索、声明验证）
-├── repos/                 # 克隆的 OS 仓库
-├── output/                # 描述模块输出（按项目名划分）
+│   ├── file_ops.py                 # 文件操作工具（read_code_segment, grep_in_repo）
+│   ├── git_ops.py                  # Git 操作与图表生成
+│   ├── lsp_ops.py                  # 语言服务器协议(LSP)封装，AST解析
+│   ├── describe_ops.py             # 仓库分析工具（描述模块专用）
+│   └── eval_ops.py                 # 评估专用工具（人类文档搜索、声明验证）
+├── repos/                          # 克隆的 OS 仓库
+├── output/                         # 描述模块输出（按项目名划分）
 │   └── <os-name>/
-│       ├── sections/      # 分段报告
-│       ├── charts/        # 图表
-│       └── report.md      # 完整报告
-└── evaluation/            # 评估模块输出（按项目名划分）
+│       ├── sections/               # 分段报告
+│       ├── charts/                 # 图表
+│       ├── report.md               # 完整报告
+│       └── describe_error_report.json  # 🆕 错误报告（如有错误）
+└── evaluation/                     # 评估模块输出（按项目名划分）
     └── <os-name>/
         ├── evaluation.log          # 详细日志
         ├── error_report.json       # 错误报告
@@ -483,9 +515,14 @@ OS-Agent/
 
 ## 🔧 常见问题
 
-### Q: 分析过程中断怎么办？
+### Q: 分析过程中断或出错怎么办？
 
 程序支持断点续传。已完成的章节会保存在 `output/<os-name>/sections/` 目录，重新运行时会自动跳过已完成的部分。
+
+**v2.6** 新增智能重试机制：
+- 网络/API/超时错误自动重试（最多 3 次，指数退避）
+- 单阶段失败不影响后续阶段执行
+- 运行结束时输出错误摘要，并生成 `output/<os-name>/describe_error_report.json`
 
 ### Q: 如何评估已有的报告？
 

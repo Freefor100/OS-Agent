@@ -81,26 +81,31 @@ def _ensure_cargo_fetched(repo_path: str):
 # --- 阶段 2：编译上下文的动态生成 (Dynamic Context Polyfill) ---
 def _polyfill_context(repo_path: str, scan_results: Dict[str, bool]):
     # C/C++ (clangd) 补全逻辑
-    has_c_config = (scan_results["compile_commands.json"] or 
-                    scan_results["Makefile"] or 
-                    scan_results["CMakeLists.txt"])
+    # C/C++ (clangd) 补全逻辑
+    # 哪怕有 Makefile/CMakeLists，如果没有 compile_commands.json，clangd 依然是个瞎子
+    has_c_config = scan_results["compile_commands.json"]
     
     if not has_c_config:
         compile_flags_path = os.path.join(repo_path, "compile_flags.txt")
-        if not os.path.exists(compile_flags_path):
-            include_dirs = set()
-            for root, dirs, files in os.walk(repo_path):
-                # 跳过无关目录，防止生成的 flags 过载
-                dirs[:] = [d for d in dirs if d not in {".git", ".github", "target", "vendor", "node_modules", "build", "dist"}]
-                if any(f.endswith('.h') or f.endswith('.hpp') for f in files):
-                    include_dirs.add(root)
-            if include_dirs:
-                try:
-                    with open(compile_flags_path, 'w', encoding='utf-8') as f:
-                        for d in include_dirs:
-                            f.write(f"-I{os.path.abspath(d)}\n")
-                except Exception as e:
-                    logger.error(f"Failed to generate compile_flags.txt: {e}")
+        # 总是重新生成，以防克隆后文件变动
+        include_dirs = {os.path.abspath(repo_path)}
+        for root, dirs, files in os.walk(repo_path):
+            # 跳过无关目录，防止生成的 flags 过载
+            dirs[:] = [d for d in dirs if d not in {".git", ".github", "target", "vendor", "node_modules", "build", "dist"}]
+            if any(f.endswith('.h') or f.endswith('.hpp') for f in files):
+                include_dirs.add(os.path.abspath(root))
+        if include_dirs:
+            try:
+                with open(compile_flags_path, 'w', encoding='utf-8') as f:
+                    # 声明这大概率是一个 C 语言或 C++ 内核项目
+                    f.write("-xc\n") 
+                    # 将根目录和所有包含头文件的目录加入搜索路径
+                    for d in include_dirs:
+                        # 对于 Windows 上的 clangd，路径中的反斜杠可能需要转义或统一替换为正斜杠
+                        sanitized_path = d.replace('\\', '/')
+                        f.write(f"-I{sanitized_path}\n")
+            except Exception as e:
+                logger.error(f"Failed to generate compile_flags.txt: {e}")
 
     # Rust (rust-analyzer) 补全逻辑
     if not scan_results["Cargo.toml"]:
@@ -119,6 +124,19 @@ def _polyfill_context(repo_path: str, scan_results: Dict[str, bool]):
                         f.write('[package]\nname = "os_kernel_dummy"\nversion = "0.1.0"\nedition = "2021"\n')
                 except Exception as e:
                     logger.error(f"Failed to generate Cargo.toml: {e}")
+            
+            # 如果存在 Cargo.toml，检查是否存在有效的 target 文件 (src/lib.rs 或 src/main.rs)
+            # 防止 rust-analyzer 的 cargo metadata 报错 `no targets specified in the manifest` 而彻底罢工
+            if os.path.exists(cargo_toml_path):
+                src_dir = os.path.join(repo_path, "src")
+                has_target = os.path.exists(os.path.join(src_dir, "lib.rs")) or os.path.exists(os.path.join(src_dir, "main.rs"))
+                if not has_target:
+                    os.makedirs(src_dir, exist_ok=True)
+                    try:
+                        with open(os.path.join(src_dir, "lib.rs"), 'w', encoding='utf-8') as f:
+                            f.write("// Dummy lib created by os-agent to satisfy rust-analyzer workspace loader\n")
+                    except Exception as e:
+                        logger.error(f"Failed to generate dummy src/lib.rs: {e}")
     
     # Rust: cargo fetch — 让 rust-analyzer 能解析 git 远程依赖
     if scan_results["Cargo.toml"] or os.path.exists(os.path.join(repo_path, "Cargo.toml")):
@@ -134,6 +152,8 @@ class LSPClient:
         self.pending_requests: Dict[int, asyncio.Future] = {}
         self.initialized_event = asyncio.Event()
         self._dead = False  # marked True when reader_loop exits
+        self.opened_uris = set()
+        self.build_scripts_disabled = False
 
     @property
     def is_alive(self) -> bool:
@@ -142,19 +162,49 @@ class LSPClient:
             return False
         if self.process is None:
             return False
+        # In asyncio.subprocess, returncode is None until you read it or wait for it.
+        # But if the reader loop marked _dead=True, we already know it's dead.
         return self.process.returncode is None
 
-    async def start(self):
+    async def start(self, disable_build_scripts: bool = False):
         self._dead = False
+        self.build_scripts_disabled = disable_build_scripts
+        env = os.environ.copy()
+        
+        if disable_build_scripts and "rust-analyzer" in self.cmd[0]:
+            # 核心漏洞防御：阻止 rust-analyzer 执行目标机器特有的、可能直接 Crash 的构建脚本
+            env["RUST_ANALYZER_CARGO_RUN_BUILD_SCRIPTS"] = "false"
+            env["RUST_ANALYZER_CARGO_FEATURES"] = "all"
+            env["RUST_ANALYZER_CARGO_NO_DEFAULT_FEATURES"] = "false"
+            # 强化隔离：防止在线拉取卡死，允许不稳定特性
+            env["RUSTC_BOOTSTRAP"] = "1"
+            env["CARGO_NET_OFFLINE"] = "true" 
+            # 终极 Workspace 防御：忽略不存在的 target 报错
+            env["RUST_ANALYZER_CARGO_UNSET_TEST"] = "true"
+            env["CARGO_TARGET_DIR"] = os.path.join(self.cwd, ".os_agent_ra_target")
+        
         self.process = await asyncio.create_subprocess_exec(
             *self.cmd,
             cwd=self.cwd,
+            env=env,
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )
         asyncio.create_task(self._reader_loop())
+        asyncio.create_task(self._stderr_loop())
         await self._initialize()
+        
+    async def _stderr_loop(self):
+        """Consume and log stderr so we know WHY the LSP process crashes."""
+        while self.process and self.process.stderr:
+            try:
+                line = await self.process.stderr.readline()
+                if not line:
+                    break
+                logger.warning(f"LSP [{self.cmd[0]}] STDERR: {line.decode('utf-8', errors='ignore').strip()}")
+            except Exception:
+                break
 
     async def _initialize(self):
         # Build proper file URI — Windows needs file:///C:/... (3 slashes)
@@ -231,10 +281,11 @@ class LSPClient:
                 
         # 标记客户端已死亡，清理所有挂起的请求
         self._dead = True
-        logger.warning(f"LSP process {self.cmd[0]} exited (reader_loop ended). Marking client as dead.")
+        logger.warning(f"LSP process {self.cmd[0]} exited (reader_loop ended). Marking client as dead. Check STDERR above for crash reason.")
         for fut in self.pending_requests.values():
-            if not fut.done():
+            if not fut.done() and not fut.cancelled():
                 fut.set_exception(RuntimeError("LSP process terminated unexpectedly"))
+        self.pending_requests.clear()
 
     async def send_request(self, message: Dict[str, Any]) -> Dict[str, Any]:
         msg_id = message.get("id")
@@ -287,17 +338,46 @@ class LSPClient:
                     pass
 
 
-def _resolve_lsp_binary(name: str) -> str:
+def _resolve_lsp_binary(name: str, cwd: Optional[str] = None) -> str:
     """Resolve LSP binary path with cross-platform fallback.
     
     Search order:
-    1. shutil.which() — current PATH
-    2. Platform-specific common installation directories
-    3. Return bare name as last resort (subprocess will report clear error)
+    1. rustup which (if name is rust-analyzer) to bypass proxy bugs
+    2. shutil.which() — current PATH
+    3. Platform-specific common installation directories
+    4. Return bare name as last resort (subprocess will report clear error)
     """
     import shutil
     import platform
+    import subprocess
     
+    if name == "rust-analyzer":
+        try:
+            # Bypass rustup proxy bug on Windows where capitalized .EXE fails to resolve the component
+            res = subprocess.run(["rustup", "which", "rust-analyzer"], cwd=cwd, capture_output=True, text=True, check=True)
+            candidate = res.stdout.strip()
+            if candidate and os.path.isfile(candidate):
+                return candidate
+        except subprocess.CalledProcessError as e:
+            # If `rustup which` fails, it's likely because the rust-analyzer component is missing 
+            # for the specific toolchain (e.g. toolchains specified in rust-toolchain.toml)
+            # Let's try to automatically install it and retry once
+            err_str = e.stderr.lower() if e.stderr else ""
+            if "not installed" in err_str or "no component" in err_str or "error" in err_str:
+                logger.info(f"rust-analyzer component seems missing for current toolchain. Attempting auto-install...")
+                try:
+                    subprocess.run(["rustup", "component", "add", "rust-analyzer"], cwd=cwd, capture_output=True, check=True)
+                    # Retry
+                    res2 = subprocess.run(["rustup", "which", "rust-analyzer"], cwd=cwd, capture_output=True, text=True, check=True)
+                    candidate2 = res2.stdout.strip()
+                    if candidate2 and os.path.isfile(candidate2):
+                        logger.info(f"Successfully auto-installed and resolved rust-analyzer: {candidate2}")
+                        return candidate2
+                except Exception as ex:
+                    logger.warning(f"Failed to auto-install rust-analyzer: {ex}")
+        except Exception:
+            pass
+
     found = shutil.which(name)
     if found:
         return found
@@ -373,21 +453,35 @@ class MultiplexingLSPGateway:
 
             cmd = []
             if lang in ["c", "cpp"]:
-                cmd = [_resolve_lsp_binary("clangd")]
+                cmd = [_resolve_lsp_binary("clangd", cwd=abs_repo)]
             elif lang == "rust":
-                cmd = [_resolve_lsp_binary("rust-analyzer")]
+                cmd = [_resolve_lsp_binary("rust-analyzer", cwd=abs_repo)]
             elif lang == "go":
-                cmd = [_resolve_lsp_binary("gopls")]
+                cmd = [_resolve_lsp_binary("gopls", cwd=abs_repo)]
             elif lang == "zig":
-                cmd = [_resolve_lsp_binary("zls")]
+                cmd = [_resolve_lsp_binary("zls", cwd=abs_repo)]
             else:
                 return None
 
             try:
-                client = LSPClient(cmd, abs_repo)
-                await client.start()
-                # Give rust-analyzer time to start indexing (large workspaces)
-                await asyncio.sleep(2.0)
+                # 必须在这个单例锁内加上全局锁，防止 OOM 轰炸
+                async with _lsp_global_lock:
+                    client = LSPClient(cmd, abs_repo)
+                    await client.start(disable_build_scripts=False)
+                    # Give rust-analyzer time to start indexing (large workspaces)
+                    await asyncio.sleep(2.0)
+                    
+                    # Check if it crashed immediately (e.g. panicking build.rs)
+                    if not client.is_alive and lang == "rust":
+                        logger.warning(f"LSP {cmd[0]} died immediately. Retrying with build scripts disabled.")
+                        client = LSPClient(cmd, abs_repo)
+                        await client.start(disable_build_scripts=True)
+                        await asyncio.sleep(2.0)
+                        
+                if not client.is_alive:
+                    logger.error(f"Failed to start LSP {cmd[0]}: Process died after startup.")
+                    return None
+                    
                 self.clients[key] = client
                 logger.info(f"LSP {cmd[0]} started successfully for {abs_repo}")
                 return client
@@ -415,6 +509,8 @@ _lsp_thread = threading.Thread(target=_start_lsp_loop, args=(_lsp_loop,), daemon
 _lsp_thread.start()
 
 _gateway = MultiplexingLSPGateway()
+# 全局并发锁：防止大模型并发调用多个 LSP 搜索导致 LSP 服务端直接崩溃
+_lsp_global_lock = asyncio.Lock()
 
 def _cleanup_lsp():
     # 退出前清理子进程
@@ -536,11 +632,26 @@ async def _async_lsp_request(repo_path: str, file_path: str, symbol: str, method
             else:
                 return ASMLexicalParser.fallback_references(repo_path, file_path, symbol)
     
-    # 通过模拟打开文档，强制 LSP 构建该文件的 AST 分析缓存
+    # 取文件内部符号扫描的最高优先级位置，下发至 LSP 引擎
+    line_idx, col_idx = positions[0]
+    
+    req = {
+        "jsonrpc": "2.0",
+        "id": 0, # 将在获取锁后分配
+        "method": method,
+        "params": {
+            "textDocument": {"uri": uri},
+            "position": {"line": line_idx, "character": col_idx}
+        }
+    }
+
+    if method == "textDocument/references":
+        req["params"]["context"] = {"includeDeclaration": True}
+
+    # 通过模拟打开文档，准备 didOpen 数据
     try:
         with open(abs_file, 'r', encoding='utf-8') as f:
             text = f.read()
-            
         did_open = {
             "jsonrpc": "2.0",
             "method": "textDocument/didOpen",
@@ -553,45 +664,40 @@ async def _async_lsp_request(repo_path: str, file_path: str, symbol: str, method
                 }
             }
         }
-        await client.send_notification(did_open)
-        # 提供几百毫秒的预缓冲时间让 LSP 消费 AST
-        await asyncio.sleep(0.5)
-    except (BrokenPipeError, ConnectionError, OSError) as e:
-        # Pipe broken = LSP process died during didOpen, trigger reconnect
-        logger.warning(f"LSP pipe broken during didOpen: {e}. Reconnecting...")
-        client = await _gateway.get_client(repo_path, lang)
-        if not client or not client.is_alive:
-            if method == "textDocument/definition":
-                return ASMLexicalParser.fallback_definition(repo_path, file_path, symbol)
-            else:
-                return ASMLexicalParser.fallback_references(repo_path, file_path, symbol)
-        # Retry didOpen on fresh client
-        try:
-            await client.send_notification(did_open)
-            await asyncio.sleep(0.5)
-        except Exception:
-            pass
     except Exception:
-        pass
-
-    # 取文件内部符号扫描的最高优先级位置，下发至 LSP 引擎
-    line_idx, col_idx = positions[0]
-    
-    req = {
-        "jsonrpc": "2.0",
-        "id": client._next_id(),
-        "method": method,
-        "params": {
-            "textDocument": {"uri": uri},
-            "position": {"line": line_idx, "character": col_idx}
-        }
-    }
-
-    if method == "textDocument/references":
-        req["params"]["context"] = {"includeDeclaration": True}
+        did_open = None
 
     try:
-        result = await client.send_request(req)
+        async with _lsp_global_lock:
+            # 1. 尝试触发文档打开 (并处理异常重连)
+            if did_open:
+                try:
+                    if uri not in client.opened_uris:
+                        await client.send_notification(did_open)
+                        client.opened_uris.add(uri)
+                        await asyncio.sleep(0.5)
+                except (BrokenPipeError, ConnectionError, OSError) as e:
+                    logger.warning(f"LSP pipe broken during didOpen: {e}. Reconnecting...")
+                    client = await _gateway.get_client(repo_path, lang)
+                    if not client or not client.is_alive:
+                        if method == "textDocument/definition":
+                            return ASMLexicalParser.fallback_definition(repo_path, file_path, symbol)
+                        else:
+                            return ASMLexicalParser.fallback_references(repo_path, file_path, symbol)
+                    try:
+                        if uri not in client.opened_uris:
+                            await client.send_notification(did_open)
+                            client.opened_uris.add(uri)
+                            await asyncio.sleep(0.5)
+                    except Exception:
+                        pass
+                except Exception:
+                    pass
+
+            # 2. 发送实际请求
+            req["id"] = client._next_id()
+            result = await client.send_request(req)
+            
         if "error" in result:
              raise RuntimeError(f"LSP Error Response: {result['error']}")
              
@@ -624,8 +730,14 @@ async def _async_lsp_request(repo_path: str, file_path: str, symbol: str, method
         # 整理输出并返回前 30 个有效引用
         out = list(dict.fromkeys(out))
         if len(out) > 30:
-            return f"[{method}] '{symbol}' 共被解析出 {len(out)} 处:\n" + "\n".join(out[:30]) + f"\n... (已自动截断剩余 {len(out) - 30} 处)"
-        return f"[{method}] '{symbol}' 结果列表:\n" + "\n".join(out)
+            out_str = f"[{method}] '{symbol}' 共被解析出 {len(out)} 处:\n" + "\n".join(out[:30]) + f"\n... (已自动截断剩余 {len(out) - 30} 处)"
+        else:
+            out_str = f"[{method}] '{symbol}' 结果列表:\n" + "\n".join(out)
+        
+        if client.build_scripts_disabled:
+            out_str += "\n\n[⚠️ Warning: 该仓库的 build.rs 脚本导致 LSP 崩溃，本次查询在强行禁用构建脚本的备用安全模式下进行。个别由 C 语言绑定或宏动态生成的代码（如 bindings.rs）可能无法进行定义跳转。]"
+            
+        return out_str
 
     except (TimeoutError, Exception) as e:
         logger.warning(f"LSP execution for {symbol} triggered an exception or timeout: {e}. Executing ASM fallback downgrade.")
@@ -651,7 +763,12 @@ def lsp_get_definition(repo_path: str, file_path: str, symbol: str) -> str:
         _async_lsp_request(repo_path, file_path, symbol, "textDocument/definition"),
         _lsp_loop
     )
-    return future.result(timeout=25.0)
+    try:
+        return future.result(timeout=60.0)
+    except TimeoutError:
+        return f"Error: LSP 获取定义超时 (60s)。此符号可能解析较深，请尝试使用 grep_search 作为替代方案。"
+    except Exception as e:
+        return f"Error: LSP 执行异常: {e}"
 
 @tool
 def lsp_get_references(repo_path: str, file_path: str, symbol: str) -> str:
@@ -668,7 +785,12 @@ def lsp_get_references(repo_path: str, file_path: str, symbol: str) -> str:
         _async_lsp_request(repo_path, file_path, symbol, "textDocument/references"),
         _lsp_loop
     )
-    return future.result(timeout=25.0)
+    try:
+        return future.result(timeout=60.0)
+    except TimeoutError:
+        return f"Error: LSP 获取引用超时 (60s)。请尝试缩小搜索范围或使用 grep_search。"
+    except Exception as e:
+        return f"Error: LSP 执行异常: {e}"
 
 
 
@@ -718,32 +840,23 @@ async def _async_lsp_document_symbols(repo_path: str, file_path: str) -> str:
                 }
             }
         }
-        await client.send_notification(did_open)
-        await asyncio.sleep(0.5)
-    except (BrokenPipeError, ConnectionError, OSError) as e:
-        logger.warning(f"LSP pipe broken during outline didOpen: {e}. Reconnecting...")
-        client = await _gateway.get_client(repo_path, lang)
-        if not client:
-            return f"Error: LSP reconnect failed for outline."
-        try:
-            await client.send_notification(did_open)
-            await asyncio.sleep(0.5)
-        except Exception:
-            pass
-    except Exception:
-        pass
-
-    req = {
-        "jsonrpc": "2.0",
-        "id": client._next_id(),
-        "method": "textDocument/documentSymbol",
-        "params": {
-            "textDocument": {"uri": uri}
-        }
-    }
-
-    try:
-        result = await client.send_request(req)
+        
+        async with _lsp_global_lock:
+            if uri not in client.opened_uris:
+                await client.send_notification(did_open)
+                client.opened_uris.add(uri)
+                await asyncio.sleep(0.5)
+            
+            req = {
+                "jsonrpc": "2.0",
+                "id": client._next_id(),
+                "method": "textDocument/documentSymbol",
+                "params": {
+                    "textDocument": {"uri": uri}
+                }
+            }
+            result = await client.send_request(req)
+            
         if "error" in result:
              raise RuntimeError(f"LSP Error: {result['error']}")
              
@@ -778,7 +891,12 @@ async def _async_lsp_document_symbols(repo_path: str, file_path: str) -> str:
             return out
             
         lines = format_symbols(symbols)
-        return f"[{file_path} 文件精确大纲] (LSP AST Parsed):\n" + "\n".join(lines)
+        out_str = f"[{file_path} 文件精确大纲] (LSP AST Parsed):\n" + "\n".join(lines)
+        
+        if client.build_scripts_disabled:
+            out_str += "\n\n[⚠️ Warning: 该仓库的 build.rs 脚本导致 LSP 崩溃，本次大纲提取在强行禁用构建脚本的备用安全模式下进行。个别由宏动态生成的结构或常量节点可能由于未展开而不会出现在大纲结构中。]"
+            
+        return out_str
     except Exception as e:
          return f"LSP Outline 提取失败: {e}"
 
@@ -797,4 +915,9 @@ def lsp_get_document_outline(repo_path: str, file_path: str) -> str:
         _async_lsp_document_symbols(repo_path, file_path),
         _lsp_loop
     )
-    return future.result(timeout=15.0)
+    try:
+        return future.result(timeout=30.0)
+    except TimeoutError:
+        return f"Error: LSP 获取 {file_path} 大纲超时 (30s)。文件可能过大或解析器挂起，请直接阅读文件。"
+    except Exception as e:
+        return f"Error: LSP Outline 执行异常: {e}"
