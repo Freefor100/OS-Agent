@@ -864,14 +864,21 @@ def run_evaluation(
         error_msg = f"未找到 sections 目录: {sections_dir}"
         logging.error(error_msg)
         print(f"❌ {error_msg}")
-        print("   请先运行 os_agent_d.py 生成报告")
+        print("   请先运行 os_agent_d_describe.py 生成报告")
         sys.exit(1)
 
-    if not os.path.isdir(repo_path):
-        error_msg = f"未找到仓库目录: {repo_path}"
-        logging.error(error_msg)
-        print(f"❌ {error_msg}")
-        sys.exit(1)
+    if not os.path.isdir(repo_path) or not os.listdir(repo_path):
+        print(f"\n📦 未找到仓库目录: {repo_path}，尝试自动克隆...")
+        try:
+            from tools.git_ops import clone_repository
+            result = clone_repository.invoke({"repo_url": repo_url})
+            print(f"✅ 克隆结果: {result}")
+        except Exception as e:
+            print(f"❌ 自动克隆失败: {e}")
+            sys.exit(1)
+        if not os.path.isdir(repo_path):
+            print(f"❌ 克隆后仍未找到仓库目录: {repo_path}")
+            sys.exit(1)
 
     # 查找章节文件，并过滤掉非标准的额外生成文件（只保留 01_xxx.md 格式）
     import re
