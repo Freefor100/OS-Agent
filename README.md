@@ -147,6 +147,20 @@
   - 修复 `lsp_ops.py` 中 `builtins.open` 引用错误
   - **新增 `_resolve_lsp_binary` 路径探测**：Conda 环境下自动搜索 `~/.cargo/bin/`、`~/AppData/Local/` 等常见安装位置
 
+#### 🆕 **v2.7 评估模块自动克隆 + 产物 Git 跟踪**（2026-03-01）
+
+- **📦 评估模块自动克隆**
+  - `os_agent_d_evaluate.py` 新增自动 clone 逻辑：检测到 `repos/<repo_name>` 不存在或为空时，自动从 `REPO_URL` 克隆 OS 仓库
+  - 与描述模块（阶段 0）行为一致，无需先运行 describe 即可直接评估
+
+- **🗂️ output/ 和 evaluation/ 纳入 Git 跟踪**
+  - 他人 clone 仓库后可直接查看已有的分析报告和评估结果
+  - `repos/` 保持 `.gitignore` 忽略（运行时自动克隆，不占仓库体积）
+  - 添加 `.gitkeep` 确保空目录也被跟踪
+
+- **🐛 修复**
+  - 修正评估模块错误提示中的脚本名称（`os_agent_d.py` → `os_agent_d_describe.py`）
+
 #### 🆕 **v2.6 代码架构重构 + 描述模块鲁棒性增强**（2026-03-01）
 
 - **♻️ 公共模块抽取**
@@ -448,14 +462,14 @@ OS-Agent/
 │   ├── lsp_ops.py                  # 语言服务器协议(LSP)封装，AST解析
 │   ├── describe_ops.py             # 仓库分析工具（描述模块专用）
 │   └── eval_ops.py                 # 评估专用工具（人类文档搜索、声明验证）
-├── repos/                          # 克隆的 OS 仓库
-├── output/                         # 描述模块输出（按项目名划分）
+├── repos/                          # 克隆的 OS 仓库（.gitignore 忽略，运行时自动克隆）
+├── output/                         # 描述模块输出（Git 跟踪，按项目名划分）
 │   └── <os-name>/
 │       ├── sections/               # 分段报告
 │       ├── charts/                 # 图表
 │       ├── report.md               # 完整报告
 │       └── describe_error_report.json  # 🆕 错误报告（如有错误）
-└── evaluation/                     # 评估模块输出（按项目名划分）
+└── evaluation/                     # 评估模块输出（Git 跟踪，按项目名划分）
     └── <os-name>/
         ├── evaluation.log          # 详细日志
         ├── error_report.json       # 错误报告
