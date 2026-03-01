@@ -98,7 +98,7 @@ def build_agent(model: str = None, stage_id: str = ""):
     ]
     
     tools = base_tools.copy()
-    if "13_history" in stage_id:
+    if "_history" in stage_id:
         tools.extend(history_tools)
     
 
