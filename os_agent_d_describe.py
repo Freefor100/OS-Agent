@@ -61,7 +61,7 @@ def _build_base_context(repo_url: str, output_dir: str) -> str:
 全局要求（严格遵守）：
 1. **反向证据原则**：如果未找到某功能的实现代码，你必须明确说明“未发现”或“未实现”。**严禁**仅仅因为它是“操作系统”就假设它实现了某些标准功能（如分页、多户）。
 2. **证据引用**：描述任何关键结论（如“支持分页”）时，必须附带文件路径或代码片段引用（如 `mm/page.rs: map_page()`）。
-3. **深度优先分析**：对于关键机制，要求追踪完整的函数调用链（Call Chain）。使用 `lsp_get_definition` 跟踪符号定义，`lsp_get_references` 查找调用方，`lsp_get_document_outline` 快速理解文件结构。
+3. **深度优先分析**：对于关键机制，要求追踪完整的函数调用链（Call Chain）。**优先使用 `lsp_get_call_graph`（多层递归调用树）**；再用 `lsp_get_definition` 跟踪符号定义；`lsp_get_references` 查找单层引用方；`lsp_get_document_outline` 快速理解文件结构。仅当 LSP 工具失败时，才退回到 `grep_in_repo`。
 4. **多模块搜索**：不要局限于单一目录。使用 `find_os_core_modules` 寻找分散的实现（例如驱动可能在 `drivers/` 也可能在 `modules/`）。
 5. **区分规划与实现**：README 中提到的功能可能是“画饼”，必须通过代码验证。未能验证的特性即使出现在文档中，也必须标注为“文档提及但未见代码”。
 6. **桩代码检测（Strict Stub Detection）**：
@@ -172,6 +172,9 @@ STAGES = [
 要求：
 - 使用 `lsp_get_document_outline` **先**查看 arch 初始化文件的整体结构（函数列表+行号），然后有目的地 `read_code_segment` 关键段。
 - 使用 `lsp_get_definition` 追踪 `_start` → `rust_main` / `kernel_main` 的跨文件调用链。每一跳都用 LSP 定位下一个函数的定义位置，**不要凭经验猜路径**。
+- **【必须】使用 `lsp_get_call_graph` 生成启动函数完整调用链**：
+  - 对 `rust_main` 或 `kernel_main`（定位到实际文件后）调用 `lsp_get_call_graph(repo_path, file_path, "rust_main", direction="outgoing", max_depth=4)`
+  - 如返回 `[⚠️ DEGRADED MODE]`，说明 LSP 降级至 Grep 分析，仍需使用该结果并在报告中标注"DEGRADED — 静态 Grep 分析"。
 - 使用 `lsp_get_references` 查找谁调用了关键初始化函数（如 `init_mmu`、`setup_trap`），验证其在启动流程中的位置。
 - 辅以 `grep_in_repo` 搜索汇编入口（`entry.S`/`start.S`）和 `list_repo_structure` 浏览目录。
 - 重点关注 arch/、platform/、boot/ 目录下的初始化代码。
@@ -225,7 +228,11 @@ STAGES = [
 - 追踪一个完整的 `page fault` -> `alloc_frame` -> `map_page` 流程。
 - **LSP 工具使用要求**：
     - 使用 `lsp_get_definition` 定位 `PageTable`、`FrameAllocator`、`MemorySet` 等核心结构体的精确定义，**不要凭记忆描述字段**。
-    - 使用 `lsp_get_references` 追踪 `handle_page_fault` 的完整调用链（谁调用了它？它又调用了谁？）。
+    - **【必须】使用 `lsp_get_call_graph` 追踪缺页异常完整链路**：
+      - `lsp_get_call_graph(repo_path, file_of_handle_page_fault, "handle_page_fault", direction="both", max_depth=3)` — 谁触发缺页，它又调用什么？
+      - `lsp_get_call_graph(repo_path, file_of_alloc_frame, "alloc_frame", direction="incoming", max_depth=2)` — 谁调用了物理页分配？
+      - 如返回 `[⚠️ DEGRADED MODE]`，在报告中标注"DEGRADED — 基于 Grep 静态分析"并继续使用结果。
+    - 使用 `lsp_get_references` 追踪 `handle_page_fault` 的调用方（谁调用了它？）。
     - 使用 `lsp_get_document_outline` 快速浏览内存管理大文件的函数列表，再有目的地读取关键实现。
 - **防幻觉检查**：
     - **mmap**: 不要看到 `Mmap` 结构体就认为实现了 mmap。检查系统调用入口 `sys_mmap`。
@@ -270,6 +277,10 @@ STAGES = [
 - 使用 `lsp_get_definition` 定位 `Task`/`Process`/`TaskInner` 结构体定义，精确列出其字段（不要猜）。
 - 使用 `lsp_get_references` 追踪 `fork`/`exec`/`schedule`/`exit` 的完整跨文件调用链。
 - 使用 `lsp_get_document_outline` 快速查看调度器文件中的所有函数，找到 `pick_next_task`、`schedule` 等关键入口。
+- **【必须】使用 `lsp_get_call_graph` 生成核心进程操作的调用树**：
+  - `lsp_get_call_graph(repo_path, file_of_sys_fork, "sys_fork", direction="outgoing", max_depth=4)` — fork 从 syscall 到内存复制的完整下行链
+  - `lsp_get_call_graph(repo_path, file_of_schedule, "schedule", direction="both", max_depth=3)` — 谁触发调度？调度器下一步调什么？
+  - 如返回 `[⚠️ DEGRADED MODE]`，标注"DEGRADED — 基于 Grep 静态分析"并继续使用结果。
 - **重要**：不要只看一个模块！用 find_os_core_modules 或 grep_in_repo 搜索所有进程/线程相关模块。
 - 查找 context_switch 汇编代码。
 
@@ -317,6 +328,10 @@ STAGES = [
 - 使用 `lsp_get_definition` 追踪 syscall 分发链：从 `trap_handler` → `syscall_handler` → 具体 `sys_xxx`，每一跳精确定位。
 - 使用 `lsp_get_document_outline` 查看 trap.rs / syscall.rs 的完整函数列表，掌握所有已实现的 syscall。
 - 使用 `lsp_get_references` 查找 `TrapFrame` 在哪些函数中被使用，验证上下文保存/恢复的完整性。
+- **【必须】使用 `lsp_get_call_graph` 追踪 Trap 完整调用链**：
+  - `lsp_get_call_graph(repo_path, file_of_trap_handler, "trap_handler", direction="outgoing", max_depth=4)` — 从 trap 入口展开完整分发树
+  - `lsp_get_call_graph(repo_path, file_of_sys_write, "sys_write", direction="incoming", max_depth=2)` — 谁调用了 sys_write？
+  - 如返回 `[⚠️ DEGRADED MODE]`，标注降级模式继续使用，关注 outgoing 结果中分发表函数的覆盖情况。
 - 辅以 `grep_in_repo` 搜索 `trap_handler|trap_return|syscall_handler` 确定文件位置。
 - 找到 trap.S / trap.rs，分析 syscall 分发表。
 
@@ -355,6 +370,10 @@ STAGES = [
 要求：
 - 使用 `lsp_get_definition` 定位 `File` trait、`Inode` trait、`SuperBlock` 等 VFS 核心抽象的精确定义。
 - 使用 `lsp_get_references` 追踪 `sys_open` → `vfs_open` → 具体 FS `open` 的完整调用链。
+- **【必须】使用 `lsp_get_call_graph` 追踪文件打开完整路径**：
+  - `lsp_get_call_graph(repo_path, file_of_sys_open, "sys_open", direction="outgoing", max_depth=4)` — 从 syscall 到 VFS 再到具体 FS 的完整下行链
+  - `lsp_get_call_graph(repo_path, file_of_vfs_open, "vfs_open", direction="both", max_depth=3)` — VFS 中枢节点双向（谁调它，它调谁）
+  - 如返回 `[⚠️ DEGRADED MODE]`，标注"DEGRADED — 静态 Grep 分析"并继续使用，重点关注 outgoing 中 FS trait impl 的调用。
 - 使用 `lsp_get_document_outline` 快速摸清 VFS 和具体 FS 实现文件的内部结构。
 - 使用 grep_in_repo 搜索 "FdTable|FileDescriptor|fd_table" 确认文件描述符表实际命名。
 - **路径精确性（关键）**：注意区分相似目录（如 `core/file/` vs `core/fs/`，`src/fs/imp/` vs `api/src/core/fs/imp/`）。引用每个文件前必须用 `lsp_get_definition` 确认函数的真实定义位置。如果同一模块在多个目录中有实现（如 TmpFS 在 `src/` 和 `api/src/` 中都有），必须全部列出。
@@ -428,11 +447,14 @@ STAGES = [
     - 信号量 (Semaphore)：PV 操作实现。同样需要检查 `sys_semget`, `semop` 是否为桩代码。
     - **信号 (Signal) 作为 IPC**：搜索 `sys_kill|sig_send|signal_send`，分析信号分发机制是否也用于进程间通信。
     - **信号处理时机**：搜索 `POST_TRAP|do_signal|handle_pending_signal`，分析信号在 Trap 返回用户态前的确切处理位置。
-- **关键流程的跨文件调用链**：对 Futex 等待/唤醒流程，使用 `lsp_get_references` 追踪完整的跨文件调用路径。
+- **关键流程的跨文件调用链**：对 Futex 等待/唤醒流程，使用 `lsp_get_call_graph` 递归展开完整调用树（优先于 `lsp_get_references` 的单层查找）。
 
 要求：
 - 使用 `lsp_get_definition` 定位 `Mutex`、`SpinLock`、`WaitQueue` 的结构体定义和 `lock()`/`unlock()` 实现。
-- 使用 `lsp_get_references` 追踪 Futex 等待/唤醒的跨文件调用路径（从 `sys_futex` → `futex_wait` → `WaitQueue::sleep`）。
+- **【必须】使用 `lsp_get_call_graph` 展开关键 IPC 流程调用链**（`sys_futex` → `futex_wait` → `WaitQueue::sleep`）：
+  - `lsp_get_call_graph(repo_path, file_of_sys_futex, "sys_futex", direction="outgoing", max_depth=4)`
+  - 如返回 `[⚠️ DEGRADED MODE]`，标注后继续使用 Grep 结果。
+- 使用 `lsp_get_references` 查找单节点引用（如哪些地方调用了 `futex_wake`）。
 - 使用 `lsp_get_document_outline` 浏览 IPC 模块文件，发现所有 Pipe/Sem/Shm 实现。
 - 辅以 grep_in_repo 搜索 sync/、ipc/ 模块。
 - **验证消息队列与信号量**：务必区分 Stub（桩）与 Real Implementation（真实实现）。
@@ -468,7 +490,10 @@ STAGES = [
 
 要求：
 - 使用 `lsp_get_definition` 定位 `PerCpu` 结构和 `smp_boot`/`__cpu_up` 的定义。
-- 使用 `lsp_get_references` 追踪 secondary CPU 启动链（从 `start_secondary` 到初始化完成）和 IPI 分发路径。
+- **【必须】使用 `lsp_get_call_graph` 追踪 Secondary CPU 启动链**：
+  - `lsp_get_call_graph(repo_path, file_of_start_secondary, "start_secondary", direction="outgoing", max_depth=4)` — 从 secondary 入口到初始化完成
+  - 如返回 `[⚠️ DEGRADED MODE]`，标注后继续使用 Grep 结果。
+- 使用 `lsp_get_references` 追踪 IPI 分发路径（单层引用）。
 - 辅以 grep_in_repo 搜索 smp/、cpu/、percpu 相关模块。
 - 分析多核安全的数据结构设计。
 
@@ -511,20 +536,13 @@ STAGES = [
     - 用户指针验证：搜索 `UserInPtr`, `verify_area`, `access_ok`。确认系统调用入口是否严格检查了用户指针？
     - 缓冲区溢出保护：是否有 `stack_guard`, `canary`？
 
-输出格式：
-- ## 隔离机制（用户/内核）
-- ## 权限控制模型（UID/GID 验证结果）
-- ## 内存安全与指针检查
-- ## 安全沙箱与审计机制 (Seccomp/Audit)
-- ## 关键代码片段与调用链
-- ## 未实现功能清单
-
 要求：
-- 使用 `lsp_get_references` 追踪 `check_perm`/`inode_permission` 被哪些 syscall 调用，验证权限检查是否真正执行。
 - 使用 `lsp_get_definition` 定位 `Credential`/`UID`/`GID` 等安全相关结构体的定义。
+- **【必须】使用 `lsp_get_call_graph` 追踪权限检查链**：
+  - `lsp_get_call_graph(repo_path, file_of_check_perm, "check_perm", direction="incoming", max_depth=3)` — 哪些 syscall 调用了权限检查？
+  - 如返回 `[⚠️ DEGRADED MODE]`，标注后继续使用 Grep 结果，并用 `lsp_get_references` 补充单层引用。
 - 辅以 grep_in_repo 搜索 security/、auth/、capability 相关模块和 "seccomp|sandbox|prctl"。
-- 查找 syscall 入口处的权限检查逻辑。
-- 分析用户/组/权限位的实现。
+- 查找 syscall 入口处的权限检查逻辑，分析用户/组/权限位的实现。
 
 输出格式：
 - ## 特权级与隔离机制
@@ -563,7 +581,10 @@ STAGES = [
 
 要求：
 - 使用 `lsp_get_definition` 定位 `Socket` trait、`TcpSocket`/`UdpSocket` 结构体定义。
-- 使用 `lsp_get_references` 追踪 `sys_sendto` → 协议栈 → 网卡驱动的完整数据发送路径。
+- **【必须】使用 `lsp_get_call_graph` 追踪数据发送路径**（`sys_sendto` → 协议栈 → 网卡驱动）：
+  - `lsp_get_call_graph(repo_path, file_of_sys_sendto, "sys_sendto", direction="outgoing", max_depth=4)`
+  - 如返回 `[⚠️ DEGRADED MODE]`，标注后继续使用 Grep 结果。
+- 使用 `lsp_get_references` 查找单层引用（如哪些地方调用了 `socket_write`、`tcp_send`）。
 - 使用 `lsp_get_document_outline` 浏览网络模块文件，发现所有 socket 操作和协议处理函数。
 - 辅以 grep_in_repo 搜索 net/、socket/、tcp/ 相关模块。
 - **严格区分**：使用了网络库（如 smoltcp）vs 自己实现了协议栈。
@@ -599,7 +620,9 @@ STAGES = [
 
 要求：
 - 使用 `lsp_get_definition` 定位 `panic_handler`、`log` 宏的实现位置。
-- 使用 `lsp_get_references` 追踪 panic 处理链（从 `panic!` → `panic_handler` → 栈回溯 → 停机）。
+- **【必须】使用 `lsp_get_call_graph` 追踪 panic 处理链**（`panic!` → `panic_handler` → 栈回溯 → 停机）：
+  - `lsp_get_call_graph(repo_path, file_of_panic_handler, "panic_handler", direction="incoming", max_depth=3)` — 谁触发了 panic？
+  - 如返回 `[⚠️ DEGRADED MODE]`，标注后继续使用，用 `lsp_get_references` 补充单层引用。
 - 使用 `lsp_get_document_outline` 浏览调试模块，发现所有调试相关函数（backtrace、dump、monitor命令）。
 - 辅以 grep_in_repo 搜索 `gdbstub|monitor|perf|trace` 确认调试工具支持。
 
@@ -623,7 +646,7 @@ STAGES = [
 必须回答：
 - 单元测试：**必须准确检测并精确计数**。Rust 项目搜索 `#[test]`、`#[cfg(test)]`，使用 `grep_in_repo` 统计精确的测试函数数量。C 项目搜索 `CuTest`, `GTest`, `Unity`。**描述测试数量时必须与 grep 结果一致，不要凭印象估算。**
 - 集成测试：tests/ 目录或独立的测试 APP。
-- **真实的测试结果**：使用 read_file 读取 `run_log.txt` (如果存在)，并分析其中的 `LTP` 或 `test` 关键字，统计**通过/失败**的用例数量。
+- **真实的测试结果**：使用 `read_code_segment` 读取 `run_log.txt`（如果存在），并分析其中的 `LTP` 或 `test` 关键字，统计**通过/失败**的用例数量。
 - **CI/CD 配置（必须验证）**：
     - 检查 `.github/workflows/` (GitHub Actions)。
     - 检查 `.gitlab-ci.yml` (GitLab CI)。
@@ -659,28 +682,69 @@ STAGES = [
 
     {
         "id": "14_history",
-        "title": "开发历史与里程碑（含图表）",
-        "prompt": """目标：给出"按模块的开发时间线"和"活跃度图表解释"。
+        "title": "开发历史与里程碑",
+        "prompt": """目标：自主阅读 Git 原始提交记录，推演操作系统的开发时间线。你需要总结"初始版本工作量"、"后续版本的功能演进轨迹"，并将历次重要 Commit 涉及的具体变更归类到对应的操作系统模块中。
 
-请完成：
-1) analyze_git_history_detailed(repo_path, max_commits=150)：总结关键阶段。
-2) get_dev_history_by_module(repo_path, max_commits=200)：提炼每个核心子系统的【初步】与【较大改动】里程碑。
-3) generate_dev_history_charts(repo_path, output_dir=charts_dir)：生成图表（charts_dir 见基础信息）。
+**强烈注意：本阶段不使用任何第三方脚本生成图表。你需要完全依赖自己的代码语义理解能力。**
 
-图表说明（会自动生成以下 3 张图）：
-- commits_monthly.png：每月提交量柱状图
-- modules_activity.png：各模块变更量柱状图
-- modules_timeline.png：**模块开发里程碑时间线**（显示每个模块的初步提交和较大改动日期）
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+阶段一：【总体提交浏览与模块分类】
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1) 循环调用 `analyze_git_history(repo_path, max_commits=50, skip=N)`
+   - 通过调整 `skip` 参数（如 0, 50, 100...），从最近的提交一路往前翻阅，直到看完该仓库生命周期内的代表性 Commit。
+   - 关注每次 Commit 的 **Date, Message，以及 Changed Files (+行数/-行数)**。
+   - **语义归类**：根据变更的文件路径（如 `kernel/mm/`），你应当自行判断这次提交属于哪个操作系统核心模块（如"内存管理"、"进程调度"、"文件系统"）。
 
-输出格式：
-- ## 总体时间线（按月/阶段）
-- ## 子系统里程碑（每个子系统 2-4 条，说明初步完成和关键改动的日期）
-- ## 图表展示与解读
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+阶段二：【初始版本工作量深度核实】
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+定义"初始版本"为时间线最早的一批 commit（通常是建立仓库骨架的那几天）。
 
-请在报告中插入图表引用：
-![每月提交量](charts/commits_monthly.png)
-![模块活跃度](charts/modules_activity.png)
-![模块开发里程碑时间线](charts/modules_timeline.png)
+A. **初始代码规模评估**
+   - 找到最底部的几个 Initial Commit，汇总其增加的代码行数。
+   - 观察这些最早 Commit 中包含了哪些文件夹，总结第一版已经搭起了哪几个子系统（例如：只搭好了 trap 和 boot，尚未有 fs）。
+
+B. **核心子系统首次引入时间（重点查验）**：
+   调用 `find_symbol_first_commit(repo_path, keywords=[...])` 批量查询以下关键词是何时从无到有被加入的：
+   - 启动入口：`["_start", "rust_main", "kernel_main"]`
+   - 内存管理：`["FrameAllocator", "PageTable", "MemorySet"]`
+   - 进程/任务：`["TaskInner", "spawn_task", "ProcessInner"]`
+   - 文件系统：`["VfsNode", "fat32", "ramfs"]`
+   - 系统调用：`["syscall_handler", "sys_write", "sys_read"]`
+   - 中断/Trap：`["trap_handler", "TrapFrame", "stvec"]`
+
+   根据工具返回的时间：
+   - 若【首次引入】日期在仓库头几天 → 标记为 "**初始版本已有**"
+   - 若【首次引入】日期在中后期 → 标记为 "**后续版本引入**"
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+阶段三：【后续重要功能的代码演进轨迹】
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+在你翻阅 `analyze_git_history` 的过程中，挑选出 **最有代表性的 8-12 次大变动**。
+对每次大变动，必须结合该次提交的 Message 与它具体更改的文件清单（Changed Files），写出深度分析：
+1. **所属模块**：这是在改网络、改内存，还是在改驱动？
+2. **改动性质**：
+   - 【新增功能】：引入了全新的机制（如第一次带入多核 SMP）
+   - 【重构/优化】：大面积重写了既有模块（如从单链表改用红黑树管理进程）
+   - 【Bug修复】：修复了重大架构缺陷
+3. **工作量与事实**：列出增删规模 (+xxx/-yyy) 以及关键文件发生了什么。
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+输出格式要求（纯文本 Markdown 历史报告）
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- ## 总体开发时间线（整体梳理）
+  用几段话概括整个 OS 经历了哪几个大阶段（如：先搭基础结构 → 引入多核 → 完善设备驱动）。
+- ## 初始版本核查
+  - **初始规模与结构**：包含的总行数与早期骨架概述。
+  - **核心功能引入时点**：（列出 find_symbol_first_commit 的检测结果卡片，明确哪些是最早自带，哪些是后续痛苦实现的）。
+- ## 核心功能迭代里程碑（按模块分类）
+  - ### 模块 A（如：内存管理）
+    - `[时间点]` **+xxx -yyy**: 核心改动事实...
+    - `[时间点]` **+xxx -yyy**: 核心改动事实...
+  - ### 模块 B（如：文件系统）
+    - ...
+- ## 后续最具代表性的重构/演进（Top 列表）
+  列出跨模块的大型提交分析。
 
 **重要**：完成所有工具调用后，你必须输出一个完整的 Markdown 格式分析报告，包含上述所有章节内容和图表引用。
 """,
