@@ -161,6 +161,19 @@
 - **🐛 修复**
   - 修正评估模块错误提示中的脚本名称（`os_agent_d.py` → `os_agent_d_describe.py`）
 
+#### 🆕 **v2.8 Git 语义化沉浸分析与工具生命周期隔离**（2026-03-04）
+
+- **🧠 纯 LLM 语义化历史推演（重构阶段 14）**
+  - **移除呆板数据脚本**：全面下线 `analyze_git_history_detailed`、`get_dev_history_by_module` 和僵硬的自动画图脚本 `generate_dev_history_charts`。
+  - **增强底层原石提取**：升级 `analyze_git_history` 工具，新增 `skip` 分页能力并直接从 Git 中解析每一次 Commit 的详尽文件变更清单（含具体增删行数）。
+  - **自主分类与总结**：不再依赖 Python 匹配模块。大模型现在直接翻阅原始 Git 记录，根据被修改的文件路径自主推测发生改动的系统模块，分析从零搭建骨架到重构重写的全历程，并撰写纯文本深度 Markdown 分析报告。
+
+- **🛡️ 严格阶段工具隔离（Stage-Based Tool Provisioning）**
+  - 彻底解决了大模型在非相关阶段“乱用工具”的幻觉问题。
+  - `analyze_tech_stack` 被严格限制在 `01_overview` 阶段使用。
+  - 所有 Git 历史挖掘工具（`analyze_git_history`, `find_symbol_first_commit`）被严格封闭在 `14_history` 阶段。
+  - `06_fs_vfs` 或 `11_network` 等技术深度探测阶段，大模型只能使用文件搜索和 LSP 系列精准探测神兵，不再存在被外围工具干扰的可能。
+
 #### 🆕 **v2.6 代码架构重构 + 描述模块鲁棒性增强**（2026-03-01）
 
 - **♻️ 公共模块抽取**
@@ -300,10 +313,6 @@ output/
     │   ├── 01_项目概览与技术栈.md
     │   ├── 02_启动流程与架构初始化.md
     │   └── ...
-    ├── charts/            # 生成的图表
-    │   ├── commits_monthly.png
-    │   ├── modules_activity.png
-    │   └── modules_timeline.png
     └── report.md          # 最终完整报告
 ```
 
@@ -466,7 +475,6 @@ OS-Agent/
 ├── output/                         # 描述模块输出（Git 跟踪，按项目名划分）
 │   └── <os-name>/
 │       ├── sections/               # 分段报告
-│       ├── charts/                 # 图表
 │       ├── report.md               # 完整报告
 │       └── describe_error_report.json  # 🆕 错误报告（如有错误）
 └── evaluation/                     # 评估模块输出（Git 跟踪，按项目名划分）
@@ -518,7 +526,8 @@ OS-Agent/
 | `list_repo_structure` | 默认 4 层深度 | 可通过 `max_depth` 调整 |
 | `lsp_get_definition` / `lsp_get_references` | 本地化跨文件追踪 | 不受文件切片截断影响，提供 AST 真实函数映射与依赖拓扑 |
 | `lsp_get_document_outline` | 文件大纲提取 | 快速获取文件中所有函数/结构体/枚举的名称与行号 |
-| `get_dev_history_by_module` | 最多 200 条提交 | 每模块最多显示 20 条 |
+| `analyze_git_history` | 每页最多 50-100 条 | 支持 `skip` 分页检索，提供文件级改动详情以供 LLM 判定边界 |
+| **阶段隔离限制** | 严格白名单 | LLM 将只能在对应 Stage 获取特定工具（如 14 阶段才给 Git 工具） |
 
 **截断提示**：所有工具在输出被截断时会明确告知 LLM，例如：
 ```

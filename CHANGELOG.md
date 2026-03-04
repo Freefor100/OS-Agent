@@ -1,5 +1,21 @@
 # 更新日志 (Changelog)
 
+## [2.8.0] - 2026-03-04
+
+### ✨ 新增功能
+
+#### 纯 LLM 语义化历史推演 (Stage 14 重构)
+
+- **移除刻板自动化工具**：移除了 `analyze_git_history_detailed`、`get_dev_history_by_module` 以及 `generate_dev_history_charts`，彻底放弃依赖 Python 逻辑提取开发历史或生成图表。
+- **强化基础 Git Diffs 提取**：升级了 `analyze_git_history`，原生支持 `skip` 大跨度翻页与 `max_commits` 控制，并携带具体文件更改清单及正负行数（Insertions/Deletions）下发给大模型。
+- **提示词深度重写**：`os_agent_d_describe.py` 中 14 阶段提示词彻底革新，要求大模型亲自翻阅 Git Log，自行断定初创期结构，自行寻找关键子系统的引爆点，自行推演重构全貌，并分类撰写纯文字深度历史脉络。
+
+#### 严格阶段工具生命周期隔离 (Stage-Based Tool Provisioning)
+
+- **阻断大模型工具幻觉**：将全局工具库打散至各个阶段孤岛。诸如 `analyze_tech_stack` 被永久性束缚于 `01_overview`，且 `analyze_git_history` 与 `find_symbol_first_commit` 唯有处于 `14_history` 阶段才向模型暴露。在如网络、调度这类无关阶段，大模型仅能依靠文件搜索和 LSP 解析器探测机制，确保不会跨域作乱调用错误生态工具。
+
+---
+
 ## [2.7.0] - 2026-03-01
 
 ### ✨ 新增功能
