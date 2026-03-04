@@ -220,7 +220,12 @@ class LSPClient:
             "params": {
                 "processId": os.getpid(),
                 "rootUri": root_uri,
-                "capabilities": {}
+                "capabilities": {
+                    "textDocument": {
+                        "callHierarchy": {"dynamicRegistration": False},
+                        "synchronization": {"dynamicRegistration": False}
+                    }
+                }
             }
         }
         await self.send_request(init_req)
@@ -921,3 +926,373 @@ def lsp_get_document_outline(repo_path: str, file_path: str) -> str:
         return f"Error: LSP 获取 {file_path} 大纲超时 (30s)。文件可能过大或解析器挂起，请直接阅读文件。"
     except Exception as e:
         return f"Error: LSP Outline 执行异常: {e}"
+
+
+# --- 阶段 6：函数调用链图谱 (Call Graph / Call Hierarchy) ---
+
+def _grep_fallback_call_graph(repo_path: str, file_path: str, symbol: str, direction: str) -> str:
+    """
+    静态 Grep 退避方案：当 LSP callHierarchy 不可用时自动调用。
+    - outgoing: 读取函数体源码，用正则提取被调用函数名称
+    - incoming: 全局搜索 `symbol(` 模式，找出所有调用点
+    输出价小于 LSP 的精确结果，但能提供有用的静态调用镜像。
+    """
+    abs_repo = os.path.abspath(repo_path)
+    abs_file = os.path.abspath(os.path.join(repo_path, file_path))
+    banner = (
+        f"\n⚠️  [Call Graph DEGRADED — Grep Fallback] symbol='{symbol}'  file={file_path}\n"
+        f"    LSP callHierarchy 不可用，已自动降级至静态正则分析。\n"
+        f"    精度低于 LSP（宏/内联函数/跨文件间接调用可能缺失）。\n"
+    )
+    print(banner, flush=True)
+    lines_out = [f"[Call Graph — Grep Fallback ⚠️] {symbol}  ← {file_path}"]
+    lines_out.append(
+        "[⚠️ DEGRADED MODE] LSP callHierarchy 不可用，本结果由静态 Grep 正则分析生成。\n"
+        "  · 宏展开、内联函数、trait 动态分发 均无法追踪\n"
+        "  · outgoing: 提取函数体内的 identifier() 调用模式\n"
+        "  · incoming: 全库搜索 symbol( 匹配\n"
+        "  建议: 若 LSP 可用后请重新调用 lsp_get_call_graph 以获取精确结果\n"
+    )
+
+    # --- Outgoing: 解析函数体，提取调用 ---
+    if direction in ("outgoing", "both"):
+        lines_out.append("》出升调用 [Grep Fallback] — 正则解析函数体")
+        try:
+            with open(abs_file, "r", encoding="utf-8", errors="ignore") as f:
+                src = f.read()
+
+            # 在 Rust 和 C 中找到函数定义起始行
+            # Rust: `fn symbol(` / `pub fn symbol(` / `async fn symbol(`
+            # C:   `ret_type symbol(` / `symbol {`
+            fn_start = -1
+            for pat in [
+                rf"(?:pub\s+)?(?:async\s+)?fn\s+{re.escape(symbol)}\s*[(<]",  # Rust
+                rf"\b{re.escape(symbol)}\s*\(",                                 # C
+            ]:
+                m = re.search(pat, src)
+                if m:
+                    fn_start = src.count("\n", 0, m.start())
+                    break
+
+            if fn_start >= 0:
+                # 提取函数体：找到开括号，配对关括号
+                body_start = src.find("{", m.end())
+                if body_start == -1:
+                    body_text = ""
+                else:
+                    depth, pos = 0, body_start
+                    for pos, ch in enumerate(src[body_start:], body_start):
+                        if ch == "{":
+                            depth += 1
+                        elif ch == "}":
+                            depth -= 1
+                            if depth == 0:
+                                break
+                    body_text = src[body_start:pos + 1]
+
+                # 从 body 提取调用：`identifier(` 模式（排除关键字、if/for/while）
+                SKIP = {"if","for","while","match","return","let","fn","use","pub","mod",
+                        "unsafe","impl","trait","struct","enum","type","const","static",
+                        "super","self","Self","loop","continue","break","println","format",
+                        "assert","panic","todo","unimplemented","dbg","write","writeln"}
+                calls_found = {}
+                for cm in re.finditer(r"\b([a-zA-Z_][a-zA-Z0-9_]*)\s*\(", body_text):
+                    fname = cm.group(1)
+                    if fname not in SKIP and not fname[0].isupper():
+                        # 找出该调用在原文件中的行号
+                        call_abs_pos = body_start + cm.start()
+                        call_line = src.count("\n", 0, call_abs_pos) + 1
+                        calls_found.setdefault(fname, call_line)
+
+                if calls_found:
+                    for fname, lineno in sorted(calls_found.items(), key=lambda x: x[1]):
+                        lines_out.append(f"  ├── {fname}()  ← {file_path}:{lineno} (grep)")
+                else:
+                    lines_out.append("  未在函数体中提取到调用（可能为宏展开）")
+            else:
+                lines_out.append(f"  未定位到 '{symbol}' 的函数体，无法提取 outgoing calls")
+        except Exception as e:
+            lines_out.append(f"  Outgoing grep 失败: {e}")
+
+    # --- Incoming: 全局搜索调用点 ---
+    if direction in ("incoming", "both"):
+        lines_out.append(f"\n》入向调用 [Grep Fallback] — 搜索 `{symbol}(` 模式")
+        seen_files: Dict[str, List[int]] = {}
+        src_exts = {'.c', '.cpp', '.cc', '.rs', '.go', '.zig', '.h', '.hpp'}
+        try:
+            for root, dirs, files in os.walk(abs_repo):
+                # 跳过构建产物目录
+                dirs[:] = [d for d in dirs if d not in {"target", "node_modules", ".git", ".os_agent_ra_target"}]
+                for fname in files:
+                    if os.path.splitext(fname)[1].lower() not in src_exts:
+                        continue
+                    fpath = os.path.join(root, fname)
+                    try:
+                        with open(fpath, "r", encoding="utf-8", errors="ignore") as f:
+                            for lineno, line in enumerate(f, 1):
+                                if re.search(rf"\b{re.escape(symbol)}\s*\(", line):
+                                    rel = os.path.relpath(fpath, abs_repo)
+                                    seen_files.setdefault(rel, []).append(lineno)
+                    except Exception:
+                        pass
+        except Exception as e:
+            lines_out.append(f"  Incoming grep 失败: {e}")
+
+        if seen_files:
+            for rel_path, linenos in sorted(seen_files.items()):
+                for ln in linenos[:3]:  # 每个文件最多显示 3 处
+                    lines_out.append(f"  ├── {rel_path}:{ln}  (grep)")
+            if sum(len(v) for v in seen_files.values()) > 30:
+                lines_out.append(f"  ... 共 {sum(len(v) for v in seen_files.values())} 处匹配（已截断）")
+        else:
+            lines_out.append(f"  未在全库中不到 `{symbol}(` 的调用点")
+
+    return "\n".join(lines_out)
+
+
+async def _async_lsp_call_graph(
+    repo_path: str,
+    file_path: str,
+    symbol: str,
+    direction: str,   # "outgoing" | "incoming" | "both"
+    max_depth: int,
+) -> str:
+    """异步核心：递归构建调用图谱，返回树形文本。"""
+    ext = os.path.splitext(file_path)[1].lower()
+    lang_map = {
+        '.c': 'c', '.cpp': 'cpp', '.cc': 'cpp', '.h': 'c', '.hpp': 'cpp',
+        '.rs': 'rust', '.go': 'go', '.zig': 'zig'
+    }
+    lang = lang_map.get(ext)
+    if not lang:
+        return f"Error: 不支持的文件类型 '{ext}'"
+
+    abs_file = os.path.abspath(os.path.join(repo_path, file_path))
+    if not os.path.exists(abs_file):
+        return f"Error: 文件未找到 {file_path}"
+
+    positions = _find_symbol_positions(abs_file, symbol)
+    if not positions:
+        return f"Error: 符号 '{symbol}' 未在文件 '{file_path}' 中找到。"
+
+    client = await _gateway.get_client(repo_path, lang)
+    if not client:
+        msg = f"[call_graph] LSP 客户端启动失败，自动转入 Grep Fallback (symbol={symbol})"
+        logger.warning(msg)
+        print(f"\n⚠️  {msg}", flush=True)
+        return _grep_fallback_call_graph(repo_path, file_path, symbol, direction)
+
+    uri = f"file://{abs_file.replace(chr(92), '/')}"
+
+    # 确保文档已打开
+    try:
+        with open(abs_file, 'r', encoding='utf-8') as f:
+            text = f.read()
+        did_open = {
+            "jsonrpc": "2.0", "method": "textDocument/didOpen",
+            "params": {"textDocument": {"uri": uri, "languageId": "cpp" if lang in ["c","cpp"] else lang, "version": 1, "text": text}}
+        }
+    except Exception:
+        did_open = None
+
+    async def prepare_hierarchy(line_idx: int, col_idx: int) -> Optional[List[Dict]]:
+        req = {
+            "jsonrpc": "2.0", "id": client._next_id(),
+            "method": "textDocument/prepareCallHierarchy",
+            "params": {
+                "textDocument": {"uri": uri},
+                "position": {"line": line_idx, "character": col_idx}
+            }
+        }
+        try:
+            res = await asyncio.wait_for(client.send_request(req), timeout=20.0)
+            return res.get("result") or []
+        except Exception:
+            return []
+
+    async def get_calls(item: Dict, method: str) -> List[Dict]:
+        req = {
+            "jsonrpc": "2.0", "id": client._next_id(),
+            "method": method,
+            "params": {"item": item}
+        }
+        try:
+            res = await asyncio.wait_for(client.send_request(req), timeout=20.0)
+            return res.get("result") or []
+        except Exception:
+            return []
+
+    def uri_to_rel(raw_uri: str) -> str:
+        """Convert file URI to repo-relative path."""
+        if raw_uri.startswith("file://"):
+            p = raw_uri[7:]
+            if os.name == 'nt' and p.startswith('/'):
+                p = p[1:]
+            try:
+                return os.path.relpath(p, os.path.abspath(repo_path))
+            except ValueError:
+                return p
+        return raw_uri
+
+    # 递归构建树，返回 lines 列表
+    visited: set = set()
+
+    async def build_tree_outgoing(item: Dict, depth: int, prefix: str) -> List[str]:
+        if depth > max_depth:
+            return [f"{prefix}└── ... (max depth {max_depth} reached)"]
+        name = item.get("name", "?")
+        detail = item.get("detail", "")
+        src_uri = item.get("uri", "")
+        src_range = item.get("selectionRange", {}).get("start", {})
+        src_line = src_range.get("line", 0) + 1
+        rel_path = uri_to_rel(src_uri)
+        node_key = f"{name}@{rel_path}:{src_line}"
+
+        detail_str = f"  [{detail}]" if detail else ""
+        loc_str = f"  ← {rel_path}:{src_line}"
+        lines_out = [f"{prefix}├── {name}{detail_str}{loc_str}"]
+
+        if node_key in visited:
+            lines_out[-1] += "  (循环引用，已剩略)"
+            return lines_out
+        visited.add(node_key)
+
+        calls = await get_calls(item, "callHierarchy/outgoingCalls")
+        child_items = [c.get("to", {}) for c in calls]
+        for i, child in enumerate(child_items):
+            is_last = (i == len(child_items) - 1)
+            child_prefix = prefix + ("    " if is_last else "│   ")
+            lines_out.extend(await build_tree_outgoing(child, depth + 1, child_prefix))
+        return lines_out
+
+    async def build_tree_incoming(item: Dict, depth: int, prefix: str) -> List[str]:
+        if depth > max_depth:
+            return [f"{prefix}└── ... (max depth {max_depth} reached)"]
+        name = item.get("name", "?")
+        detail = item.get("detail", "")
+        src_uri = item.get("uri", "")
+        src_range = item.get("selectionRange", {}).get("start", {})
+        src_line = src_range.get("line", 0) + 1
+        rel_path = uri_to_rel(src_uri)
+        node_key = f"{name}@{rel_path}:{src_line}"
+
+        detail_str = f"  [{detail}]" if detail else ""
+        loc_str = f"  ← {rel_path}:{src_line}"
+        lines_out = [f"{prefix}├── {name}{detail_str}{loc_str}"]
+
+        if node_key in visited:
+            lines_out[-1] += "  (循环引用，已剩略)"
+            return lines_out
+        visited.add(node_key)
+
+        callers = await get_calls(item, "callHierarchy/incomingCalls")
+        parent_items = [c.get("from", {}) for c in callers]
+        for i, parent in enumerate(parent_items):
+            is_last = (i == len(parent_items) - 1)
+            child_prefix = prefix + ("    " if is_last else "│   ")
+            lines_out.extend(await build_tree_incoming(parent, depth + 1, child_prefix))
+        return lines_out
+
+    try:
+        async with _lsp_global_lock:
+            if did_open and uri not in client.opened_uris:
+                await client.send_notification(did_open)
+                client.opened_uris.add(uri)
+                await asyncio.sleep(0.5)
+
+            line_idx, col_idx = positions[0]
+            root_items = await prepare_hierarchy(line_idx, col_idx)
+
+        if not root_items:
+            msg = f"[call_graph] callHierarchy/prepare 返回空，自动转入 Grep Fallback (symbol={symbol})"
+            logger.warning(msg)
+            print(f"\n⚠️  {msg}", flush=True)
+            return _grep_fallback_call_graph(repo_path, file_path, symbol, direction)
+
+        root_item = root_items[0]
+        root_name = root_item.get("name", symbol)
+        root_uri_raw = root_item.get("uri", "")
+        root_line = root_item.get("selectionRange", {}).get("start", {}).get("line", 0) + 1
+        root_rel = uri_to_rel(root_uri_raw)
+
+        result_lines = [f"[Call Graph] 根节点: {root_name}  ← {root_rel}:{root_line}"]
+
+        if direction in ("outgoing", "both"):
+            visited.clear()
+            result_lines.append("\n》出吐调用 (Outgoing Calls) — '{root_name}' 调用了谁？")
+            async with _lsp_global_lock:
+                calls = await get_calls(root_item, "callHierarchy/outgoingCalls")
+            child_items = [c.get("to", {}) for c in calls]
+            visited.add(f"{root_name}@{root_rel}:{root_line}")
+            for i, child in enumerate(child_items):
+                is_last = (i == len(child_items) - 1)
+                child_prefix = "    " if is_last else "│   "
+                async with _lsp_global_lock:
+                    subtree = await build_tree_outgoing(child, 1, child_prefix)
+                result_lines.extend(subtree)
+
+        if direction in ("incoming", "both"):
+            visited.clear()
+            result_lines.append(f"\n》入向调用 (Incoming Calls) — 谁调用了 '{root_name}'？")
+            async with _lsp_global_lock:
+                callers = await get_calls(root_item, "callHierarchy/incomingCalls")
+            parent_items = [c.get("from", {}) for c in callers]
+            visited.add(f"{root_name}@{root_rel}:{root_line}")
+            for i, parent in enumerate(parent_items):
+                is_last = (i == len(parent_items) - 1)
+                child_prefix = "    " if is_last else "│   "
+                async with _lsp_global_lock:
+                    subtree = await build_tree_incoming(parent, 1, child_prefix)
+                result_lines.extend(subtree)
+
+        return "\n".join(result_lines)
+
+    except Exception as e:
+        msg = f"[call_graph] 内部异常: {e}，自动转入 Grep Fallback (symbol={symbol})"
+        logger.warning(msg)
+        print(f"\n⚠️  {msg}", flush=True)
+        return _grep_fallback_call_graph(repo_path, file_path, symbol, direction)
+
+
+@tool
+def lsp_get_call_graph(repo_path: str, file_path: str, symbol: str,
+                       direction: str = "outgoing", max_depth: int = 3) -> str:
+    """
+    基于 LSP callHierarchy 协议递归构建函数调用链图（Call Graph），
+    以树形缩进文本输出"函数 A 调用了谁" / "谁调用了函数 A"两个方向的完整相关关系。
+
+    适用场景：
+    - 分析内核关键路径（如 fork、handle_page_fault、syscall_handler）的完整调用链
+    - 验证某个函数是否被正确调用，以及调用层次是否合理
+    - 为 OS-Agent C 的细粒度比对提供 Call Graph 快照
+
+    注意：需要 Language Server 支持 callHierarchy 协议。
+    clangd (v12+) 和 rust-analyzer 均支持。
+    若 LSP 无法解析（如符号为宏威码），会返回提示信息而非崩溃。
+
+    Args:
+        repo_path: 仓库它对或相对根路径 (e.g. repos/my-os)
+        file_path: 包含该符号的相对文件路径
+        symbol: 目标函数/方法名称 (e.g. "handle_page_fault", "sys_fork")
+        direction: 调用方向 —
+            "outgoing" : 列出该函数调用了哪些熱数 (默认)
+            "incoming" : 列出谁调用了该函数 (反调用图)
+            "both"     : 同时输出两个方向
+        max_depth: 递归深度限制 (1-5，默认 3。过大会导致超时)
+    """
+    future = asyncio.run_coroutine_threadsafe(
+        _async_lsp_call_graph(repo_path, file_path, symbol, direction, max_depth),
+        _lsp_loop
+    )
+    try:
+        return future.result(timeout=120.0)
+    except TimeoutError:
+        msg = f"[call_graph] LSP 超时 (120s)，自动转入 Grep Fallback (symbol={symbol})"
+        logger.warning(msg)
+        print(f"\n⚠️  {msg}", flush=True)
+        return _grep_fallback_call_graph(repo_path, file_path, symbol, direction)
+    except Exception as e:
+        msg = f"[call_graph] 外层异常: {e}，自动转入 Grep Fallback (symbol={symbol})"
+        logger.warning(msg)
+        print(f"\n⚠️  {msg}", flush=True)
+        return _grep_fallback_call_graph(repo_path, file_path, symbol, direction)
