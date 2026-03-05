@@ -9,6 +9,7 @@ from tools.file_ops import read_code_segment, grep_in_repo
 from tools.git_ops import (
     analyze_git_history,
     find_symbol_first_commit,
+    get_git_history_summary,
     get_repo_local_path,
 )
 from tools.describe_ops import (
@@ -131,6 +132,7 @@ def build_agent(model: str = None, stage_id: str = ""):
     # 历史分析阶段专用工具
     if "14_history" in stage_id:
         tools.extend([
+            get_git_history_summary,
             analyze_git_history,
             find_symbol_first_commit,
         ])

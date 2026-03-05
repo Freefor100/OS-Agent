@@ -687,13 +687,21 @@ STAGES = [
 
 **强烈注意：本阶段不使用任何第三方脚本生成图表。你需要完全依赖自己的代码语义理解能力。**
 
+**⚠️ Token 节约规则（必须遵守）**：
+- **严禁**对同一工具使用相同/近似参数重复调用。
+- **优先使用** `get_git_history_summary` 获取全局概览（一次调用即可覆盖全部提交历史，无需分页）。
+- 只有在需要查看某个特定提交的详细文件变更时，才使用 `analyze_git_history(repo_path, max_commits=1, skip=N)` 定点查看。
+- `find_symbol_first_commit` 可以批量传入多个关键词，请尽量合并为少量调用（1-2 次）。
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 阶段一：【总体提交浏览与模块分类】
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-1) 循环调用 `analyze_git_history(repo_path, max_commits=50, skip=N)`
-   - 通过调整 `skip` 参数（如 0, 50, 100...），从最近的提交一路往前翻阅，直到看完该仓库生命周期内的代表性 Commit。
-   - 关注每次 Commit 的 **Date, Message，以及 Changed Files (+行数/-行数)**。
-   - **语义归类**：根据变更的文件路径（如 `kernel/mm/`），你应当自行判断这次提交属于哪个操作系统核心模块（如"内存管理"、"进程调度"、"文件系统"）。
+1) **调用一次** `get_git_history_summary(repo_path)` 获取全局提交概览。
+   该工具会自动返回所有提交的精炼摘要，包含：日期、SHA、作者、commit message、总增删行数、变更量最大的 Top-3 模块。
+   **注意：这个工具已经做了分页和截断，你不需要循环调用。一次即可获得全局视图。**
+2) 根据返回的摘要数据进行**语义归类**：
+   - 根据每个 commit 涉及的模块名（如 `kernel/`、`fs/`、`drivers/`），判断属于哪个 OS 核心子系统。
+   - 识别出提交密集期（快速开发阶段）和平稳期。
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 阶段二：【初始版本工作量深度核实】
@@ -701,52 +709,61 @@ STAGES = [
 定义"初始版本"为时间线最早的一批 commit（通常是建立仓库骨架的那几天）。
 
 A. **初始代码规模评估**
-   - 找到最底部的几个 Initial Commit，汇总其增加的代码行数。
-   - 观察这些最早 Commit 中包含了哪些文件夹，总结第一版已经搭起了哪几个子系统（例如：只搭好了 trap 和 boot，尚未有 fs）。
+   - 从 `get_git_history_summary` 的返回中找到最早的几个 commit，汇总其增加的代码行数。
+   - 观察这些最早 commit 涉及的模块，总结第一版已经搭起了哪几个子系统。
 
 B. **核心子系统首次引入时间（重点查验）**：
-   调用 `find_symbol_first_commit(repo_path, keywords=[...])` 批量查询以下关键词是何时从无到有被加入的：
+   调用 `find_symbol_first_commit(repo_path, keywords=[...])` 批量查询以下关键词是何时从无到有被加入的（**尽量合并为 1-2 次调用**）：
    - 启动入口：`["_start", "rust_main", "kernel_main"]`
    - 内存管理：`["FrameAllocator", "PageTable", "MemorySet"]`
    - 进程/任务：`["TaskInner", "spawn_task", "ProcessInner"]`
-   - 文件系统：`["VfsNode", "fat32", "ramfs"]`
-   - 系统调用：`["syscall_handler", "sys_write", "sys_read"]`
+   - 文件系统：`["VfsNode", "fat32", "ramfs", "sys_open"]`
+   - 系统调用：`["syscall_handler", "sys_write", "sys_read", "sys_exec"]`
    - 中断/Trap：`["trap_handler", "TrapFrame", "stvec"]`
+   - 进程间通信(IPC)：`["sys_pipe", "Mailbox", "sys_msgget", "sys_shmget"]`
+   - 设备驱动：`["virtio_blk", "UART", "plic", "device_init"]`
+   - 网络(Network)：`["sys_socket", "smoltcp", "TcpSocket", "udp_send"]`
 
    根据工具返回的时间：
    - 若【首次引入】日期在仓库头几天 → 标记为 "**初始版本已有**"
    - 若【首次引入】日期在中后期 → 标记为 "**后续版本引入**"
+   - 若查询结果显示未找到 → 标记为 "**暂不支持该功能**"
+
+C. **使用 grep_in_repo 探索隐藏功能**（可选）：
+   - 如果遇到分析瓶颈，可用 `grep_in_repo` 搜索关键字（如 `SMP`, `signal`, `mmap`）核实功能是否存在。
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 阶段三：【后续重要功能的代码演进轨迹】
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-在你翻阅 `analyze_git_history` 的过程中，挑选出 **最有代表性的 8-12 次大变动**。
-对每次大变动，必须结合该次提交的 Message 与它具体更改的文件清单（Changed Files），写出深度分析：
+根据 `get_git_history_summary` 返回的概览，挑选 **最有代表性的 8-12 次大变动**（通过增删行数和模块判断）。
+对每次大变动，基于概览中的信息写出分析：
 1. **所属模块**：这是在改网络、改内存，还是在改驱动？
 2. **改动性质**：
    - 【新增功能】：引入了全新的机制（如第一次带入多核 SMP）
-   - 【重构/优化】：大面积重写了既有模块（如从单链表改用红黑树管理进程）
+   - 【重构/优化】：大面积重写了既有模块
    - 【Bug修复】：修复了重大架构缺陷
-3. **工作量与事实**：列出增删规模 (+xxx/-yyy) 以及关键文件发生了什么。
+3. **工作量与事实**：列出增删规模 (+xxx/-yyy) 以及涉及的主要模块。
+
+如果某个大变动需要更细粒度的文件级变更信息，**仅对该 commit** 使用 `analyze_git_history(repo_path, max_commits=1, skip=N)` 定点查看。
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 输出格式要求（纯文本 Markdown 历史报告）
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-- ## 总体开发时间线（整体梳理）
-  用几段话概括整个 OS 经历了哪几个大阶段（如：先搭基础结构 → 引入多核 → 完善设备驱动）。
-- ## 初始版本核查
-  - **初始规模与结构**：包含的总行数与早期骨架概述。
-  - **核心功能引入时点**：（列出 find_symbol_first_commit 的检测结果卡片，明确哪些是最早自带，哪些是后续痛苦实现的）。
-- ## 核心功能迭代里程碑（按模块分类）
-  - ### 模块 A（如：内存管理）
-    - `[时间点]` **+xxx -yyy**: 核心改动事实...
-    - `[时间点]` **+xxx -yyy**: 核心改动事实...
-  - ### 模块 B（如：文件系统）
-    - ...
-- ## 后续最具代表性的重构/演进（Top 列表）
-  列出跨模块的大型提交分析。
+**必须**严格按照以下结构输出，清晰回答这三个核心问题：
 
-**重要**：完成所有工具调用后，你必须输出一个完整的 Markdown 格式分析报告，包含上述所有章节内容和图表引用。
+- ## 一、 初始版本状态评估
+  - **初始代码规模**：第一次建立仓库骨架时包含的总行数。
+  - **已完成的初始功能**：明确指出第一版就已经搭起了哪几个子系统（核心功能引入时点检测结果）。
+
+- ## 二、 后续版本演进与功能完善
+  - 详细罗列后续的历次重大 Commit/迭代中，完成（完善/修改）了哪些 OS 功能模块。
+  - 按模块分类（如：内存管理、驱动、文件系统）列出其演进轨迹及其增加/减少的代码量估算。列出最具代表性的演进记录。
+
+- ## 三、 现状评估与后续修改建议（核心总结）
+  - **目前还缺什么**：基于前面对整个仓库历史和现状的分析，目前这个 OS 还有哪些明显的缺失功能或尚未完善的半成品模块？
+  - **现在还需要怎么改**：给出 3-5 条对该项目当下最迫切的代码修改、架构重构或功能补全的建议方向。
+
+**重要**：完成所有工具调用后，你必须输出一个完整的 Markdown 格式分析报告。
 """,
     },
     {
@@ -886,11 +903,9 @@ def main():
     
     # 按 OS 名称创建独立的输出目录
     repo_output_dir = os.path.join(OUTPUT_DIR, repo_name)
-    charts_dir = os.path.join(repo_output_dir, "charts")
     sections_dir = os.path.join(repo_output_dir, "sections")
     
     os.makedirs(repo_output_dir, exist_ok=True)
-    os.makedirs(charts_dir, exist_ok=True)
     os.makedirs(sections_dir, exist_ok=True)
 
     print("=" * 80)
@@ -915,7 +930,7 @@ def main():
 
     # 在此处增加直接克隆逻辑
     repo_local_path = os.path.normpath(os.path.join("./repos", repo_name))
-    print("\n" + "=" * 80)
+    print("=" * 80)
     print(f"📦 阶段 0：仓库准备 (直接执行，无需 LLM)")
     print("=" * 80)
     if os.path.exists(repo_local_path) and os.path.isdir(repo_local_path) and os.listdir(repo_local_path):
@@ -1280,6 +1295,23 @@ def main():
             out.write(f"> **仓库地址**: {repo_url}\n")
             out.write(f"> **分析日期**: {datetime.now().strftime('%Y年%m月%d日')}\n")
             out.write(f"> **分析工具**: OS-Agent-D\n\n")
+            out.write("---\n\n")
+            
+            # 添加仓库目录文件结构
+            out.write("## 仓库目录文件结构\n\n")
+            out.write("```bash\n")
+            try:
+                # 尝试从 tools.describe_ops 导入 list_repo_structure 并获取详尽的目录结构
+                from tools.describe_ops import list_repo_structure
+                repo_local_path = os.path.normpath(os.path.join("./repos", repo_name))
+                if os.path.exists(repo_local_path):
+                    tree_str = list_repo_structure.invoke({"repo_path": repo_local_path, "max_depth": 10})
+                    out.write(tree_str + "\n")
+                else:
+                    out.write("仓库路径不存在或获取目录结构失败。\n")
+            except Exception as e:
+                out.write(f"获取目录结构失败: {e}\n")
+            out.write("```\n\n")
             out.write("---\n\n")
             
             # 执行摘要
