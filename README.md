@@ -513,6 +513,17 @@ VERBOSE_LOGGING=true
    - 强制 Prompt 遵循原则：未发现代码证据时必须标记 `❌ 未实现`，禁止凭空捏造。
    - 明确区分 `✅ 已实现` 与 `🔸 桩函数`，确保技术报告的诚实性。
 
+6. **全链路执行韧性 (Execution Resilience)**：
+   - **智能重试与退避 (Intelligent Retry)**：针对 API 超时、网络波动或工具执行异常，内置 7 种错误分类及指数退避重试机制。
+   - **递归深度熔断 (Recursion Limit)**：为 Agent 执行链设置硬性熔断阈值（默认 500 步），防止复杂逻辑导致的 Token 无限消耗。
+   - **自愈式摘要驱动 (Forced Summary)**：当 Agent 在某阶段陷入“分析死循环”且即将触达步数限制时，系统自动发送“追问消息”强制 LLM 脱离工具调用，立即生成基于已有信息的最佳报告。
+   - **断点续传 (Breakpoint Resume)**：实时保存各阶段中间产物，支持在发生不可控中断后从断点无感恢复，无需重新运行。
+
+7. **Git 与 Token 效率优化 (Optimization)**：
+   - **递进式下钻分析 (Path-Filter Drill-down)**：针对包含数千个文件的巨型提交（如合入整个第三方模块），支持指定 `path_filter` 进行定点下钻，避免输出撑爆上下文。
+   - **智能历史浓缩 (History Distillation)**：内置 `get_git_history_summary` 工具，采用“头部+尾部”双端保留算法，在确保分析跨度的同时将 200 个 commit 的上下文压缩并在 8000 字符内。
+   - **Windows NTFS 兼容补丁**：针对 Linux OS 项目中可能存在的“非法 Windows 文件名”（如冒号 `:` 等），在克隆阶段自动检测并注入 `protectNTFS=false` 补丁，确保跨平台分析链的完整性。
+
 ---
 
 ## 📄 许可证
