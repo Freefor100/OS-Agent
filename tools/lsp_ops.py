@@ -120,24 +120,41 @@ def _polyfill_context(repo_path: str, scan_results: Dict[str, bool]):
         if has_rs:
             cargo_toml_path = os.path.join(repo_path, "Cargo.toml")
             if not os.path.exists(cargo_toml_path):
+                # 收集子目录中的所有 Cargo.toml 路径，组装成 workspace members
+                members = []
+                for root, dirs, files in os.walk(repo_path):
+                    dirs[:] = [d for d in dirs if d not in {".git", "target", "vendor", ".github"}]
+                    if root != repo_path and "Cargo.toml" in files:
+                        rel_path = os.path.relpath(root, repo_path).replace('\\', '/')
+                        members.append(rel_path)
+                
                 try:
                     with open(cargo_toml_path, 'w', encoding='utf-8') as f:
                         f.write('[package]\nname = "os_kernel_dummy"\nversion = "0.1.0"\nedition = "2021"\n')
+                        if members:
+                            f.write('\n[workspace]\nmembers = [\n')
+                            for m in members:
+                                f.write(f'    "{m}",\n')
+                            f.write(']\n')
                 except Exception as e:
                     logger.error(f"Failed to generate Cargo.toml: {e}")
             
-            # 如果存在 Cargo.toml，检查是否存在有效的 target 文件 (src/lib.rs 或 src/main.rs)
+            # 如果存在 Cargo.toml，检查是否存在有效的 target 文件 (src/lib.rs 或 src/main.rs) 或者包含 members
             # 防止 rust-analyzer 的 cargo metadata 报错 `no targets specified in the manifest` 而彻底罢工
             if os.path.exists(cargo_toml_path):
-                src_dir = os.path.join(repo_path, "src")
-                has_target = os.path.exists(os.path.join(src_dir, "lib.rs")) or os.path.exists(os.path.join(src_dir, "main.rs"))
-                if not has_target:
-                    os.makedirs(src_dir, exist_ok=True)
-                    try:
-                        with open(os.path.join(src_dir, "lib.rs"), 'w', encoding='utf-8') as f:
-                            f.write("// Dummy lib created by os-agent to satisfy rust-analyzer workspace loader\n")
-                    except Exception as e:
-                        logger.error(f"Failed to generate dummy src/lib.rs: {e}")
+                with open(cargo_toml_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                # 只有既没有 members 也没有目标文件时，才强制创建 dummy src
+                if "[workspace]" not in content:
+                    src_dir = os.path.join(repo_path, "src")
+                    has_target = os.path.exists(os.path.join(src_dir, "lib.rs")) or os.path.exists(os.path.join(src_dir, "main.rs"))
+                    if not has_target:
+                        os.makedirs(src_dir, exist_ok=True)
+                        try:
+                            with open(os.path.join(src_dir, "lib.rs"), 'w', encoding='utf-8') as f:
+                                f.write("// Dummy lib created by os-agent to satisfy rust-analyzer workspace loader\n")
+                        except Exception as e:
+                            logger.error(f"Failed to generate dummy src/lib.rs: {e}")
     
     # Rust: cargo fetch — 让 rust-analyzer 能解析 git 远程依赖
     if scan_results["Cargo.toml"] or os.path.exists(os.path.join(repo_path, "Cargo.toml")):
