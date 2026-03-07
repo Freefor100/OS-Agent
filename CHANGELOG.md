@@ -1,5 +1,13 @@
 # 更新日志 (Changelog)
 
+## [2.9.1] - 2026-03-07
+
+### 🐛 Bug 修复
+
+- **LSP 路径解析修复**：修复了在 Windows 平台上 `lsp_get_document_outline` 等探针向 clangd 发送带有本地盘符的绝对路径时，由于缺失 `file:///` 的第三个 `斜杠` 导致 LLVM VFS 底层将其错误解析为 `\\G:\...` UNC 网络路径而直接崩溃（`VFS: failed to set CWD`）的问题。
+
+---
+
 ## [2.9.0] - 2026-03-07
 
 ### ✨ 新增功能

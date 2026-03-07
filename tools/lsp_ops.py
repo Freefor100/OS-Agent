@@ -635,7 +635,10 @@ async def _async_lsp_request(repo_path: str, file_path: str, symbol: str, method
         else:
             return ASMLexicalParser.fallback_references(repo_path, file_path, symbol)
 
-    uri = f"file://{abs_file.replace(chr(92), '/')}"
+    abs_file_unix = abs_file.replace(chr(92), '/')
+    if not abs_file_unix.startswith('/'):
+        abs_file_unix = '/' + abs_file_unix
+    uri = f"file://{abs_file_unix}"
     
     # 检查客户端是否还活着
     if not client.is_alive:
@@ -833,7 +836,10 @@ async def _async_lsp_document_symbols(repo_path: str, file_path: str) -> str:
     if not client:
         return "Error: LSP client failed to start."
 
-    uri = f"file://{abs_file.replace(chr(92), '/')}"
+    abs_file_unix = abs_file.replace(chr(92), '/')
+    if not abs_file_unix.startswith('/'):
+        abs_file_unix = '/' + abs_file_unix
+    uri = f"file://{abs_file_unix}"
     
     # Health check before request
     if not client.is_alive:
@@ -1094,7 +1100,10 @@ async def _async_lsp_call_graph(
         print(f"\n⚠️  {msg}", flush=True)
         return _grep_fallback_call_graph(repo_path, file_path, symbol, direction)
 
-    uri = f"file://{abs_file.replace(chr(92), '/')}"
+    abs_file_unix = abs_file.replace(chr(92), '/')
+    if not abs_file_unix.startswith('/'):
+        abs_file_unix = '/' + abs_file_unix
+    uri = f"file://{abs_file_unix}"
 
     # 确保文档已打开
     try:
