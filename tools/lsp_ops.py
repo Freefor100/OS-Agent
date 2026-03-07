@@ -80,6 +80,38 @@ def _ensure_cargo_fetched(repo_path: str):
             pass
 
 # --- 阶段 2：编译上下文的动态生成 (Dynamic Context Polyfill) ---
+def _detect_target_arch(repo_path: str) -> Optional[str]:
+    """尝试从仓库结构中推测目标架构 (riscv64, loongarch64 etc)"""
+    # 1. 优先使用环境变量强制覆盖
+    target = os.environ.get("LSP_TARGET")
+    if target:
+        return target
+    
+    # 2. 检查常见的目录名
+    arch_dir = os.path.join(repo_path, "os", "src", "arch")
+    if os.path.exists(arch_dir):
+        subdirs = [d for d in os.listdir(arch_dir) if os.path.isdir(os.path.join(arch_dir, d))]
+        if "riscv64" in subdirs: return "riscv64gc-unknown-none-elf"
+        if "loongarch64" in subdirs: return "loongarch64-unknown-none-elf"
+        if "x86_64" in subdirs: return "x86_64-unknown-none-elf"
+        if "aarch64" in subdirs: return "aarch64-unknown-none-elf"
+    
+    # 3. 语义搜索 (启发式)
+    try:
+        # 只看核心模块
+        for root, dirs, files in os.walk(os.path.join(repo_path, "os", "src")):
+            if "target" in dirs: dirs.remove("target")
+            for f in files:
+                if f.endswith(".rs"):
+                    with open(os.path.join(root, f), 'r', encoding='utf-8', errors='ignore') as f_in:
+                        content = f_in.read(2048) # 只看开头
+                        if 'target_arch = "riscv64"' in content: return "riscv64gc-unknown-none-elf"
+                        if 'target_arch = "loongarch64"' in content: return "loongarch64-unknown-none-elf"
+    except:
+        pass
+        
+    return None
+
 def _polyfill_context(repo_path: str, scan_results: Dict[str, bool]):
     # C/C++ (clangd) 补全逻辑
     # C/C++ (clangd) 补全逻辑
@@ -252,6 +284,7 @@ class LSPClient:
                 },
                 "initializationOptions": {
                     "cargo": {
+                        "target": _detect_target_arch(self.cwd),
                         "extraArgs": ["--offline"],
                         "extraEnv": {
                             "CARGO_NET_OFFLINE": "true"
