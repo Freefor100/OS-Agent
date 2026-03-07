@@ -120,11 +120,11 @@ STAGES = [
 **严格注意**：区分项目本身名称（如 Undefined OS）与底层框架（如 ArceOS）。如果项目是基于 ArceOS 修改的，必须明确说明"基于 ArceOS 开发"，不能直接把 ArceOS 当作项目名称。
 
 请按顺序完成（仓库已克隆到 repo_path，直接使用即可）：
-1) analyze_tech_stack(repo_path)：总结语言/构建/依赖。
+1) analyze_tech_stack(repo_path)：总结语言/构建/依赖。**必须明确提取编程语言（版本、是否no_std）、基础框架来源（rCore/ArceOS等）、内核类型（宏内核/微内核/混合等）。**
 2) list_repo_structure(repo_path, max_depth=5)：总结关键目录。注意输出中的文件行数和大小信息。
 3) read_code_segment 读取并总结：README.md、Cargo.toml、Makefile（如存在）。
 4) **寻找内核入口与架构支持**（优先使用 LSP 工具定位符号，辅以 grep_in_repo 搜索关键词）：
-   - **架构扫描**：检查 `arch/` 或 `platform/` 目录，列出所有支持的架构（x86_64, aarch64, riscv64, loongarch64 等）。
+   - **架构扫描**：检查 `arch/` 或 `platform/` 目录，明确列出**所有支持的目标架构完整列表**（x86_64, aarch64, riscv64, loongarch64 等）。
    - **寻找入口**：
      - **严禁假设** `src/main.rs` 是入口。
      - 在 Rust 项目中，搜索 `#[entry]`、`_start` 或 `rust_main`。
@@ -140,8 +140,8 @@ STAGES = [
    - **子模块搜索（关键）**：如果项目包含子模块目录（如 `arceos/`、`.arceos/`），**必须进入子模块搜索功能实现**。例如 Lazy Allocation 可能在 `arceos/modules/axmm/` 中，CFS 调度可能通过 `arceos/modules/axtask/` 的 feature flag 启用。不要只搜索顶层目录就下结论说"未发现"。
 
 输出格式：
-- ## 结论摘要（3-5 条，明确项目与框架关系）
-- ## 技术栈与构建（含关键命令/入口文件）
+- ## 结论摘要（3-5 条，明确项目与框架关系及内核类型）
+- ## 技术栈与构建（含编程语言版本、所有支持的架构完整列表）
 - ## 目录结构导读（列出"子系统→目录→入口文件"）
 - ## 核心子系统概览（内存/进程/FS/网络，务必区分"已实现"与"计划中"）
 - ## 证据列表（文件路径清单）
@@ -160,8 +160,8 @@ STAGES = [
 - CPU 模式切换与初始化（如 RISC-V M-Mode -> S-Mode，x86实模式->保护模式->长模式）。**必须验证是否真的发生了模式切换（查找 sstatus.spp, mstatus.mpp, cr0 等寄存器操作）。**
 - 关键寄存器设置（栈指针 SP、页表基址 SATP/CR3、中断向量表 stvec 等）。
 - 它是如何跳转到 Rust/C 入口函数的？
-- 早期初始化做了什么（BSS 清零、早期串口打印、设备树解析）？
-- **浮点单元 (FPU) 初始化**：搜索 `sstatus.fs` (RISC-V) 或 `cpacr_el1` (AArch64) 或 `cr4` (x86_64)。如果没有找到相关代码，**必须明确说明未启用 FPU**。
+- 早期初始化做了什么（BSS 清零、早期串口打印、设备树解析、页表初始化时机）？
+- **浮点单元 (FPU) 初始化**：搜索 `sstatus.fs` (RISC-V) 或 `cpacr_el1` (AArch64) 或 `cr4` (x86_64)。如果没有找到相关代码，**必须明确说明未启用 FPU（状态为未实现）**。
 - **多平台适配**：
     - **StarFive VisionFive2**：搜索 `visionfive` 或 `jh7110`，分析其启动流程特异性（SBI -> U-Boot）。
     - **LoongArch**：搜索 `loongarch`，分析其启动流程。
@@ -213,18 +213,18 @@ STAGES = [
 - **用户指针安全**：搜索 `UserInPtr|UserOutPtr|verify_area|check_region`，分析系统调用入口处如何验证用户空间指针合法性。
 - 缺页异常（Page Fault）处理逻辑（如有）。**追踪 handle_page_fault 调用链**。
 - **进程级映射管理**：搜索地址空间管理结构（如 `VmAreaStruct`、`BTreeMap` 管理的映射区间），分析是否有反向映射表（rmap）支持。
-- **高级特性验证**（必须使用 grep_in_repo 搜索实现代码，而不仅仅是特质定义）：
+- **高级特性验证**（必须分类为 `✅ 已实现`、`🔸 桩函数`、`❌ 未实现`，并寻找具体代码）：
   - 写时复制（Copy-on-Write）：搜索 `cow|copy_on_write`，确认是否在 page fault 中处理了 CoW。
   - 懒分配（Lazy Allocation）：搜索 `lazy|populate`，确认是否推迟了物理页分配。
   - 共享内存管理（SharedMem）：是否有 `shm` 相关系统调用和数据结构？**深入分析**：搜索 `sys_shmdt` 实现，检查是否使用 `BTreeMap` 进行 O(log n) 定位。搜索 `SharedMemoryManager`，分析 `IPC_RMID` 删除策略（立即删除 vs Arc 引用计数延迟释放）。
   - **反向映射表（rmap）**：搜索 `rmap|reverse_map|page_to_vma`，检查是否有物理页到虚拟页的反向映射机制。
   - 交换区/页面置换（Swap）：是否实现了 `swap_out`/`swap_in`？
   - **大页支持（Huge Page）**：在页表映射中是否处理了 2M/1G 页面？搜索 `HugePage|MapSize::2M|MapSize::1G`。
-  - **零拷贝与 mmap**：搜索 `mmap` 实现，验证是否支持文件映射？是否支持零拷贝IO（sendfile/splice）？**注意：如果是 `mmap` 系统调用，检查它是否真的实现了 MAP_FIXED/MAP_ANON 等标志的处理，还是仅仅是一个空壳？**
+  - **零拷贝与 mmap**：搜索 `mmap` 实现，验证是否支持文件映射？是否支持零拷贝IO（sendfile/splice）？**注意：如果是 `mmap` 系统调用，检查它是否真的实现了 MAP_FIXED/MAP_ANON 等标志的处理，还是仅仅是一个空壳？（如果是空壳/仅返回0，标注为桩函数）**
 
 **强制要求**：
 - 对于上述每一个特性，如果支持，必须引用代码文件和行号。
-- 如果不支持，必须明确写“未发现实现”。
+- 如果不支持，必须明确写“未发现实现”或“❌ 未实现”。
 - 追踪一个完整的 `page fault` -> `alloc_frame` -> `map_page` 流程。
 - **LSP 工具使用要求**：
     - 使用 `lsp_get_definition` 定位 `PageTable`、`FrameAllocator`、`MemorySet` 等核心结构体的精确定义，**不要凭记忆描述字段**。
@@ -261,7 +261,7 @@ STAGES = [
 - 调度策略：算法是什么（FIFO, RR, Priority, Stride, CFS）？Scheduler 实现细节。
 - 状态流转：Ready/Running/Blocked/Exited 状态机。
 - 上下文切换：switch.S 或类似汇编代码，保存了哪些寄存器？
-- **高级特性验证**：
+- **高级特性验证**（必须分类为 `✅ 已实现`、`🔸 桩函数`、`❌ 未实现`，并寻找具体代码）：
     - **信号机制 (Signal)**：使用 grep_in_repo 搜索 `signal|sigaction|kill`，确认是否实现了信号注册与分发？
     - **Futex**：搜索 `futex|wait_queue`，是否支持快速用户态互斥锁？
 - **深度调用链追踪（必须）**：
@@ -271,7 +271,7 @@ STAGES = [
     - `exit()`: 资源回收流程，父进程通知。
 - 进程与线程的区别：代码中是否区分了 TCB 和 PCB？还是只有 Task？
 - **层次结构 ID 规则**：搜索 `pgid|session_id|set_sid|setpgid`，分析 PGID（进程组 ID = 组长 PID）和 SID（会话 ID = 会话组长 PGID）的分配规则。
-- **POSIX 资源限制**：搜索 `rlimit|RLIMIT|getrlimit|setrlimit|resource_limit`，检查是否实现了资源限制。如果找到，列出支持的资源类型数量（POSIX 定义了 16 种）及软/硬限制双机制。
+- **POSIX 资源限制**（必须分类为 `✅ 已实现`、`🔸 桩函数`、`❌ 未实现`）：搜索 `rlimit|RLIMIT|getrlimit|setrlimit|resource_limit`，检查是否实现了资源限制。如果找到，列出支持的资源类型数量（POSIX 定义了 16 种）及软/硬限制双机制。
 
 要求：
 - 使用 `lsp_get_definition` 定位 `Task`/`Process`/`TaskInner` 结构体定义，精确列出其字段（不要猜）。
@@ -310,7 +310,8 @@ STAGES = [
     - 用户态 `ecall`/`syscall` 指令。
     - 内核态 `syscall_handler` 分发逻辑。
     - **必须找到分发表**（syscall table 或 match 语句）。
-    - **Stub验证**：检查 `sys_clone`, `sys_exec`, `sys_write` 等是否直接返回错误或 0？只有包含具体逻辑才算实现。
+    - **Stub验证**：检查核心 syscall（如 `sys_clone`, `sys_exec`, `sys_mmap`, `sys_write`）等是否直接返回错误、返回 0，或者包含了 `todo!()`/`unimplemented!()`？
+    - **覆盖度统计**：基于上述验证，明确区分并列出“已注册但仅为桩特征（`🔸 桩函数`）”的 syscall 数量，与“完整功能实现（`✅ 已实现`）”的 syscall 数量。
     - 选择一个具体 syscall（如 `sys_write`）追踪其从 Trap 到真正处理逻辑的路径。
 - **接口/实现分离模式**：如果项目采用了 syscall 接口与实现分离的设计（如 `sys_xxx` 为接口，`sys_xxx_impl` 为实现），必须明确描述此模式。搜索 `_impl` 后缀函数。
 - **用户指针语义化包装**：搜索 `UserInPtr|UserOutPtr|UserInOutPtr`，如果存在此类类型安全包装，需描述其在 syscall 入口处的作用。
@@ -359,13 +360,14 @@ STAGES = [
   - RamFS/TmpFS：是否有内存文件系统？
 - **伪文件系统**：使用 grep_in_repo 搜索 `devfs|procfs|sysfs` 检查是否实现了伪文件系统。若有，分析其实现方式。
 - 文件描述符表：Global 还是 Per-Process？`fd_table` 结构在哪？
-- **功能细节**：
-  - 是否支持 `pipe`？
-  - 是否支持 `socket`？
-  - 是否支持 `mmap`？**注意**：必须检查 `sys_mmap` 实现。如果是 **零拷贝**，必须看到 `VmArea` 结构体中有 `shared` 字段或 `MAP_SHARED` 处理逻辑。
-  - **文件打开流程**：追踪从 `sys_open` 到最终获得文件描述符的完整调用链，说明超级块、Inode、Dentry、File 四大核心数据结构如何协同。
-  - **高级特性**：`poll`/`select` 是否实现？搜索 `sys_poll` / `sys_select`，检查是一律返回 Ready 还是真的检查了文件状态？
-  - **如果上述功能未找到代码，明确写“未实现”**。
+- **功能细节**（必须分类为 `✅ 已实现`、`🔸 桩函数`、`❌ 未实现`）：
+  - 是否支持 `pipe` 套接字？
+  - 是否支持网络 `socket`？
+  - 是否支持 `mmap`？**注意**：必须检查 `sys_mmap` 实现。如果是 **零拷贝**，必须看到 `VmArea` 结构体中有 `shared` 字段或 `MAP_SHARED` 处理逻辑。如果是 `sys_mmap` 仅返回 Ok(0) 没有处理标志位，标注为'桩函数'。
+  - **高级特性**：`poll`/`select`/`epoll` 是否实现？搜索 `sys_poll` / `sys_select` / `sys_epoll`，检查是一律返回 Ready 还是真的检查了文件状态？
+  - **如果上述功能未找到代码，明确写“未实现（❌ 未实现）”**。
+
+- **文件打开流程**：追踪从 `sys_open` 到最终获得文件描述符的完整调用链，说明超级块、Inode、Dentry、File 四大核心数据结构如何协同。
 
 要求：
 - 使用 `lsp_get_definition` 定位 `File` trait、`Inode` trait、`SuperBlock` 等 VFS 核心抽象的精确定义。
@@ -438,13 +440,13 @@ STAGES = [
 - 锁机制：SpinLock / Mutex / Semaphore / RwLock 实现。
     - **原子操作**：是使用 Rust `core::sync::atomic` 还是自定义汇编？(grep `ldxr/stxr`, `lock xchg`)
     - **等待队列 (WaitQueue)**：线程获取锁失败时如何挂起？（find `WaitQueue`, `sleep`, `block`）
-- **IPC 机制（必须代码验证，谨防桩代码）**：
-    - 管道 (Pipe)：**实现验证**：是否使用了环形缓冲区 (Ring Buffer)？
+- **IPC 机制（必须代码验证并分类为 `✅ 已实现`、`🔸 桩函数`、`❌ 未实现`，谨防桩代码）**：
+    - 管道 (Pipe)：**实现验证**：是否使用了环形缓冲区 (Ring Buffer) 还是简单字节流？
     - 消息队列 (MessageQueue)：**必须检查实现**。grep `sys_msgget` 或 `msgget`。
-        - 如果函数体为空或 `Ok(0)` 但没有队列逻辑，标记为 **桩函数**。
-        - 只有看到了队列结构体操作（push/pop），才可标记为 **已实现**。
-    - 共享内存 (SharedMem)：结合内存管理章节分析。
-    - 信号量 (Semaphore)：PV 操作实现。同样需要检查 `sys_semget`, `semop` 是否为桩代码。
+        - 如果函数体为空、`Ok(0)` 但没有队列逻辑，必须标记为 **`🔸 桩函数`**。
+        - 只有看到了完整的队列结构体操作（push/pop），才可标记为 **`✅ 已实现`**。
+    - 共享内存 (SharedMem)：结合内存管理章节分析（SharedMemoryManager 实现）。
+    - 信号量 (Semaphore)：PV 操作实现。同样需要检查 `sys_semget`, `semop` 区分是否为桩代码。
     - **信号 (Signal) 作为 IPC**：搜索 `sys_kill|sig_send|signal_send`，分析信号分发机制是否也用于进程间通信。
     - **信号处理时机**：搜索 `POST_TRAP|do_signal|handle_pending_signal`，分析信号在 Trap 返回用户态前的确切处理位置。
 - **关键流程的跨文件调用链**：对 Futex 等待/唤醒流程，使用 `lsp_get_call_graph` 递归展开完整调用树（优先于 `lsp_get_references` 的单层查找）。
@@ -475,7 +477,7 @@ STAGES = [
         "prompt": """目标：分析多核/SMP（对称多处理）支持实现。
 
 必须回答：
-- 是否支持多核？架构设计是 SMP 还是 AMP？
+- 是否支持多核？架构设计是 SMP 还是 AMP？**如果不支持多核，明确写“仅支持单核（❌ 未实现）”**。
 - Secondary CPU 启动流程：**必须代码验证**。搜索 `smp_boot`, `__cpu_up`。如果找不到启动其他核的代码，那就是单核。
 - 核间中断 (IPI)：搜索 `send_ipi`, `ipi_handler`。
 - **锁的实现**：SpinLock 是否禁用了中断？Mutex 是否支持优先级继承？
@@ -523,13 +525,13 @@ STAGES = [
 - **Rust 安全性机制**：如果项目使用 Rust 编写，必须指出 RAII、所有权分析、基于生命周期的锁等机制带来的安全性。
 - 用户态/内核态隔离：页表隔离（KPTI）、SMEP/SMAP 是否开启？
 - **权限模型深度验证（关键）**：
-    - **用户/组（UID/GID）**：不仅要看 `Task` 结构体是否有 `uid` 字段，**必须验证**这些字段是否在 `open/write/exec` 等系统调用中被用于权限检查！（grep `check_perm`, `inode_permission`）。如果仅有字段但无检查逻辑，必须注明“**仅有定义但未强制执行**”。
+    - **用户/组（UID/GID）**：不仅要看 `Task` 结构体是否有 `uid` 字段，**必须验证**这些字段是否在 `open/write/exec` 等系统调用中被用于权限检查！（grep `check_perm`, `inode_permission`）。如果仅有字段但无检查逻辑，必须注明“**仅有定义但未强制执行（🔸 桩函数）**”。
     - **Capability/ACL**：搜索 `capability`, `acl`。
 - **安全沙箱 (Seccomp/Prctl)**：
     - 搜索 `prctl` 或 `seccomp`。
     - **必须检查实现**：是返回 `ENOSYS`（未实现），还是直接返回 `0`（假装成功），还是真的解析了 BPF 规则？
-    - **Stub判断**：如果 `sys_prctl` 只是 returning 0 without doing anything，标记为 **Stub/Bypass**。
-    - 如未找到，明确写“未实现安全沙箱”。
+    - **Stub判断**：如果 `sys_prctl` 只是 returning 0 without doing anything，标记为 **`🔸 桩函数`**。
+    - 如未找到，明确写“未实现安全沙箱（❌ 未实现）”。
 - **审计与安全启动**：
     - 搜索 `audit`（审计日志）、`secure_boot`、`signature`（签名验证）。
 - **内存安全**：
@@ -564,7 +566,7 @@ STAGES = [
         "prompt": """目标：深入分析网络子系统与 TCP/IP 协议栈实现。
 
 必须回答：
-- 网络协议栈架构：自实现还是使用 `smoltcp`/`lwip` 等库？（**检查 Cargo.toml 依赖**）
+- 网络协议栈架构：自实现还是使用 `smoltcp`/`lwip` 等库？（**检查 Cargo.toml 依赖**）**如果完全没有网络支持，明确写“未实现网络功能（❌ 未实现）”**。
 - Socket 接口实现：是否有 `socket`/`bind`/`connect` 等 syscall？还是仅有 Loopback？
 - **功能限制声明（必须）**：分析项目是否已在真实物理网卡上测试过网络功能。如果仅在 QEMU 环境测试或仅支持本地回环通信，必须明确写出该限制。搜索 `loopback|LOOPBACK|127.0.0.1` 确认是否仅有回环设备。
 - **网卡驱动细节**：
@@ -652,7 +654,7 @@ STAGES = [
     - 检查 `.gitlab-ci.yml` (GitLab CI)。
     - **递归搜索**：如果根目录没有，使用 `find_by_name` 搜索 `*.yml`，查看是否在 `bi-direction-copy` 目录或其他子目录？
     - **子模块 CI**：如果项目依赖子模块（如 `arceos/`），也检查子模块中的 `.github/workflows/` 和 CI 配置。
-    - **如果找不到 CI 配置文件，请明确写“未发现 CI/CD 配置”**。
+    - **如果找不到 CI 配置文件，请明确写“未发现 CI/CD 配置”或“❌ 未实现”**。
     - **陷阱警告**：`.github/` 目录在 `list_repo_structure` 的默认排除列表中。你必须显式使用 `list_repo_structure(repo_path + '/.github', max_depth=3)` 或 `grep_in_repo` 搜索 `on:|push:|jobs:` 等 CI 语法关键词。
 - 测试脚本：分析 `scripts/` 下的测试运行脚本（如 `test.sh`, `runner.py`）。
 - **模糊测试 (Fuzzing)**：
@@ -687,20 +689,21 @@ STAGES = [
 
 **强烈注意：本阶段不使用任何第三方脚本生成图表。你需要完全依赖自己的代码语义理解能力。**
 
-**⚠️ Token 节约规则（必须遵守）**：
-- **严禁**对同一工具使用相同/近似参数重复调用。
-- **优先使用** `get_git_history_summary` 获取全局概览（一次调用即可覆盖全部提交历史，无需分页）。
-- 只有在需要查看某个特定提交的详细文件变更时，才使用 `analyze_git_history(repo_path, max_commits=1, skip=N)` 定点查看。
-- `find_symbol_first_commit` 可以批量传入多个关键词，请尽量合并为少量调用（1-2 次）。
+**⚠️ Token 节约与防死循环规则（绝对红线）**：
+- **严禁**把 `get_git_history_summary` 放在循环里调用。你只需要调用**一次**，它会自动返回贯穿仓库生命周期的浓缩摘要。
+- **严禁**无脑遍历所有的历史节点。
+- 当 `get_git_history_summary` 的结果显示某次重大 Commit 涉及了海量文件（如 `[arceos/modules/] 3500 files`）且你需要知道具体加了什么功能时，**必须且只能**使用 `analyze_git_history(repo_path, max_commits=1, skip=N, path_filter="arceos/modules")` 对该重点目录进行定点下钻。
+- **绝不允许**在未设定 `path_filter` 的情况下对几千个文件的重大提交使用 `analyze_git_history`，这会导致上万行的输出撑爆监控。
+- `find_symbol_first_commit` 可以批量传入多个关键词，请严格合并为 1-2 次统一调用。
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 阶段一：【总体提交浏览与模块分类】
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-1) **调用一次** `get_git_history_summary(repo_path)` 获取全局提交概览。
-   该工具会自动返回所有提交的精炼摘要，包含：日期、SHA、作者、commit message、总增删行数、变更量最大的 Top-3 模块。
-   **注意：这个工具已经做了分页和截断，你不需要循环调用。一次即可获得全局视图。**
-2) 根据返回的摘要数据进行**语义归类**：
-   - 根据每个 commit 涉及的模块名（如 `kernel/`、`fs/`、`drivers/`），判断属于哪个 OS 核心子系统。
+1) **调用且仅调用一次** `get_git_history_summary(repo_path)` 获取全局提交概览。
+   该工具会自动返回精炼摘要，包含：日期、SHA、作者、总增删行数、以及**变更量最大的前 3 个确切目录**。
+2) **调用且仅调用一次** `analyze_authors_contribution(repo_path)` 获取该项目的开发者图谱。
+   分析该操作系统是属于“单人独立开发”还是“多人模块化协作”，各个核心目录的主力作者是谁。
+3) 根据以上返回摘要进行**语义归类**：
    - 识别出提交密集期（快速开发阶段）和平稳期。
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -744,16 +747,19 @@ C. **使用 grep_in_repo 探索隐藏功能**（可选）：
    - 【Bug修复】：修复了重大架构缺陷
 3. **工作量与事实**：列出增删规模 (+xxx/-yyy) 以及涉及的主要模块。
 
-如果某个大变动需要更细粒度的文件级变更信息，**仅对该 commit** 使用 `analyze_git_history(repo_path, max_commits=1, skip=N)` 定点查看。
+**【高级钻取工具（按需使用）】**：
+- 如果某个大变动在 `get_git_history_summary` 中显示修改了大量的核心子系统（例如 `[arceos/modules/] 3500 files`），你需要弄清楚里面包含了什么文件，**必须**使用带目录过滤的精确下钻：`analyze_git_history(repo_path, max_commits=1, skip=N, path_filter="arceos/modules")`。
+- 如果你看到一个极其关键的 Commit（比如标为"Add Network Stack"），但你想知道它到底在底层新增了什么函数接口？调用 `get_commit_diff_summary(repo_path, commit_sha)` 一键透视其底层增删的具体代码逻辑，而不是光靠猜。
+- 如果你想知道一个至关重要的大文件（如 `kernel/sched.rs`）从立项起经历了几次重构，调用 `trace_file_evolution(repo_path, "kernel/sched.rs")` 拉出它演进的生命线。
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 输出格式要求（纯文本 Markdown 历史报告）
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 **必须**严格按照以下结构输出，清晰回答这三个核心问题：
 
-- ## 一、 初始版本状态评估
-  - **初始代码规模**：第一次建立仓库骨架时包含的总行数。
-  - **已完成的初始功能**：明确指出第一版就已经搭起了哪几个子系统（核心功能引入时点检测结果）。
+- ## 一、 项目概览与人员协作
+  - **总规模与协作模式**：基于代码规模和作者贡献图，总结这是个单人作业还是社区协作项目？各作者主力负责什么模块。
+  - **初始完成功能**：第一版建立时就已经搭起了哪几个子系统（核心功能引入时点检测结果）。
 
 - ## 二、 后续版本演进与功能完善
   - 详细罗列后续的历次重大 Commit/迭代中，完成（完善/修改）了哪些 OS 功能模块。
@@ -1044,7 +1050,7 @@ def main():
         
         inputs = {"messages": [SystemMessage(content=SYSTEM_PROMPT), HumanMessage(content=task)]}
 
-        print("\\n" + "=" * 80)
+        print("\n" + "=" * 80)
         print(f"🧩 阶段 {idx}/{len(STAGES)}：{title}")
         print("=" * 80)
         print(f"🚀 开始执行 Agent (模型: {os.getenv('MODEL_NAME')})...")

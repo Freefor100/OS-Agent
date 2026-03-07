@@ -59,7 +59,7 @@ def format_tool_call_summary(tool_name: str, tool_args: dict) -> str:
         return f"{dirname}/"
 
     # Git 历史分析
-    elif tool_name in ("analyze_git_history_detailed", "analyze_git_history", "get_git_history_summary", "get_dev_history_by_module", "generate_dev_history_charts"):
+    elif tool_name in ("analyze_git_history_detailed", "analyze_git_history", "get_git_history_summary", "get_dev_history_by_module", "generate_dev_history_charts", "trace_file_evolution", "analyze_authors_contribution", "get_commit_diff_summary"):
         path = tool_args.get("repo_path", "?")
         max_commits = tool_args.get("max_commits", "")
         skip = tool_args.get("skip", "")
@@ -119,7 +119,7 @@ def format_tool_result_summary(tool_name: str, content: str) -> str:
         if "代码文件统计" in content or "Rust" in content:
             return "返回技术栈与文件统计"
         return f"返回 {content_len} 字符"
-    elif tool_name in ("get_dev_history_by_module", "analyze_git_history_detailed", "analyze_git_history", "get_git_history_summary"):
-        return f"返回开发历史 ({line_count} 行, {content_len} 字符)"
+    elif tool_name in ("get_dev_history_by_module", "analyze_git_history_detailed", "analyze_git_history", "get_git_history_summary", "trace_file_evolution", "analyze_authors_contribution", "get_commit_diff_summary"):
+        return f"返回开发历史分析 ({line_count} 行, {content_len} 字符)"
     else:
         return f"返回 {content_len} 字符 ({line_count} 行)"

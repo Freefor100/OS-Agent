@@ -64,19 +64,20 @@ def _ensure_cargo_fetched(repo_path: str):
             timeout=180  # 3 minutes max for large workspaces with git deps
         )
         if result.returncode == 0:
-            # Write marker so we don't fetch again
-            try:
-                with open(marker, 'w') as f:
-                    f.write("ok")
-            except Exception:
-                pass
             logger.info(f"cargo fetch completed successfully in {repo_path}")
         else:
-            logger.warning(f"cargo fetch failed (rc={result.returncode}): {result.stderr[:300]}")
+            logger.warning(f"cargo fetch failed (rc={result.returncode}): {result.stderr[:300]}\nProceeding anyway with partial deps.")
     except subprocess.TimeoutExpired:
         logger.warning("cargo fetch timed out after 180s — continuing without full dependency resolution")
     except Exception as e:
         logger.warning(f"cargo fetch error: {e} — continuing anyway")
+    finally:
+        # ALWAYS write marker so we don't repeatedly fetch and hang on broken repos
+        try:
+            with open(marker, 'w') as f:
+                f.write("ok")
+        except Exception:
+            pass
 
 # --- 阶段 2：编译上下文的动态生成 (Dynamic Context Polyfill) ---
 def _polyfill_context(repo_path: str, scan_results: Dict[str, bool]):
@@ -171,14 +172,16 @@ class LSPClient:
         self.build_scripts_disabled = disable_build_scripts
         env = os.environ.copy()
         
+        # 强化隔离：防止在线拉取卡死，允许不稳定特性 (全局对 rust-analyzer 生效)
+        if "rust-analyzer" in self.cmd[0]:
+            env["CARGO_NET_OFFLINE"] = "true" 
+            env["RUSTC_BOOTSTRAP"] = "1"
+
         if disable_build_scripts and "rust-analyzer" in self.cmd[0]:
             # 核心漏洞防御：阻止 rust-analyzer 执行目标机器特有的、可能直接 Crash 的构建脚本
             env["RUST_ANALYZER_CARGO_RUN_BUILD_SCRIPTS"] = "false"
             env["RUST_ANALYZER_CARGO_FEATURES"] = "all"
             env["RUST_ANALYZER_CARGO_NO_DEFAULT_FEATURES"] = "false"
-            # 强化隔离：防止在线拉取卡死，允许不稳定特性
-            env["RUSTC_BOOTSTRAP"] = "1"
-            env["CARGO_NET_OFFLINE"] = "true" 
             # 终极 Workspace 防御：忽略不存在的 target 报错
             env["RUST_ANALYZER_CARGO_UNSET_TEST"] = "true"
             env["CARGO_TARGET_DIR"] = os.path.join(self.cwd, ".os_agent_ra_target")
@@ -225,7 +228,16 @@ class LSPClient:
                         "callHierarchy": {"dynamicRegistration": False},
                         "synchronization": {"dynamicRegistration": False}
                     }
-                }
+                },
+                "initializationOptions": {
+                    "cargo": {
+                        "extraArgs": ["--offline"],
+                        "extraEnv": {
+                            "CARGO_NET_OFFLINE": "true"
+                        }
+                    },
+                    "checkOnSave": False
+                } if "rust-analyzer" in self.cmd[0] else {}
             }
         }
         await self.send_request(init_req)
