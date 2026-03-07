@@ -130,12 +130,15 @@ def _polyfill_context(repo_path: str, scan_results: Dict[str, bool]):
                 
                 try:
                     with open(cargo_toml_path, 'w', encoding='utf-8') as f:
-                        f.write('[package]\nname = "os_kernel_dummy"\nversion = "0.1.0"\nedition = "2021"\n')
                         if members:
-                            f.write('\n[workspace]\nmembers = [\n')
+                            # 这种情况下生成 "Virtual Manifest"，即只有 [workspace] 而没有 [package]
+                            # 这样 cargo metadata 就不会报错要求根目录必须有 src/lib.rs 了
+                            f.write('[workspace]\nmembers = [\n')
                             for m in members:
                                 f.write(f'    "{m}",\n')
                             f.write(']\n')
+                        else:
+                            f.write('[package]\nname = "os_kernel_dummy"\nversion = "0.1.0"\nedition = "2021"\n')
                 except Exception as e:
                     logger.error(f"Failed to generate Cargo.toml: {e}")
             
@@ -144,8 +147,9 @@ def _polyfill_context(repo_path: str, scan_results: Dict[str, bool]):
             if os.path.exists(cargo_toml_path):
                 with open(cargo_toml_path, 'r', encoding='utf-8') as f:
                     content = f.read()
-                # 只有既没有 members 也没有目标文件时，才强制创建 dummy src
-                if "[workspace]" not in content:
+                # 只有如果是 [package] 类型的 manifest 且没有目标文件时，才强制创建 dummy src
+                # Virtual Manifest ([workspace]) 模式下不需要也不能在根目录创建 src/lib.rs
+                if "[package]" in content:
                     src_dir = os.path.join(repo_path, "src")
                     has_target = os.path.exists(os.path.join(src_dir, "lib.rs")) or os.path.exists(os.path.join(src_dir, "main.rs"))
                     if not has_target:
