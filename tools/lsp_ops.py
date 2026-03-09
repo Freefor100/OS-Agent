@@ -8,6 +8,7 @@ import asyncio
 import logging
 import threading
 import atexit
+import platform
 from typing import Dict, Any, Optional, List, Tuple
 
 from langchain.tools import tool
@@ -82,6 +83,18 @@ def _ensure_cargo_fetched(repo_path: str):
 # --- 阶段 2：编译上下文的动态生成 (Dynamic Context Polyfill) ---
 def _detect_target_arch(repo_path: str) -> Optional[str]:
     """尝试从仓库结构中推测目标架构 (riscv64, loongarch64 etc)"""
+    # 0. 极高优先级：检查 LLM 手动设置的本地标记文件
+    override_marker = os.path.join(repo_path, ".os_agent_lsp_target")
+    if os.path.exists(override_marker):
+        try:
+            with open(override_marker, 'r', encoding='utf-8') as f:
+                target = f.read().strip()
+                if target:
+                    logger.info(f"Using LLM-driven target override from {override_marker}: {target}")
+                    return target
+        except Exception:
+            pass
+
     # 1. 优先使用环境变量强制覆盖
     target = os.environ.get("LSP_TARGET")
     if target:
@@ -91,8 +104,9 @@ def _detect_target_arch(repo_path: str) -> Optional[str]:
     arch_dir = os.path.join(repo_path, "os", "src", "arch")
     if os.path.exists(arch_dir):
         subdirs = [d for d in os.listdir(arch_dir) if os.path.isdir(os.path.join(arch_dir, d))]
+        # 优先级探测：如果同时存在，目前保持现有顺序，但增加 la64 识别
         if "riscv64" in subdirs: return "riscv64gc-unknown-none-elf"
-        if "loongarch64" in subdirs: return "loongarch64-unknown-none-elf"
+        if "loongarch64" in subdirs or "la64" in subdirs: return "loongarch64-unknown-none-elf"
         if "x86_64" in subdirs: return "x86_64-unknown-none-elf"
         if "aarch64" in subdirs: return "aarch64-unknown-none-elf"
     
@@ -208,6 +222,7 @@ class LSPClient:
         self._dead = False  # marked True when reader_loop exits
         self.opened_uris = set()
         self.build_scripts_disabled = False
+        self.build_script_failed = False
 
     @property
     def is_alive(self) -> bool:
@@ -225,6 +240,31 @@ class LSPClient:
         self.build_scripts_disabled = disable_build_scripts
         env = os.environ.copy()
         
+        # 强化外部路径注入：确保 rust-analyzer 能看到 check_env.py 深度扫描到的 make 和 cmake
+        try:
+            import sys
+            sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            from check_env import _find_build_tool, get_git_usr_bin
+            
+            extra_paths = []
+            for tool in ["make", "cmake", "gcc", "clang"]:
+                p = _find_build_tool(tool)
+                if p:
+                    extra_paths.append(os.path.dirname(p))
+            
+            # Windows 特供：注入 Git 内置的 Linux 命令环境 (包含 rm, test, sh 等)，解决跨平台 Makefile 报错
+            if platform.system() == "Windows":
+                git_usr_bin = get_git_usr_bin()
+                if git_usr_bin and git_usr_bin not in extra_paths:
+                    extra_paths.append(git_usr_bin)
+            
+            if extra_paths:
+                # prepend the discovered tool directories to PATH
+                current_path = env.get("PATH", "")
+                env["PATH"] = os.pathsep.join(extra_paths) + os.pathsep + current_path
+        except Exception as e:
+            logger.warning(f"Failed to inject check_env build tool paths into LSP environment: {e}")
+
         # 强化隔离：防止在线拉取卡死，允许不稳定特性 (全局对 rust-analyzer 生效)
         if "rust-analyzer" in self.cmd[0]:
             env["CARGO_NET_OFFLINE"] = "true" 
@@ -258,7 +298,10 @@ class LSPClient:
                 line = await self.process.stderr.readline()
                 if not line:
                     break
-                logger.warning(f"LSP [{self.cmd[0]}] STDERR: {line.decode('utf-8', errors='ignore').strip()}")
+                decoded_line = line.decode('utf-8', errors='ignore').strip()
+                logger.warning(f"LSP [{self.cmd[0]}] STDERR: {decoded_line}")
+                if any(err in decoded_line for err in ["failed to run custom build command", "could not compile", "linker `cc` not found", "program not found"]):
+                    self.build_script_failed = True
             except Exception:
                 break
 
@@ -284,6 +327,9 @@ class LSPClient:
                 },
                 "initializationOptions": {
                     "cargo": {
+                        "buildScripts": {
+                            "enable": not getattr(self, "build_scripts_disabled", False)
+                        },
                         "target": _detect_target_arch(self.cwd),
                         "extraArgs": ["--offline"],
                         "extraEnv": {
@@ -542,9 +588,13 @@ class MultiplexingLSPGateway:
                     # Give rust-analyzer time to start indexing (large workspaces)
                     await asyncio.sleep(2.0)
                     
-                    # Check if it crashed immediately (e.g. panicking build.rs)
-                    if not client.is_alive and lang == "rust":
-                        logger.warning(f"LSP {cmd[0]} died immediately. Retrying with build scripts disabled.")
+                    # Check if it crashed immediately or build script failed (e.g. panicking build.rs)
+                    if (not client.is_alive or getattr(client, "build_script_failed", False)) and lang == "rust":
+                        logger.warning(f"LSP {cmd[0]} died or build script failed. Retrying with build scripts disabled.")
+                        try:
+                            await client.stop()
+                        except Exception:
+                            pass
                         client = LSPClient(cmd, abs_repo)
                         await client.start(disable_build_scripts=True)
                         await asyncio.sleep(2.0)
@@ -559,6 +609,19 @@ class MultiplexingLSPGateway:
             except Exception as e:
                 logger.error(f"Failed to start LSP {cmd[0]}: {e}")
                 return None
+
+    async def force_restart_client(self, repo_path: str, lang: str):
+        """强制清理并关闭特定语言的 LSP 客户端，以便在配置更改（如图架构切换）后重建。"""
+        abs_repo = os.path.abspath(repo_path)
+        key = f"{abs_repo}_{lang}"
+        async with self.lock:
+            if key in self.clients:
+                logger.info(f"Force restarting LSP client for {lang} in {abs_repo}...")
+                client = self.clients.pop(key)
+                try:
+                    await client.stop()
+                except Exception:
+                    pass
 
     async def stop_all(self):
         async with self.lock:
@@ -770,7 +833,16 @@ async def _async_lsp_request(repo_path: str, file_path: str, symbol: str, method
 
             # 2. 发送实际请求
             req["id"] = client._next_id()
-            result = await client.send_request(req)
+            try:
+                result = await asyncio.wait_for(client.send_request(req), timeout=25.0)
+            except (asyncio.TimeoutError, TimeoutError):
+                logger.warning(f"LSP request timed out for {lang}. Engine deadlocked? Falling back to ASM parser.")
+                # Force restart the deadlocked client so it doesn't block future requests
+                asyncio.create_task(_gateway.force_restart_client(repo_path, lang))
+                if method == "textDocument/definition":
+                    return ASMLexicalParser.fallback_definition(repo_path, file_path, symbol)
+                else:
+                    return ASMLexicalParser.fallback_references(repo_path, file_path, symbol)
             
         if "error" in result:
              raise RuntimeError(f"LSP Error Response: {result['error']}")
@@ -1371,3 +1443,50 @@ def lsp_get_call_graph(repo_path: str, file_path: str, symbol: str,
         logger.warning(msg)
         print(f"\n⚠️  {msg}", flush=True)
         return _grep_fallback_call_graph(repo_path, file_path, symbol, direction)
+
+
+async def _async_lsp_set_target_arch(repo_path: str, target: str) -> str:
+    """内部异步实现：保存架构标记并强制重启 rust-analyzer。"""
+    repo_path = os.path.abspath(repo_path)
+    marker = os.path.join(repo_path, ".os_agent_lsp_target")
+    
+    try:
+        with open(marker, 'w', encoding='utf-8') as f:
+            f.write(target)
+        
+        # 强制重启 rust-analyzer 以应用新架构
+        await _gateway.force_restart_client(repo_path, "rust")
+        return f"Successfully set LSP target to '{target}' and restarted rust-analyzer for {repo_path}."
+    except Exception as e:
+        return f"Error setting target arch: {e}"
+
+
+@tool
+def lsp_set_target_arch(repo_path: str, target: str) -> str:
+    """
+    显式通过 LLM 指令设置特定仓库的 LSP 目标架构 (Target Triple)。
+    仅在以下情况调用：
+    1. 自动探测失败或选错了架构（例如同时存在 riscv64 和 loongarch64 目录）。
+    2. 你在源码中读到了明确的架构要求（如 target_arch = "..."），但 LSP 却返回了空结果或大量错误。
+    3. 代码块由于 #[cfg] 显式被 LSP 灰化。
+
+    调用后，系统会保存设置并【强制重启】LSP 服务端，以确保所有语义分析能够基于正确的架构进行重算。
+
+    常见 Target Triples:
+    - riscv64gc-unknown-none-elf (RISC-V 64)
+    - loongarch64-unknown-none-elf (LoongArch 64)
+    - x86_64-unknown-none-elf (x86_64 Bare Metal)
+    - aarch64-unknown-none-elf (ARM64 Bare Metal)
+
+    Args:
+        repo_path: 仓库绝对或相对根路径 (e.g. repos/my-os)
+        target: 目标架构标识符 (Target Triple)
+    """
+    future = asyncio.run_coroutine_threadsafe(
+        _async_lsp_set_target_arch(repo_path, target),
+        _lsp_loop
+    )
+    try:
+        return future.result(timeout=10.0)
+    except Exception as e:
+        return f"Error executing lsp_set_target_arch: {e}"

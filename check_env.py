@@ -10,6 +10,52 @@ import os
 import platform
 import subprocess
 
+def _find_build_tool(tool_name):
+    path = shutil.which(tool_name)
+    if path:
+        return path
+    if platform.system() == "Windows":
+        import glob
+        # Common fallback locations for Windows package managers and default installers
+        fallbacks = [
+            os.path.expandvars(rf"%LOCALAPPDATA%\Microsoft\WinGet\Packages\*{tool_name}*\*\bin\{tool_name}.exe"),
+            os.path.expandvars(rf"%LOCALAPPDATA%\Microsoft\WinGet\Packages\*{tool_name}*\{tool_name}.exe"),
+            os.path.expandvars(rf"%LOCALAPPDATA%\Microsoft\WinGet\Packages\*\*\{tool_name}.exe"),
+            os.path.expandvars(rf"%LOCALAPPDATA%\Microsoft\WinGet\Packages\*\*\bin\{tool_name}.exe"),
+            os.path.expandvars(rf"%USERPROFILE%\scoop\apps\*\current\bin\{tool_name}.exe"),
+            rf"C:\Program Files\CMake\bin\{tool_name}.exe",
+            rf"C:\Program Files\LLVM\bin\{tool_name}.exe",
+            rf"C:\Program Files\Git\usr\bin\{tool_name}.exe"
+        ]
+        for pattern in fallbacks:
+            matches = glob.glob(pattern)
+            if matches:
+                return matches[0]
+    return None
+
+def get_git_usr_bin():
+    if platform.system() != "Windows":
+        return None
+    # Try from shutil.which
+    git_path = shutil.which("git")
+    if git_path:
+        # Usually C:\Program Files\Git\cmd\git.exe -> we want C:\Program Files\Git\usr\bin
+        git_dir = os.path.dirname(os.path.dirname(git_path))
+        usr_bin = os.path.join(git_dir, "usr", "bin")
+        if os.path.isdir(usr_bin):
+            return usr_bin
+            
+        # Or C:\Program Files\Git\bin\git.exe
+        usr_bin2 = os.path.join(os.path.dirname(git_path), "..", "usr", "bin")
+        if os.path.isdir(usr_bin2):
+            return os.path.abspath(usr_bin2)
+            
+    # Fallback default location
+    fallback = r"C:\Program Files\Git\usr\bin"
+    if os.path.isdir(fallback):
+        return fallback
+    return None
+
 def _check(label: str, ok: bool, detail: str = ""):
     status = "✅" if ok else "❌"
     msg = f"  {status} {label}"
@@ -69,6 +115,53 @@ def main():
     env_exists = os.path.isfile(".env")
     all_ok &= _check(".env 文件", env_exists, "缺失 — 请复制 .env.example 并填写 API_KEY" if not env_exists else "")
 
+    # --- C/C++ Build Tools ---
+    print("\n🛠️  C/C++ Build Tools (OS 编译依赖):")
+    build_tools = {
+        "make": {
+            "Windows": "scoop install make 或者 choco install make 或者 winget install ezwinports.make",
+            "Linux": "apt install build-essential",
+            "Darwin": "brew install make"
+        },
+        "cmake": {
+            "Windows": "scoop install cmake 或者 winget install Kitware.CMake",
+            "Linux": "apt install cmake",
+            "Darwin": "brew install cmake"
+        }
+    }
+    sys_name = platform.system()
+    
+    for tool, hints in build_tools.items():
+        found_path = _find_build_tool(tool)
+        if found_path:
+            _check(tool, True, found_path)
+        else:
+            all_ok = False
+            _check(tool, False, f"未找到，建议运行: {hints.get(sys_name, hints['Linux'])}")
+            
+    # Check for a C compiler (gcc or clang)
+    gcc_path = _find_build_tool("gcc")
+    clang_path = _find_build_tool("clang")
+    
+    if gcc_path or clang_path:
+        compiler_path = gcc_path if gcc_path else clang_path
+        _check("C Compiler (gcc/clang)", True, compiler_path)
+    else:
+        all_ok = False
+        hints = {
+            "Windows": "scoop install gcc 或者 winget install LLVM.LLVM",
+            "Linux": "apt install build-essential clang",
+            "Darwin": "brew install gcc llvm"
+        }
+        _check("C Compiler (gcc/clang)", False, f"未找到，建议运行: {hints.get(sys_name, hints['Linux'])}")
+        
+    # Check Git Windows tools specifically for MSYS2 utilities
+    if sys_name == "Windows":
+        git_usr_bin = get_git_usr_bin()
+        if git_usr_bin:
+            _check("Git Bash Utils (rm, sh 等)", True, git_usr_bin)
+        else:
+            _check("Git Bash Utils (rm, sh 等)", False, "未找到 Git 附带的 shell 环境，可能导致编译跨平台 C 代码失败。建议: winget install Git.Git")
     # --- LSP tools ---
     print("\n🔧 Language Servers (LSP):")
     # Import the resolve function to use the same logic as the agent

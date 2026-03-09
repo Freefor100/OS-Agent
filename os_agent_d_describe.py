@@ -123,13 +123,13 @@ STAGES = [
 1) analyze_tech_stack(repo_path)：总结语言/构建/依赖。**必须明确提取编程语言（版本、是否no_std）、基础框架来源（rCore/ArceOS等）、内核类型（宏内核/微内核/混合等）。**
 2) list_repo_structure(repo_path, max_depth=5)：总结关键目录。注意输出中的文件行数和大小信息。
 3) read_code_segment 读取并总结：README.md、Cargo.toml、Makefile（如存在）。
-4) **寻找内核入口与架构支持**（优先使用 LSP 工具定位符号，辅以 grep_in_repo 搜索关键词）：
-   - **架构扫描**：检查 `arch/` 或 `platform/` 目录，明确列出**所有支持的目标架构完整列表**（x86_64, aarch64, riscv64, loongarch64 等）。
+4) **寻找内核入口与架构支持（核心对齐机制）**：
+   - **架构探测**：检查 `arch/` 或 `platform/` 目录。**注意**：如果发现 `la64` 或 `loongarch64` 目录，但分析工具返回空或代码被 `#[cfg]` 灰化，**必须**立即检查 `Makefile` 或 `rust-toolchain.toml` 并调用 `lsp_set_target_arch` 强制对齐。
+   - **架构列表**：明确列出该项目支持的所有架构（x86_64, aarch64, riscv64, loongarch64 等）。
    - **寻找入口**：
      - **严禁假设** `src/main.rs` 是入口。
      - 在 Rust 项目中，搜索 `#[entry]`、`_start` 或 `rust_main`。
      - 使用 grep_in_repo 搜索 `entry|start_kernel|rust_main`。
-     - 对于每个支持的架构，分别指出其启动入口文件。
 5) **子系统概览（必须验证代码存在性）**：
    - **内存管理**：简述是否支持分页/CoW/Lazy（**必须grep verify**）。
    - **进程管理**：简述支持线程/进程/调度算法。
@@ -168,6 +168,7 @@ STAGES = [
 - **平台与构建配置**：使用 grep_in_repo 搜索 `.toml`/`defconfig`/`Kconfig` 配置文件，分析构建系统如何选择编译目标和平台参数。
 - **固件级启动链（RISC-V 必须）**：如果是 RISC-V，必须描述 SBI->U-Boot->OS 的完整固件级启动链。搜索 `sbi|opensbi|u-boot` 关键词。分析 SBI 如何将控制权移交给内核。
 - **MMU 启用前后串口地址切换**：在 UART 初始化代码中，分析 MMU 启用前（物理地址直接访问）和 MMU 启用后（虚拟地址访问）的串口地址切换逻辑。搜索 `phys_to_virt|virt_to_phys` 或 UART 基址相关常量。
+- **架构对齐检查（Architecture Alignment Check）**：在深入分析初始化代码前，先确认当前 LSP 的 Target Triple 与你正在分析的架构分支（如 `arch/riscv64`）是否匹配。通过读取 `.cargo/config.toml` 或 `Makefile` 获取精准 Triple。**如果发现不匹配或代码块被 `#[cfg]` 灰化，必须调用 `lsp_set_target_arch` 进行强制校准并重启分析。**
 
 要求：
 - 使用 `lsp_get_document_outline` **先**查看 arch 初始化文件的整体结构（函数列表+行号），然后有目的地 `read_code_segment` 关键段。
@@ -822,7 +823,7 @@ C. **使用 grep_in_repo 探索隐藏功能**（可选）：
 # _format_tool_call_summary 和 _format_tool_result_summary 已移至 core.utils 模块
 
 
-def print_step(step_num: int, node_name: str, state: dict, stage_step_num: int = 0, max_steps: int = 1000, stage_limit: int = 500) -> int:
+def print_step(step_num: int, node_name: str, state: dict, stage_step_num: int = 0, max_steps: int = 1500, stage_limit: int = 500) -> int:
     """打印每一步的执行信息（简洁的 agent 风格）
     
     Args:
@@ -853,7 +854,7 @@ def print_step(step_num: int, node_name: str, state: dict, stage_step_num: int =
             tool_calls = getattr(msg, "tool_calls", None) or []
             
             if step_num > 0:
-                print(f"\n【Step {step_num}/{max_steps}】(Stage: {stage_step_num}/{stage_limit})", end=" ")
+                print(f"\n【Total Step {step_num}/{max_steps}】(Stage step: {stage_step_num}/{stage_limit})", end=" ")
 
             if tool_calls:
                 print("🔧 Tool Calls:")

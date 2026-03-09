@@ -82,6 +82,11 @@ def format_tool_call_summary(tool_name: str, tool_args: dict) -> str:
         file_path = str(tool_args.get("file_path", "?"))
         return f"{os.path.basename(file_path)}"
 
+    # LSP 架构设置
+    elif tool_name == "lsp_set_target_arch":
+        target = str(tool_args.get("target", "?"))
+        return f"target={target}"
+
     # 默认：显示第一个参数
     else:
         if tool_args:
@@ -115,6 +120,8 @@ def format_tool_result_summary(tool_name: str, content: str) -> str:
     elif tool_name in ("lsp_get_definition", "lsp_get_references", "lsp_get_document_outline"):
         lines = len(content.split("\n")) if content else 0
         return f"返回 {lines} 行关联信息"
+    elif tool_name == "lsp_set_target_arch":
+        return f"成功切换架构并重启 LSP" if "Successfully" in content else f"切换失败: {content[:30]}..."
     elif tool_name == "analyze_tech_stack":
         if "代码文件统计" in content or "Rust" in content:
             return "返回技术栈与文件统计"
