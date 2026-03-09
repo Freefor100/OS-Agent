@@ -26,6 +26,7 @@ from tools.lsp_ops import (
     lsp_get_references,
     lsp_get_document_outline,
     lsp_get_call_graph,
+    lsp_set_target_arch,
 )
 
 load_dotenv()
@@ -98,7 +99,12 @@ If a requested file or directory does not exist, use `list_repo_structure` or `f
       - 节点格式：`FunctionName["func_name\\n relative/path.rs:line"]`
       - 每条 `parent --> child` 对应树中一条调用边
       - 按深度层级展开，最多保留 3 层（超过时截断并标注 `... (depth limit)`）
-      - 若为 DEGRADED 结果，在图下方加注 `> ⚠️ 以上为静态 Grep 分析结果，精度有限`"""
+      - 若为 DEGRADED 结果，在图下方加注 `> ⚠️ 以上为静态 Grep 分析结果，精度有限`
+13. **Architecture Alignment (Target Triple)**: 
+    - OS code heavily uses `#[cfg(target_arch = "...")]`. If you see code blocks "grayed out" or empty results from LSP despite the code being present, you MUST verify the target architecture.
+    - **Discovery**: Look for the correct Target Triple in `rust-toolchain.toml`, `Makefile`, `.cargo/config.toml`, or architecture-specific directories (e.g., `os/src/arch/la64` → `loongarch64`).
+    - **Action**: Call `lsp_set_target_arch` to explicitly command the LSP to use the correct Target Triple (e.g., `loongarch64-unknown-none-elf`).
+    - This will **force restart** the LSP with the correct context. After setting, retry your previous LSP calls to get full semantic data."""
 
 
 def get_model_name() -> str:
@@ -124,6 +130,7 @@ def build_agent(model: str = None, stage_id: str = ""):
         lsp_get_call_graph,
         lsp_get_references,
         lsp_get_document_outline,
+        lsp_set_target_arch,
         # │ 🥈 文件读取
         read_code_segment,
         # │ 🥉 Grep 搜索（最后选）
