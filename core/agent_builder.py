@@ -146,7 +146,7 @@ def build_agent(model: str = None, stage_id: str = ""):
         tools.append(analyze_tech_stack)
 
     # 历史分析阶段专用工具
-    if "14_history" in stage_id:
+    if "13_history" in stage_id:
         tools.extend([
             get_git_history_summary,
             analyze_git_history,

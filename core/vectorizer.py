@@ -208,10 +208,10 @@ DIMENSION_MAP = {
         ),
         "weight": 0.08,
     },
-    "D10_net_debug_test": {
-        "sections": ["11_", "12_", "13_"],
+    "D10_net_debug": {
+        "sections": ["11_", "12_"],
         "prompt": (
-            "从以下网络、调试、测试报告中综合提取特征摘要（120-180 字）。\n\n"
+            "从以下网络与调试报告中综合提取特征摘要（120-180 字）。\n\n"
             "【网络部分】：\n"
             "1. 协议栈来源（smoltcp / lwip / 自研）\n"
             "2. Socket 接口支持（socket/bind/connect/sendto syscall）\n"
@@ -223,14 +223,8 @@ DIMENSION_MAP = {
             "2. Panic 处理与栈回溯（是否有真正的 Backtrace / dwarf 解析）\n"
             "3. 调试接口（交互式 Shell / GDB Stub / Monitor）\n"
             "4. 性能追踪（perf / ftrace / tracepoint）\n\n"
-            "【测试部分】：\n"
-            "1. 单元测试数量（#[test] 函数精确数量）\n"
-            "2. 集成测试与 LTP 测试移植情况\n"
-            "3. CI/CD 配置（GitHub Actions / GitLab CI）\n"
-            "4. 性能基准（Lmbench / UnixBench）\n\n"
             "【严格要求】：\n"
-            "- 如果无网络支持明确写'未实现网络功能'\n"
-            "- 如果无 CI 配置明确写'未发现 CI/CD 配置'\n\n"
+            "- 如果无网络支持明确写'未实现网络功能'\n\n"
             "输出纯文本摘要。"
         ),
         "weight": 0.12,
