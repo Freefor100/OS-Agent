@@ -209,16 +209,16 @@ COMPARE_STAGES = [
 5. **【必须】使用 `compare_call_graphs` 对比 `sys_sendto` 或 `socket_write` 调用链**
    - 如果两个项目都不支持网络，此步跳过并在报告中注明
 
-加载两个项目的 09_/10_/11_ section 报告，使用 `compare_feature_summary` 对比 D9_smp_security 和 D10_net_debug_test 维度。
+加载两个项目的 09_/10_/11_ section 报告，使用 `compare_feature_summary` 对比 D9_smp_security 和 D10_net_debug 维度。
 
 **Call Graph 退避策略**：如果 compare_call_graphs 返回'未找到函数'或'Call Graph 获取失败'，改用 `grep_in_repo` 搜索对应函数名进行文本级对比，并在报告中标注'降级分析'。
 
 输出格式：## 多核差异 → ## 安全机制差异 → ## 网络差异 → ## Call Graph差异 → ## 功能覆盖对比表""",
     },
     {
-        "id": "c08_debug_test_diff",
-        "title": "调试测试框架差异",
-        "prompt": """对比 {target} 与 {candidate} 的调试与测试系统：
+        "id": "c08_debug_diff",
+        "title": "调试与错误处理差异",
+        "prompt": """对比 {target} 与 {candidate} 的调试与错误处理系统：
 
 【调试部分】：
 1. **日志系统差异**：print/log 宏实现、日志级别设计
@@ -226,17 +226,9 @@ COMPARE_STAGES = [
 3. **调试接口差异**：交互式 Shell / GDB Stub / Monitor
 4. **错误码设计差异**：Result/Error 类型定义
 
-【测试部分】：
-1. **单元测试差异**：#[test] 函数数量对比
-2. **集成测试差异**：LTP 测试移植情况
-3. **CI/CD 配置差异**：GitHub Actions / GitLab CI
-4. **性能基准差异**：Lmbench / UnixBench 等移植情况
+加载两个项目的 12_ section 报告进行对比。
 
-加载两个项目的 12_ 和 13_ section 报告进行对比。
-
-**注意**：如果某项目没有 CI 配置，明确标注'未发现 CI/CD 配置'。
-
-输出格式：## 调试机制差异 → ## 测试框架差异 → ## CI/CD 差异 → ## 测试覆盖度对比""",
+输出格式：## 调试机制差异 → ## 错误处理机制差异 → ## 日志系统对比""",
     },
     {
         "id": "c09_innovation",
@@ -248,9 +240,9 @@ COMPARE_STAGES = [
    - 核心算法是否相同（调度算法 / 内存分配器 / 页表操作）
    - Call Graph 结构相似度（基于前面阶段的 compare_call_graphs 结果）
 
-2. **【必须】补充 Call Graph 对比**：
+2. **【必须】补充源码比对**：
    - 使用 `compare_call_graphs` 对比 `alloc_frame` 或 `alloc_pages` 物理内存分配调用链
-   - 如果前面阶段有 Call Graph 结果因降级而不完整，在此处使用 `grep_in_repo` 搜索关键函数补充分析
+   - 如果遇到 LSP 解析失效、宏无法展开的问题，**必须**使用 `search_code_snippets` 对两个项目分别搜索相关代码片段供判断依据，而不要凭猜想。
 
 3. **{target} 独有的技术创新点**（{candidate} 没有的特性）：
    - 有而对方没有的高级特性（如 CoW / Lazy / HugePage / Signal trampoline）
@@ -269,9 +261,9 @@ COMPARE_STAGES = [
 使用 `load_project_fingerprint` 查看完整特征指纹进行综合判断。
 使用 `compare_feature_summary` 对比所有 10 个维度的特征摘要。
 
-**Call Graph 退避策略**：如果 compare_call_graphs 返回'未找到函数'或'Call Graph 获取失败'，改用 grep_in_repo 搜索关键函数名进行文本级对比，并在报告中标注'降级分析'。
+**容错与退避策略**：遇到 `compare_call_graphs` 降级或失败时，搭配使用 `search_code_snippets` 和 `grep_in_repo` 来获取代码级别的特征供比对。
 
-输出格式：## 代码重合度 → ## Call Graph 结构对比 → ## {target} 创新点列表 → ## {candidate} 优势列表 → ## 总体结论与评分""",
+输出格式：## 代码重合度 → ## 源码/Call Graph 比对结果 → ## {target} 创新点列表 → ## {candidate} 优势列表 → ## 总体结论与评分""",
     },
 ]
 
@@ -284,6 +276,7 @@ def _build_compare_agent(target_name: str, candidate_name: str):
         load_project_fingerprint,
         compare_call_graphs,
         compare_feature_summary,
+        search_code_snippets,
     )
     from tools.file_ops import read_code_segment, grep_in_repo
 
@@ -311,6 +304,7 @@ def _build_compare_agent(target_name: str, candidate_name: str):
         load_project_fingerprint,
         compare_call_graphs,
         compare_feature_summary,
+        search_code_snippets,
         read_code_segment,
         grep_in_repo,
     ]

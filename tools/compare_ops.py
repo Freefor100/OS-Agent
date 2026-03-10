@@ -171,8 +171,10 @@ def compare_call_graphs(
             results[repo_name] = f"[未找到函数 {entry_function} 的定义]"
             continue
 
-        # 调用 Call Graph
+        # 调用 Call Graph 首选 LSP，如果失败或降级则使用 Doxygen 备份
+        cg_text = ""
         try:
+            from tools.callgraph_ops import generate_fallback_callgraph
             cg = lsp_get_call_graph.invoke({
                 "repo_path": repo_path,
                 "file_path": file_path,
@@ -180,9 +182,19 @@ def compare_call_graphs(
                 "direction": "outgoing",
                 "max_depth": 3,
             })
-            results[repo_name] = str(cg)
+            cg_text = str(cg)
+            if "[⚠️ DEGRADED MODE]" in cg_text or not cg_text.strip():
+                fallback = generate_fallback_callgraph(repo_path, entry_function)
+                if fallback:
+                    cg_text = fallback + "\n\n> ℹ️ Generated via Doxygen Fallback"
+            results[repo_name] = cg_text
         except Exception as e:
-            results[repo_name] = f"[Call Graph 获取失败: {e}]"
+            from tools.callgraph_ops import generate_fallback_callgraph
+            fallback = generate_fallback_callgraph(repo_path, entry_function)
+            if fallback:
+                results[repo_name] = fallback + "\n\n> ℹ️ Generated via Doxygen Fallback"
+            else:
+                results[repo_name] = f"[Call Graph 获取失败: {e}]"
 
     # 解析差异
     nodes_a = _parse_call_tree_nodes(results.get(repo_a, ""))
@@ -242,3 +254,47 @@ def compare_feature_summary(repo_a: str, repo_b: str, dimension: str) -> str:
         f"### {repo_a}\n{summaries[repo_a]}\n\n"
         f"### {repo_b}\n{summaries[repo_b]}"
     )
+
+# ---------------------------------------------------------------------------
+# AST-based Code RAG 检索
+# ---------------------------------------------------------------------------
+@tool
+def search_code_snippets(repo_name: str, query: str, top_k: int = 3) -> str:
+    """
+    在指定项目中，利用架构感知的 AST 切块与向量引擎，搜索与查询最匹配核心代码片段。
+    
+    用于补充基于 LSP 分析失败时，依靠静态 AST RAG （代码块）获取源码比对的细节。
+    
+    Args:
+        repo_name: 项目名称，如 rcore-v3
+        query: 检索的自然语言描述或核心函数/结构体名称 (如 "handle_page_fault implementation")
+        top_k: 返回的最高匹配代码片段数量
+        
+    Returns:
+        包含文件路径、相似度、代码块内容的文本字符串。
+    """
+    try:
+        from core.code_rag import CodeRAGEngine
+        engine = CodeRAGEngine(repo_name, output_dir=OUTPUT_DIR)
+        repo_path = f"repos/{repo_name}"
+        if not os.path.exists(repo_path):
+            return f"❌ 无法定位仓库: {repo_path}"
+            
+        # 强制懒加载建立索引 (如果不存在)
+        engine.build_index(repo_path, force=False)
+        
+        results = engine.search(query, top_k=top_k)
+        if not results:
+            return f"未找到与 '{query}' 高度匹配的代码片段。"
+            
+        out_lines = [f"### 检索 '{query}' 在 {repo_name} 的结果："]
+        for i, res in enumerate(results, 1):
+            score = res.get("similarity_score", 0)
+            score_out = f" (相似度 {score:.2f})" if isinstance(score, float) else f" (匹配度得分:{score})"
+            out_lines.append(f"\n**片段 {i}** - {res.get('file_path')} `[{res.get('node_type')}:{res.get('name')}]` {score_out}")
+            out_lines.append(f"```c\n{res.get('code')}\n```")
+            
+        return "\n".join(out_lines)
+    except Exception as e:
+        logger.error(f"检索代码片段异常: {e}")
+        return f"检索失败: {e}"
