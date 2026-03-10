@@ -8,17 +8,27 @@ from langchain.tools import tool
 # 定义一个工作目录，专门存放 Agent 下载的代码
 WORKSPACE_DIR = "./repos"
 
+from core.utils import repo_name_from_url
+
+# 定义一个工作目录，专门存放 Agent 下载的代码
+WORKSPACE_DIR = "./repos"
+
 # 忽略的顶层目录（如 vendor、.git 等），不参与“按模块”统计
-EXCLUDE_TOP_DIRS = {"vendor", ".git", ".github", "target", "node_modules", ".devcontainer"}
+EXCLUDE_TOP_DIRS = {"vendor", ".git", ".github", "target", "node_modules", ".devcontainer", "__pycache__"}
 
 
 def _module_from_path(path: str) -> Optional[str]:
     """从文件路径提取顶层模块名，用于按模块统计开发历史。"""
-    parts = path.replace("\\", "/").strip("/").split("/")
-    if not parts:
+    if not path:
+        return None
+    # 统一路径分隔符并移除首尾斜杠
+    norm_path = path.replace("\\", "/").strip("/")
+    parts = norm_path.split("/")
+    if not parts or not parts[0]:
         return None
     top = parts[0]
-    if top.startswith(".") or top in EXCLUDE_TOP_DIRS:
+    # 检查排除目录（区分大小写或不区分，取决于系统，这里先统一转小写判断）
+    if top.startswith(".") or top.lower() in {d.lower() for d in EXCLUDE_TOP_DIRS}:
         return None
     return top
 
@@ -31,9 +41,9 @@ def clone_repository(repo_url: str) -> str:
     返回: 本地仓库的绝对路径。
     """
     try:
-        # 1. 提取仓库名作为文件夹名 (例如 os-kernel.git -> os-kernel)
-        repo_name = repo_url.split('/')[-1].replace('.git', '')
-        local_path = os.path.join(WORKSPACE_DIR, repo_name)
+        # 1. 使用核心工具函数解析仓库名
+        repo_name = repo_name_from_url(repo_url)
+        local_path = os.path.normpath(os.path.join(WORKSPACE_DIR, repo_name))
         
         # 2. 检查目录是否存在
         if os.path.exists(local_path):
@@ -78,7 +88,7 @@ def get_repo_local_path(repo_url: str) -> str:
     根据 Git 仓库 URL 返回克隆后的本地路径（不执行克隆）。
     用于在 clone_repository 之后统一获取 repo_path，供 list_repo_structure、analyze_git_history 等使用。
     """
-    name = repo_url.rstrip("/").split("/")[-1].replace(".git", "")
+    name = repo_name_from_url(repo_url)
     return os.path.normpath(os.path.join(WORKSPACE_DIR, name))
 
 

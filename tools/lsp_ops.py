@@ -252,6 +252,34 @@ class LSPClient:
                 if p:
                     extra_paths.append(os.path.dirname(p))
             
+            # --- 交叉编译器注入 (Multi-Arch Context) ---
+            target_arch = _detect_target_arch(self.cwd)
+            # 定义架构到编译器的映射
+            arch_to_cc = {
+                "riscv64": "riscv64-linux-musl-cc",
+                "riscv32": "riscv64-linux-musl-cc",
+                "aarch64": "arm-none-eabi-gcc",
+                "arm": "arm-none-eabi-gcc",
+                "loongarch64": "loongarch64-unknown-elf-gcc",
+            }
+            
+            # 无论是否匹配架构，先扫描所有已知编译器并注入 PATH
+            for arch_key, cc_base in arch_to_cc.items():
+                cc_path = _resolve_lsp_binary(cc_base, cwd=self.cwd)
+                if os.path.isabs(cc_path):
+                    cc_dir = os.path.dirname(cc_path)
+                    if cc_dir not in extra_paths:
+                        extra_paths.append(cc_dir)
+                    
+                    # 如果匹配当前检测到的架构，或者尚未设置 CC，则注入环境变量
+                    if (target_arch and arch_key in target_arch.lower()) or "CC" not in env:
+                        env["CC"] = cc_path
+                        env["CXX"] = cc_path.replace("gcc", "g++").replace("-cc", "-c++")
+                        ld_base = cc_base.replace("-cc", "-ld").replace("-gcc", "-ld")
+                        ld_path = _resolve_lsp_binary(ld_base, cwd=self.cwd)
+                        if os.path.isabs(ld_path):
+                            env["LD"] = ld_path
+
             # Windows 特供：注入 Git 内置的 Linux 命令环境 (包含 rm, test, sh 等)，解决跨平台 Makefile 报错
             if platform.system() == "Windows":
                 git_usr_bin = get_git_usr_bin()
@@ -307,7 +335,13 @@ class LSPClient:
 
     async def _initialize(self):
         # Build proper file URI — Windows needs file:///C:/... (3 slashes)
-        abs_cwd = os.path.abspath(self.cwd).replace(chr(92), '/')
+        raw_abs = os.path.abspath(self.cwd).replace(chr(92), '/')
+        # 移除 Windows 扩展路径前缀 //?/ 以免干扰某些 Linux 风格的构建工具 (如 make)
+        if raw_abs.startswith('//?/'):
+            abs_cwd = raw_abs[4:]
+        else:
+            abs_cwd = raw_abs
+            
         if not abs_cwd.startswith('/'):
             abs_cwd = '/' + abs_cwd  # Windows: /C:/Users/...
         root_uri = f"file://{abs_cwd}"
@@ -455,92 +489,95 @@ class LSPClient:
                     pass
 
 
-def _resolve_lsp_binary(name: str, cwd: Optional[str] = None) -> str:
-    """Resolve LSP binary path with cross-platform fallback.
+def _resolve_lsp_binary(base_name: str, cwd: Optional[str] = None) -> str:
+    """Resolve LSP binary path with cross-platform fallback and alias support.
     
-    Search order:
-    1. rustup which (if name is rust-analyzer) to bypass proxy bugs
-    2. shutil.which() — current PATH
-    3. Platform-specific common installation directories
-    4. Return bare name as last resort (subprocess will report clear error)
+    Args:
+        base_name: The target tool name (e.g., 'riscv64-linux-musl-cc')
+        cwd: Current working directory
     """
     import shutil
     import platform
     import subprocess
     
-    if name == "rust-analyzer":
+    # 别名映射：允许一个工具对应多个可能的名称（比如在不同系统或分发版下）
+    aliases = {
+        "riscv64-linux-musl-cc": ["riscv64-linux-musl-cc", "riscv-none-elf-gcc", "riscv64-unknown-elf-gcc"],
+        "riscv64-linux-musl-ld": ["riscv64-linux-musl-ld", "riscv-none-elf-ld", "riscv64-unknown-elf-ld"],
+        "arm-none-eabi-gcc": ["arm-none-eabi-gcc", "arm-linux-gnueabi-gcc", "arm-none-linux-gnueabihf-gcc"],
+        "loongarch64-unknown-elf-gcc": ["loongarch64-unknown-elf-gcc", "loongarch64-linux-gnu-gcc", "loongarch64-unknown-linux-gnu-gcc"],
+    }
+    
+    search_names = aliases.get(base_name, [base_name])
+    
+    # --- 1. 特殊逻辑：rust-analyzer 的自动安装与 rustup 环境处理 ---
+    if base_name == "rust-analyzer":
         try:
-            # Bypass rustup proxy bug on Windows where capitalized .EXE fails to resolve the component
+            # Bypass rustup proxy bug on Windows
             res = subprocess.run(["rustup", "which", "rust-analyzer"], cwd=cwd, capture_output=True, text=True, check=True)
             candidate = res.stdout.strip()
             if candidate and os.path.isfile(candidate):
                 return candidate
-        except subprocess.CalledProcessError as e:
-            # If `rustup which` fails, it's likely because the rust-analyzer component is missing 
-            # for the specific toolchain (e.g. toolchains specified in rust-toolchain.toml)
-            # Let's try to automatically install it and retry once
-            err_str = e.stderr.lower() if e.stderr else ""
-            if "not installed" in err_str or "no component" in err_str or "error" in err_str:
-                logger.info(f"rust-analyzer component seems missing for current toolchain. Attempting auto-install...")
-                try:
-                    subprocess.run(["rustup", "component", "add", "rust-analyzer"], cwd=cwd, capture_output=True, check=True)
-                    # Retry
-                    res2 = subprocess.run(["rustup", "which", "rust-analyzer"], cwd=cwd, capture_output=True, text=True, check=True)
-                    candidate2 = res2.stdout.strip()
-                    if candidate2 and os.path.isfile(candidate2):
-                        logger.info(f"Successfully auto-installed and resolved rust-analyzer: {candidate2}")
-                        return candidate2
-                except Exception as ex:
-                    logger.warning(f"Failed to auto-install rust-analyzer: {ex}")
         except Exception:
-            pass
+            # 尝试自动安装
+            try:
+                subprocess.run(["rustup", "component", "add", "rust-analyzer"], cwd=cwd, capture_output=True)
+                res2 = subprocess.run(["rustup", "which", "rust-analyzer"], cwd=cwd, capture_output=True, text=True)
+                candidate2 = res2.stdout.strip()
+                if candidate2 and os.path.isfile(candidate2):
+                    return candidate2
+            except Exception:
+                pass
 
-    found = shutil.which(name)
-    if found:
-        return found
+    # --- 2. 基于 PATH 的搜索 (优先尝试所有别名) ---
+    for name in search_names:
+        found = shutil.which(name)
+        if found:
+            return found
     
+    # --- 3. 平台特定的后备路径搜索 ---
     home = os.path.expanduser("~")
-    system = platform.system()  # 'Windows', 'Linux', 'Darwin'
+    system = platform.system()
     ext = ".exe" if system == "Windows" else ""
     
-    candidates = []
+    for name in search_names:
+        candidates = []
+        candidates.append(os.path.join(home, ".cargo", "bin", f"{name}{ext}"))
+        
+        if system == "Windows":
+            candidates.append(os.path.join(home, "AppData", "Local", name, f"{name}.exe"))
+            candidates.append(os.path.join(home, "scoop", "shims", f"{name}.exe"))
+            if name == "clangd":
+                candidates.append(r"C:\Program Files\LLVM\bin\clangd.exe")
+            
+            # WinGet Packages 递归搜索
+            local_appdata = os.environ.get("LOCALAPPDATA", os.path.join(home, "AppData", "Local"))
+            winget_base = os.path.join(local_appdata, "Microsoft", "WinGet", "Packages")
+            if os.path.isdir(winget_base):
+                import glob
+                patterns = [
+                    os.path.join(winget_base, f"*{name}*", f"{name}.exe"),
+                    os.path.join(winget_base, f"*{name}*", "*", f"{name}.exe"),
+                ]
+                for p in patterns:
+                    for match in glob.glob(p):
+                        if os.path.isfile(match):
+                            candidates.append(match)
+        elif system == "Darwin":
+            candidates.append(f"/opt/homebrew/bin/{name}")
+            candidates.append(f"/usr/local/bin/{name}")
+        else:
+            candidates.append(f"/usr/bin/{name}")
+            candidates.append(f"/usr/local/bin/{name}")
+            candidates.append(os.path.join(home, ".local", "bin", name))
+        
+        for c in candidates:
+            if os.path.isfile(c):
+                logger.info(f"Resolved {base_name} via {name} at fallback path: {c}")
+                return c
     
-    # --- Cross-platform: cargo/rustup ---
-    candidates.append(os.path.join(home, ".cargo", "bin", f"{name}{ext}"))
-    
-    if system == "Windows":
-        # Windows standalone installers often use AppData/Local
-        candidates.append(os.path.join(home, "AppData", "Local", name, f"{name}.exe"))
-        # Scoop
-        candidates.append(os.path.join(home, "scoop", "shims", f"{name}.exe"))
-        # winget default for LLVM (clangd)
-        if name == "clangd":
-            candidates.append(r"C:\Program Files\LLVM\bin\clangd.exe")
-    elif system == "Darwin":
-        # Homebrew (Apple Silicon & Intel)
-        candidates.append(f"/opt/homebrew/bin/{name}")
-        candidates.append(f"/usr/local/bin/{name}")
-    else:
-        # Linux: common paths
-        candidates.append(f"/usr/bin/{name}")
-        candidates.append(f"/usr/local/bin/{name}")
-        candidates.append(os.path.join(home, ".local", "bin", name))
-        # Snap / Nix
-        candidates.append(f"/snap/bin/{name}")
-        candidates.append(os.path.join(home, ".nix-profile", "bin", name))
-    
-    for c in candidates:
-        if os.path.isfile(c):
-            logger.info(f"Resolved {name} via fallback path: {c}")
-            return c
-    
-    logger.warning(
-        f"LSP binary '{name}' not found in PATH or common locations. "
-        f"Install it for better code analysis accuracy. "
-        f"Searched: PATH + {len(candidates)} fallback paths. "
-        f"See README.md '安装 Language Servers' section for instructions."
-    )
-    return name  # let subprocess fail with a clear error
+    logger.warning(f"Failed to resolve any candidates for {base_name}: {search_names}")
+    return base_name
 
 class MultiplexingLSPGateway:
     def __init__(self):

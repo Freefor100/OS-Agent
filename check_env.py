@@ -162,6 +162,31 @@ def main():
             _check("Git Bash Utils (rm, sh 等)", True, git_usr_bin)
         else:
             _check("Git Bash Utils (rm, sh 等)", False, "未找到 Git 附带的 shell 环境，可能导致编译跨平台 C 代码失败。建议: winget install Git.Git")
+            
+    # --- Cross Compilers ---
+    print("\n🌍 Cross Compilers (多架构支持):")
+    cross_compilers = {
+        "riscv64-linux-musl-cc": {
+            "label": "RISC-V CC",
+            "hint": "scoop install riscv-none-elf-gcc (Alias: riscv64-linux-musl-cc)"
+        },
+        "loongarch64-unknown-elf-gcc": {
+            "label": "LoongArch CC",
+            "hint": "请从龙芯社区下载 Windows 版交叉工具链"
+        },
+        "arm-none-eabi-gcc": {
+            "label": "ARM CC",
+            "hint": "winget install Arm.GnuArmEmbeddedToolchain"
+        }
+    }
+    
+    for base_name, info in cross_compilers.items():
+        found_path = _resolve_lsp_binary(base_name) if use_resolve else shutil.which(base_name)
+        if found_path and found_path != base_name:
+            _check(info["label"], True, found_path)
+        else:
+            _check(info["label"], False, f"未找到。建议: {info['hint']}")
+
     # --- LSP tools ---
     print("\n🔧 Language Servers (LSP):")
     # Import the resolve function to use the same logic as the agent
