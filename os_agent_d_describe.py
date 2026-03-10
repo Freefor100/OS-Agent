@@ -929,7 +929,7 @@ def main():
     # 计算有效章节数（用于文件命名）
     chapter_counter = 0  # 实际章节计数器
     
-    GLOBAL_ESTIMATED_STEPS = 1000  # 全局估计总步数（用于显示进度条分母）
+    GLOBAL_ESTIMATED_STEPS = 1500  # 全局估计总步数（用于显示进度条分母）
 
     # 初始化错误追踪器
     error_tracker = ErrorTracker(output_dir=repo_output_dir)

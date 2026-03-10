@@ -9,8 +9,14 @@ import os
 
 def repo_name_from_url(repo_url: str) -> str:
     """从 Git 仓库 URL 提取仓库名称"""
-    name = repo_url.rstrip("/").split("/")[-1]
-    return name[:-4] if name.endswith(".git") else name
+    # 移除末尾斜杠
+    url = repo_url.rstrip("/\\")
+    # 统一转换路径分隔符并取最后一部分
+    name = url.replace(chr(92), "/").split("/")[-1]
+    # 移除 .git 后缀
+    if name.lower().endswith(".git"):
+        name = name[:-4]
+    return name
 
 
 def format_tool_call_summary(tool_name: str, tool_args: dict) -> str:
