@@ -2,7 +2,7 @@
 OS-Agent C: 特征提取与本地向量化模块
 
 从 OS-Agent D 生成的 section 报告中提取结构化特征摘要，
-再通过本地 Embedding 模型（BGE-M3）转换为向量表示。
+再通过本地 Embedding 模型转换为向量表示。
 """
 import os
 import re
@@ -319,10 +319,10 @@ def extract_features_from_report(sections_dir: str) -> Dict[str, str]:
 class LocalEmbedder:
     """
     基于 sentence-transformers 的本地 Embedding 模型。
-    默认使用 BAAI/bge-m3（中英文多语言，1024 维）。
+    默认统一使用 jinaai/jina-embeddings-v2-base-code（支持 8192 长度中英代码混合，768 维）。
     """
 
-    DEFAULT_MODEL = "BAAI/bge-m3"
+    DEFAULT_MODEL = "jinaai/jina-embeddings-v2-base-code"
 
     def __init__(self, model_name: str = None):
         self.model_name = model_name or self.DEFAULT_MODEL

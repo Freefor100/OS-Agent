@@ -80,7 +80,8 @@ class ASTParser:
             return self._parse_with_regex(file_path, code_bytes.decode('utf-8', errors='ignore'), lang_key)
 
     def _parse_with_treesitter(self, file_path: str, code_bytes: bytes, lang_key: str) -> List[CodeChunk]:
-        parser = self.Parser(self.langs[lang_key])
+        parser = self.Parser()
+        parser.language = self.langs[lang_key]
         tree = parser.parse(code_bytes)
         root_node = tree.root_node
         
@@ -169,13 +170,15 @@ class CodeRAGEngine:
 
     def _load_model(self):
         if self.model is None and SentenceTransformer is not None:
-            # 使用针对代码优化的模型，或回退到通用模型
+            # 强制使用针对代码优化的 Jina 模型，禁止回退到其他模型
             model_name = os.environ.get("CODE_EMBEDDING_MODEL", "jinaai/jina-embeddings-v2-base-code")
             try:
+                logger.info(f"正在加载代码嵌入模型: {model_name}...")
                 self.model = SentenceTransformer(model_name, trust_remote_code=True)
             except Exception as e:
-                logger.warning(f"无法加载代码模型 {model_name}: {e}，尝试使用 BAAI/bge-m3")
-                self.model = SentenceTransformer("BAAI/bge-m3")
+                msg = f"❌ 无法加载核心代码模型 {model_name}: {e}。请检查网络环境或模型缓存。"
+                logger.error(msg)
+                raise RuntimeError(msg)
 
     def build_index(self, repo_path: str, force: bool = False):
         if not force and os.path.exists(self.chunks_file) and os.path.exists(self.vectors_file):
