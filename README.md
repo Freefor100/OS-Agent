@@ -58,6 +58,87 @@
 - **创新亮点锚定**: 发现比人类原生文档更详细的地方，以及遗漏的关键缺陷
 - **沙盒安全边界**: 大模型仅能访问指定的仓库源内文件以及受限的外部沙盒输出目录
 
+### 5. 本地代码 RAG 语义搜索引擎
+
+OS-Agent 内置了一套专为操作系统内核代码优化的**本地 RAG（Retrieval-Augmented Generation）引擎**，在分析每个 OS 仓库前自动完成代码向量化，使 LLM Agent 可以用自然语言"查找功能实现"而非死记函数名。
+
+#### 完整工作链路
+
+```
+OS 仓库源码 (.c / .h / .rs)
+       │
+       ▼  ① tree-sitter AST 解析（精确切块）
+  CodeChunk：函数定义 / impl 块 / struct
+  含：文件路径、起止行号、代码体、符号名
+       │
+       ▼  ② Jina Embedding 向量化
+  模型：jinaai/jina-embeddings-v2-base-code
+  输入：Name + Path + Type + Code(≤2000字符)
+  输出：768 维 float32 稠密向量，L2 归一化
+       │
+       ▼  ③ 持久化向量索引
+  output/<proj>/_vector_db/
+  ├── chunks.json   ← 代码块元数据
+  └── vectors.npy   ← 向量矩阵 (NumPy float32)
+       │
+       ▼  ④ 余弦相似度最近邻检索（纯 NumPy）
+  scores = vectors @ encode(query)
+  top_k = argsort(scores)[-k:]
+  返回：相似度分数 + 文件:行号 + 代码片段
+```
+
+#### 阶段 0.5：自动预索引
+
+克隆仓库后，系统在正式分析前立即执行 RAG 预索引：
+
+```
+🚀 阶段 0.5：RAG 预索引 (代码向量化)...
+✅ RAG 预索引完成，后续语义搜索将秒开。
+```
+
+- **增量感知**：`_vector_db/` 已存在时直接加载，避免重复向量化
+- **自动剪枝**：跳过 `.git/`、`target/`、`build/` 等无关目录
+- **双重降级保护**：tree-sitter 未安装 → 正则切块；Embedding 模型失败 → 关键词词频匹配
+
+#### `rag_search_code` 工具接口
+
+```
+rag_search_code(repo_path, query, top_k=3)
+```
+
+| 参数 | 说明 |
+|------|------|
+| `repo_path` | 仓库路径（受沙盒限制，只能访问 `repos/` 目录） |
+| `query` | **自然语言**描述，如 `"物理页面分配与回收"` / `"page fault handler"` |
+| `top_k` | 返回最相关代码块数（默认 3） |
+
+**返回格式：**
+```
+[1] 相似度: 0.8821 | 文件: kernel/vm.c:120-165 | 类型: function_definition | 符号名: mappages
+```c
+void mappages(pagetable_t pagetable, uint64 va, ...) { ... }
+```
+```
+
+每个结果含相似度分数、文件路径与起止行号、节点类型、代码体（≤800字符，超出提示使用 `read_code_segment` 读完整内容）。
+
+#### 三级联动分析策略
+
+| 优先级 | 工具 | 适用场景 |
+|--------|------|---------|
+| 🥇 **首选** | `rag_search_code` | 不知道函数名，只知道功能描述 |
+| 🥈 **次选** | `lsp_get_call_graph` / `lsp_get_definition` | 已找到符号，展开调用拓扑 |
+| 🥉 **兜底** | `grep_in_repo` | 精确关键词/正则，或前两者均无结果 |
+
+#### 模型与存储配置
+
+| 配置项 | 默认值 |
+|--------|--------|
+| 嵌入模型 | `jinaai/jina-embeddings-v2-base-code`（`.env` 中 `CODE_EMBEDDING_MODEL` 可覆盖） |
+| 向量维度 | 768 维，float32 |
+| 索引位置 | `output/<proj>/_vector_db/`（与分析报告同级） |
+| 建索引时代码截断 | ≤ 2000 字符/块 |
+| 搜索结果截断 | ≤ 800 字符/块（防 Token 溢出） |
 
 ---
 
