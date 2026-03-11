@@ -58,26 +58,25 @@
 
 ### 1. 自动环境配置（推荐）
 
-本项目依赖多种底层分析工具（如 `rust-analyzer`, `clangd` 等）。我们提供了全自动的依赖安装脚本：
-
-**Windows (PowerShell):**
-```powershell
-.\setup_env.ps1
-```
-
-**Linux / macOS:**
-```bash
-chmod +x setup_env.sh
-./setup_env.sh
-```
-
-*(如果脚本因网络原因失败，可参考脚本内容手动安装所需依赖。我们推荐使用 Conda 隔离 Python 环境：`conda create -n os_agent python=3.10`)*
-
-如果不使用 conda，也可以直接安装：
+推荐使用 Conda 隔离 Python 环境：
 
 ```bash
+conda create -n os_agent python=3.10
+conda activate os_agent
 pip install -r requirements.txt
 ```
+
+然后运行环境检查脚本，它会自动检测缺失依赖、尝试安装 LSP 工具，并自动识别 Cross Compiler 和 Go 工具链路径：
+
+```bash
+python check_env.py
+```
+
+`check_env.py` 特性：
+- **智能预检**：先运行 `pip --dry-run` 判断依赖是否已满足，已满足则跳过安装，秒速完成检查
+- **自动安装 LSP**：缺失 `clangd`、`gopls`、`rust-analyzer` 时自动安装
+- **多架构 Cross Compiler 检测**：自动扫描 RISC-V、ARM、LoongArch 交叉编译器
+- **路径自动修复**：通过 `_resolve_lsp_binary` 探测 `~/go/bin/`、`~/.cargo/bin/`、WinGet 等非标准安装目录，无需手动配置 PATH
 
 ### 2. 安装 Language Servers（LSP 工具依赖）
 
@@ -107,9 +106,9 @@ clangd --version          # 例如: clangd version 21.1.8
 >
 > | 平台 | 自动搜索路径 |
 > |------|-------------|
-> | Windows | `~/.cargo/bin/`, `~/AppData/Local/{name}/`, `~/scoop/shims/` |
-> | macOS | `~/.cargo/bin/`, `/opt/homebrew/bin/`, `/usr/local/bin/` |
-> | Linux | `~/.cargo/bin/`, `/usr/bin/`, `~/.local/bin/`, `/snap/bin/` |
+> | Windows | `~/.cargo/bin/`, `~/go/bin/`, `~/AppData/Local/{name}/`, `~/scoop/shims/`, WinGet 包目录 |
+> | macOS | `~/.cargo/bin/`, `~/go/bin/`, `/opt/homebrew/bin/`, `/usr/local/bin/` |
+> | Linux | `~/.cargo/bin/`, `~/go/bin/`, `/usr/bin/`, `~/.local/bin/`, `/snap/bin/` |
 >
 > 如果仍然报错，请将 Language Server 安装目录手动加入系统 PATH。
 
@@ -293,6 +292,14 @@ evaluation/
 ## 📜 核心演进史 (Key Version History)
 
 > 从最早期的基础描述模块，本作在各个子版本的演进中不断填补了 LLM 的认知短板，并建立起牢不可破的沙盒机制。
+
+#### 🆕 **v3.0 LSP 深度修复与报告质量优化**（2026-03-11）
+- **LSP Call Graph 修复**：`callHierarchy/prepare` 现在遍历所有符号位置并优先选取函数定义行，解决了 `exec`/`exit` 等与标准库同名函数无法建立调用层次的问题。
+- **裸金属编译环境注入**：自动向 clangd 的 `compile_flags.txt` 注入 `-ffreestanding -fno-builtin`，确保 OS 代码在无标准库环境下被正确解析。
+- **报告前缀清洗 (`_strip_llm_preamble`)**：LLM 在正式报告前输出的过渡性口语文字（如"现在我已经收集了足够的信息…"）在写入章节文件前自动剥除，不再污染报告格式。
+- **`check_env.py` 改进**：新增 `pip --dry-run` 预检（避免每次重装）、修复 Cross Compiler 检查时 `use_resolve` 未定义的 `UnboundLocalError`、新增多架构交叉编译器自动检测。
+- **`requirements.txt` 依赖宽松化**：`transformers` 从 `==4.34.0` 改为 `>=4.36.0,<4.58.0`，解决与 `optimum-onnx` 的版本冲突和无谓降级。
+- **路径探测补全**：`_resolve_lsp_binary` 新增 `~/go/bin/` 搜索路径，修复 `gopls` 安装后被误判为未找到的问题。
 
 #### 🆕 **v2.9 高阶 Git 历史语意化钻取探针**（2026-03-07）
 - 细粒度深钻机制 (`path_filter`) 规避全局分析引发的 Token 爆炸。

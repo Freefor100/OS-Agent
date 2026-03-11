@@ -145,7 +145,21 @@ def _polyfill_context(repo_path: str, scan_results: Dict[str, bool]):
             try:
                 with open(compile_flags_path, 'w', encoding='utf-8') as f:
                     # 声明这大概率是一个 C 语言或 C++ 内核项目
-                    f.write("-xc\n") 
+                    f.write("-xc\n")
+
+                    # 裸机/内核环境标志：
+                    # -ffreestanding: 告知 clangd 不假设标准 C 运行时存在（无 main 入口、无 libc）
+                    # -fno-builtin:   禁止将 exit/exec/memcpy 等识别为编译器内建函数，
+                    #                 避免与内核自定义同名函数冲突导致 prepareCallHierarchy 失败
+                    f.write("-ffreestanding\n")
+                    f.write("-fno-builtin\n")
+
+                    # 注入交叉编译目标架构，防止 clangd 在 x86 主机上解析异构汇编报错
+                    target_arch = _detect_target_arch(repo_path)
+                    if target_arch:
+                        base_arch = target_arch.split('-')[0].replace('gc', '')
+                        f.write(f"--target={base_arch}\n")
+
                     # 将根目录和所有包含头文件的目录加入搜索路径
                     for d in include_dirs:
                         # 对于 Windows 上的 clangd，路径中的反斜杠可能需要转义或统一替换为正斜杠
@@ -321,15 +335,35 @@ class LSPClient:
         
     async def _stderr_loop(self):
         """Consume and log stderr so we know WHY the LSP process crashes."""
+        # Fatal 关键词：命中时标记 build_script_failed
+        _fatal_keywords = [
+            "failed to run custom build command", "could not compile",
+            "linker `cc` not found", "program not found",
+            "crashed", "fatal error", "SIGSEGV", "Assertion failed",
+        ]
+        # 纯 LSP 协议收发行前缀：仅做 debug，避免淹没有用信息
+        # 形如 "I[...] <-- textDocument/didOpen" 或 "I[...] --> reply:callHierarchy/..."
+        _protocol_prefixes = ("<--", "-->")
+
         while self.process and self.process.stderr:
             try:
                 line = await self.process.stderr.readline()
                 if not line:
                     break
                 decoded_line = line.decode('utf-8', errors='ignore').strip()
-                logger.warning(f"LSP [{self.cmd[0]}] STDERR: {decoded_line}")
-                if any(err in decoded_line for err in ["failed to run custom build command", "could not compile", "linker `cc` not found", "program not found"]):
+                if not decoded_line:
+                    continue
+
+                if any(kw in decoded_line for kw in _fatal_keywords):
+                    # 真正的错误：WARNING + 标记
+                    logger.warning(f"LSP [{self.cmd[0]}] STDERR: {decoded_line}")
                     self.build_script_failed = True
+                elif any(p in decoded_line for p in _protocol_prefixes):
+                    # 纯 LSP 协议收发追踪行：降为 DEBUG（不污染日志）
+                    logger.debug(f"LSP [{self.cmd[0]}] STDERR: {decoded_line}")
+                else:
+                    # 有意义的 clangd 状态行（ASTWorker、preamble、compilation db 等）
+                    logger.warning(f"LSP [{self.cmd[0]}] STDERR: {decoded_line}")
             except Exception:
                 break
 
@@ -506,6 +540,8 @@ def _resolve_lsp_binary(base_name: str, cwd: Optional[str] = None) -> str:
         "riscv64-linux-musl-ld": ["riscv64-linux-musl-ld", "riscv-none-elf-ld", "riscv64-unknown-elf-ld"],
         "arm-none-eabi-gcc": ["arm-none-eabi-gcc", "arm-linux-gnueabi-gcc", "arm-none-linux-gnueabihf-gcc"],
         "loongarch64-unknown-elf-gcc": ["loongarch64-unknown-elf-gcc", "loongarch64-linux-gnu-gcc", "loongarch64-unknown-linux-gnu-gcc"],
+        # xpack RISC-V 工具链别名（Windows 安装的实际可执行文件名）
+        "riscv-none-elf-gcc": ["riscv-none-elf-gcc", "riscv64-unknown-elf-gcc", "riscv64-linux-musl-cc"],
     }
     
     search_names = aliases.get(base_name, [base_name])
@@ -543,24 +579,42 @@ def _resolve_lsp_binary(base_name: str, cwd: Optional[str] = None) -> str:
     for name in search_names:
         candidates = []
         candidates.append(os.path.join(home, ".cargo", "bin", f"{name}{ext}"))
+        # Go 工具链默认安装到 ~/go/bin（gopls、dlv 等）
+        candidates.append(os.path.join(home, "go", "bin", f"{name}{ext}"))
         
         if system == "Windows":
             candidates.append(os.path.join(home, "AppData", "Local", name, f"{name}.exe"))
             candidates.append(os.path.join(home, "scoop", "shims", f"{name}.exe"))
             if name == "clangd":
                 candidates.append(r"C:\Program Files\LLVM\bin\clangd.exe")
-            
+
+            # ── 已知 Windows 工具链硬编码路径 ──────────────────────────────
+            import glob as _glob
+            # xpack RISC-V（支持所有版本，通配符匹配）
+            if "riscv" in name:
+                for xpack_bin in _glob.glob(r"C:\xpack-riscv-none-elf-gcc-*\bin"):
+                    candidates.append(os.path.join(xpack_bin, f"{name}.EXE"))
+                    candidates.append(os.path.join(xpack_bin, f"{name}.exe"))
+                    # xpack 内部的实际可执行文件名可能与 canonical name 不同
+                    candidates.append(os.path.join(xpack_bin, "riscv-none-elf-gcc.EXE"))
+            # Arm GNU Toolchain (arm-none-eabi)
+            if "arm" in name and "linux" not in name:
+                for arm_bin in _glob.glob(r"C:\Program Files (x86)\Arm GNU Toolchain arm-none-eabi\*\bin"):
+                    candidates.append(os.path.join(arm_bin, f"{name}.EXE"))
+                    candidates.append(os.path.join(arm_bin, f"{name}.exe"))
+                    candidates.append(os.path.join(arm_bin, "arm-none-eabi-gcc.EXE"))
+            # ─────────────────────────────────────────────────────────────
+
             # WinGet Packages 递归搜索
             local_appdata = os.environ.get("LOCALAPPDATA", os.path.join(home, "AppData", "Local"))
             winget_base = os.path.join(local_appdata, "Microsoft", "WinGet", "Packages")
             if os.path.isdir(winget_base):
-                import glob
                 patterns = [
                     os.path.join(winget_base, f"*{name}*", f"{name}.exe"),
                     os.path.join(winget_base, f"*{name}*", "*", f"{name}.exe"),
                 ]
                 for p in patterns:
-                    for match in glob.glob(p):
+                    for match in _glob.glob(p):
                         if os.path.isfile(match):
                             candidates.append(match)
         elif system == "Darwin":
@@ -576,7 +630,7 @@ def _resolve_lsp_binary(base_name: str, cwd: Optional[str] = None) -> str:
                 logger.info(f"Resolved {base_name} via {name} at fallback path: {c}")
                 return c
     
-    logger.warning(f"Failed to resolve any candidates for {base_name}: {search_names}")
+    logger.debug(f"Failed to resolve any candidates for {base_name}: {search_names}")
     return base_name
 
 class MultiplexingLSPGateway:
@@ -607,7 +661,30 @@ class MultiplexingLSPGateway:
 
             cmd = []
             if lang in ["c", "cpp"]:
-                cmd = [_resolve_lsp_binary("clangd", cwd=abs_repo)]
+                clangd_path = _resolve_lsp_binary("clangd", cwd=abs_repo)
+                cmd = [clangd_path]
+
+                # 注入 query-driver 允许 clangd 调用交叉编译器提取系统头文件路径
+                # 这是一个逗号分隔的通配符/路径列表。我们把探测到的所有已知交叉编译器都加进去。
+                drivers = [
+                    "riscv64-unknown-elf-gcc", "riscv64-linux-musl-cc", "riscv-none-elf-gcc",
+                    "loongarch64-unknown-elf-gcc", "loongarch64-linux-gnu-gcc",
+                    "arm-none-eabi-gcc", "arm-linux-gnueabi-gcc"
+                ]
+                resolved_drivers = []
+                for d in drivers:
+                    p = _resolve_lsp_binary(d, cwd=abs_repo)
+                    if os.path.isabs(p):
+                        resolved_drivers.append(p.replace('\\', '/'))
+                
+                if resolved_drivers:
+                    # 去重并组装参数
+                    driver_patterns = ",".join(list(dict.fromkeys(resolved_drivers)))
+                    cmd.append(f"--query-driver={driver_patterns}")
+                    logger.info(f"Injected clangd --query-driver with: {driver_patterns}")
+                    
+                # 额外增加一些通用的标志以提升分析稳定性
+                cmd.extend(["--background-index", "--clang-tidy", "--header-insertion=never"])
             elif lang == "rust":
                 cmd = [_resolve_lsp_binary("rust-analyzer", cwd=abs_repo)]
             elif lang == "go":
@@ -1384,11 +1461,47 @@ async def _async_lsp_call_graph(
                 client.opened_uris.add(uri)
                 await asyncio.sleep(0.5)
 
-            line_idx, col_idx = positions[0]
-            root_items = await prepare_hierarchy(line_idx, col_idx)
+            # 健壮化：遍历所有出现位置，优先选函数定义行
+            # 原因：positions[0] 可能是注释、#include 或声明行，prepareCallHierarchy 会返回空
+            # 函数定义行的特征：行内含有 symbol 且紧随其后有 '(' 或 '('
+            root_items = []
+            # 读取文件行，用于后续判断是否是定义行
+            try:
+                with open(abs_file, 'r', encoding='utf-8', errors='ignore') as _f:
+                    _file_lines = _f.readlines()
+            except Exception:
+                _file_lines = []
 
-        if not root_items:
-            msg = f"[call_graph] callHierarchy/prepare 返回空，自动转入 Grep Fallback (symbol={symbol})"
+            def _is_definition_line(line_idx: int) -> bool:
+                """粗判断：该行是否看起来像函数定义（不是注释/include/typedef）"""
+                if line_idx >= len(_file_lines):
+                    return False
+                line_content = _file_lines[line_idx]
+                stripped = line_content.strip()
+                if stripped.startswith(('/*', '*', '//', '#')):
+                    return False  # 注释或预处理指令
+                # 包含函数调用特征：symbol 后跟 '('
+                col = line_content.find(symbol)
+                if col >= 0:
+                    after = line_content[col + len(symbol):].lstrip()
+                    if after.startswith('('):
+                        return True
+                return False
+
+            # 按定义行优先排序
+            sorted_positions = sorted(
+                positions,
+                key=lambda p: (0 if _is_definition_line(p[0]) else 1)
+            )
+
+            for line_idx, col_idx in sorted_positions:
+                root_items = await prepare_hierarchy(line_idx, col_idx)
+                if root_items and isinstance(root_items, list) and len(root_items) > 0:
+                    logger.debug(f"[call_graph] prepareCallHierarchy 成功，使用位置 line={line_idx+1}, col={col_idx}")
+                    break
+
+        if not root_items or not isinstance(root_items, list) or len(root_items) == 0:
+            msg = f"[call_graph] callHierarchy/prepare 返回无效，自动转入 Grep Fallback (symbol={symbol})"
             logger.warning(msg)
             print(f"\n⚠️  {msg}", flush=True)
             return _grep_fallback_call_graph(repo_path, file_path, symbol, direction)
