@@ -326,37 +326,48 @@ evaluation/
 
 ```
 OS-Agent/
-├── os_agent_d_describe.py          # OS描述/分析程序（含智能重试与错误追踪）
-├── os_agent_d_evaluate.py          # 报告评估程序 (v2.6)
+├── os_agent_d_describe.py          # Agent D：OS 源码深度描述（16 阶段）
+├── os_agent_d_evaluate.py          # Agent D：报告自动评估
+├── os_agent_c_coarse.py            # Agent C：粗筛（本地 Embedding 相似度比对）
+├── os_agent_c_fine.py              # Agent C：精比（LLM 深度源码逐项比对）
+├── check_env.py                    # 环境检查脚本（含依赖预检与 LSP 自动安装）
+├── test_api.py                     # LLM API 连通性快速测试
+├── force_download_jina.py          # Jina 嵌入模型强制下载脚本
+├── verify_jina.py                  # Jina 嵌入模型验证脚本
 ├── requirements.txt                # Python 依赖
+├── CHANGELOG.md                    # 变更日志
 ├── .env                            # 环境变量配置（需自行创建）
 ├── .env.example                    # 环境变量配置模板
 ├── core/
-│   ├── agent_builder.py            # Agent 构建器（含 LSP 工具、grep_in_repo 等）
-│   ├── utils.py                    # 🆕 公共工具函数（格式化、仓库名解析）
-│   └── error_handling.py           # 🆕 错误处理模块（分类、重试、追踪）
-├── docs/                           # 文档目录
-│   └── markdown_format_guide.md    # Markdown 格式指南
+│   ├── agent_builder.py            # Agent 构建器（工具绑定、LSP、grep 等）
+│   ├── code_rag.py                 # 代码 RAG 引擎（AST 解析 + 向量索引）
+│   ├── vectorizer.py               # 本地 Embedding 向量化（Jina 模型）
+│   ├── vector_store.py             # 向量数据库存取
+│   ├── utils.py                    # 公共工具函数（格式化、仓库名解析）
+│   └── error_handling.py           # 错误处理模块（分类、重试、追踪）
 ├── tools/
-│   ├── file_ops.py                 # 文件操作工具（read_code_segment, grep_in_repo）
-│   ├── git_ops.py                  # Git 操作与图表生成
-│   ├── lsp_ops.py                  # 语言服务器协议(LSP)封装，AST解析
-│   ├── describe_ops.py             # 仓库分析工具（描述模块专用）
+│   ├── lsp_ops.py                  # LSP 封装（callHierarchy、定义、引用、大纲）
+│   ├── file_ops.py                 # 文件操作（read_code_segment、grep_in_repo）
+│   ├── git_ops.py                  # Git 操作（历史分析、作者贡献、Diff 透视）
+│   ├── callgraph_ops.py            # 调用图分析（跨文件调用关系）
+│   ├── compare_ops.py              # 项目比对工具（Agent C 精比辅助）
+│   ├── describe_ops.py             # 描述模块专用工具
 │   └── eval_ops.py                 # 评估专用工具（人类文档搜索、声明验证）
-├── repos/                          # 克隆的 OS 仓库（.gitignore 忽略，运行时自动克隆）
-├── output/                         # 描述模块输出（Git 跟踪，按项目名划分）
+├── repos/                          # 克隆的 OS 仓库（运行时自动克隆，.gitignore 忽略）
+├── output/                         # 描述模块输出（按项目名划分）
 │   └── <os-name>/
-│       ├── sections/               # 分段报告
-│       ├── report.md               # 完整报告
-│       └── describe_error_report.json  # 🆕 错误报告（如有错误）
-└── evaluation/                     # 评估模块输出（Git 跟踪，按项目名划分）
+│       ├── sections/               # 各章节分段报告
+│       ├── report.md               # 最终完整报告
+│       └── describe_error_report.json  # 错误报告（如有）
+└── evaluation/                     # 评估模块输出（按项目名划分）
     └── <os-name>/
         ├── evaluation.log          # 详细日志
         ├── error_report.json       # 错误报告
-        ├── summary.json            # 汇总结果
-        ├── evaluation_report.md    # Markdown 报告（含维度表格与改进建议）
+        ├── summary.json            # 汇总评分
+        ├── evaluation_report.md    # Markdown 评估报告
         └── sections/               # 各章节评估 JSON
 ```
+
 
 ---
 
