@@ -61,7 +61,10 @@ def _build_base_context(repo_url: str, output_dir: str) -> str:
 全局要求（严格遵守）：
 1. **反向证据原则**：如果未找到某功能的实现代码，你必须明确说明“未发现”或“未实现”。**严禁**仅仅因为它是“操作系统”就假设它实现了某些标准功能（如分页、多户）。
 2. **证据引用**：描述任何关键结论（如“支持分页”）时，必须附带文件路径或代码片段引用（如 `mm/page.rs: map_page()`）。
-3. **深度优先分析**：对于关键机制，要求追踪完整的函数调用链（Call Chain）。**优先使用 `lsp_get_call_graph`（多层递归调用树）**；再用 `lsp_get_definition` 跟踪符号定义；`lsp_get_references` 查找单层引用方；`lsp_get_document_outline` 快速理解文件结构。仅当 LSP 工具失败时，才退回到 `grep_in_repo`。
+3. **语义发现与拓扑追踪**：
+   - 🔍 **第一优先级：语义切入**。在分析任何子系统前，**必须首先调用 `rag_search_code` 进行语义搜索**（例如：“寻找页表映射的实现”）。这能帮你穿透复杂的目录结构，直接定位到最相关的代码块。
+   - 🌳 **第二优先级：拓扑展开**。通过 RAG 获得核心符号后，立即使用 `lsp_get_call_graph` 展开多层递归调用树，利用 `lsp_get_definition` 等 LSP 工具构建精确的 AST 画布。
+   - 🛠️ **第三优先级：降级与查漏**。仅当 RAG 和 LSP 均返回为空或需要确切宏定义时，才触发 `grep_in_repo`。读取代码片段必须使用 `read_code_segment` 且仅限于关键逻辑。
 4. **多模块搜索**：不要局限于单一目录。使用 `find_os_core_modules` 寻找分散的实现（例如驱动可能在 `drivers/` 也可能在 `modules/`）。
 5. **区分规划与实现**：README 中提到的功能可能是“画饼”，必须通过代码验证。未能验证的特性即使出现在文档中，也必须标注为“文档提及但未见代码”。
 6. **桩代码检测（Strict Stub Detection）**：
@@ -120,10 +123,11 @@ STAGES = [
 **严格注意**：区分项目本身名称（如 Undefined OS）与底层框架（如 ArceOS）。如果项目是基于 ArceOS 修改的，必须明确说明"基于 ArceOS 开发"，不能直接把 ArceOS 当作项目名称。
 
 请按顺序完成（仓库已克隆到 repo_path，直接使用即可）：
-1) analyze_tech_stack(repo_path)：总结语言/构建/依赖。**必须明确提取编程语言（版本、是否no_std）、基础框架来源（rCore/ArceOS等）、内核类型（宏内核/微内核/混合等）。**
-2) list_repo_structure(repo_path, max_depth=5)：总结关键目录。注意输出中的文件行数和大小信息。
-3) read_code_segment 读取并总结：README.md、Cargo.toml、Makefile（如存在）。
-4) **寻找内核入口与架构支持（核心对齐机制）**：
+1) **语义探测（🥇 首选）**：调用 `rag_search_code` 搜索项目核心关键字（如 "kernel entry", "memory management", "filesystem type"），快速建立第一印象。
+2) analyze_tech_stack(repo_path)：总结语言/构建/依赖。**必须明确提取编程语言（版本、是否no_std）、基础框架来源（rCore/ArceOS等）、内核类型（宏内核/微内核/混合等）。**
+3) list_repo_structure(repo_path, max_depth=5)：总结关键目录。注意输出中的文件行数和大小信息。
+4) read_code_segment 读取并总结：README.md、Cargo.toml、Makefile（如存在）。
+5) **寻找内核入口与架构支持（核心对齐机制）**：
    - **架构探测**：检查 `arch/` 或 `platform/` 目录。**注意**：如果发现 `la64` 或 `loongarch64` 目录，但分析工具返回空或代码被 `#[cfg]` 灰化，**必须**立即检查 `Makefile` 或 `rust-toolchain.toml` 并调用 `lsp_set_target_arch` 强制对齐。
    - **架构列表**：明确列出该项目支持的所有架构（x86_64, aarch64, riscv64, loongarch64 等）。
    - **寻找入口**：
@@ -171,6 +175,7 @@ STAGES = [
 - **架构对齐检查（Architecture Alignment Check）**：在深入分析初始化代码前，先确认当前 LSP 的 Target Triple 与你正在分析的架构分支（如 `arch/riscv64`）是否匹配。通过读取 `.cargo/config.toml` 或 `Makefile` 获取精准 Triple。**如果发现不匹配或代码块被 `#[cfg]` 灰化，必须调用 `lsp_set_target_arch` 进行强制校准并重启分析。**
 
 要求：
+- **语义发现（🥇 首选）**：使用 `rag_search_code` 搜索 "boot", "_start", "kernel_main", "architecture initialization" 锁定启动入口文件。
 - 使用 `lsp_get_document_outline` **先**查看 arch 初始化文件的整体结构（函数列表+行号），然后有目的地 `read_code_segment` 关键段。
 - 使用 `lsp_get_definition` 追踪 `_start` → `rust_main` / `kernel_main` 的跨文件调用链。每一跳都用 LSP 定位下一个函数的定义位置，**不要凭经验猜路径**。
 - **【必须】使用 `lsp_get_call_graph` 生成启动函数完整调用链**：
@@ -224,6 +229,7 @@ STAGES = [
   - **零拷贝与 mmap**：搜索 `mmap` 实现，验证是否支持文件映射？是否支持零拷贝IO（sendfile/splice）？**注意：如果是 `mmap` 系统调用，检查它是否真的实现了 MAP_FIXED/MAP_ANON 等标志的处理，还是仅仅是一个空壳？（如果是空壳/仅返回0，标注为桩函数）**
 
 **强制要求**：
+- **语义发现（🥇 首选）**：调用 `rag_search_code` 搜索 "page table", "buddy system", "slab allocator", "mmap implementation" 定位核心内存管理源码。
 - 对于上述每一个特性，如果支持，必须引用代码文件和行号。
 - 如果不支持，必须明确写“未发现实现”或“❌ 未实现”。
 - 追踪一个完整的 `page fault` -> `alloc_frame` -> `map_page` 流程。
@@ -275,6 +281,7 @@ STAGES = [
 - **POSIX 资源限制**（必须分类为 `✅ 已实现`、`🔸 桩函数`、`❌ 未实现`）：搜索 `rlimit|RLIMIT|getrlimit|setrlimit|resource_limit`，检查是否实现了资源限制。如果找到，列出支持的资源类型数量（POSIX 定义了 16 种）及软/硬限制双机制。
 
 要求：
+- **语义发现（🥇 首选）**：使用 `rag_search_code` 搜索 "task structure", "scheduler algorithm", "context switch", "fork implementation" 快速锁定进程管理模块。
 - 使用 `lsp_get_definition` 定位 `Task`/`Process`/`TaskInner` 结构体定义，精确列出其字段（不要猜）。
 - 使用 `lsp_get_references` 追踪 `fork`/`exec`/`schedule`/`exit` 的完整跨文件调用链。
 - 使用 `lsp_get_document_outline` 快速查看调度器文件中的所有函数，找到 `pick_next_task`、`schedule` 等关键入口。
@@ -327,6 +334,7 @@ STAGES = [
     - 搜索 `handle_page_fault|do_page_fault|cow|lazy|alloc`，追踪从 Trap 入口到内存管理模块的完整调用链。
 
 要求：
+- **语义发现（🥇 首选）**：使用 `rag_search_code` 搜索 "trap handler", "syscall table", "interrupt vector", "ecall handling" 精准定位异常分发代码。
 - 使用 `lsp_get_definition` 追踪 syscall 分发链：从 `trap_handler` → `syscall_handler` → 具体 `sys_xxx`，每一跳精确定位。
 - 使用 `lsp_get_document_outline` 查看 trap.rs / syscall.rs 的完整函数列表，掌握所有已实现的 syscall。
 - 使用 `lsp_get_references` 查找 `TrapFrame` 在哪些函数中被使用，验证上下文保存/恢复的完整性。
@@ -371,6 +379,7 @@ STAGES = [
 - **文件打开流程**：追踪从 `sys_open` 到最终获得文件描述符的完整调用链，说明超级块、Inode、Dentry、File 四大核心数据结构如何协同。
 
 要求：
+- **语义发现（🥇 首选）**：使用 `rag_search_code` 搜索 "VFS trait", "FAT32 implementation", "file descriptor table", "mount logic" 锁定文件系统核心实现。
 - 使用 `lsp_get_definition` 定位 `File` trait、`Inode` trait、`SuperBlock` 等 VFS 核心抽象的精确定义。
 - 使用 `lsp_get_references` 追踪 `sys_open` → `vfs_open` → 具体 FS `open` 的完整调用链。
 - **【必须】使用 `lsp_get_call_graph` 追踪文件打开完整路径**：
@@ -414,6 +423,7 @@ STAGES = [
 - **MMU 前后串口地址切换**：分析 UART 驱动在 MMU 启用前（使用物理地址）和 MMU 启用后（使用虚拟地址）的地址切换机制。搜索串口基址常量的不同定义。
 
 要求：
+- **语义发现（🥇 首选）**：使用 `rag_search_code` 搜索 "device driver trait", "virtio-blk driver", "UART initialization", "PCI bus scanning" 快速锁定驱动程序。
 - 使用 `lsp_get_definition` 定位 Driver trait 定义和各设备驱动的 trait impl。
 - 使用 `lsp_get_references` 追踪 `init_drivers` / `probe` 的调用链，理解驱动注册与初始化顺序。
 - 使用 `lsp_get_document_outline` 浏览驱动文件结构，快速发现所有设备相关的 struct 和 impl。
@@ -453,6 +463,7 @@ STAGES = [
 - **关键流程的跨文件调用链**：对 Futex 等待/唤醒流程，使用 `lsp_get_call_graph` 递归展开完整调用树（优先于 `lsp_get_references` 的单层查找）。
 
 要求：
+- **语义发现（🥇 首选）**：使用 `rag_search_code` 搜索 "SpinLock implementation", "Mutex wait queue", "Pipe ring buffer", "shared memory manager" 锁定同步与 IPC 源码。
 - 使用 `lsp_get_definition` 定位 `Mutex`、`SpinLock`、`WaitQueue` 的结构体定义和 `lock()`/`unlock()` 实现。
 - **【必须】使用 `lsp_get_call_graph` 展开关键 IPC 流程调用链**（`sys_futex` → `futex_wait` → `WaitQueue::sleep`）：
   - `lsp_get_call_graph(repo_path, file_of_sys_futex, "sys_futex", direction="outgoing", max_depth=4)`
@@ -492,6 +503,7 @@ STAGES = [
     - 原子操作（`core::sync::atomic`）在多核下的内存序保证
 
 要求：
+- **语义发现（🥇 首选）**：使用 `rag_search_code` 搜索 "SMP boot", "IPI send", "Per-CPU variables", "multicore scheduler" 锁定多核支持代码。
 - 使用 `lsp_get_definition` 定位 `PerCpu` 结构和 `smp_boot`/`__cpu_up` 的定义。
 - **【必须】使用 `lsp_get_call_graph` 追踪 Secondary CPU 启动链**：
   - `lsp_get_call_graph(repo_path, file_of_start_secondary, "start_secondary", direction="outgoing", max_depth=4)` — 从 secondary 入口到初始化完成
@@ -540,6 +552,7 @@ STAGES = [
     - 缓冲区溢出保护：是否有 `stack_guard`, `canary`？
 
 要求：
+- **语义发现（🥇 首选）**：使用 `rag_search_code` 搜索 "capability check", "seccomp filter", "user pointer verification", "stack canary" 锁定安全机制实现。
 - 使用 `lsp_get_definition` 定位 `Credential`/`UID`/`GID` 等安全相关结构体的定义。
 - **【必须】使用 `lsp_get_call_graph` 追踪权限检查链**：
   - `lsp_get_call_graph(repo_path, file_of_check_perm, "check_perm", direction="incoming", max_depth=3)` — 哪些 syscall 调用了权限检查？
@@ -583,6 +596,7 @@ STAGES = [
 - 数据包收发流程：追踪从 `virtio-net` 中断到 `tcp_recv` 的路径。
 
 要求：
+- **语义发现（🥇 首选）**：使用 `rag_search_code` 搜索 "smoltcp integration", "socket syscall", "VirtIO-Net driver", "network stack architecture" 锁定网络源码。
 - 使用 `lsp_get_definition` 定位 `Socket` trait、`TcpSocket`/`UdpSocket` 结构体定义。
 - **【必须】使用 `lsp_get_call_graph` 追踪数据发送路径**（`sys_sendto` → 协议栈 → 网卡驱动）：
   - `lsp_get_call_graph(repo_path, file_of_sys_sendto, "sys_sendto", direction="outgoing", max_depth=4)`
@@ -781,6 +795,31 @@ C. **使用 grep_in_repo 探索隐藏功能**（可选）：
 # _format_tool_call_summary 和 _format_tool_result_summary 已移至 core.utils 模块
 
 
+def _strip_llm_preamble(text: str) -> str:
+    """剥掉 LLM 输出中第一个 Markdown 标题（# 开头）之前的过渡性思考文字。
+
+    LLM 有时会在正式报告内容之前输出一段口语化的过渡文字，例如：
+      "现在我已经收集了足够的信息来撰写...让我整理分析结果..."
+    这类文字不属于报告内容，需要在写入文件前过滤掉。
+
+    策略：找到第一个以 '#' 开头的行，从该行开始作为有效内容。
+    如果全文均无 '#' 标题行，则保留原文（避免误删真实内容）。
+    """
+    lines = text.splitlines()
+    for i, line in enumerate(lines):
+        if line.strip().startswith('#'):
+            stripped = "\n".join(lines[i:]).strip()
+            if i > 0:
+                dropped = "\n".join(lines[:i]).strip()
+                # 只在确实有内容被剥掉时打印提示
+                if dropped:
+                    preview = dropped[:120].replace('\n', ' ')
+                    print(f"  ✂️  已剥除 LLM 前缀（{len(dropped)} 字符）: {preview}...")
+            return stripped
+    # 没有找到 '#' 标题，保留原文
+    return text
+
+
 def print_step(step_num: int, node_name: str, state: dict, stage_step_num: int = 0, max_steps: int = 1500, stage_limit: int = 500) -> int:
     """打印每一步的执行信息（简洁的 agent 风格）
     
@@ -904,7 +943,20 @@ def main():
         print(f"🚀 正在克隆仓库: {repo_url} ...")
         from tools.git_ops import clone_repository
         result = clone_repository.invoke({"repo_url": repo_url})
-        print(f"✅ 克隆结果: {result}")
+        print(result)
+    
+    # --- 增加：RAG 预索引 (加速后续分析阶段) ---
+    print(f"\n🚀 阶段 0.5：RAG 预索引 (代码向量化)...")
+    try:
+        from core.code_rag import CodeRAGEngine
+        # 注意：这里传入的 repo_local_path 是 ./repos/xv6-k210
+        rag_engine = CodeRAGEngine(project_name=repo_name)
+        # build_index 会自动检测并跳过已存在的索引
+        rag_engine.build_index(repo_local_path, force=False)
+        print(f"✅ RAG 预索引完成，后续语义搜索将秒开。")
+    except Exception as e:
+        print(f"⚠️ RAG 预索引跳过 (将在首次调用时重试): {e}")
+    # ------------------------------------------
     
     for idx, stage in enumerate(STAGES, 1):
         stage_id = stage["id"]
@@ -1198,7 +1250,9 @@ def main():
                 with open(section_path, "w", encoding="utf-8") as f:
                     # 不添加一级标题，由拼接时统一添加
                     # LLM输出应从二级标题开始
-                    f.write(stage_text.strip() + "\n")
+                    # 剥除 LLM 在报告内容前的过渡性思考文字
+                    clean_text = _strip_llm_preamble(stage_text.strip())
+                    f.write(clean_text + "\n")
                 all_section_paths.append(section_path)
                 print(f"\n✅ 已保存阶段输出: {section_path}")
             except Exception as e:

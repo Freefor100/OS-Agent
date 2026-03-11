@@ -89,14 +89,24 @@ def main():
     req_path = "requirements.txt"
     if os.path.isfile(req_path):
         _check("requirements.txt", True)
-        try:
-            print(f"  正在通过 {req_path} 安装依赖...")
-            subprocess.run([sys.executable, "-m", "pip", "install", "-r", req_path], check=True)
-            _check("requirements.txt 依赖安装", True)
-        except subprocess.CalledProcessError:
-            all_ok = False
-            _check("requirements.txt 依赖安装", False, "请手动运行 pip install -r requirements.txt")
+        # 先做 dry-run 预检：若所有包已满足则跳过安装，避免每次运行都触发 pip 重装
+        dry = subprocess.run(
+            [sys.executable, "-m", "pip", "install", "--dry-run", "-r", req_path],
+            capture_output=True, text=True
+        )
+        needs_install = ("Would install" in dry.stdout) or (dry.returncode != 0)
+        if needs_install:
+            try:
+                print(f"  检测到缺失/不匹配的依赖，正在安装...")
+                subprocess.run([sys.executable, "-m", "pip", "install", "-r", req_path], check=True)
+                _check("requirements.txt 依赖安装", True)
+            except subprocess.CalledProcessError:
+                all_ok = False
+                _check("requirements.txt 依赖安装", False, "请手动运行 pip install -r requirements.txt")
+        else:
+            _check("requirements.txt 依赖已满足", True, "所有包版本均符合要求")
     
+
     for imp, pip_name in pkgs.items():
         try:
             __import__(imp)
@@ -163,6 +173,14 @@ def main():
         else:
             _check("Git Bash Utils (rm, sh 等)", False, "未找到 Git 附带的 shell 环境，可能导致编译跨平台 C 代码失败。建议: winget install Git.Git")
             
+    # --- 提前导入 _resolve_lsp_binary，用于 Cross Compilers 和 LSP 工具检查 ---
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from tools.lsp_ops import _resolve_lsp_binary
+        use_resolve = True
+    except ImportError:
+        use_resolve = False
+
     # --- Cross Compilers ---
     print("\n🌍 Cross Compilers (多架构支持):")
     cross_compilers = {
@@ -189,14 +207,6 @@ def main():
 
     # --- LSP tools ---
     print("\n🔧 Language Servers (LSP):")
-    # Import the resolve function to use the same logic as the agent
-    try:
-        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-        from tools.lsp_ops import _resolve_lsp_binary
-        use_resolve = True
-    except ImportError:
-        use_resolve = False
-
     lsp_tools = {
         "rust-analyzer": {"required": "Rust OS 分析必需", "install": {
             "Windows": "rustup component add rust-analyzer",
