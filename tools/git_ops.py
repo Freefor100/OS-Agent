@@ -74,12 +74,12 @@ def clone_repository(repo_url: str) -> str:
                 # Force checkout to HEAD
                 repo.git.checkout('-f', 'HEAD')
             else:
-                raise
+                return e.stderr if e.stderr else str(e)
         
         return f"Successfully cloned to: {local_path}"
         
     except Exception as e:
-        return f"Error cloning repository: {str(e)}"
+        return str(e)
 
 
 @tool

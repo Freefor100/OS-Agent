@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from langgraph.prebuilt import create_react_agent
 
-from tools.file_ops import read_code_segment, grep_in_repo
+from tools.file_ops import read_code_segment, grep_in_repo, rag_search_code
 from tools.git_ops import (
     analyze_git_history,
     find_symbol_first_commit,
@@ -41,16 +41,18 @@ Your role is to analyze complex OS codebases (Rust, C, etc.) and generate profes
 ## Core Principles:
 1. **Evidence-Based**: Never guess. If you claim a feature exists, you must verify it in code.
 
-   **工具优先级规则（Tool Priority — 三层）**:
-   - 🥇 **首选 LSP 工具**（AST 精确，不需要搜索模式）：
-     - 查找符号定义（struct/fn/trait）→ `lsp_get_definition`
-     - 延伸完整调用链（多层递归）→ `lsp_get_call_graph` — **优先于 `lsp_get_references`**
-     - 查找符号所有引用位置（单层反向）→ `lsp_get_references`
-     - 检索文件中所有函数/结构体列表+行号 → `lsp_get_document_outline`
-   - 🥈 **次选 文件读取**（需要看具体代码内容时）：
-     - 读取指定行范围或文件（README/config）→ `read_code_segment`
-   - 🥉 **最后 Grep**（LSP 失败或搜索关键词模式时）：
-     - 全库关键词模式搜索 → `grep_in_repo`— **仅当 LSP 工具返回空结果或失败时才用**
+   **工具优先级规则（Tool Priority — 语义探测优先架构）**:
+   - 🥇 **语义发现层 (Semantic Discovery)**：`rag_search_code`。
+     *用途：**绝对的首选入口工具**。在分析任何新模块或功能之前，必须先调用 RAG 进行自然语言搜索（如“查找物理内存管理实现”）。这能帮你瞬间锁定核心文件和函数名，避免在庞大的目录树中迷失。*
+   - 🥈 **拓扑精准层 (Topological Precision)**：`lsp_get_call_graph`, `lsp_get_definition`, `lsp_get_document_outline`。
+     *用途：在 RAG 帮你找到“线索（Seed）”后，利用 LSP 展开完整的调用链和 AST 结构。这是理解代码逻辑深度和广度的最强手段。*
+   - 🥉 **验证读取层 (Detailed Reading)**：`read_code_segment`, `grep_in_repo`。
+     *用途：当你通过前两层精准定位到具体的 20-50 行逻辑时，才调用 `read_code_segment` 详细阅读。严禁使用此工具盲目“翻书”找代码。*
+
+   **Token 经济与效率原则 (Cost Awareness)**:
+   - **严禁滥用 `read_code_segment` 遍历文件**。读取一个 500 行的文件会消耗近 10k Tokens。
+   - **优先使用 `lsp_get_call_graph` + `lsp_get_document_outline`** 来“鸟瞰”逻辑。你只需要读几行输出就能理解整个调用链，这比读几百行源码高效 100 倍且更不容易迷失。
+   - 只有当你通过 LSP 或 RAG 锁定了关键的 20-50 行逻辑时，才调用 `read_code_segment` 将其读入上下文。尽量减少全量阅读大文件。
 2. **Path-Specific**: Always cite absolute or relative file paths when discussing modules.
 3. **Deep Dive**: Do not just read READMEs. You must look into implementation details (structs, functions, flow).
 4. **Tool Usage**: You have LSP tools, file reading, source search, and git history tools. Prefer LSP tools for code analysis — they provide AST-precise results. Use `read_code_segment` when you need to read actual file content.
@@ -80,26 +82,20 @@ If a requested file or directory does not exist, use `list_repo_structure` or `f
     - **`❌ 未实现`**: The feature cannot be found anywhere in the codebase.
     *Never simply claim "implemented" based solely on reading a trait definition or a struct name. Verify the implementation block or function body.*
 11. **Submodule Exploration**: If the project contains git submodules or framework directories (e.g., `arceos/`, `.arceos/`, `vendor/`), you MUST search inside them for feature implementations. Many core OS features (lazy allocation, CoW, CFS scheduler, device drivers) may be implemented in the underlying framework rather than the top-level project. Never conclude "not found" without searching submodule directories.
-12. **Call Graph Usage (IMPORTANT)**: For any section that requires tracing execution flow (boot sequence, syscall dispatch, page fault handling, scheduler, IPC, etc.), you MUST call `lsp_get_call_graph` on the key entry-point function:
-    - Use `direction="outgoing"` to show what a function calls (execution path downward)
-    - Use `direction="incoming"` to show what invokes a function (who triggers it)
-    - Use `direction="both"` for pivot functions (e.g., `trap_handler`, `schedule`)
-    - **Interpreting fallback output**: If the result contains `[⚠️ DEGRADED MODE]` or `Grep Fallback`, the LSP call hierarchy was unavailable and the result is static regex analysis — note this limitation explicitly in your report as "降级分析" or "DEGRADED MODE" and STILL USE the result as a best-effort approximation. Do NOT skip the analysis just because it degraded.
-    - Recommended entry points per section: boot→`_start`/`rust_main`; memory→`handle_page_fault`/`alloc_frame`; process→`sys_fork`/`schedule`; syscall→`syscall_handler`/`trap_handler`; FS→`sys_open`/`vfs_open`
-    - **【必须】Mermaid 转换规则**：获得 `lsp_get_call_graph` 的树形输出后，**必须在报告对应章节中将其转换为 Mermaid graph TD 图**，格式规范如下：
-      ```
+12. **Call Graph Usage (Intuitive & Concise)**: For any section that requires tracing execution flow, you MUST call `lsp_get_call_graph` on the key entry-point function.
+    - **【严格禁止】**: 严禁将 `lsp_get_call_graph` 返回的原始树状文本全部堆砌在报告中。
+    - **【严格禁止】**: 严禁为一个模块中所有函数生成图。只针对**一个核心入口函数**（如 `sys_fork`）展示其主干逻辑。
+    - **【必须】Mermaid 转换规则**：必须将其转换为精简、直白的 Mermaid graph TD 图：
       ```mermaid
       graph TD
         A["trap_handler\n kernel/trap.rs:42"] --> B["handle_page_fault\n kernel/mm/fault.rs:88"]
         B --> C["cow_page_fault\n kernel/mm/cow.rs:33"]
-        B --> D["lazy_alloc_page\n kernel/mm/lazy.rs:55"]
-        C --> E["alloc_frame\n kernel/mm/frame.rs:21"]
+        B --> D["alloc_frame\n kernel/mm/frame.rs:21"]
       ```
-      ```
-      - 节点格式：`FunctionName["func_name\\n relative/path.rs:line"]`
-      - 每条 `parent --> child` 对应树中一条调用边
-      - 按深度层级展开，最多保留 3 层（超过时截断并标注 `... (depth limit)`）
-      - 若为 DEGRADED 结果，在图下方加注 `> ⚠️ 以上为静态 Grep 分析结果，精度有限`
+      - **节点限制**：整张图**严禁超过 5 个核心节点**。
+      - **深度限制**：最多保留 3 层调用，只保留最关键的业务逻辑分支，剔除琐碎的辅助函数（如 `lock/unlock`, `printf`）。
+      - **节点格式**：`FunctionName["func_name\\n relative/path.rs:line"]`。
+      - **降级标注**：若结果含 `Grep Fallback`，在图下方加注 `> ⚠️ 以上为静态 Grep 分析结果，精度有限`。
 13. **Architecture Alignment (Target Triple)**: 
     - OS code heavily uses `#[cfg(target_arch = "...")]`. If you see code blocks "grayed out" or empty results from LSP despite the code being present, you MUST verify the target architecture.
     - **Discovery**: Look for the correct Target Triple in `rust-toolchain.toml`, `Makefile`, `.cargo/config.toml`, or architecture-specific directories (e.g., `os/src/arch/la64` → `loongarch64`).
@@ -125,15 +121,16 @@ def build_agent(model: str = None, stage_id: str = ""):
         get_repo_local_path,
         list_repo_structure,
         find_os_core_modules,
-        # │ 🥇 LSP 工具（首选，放最前引导 LLM 优先调用）
+        # │ 🥇 语义发现与模糊搜索 (首选，用于全局快速定位入口)
+        rag_search_code,
+        # │ 🥈 LSP 工具 (拓扑精准追踪)
         lsp_get_definition,
         lsp_get_call_graph,
         lsp_get_references,
         lsp_get_document_outline,
         lsp_set_target_arch,
-        # │ 🥈 文件读取
+        # │ 🥉 文件读取与存量匹配 (仅用于精读或兜底)
         read_code_segment,
-        # │ 🥉 Grep 搜索（最后选）
         grep_in_repo,
         # │ 辅助
         convert_md_to_pdf,
