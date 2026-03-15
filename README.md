@@ -34,8 +34,8 @@
 **核心分析机制（三级联动）：**
 
 1. 🔍 **RAG 语义搜索（首选）**：`rag_search_code` 对整个仓库代码建立本地向量索引（Jina Embedding），支持语义级模糊搜索（如"查找页表映射实现"），穿透复杂目录结构直接定位相关代码块，大幅减少无效的目录遍历。
-2. 🌳 **LSP 拓扑展开**：通过 `lsp_get_call_graph`（多层递归调用树）、`lsp_get_definition`（跨文件跳转）、`lsp_get_references` 构建精确的 AST 调用拓扑图。
-3. 🛠️ **Grep 降级兜底**：仅当 RAG 和 LSP 均无结果时，才触发 `grep_in_repo` 静态文本搜索。
+2. 🌳 **LSP 拓扑展开**：通过 `lsp_get_call_graph`（多层递归调用树，包含变量到引用的智能降级）、`lsp_get_definition`（跨文件跳转）、`lsp_get_references` 构建精确的 AST 调用拓扑图。
+3. 🛠️ **Grep 降级兜底**：仅当 RAG 和 LSP 均无结果时，才触发 `grep_in_repo` 静态文本搜索。系统具备“智能三态切换”：LSP 函数图谱 -> LSP 语义引用 -> Grep 静态扫描。
 
 ### 2. OS-Agent D：自动报告评估 (`os_agent_d_evaluate.py`) ✨ **增强版**
 
@@ -127,7 +127,7 @@ void mappages(pagetable_t pagetable, uint64 va, ...) { ... }
 | 优先级 | 工具 | 适用场景 |
 |--------|------|---------|
 | 🥇 **首选** | `rag_search_code` | 不知道函数名，只知道功能描述 |
-| 🥈 **次选** | `lsp_get_call_graph` / `lsp_get_definition` | 已找到符号，展开调用拓扑 |
+| 🥈 **次选** | `lsp_get_call_graph` | 已找到符号，展开调用拓扑（自动处理函数与变量的差异） |
 | 🥉 **兜底** | `grep_in_repo` | 精确关键词/正则，或前两者均无结果 |
 
 #### 模型与存储配置
@@ -381,6 +381,13 @@ evaluation/
 
 > 从最早期的基础描述模块，本作在各个子版本的演进中不断填补了 LLM 的认知短板，并建立起牢不可破的沙盒机制。
 
+#### 🆕 **v3.1 LSP 智能降级与 Windows 兼容性加固**（2026-03-15）
+- **Cross Compilers提示更新**：`check_env.py` 中优化了 Cross Compilers 检查，并提供了详细的安装提示。
+- **智能变量 fallback**：`lsp_get_call_graph` 在遇到变量/静态引用时不再单纯报错，而是自动切换至 `textDocument/references` 模式并向 Agent 解释原因，确保数据流分析不中断。
+- **符号位置打分驱动**：修正了 LSP 锚点可能落在 doc-comments 导致的解析失败，新增位置权重算法优先锁定实际代码定义行。
+- **Windows 稳定性全量补丁**：深度解决 CRLF 换行符导致的偏移 panic、驱动器盘符大小写不一致导致的 VFS 分叉，以及 `nightly-2024-02-03` 遗留的 line-index bug（通过强制注入 `stable` toolchain）。
+- **依赖树补全**：正式引入 `tree-sitter-c` 与 `tree-sitter-rust` 原生绑定，大幅提升 RAG 切块精度；新增 `optimum-onnx` 支持，加速本地向量化过程。
+
 #### 🆕 **v3.0 LSP 深度修复与报告质量优化**（2026-03-11）
 - **LSP Call Graph 修复**：`callHierarchy/prepare` 现在遍历所有符号位置并优先选取函数定义行，解决了 `exec`/`exit` 等与标准库同名函数无法建立调用层次的问题。
 - **裸金属编译环境注入**：自动向 clangd 的 `compile_flags.txt` 注入 `-ffreestanding -fno-builtin`，确保 OS 代码在无标准库环境下被正确解析。
@@ -600,6 +607,7 @@ VERBOSE_LOGGING=true
 1. **自愈式工作区生成 (Virtual Manifest Polyfill)**：
    - 自动递归探测仓库内所有嵌套的 `Cargo.toml`。
    - 动态生成合成工作区清单 (`[workspace]`)，无需修改源码即可让 LSP 获得全局视角。
+   - **Windows 级自愈**：自动转换物理路径换行符风格，并同步 VFS 驱动器标识符。
 
 2. **离线安全沙箱 (LSP Offline Sandbox)**：
    - 强制启用 `CARGO_NET_OFFLINE="true"` 及初始化参数 `--offline`。

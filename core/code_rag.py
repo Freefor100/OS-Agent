@@ -9,6 +9,7 @@ import json
 import logging
 import numpy as np
 from typing import List, Dict, Any, Optional
+import threading
 
 try:
     from sentence_transformers import SentenceTransformer
@@ -157,6 +158,7 @@ class ASTParser:
         return chunks
 
 class CodeRAGEngine:
+    _model_lock = threading.Lock()
     def __init__(self, project_name: str, output_dir: str = "./output"):
         self.project_name = project_name
         self.db_dir = os.path.join(output_dir, project_name, "_vector_db")
@@ -169,16 +171,39 @@ class CodeRAGEngine:
         self.model = None
 
     def _load_model(self):
-        if self.model is None and SentenceTransformer is not None:
-            # 强制使用针对代码优化的 Jina 模型，禁止回退到其他模型
-            model_name = os.environ.get("CODE_EMBEDDING_MODEL", "jinaai/jina-embeddings-v2-base-code")
-            try:
-                logger.info(f"正在加载代码嵌入模型: {model_name}...")
-                self.model = SentenceTransformer(model_name, trust_remote_code=True)
-            except Exception as e:
-                msg = f"❌ 无法加载核心代码模型 {model_name}: {e}。请检查网络环境或模型缓存。"
-                logger.error(msg)
-                raise RuntimeError(msg)
+        if self.model is not None:
+            return
+            
+        with CodeRAGEngine._model_lock:
+            if self.model is not None:
+                return
+                
+            if SentenceTransformer is not None:
+                # 强制使用针对代码优化的 Jina 模型，禁止回退到其他模型
+                model_name = os.environ.get("CODE_EMBEDDING_MODEL", "jinaai/jina-embeddings-v2-base-code")
+                try:
+                    import torch
+                    # 强制离线模式，避免连接 HF 检查更新导致超时
+                    os.environ["HF_HUB_OFFLINE"] = "1"
+                    os.environ["TRANSFORMERS_OFFLINE"] = "1"
+                    
+                    device = "cuda" if torch.cuda.is_available() else "cpu"
+                    logger.info(f"正在加载代码嵌入模型: {model_name} (Device: {device})...")
+                    
+                    # 显式指定 dtype 和 device 以避免 meta tensor 错误
+                    # 显式指定 local_files_only=True 以阻止 trust_remote_code 发起任何网络请求
+                    model_kwargs = {"dtype": torch.float32, "low_cpu_mem_usage": False}
+                    self.model = SentenceTransformer(
+                        model_name, 
+                        trust_remote_code=True, 
+                        local_files_only=True,
+                        device=device,
+                        model_kwargs=model_kwargs
+                    )
+                except Exception as e:
+                    msg = f"❌ 无法加载核心代码模型 {model_name}: {e}。请检查网络环境或模型缓存。"
+                    logger.error(msg)
+                    raise RuntimeError(msg)
 
     def build_index(self, repo_path: str, force: bool = False):
         if not force and os.path.exists(self.chunks_file) and os.path.exists(self.vectors_file):
