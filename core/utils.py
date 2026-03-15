@@ -88,6 +88,13 @@ def format_tool_call_summary(tool_name: str, tool_args: dict) -> str:
         file_path = str(tool_args.get("file_path", "?"))
         return f"{os.path.basename(file_path)}"
 
+    # LSP 调用图
+    elif tool_name == "lsp_get_call_graph":
+        symbol = str(tool_args.get("symbol", "?"))
+        file_path = str(tool_args.get("file_path", "?"))
+        direction = str(tool_args.get("direction", "both"))
+        return f"{symbol}({direction}) in {os.path.basename(file_path)}"
+
     # LSP 架构设置
     elif tool_name == "lsp_set_target_arch":
         target = str(tool_args.get("target", "?"))
@@ -97,7 +104,7 @@ def format_tool_call_summary(tool_name: str, tool_args: dict) -> str:
     else:
         if tool_args:
             first_key = list(tool_args.keys())[0]
-            first_val = str(tool_args[first_key])[:40]
+            first_val = str(tool_args[first_key])[:120]
             return f"{first_key}={first_val}"
         return ""
 

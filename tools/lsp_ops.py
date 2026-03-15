@@ -2,6 +2,13 @@
 LSP Operations Tool (Dynamic Multiplexing Gateway)
 """
 import os
+
+def _abspath(p: str) -> str:
+    res = os.path.abspath(p)
+    if os.name == 'nt' and len(res) >= 2 and res[1] == ':':
+        # 强制将 Windows 盘符大写化，确保与 Cargo Metadata 的物理路径输出一致，防止 rust-analyzer 产生 VFS 分叉
+        return res[0].upper() + res[1:]
+    return res
 import re
 import json
 import asyncio
@@ -28,8 +35,11 @@ def _pre_flight_workspace_scan(repo_path: str) -> Dict[str, bool]:
         "go.mod": os.path.exists(os.path.join(repo_path, "go.mod")),
     }
 
-def _ensure_cargo_fetched(repo_path: str):
+async def _ensure_cargo_fetched(repo_path: str):
     """Run `cargo fetch` once per repo so rust-analyzer can resolve all dependencies.
+    
+    This function should be called within an async context using asyncio.to_thread if we want to avoid blocking, 
+    but since we are moving it here, we will change it to an async function.
     
     Without this, rust-analyzer crashes when Cargo.toml has git dependencies
     that haven't been downloaded yet. Uses a marker file to avoid re-fetching.
@@ -57,19 +67,22 @@ def _ensure_cargo_fetched(repo_path: str):
     
     logger.info(f"Running 'cargo fetch' in {repo_path} (first-time LSP setup, may take 1-2 minutes)...")
     try:
-        result = subprocess.run(
-            [cargo, "fetch"],
+        # Use asyncio.create_subprocess_exec to avoid blocking the event loop
+        process = await asyncio.create_subprocess_exec(
+            cargo, "fetch",
             cwd=repo_path,
-            capture_output=True,
-            text=True,
-            timeout=180  # 3 minutes max for large workspaces with git deps
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
         )
-        if result.returncode == 0:
-            logger.info(f"cargo fetch completed successfully in {repo_path}")
-        else:
-            logger.warning(f"cargo fetch failed (rc={result.returncode}): {result.stderr[:300]}\nProceeding anyway with partial deps.")
-    except subprocess.TimeoutExpired:
-        logger.warning("cargo fetch timed out after 180s — continuing without full dependency resolution")
+        try:
+            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=180)
+            if process.returncode == 0:
+                logger.info(f"cargo fetch completed successfully in {repo_path}")
+            else:
+                logger.warning(f"cargo fetch failed (rc={process.returncode}): {stderr.decode('utf-8')[:300]}\nProceeding anyway with partial deps.")
+        except asyncio.TimeoutError:
+            process.kill()
+            logger.warning("cargo fetch timed out after 180s — continuing without full dependency resolution")
     except Exception as e:
         logger.warning(f"cargo fetch error: {e} — continuing anyway")
     finally:
@@ -126,21 +139,27 @@ def _detect_target_arch(repo_path: str) -> Optional[str]:
         
     return None
 
-def _polyfill_context(repo_path: str, scan_results: Dict[str, bool]):
-    # C/C++ (clangd) 补全逻辑
+async def _polyfill_context(repo_path: str, scan_results: Dict[str, bool], lang: str):
     # C/C++ (clangd) 补全逻辑
     # 哪怕有 Makefile/CMakeLists，如果没有 compile_commands.json，clangd 依然是个瞎子
-    has_c_config = scan_results["compile_commands.json"]
+    has_c_config = False
+    if lang in ["c", "cpp"]:
+        has_c_config = scan_results.get("compile_commands.json", False)
     
-    if not has_c_config:
+    if lang in ["c", "cpp"] and not has_c_config:
         compile_flags_path = os.path.join(repo_path, "compile_flags.txt")
         # 总是重新生成，以防克隆后文件变动
-        include_dirs = {os.path.abspath(repo_path)}
+        include_dirs = {_abspath(repo_path)}
         for root, dirs, files in os.walk(repo_path):
             # 跳过无关目录，防止生成的 flags 过载
             dirs[:] = [d for d in dirs if d not in {".git", ".github", "target", "vendor", "node_modules", "build", "dist"}]
             if any(f.endswith('.h') or f.endswith('.hpp') for f in files):
-                include_dirs.add(os.path.abspath(root))
+                include_dirs.add(_abspath(root))
+                # Also add the parent directory to handle includes like "proc/thread.h"
+                include_dirs.add(os.path.dirname(_abspath(root)))
+            # If the directory is named 'include', proactively add it even if it directly contains no headers
+            if os.path.basename(os.path.normpath(root)) == "include":
+                include_dirs.add(_abspath(root))
         if include_dirs:
             try:
                 with open(compile_flags_path, 'w', encoding='utf-8') as f:
@@ -169,60 +188,61 @@ def _polyfill_context(repo_path: str, scan_results: Dict[str, bool]):
                 logger.error(f"Failed to generate compile_flags.txt: {e}")
 
     # Rust (rust-analyzer) 补全逻辑
-    if not scan_results["Cargo.toml"]:
-        has_rs = False
-        for root, dirs, files in os.walk(repo_path):
-            dirs[:] = [d for d in dirs if d not in {".git", "target", "vendor"}]
-            if any(f.endswith('.rs') for f in files):
-                has_rs = True
-                break
-        
-        if has_rs:
-            cargo_toml_path = os.path.join(repo_path, "Cargo.toml")
-            if not os.path.exists(cargo_toml_path):
-                # 收集子目录中的所有 Cargo.toml 路径，组装成 workspace members
-                members = []
-                for root, dirs, files in os.walk(repo_path):
-                    dirs[:] = [d for d in dirs if d not in {".git", "target", "vendor", ".github"}]
-                    if root != repo_path and "Cargo.toml" in files:
-                        rel_path = os.path.relpath(root, repo_path).replace('\\', '/')
-                        members.append(rel_path)
-                
-                try:
-                    with open(cargo_toml_path, 'w', encoding='utf-8') as f:
-                        if members:
-                            # 这种情况下生成 "Virtual Manifest"，即只有 [workspace] 而没有 [package]
-                            # 这样 cargo metadata 就不会报错要求根目录必须有 src/lib.rs 了
-                            f.write('[workspace]\nmembers = [\n')
-                            for m in members:
-                                f.write(f'    "{m}",\n')
-                            f.write(']\n')
-                        else:
-                            f.write('[package]\nname = "os_kernel_dummy"\nversion = "0.1.0"\nedition = "2021"\n')
-                except Exception as e:
-                    logger.error(f"Failed to generate Cargo.toml: {e}")
+    if lang == "rust":
+        if not scan_results["Cargo.toml"]:
+            has_rs = False
+            for root, dirs, files in os.walk(repo_path):
+                dirs[:] = [d for d in dirs if d not in {".git", "target", "vendor"}]
+                if any(f.endswith('.rs') for f in files):
+                    has_rs = True
+                    break
             
-            # 如果存在 Cargo.toml，检查是否存在有效的 target 文件 (src/lib.rs 或 src/main.rs) 或者包含 members
-            # 防止 rust-analyzer 的 cargo metadata 报错 `no targets specified in the manifest` 而彻底罢工
-            if os.path.exists(cargo_toml_path):
-                with open(cargo_toml_path, 'r', encoding='utf-8') as f:
-                    content = f.read()
-                # 只有如果是 [package] 类型的 manifest 且没有目标文件时，才强制创建 dummy src
-                # Virtual Manifest ([workspace]) 模式下不需要也不能在根目录创建 src/lib.rs
-                if "[package]" in content:
-                    src_dir = os.path.join(repo_path, "src")
-                    has_target = os.path.exists(os.path.join(src_dir, "lib.rs")) or os.path.exists(os.path.join(src_dir, "main.rs"))
-                    if not has_target:
-                        os.makedirs(src_dir, exist_ok=True)
-                        try:
-                            with open(os.path.join(src_dir, "lib.rs"), 'w', encoding='utf-8') as f:
-                                f.write("// Dummy lib created by os-agent to satisfy rust-analyzer workspace loader\n")
-                        except Exception as e:
-                            logger.error(f"Failed to generate dummy src/lib.rs: {e}")
+            if has_rs:
+                cargo_toml_path = os.path.join(repo_path, "Cargo.toml")
+                if not os.path.exists(cargo_toml_path):
+                    # 收集子目录中的所有 Cargo.toml 路径，组装成 workspace members
+                    members = []
+                    for root, dirs, files in os.walk(repo_path):
+                        dirs[:] = [d for d in dirs if d not in {".git", "target", "vendor", ".github"}]
+                        if root != repo_path and "Cargo.toml" in files:
+                            rel_path = os.path.relpath(root, repo_path).replace('\\', '/')
+                            members.append(rel_path)
+                    
+                    try:
+                        with open(cargo_toml_path, 'w', encoding='utf-8') as f:
+                            if members:
+                                # 这种情况下生成 "Virtual Manifest"，即只有 [workspace] 而没有 [package]
+                                # 这样 cargo metadata 就不会报错要求根目录必须有 src/lib.rs 了
+                                f.write('[workspace]\\nmembers = [\\n')
+                                for m in members:
+                                    f.write(f'    "{m}",\\n')
+                                f.write(']\\n')
+                            else:
+                                f.write('[package]\\nname = "os_kernel_dummy"\\nversion = "0.1.0"\\nedition = "2021"\\n')
+                    except Exception as e:
+                        logger.error(f"Failed to generate Cargo.toml: {e}")
+                
+                # 如果存在 Cargo.toml，检查是否存在有效的 target 文件 (src/lib.rs 或 src/main.rs) 或者包含 members
+                # 防止 rust-analyzer 的 cargo metadata 报错 `no targets specified in the manifest` 而彻底罢工
+                if os.path.exists(cargo_toml_path):
+                    with open(cargo_toml_path, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                    # 只有如果是 [package] 类型的 manifest 且没有目标文件时，才强制创建 dummy src
+                    # Virtual Manifest ([workspace]) 模式下不需要也不能在根目录创建 src/lib.rs
+                    if "[package]" in content:
+                        src_dir = os.path.join(repo_path, "src")
+                        has_target = os.path.exists(os.path.join(src_dir, "lib.rs")) or os.path.exists(os.path.join(src_dir, "main.rs"))
+                        if not has_target:
+                            os.makedirs(src_dir, exist_ok=True)
+                            try:
+                                with open(os.path.join(src_dir, "lib.rs"), 'w', encoding='utf-8') as f:
+                                    f.write("// Dummy lib created by os-agent to satisfy rust-analyzer workspace loader\\n")
+                            except Exception as e:
+                                logger.error(f"Failed to generate dummy src/lib.rs: {e}")
     
-    # Rust: cargo fetch — 让 rust-analyzer 能解析 git 远程依赖
-    if scan_results["Cargo.toml"] or os.path.exists(os.path.join(repo_path, "Cargo.toml")):
-        _ensure_cargo_fetched(repo_path)
+        # Rust: cargo fetch — 让 rust-analyzer 能解析 git 远程依赖
+        if scan_results["Cargo.toml"] or os.path.exists(os.path.join(repo_path, "Cargo.toml")):
+            await _ensure_cargo_fetched(repo_path)
 
 # --- 阶段 3：多路复用 LSP 客户端构建 (Multiplexing LSP Gateway) ---
 class LSPClient:
@@ -257,7 +277,7 @@ class LSPClient:
         # 强化外部路径注入：确保 rust-analyzer 能看到 check_env.py 深度扫描到的 make 和 cmake
         try:
             import sys
-            sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            sys.path.insert(0, os.path.dirname(os.path.dirname(_abspath(__file__))))
             from check_env import _find_build_tool, get_git_usr_bin
             
             extra_paths = []
@@ -309,7 +329,11 @@ class LSPClient:
 
         # 强化隔离：防止在线拉取卡死，允许不稳定特性 (全局对 rust-analyzer 生效)
         if "rust-analyzer" in self.cmd[0]:
-            env["CARGO_NET_OFFLINE"] = "true" 
+            # 强制解除 Windows 平台下目标仓库通过 rust-toolchain.toml 锁定极其古老版本 (比如 nightly-2024-02-03) 
+            # 导致的 line-index offset panic BUG，直接提权使用 stable 通道下最新修复版的 rust-analyzer
+            env["RUSTUP_TOOLCHAIN"] = "stable"
+            # 出于稳定性考量目前暂不强制阻断网络，使得 metadata 能够去拉取最新版本 crate
+            # env["CARGO_NET_OFFLINE"] = "true" 
             env["RUSTC_BOOTSTRAP"] = "1"
 
         if disable_build_scripts and "rust-analyzer" in self.cmd[0]:
@@ -369,7 +393,7 @@ class LSPClient:
 
     async def _initialize(self):
         # Build proper file URI — Windows needs file:///C:/... (3 slashes)
-        raw_abs = os.path.abspath(self.cwd).replace(chr(92), '/')
+        raw_abs = _abspath(self.cwd).replace(chr(92), '/')
         # 移除 Windows 扩展路径前缀 //?/ 以免干扰某些 Linux 风格的构建工具 (如 make)
         if raw_abs.startswith('//?/'):
             abs_cwd = raw_abs[4:]
@@ -388,6 +412,11 @@ class LSPClient:
                 "processId": os.getpid(),
                 "rootUri": root_uri,
                 "capabilities": {
+                    # 强硬声明：客户端的 offset 规范严格遵守 UTF-16 code units (解决多字节和中文混合 panic)
+                    "offsetEncoding": ["utf-16"],
+                    "general": {
+                        "positionEncodings": ["utf-16"]
+                    },
                     "textDocument": {
                         "callHierarchy": {"dynamicRegistration": False},
                         "synchronization": {"dynamicRegistration": False}
@@ -399,10 +428,6 @@ class LSPClient:
                             "enable": not getattr(self, "build_scripts_disabled", False)
                         },
                         "target": _detect_target_arch(self.cwd),
-                        "extraArgs": ["--offline"],
-                        "extraEnv": {
-                            "CARGO_NET_OFFLINE": "true"
-                        }
                     },
                     "checkOnSave": False
                 } if "rust-analyzer" in self.cmd[0] else {}
@@ -639,7 +664,7 @@ class MultiplexingLSPGateway:
         self.lock = asyncio.Lock()
 
     async def get_client(self, repo_path: str, lang: str) -> Optional[LSPClient]:
-        abs_repo = os.path.abspath(repo_path)
+        abs_repo = _abspath(repo_path)
         key = f"{abs_repo}_{lang}"
         
         async with self.lock:
@@ -657,7 +682,7 @@ class MultiplexingLSPGateway:
                     del self.clients[key]
 
             scan_res = _pre_flight_workspace_scan(abs_repo)
-            _polyfill_context(abs_repo, scan_res)
+            await _polyfill_context(abs_repo, scan_res, lang)
 
             cmd = []
             if lang in ["c", "cpp"]:
@@ -726,7 +751,7 @@ class MultiplexingLSPGateway:
 
     async def force_restart_client(self, repo_path: str, lang: str):
         """强制清理并关闭特定语言的 LSP 客户端，以便在配置更改（如图架构切换）后重建。"""
-        abs_repo = os.path.abspath(repo_path)
+        abs_repo = _abspath(repo_path)
         key = f"{abs_repo}_{lang}"
         async with self.lock:
             if key in self.clients:
@@ -772,7 +797,7 @@ class ASMLexicalParser:
     """正则表达式匹配机制，强制作为 .S 或 .asm 文件及高级语言超时的降级方案"""
     @staticmethod
     def fallback_definition(repo_path: str, file_path: str, symbol: str) -> str:
-        abs_path = os.path.abspath(os.path.join(repo_path, file_path))
+        abs_path = _abspath(os.path.join(repo_path, file_path))
         if not os.path.exists(abs_path):
             return f"Error: 文件未找到 {abs_path}"
         
@@ -795,7 +820,7 @@ class ASMLexicalParser:
             
     @staticmethod
     def fallback_references(repo_path: str, file_path: str, symbol: str) -> str:
-        abs_path = os.path.abspath(os.path.join(repo_path, file_path))
+        abs_path = _abspath(os.path.join(repo_path, file_path))
         if not os.path.exists(abs_path):
             return f"Error: 文件未找到 {abs_path}"
         
@@ -818,11 +843,20 @@ def _find_symbol_positions(abs_path: str, symbol: str) -> List[Tuple[int, int]]:
     """在文件当中寻找符号的第一次出现的位置，用于提供给 LSP 锚点"""
     positions = []
     try:
-        with open(abs_path, "r", encoding="utf-8", errors="ignore") as f:
-            for line_idx, line in enumerate(f):
-                col_idx = line.find(symbol)
-                if col_idx != -1:
-                    positions.append((line_idx, col_idx))
+        # 强制以 rb 读取并解码，完全保留真实的字节偏移量，避免任何隐式 \r\n 转换
+        with open(abs_path, "rb") as f:
+            raw = f.read()
+            text = raw.decode("utf-8", errors="ignore")
+            
+        lines = text.split('\n')
+        for line_idx, line in enumerate(lines):
+            # 处理可能的 \r
+            clean_line = line.rstrip('\r')
+            col_idx = clean_line.find(symbol)
+            if col_idx != -1:
+                # LSP 默认规范中，character 偏移量基于 UTF-16 code units
+                utf16_col_idx = len(clean_line[:col_idx].encode('utf-16-le')) // 2
+                positions.append((line_idx, utf16_col_idx))
     except Exception:
         pass
     return positions
@@ -849,7 +883,7 @@ async def _async_lsp_request(repo_path: str, file_path: str, symbol: str, method
     if not lang:
         return f"Error: 不支持的文件扩展名 '{ext}'，无法匹配可用的 Language Server。"
 
-    abs_file = os.path.abspath(os.path.join(repo_path, file_path))
+    abs_file = _abspath(os.path.join(repo_path, file_path))
     if not os.path.exists(abs_file):
         return f"Error: 文件未找到 {file_path}"
         
@@ -883,8 +917,29 @@ async def _async_lsp_request(repo_path: str, file_path: str, symbol: str, method
             else:
                 return ASMLexicalParser.fallback_references(repo_path, file_path, symbol)
     
-    # 取文件内部符号扫描的最高优先级位置，下发至 LSP 引擎
-    line_idx, col_idx = positions[0]
+    # 【新增强化】：位置打分机制。
+    # 优先选择非注释、非预处理、且看起来像定义或活跃使用的行。
+    # 避免 LSP 锚点落在 doc comment (/// ...) 导致解析失效。
+    try:
+        with open(abs_file, 'r', encoding='utf-8', errors='ignore') as _f:
+            _file_lines = _f.readlines()
+    except Exception:
+        _file_lines = []
+
+    def _score_position(p: Tuple[int, int]) -> int:
+        l_idx = p[0]
+        if l_idx >= len(_file_lines): return 100
+        line_content = _file_lines[l_idx].strip()
+        # 排除常见非代码行
+        if line_content.startswith(('///', '//!')): return 90  # Doc comments 最不优先
+        if line_content.startswith(('/*', '//', '*', '#')): return 80 # 普通注释或宏预处理
+        # 优先选择 pub static, fn, struct 等关键词所在的行
+        if any(kw in line_content for kw in ['pub ', 'fn ', 'struct ', 'static ', 'const ', 'use ']): return 0
+        return 50 # 普通代码行
+
+    sorted_positions = sorted(positions, key=_score_position)
+    line_idx, col_idx = sorted_positions[0]
+
     
     req = {
         "jsonrpc": "2.0",
@@ -901,7 +956,7 @@ async def _async_lsp_request(repo_path: str, file_path: str, symbol: str, method
 
     # 通过模拟打开文档，准备 didOpen 数据
     try:
-        with open(abs_file, 'r', encoding='utf-8') as f:
+        with open(abs_file, 'r', encoding='utf-8', newline='') as f:
             text = f.read()
         did_open = {
             "jsonrpc": "2.0",
@@ -979,7 +1034,7 @@ async def _async_lsp_request(repo_path: str, file_path: str, symbol: str, method
                     if os.name == 'nt' and file_sys_path.startswith('/'):
                         file_sys_path = file_sys_path[1:]
                     try:
-                        rel = os.path.relpath(file_sys_path, os.path.abspath(repo_path))
+                        rel = os.path.relpath(file_sys_path, _abspath(repo_path))
                     except ValueError:
                         rel = file_sys_path
                     target_uri = rel
@@ -1068,7 +1123,7 @@ async def _async_lsp_document_symbols(repo_path: str, file_path: str) -> str:
     if not lang:
         return f"Error: 当前文件类型不被 LSP Outline 支持 '{ext}'"
 
-    abs_file = os.path.abspath(os.path.join(repo_path, file_path))
+    abs_file = _abspath(os.path.join(repo_path, file_path))
     if not os.path.exists(abs_file):
         return f"Error: 文件未找到 {file_path}"
         
@@ -1088,7 +1143,7 @@ async def _async_lsp_document_symbols(repo_path: str, file_path: str) -> str:
             return "Error: LSP client failed to restart."
     
     try:
-        with open(abs_file, 'r', encoding='utf-8') as f:
+        with open(abs_file, 'r', encoding='utf-8', newline='') as f:
             text = f.read()
             
         did_open = {
@@ -1195,8 +1250,8 @@ def _grep_fallback_call_graph(repo_path: str, file_path: str, symbol: str, direc
     - incoming: 全局搜索 `symbol(` 模式，找出所有调用点
     输出价小于 LSP 的精确结果，但能提供有用的静态调用镜像。
     """
-    abs_repo = os.path.abspath(repo_path)
-    abs_file = os.path.abspath(os.path.join(repo_path, file_path))
+    abs_repo = _abspath(repo_path)
+    abs_file = _abspath(os.path.join(repo_path, file_path))
     banner = (
         f"\n⚠️  [Call Graph DEGRADED — Grep Fallback] symbol='{symbol}'  file={file_path}\n"
         f"    LSP callHierarchy 不可用，已自动降级至静态正则分析。\n"
@@ -1325,14 +1380,11 @@ async def _async_lsp_call_graph(
     if not lang:
         return f"Error: 不支持的文件类型 '{ext}'"
 
-    abs_file = os.path.abspath(os.path.join(repo_path, file_path))
+    abs_file = _abspath(os.path.join(repo_path, file_path))
     if not os.path.exists(abs_file):
         return f"Error: 文件未找到 {file_path}"
 
     positions = _find_symbol_positions(abs_file, symbol)
-    if not positions:
-        return f"Error: 符号 '{symbol}' 未在文件 '{file_path}' 中找到。"
-
     client = await _gateway.get_client(repo_path, lang)
     if not client:
         msg = f"[call_graph] LSP 客户端启动失败，自动转入 Grep Fallback (symbol={symbol})"
@@ -1347,7 +1399,7 @@ async def _async_lsp_call_graph(
 
     # 确保文档已打开
     try:
-        with open(abs_file, 'r', encoding='utf-8') as f:
+        with open(abs_file, 'r', encoding='utf-8', newline='') as f:
             text = f.read()
         did_open = {
             "jsonrpc": "2.0", "method": "textDocument/didOpen",
@@ -1390,7 +1442,7 @@ async def _async_lsp_call_graph(
             if os.name == 'nt' and p.startswith('/'):
                 p = p[1:]
             try:
-                return os.path.relpath(p, os.path.abspath(repo_path))
+                return os.path.relpath(p, _abspath(repo_path))
             except ValueError:
                 return p
         return raw_uri
@@ -1501,10 +1553,26 @@ async def _async_lsp_call_graph(
                     break
 
         if not root_items or not isinstance(root_items, list) or len(root_items) == 0:
-            msg = f"[call_graph] callHierarchy/prepare 返回无效，自动转入 Grep Fallback (symbol={symbol})"
+            # 【新增强化】：Semantic Fallback for Variables/Statics
+            # 当调用图准备失败时（通常是因为符号是变量而非函数），由于变量没有“控制流”调用关系，
+            # 我们自动转向“语义引用查找”，这能提供比单纯 Grep 更精准的跨文件符号使用分析。
+            reason = f"注意：符号 '{symbol}' 似乎是一个变量、常量或静态引用（LSP 调用图协议仅支持函数/方法）。系统已自动为您切换至【高精度语义引用查找】以分析其数据流向。"
+            logger.info(f"[call_graph] {symbol} is not a function. Falling back to semantic references.")
+            
+            # 异步调用引用查找逻辑 (reuse existing _async_lsp_request)
+            ref_result = await _async_lsp_request(repo_path, file_path, symbol, "textDocument/references")
+            
+            # 如果解析出了有效的引用列表（非 Error 且非“未解析出”提示）
+            if "结果列表" in ref_result or "共被解析出" in ref_result:
+                header = f"\n💡 {reason}\n"
+                return header + ref_result
+            
+            # 最后防线：如果语义引用查找也彻底失效（常见于宏生成或 ASM），再执行 Grep 降级
+            msg = f"[call_graph] LSP 语义解析（CallGraph & References）均无效，自动转入终极 Grep Fallback (symbol={symbol})"
             logger.warning(msg)
             print(f"\n⚠️  {msg}", flush=True)
             return _grep_fallback_call_graph(repo_path, file_path, symbol, direction)
+
 
         root_item = root_items[0]
         root_name = root_item.get("name", symbol)
@@ -1565,7 +1633,10 @@ def lsp_get_call_graph(repo_path: str, file_path: str, symbol: str,
 
     注意：需要 Language Server 支持 callHierarchy 协议。
     clangd (v12+) 和 rust-analyzer 均支持。
-    若 LSP 无法解析（如符号为宏威码），会返回提示信息而非崩溃。
+    若 LSP 无法解析（如符号为变量、常量或宏生成的代码），本工具会自动识别并尝试切换至“语义引用查找”
+    （Semantic References）模式以确保高精度的分析结果，并会在输出中告知 Agent 切换的原因。
+    若语义解析完全不可用，则最后降级为正则匹配。
+
 
     Args:
         repo_path: 仓库它对或相对根路径 (e.g. repos/my-os)
@@ -1597,7 +1668,7 @@ def lsp_get_call_graph(repo_path: str, file_path: str, symbol: str,
 
 async def _async_lsp_set_target_arch(repo_path: str, target: str) -> str:
     """内部异步实现：保存架构标记并强制重启 rust-analyzer。"""
-    repo_path = os.path.abspath(repo_path)
+    repo_path = _abspath(repo_path)
     marker = os.path.join(repo_path, ".os_agent_lsp_target")
     
     try:

@@ -96,13 +96,8 @@ def main():
         )
         needs_install = ("Would install" in dry.stdout) or (dry.returncode != 0)
         if needs_install:
-            try:
-                print(f"  检测到缺失/不匹配的依赖，正在安装...")
-                subprocess.run([sys.executable, "-m", "pip", "install", "-r", req_path], check=True)
-                _check("requirements.txt 依赖安装", True)
-            except subprocess.CalledProcessError:
-                all_ok = False
-                _check("requirements.txt 依赖安装", False, "请手动运行 pip install -r requirements.txt")
+            all_ok = False
+            _check("requirements.txt 依赖不满足", False, "请手动运行: pip install -r requirements.txt")
         else:
             _check("requirements.txt 依赖已满足", True, "所有包版本均符合要求")
     
@@ -112,13 +107,8 @@ def main():
             __import__(imp)
             _check(pip_name, True)
         except ImportError:
-            _check(pip_name, False, f"未找到，正在自动安装 pip install {pip_name}...")
-            try:
-                subprocess.run([sys.executable, "-m", "pip", "install", pip_name], check=True)
-                _check(f"{pip_name} (自动安装成功)", True)
-            except subprocess.CalledProcessError:
-                all_ok = False
-                _check(f"{pip_name} (自动安装失败)", False, f"请手动运行 pip install {pip_name}")
+            all_ok = False
+            _check(pip_name, False, f"未找到，请手动运行: pip install {pip_name}")
 
     # --- .env file ---
     print("\n⚙️  配置文件:")
@@ -186,11 +176,11 @@ def main():
     cross_compilers = {
         "riscv64-linux-musl-cc": {
             "label": "RISC-V CC",
-            "hint": "scoop install riscv-none-elf-gcc (Alias: riscv64-linux-musl-cc)"
+            "hint": "请前往 https://github.com/xpack-dev-tools/riscv-none-elf-gcc-xpack/releases 下载对应版本交叉工具链"
         },
         "loongarch64-unknown-elf-gcc": {
             "label": "LoongArch CC",
-            "hint": "请从龙芯社区下载 Windows 版交叉工具链"
+            "hint": "请从龙芯社区 https://github.com/loongson/build-tools 下载对应版本交叉工具链"
         },
         "arm-none-eabi-gcc": {
             "label": "ARM CC",

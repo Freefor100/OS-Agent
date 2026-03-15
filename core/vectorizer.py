@@ -8,6 +8,7 @@ import os
 import re
 import json
 import logging
+import threading
 from typing import Dict, List, Optional
 
 import numpy as np
@@ -326,19 +327,64 @@ class LocalEmbedder:
 
     def __init__(self, model_name: str = None):
         self.model_name = model_name or self.DEFAULT_MODEL
-        self._model = None
+        
+    # 类级别缓存模型和锁
+    _shared_models = {} # {model_name: model_instance}
+    _global_lock = threading.Lock()
 
     def _load_model(self):
-        if self._model is None:
-            logger.info(f"加载 Embedding 模型: {self.model_name} ...")
+        if self.model_name in LocalEmbedder._shared_models:
+            return
+            
+        with LocalEmbedder._global_lock:
+            if self.model_name in LocalEmbedder._shared_models:
+                return
+                
             try:
+                import torch
                 from sentence_transformers import SentenceTransformer
-                self._model = SentenceTransformer(self.model_name)
-                logger.info(f"模型加载完成，向量维度: {self._model.get_sentence_embedding_dimension()}")
+                # 强制离线模式
+                os.environ["HF_HUB_OFFLINE"] = "1"
+                os.environ["TRANSFORMERS_OFFLINE"] = "1"
+                
+                device = "cuda" if torch.cuda.is_available() else "cpu"
+                logger.info(f"加载 Embedding 模型: {self.model_name} (Device: {device}, Global Load) ...")
+                
+                # 显式指定 dtype 和 device 以避免 meta tensor 错误，且必须 trust_remote_code=True
+                # 显式指定 local_files_only=True 以阻止 trust_remote_code=True 在底层发起网络检验
+                model_kwargs = {
+                    "dtype": torch.float32,
+                    "low_cpu_mem_usage": False,
+                    "trust_remote_code": True
+                }
+                
+                # 先在 CPU 加载再移动到 CUDA
+                model = SentenceTransformer(
+                    self.model_name, 
+                    trust_remote_code=True,
+                    local_files_only=True,
+                    device="cpu", 
+                    model_kwargs=model_kwargs
+                )
+                
+                if device == "cuda":
+                    logger.info(f"正在将模型移动到 {device}...")
+                    model = model.to(device)
+                
+                LocalEmbedder._shared_models[self.model_name] = model
+                logger.info(f"模型加载完成，向量维度: {model.get_sentence_embedding_dimension()}")
             except ImportError:
                 raise ImportError(
                     "请安装 sentence-transformers: pip install sentence-transformers torch"
                 )
+            except Exception as e:
+                logger.error(f"加载 Embedding 模型失败: {e}")
+                raise e
+
+    @property
+    def _model(self):
+        self._load_model()
+        return LocalEmbedder._shared_models[self.model_name]
 
     def encode(self, texts: List[str]) -> np.ndarray:
         """

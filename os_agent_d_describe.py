@@ -980,7 +980,7 @@ def main():
         # 简单的断点续传：如果文件已存在且内容看起来正常（>200字节），则跳过
         if os.path.exists(section_path):
             if os.path.getsize(section_path) > 200:
-                print("\\n" + "=" * 80)
+                print("=" * 80)
                 print(f"⏭️  阶段 {idx}/{len(STAGES)}：{title} (已存在，跳过)")
                 print(f"   文件: {section_path}")
                 print("=" * 80)
@@ -1417,7 +1417,7 @@ def main():
     end_time = datetime.now()
     elapsed = (end_time - start_time).total_seconds()
 
-    print("\\n" + "=" * 80)
+    print("=" * 80)
     print("✅ 多阶段任务完成！")
     print(f"   总步数: {overall_step_count}")
     print(f"   总Token使用: {total_tokens_used:,}")
