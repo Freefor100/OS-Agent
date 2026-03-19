@@ -18,6 +18,48 @@ langchain.debug = True
 load_dotenv()
 
 OUTPUT_DIR = "./output"
+import openpyxl
+
+def get_author_info(repo_url: str) -> dict:
+    """从 collected-data.xlsx 提取作者信息"""
+    try:
+        xlsx_path = "collected-data.xlsx"
+        if not os.path.exists(xlsx_path):
+            return {}
+            
+        wb = openpyxl.load_workbook(xlsx_path, data_only=True)
+        sheet = wb.active
+        
+        # 寻找列索引
+        headers = {}
+        for col_idx, cell in enumerate(sheet[1], 1):
+            if cell.value:
+                headers[str(cell.value).strip()] = col_idx
+                
+        repo_col = headers.get("仓库地址")
+        if not repo_col:
+            return {}
+            
+        for row in range(2, sheet.max_row + 1):
+            cell_url = sheet.cell(row=row, column=repo_col).value
+            if cell_url and str(cell_url).strip() == repo_url:
+                result = {}
+                mapping = {
+                    "year": "年份",
+                    "competition": "赛事",
+                    "sub_competition": "子赛事",
+                    "school": "学校",
+                    "team": "队伍名称"
+                }
+                for key, col_name in mapping.items():
+                    col_idx = headers.get(col_name)
+                    if col_idx:
+                        val = sheet.cell(row=row, column=col_idx).value
+                        result[key] = str(val).strip() if val is not None else ""
+                return result
+    except Exception as e:
+        print(f"  ⚠️  读取 collected-data.xlsx 失败: {e}")
+    return {}
 
 
 def _slug(s: str) -> str:
@@ -115,45 +157,7 @@ def _build_base_context(repo_url: str, output_dir: str) -> str:
 
 
 STAGES = [
-    {
-        "id": "01_overview",
-        "title": "项目概览与技术栈",
-        "prompt": """目标：建立"这是什么 OS、怎么构建、关键入口在哪"及"核心子系统概览"。
 
-**严格注意**：区分项目本身名称（如 Undefined OS）与底层框架（如 ArceOS）。如果项目是基于 ArceOS 修改的，必须明确说明"基于 ArceOS 开发"，不能直接把 ArceOS 当作项目名称。
-
-请按顺序完成（仓库已克隆到 repo_path，直接使用即可）：
-1) **语义探测（🥇 首选）**：调用 `rag_search_code` 搜索项目核心关键字（如 "kernel entry", "memory management", "filesystem type"），快速建立第一印象。
-2) analyze_tech_stack(repo_path)：总结语言/构建/依赖。**必须明确提取编程语言（版本、是否no_std）、基础框架来源（rCore/ArceOS等）、内核类型（宏内核/微内核/混合等）。**
-3) list_repo_structure(repo_path, max_depth=5)：总结关键目录。注意输出中的文件行数和大小信息。
-4) read_code_segment 读取并总结：README.md、Cargo.toml、Makefile（如存在）。
-5) **寻找内核入口与架构支持（核心对齐机制）**：
-   - **架构探测**：检查 `arch/` 或 `platform/` 目录。**注意**：如果发现 `la64` 或 `loongarch64` 目录，但分析工具返回空或代码被 `#[cfg]` 灰化，**必须**立即检查 `Makefile` 或 `rust-toolchain.toml` 并调用 `lsp_set_target_arch` 强制对齐。
-   - **架构列表**：明确列出该项目支持的所有架构（x86_64, aarch64, riscv64, loongarch64 等）。
-   - **寻找入口**：
-     - **严禁假设** `src/main.rs` 是入口。
-     - 在 Rust 项目中，搜索 `#[entry]`、`_start` 或 `rust_main`。
-     - 使用 grep_in_repo 搜索 `entry|start_kernel|rust_main`。
-5) **子系统概览（必须验证代码存在性）**：
-   - **内存管理**：简述是否支持分页/CoW/Lazy（**必须grep verify**）。
-   - **进程管理**：简述支持线程/进程/调度算法。
-   - **文件系统**：简述支持的 FS 类型（fat32/ext4/ramfs）。
-   - **网络**：简述是否支持网络栈（smoltcp/lwip）。
-   - **如果某项仅在 README 提及但未找到代码，明确写“文档提及但未见代码实现”**。
-   - **README vs Code**：如果 README 声称不仅有“高级调度器”但代码只有 FIFO，必须如实报告代码现状。
-   - **子模块搜索（关键）**：如果项目包含子模块目录（如 `arceos/`、`.arceos/`），**必须进入子模块搜索功能实现**。例如 Lazy Allocation 可能在 `arceos/modules/axmm/` 中，CFS 调度可能通过 `arceos/modules/axtask/` 的 feature flag 启用。不要只搜索顶层目录就下结论说"未发现"。
-
-输出格式：
-- ## 结论摘要（3-5 条，明确项目与框架关系及内核类型）
-- ## 技术栈与构建（含编程语言版本、所有支持的架构完整列表）
-- ## 目录结构导读（列出"子系统→目录→入口文件"）
-- ## 核心子系统概览（内存/进程/FS/网络，务必区分"已实现"与"计划中"）
-- ## 证据列表（文件路径清单）
-
-**重要**：完成所有工具调用后，你必须输出一个完整的 Markdown 格式分析报告。
-""",
-
-    },
     {
         "id": "02_boot_arch",
         "title": "启动流程与架构初始化",
@@ -748,47 +752,30 @@ C. **使用 grep_in_repo 探索隐藏功能**（可选）：
 """,
     },
     {
-        "id": "14_final",
-        "title": "执行摘要与总结评价",
-        "prompt": """目标：基于前面所有章节的分析，生成执行摘要和项目总结评估。
-
-你已经完成了对该OS项目的详细分析（包括：项目概览、启动流程、内存管理、进程调度、中断系统调用、文件系统、设备驱动、同步IPC、多核支持、安全机制、网络协议栈、调试机制、测试框架、开发历史等）。
-
-现在需要你输出这三个部分：
-
-## 1. 执行摘要（Executive Summary）
-
-用200-300字概括：
-- 项目定位与目标（教学OS/实验OS/微内核等）
-- 技术栈概览（编程语言、目标架构、关键技术）
-- 实现完成度评估（系统主要功能模块是否闭环）
-
-## 2. 核心架构与机制提炼
-
-对于该 OS 的主要架构和功能机制进行**详细且深刻的技术性总结**，这包含但不限于：
-- 内存分配器底层模型与页表机制
-- 调度模型（Task / Process）以及 IPC 机制
-- VFS 与核心抽象层设计
-- Trap 处理路径
-不要给出主观评价，只需基于客观代码给出实现细节汇总。保证对各种重点机制描述透彻清楚。
-
-## 3. 问题与缺陷揭露
-
-基于前面的检查，罗列出本项目仍未完成或仅有“桩实现”的核心功能模块，指出其与完整 OS 的客观差距在哪。如网络、文件系统、多核支持等模块的空白。**仅需指出具体缺失的机制，不要主动给出改进或填坑建议**。
-
----
-
-**输出要求**：
-1. 只输出上述三个部分（执行摘要 + 核心架构与机制提炼 + 问题与缺陷揭露）
-2. 不要长篇大论重复细节，要提纲挈领
-3. **不要评价技术亮点，不要给出场景适用建议，纯客观分析技术机制与缺陷**
-4. 语气专业客观，类似内核代码审查报告
-5. 使用严格的Markdown格式
-
-**前面阶段的分析内容将附在下面供参考...**
-""",
+        "id": "01_overview",
+        "title": "项目概览与技术栈",
         "needs_previous_sections": True,
-        "skip_in_report": False,  # 改为False，要保存到sections并包含在最终报告中
+        "prompt": """目标：建立"这是什么 OS、怎么构建、关键入口在哪"的简明技术字典，并生成全项目的完成度评价。
+
+**严格注意**：区分项目本身名称（如 Undefined OS）与底层框架（如 ArceOS）。如果项目是基于 ArceOS 修改的，必须明确说明"基于 ArceOS 开发"。
+
+由于你是最后执行的阶段，你需要宏观总结整个项目代码与结构。
+请按顺序完成（仓库已克隆到 repo_path，直接使用即可）：
+1) **查阅已有进度**：使用 `list_directory` 查阅已经生成的其他章节分析文件，了解整体完成情况。
+2) analyze_tech_stack(repo_path)：总结语言/构建/依赖。**必须明确提取编程语言（版本、是否no_std）、基础框架来源（rCore/ArceOS等）、内核类型（宏内核/微内核/混合等）。**
+3) list_repo_structure(repo_path, max_depth=5)：总结关键目录。
+4) **寻找架构支持**：代码验证并明确列出该项目支持的所有架构（x86_64, aarch64, riscv64, loongarch64 等）。
+5) **寻找入口**：搜索并确定真正的 OS 内核入口函数。
+
+输出格式要求：
+- ## 结论摘要（3-5 条，明确项目与框架关系及内核类型）
+- ## 技术栈与构建（含编程语言版本、所有支持的架构完整列表）
+- ## 目录结构导读（列出系统关键目录与源码入口）
+- ## 总结评价（完成度评估）
+  - 结合全局架构与之前各关键模块的情况，用200-300字概括：项目定位与目标、技术栈概览、实现完成度评估（系统主要功能模块是否闭环）。**注意：只做客观的定性评价，绝不要打分（如不要出现x/10这样的评分）。**
+
+**重要**：完成所有工具调用后，你必须输出一个完整的 Markdown 格式分析报告。
+""",
     },
 ]
 
@@ -969,8 +956,15 @@ def main():
         
         # 只有非skip阶段才计入章节号
         if not skip_in_report:
-            chapter_counter += 1
-            section_name = f"{chapter_counter:02d}_{_slug(title)}.md"
+            # 优先从 stage_id 提取章节号 (例如 "02_boot_arch" -> "02")
+            chapter_prefix = stage_id.split('_')[0]
+            if not chapter_prefix.isdigit():
+                chapter_counter += 1
+                chapter_prefix = f"{chapter_counter:02d}"
+            else:
+                chapter_counter = int(chapter_prefix)
+                
+            section_name = f"{chapter_prefix}_{_slug(title)}.md"
         else:
             # skip阶段使用idx作为前缀（避免冲突，但不会保存）
             section_name = f"00_{_slug(title)}.md"
@@ -1005,7 +999,7 @@ def main():
             sections_texts = []
             
             # 限制每个 section 的最大字符数，避免 "lost in the middle" 问题
-            MAX_CHARS_PER_SECTION = 15000  # 每个 section 最多 15000 字符
+            MAX_CHARS_PER_SECTION = 17000  # 每个 section 最多 17000 字符
             total_chars = 0
             
             for sp in all_section_paths:
@@ -1033,14 +1027,8 @@ def main():
                 previous_sections_content += "\n\n" + "=" * 60 + "\n[以上是前面阶段的分析内容，请基于这些内容整合生成最终报告]\n" + "=" * 60 + "\n"
                 print(f"  ✅ 已加载 {len(sections_texts)} 个 section，共 {total_chars} 字符（每个最多 {MAX_CHARS_PER_SECTION} 字符）")
         
-        # 计算章节号（跳过 repo_prep 阶段）
-        # 章节号从 1 开始，用于非跳过阶段
-        chapter_stages = [s for s in STAGES if not s.get("skip_in_report", False)]
-        chapter_num = None
-        for i, cs in enumerate(chapter_stages, 1):
-            if cs["id"] == stage_id:
-                chapter_num = i
-                break
+        # 从已解析的 chapter_counter 直接获取章节号
+        chapter_num = chapter_counter if not skip_in_report else None
         
         # 构建任务 prompt
         if chapter_num and not stage.get("needs_previous_sections", False):
@@ -1275,62 +1263,35 @@ def main():
     # 合并总报告 - 生成专业的、类似人类撰写的技术文档
     final_report_path = os.path.join(repo_output_dir, f"OS技术分析报告_{repo_name}.md")
     try:
-        # 查找第15阶段的内容（执行摘要和总结评价）
+        final_stage_path = None
         executive_summary = ""
         project_evaluation = ""
-        final_stage_path = None
-        
-        for p in all_section_paths:
-            if "15_" in os.path.basename(p) or "执行摘要" in os.path.basename(p):
-                final_stage_path = p
-                with open(p, "r", encoding="utf-8", errors="ignore") as f:
-                    final_content = f.read()
-                    # 提取执行摘要和总结评价部分（使用正则表达式支持多种格式）
-                    if "执行摘要" in final_content and "项目总结与评价" in final_content:
-                        # 按"项目总结与评价"分割，支持一级标题(#)或二级标题(##)
-                        parts = re.split(r'##?\s*项目总结与评价', final_content, maxsplit=1)
-                        if len(parts) >= 2:
-                            # 移除顶部的"执行摘要与总结评价"标题（支持 # 或 ##）
-                            executive_summary = re.sub(r'##?\s*执行摘要与总结评价', '', parts[0]).strip()
-                            # 保留"## 项目总结与评价"标题
-                            project_evaluation = "## 项目总结与评价" + parts[1]
-                        else:
-                            # 如果分割失败，整个内容作为执行摘要
-                            executive_summary = final_content
-                    elif "执行摘要" in final_content:
-                        # 只有执行摘要，没有项目总结与评价
-                        executive_summary = re.sub(r'##?\s*执行摘要与总结评价', '', final_content).strip()
-                    else:
-                        # 都没有，整个内容作为执行摘要
-                        executive_summary = final_content
-                break
+
         
         # 其他章节（排除第15阶段）
-        content_sections = [p for p in all_section_paths if p != final_stage_path]
+        content_sections = sorted([p for p in all_section_paths if p != final_stage_path])
         
         with open(final_report_path, "w", encoding="utf-8") as out:
             # 标题和元数据
             out.write(f"# {repo_name} 操作系统技术分析报告\n\n")
-            out.write(f"> **仓库地址**: {repo_url}\n")
-            out.write(f"> **分析日期**: {datetime.now().strftime('%Y年%m月%d日')}\n")
-            out.write(f"> **分析工具**: OS-Agent-D\n\n")
-            out.write("---\n\n")
             
-            # 添加仓库目录文件结构
-            out.write("## 仓库目录文件结构\n\n")
-            out.write("```bash\n")
-            try:
-                # 尝试从 tools.describe_ops 导入 list_repo_structure 并获取详尽的目录结构
-                from tools.describe_ops import list_repo_structure
-                repo_local_path = os.path.normpath(os.path.join("./repos", repo_name))
-                if os.path.exists(repo_local_path):
-                    tree_str = list_repo_structure.invoke({"repo_path": repo_local_path, "max_depth": 10})
-                    out.write(tree_str + "\n")
-                else:
-                    out.write("仓库路径不存在或获取目录结构失败。\n")
-            except Exception as e:
-                out.write(f"获取目录结构失败: {e}\n")
-            out.write("```\n\n")
+            # 加载作者信息
+            author_info = get_author_info(repo_url)
+            if author_info:
+                if author_info.get("year"):
+                    out.write(f"> **年份**: {author_info['year']}\n\n")
+                if author_info.get("competition"):
+                    out.write(f"> **赛事**: {author_info['competition']}\n\n")
+                if author_info.get("sub_competition"):
+                    out.write(f"> **子赛事**: {author_info['sub_competition']}\n\n")
+                if author_info.get("school"):
+                    out.write(f"> **学校**: {author_info['school']}\n\n")
+                if author_info.get("team"):
+                    out.write(f"> **队伍名称**: {author_info['team']}\n\n")
+
+            out.write(f"> **仓库地址**: {repo_url}\n\n")
+            out.write(f"> **分析日期**: {datetime.now().strftime('%Y年%m月%d日')}\n\n")
+            out.write(f"> **分析工具**: OS-Agent-D\n\n")
             out.write("---\n\n")
             
             # 执行摘要

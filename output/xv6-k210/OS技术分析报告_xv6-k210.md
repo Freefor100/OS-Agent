@@ -1,786 +1,20 @@
 # xv6-k210 操作系统技术分析报告
 
+> **年份**: 2021
+
+> **赛事**: 操作系统赛
+
+> **子赛事**: 内核实现赛道
+
+> **学校**: 华中科技大学
+
+> **队伍名称**: 3Los
+
 > **仓库地址**: https://gitlab.eduxiji.net/retrhelo/xv6-k210
-> **分析日期**: 2026年03月14日
+
+> **分析日期**: 2026年03月19日
+
 > **分析工具**: OS-Agent-D
-
----
-
-## 仓库目录文件结构
-
-```bash
-xv6-k210/
-├── bootloader/
-│   └── SBI/
-│       ├── rustsbi-k210/
-│       │   ├── .cargo/
-│       │   │   └── config.toml (7L, 143B)
-│       │   ├── src/
-│       │   │   ├── console.rs (1L, 32B)
-│       │   │   ├── main.back.rs (556L, 18.9KB)
-│       │   │   ├── main.rs (583L, 19.8KB)
-│       │   │   └── serial.rs (106L, 2.3KB)
-│       │   ├── Cargo.toml (18L, 572B)
-│       │   ├── README.md (4L, 277B)
-│       │   ├── build.rs (19L, 615B)
-│       │   ├── justfile (500B)
-│       │   ├── kendryte-k210.dtsi (3.5KB)
-│       │   ├── link-k210.ld (2.3KB)
-│       │   └── rust-toolchain (18B)
-│       ├── rustsbi-qemu/
-│       │   ├── .cargo/
-│       │   │   └── config.toml (7L, 143B)
-│       │   ├── src/
-│       │   │   ├── hal/
-│       │   │   │   ├── clint.rs (66L, 1.8KB)
-│       │   │   │   └── ns16550a.rs (93L, 2.9KB)
-│       │   │   ├── hal.rs (40L, 1.2KB)
-│       │   │   └── main.rs (486L, 14.5KB)
-│       │   ├── Cargo.lock (5.4KB)
-│       │   ├── Cargo.toml (18L, 572B)
-│       │   ├── README.md (4L, 259B)
-│       │   ├── build.rs (18L, 535B)
-│       │   ├── justfile (676B)
-│       │   ├── link-qemu.ld (2.3KB)
-│       │   └── rust-toolchain (18B)
-│       ├── sbi-k210 (1.8MB)
-│       └── sbi-qemu (1.8MB)
-├── debug/
-│   ├── kendryte_openocd/
-│   │   └── openocd (12.5MB)
-│   ├── openocd_cfg/
-│   │   ├── ft2232c.cfg (176B)
-│   │   ├── k210.cfg (362B)
-│   │   └── openocd_ftdi.cfg (791B)
-│   └── .gdbinit.tmpl-riscv (135B)
-├── doc/
-│   ├── img/
-│   │   ├── backtrace.png (74.4KB)
-│   │   ├── boot.jpg (42.7KB)
-│   │   ├── diskio.png (40.5KB)
-│   │   ├── mem_map.jpg (83.0KB)
-│   │   ├── proc.jpg (34.8KB)
-│   │   ├── ptview.png (39.8KB)
-│   │   ├── run-k210.png (222.2KB)
-│   │   ├── s_extern_interrupt.png (3.3MB)
-│   │   ├── sd_spi_cmd13_response.png (96.1KB)
-│   │   ├── sd_spi_cmd_format.png (45.1KB)
-│   │   ├── sd_spi_init.png (220.0KB)
-│   │   ├── sd_spi_ocr.png (150.5KB)
-│   │   ├── sd_spi_read_single_block.png (46.8KB)
-│   │   ├── sd_spi_write_single_block.png (57.7KB)
-│   │   ├── sdcard.png (3.1MB)
-│   │   ├── strace.png (29.3KB)
-│   │   ├── syscall_test.png (32.8KB)
-│   │   ├── timer_interrupt.png (230.6KB)
-│   │   ├── vamap.png (18.3KB)
-│   │   ├── xv6-k210_on_k210.gif (3.6MB)
-│   │   ├── xv6-k210_on_qemu.gif (4.8MB)
-│   │   ├── xv6-k210_run.gif (3.1MB)
-│   │   └── xv6_k210_run_proc.png (382.4KB)
-│   ├── report_2020_12_26.md (285L, 10.5KB)
-│   ├── rustsbi.md (61L, 3.4KB)
-│   ├── xv6-k210-report-车春池.md (282L, 9.3KB)
-│   ├── 内核原理-内存管理.md (70L, 12.5KB)
-│   ├── 内核原理-系统调用.md (55L, 4.1KB)
-│   ├── 内核原理-进程管理.md (8L, 831B)
-│   ├── 内核设计-IO策略.md (143L, 10.7KB)
-│   ├── 内核设计-内存分配器.md (60L, 5.9KB)
-│   ├── 内核设计-内存映射.md (111L, 14.8KB)
-│   ├── 内核设计-文件系统v2.md (321L, 21.3KB)
-│   ├── 内核设计-页表映射.md (246L, 15.7KB)
-│   ├── 总言.md (129L, 7.5KB)
-│   ├── 构建调试-SD卡驱动.md (48L, 4.0KB)
-│   ├── 构建调试-SD卡驱动v2.md (60L, 7.9KB)
-│   ├── 构建调试-外部中断.md (116L, 6.6KB)
-│   ├── 构建调试-外部中断v2.md (208L, 14.6KB)
-│   ├── 构建调试-应用支持.md (71L, 6.5KB)
-│   ├── 构建调试-开机启动.md (169L, 5.9KB)
-│   ├── 构建调试-文件系统.md (23L, 1.9KB)
-│   ├── 构建调试-时钟中断.md (276L, 10.1KB)
-│   ├── 构建调试-浮点操作.md (90L, 6.4KB)
-│   ├── 构建调试-系统调用.md (169L, 8.1KB)
-│   ├── 构建调试-系统调用v2.md (68L, 5.0KB)
-│   ├── 构建调试-调试指南.md (78L, 4.1KB)
-│   ├── 构建调试-进程管理.md (69L, 12.5KB)
-│   ├── 用户使用-内存管理.md (52L, 12.4KB)
-│   ├── 用户使用-文件系统.md (34L, 1.6KB)
-│   └── 用户使用-系统调用.md (95L, 3.2KB)
-├── include/
-│   ├── fs/
-│   │   ├── buf.h (45L, 1.1KB)
-│   │   ├── fcntl.h (21L, 392B)
-│   │   ├── file.h (67L, 1.7KB)
-│   │   ├── fs.h (187L, 5.2KB)
-│   │   ├── pipe.h (38L, 1.1KB)
-│   │   ├── poll.h (89L, 2.0KB)
-│   │   └── stat.h (90L, 2.1KB)
-│   ├── hal/
-│   │   ├── disk.h (14L, 299B)
-│   │   ├── dmac.example.h (1539L, 45.7KB)
-│   │   ├── dmac.h (1541L, 45.8KB)
-│   │   ├── fpioa.h (1036L, 51.7KB)
-│   │   ├── gpiohs.h (278L, 7.7KB)
-│   │   ├── plic.back.h (500L, 21.9KB)
-│   │   ├── plic.h (101L, 5.8KB)
-│   │   ├── riscv.h (457L, 9.0KB)
-│   │   ├── sdcard.h (20L, 429B)
-│   │   ├── spi.h (504L, 18.5KB)
-│   │   ├── sysctl.h (1077L, 28.6KB)
-│   │   └── virtio.h (110L, 3.8KB)
-│   ├── mm/
-│   │   ├── kmalloc.h (32L, 506B)
-│   │   ├── mmap.h (68L, 1.7KB)
-│   │   ├── pm.h (39L, 775B)
-│   │   ├── usrmm.h (115L, 3.5KB)
-│   │   └── vm.h (83L, 3.2KB)
-│   ├── sched/
-│   │   ├── proc.h (185L, 4.8KB)
-│   │   └── signal.h (92L, 1.9KB)
-│   ├── sync/
-│   │   ├── sleeplock.h (25L, 649B)
-│   │   ├── spinlock.h (30L, 638B)
-│   │   └── waitqueue.h (75L, 1.8KB)
-│   ├── utils/
-│   │   ├── debug.h (58L, 1.5KB)
-│   │   ├── dlist.h (63L, 1.4KB)
-│   │   ├── list.h (43L, 1.2KB)
-│   │   ├── rbtree.h (170L, 5.2KB)
-│   │   ├── string.h (18L, 666B)
-│   │   └── utils.h (341L, 11.7KB)
-│   ├── console.h (8L, 128B)
-│   ├── elf.h (96L, 2.8KB)
-│   ├── errno.h (107L, 4.8KB)
-│   ├── intr.h (10L, 116B)
-│   ├── memlayout.h (132L, 4.6KB)
-│   ├── param.h (35L, 1.3KB)
-│   ├── printf.h (23L, 408B)
-│   ├── resource.h (30L, 543B)
-│   ├── sbi.h (128L, 3.4KB)
-│   ├── sprintf.h (6L, 116B)
-│   ├── syscall.h (14L, 307B)
-│   ├── sysinfo.h (28L, 1005B)
-│   ├── sysnum.h (79L, 1.9KB)
-│   ├── time.h (49L, 1016B)
-│   ├── timer.h (14L, 224B)
-│   ├── trap.h (103L, 2.9KB)
-│   ├── types.h (46L, 1.3KB)
-│   └── uname.h (26L, 644B)
-├── kernel/
-│   ├── fs/
-│   │   ├── fat32/
-│   │   │   ├── cluster.c (319L, 8.8KB)
-│   │   │   ├── dirent.c (490L, 14.2KB)
-│   │   │   ├── fat.c (394L, 11.8KB)
-│   │   │   ├── fat32.c (589L, 15.7KB)
-│   │   │   └── fat32.h (175L, 5.3KB)
-│   │   ├── bio.c (300L, 7.5KB)
-│   │   ├── blkdev.c (265L, 5.9KB)
-│   │   ├── file.c (584L, 12.0KB)
-│   │   ├── fs.c (660L, 14.6KB)
-│   │   ├── mount.c (222L, 5.6KB)
-│   │   ├── pipe.c (476L, 10.7KB)
-│   │   ├── poll.c (243L, 5.6KB)
-│   │   └── rootfs.c (313L, 8.1KB)
-│   ├── hal/
-│   │   ├── disk.c (173L, 3.3KB)
-│   │   ├── dmac.c (425L, 11.9KB)
-│   │   ├── fpioa.c (4947L, 83.7KB)
-│   │   ├── gpiohs.c (204L, 5.7KB)
-│   │   ├── plic.c (90L, 2.5KB)
-│   │   ├── sdcard.c (1076L, 25.2KB)
-│   │   ├── spi.c (726L, 19.8KB)
-│   │   ├── sysctl.c (328L, 7.6KB)
-│   │   └── virtio_disk.c (505L, 13.2KB)
-│   ├── mm/
-│   │   ├── kmalloc.c (338L, 9.3KB)
-│   │   ├── mmap.c (1159L, 26.8KB)
-│   │   ├── pm.c (296L, 6.0KB)
-│   │   ├── usrmm.c (233L, 5.9KB)
-│   │   └── vm.c (1105L, 27.8KB)
-│   ├── sched/
-│   │   ├── proc.c (1086L, 30.4KB)
-│   │   ├── signal.c (283L, 6.7KB)
-│   │   └── swtch.S (41L, 679B)
-│   ├── sync/
-│   │   ├── sleeplock.c (66L, 1.0KB)
-│   │   └── spinlock.c (84L, 2.1KB)
-│   ├── syscall/
-│   │   ├── syscall.c (403L, 10.2KB)
-│   │   ├── sysfile.c (1028L, 20.0KB)
-│   │   ├── sysmem.c (150L, 2.6KB)
-│   │   ├── sysproc.c (316L, 5.8KB)
-│   │   ├── syssignal.c (142L, 3.0KB)
-│   │   ├── systime.c (145L, 2.9KB)
-│   │   └── sysuname.c (18L, 263B)
-│   ├── trap/
-│   │   ├── fcntxt (300B)
-│   │   ├── fcntxt.S (95L, 1.6KB)
-│   │   ├── kernelvec.S (86L, 1.5KB)
-│   │   ├── sig_trampoline.S (25L, 514B)
-│   │   ├── trampoline.S (147L, 3.0KB)
-│   │   └── trap.c (413L, 12.5KB)
-│   ├── utils/
-│   │   ├── list.c (58L, 1.1KB)
-│   │   ├── rbtree.c (461L, 10.3KB)
-│   │   ├── string.c (171L, 2.5KB)
-│   │   └── utils.c (28L, 673B)
-│   ├── console.c (331L, 7.0KB)
-│   ├── entry.S (21L, 306B)
-│   ├── entry_k210.S (22L, 331B)
-│   ├── entry_qemu.S (19L, 275B)
-│   ├── exec.c (316L, 8.7KB)
-│   ├── intr.c (41L, 940B)
-│   ├── logo.c (31L, 1.8KB)
-│   ├── main.c (98L, 2.4KB)
-│   ├── printf.c (152L, 2.4KB)
-│   ├── sprintf.c (170L, 3.1KB)
-│   ├── timer.c (66L, 1.5KB)
-│   ├── uname.c (68L, 1.7KB)
-│   └── xv6-riscv-license (1.2KB)
-├── linker/
-│   ├── k210.ld (1003B)
-│   ├── linker64.ld (1.3KB)
-│   ├── qemu.ld (1003B)
-│   └── user.ld (432B)
-├── sbi/
-│   ├── psicasbi/
-│   ├── sbi-k210 (1.7MB)
-│   └── sbi-qemu (1.6MB)
-├── tools/
-│   ├── flash-list.json (233B)
-│   └── kflash.py (1452L, 179.4KB)
-├── xv6-user/
-│   ├── cat.c (43L, 643B)
-│   ├── cowtest.c (199L, 3.6KB)
-│   ├── crt.c (16L, 326B)
-│   ├── dup3.c (37L, 961B)
-│   ├── echo.c (19L, 299B)
-│   ├── find.c (69L, 1.6KB)
-│   ├── forktest.c (56L, 792B)
-│   ├── grep.c (105L, 2.0KB)
-│   ├── grind.c (362L, 8.1KB)
-│   ├── info.c (18L, 464B)
-│   ├── init.c (53L, 1.1KB)
-│   ├── initcode.S (28L, 450B)
-│   ├── kill.c (17L, 264B)
-│   ├── lazytests.c (153L, 2.9KB)
-│   ├── ls.c (97L, 1.8KB)
-│   ├── mkdir.c (23L, 357B)
-│   ├── mmaptests.c (563L, 14.1KB)
-│   ├── mount.c (15L, 323B)
-│   ├── mv.c (50L, 1.4KB)
-│   ├── ostest.c (70L, 1.1KB)
-│   ├── ostest2 (592B)
-│   ├── ostest2.c (40L, 501B)
-│   ├── ostest2.out (6.6KB)
-│   ├── ostest_asm.S (37L, 369B)
-│   ├── printf.c (146L, 2.5KB)
-│   ├── rm.c (23L, 361B)
-│   ├── rmdir.c (20L, 300B)
-│   ├── sh.c (661L, 12.0KB)
-│   ├── shrc (30B)
-│   ├── signal_test.c (34L, 566B)
-│   ├── sleep.c (19L, 391B)
-│   ├── strace.c (68L, 1.3KB)
-│   ├── stressfs.c (48L, 1.0KB)
-│   ├── sync.c (7L, 65B)
-│   ├── test.c (28L, 579B)
-│   ├── ulib.c (152L, 2.0KB)
-│   ├── umalloc.c (90L, 1.7KB)
-│   ├── umount.c (15L, 278B)
-│   ├── user.h (111L, 3.4KB)
-│   ├── usertests.c (2765L, 58.5KB)
-│   ├── usys.pl (971B)
-│   ├── wc.c (55L, 914B)
-│   ├── xargs.c (62L, 1.5KB)
-│   ├── xargstest.sh (99B)
-│   └── xv6-riscv-license (1.2KB)
-├── .gitignore (149B)
-├── .gitmodules (91B)
-├── LICENSE (1.1KB)
-├── Makefile (7.0KB)
-├── README (2.1KB)
-├── README.md (123L, 4.1KB)
-└── README_cn.md (121L, 4.4KB)
-
-根目录文档: README, README.md, README_cn.md
-
-📊 统计: 36 个目录, 257 个文件 (深度限制: 10 层)
-```
-
----
-
-# 第 14 章：执行摘要与总结评价
-
-## 1. 执行摘要（Executive Summary）
-
-**项目定位**：xv6-k210 是基于 MIT xv6-riscv 操作系统移植到 **Kendryte K210 RISC-V 开发板** 的教学/实验型操作系统，由 HUST-OS 团队开发。项目采用**宏内核（Monolithic Kernel）架构**，所有核心模块（进程管理、内存管理、文件系统、设备驱动）均运行在 RISC-V S-Mode（监督态），通过函数调用直接交互。
-
-**技术栈概览**：
-| 维度 | 技术选型 |
-|------|---------|
-| **编程语言** | C（内核主体 87 个文件）、Rust（SBI 固件 10 个文件）、RISC-V 汇编（启动/上下文切换） |
-| **目标架构** | `riscv64gc-unknown-none-elf`（RV64IMAFDC，支持浮点/原子/压缩指令） |
-| **支持平台** | K210 硬件（SD 卡 + UARTHS）、QEMU 仿真（VirtIO-Blk + NS16550A） |
-| **构建系统** | GNU Make + Cargo（混合构建） |
-| **分页方案** | RISC-V Sv39（39 位虚拟地址，三级页表） |
-
-**实现完成度评估**：
-- **✅ 闭环模块**：物理内存管理、虚拟内存（含 COW/Lazy）、进程调度、信号机制、VFS+FAT32 文件系统、管道 IPC、80+ POSIX 系统调用、中断/异常处理、设备驱动（UART/SD 卡/VirtIO）
-- **🔸 部分实现**：多核支持（IPI 机制可用但无负载均衡）、权限模型（UID/GID 定义但所有进程视为 root）
-- **❌ 缺失模块**：网络协议栈（无 TCP/IP、无 socket 系统调用）、System V IPC（无消息队列/信号量/共享内存）、Futex、安全机制（无 seccomp/KPTI/栈保护）
-
-**总体评价**：xv6-k210 是一个功能相对完整的 RISC-V 教学操作系统，核心子系统（内存/进程/文件系统）均有扎实实现，支持在真实硬件（K210）和仿真器（QEMU）上运行。但作为教学项目，其网络、安全、多用户等生产级功能尚未实现。
-
----
-
-## 2. 核心架构与机制提炼
-
-### 2.1 内存管理架构
-
-#### 物理内存分配器（`kernel/mm/pm.c`）
-
-采用**双向链表空闲列表（Free List）** 算法，而非 Buddy/Slab。核心设计为**双分配器策略**：
-
-```c
-// kernel/mm/pm.c:13-19
-struct pm_allocator {
-    struct spinlock lock;
-    struct run *freelist;  // 空闲链表头
-    uint64 npage;          // 总页数
-};
-
-struct run {
-    struct run *next;
-    uint64 npage;  // 连续页数
-};
-```
-
-- **`single` 分配器**：管理单页分配（400 页，位于 `PHYSTOP - 400*PGSIZE` 到 `PHYSTOP`）
-- **`multiple` 分配器**：管理多页连续分配（剩余内存）
-- **分配策略**：优先从 `single` 分配，耗尽时从 `multiple` 借用
-
-**页面引用计数**（用于 COW）：
-```c
-// kernel/mm/vm.c:154-163
-static uint8 page_ref_table[MAX_PAGES_NUM];  // 物理页引用计数表
-
-void pagereg(uint64 pa, uint8 init) {
-    page_ref_table[__hash_page_idx(pa)] = init ? 1 : 
-        page_ref_table[__hash_page_idx(pa)] + 1;
-}
-```
-
-#### 虚拟内存与页表机制（`kernel/mm/vm.c`）
-
-使用 RISC-V **Sv39 三级页表**，页表项格式：
-
-```c
-// include/hal/riscv.h:411-420
-#define PTE_V (1L << 0)  // valid
-#define PTE_R (1L << 1)  // readable
-#define PTE_W (1L << 2)  // writable
-#define PTE_X (1L << 3)  // executable
-#define PTE_U (1L << 4)  // user accessible
-#define PTE_COW PTE_RSW1 // copy-on-write 标记 (bit 8)
-```
-
-**页表遍历**（`walk` 函数，`kernel/mm/vm.c:211-233`）：
-```c
-pte_t *walk(pagetable_t pagetable, uint64 va, int alloc) {
-    for(int level = 2; level > 0; level--) {
-        pte_t *pte = &pagetable[PX(level, va)];
-        if(*pte & PTE_V) {
-            pagetable = (pagetable_t)PTE2PA(*pte);  // 进入下一级
-        } else {
-            if(!alloc || (pagetable = (pde_t*)allocpage()) == NULL)
-                return NULL;
-            memset(pagetable, 0, PGSIZE);
-            *pte = PA2PTE(pagetable) | PTE_V;
-        }
-    }
-    return &pagetable[PX(0, va)];  // 返回叶级 PTE
-}
-```
-
-**地址空间隔离**：
-- **内核空间**：直接映射（虚拟地址 = 物理地址 + `VIRT_OFFSET`）
-- **用户空间**：段式管理（`struct seg` 链表：LOAD/HEAP/MMAP/STACK）
-- **隔离机制**：通过 `SSTATUS_PUM` 位控制内核访问用户页权限
-
-#### 高级内存特性
-
-| 特性 | 实现位置 | 触发机制 |
-|------|---------|---------|
-| **COW（写时复制）** | `kernel/mm/vm.c:975-997` | fork 时标记 `PTE_COW`，缺页时复制 |
-| **Lazy Allocation** | `kernel/mm/vm.c:1002-1016` | HEAP/STACK 段缺页时动态分配 |
-| **ELF 懒加载** | `kernel/mm/vm.c:1018-1037` | LOAD 段缺页时从磁盘加载 |
-| **mmap** | `kernel/mm/mmap.c` | 支持匿名/文件映射，MAP_FIXED/MAP_SHARED |
-
-### 2.2 进程调度模型
-
-#### 进程控制块（`include/sched/proc.h`）
-
-```c
-// include/sched/proc.h:51-148
-struct proc {
-    int pid;                          // 进程 ID
-    enum procstate state;             // RUNNABLE/RUNNING/SLEEPING/ZOMBIE
-    struct context context;           // 内核上下文 (14 个寄存器)
-    struct trapframe *trapframe;      // 陷阱帧 (544 字节)
-    pagetable_t pagetable;            // 用户页表
-    struct seg *segment;              // 内存段链表
-    struct fdtable fds;               // 文件描述符表
-    struct proc *parent;              // 父进程
-    struct proc *child;               // 子进程链表
-    ksigaction_t *sig_act;            // 信号处理动作
-    __sigset_t sig_pending;           // 待处理信号集
-    int killed;                       // 当前待处理信号编号
-    // ...
-};
-```
-
-**进程与线程统一抽象**：未区分 PCB/TCB，线程通过 `clone()` 共享地址空间实现。
-
-#### 调度算法（`kernel/sched/proc.c`）
-
-实现**基于优先级的时间片轮转调度**，支持 3 个优先级队列：
-
-```c
-// kernel/sched/proc.c:241-246
-#define PRIORITY_TIMEOUT    0   // 超时队列 (最低优先级)
-#define PRIORITY_IRQ        1   // 中断/信号唤醒队列 (高优先级)
-#define PRIORITY_NORMAL     2   // 普通进程队列 (默认优先级)
-
-struct proc *proc_runnable[PRIORITY_NUMBER];  // 3 个优先级队列
-```
-
-**调度器核心逻辑**：
-```c
-// kernel/sched/proc.c:671-711
-void scheduler(void) {
-    while (1) {
-        tmp = __get_runnable_no_lock();  // 按优先级扫描队列
-        if (NULL != tmp) {
-            tmp->state = RUNNING;
-            swtch(&c->context, &tmp->context);  // 上下文切换
-        }
-    }
-}
-```
-
-**时间片机制**：
-- 默认时间片：`TIMER_NORMAL = 10` ticks
-- 时间片耗尽后降级到 `PRIORITY_TIMEOUT` 队列
-- 被信号/中断唤醒的进程插入 `PRIORITY_IRQ` 队列
-
-#### 上下文切换（`kernel/sched/swtch.S`）
-
-保存/恢复 14 个 callee-saved 寄存器（112 字节）：
-```asm
-# kernel/sched/swtch.S
-swtch:
-    sd ra, 0(a0)    # 保存到 old context
-    sd sp, 8(a0)
-    sd s0-s11, 16(a0)
-    
-    ld ra, 0(a1)    # 从 new context 恢复
-    ld sp, 8(a1)
-    ld s0-s11, 16(a1)
-    ret
-```
-
-### 2.3 虚拟文件系统（VFS）架构
-
-#### 核心数据结构（`include/fs/fs.h`）
-
-```c
-// include/fs/fs.h:73-132
-struct superblock {
-    char type[16];              // 文件系统类型 ("FAT32")
-    struct inode *dev;          // 块设备 inode
-    struct dentry *root;        // 根目录项
-    struct fs_op op;            // 文件系统操作集
-};
-
-struct inode {
-    uint64 inum;                // inode 号
-    uint16 mode;                // 文件类型 + 权限
-    struct superblock *sb;      // 所属超级块
-    struct inode_op *op;        // inode 操作集 (create/lookup/truncate)
-    struct file_op *fop;        // 文件操作集 (read/write/readdir)
-};
-
-struct dentry {
-    char filename[MAXNAME + 1];
-    struct inode *inode;
-    struct dentry *parent;
-    struct dentry *mount;       // 挂载点重定向
-};
-```
-
-#### FAT32 实现（`kernel/fs/fat32/`）
-
-| 文件 | 行数 | 功能 |
-|------|------|------|
-| `fat32.c` | 589L | 初始化、inode 分配、文件读写 |
-| `dirent.c` | 490L | 目录项创建/查找/删除、长文件名支持 |
-| `cluster.c` | 319L | 簇分配/释放、FAT 链管理 |
-| `fat.c` | 394L | FAT 表缓存、FAT 项读写 |
-
-**FAT32 操作集**：
-```c
-// kernel/fs/fat32/fat32.c:21-37
-struct inode_op fat32_inode_op = {
-    .create = fat_alloc_entry,
-    .lookup = fat_lookup_dir,
-    .truncate = fat_truncate_file,
-    .unlink = fat_remove_entry,
-};
-
-struct file_op fat32_file_op = {
-    .read = fat_read_file,
-    .write = fat_write_file,
-    .readdir = fat_read_dir,
-};
-```
-
-#### 管道 IPC（`kernel/fs/pipe.c`）
-
-使用**环形缓冲区 + 等待队列**实现：
-```c
-// include/fs/pipe.h:12-26
-struct pipe {
-    struct spinlock lock;
-    struct wait_queue rqueue;  // 读等待队列
-    struct wait_queue wqueue;  // 写等待队列
-    uint nread, nwrite;        // 环形索引
-    char *pdata;               // 动态扩展数据区
-    char data[PIPE_SIZE];      // 默认 512 字节
-};
-```
-
-**阻塞机制**：
-- 管道满时写者进入 `wqueue` 睡眠
-- 管道空时读者进入 `rqueue` 睡眠
-- 支持动态扩展至 16KB（`size_shift=5`）
-
-### 2.4 Trap 处理路径
-
-#### 用户态陷阱入口（`kernel/trap/trampoline.S`）
-
-```asm
-# kernel/trap/trampoline.S:20-60
-uservec:
-    csrrw a0, sscratch, a0     # 交换 a0 与 sscratch，a0 指向 trapframe
-    sd ra, 40(a0)              # 保存所有用户寄存器
-    # ... (保存 32 个通用寄存器 + 32 个浮点寄存器)
-    ld sp, 8(a0)               # 加载内核栈指针
-    ld t0, 16(a0)
-    jr t0                      # 跳转到 usertrap()
-```
-
-#### 陷阱分发（`kernel/trap/trap.c`）
-
-```c
-// kernel/trap/trap.c:75-145
-void usertrap(void) {
-    protect_usr_mem();  // 启用用户内存保护
-    
-    uint64 scause = r_scause();
-    if ((scause & 0x8000000000000000L) && (scause & 0xff) == 9) {
-        // 外部中断
-        handle_intr(scause);
-    } else if (scause == 0x8) {
-        // 系统调用 (ecall)
-        syscall();
-    } else {
-        // 异常
-        handle_excp(scause);
-    }
-    
-    if (p->killed) {
-        sighandle();  // 信号处理
-    }
-    usertrapret();  // 返回用户态
-}
-```
-
-#### 系统调用分发（`kernel/syscall/syscall.c`）
-
-采用**集中式分发表**：
-```c
-// kernel/syscall/syscall.c:180-293
-static uint64 (*syscalls[])(void) = {
-    [SYS_fork]    sys_fork,
-    [SYS_exit]    sys_exit,
-    [SYS_write]   sys_write,
-    [SYS_read]    sys_read,
-    // ... 共约 60 个系统调用
-};
-
-void syscall(void) {
-    uint64 num = p->trapframe->a7;
-    if (num < NELEM(syscalls) && syscalls[num]) {
-        p->trapframe->a0 = syscalls[num]();
-    } else {
-        p->trapframe->a0 = -1;  // 未实现
-    }
-}
-```
-
-#### 缺页异常处理链
-
-```mermaid
-graph TD
-    A["usertrap
- kernel/trap/trap.c:75"] --> B["handle_excp
- kernel/trap/trap.c:328"]
-    B --> C["handle_page_fault
- kernel/mm/vm.c:1039"]
-    C --> D{seg->type}
-    D -->|LOAD| E["handle_page_fault_loadelf
- kernel/mm/vm.c:1018"]
-    D -->|HEAP/STACK| F["handle_page_fault_lazy
- kernel/mm/vm.c:1002"]
-    D -->|MMAP| G["handle_page_fault_mmap
- kernel/mm/mmap.c:1126"]
-    E --> H["loadseg
- 从磁盘加载 ELF 段"]
-    F --> I["uvmalloc
- 懒分配物理页"]
-    G --> J["匿名/文件映射处理"]
-```
-
-### 2.5 信号机制
-
-**信号处理流程**：
-1. `kill(pid, sig)` 设置目标进程 `sig_pending` 位图
-2. 若目标进程睡眠，唤醒到 `PRIORITY_IRQ` 队列
-3. 返回用户态前检查 `p->killed`
-4. 通过 `sig_trampoline.S` 跳转到用户注册的处理函数
-5. 处理完成后通过 `SYS_rt_sigreturn` 恢复原始上下文
-
-**支持信号**：`SIGTERM`、`SIGKILL`、`SIGABRT`、`SIGHUP`、`SIGINT`、`SIGCHLD`、`SIGRTMIN`~`SIGRTMAX`（共 64 种，位图实现）
-
----
-
-## 3. 问题与缺陷揭露
-
-基于代码审查，以下核心功能模块**未完成或仅有桩实现**：
-
-### 3.1 网络子系统（❌ 完全缺失）
-
-| 组件 | 状态 | 说明 |
-|------|------|------|
-| **TCP/IP 协议栈** | ❌ 未实现 | 无 smoltcp、lwip 或其他协议栈代码 |
-| **Socket 系统调用** | ❌ 未实现 | `sys_socket`、`sys_bind`、`sys_connect` 等均未定义 |
-| **网络设备驱动** | ❌ 未实现 | 无 VirtIO-Net、无 K210 MAC 控制器驱动 |
-| **错误码定义** | 🔸 仅定义 | `include/errno.h` 中 `ENOTSOCK` 等仅为 POSIX 兼容预留 |
-
-**客观差距**：无法运行任何网络应用，缺少现代操作系统基本通信能力。
-
-### 3.2 进程间通信（❌ 大部分缺失）
-
-| IPC 机制 | 状态 | 说明 |
-|---------|------|------|
-| **管道 (Pipe)** | ✅ 已实现 | 完整实现环形缓冲区 + 等待队列 |
-| **消息队列** | ❌ 未实现 | 无 `sys_msgget`、`sys_msgsnd`、`sys_msgrcv` |
-| **信号量** | ❌ 未实现 | 无 `sys_semget`、`sys_semop`、`sys_semctl` |
-| **共享内存** | ❌ 未实现 | 无 `sys_shmget`、`sys_shmat`、`sys_shmdt` |
-| **Futex** | ❌ 未实现 | 无用户态快速互斥锁机制 |
-
-**客观差距**：仅支持管道一种 IPC 方式，进程间高效通信能力受限。
-
-### 3.3 多用户权限模型（🔸 桩实现）
-
-| 功能 | 状态 | 代码证据 |
-|------|------|---------|
-| **UID/GID 字段** | ✅ 已定义 | `struct kstat` 包含 uid/gid 字段 |
-| **进程 UID/GID** | ❌ 未实现 | `struct proc` 中无 uid/gid 字段 |
-| **`getuid()` 系统调用** | 🔸 桩函数 | `kernel/syscall/sysproc.c:267` 始终返回 0 |
-| **权限检查** | 🔸 简化实现 | `sys_faccessat` 注释 `// assume user as root`，仅检查 owner 权限位 |
-| **Capability/ACL** | ❌ 未实现 | 无相关代码 |
-
-**客观差距**：所有进程实质上以 root 权限运行，无多用户隔离能力。
-
-### 3.4 安全机制（❌ 大部分缺失）
-
-| 安全特性 | 状态 | 说明 |
-|---------|------|------|
-| **KPTI** | ❌ 未实现 | 无内核页表隔离机制 |
-| **SMEP/SMAP** | ❌ 未实现 | 仅基础 PUM/SUM 保护 |
-| **Seccomp** | ❌ 未实现 | 无系统调用过滤机制 |
-| **Stack Canary** | ❌ 未实现 | 无栈溢出保护 |
-| **ASLR** | ❌ 未实现 | 地址空间布局固定 |
-| **安全启动** | ❌ 未实现 | 无 ELF 签名验证 |
-| **审计日志** | ❌ 未实现 | 无 audit 子系统 |
-
-**客观差距**：仅依赖 RISC-V 硬件特权级实现基础用户/内核隔离，无高级安全防护。
-
-### 3.5 多核支持（🔸 部分实现）
-
-| 功能 | 状态 | 问题 |
-|------|------|------|
-| **Secondary CPU 启动** | 🔸 不完整 | Hart 1 可运行但无独立启动代码，IPI 发送代码有 bug |
-| **Per-CPU 变量** | ✅ 已实现 | 通过 `tp` 寄存器访问 `struct cpu` |
-| **多核调度** | ❌ 未实现 | 全局唯一运行队列，无负载均衡 |
-| **自旋锁** | ✅ 已实现 | 禁用中断防止死锁，但无优先级继承 |
-| **原子 PID 分配** | ❌ 未实现 | `__pid++` 非原子操作，多核并发时可能冲突 |
-| **IPI 处理** | 🔸 不完整 | 仅清除 pending 位，无业务逻辑 |
-
-**客观差距**：仅支持单核有效运行，多核并行能力有限。
-
-### 3.6 系统调用桩函数列表
-
-以下系统调用在分发表中注册但**无实际业务逻辑**：
-
-| 系统调用 | 文件位置 | 桩特征 |
-|---------|---------|--------|
-| `sys_getuid` | `kernel/syscall/sysproc.c:267` | 始终返回 0 |
-| `sys_geteuid` | 同上 | 复用 `sys_getuid` |
-| `sys_getgid` | 同上 | 复用 `sys_getuid` |
-| `sys_getegid` | 同上 | 复用 `sys_getuid` |
-| `sys_prlimit64` | `kernel/syscall/sysproc.c:273` | 返回 0，注释 "not very necessary" |
-| `sys_adjtimex` | 未找到实现 | 分发表中注册但无定义 |
-| `sys_readv`/`sys_writev` | 未找到实现 | 分发表中注册但无定义 |
-
-### 3.7 文件系统限制
-
-| 功能 | 状态 | 说明 |
-|------|------|------|
-| **FAT32** | ✅ 已实现 | 完整支持读写 |
-| **Ext2/Ext4** | ❌ 未实现 | 无相关代码 |
-| **RamFS/TmpFS** | 🔸 部分实现 | `rootfs.c` 中伪文件系统，读写返回 0 |
-| **VFS 抽象** | 🔸 简化实现 | 无统一 `VfsNode` 结构，扩展性受限 |
-| **写操作** | 🔸 部分禁用 | `disk_write()` 中 VirtIO/SD 卡写被注释 |
-
-### 3.8 内存管理缺失特性
-
-| 特性 | 状态 | 说明 |
-|------|------|------|
-| **Swap/页面置换** | ❌ 未实现 | 无交换区支持（受限于 K210 仅 8MB RAM） |
-| **反向映射表 (rmap)** | ❌ 未实现 | 无 `rmap`/`page_to_vma` 实现 |
-| **大页 (Huge Page)** | ❌ 未实现 | 仅支持 4KB 页，无 2M/1G 页面 |
-| **零拷贝 (sendfile)** | ❌ 未实现 | 无相关系统调用 |
-
----
-
-## 本章总结
-
-| 评估维度 | 完成度 | 关键缺失 |
-|---------|-------|---------|
-| **内存管理** | 90% | Swap、rmap、大页 |
-| **进程调度** | 85% | 多核负载均衡、CPU 亲和性 |
-| **文件系统** | 80% | 多文件系统支持、VFS 抽象完善 |
-| **IPC** | 30% | 仅管道，缺消息队列/信号量/共享内存 |
-| **网络** | 0% | 完全缺失 |
-| **安全机制** | 20% | 仅基础特权级隔离 |
-| **多核支持** | 40% | IPI 可用但 SMP 调度缺失 |
-| **系统调用** | 70% | 80+ 已实现，约 12 个为桩函数 |
-
-**总体定位**：xv6-k210 是一个**功能完整的教学操作系统**，核心子系统（内存/进程/文件系统）实现扎实，适合用于 RISC-V 架构和操作系统原理教学。但作为生产级 OS，其在网络、安全、多用户、多核并行等方面存在显著差距。
 
 ---
 
@@ -807,347 +41,243 @@ graph TD
 
 ## 结论摘要
 
-1. **项目身份**：xv6-k210 是基于 **MIT xv6-riscv** 操作系统移植到 **K210 RISC-V 开发板** 的教学/竞赛项目，由 HUST-OS 团队开发。项目保留了 xv6 的宏内核架构，但对各子系统进行了大量重写和增强。
+1. **项目定位**：xv6-k210 是一个**基于 RISC-V 架构的教学用操作系统**，将 MIT xv6-riscv 移植到 Kendryte K210 开发板，同时支持 QEMU 仿真环境。项目采用 **C 语言编写内核**，Bootloader 使用 RustSBI 固件。
 
-2. **内核类型**：**宏内核（Monolithic Kernel）**。所有核心模块（进程管理、内存管理、文件系统、设备驱动）均运行在内核态，通过函数调用直接交互。
+2. **内核架构**：采用**宏内核设计**，所有核心子系统（进程管理、内存管理、文件系统、设备驱动）均编译为单一内核镜像。通过 RISC-V S-Mode（Supervisor Mode）运行，利用 RustSBI 完成 M-Mode → S-Mode 特权级切换。
 
-3. **框架关系**：底层使用 **RustSBI/PsicaSBI**（用 Rust 重新实现的 SBI 固件）提供机器态（M-mode）支持，内核本身运行在监督态（S-mode）。**不是基于 ArceOS 或 rCore 开发**。
+3. **核心功能完成度**：
+   - ✅ **已完整实现**：进程调度（优先级时间片轮转）、虚拟内存（Sv39 页表 + CoW + Lazy Allocation）、FAT32 文件系统、信号机制、管道 IPC
+   - 🔸 **部分实现**：多核 SMP（有 IPI 框架但无完整负载均衡）、系统调用（约 60 个中 40 个完整实现）
+   - ❌ **未实现**：网络栈、System V IPC（消息队列/信号量/共享内存）、多用户权限模型
 
-4. **架构支持**：
-   - ✅ **riscv64**（RV64IMAFDC）：主要目标架构
-   - ✅ **K210 平台**： Kendryte K210 SoC（RISC-V 双核）
-   - ✅ **QEMU 仿真**：`qemu-system-riscv64` virt 机器
-   - ❌ **不支持** x86_64、ARM64、LoongArch 等其他架构
+4. **技术特色**：双平台抽象（K210 硬件 + QEMU 仿真）、物理内存双区管理（单页/多页分离）、mmap 惰性映射、信号跳板机制。
 
-5. **核心特性**（已验证代码实现）：
-   - ✅ 多核启动与调度（2 核）
-   - ✅ 分页内存管理（SV39 页表）
-   - ✅ COW（Copy-on-Write）fork 机制
-   - ✅ Lazy Allocation（懒分配）
-   - ✅ FAT32 文件系统（非原始 xv6 的 ext2）
-   - ✅ 虚拟文件系统（VFS）层
-   - ✅ POSIX 风格系统调用（80+ 个）
-   - ✅ 进程信号机制
+5. **项目状态**：开发周期 3 个月（2021.05-2021.08），200+ 次提交，代码规模约 8 万行。作为教学 OS 功能相对完整，但缺少网络、完整多核调度等生产级特性。
+
+---
 
 ## 技术栈与构建
 
-### 编程语言
+### 编程语言与版本
 
-| 语言 | 文件数 | 用途 |
-|------|--------|------|
-| **C** | 87 个 | 内核主体代码（`kernel/`） |
-| **C/C++** | 55 个 | 头文件（`include/`）与部分实现 |
-| **Rust** | 10 个 | SBI 固件（`bootloader/SBI/rustsbi-*`） |
-| **RISC-V 汇编** | 若干 | 启动代码、上下文切换（`.S` 文件） |
-| **Python** | 1 个 | K210 烧录工具（`tools/kflash.py`） |
+| 组件 | 语言 | 版本/工具链 | 说明 |
+|------|------|------------|------|
+| **内核主体** | C | GCC RISC-V 64 | `-march=rv64imafdc`，支持整数/乘除/原子/浮点/压缩指令 |
+| **Bootloader** | Rust | nightly-2020-08-01 | `riscv64gc-unknown-none-elf` 目标 |
+| **用户程序** | C | 同内核 | 标准 POSIX 接口 |
+| **构建系统** | Makefile + Cargo | GNU Make 4.x | 混合构建系统 |
 
-**内核语言**：纯 C（无 C++ 特性），**非 Rust 内核**。Rust 仅用于 SBI 层。
-
-### 构建工具链
-
+**关键编译标志**：
 ```makefile
-# Makefile 关键配置
-TOOLPREFIX := riscv64-unknown-elf-
-CC := $(TOOLPREFIX)gcc
-CFLAGS := -Wall -O2 -march=rv64imafdc -mcmodel=medany \
-          -ffreestanding -fno-common -nostdlib -mno-relax
+CFLAGS = -Wall -O2 -fno-omit-frame-pointer -ggdb -g -march=rv64imafdc
+CFLAGS += -mcmodel=medany -ffreestanding -fno-common -nostdlib -mno-relax
+CFLAGS += -Iinclude/ -D QEMU  # QEMU 平台时
 ```
 
-- **编译器**：RISC-V 64 位裸机工具链（`riscv64-unknown-elf-gcc`）
-- **构建系统**：GNU Make（`Makefile` 303 行）
-- **链接脚本**：`linker/linker64.ld`（内核）、`linker/user.ld`（用户程序）
-- **Rust 工具链**：`rust-toolchain` 指定（用于 SBI 编译）
+### 支持的架构与平台
 
-### 构建目标
+**✅ 已支持**：
+| 平台 | 目标三元组 | 加载地址 | 关键驱动 |
+|------|-----------|---------|---------|
+| **Kendryte K210** | `riscv64gc-unknown-none-elf` | `0x80020000` | SD 卡、UARTHS、GPIOHS、DMAC、SPI0 |
+| **QEMU virt** | `riscv64gc-unknown-none-elf` | `0x80200000` | VirtIO-Blk、NS16550A UART |
 
-```bash
-make build        # 编译内核 + 用户程序
-make run          # 在 K210 上运行（通过 UART 烧录）
-make run platform=qemu  # 在 QEMU 上运行
-make fs           # 生成 FAT32 磁盘镜像（fs.img）
+**❌ 不支持**：
+- x86_64、aarch64、loongarch64 等其他架构
+- StarFive VisionFive2、其他 RISC-V 开发板
+
+### 依赖与框架
+
+**内核依赖**：
+- **无外部库**：纯 C 实现，不依赖 glibc 或其他运行时库
+- **自包含头文件**：`include/` 目录提供所有系统接口定义
+
+**Bootloader 依赖**（`bootloader/SBI/rustsbi-k210/Cargo.toml`）：
+```toml
+[dependencies]
+k210-hal = { git = "https://github.com/riscv-rust/k210-hal" }
+embedded-hal = "1.0.0-alpha.1"
+riscv = "0.6"
+spin = "0.5"
+lazy_static = { version = "1.4", features = ["spin_no_std"] }
 ```
 
-### 依赖项
+**构建工具链**：
+- `riscv64-unknown-elf-gcc`：C 编译器
+- `rustup` + `rust-src`：Rust 工具链
+- `openocd`：硬件调试（K210）
+- `qemu-system-riscv64`：仿真运行
 
-- **硬件**：K210 开发板 或 QEMU RISC-V 仿真器
-- **工具链**：`riscv-gnu-toolchain`
-- **SBI 固件**：项目自带预编译二进制（`sbi/sbi-k210`、`sbi/sbi-qemu`）
-- **文件系统**：FAT32 格式的 SD 卡（K210）或虚拟磁盘镜像（QEMU）
+### 内核类型判定
+
+**宏内核（Monolithic Kernel）**，证据：
+1. 所有子系统编译为单一二进制 `kernel/kernel`
+2. 链接脚本 `linker/linker64.ld` 将所有 `.text`、`.data`、`.bss` 段合并
+3. 无模块加载机制，所有驱动静态链接
+4. 系统调用直接调用内核函数（如 `sys_write` → `filewrite`）
+
+---
 
 ## 目录结构导读
 
+### 关键目录与功能映射
+
 ```
-xv6-k210/
-├── kernel/              # 内核核心代码（C 语言）
-│   ├── main.c          # 内核入口（hart 初始化）
-│   ├── entry.S         # 汇编入口（_entry）
-│   ├── fs/             # 文件系统（VFS + FAT32）
-│   ├── mm/             # 内存管理（物理页、虚拟内存、kmalloc）
-│   ├── sched/          # 进程调度（proc.c 1086 行）
-│   ├── syscall/        # 系统调用处理
-│   ├── trap/           # 中断/异常处理
-│   ├── hal/            # 硬件抽象层（SD 卡、DMA、PLIC 等）
-│   └── sync/           # 同步原语（自旋锁、睡眠锁）
+repos/xv6-k210/
+├── kernel/                     # 内核源码（约 6 万行）
+│   ├── entry_k210.S           # K210 汇编入口（_start）
+│   ├── entry_qemu.S           # QEMU 汇编入口（_entry）
+│   ├── main.c                 # C 语言入口（main 函数）
+│   ├── mm/                    # 内存管理子系统
+│   │   ├── pm.c              # 物理页分配器（Free List）
+│   │   ├── vm.c              # 虚拟内存（页表操作、CoW、Lazy）
+│   │   ├── mmap.c            # mmap 系统调用实现
+│   │   ├── usrmm.c           # 用户地址空间管理
+│   │   └── kmalloc.c         # 内核堆分配器（类 Slab）
+│   ├── sched/                 # 进程调度子系统
+│   │   ├── proc.c            # 进程管理（fork/exit/wait/scheduler）
+│   │   ├── signal.c          # 信号机制（sigaction/kill）
+│   │   └── swtch.S           # 上下文切换汇编
+│   ├── syscall/               # 系统调用实现
+│   │   ├── syscall.c         # 系统调用分发器
+│   │   ├── sysfile.c         # 文件系统 syscall（read/write/open）
+│   │   ├── sysproc.c         # 进程 syscall（fork/exec/wait）
+│   │   ├── sysmem.c          # 内存 syscall（mmap/brk）
+│   │   └── syssignal.c       # 信号 syscall（kill/sigaction）
+│   ├── fs/                    # 文件系统子系统
+│   │   ├── fs.c              # VFS 层实现
+│   │   ├── fat32/            # FAT32 文件系统驱动
+│   │   ├── pipe.c            # 管道实现
+│   │   ├── bio.c             # 块缓存
+│   │   └── rootfs.c          # 根文件系统（devfs/procfs）
+│   ├── hal/                   # 硬件抽象层（设备驱动）
+│   │   ├── sdcard.c          # SD 卡驱动（SPI 模式）
+│   │   ├── virtio_disk.c     # VirtIO 块设备驱动
+│   │   ├── plic.c            # 中断控制器驱动
+│   │   ├── uart.c            # 串口驱动
+│   │   └── dmac.c            # DMA 控制器
+│   ├── trap/                  # 中断/异常处理
+│   │   ├── trap.c            # Trap 处理入口
+│   │   ├── trampoline.S      # 用户态 Trap 跳板
+│   │   └── sig_trampoline.S  # 信号处理跳板
+│   ├── exec.c                 # ELF 加载与 exec 实现
+│   ├── printf.c               # 内核打印与 panic
+│   └── sync/                  # 同步原语
+│       ├── spinlock.c        # 自旋锁
+│       └── sleeplock.c       # 睡眠锁
 │
-├── include/            # 头文件（与 kernel/ 布局对应）
-│   ├── mm/             # 内存管理头文件（vm.h, pm.h）
-│   ├── sched/          # 进程管理（proc.h, signal.h）
-│   ├── fs/             # 文件系统（fs.h, file.h）
-│   └── hal/            # 硬件定义（riscv.h, plic.h）
+├── include/                    # 头文件（约 1.5 万行）
+│   ├── fs/                    # 文件系统头文件
+│   ├── mm/                    # 内存管理头文件
+│   ├── sched/                 # 调度头文件
+│   ├── hal/riscv.h           # RISC-V 寄存器定义
+│   ├── memlayout.h           # 内存布局定义
+│   ├── sysnum.h              # 系统调用号表
+│   └── errno.h               # 错误码定义
 │
-├── xv6-user/           # 用户空间程序
-│   ├── init.c          # 第一个用户进程
-│   ├── sh.c            # Shell（661 行）
-│   ├── usertests.c     # 综合测试（2765 行）
-│   ├── cowtest.c       # COW 测试
-│   └── lazytests.c     # Lazy Allocation 测试
+├── bootloader/SBI/            # Bootloader（Rust）
+│   └── rustsbi-k210/         # K210 版 RustSBI
+│       ├── src/main.rs       # SBI 入口与模式切换
+│       └── src/serial.rs     # 串口驱动
 │
-├── bootloader/SBI/     # SBI 固件（Rust）
-│   ├── rustsbi-k210/   # K210 平台 SBI
-│   └── rustsbi-qemu/   # QEMU 平台 SBI
+├── xv6-user/                  # 用户空间程序
+│   ├── sh.c                  # Shell
+│   ├── usertests.c           # 综合测试套件
+│   ├── strace.c              # 系统调用追踪工具
+│   └── init.c                # 初始化进程
 │
-├── linker/             # 链接脚本
-│   ├── linker64.ld     # 内核链接脚本
-│   └── user.ld         # 用户程序链接脚本
+├── linker/                    # 链接脚本
+│   ├── k210.ld               # K210 平台链接脚本
+│   ├── qemu.ld               # QEMU 平台链接脚本
+│   └── linker64.ld           # 统一链接脚本
 │
-├── doc/                # 设计文档（中文）
-│   ├── 总言.md         # 项目概述
-│   ├── 内核设计-*.md   # 各子系统设计文档
-│   └── 构建调试-*.md   # 开发指南
-│
-└── Makefile            # 主构建文件
+├── Makefile                   # 主构建文件
+└── doc/                       # 技术文档
 ```
 
-### 关键入口文件
+### 源码入口追踪
 
-| 组件 | 文件路径 | 说明 |
-|------|----------|------|
-| **汇编入口** | `kernel/entry.S:4` | `_entry`：设置栈后跳转 `main()` |
-| **C 语言入口** | `kernel/main.c:26` | `main()`：CPU 初始化、内存初始化、启动调度器 |
-| **SBI 入口** | `bootloader/SBI/rustsbi-k210/src/main.rs:77` | `_start`（Rust） |
-| **第一个用户进程** | `xv6-user/init.c` | `init`：启动 shell |
-| **系统调用入口** | `kernel/trap/trampoline.S` | `uservec`/`userret`：用户态↔内核态切换 |
-
-## 核心子系统概览
-
-### 内存管理（`kernel/mm/`）
-
-**已实现功能**：
-
-| 功能 | 状态 | 实现文件 | 说明 |
-|------|------|----------|------|
-| 物理页分配器 | ✅ 已实现 | `pm.c` (296L) | 双分配器策略：`multiple`（多页）+ `single`（单页） |
-| 内核页表初始化 | ✅ 已实现 | `vm.c:53` `kvminit()` | 映射 UART、PLIC、CLINT 等 MMIO 区域 |
-| 用户页表管理 | ✅ 已实现 | `vm.c` | `uvmalloc()`、`uvmcopy()`、`uvmfree()` |
-| COW（写时复制） | ✅ 已实现 | `vm.c:567` | 使用 `PTE_COW` 标志（`PTE_RSW1`），fork 时标记父页为只读 |
-| Lazy Allocation | ✅ 已实现 | `vm.c:1002` `handle_page_fault_lazy()` | 堆/栈区域缺页时动态分配物理页 |
-| ELF 懒加载 | ✅ 已实现 | `vm.c:1018` `handle_page_fault_loadelf()` | 代码段按需从磁盘加载 |
-| mmap 支持 | ✅ 已实现 | `mmap.c` (1159L) | 支持内存映射文件 |
-
-**关键数据结构**（`kernel/mm/vm.c:22-29`）：
-```c
-#define PTE_COW PTE_RSW1  // 用于标记 COW 页
-static uint8 page_ref_table[MAX_PAGES_NUM];  // COW 引用计数
-pagetable_t kernel_pagetable;  // 内核页表全局实例
+**完整启动调用链**：
+```
+M-Mode (RustSBI)
+  │
+  ├─> mepc::write(0x80020000)     # 设置 S-Mode 入口
+  ├─> mstatus::set_mpp(Supervisor) # 设置目标特权级
+  └─> mret                         # 跳转到 S-Mode
+       │
+       └─> _start / _entry         # kernel/entry_*.S
+            │
+            ├─> 计算栈指针          # sp = boot_stack + (hartid+1)<<14
+            └─> call main          # 跳转到 C 入口
+                 │
+                 └─> kernel/main.c:main()
+                      │
+                      ├─> cpuinit()           # CPU 结构初始化
+                      ├─> kvminit()           # 内核页表创建
+                      ├─> kvminithart()       # 启用 MMU (satp)
+                      ├─> trapinithart()      # 安装中断向量 (stvec)
+                      ├─> procinit()          # 进程结构初始化
+                      ├─> userinit()          # 创建第一个用户进程
+                      └─> scheduler()         # 进入调度循环
 ```
 
-**页表机制**：
-- 使用 RISC-V **SV39** 分页方案（39 位虚拟地址）
-- 页表项标志：`PTE_V`（有效）、`PTE_R/W/X`（读写执行）、`PTE_U`（用户态）、`PTE_COW`（自定义）
-- 缺页处理入口：`kernel/trap/trap.c:329` `handle_page_fault()`
+**关键入口文件**：
+| 功能 | 文件路径 | 入口符号 |
+|------|---------|---------|
+| 汇编入口 | `kernel/entry_k210.S` | `_start` |
+| C 入口 | `kernel/main.c` | `main()` |
+| 系统调用分发 | `kernel/syscall/syscall.c` | `syscall()` |
+| Trap 入口 | `kernel/trap/trap.c` | `usertrap()` / `kerneltrap()` |
+| 调度器 | `kernel/sched/proc.c` | `scheduler()` |
+| 页错误处理 | `kernel/mm/vm.c` | `handle_page_fault()` |
 
 ---
 
-### 进程管理（`kernel/sched/`）
+## 总结评价
 
-**已实现功能**：
+### 项目定位与目标
 
-| 功能 | 状态 | 实现文件 | 说明 |
-|------|------|----------|------|
-| 进程控制块（PCB） | ✅ 已实现 | `proc.h` 定义，`proc.c` 实现 | `struct proc` 包含 trapframe、页表、文件描述符表等 |
-| 进程调度器 | ✅ 已实现 | `proc.c:661` `scheduler()` | 基于优先级的多队列调度（3 个优先级） |
-| 进程创建（fork） | ✅ 已实现 | `proc.c:297` `clone()` | 支持 `fork()` 和 `clone()`（线程创建） |
-| 进程退出/等待 | ✅ 已实现 | `proc.c:466` `exit()`、`proc.c:519` `wait4()` | 僵尸进程回收、父子进程同步 |
-| 进程信号 | ✅ 已实现 | `signal.c` (283L) | 支持 `kill()`、`rt_sigaction()` 等 |
-| 上下文切换 | ✅ 已实现 | `swtch.S` (41L) | RISC-V 汇编实现 `swtch()` |
+xv6-k210 是一个**面向 RISC-V 架构的教学用操作系统**，核心目标是将 MIT xv6-riscv 从 QEMU 平台移植到真实的 Kendryte K210 开发板，同时保留 QEMU 仿真支持。项目定位为**操作系统原理教学与实践平台**，而非生产级通用操作系统。
 
-**调度算法**（`proc.c:661-700`）：
-```c
-void scheduler(void) {
-    while (1) {
-        tmp = __get_runnable_no_lock();  // 遍历 3 个优先级队列
-        if (NULL != tmp) {
-            tmp->state = RUNNING;
-            swtch(&c->context, &tmp->context);  // 上下文切换
-        }
-    }
-}
-```
+### 技术栈概览
 
-**优先级队列**（`proc.c:247-250`）：
-- `PRIORITY_IRQ`（1）：中断处理唤醒的进程
-- `PRIORITY_NORMAL`（2）：普通进程
-- `TIMER_NORMAL`（10）：时间片轮转
+项目采用**C 语言宏内核**架构，Bootloader 使用 RustSBI 固件。技术选型体现以下特点：
 
-**进程状态**：`UNUSED`、`USED`、`RUNNABLE`、`RUNNING`、`SLEEPING`、`ZOMBIE`
+1. **简洁优先**：内核主体约 8 万行 C 代码，无外部依赖，所有子系统自包含实现
+2. **双平台抽象**：通过条件编译（`#ifdef QEMU`）和内存布局分离（`memlayout.h`）实现 K210/QEMU 双平台支持
+3. **RISC-V 原生**：充分利用 RISC-V 特权级（M/S/U Mode）、Sv39 页表、PLIC 中断控制器等硬件特性
+4. **POSIX 兼容**：实现约 60 个系统调用，支持标准 POSIX 接口（fork/exec/mmap/signal 等）
 
----
+### 实现完成度评估
 
-### 文件系统（`kernel/fs/`）
+**核心子系统完成度**：
 
-**已实现功能**：
+| 子系统 | 完成度 | 关键特性 |
+|--------|-------|---------|
+| **进程管理** | ✅ 高 | fork/exec/wait/exit 完整，信号机制完善 |
+| **内存管理** | ✅ 高 | Sv39 页表、CoW、Lazy Allocation、mmap 完整实现 |
+| **文件系统** | ✅ 中高 | VFS + FAT32 完整，支持 pipe，无 socket |
+| **设备驱动** | ✅ 中 | UART/SD 卡/VirtIO-Blk 完整，无网络驱动 |
+| **多核支持** | 🔸 低 | 有 IPI 框架，无完整 SMP 调度 |
+| **安全机制** | 🔸 低 | 基础用户/内核隔离，无多用户权限模型 |
+| **网络栈** | ❌ 无 | 完全未实现 |
 
-| 功能 | 状态 | 实现文件 | 说明 |
-|------|------|----------|------|
-| 虚拟文件系统（VFS） | ✅ 已实现 | `fs.c` (660L) | 统一 inode 接口，支持多后端 |
-| FAT32 驱动 | ✅ 已实现 | `fat32/` (5 个文件) | 完整 FAT32 实现（目录、文件、簇分配） |
-| 块设备抽象 | ✅ 已实现 | `blkdev.c`、`bio.c` | 缓冲层（buffer cache） |
-| 管道（pipe） | ✅ 已实现 | `pipe.c` (476L) | 进程间通信 |
-| 设备文件 | ✅ 已实现 | `rootfs.c` | `/dev`、`/proc` 伪文件系统 |
-| mount/umount | ✅ 已实现 | `mount.c` (222L) | 动态挂载文件系统 |
+**系统功能闭环评估**：
 
-**VFS 接口**（`include/fs/fs.h`）：
-```c
-struct inode_op {
-    struct inode *(*create)(struct inode*, char*, int);
-    int (*lookup)(struct inode*, char*, struct inode**);
-    int (*truncate)(struct inode*);
-    // ...
-};
-```
+项目实现了**单用户单任务环境下的完整 OS 功能闭环**：
+- ✅ 进程可创建（fork）、加载程序（exec）、退出（exit）、等待子进程（wait）
+- ✅ 内存可动态分配（sbrk/mmap）、支持写时复制优化
+- ✅ 文件可读写（open/read/write）、目录可遍历（getdents）
+- ✅ 进程间可通过管道（pipe）和信号（signal）通信
+- ✅ 支持串口终端交互（Shell）
 
-**FAT32 初始化**（`fat32.c:45`）：
-```c
-struct inode *fat32_init(struct superblock *sb) {
-    // 解析 BPB（BIOS Parameter Block）
-    // 验证 "FAT32" 签名
-    // 计算数据区起始扇区
-}
-```
+**主要缺失**：
+- ❌ 无网络功能，无法运行网络应用
+- ❌ 无多用户权限模型，所有进程以 root 权限运行
+- ❌ 多核并行能力有限，无负载均衡机制
+- ❌ 无 System V IPC（消息队列/信号量/共享内存）
 
-**块设备驱动**：
-- **K210**：SD 卡 SPI 驱动（`hal/sdcard.c` 1076 行）+ DMA 控制器
-- **QEMU**：VirtIO 块设备（`hal/virtio_disk.c` 505 行）
-
----
-
-### 系统调用（`kernel/syscall/`）
-
-**已实现系统调用**（部分列表，共 80+ 个）：
-
-| 类别 | 系统调用 | 实现文件 | 状态 |
-|------|----------|----------|------|
-| 进程 | `fork`, `exec`, `exit`, `wait4`, `clone`, `getpid`, `getppid` | `sysproc.c` | ✅ 已实现 |
-| 文件 | `openat`, `close`, `read`, `write`, `lseek`, `fstat`, `getdents` | `sysfile.c` | ✅ 已实现 |
-| 内存 | `sbrk`, `brk`, `mmap`, `munmap`, `mprotect` | `sysmem.c` | ✅ 已实现 |
-| 信号 | `rt_sigaction`, `rt_sigprocmask`, `kill` | `syssignal.c` | ✅ 已实现 |
-| 时间 | `gettimeofday`, `nanosleep`, `clock_gettime`, `uptime` | `systime.c` | ✅ 已实现 |
-| 其他 | `uname`, `getuid`, `getgid`, `sysinfo`, `trace` | `sysuname.c` 等 | ✅ 已实现 |
-
-**系统调用分发**（`syscall.c`）：
-```c
-static uint64 (*syscalls[])(void) = {
-    [SYS_fork]    sys_fork,
-    [SYS_exit]    sys_exit,
-    [SYS_read]    sys_read,
-    // ... 共 80+ 个
-};
-```
-
-**桩函数检测**：
-- `sys_getuid`、`sys_getgid` 等：✅ 已实现（返回硬编码值 0 或 1000）
-- 未发现返回 `ENOSYS` 或 `unimplemented!()` 的桩函数
-
----
-
-### 网络支持
-
-| 功能 | 状态 | 说明 |
-|------|------|------|
-| TCP/IP 协议栈 | ❌ 未实现 | 代码中无 smoltcp、lwip 或其他网络栈 |
-| Socket API | ❌ 未实现 | 仅在 `errno.h` 中定义了网络相关错误码（`ENOTSOCK` 等），但无实际实现 |
-| 网络设备驱动 | ❌ 未实现 | 无网卡驱动代码 |
-
-**结论**：xv6-k210 **不支持网络功能**。错误码定义仅为 POSIX 兼容性预留。
-
----
-
-### 中断与异常处理（`kernel/trap/`）
-
-**已实现功能**：
-
-| 功能 | 状态 | 实现文件 | 说明 |
-|------|------|----------|------|
-| 用户态陷阱入口 | ✅ 已实现 | `trampoline.S` | `uservec`/`userret` 保存/恢复上下文 |
-| 内核态陷阱入口 | ✅ 已实现 | `kernelvec.S` | 内核异常处理 |
-| 系统调用处理 | ✅ 已实现 | `trap.c:267` `usertrap()` | 通过 `ecall` 指令触发 |
-| 时钟中断 | ✅ 已实现 | `timer.c` + `trap.c` | S 模式定时器，触发进程调度 |
-| 外部中断（PLIC） | ✅ 已实现 | `plic.c` + `trap.c:229` | 设备中断路由 |
-| 缺页异常 | ✅ 已实现 | `trap.c:329` `handle_page_fault()` | 支持 COW、Lazy、ELF 懒加载 |
-
-**中断类型**（`trap.c:27-31`）：
-```c
-#define INTR_SOFTWARE    (0x1 | INTERRUPT_FLAG)  // 软件中断
-#define INTR_TIMER       (0x5 | INTERRUPT_FLAG)  // 定时器中断
-#define INTR_EXTERNAL    (0x9 | INTERRUPT_FLAG)  // 外部中断
-```
-
----
-
-## 证据列表
-
-### 核心文件路径清单
-
-| 类别 | 文件路径 | 行数/大小 | 用途 |
-|------|----------|-----------|------|
-| **入口** | `kernel/entry.S` | 21L | 汇编入口 `_entry` |
-| **入口** | `kernel/main.c` | 98L | C 语言入口 `main()` |
-| **内存** | `kernel/mm/vm.c` | 1105L | 虚拟内存、页表、COW、Lazy |
-| **内存** | `kernel/mm/pm.c` | 296L | 物理页分配器 |
-| **内存** | `kernel/mm/mmap.c` | 1159L | 内存映射 |
-| **进程** | `kernel/sched/proc.c` | 1086L | 进程管理、调度器 |
-| **进程** | `kernel/sched/signal.c` | 283L | 信号处理 |
-| **进程** | `kernel/sched/swtch.S` | 41L | 上下文切换汇编 |
-| **文件系统** | `kernel/fs/fs.c` | 660L | VFS 层 |
-| **文件系统** | `kernel/fs/fat32/fat32.c` | 589L | FAT32 核心逻辑 |
-| **文件系统** | `kernel/fs/bio.c` | 300L | 块缓冲层 |
-| **系统调用** | `kernel/syscall/syscall.c` | 403L | 系统调用分发 |
-| **系统调用** | `kernel/syscall/sysfile.c` | 1028L | 文件类 syscall |
-| **系统调用** | `kernel/syscall/sysproc.c` | 316L | 进程类 syscall |
-| **中断** | `kernel/trap/trap.c` | 413L | 陷阱处理 |
-| **中断** | `kernel/trap/trampoline.S` | 147L | 用户态陷阱入口 |
-| **硬件** | `kernel/hal/sdcard.c` | 1076L | SD 卡驱动（K210） |
-| **硬件** | `kernel/hal/virtio_disk.c` | 505L | VirtIO 驱动（QEMU） |
-| **硬件** | `kernel/hal/plic.c` | 90L | PLIC 中断控制器 |
-| **头文件** | `include/hal/riscv.h` | 457L | RISC-V CSR 定义、页表宏 |
-| **头文件** | `include/sched/proc.h` | 185L | 进程 PCB 定义 |
-| **头文件** | `include/sysnum.h` | 79L | 系统调用号定义 |
-| **构建** | `Makefile` | 303L | 主构建脚本 |
-| **构建** | `linker/linker64.ld` | - | 内核链接脚本 |
-| **文档** | `README.md` | 123L | 项目说明 |
-| **文档** | `doc/总言.md` | 129L | 设计概述 |
-| **SBI** | `bootloader/SBI/rustsbi-k210/src/main.rs` | 583L | Rust SBI 固件 |
-| **测试** | `xv6-user/usertests.c` | 2765L | 综合测试套件 |
-| **测试** | `xv6-user/cowtest.c` | 199L | COW 功能测试 |
-| **测试** | `xv6-user/lazytests.c` | 153L | Lazy Allocation 测试 |
-
-### 关键符号引用
-
-| 符号 | 定义位置 | 说明 |
-|------|----------|------|
-| `_entry` | `kernel/entry.S:4` | 汇编入口 |
-| `main()` | `kernel/main.c:26` | C 入口 |
-| `kvminit()` | `kernel/mm/vm.c:53` | 内核页表初始化 |
-| `scheduler()` | `kernel/sched/proc.c:661` | 进程调度器 |
-| `clone()` | `kernel/sched/proc.c:297` | fork/clone 实现 |
-| `handle_page_fault()` | `kernel/trap/trap.c:367` | 缺页处理 |
-| `usertrap()` | `kernel/trap/trap.c:75` | 用户态陷阱处理 |
-| `fat32_init()` | `kernel/fs/fat32/fat32.c:45` | FAT32 初始化 |
-| `disk_init()` | `kernel/hal/disk.c` | 磁盘驱动初始化 |
-
----
-
-**本章小结**：xv6-k210 是一个功能完整的 RISC-V 教学操作系统，基于 MIT xv6-riscv 但进行了大量增强（COW、Lazy Allocation、FAT32、VFS 等）。代码质量较高，关键子系统均有完整实现，支持在真实硬件（K210）和仿真器（QEMU）上运行。网络功能未实现，系统调用覆盖 POSIX 子集（80+ 个）。
+**总体评价**：xv6-k210 作为一个教学用操作系统，在 3 个月开发周期内实现了较为完整的核心 OS 功能，代码质量较高，文档完善。项目成功将 xv6 从 QEMU 移植到真实硬件（K210），并扩展了 FAT32 文件系统、mmap、信号机制等高级功能。虽然缺少网络、完整多核支持等生产级特性，但作为操作系统教学与实践平台已具备较高价值。
 
 ---
 
@@ -7251,5 +6381,5 @@ void syscall(void)
 ---
 
 *本报告由 OS-Agent-D 自动生成*  
-*生成时间: 2026-03-14 03:20:06*  
-*分析耗时: 4.4 分钟*
+*生成时间: 2026-03-19 16:52:04*  
+*分析耗时: 2.4 分钟*
