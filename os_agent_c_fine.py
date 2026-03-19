@@ -30,21 +30,60 @@ import argparse
 from datetime import datetime
 
 from dotenv import load_dotenv
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_openai import ChatOpenAI
 from langgraph.prebuilt import create_react_agent
 
 from core.agent_builder import get_model_name
-from core.utils import repo_name_from_url
+from core.utils import repo_name_from_url, format_tool_call_summary, format_tool_result_summary
 
 load_dotenv()
 logging.basicConfig(
     level=logging.INFO,
     format="%(name)s | %(levelname)s | %(message)s",
 )
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
 logger = logging.getLogger("os_agent_c_fine")
 
 DEFAULT_OUTPUT_DIR = "./output"
+
+def print_step(step_num: int, node_name: str, state: dict, stage_step_num: int = 0, stage_limit: int = 100) -> int:
+    token_count = 0
+    messages = state.get("messages", [])
+    if not messages: return 0
+    
+    msg_to_show = [messages[-1]] if (step_num > 1 and messages) else messages
+    
+    for msg in msg_to_show:
+        if isinstance(msg, AIMessage):
+            content = msg.content or ""
+            tool_calls = getattr(msg, "tool_calls", None) or []
+            if step_num > 0:
+                print(f"\n【Step {stage_step_num}/{stage_limit}】", end=" ")
+            if tool_calls:
+                print("🔧 Tool Calls:")
+                for tc in tool_calls:
+                    tool_name = tc.get("name", "unknown") if isinstance(tc, dict) else getattr(tc, "name", "unknown")
+                    tool_args = tc.get("args", {}) if isinstance(tc, dict) else getattr(tc, "args", {})
+                    summary = format_tool_call_summary(tool_name, tool_args)
+                    print(f"   {tool_name}({summary})")
+            elif content.strip():
+                preview = content.strip()[:200]
+                if len(content) > 200: preview += "..."
+                print(f"🤔 Agent: {preview}")
+            
+            usage = getattr(msg, "response_metadata", {}).get("token_usage", {})
+            if usage:
+                total_tokens = usage.get("total_tokens", 0)
+                if total_tokens > 0:
+                    token_count += total_tokens
+                    print(f"   📄 Tokens: {total_tokens:,} (In:{usage.get('prompt_tokens',0):,} + Out:{usage.get('completion_tokens',0):,})")
+        elif isinstance(msg, ToolMessage):
+            tool_name = getattr(msg, "name", "unknown")
+            summary = format_tool_result_summary(tool_name, msg.content or "")
+            print(f"   ✅ {tool_name}: {summary}")
+    return token_count
 
 # ═══════════════════════════════════════════════════════════════════
 # 精比 STAGES
@@ -368,10 +407,20 @@ def run_fine_compare(
         agent, system_prompt = _build_compare_agent(target_name, cand_name)
         stage_texts = []
 
+        cand_sections_dir = os.path.join(comparison_dir, f"vs_{cand_name}_sections")
+        os.makedirs(cand_sections_dir, exist_ok=True)
+
         for stage in COMPARE_STAGES:
             title = stage["title"]
             prompt = stage["prompt"].format(target=target_name, candidate=cand_name)
             print(f"\n   🧩 {stage['id']}: {title}")
+
+            stage_file_path = os.path.join(cand_sections_dir, f"{stage['id']}.md")
+            if os.path.exists(stage_file_path) and os.path.getsize(stage_file_path) > 50:
+                print(f"      ⏭️  跳过（找到本地缓存: {stage['id']}.md）")
+                with open(stage_file_path, "r", encoding="utf-8") as sf:
+                    stage_texts.append(sf.read())
+                continue
 
             inputs = {
                 "messages": [
@@ -395,10 +444,9 @@ def run_fine_compare(
                     step_count = 0
                     for event in agent.stream(inputs, config={"recursion_limit": 100}):
                         step_count += 1
-                        for _, state in event.items():
+                        for node_name, state in event.items():
+                            print_step(step_count, node_name, state, stage_step_num=step_count, stage_limit=100)
                             final_state = state
-                        if step_count % 5 == 0:
-                            print(f"      ... step {step_count}")
 
                     if final_state and final_state.get("messages"):
                         for m in reversed(final_state["messages"]):
@@ -454,7 +502,9 @@ def run_fine_compare(
             stage_texts.append(stage_text)
             if succeeded:
                 retry_info = f"，重试 {retry} 次" if retry > 0 else ""
-                print(f"      ✅ 完成 ({len(stage_text)} 字符{retry_info})")
+                with open(stage_file_path, "w", encoding="utf-8") as sf:
+                    sf.write(stage_text)
+                print(f"      ✅ 完成 ({len(stage_text)} 字符{retry_info}) -> 已存档: {stage['id']}.md")
             else:
                 print(f"      ❌ 失败（已重试 {retry} 次）")
 
@@ -531,22 +581,58 @@ def main():
 
     # 确定目标
     target_name = args.target
+    target_url = None
+    repo_url = os.environ.get("REPO_URL", "").strip()
     if not target_name:
-        repo_url = os.environ.get("REPO_URL", "").strip()
         if repo_url:
             target_name = repo_name_from_url(repo_url)
+            target_url = repo_url
         else:
             print("❌ 请通过 --target 指定目标项目名，或在 .env 中设置 REPO_URL")
             sys.exit(1)
+    elif target_name == repo_name_from_url(repo_url):
+        target_url = repo_url
 
     # 确定候选列表
     candidates = []
+
+    # 尝试读取环境变量中的 COMPARE_CANDIDATES
+    env_candidates = os.environ.get("COMPARE_CANDIDATES", "").strip()
+    env_candidates_list = []
+    if env_candidates:
+        try:
+            if env_candidates.startswith("[") and env_candidates.endswith("]"):
+                import ast
+                env_candidates_list = ast.literal_eval(env_candidates)
+            elif env_candidates.startswith("{") and env_candidates.endswith("}"):
+                inner = env_candidates[1:-1]
+                env_candidates_list = [x.strip().strip("'\"") for x in inner.split(",") if x.strip()]
+            else:
+                env_candidates_list = [x.strip() for x in env_candidates.split(",") if x.strip()]
+        except Exception as e:
+            print(f"⚠️ 解析 COMPARE_CANDIDATES 环境变量失败: {e}")
+
+    if env_candidates_list:
+        parsed_list = []
+        for x in env_candidates_list:
+            if x.startswith("http") or x.startswith("git@"):
+                parsed_list.append({"name": repo_name_from_url(x), "url": x})
+            else:
+                parsed_list.append({"name": x, "url": None})
+        env_candidates_list = parsed_list
+
     if args.candidates:
         # 手动指定
         for name in args.candidates.split(","):
             name = name.strip()
             if name:
-                candidates.append({"name": name, "total_score": 0.0})
+                candidates.append({"name": name, "url": None, "total_score": 0.0})
+    elif env_candidates_list:
+        # 从环境变量指定
+        for cand in env_candidates_list:
+            if cand["name"]:
+                candidates.append({"name": cand["name"], "url": cand["url"], "total_score": 0.0})
+        print(f"📂 从环境变量加载了 {len(candidates)} 个精比候选: {[c['name'] for c in candidates]}")
     else:
         # 从粗筛结果读取
         coarse_path = os.path.join(args.output_dir, target_name, "coarse_screening.json")
@@ -565,6 +651,23 @@ def main():
     if not candidates:
         print("❌ 没有候选项目")
         sys.exit(1)
+
+    # 确保目标按需克隆
+    def _ensure_cloned(r_name, r_url):
+        repo_local_path = os.path.normpath(os.path.join("./repos", r_name))
+        if os.path.exists(repo_local_path) and os.path.isdir(repo_local_path) and os.listdir(repo_local_path):
+            pass
+        else:
+            if r_url:
+                print(f"🚀 正在自动克隆缺失的仓库: {r_url} ...")
+                from tools.git_ops import clone_repository
+                print(clone_repository.invoke({"repo_url": r_url}))
+            else:
+                print(f"⚠️ 找不到本地仓库 './repos/{r_name}'，且未提供下载链接。比对过程可能会报错！")
+
+    _ensure_cloned(target_name, target_url)
+    for c in candidates:
+        _ensure_cloned(c["name"], c.get("url"))
 
     run_fine_compare(target_name, candidates, output_dir=args.output_dir)
 

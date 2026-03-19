@@ -57,12 +57,13 @@ logger = logging.getLogger("os_agent_c_coarse")
 DEFAULT_OUTPUT_DIR = "./output"
 
 
-def discover_projects(library_dir: str) -> list:
+def discover_projects(library_dir: str, filter_list: list = None) -> list:
     """
     扫描历史 OS 库目录，发现所有包含 D 报告（sections/）的项目。
 
     Args:
         library_dir: 历史 OS 库根目录（每个子目录是一个项目）
+        filter_list: 如果提供，只选出该列表中的项目名称
 
     Returns:
         [(project_name, sections_dir), ...]
@@ -78,6 +79,10 @@ def discover_projects(library_dir: str) -> list:
             continue
         if entry.startswith("_"):  # 跳过 _vector_index 等内部目录
             continue
+            
+        if filter_list is not None and entry not in filter_list:
+            continue
+            
         sections_path = os.path.join(entry_path, "sections")
         if os.path.isdir(sections_path):
             projects.append((entry, sections_path))
@@ -91,6 +96,7 @@ def run_coarse_screening(
     output_dir: str = DEFAULT_OUTPUT_DIR,
     top_k: int = 5,
     rebuild: bool = False,
+    filter_list: list = None,
 ) -> dict:
     """
     执行粗筛流程。
@@ -152,7 +158,9 @@ def run_coarse_screening(
 
     # ── Step 3: 为历史库中所有项目生成指纹 ──
     print(f"\n📂 Step 3/4: 扫描历史库并生成指纹...")
-    all_projects = discover_projects(library_dir)
+    if filter_list:
+        print(f"   📋 使用过滤列表: {filter_list}")
+    all_projects = discover_projects(library_dir, filter_list=filter_list)
     print(f"   发现 {len(all_projects)} 个历史项目")
 
     store = VectorStore(output_dir=output_dir)
@@ -328,12 +336,32 @@ def main():
 
     output_dir = args.output_dir or args.library
 
+    # 解析 .env 中的 HISTORY_PROJECTS
+    history_projects_env = os.environ.get("HISTORY_PROJECTS", "").strip()
+    filter_list = None
+    if history_projects_env:
+        try:
+            if history_projects_env.startswith("[") and history_projects_env.endswith("]"):
+                import ast
+                filter_list = ast.literal_eval(history_projects_env)
+            elif history_projects_env.startswith("{") and history_projects_env.endswith("}"):
+                inner = history_projects_env[1:-1]
+                filter_list = [x.strip().strip("'\"") for x in inner.split(",") if x.strip()]
+            else:
+                filter_list = [x.strip() for x in history_projects_env.split(",") if x.strip()]
+        except Exception as e:
+            print(f"⚠️ 解析 HISTORY_PROJECTS 环境变量失败: {e}，将扫描库目录下所有项目")
+
+    if filter_list:
+        filter_list = [repo_name_from_url(x) if x.startswith("http") or x.startswith("git@") else x for x in filter_list]
+
     run_coarse_screening(
         target_name=target_name,
         library_dir=args.library,
         output_dir=output_dir,
         top_k=args.top_k,
         rebuild=args.rebuild,
+        filter_list=filter_list,
     )
 
 

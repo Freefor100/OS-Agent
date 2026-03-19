@@ -213,12 +213,12 @@ async def _polyfill_context(repo_path: str, scan_results: Dict[str, bool], lang:
                             if members:
                                 # 这种情况下生成 "Virtual Manifest"，即只有 [workspace] 而没有 [package]
                                 # 这样 cargo metadata 就不会报错要求根目录必须有 src/lib.rs 了
-                                f.write('[workspace]\\nmembers = [\\n')
+                                f.write('[workspace]\nmembers = [\n')
                                 for m in members:
-                                    f.write(f'    "{m}",\\n')
-                                f.write(']\\n')
+                                    f.write(f'    "{m}",\n')
+                                f.write(']\n')
                             else:
-                                f.write('[package]\\nname = "os_kernel_dummy"\\nversion = "0.1.0"\\nedition = "2021"\\n')
+                                f.write('[package]\nname = "os_kernel_dummy"\nversion = "0.1.0"\nedition = "2021"\n')
                     except Exception as e:
                         logger.error(f"Failed to generate Cargo.toml: {e}")
                 
@@ -236,7 +236,7 @@ async def _polyfill_context(repo_path: str, scan_results: Dict[str, bool], lang:
                             os.makedirs(src_dir, exist_ok=True)
                             try:
                                 with open(os.path.join(src_dir, "lib.rs"), 'w', encoding='utf-8') as f:
-                                    f.write("// Dummy lib created by os-agent to satisfy rust-analyzer workspace loader\\n")
+                                    f.write("// Dummy lib created by os-agent to satisfy rust-analyzer workspace loader\n")
                             except Exception as e:
                                 logger.error(f"Failed to generate dummy src/lib.rs: {e}")
     
