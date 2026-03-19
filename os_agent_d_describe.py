@@ -19,6 +19,22 @@ load_dotenv()
 
 OUTPUT_DIR = "./output"
 import openpyxl
+def normalize_url(url: str) -> str:
+    """标准化仓库 URL，剔除 .git 后缀、结尾斜杠并统一小写"""
+    if not url:
+        return ""
+    url = str(url).strip().lower()
+    # 先剔除结尾斜杠
+    while url.endswith("/"):
+        url = url[:-1]
+    # 再剔除 .git 后缀
+    if url.endswith(".git"):
+        url = url[:-4]
+    # 再次剔除可能出现的结尾斜杠（例如 .git/ 情况）
+    while url.endswith("/"):
+        url = url[:-1]
+    return url
+
 
 def get_author_info(repo_url: str) -> dict:
     """从 collected-data.xlsx 提取作者信息"""
@@ -42,7 +58,7 @@ def get_author_info(repo_url: str) -> dict:
             
         for row in range(2, sheet.max_row + 1):
             cell_url = sheet.cell(row=row, column=repo_col).value
-            if cell_url and str(cell_url).strip() == repo_url:
+            if cell_url and normalize_url(cell_url) == normalize_url(repo_url):
                 result = {}
                 mapping = {
                     "year": "年份",
@@ -757,25 +773,25 @@ C. **使用 grep_in_repo 探索隐藏功能**（可选）：
         "needs_previous_sections": True,
         "prompt": """目标：建立"这是什么 OS、怎么构建、关键入口在哪"的简明技术字典，并生成全项目的完成度评价。
 
-**严格注意**：区分项目本身名称（如 Undefined OS）与底层框架（如 ArceOS）。如果项目是基于 ArceOS 修改的，必须明确说明"基于 ArceOS 开发"。
+        **严格注意**：区分项目本身名称（如 Undefined OS）与底层框架（如 ArceOS、rCore、xv6等）。如果项目是基于 ArceOS 修改的，必须明确说明"基于 ArceOS 开发"。
+        由于你是最后执行的综合阶段，此时**其他章节（02-13章）的生成报告已经全部提供在你的上下文末尾**，你需要直接利用这些信息来宏观总结整个项目。
 
-由于你是最后执行的阶段，你需要宏观总结整个项目代码与结构。
-请按顺序完成（仓库已克隆到 repo_path，直接使用即可）：
-1) **查阅已有进度**：使用 `list_directory` 查阅已经生成的其他章节分析文件，了解整体完成情况。
-2) analyze_tech_stack(repo_path)：总结语言/构建/依赖。**必须明确提取编程语言（版本、是否no_std）、基础框架来源（rCore/ArceOS等）、内核类型（宏内核/微内核/混合等）。**
-3) list_repo_structure(repo_path, max_depth=5)：总结关键目录。
-4) **寻找架构支持**：代码验证并明确列出该项目支持的所有架构（x86_64, aarch64, riscv64, loongarch64 等）。
-5) **寻找入口**：搜索并确定真正的 OS 内核入口函数。
+        请按顺序完成（仓库已克隆到 repo_path，直接使用即可）：
+        1) **融会贯通**：直接阅读并深刻理解上下文中附带的前置章节报告，了解系统整体完成情况，无需再调用工具去查阅底层细枝末节的代码（除非是为了寻找内核入口）。
+        2) analyze_tech_stack(repo_path)：总结语言/构建/依赖。**必须明确提取编程语言（版本、是否no_std）、基础框架来源（rCore/ArceOS/xv6等）、内核类型（宏内核/微内核/混合等）。**
+        3) list_repo_structure(repo_path, max_depth=5)：总结关键目录。
+        4) **寻找架构支持**：代码验证并明确列出该项目支持的所有架构（x86_64, aarch64, riscv64, loongarch64 等）。
+        5) **寻找入口**：搜索并确定真正的 OS 内核入口函数（可借用 LSP 或 grep 快速定位）。
 
-输出格式要求：
-- ## 结论摘要（3-5 条，明确项目与框架关系及内核类型）
-- ## 技术栈与构建（含编程语言版本、所有支持的架构完整列表）
-- ## 目录结构导读（列出系统关键目录与源码入口）
-- ## 总结评价（完成度评估）
-  - 结合全局架构与之前各关键模块的情况，用200-300字概括：项目定位与目标、技术栈概览、实现完成度评估（系统主要功能模块是否闭环）。**注意：只做客观的定性评价，绝不要打分（如不要出现x/10这样的评分）。**
+        输出格式要求：
+        - ## 结论摘要（3-5 条，基于前置报告明确项目特性及内核类型）
+        - ## 技术栈与构建（含编程语言版本、所有支持的架构完整列表）
+        - ## 目录结构导读（列出系统关键目录与源码入口）
+        - ## 总结评价（完成度评估）
+        - 深度结合下文附带的各模块报告情况，用200-300字概括：项目定位与目标、技术栈概览、实现完成度评估（系统主要功能模块是否闭环）。**注意：只做客观的定性评价，绝不要打分（如不要出现x/10这样的评分）。**
 
-**重要**：完成所有工具调用后，你必须输出一个完整的 Markdown 格式分析报告。
-""",
+        **重要**：完成所有工具调用后，你必须输出一个完整的 Markdown 格式分析报告。
+        """,
     },
 ]
 
@@ -1031,7 +1047,7 @@ def main():
         chapter_num = chapter_counter if not skip_in_report else None
         
         # 构建任务 prompt
-        if chapter_num and not stage.get("needs_previous_sections", False):
+        if chapter_num:
             # 这是一个正式章节，告诉 Agent 输出的是第几章
             chapter_hint = f"""
 **本阶段是最终报告的第 {chapter_num} 章：{title}**

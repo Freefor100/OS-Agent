@@ -1,680 +1,20 @@
 # oskernrl2022-rv6 操作系统技术分析报告
 
+> **年份**: 2022
+
+> **赛事**: 操作系统赛
+
+> **子赛事**: 内核实现赛道
+
+> **学校**: 华中科技大学
+
+> **队伍名称**: 我永远喜欢少名针妙丸
+
 > **仓库地址**: https://gitlab.eduxiji.net/Cty/oskernrl2022-rv6
-> **分析日期**: 2026年03月14日
+
+> **分析日期**: 2026年03月19日
+
 > **分析工具**: OS-Agent-D
-
----
-
-## 仓库目录文件结构
-
-```bash
-oskernrl2022-rv6/
-├── bin/
-│   └── localtime (2.8KB)
-├── doc/
-│   ├── 内核实现--Futex.md (45L, 2.5KB)
-│   ├── 内核实现--信号相关.md (177L, 4.4KB)
-│   ├── 内核实现--内存映射.md (26L, 1.9KB)
-│   ├── 内核实现--内存管理.md (287L, 9.7KB)
-│   ├── 内核实现--多核启动.md (66L, 2.2KB)
-│   ├── 内核实现--文件系统.md (215L, 6.5KB)
-│   ├── 内核实现--时钟中断.md (79L, 2.2KB)
-│   ├── 内核实现--系统调用.md (466L, 15.1KB)
-│   ├── 内核实现--线程相关.md (65L, 1.9KB)
-│   ├── 内核实现--输入输出.md (60L, 2.7KB)
-│   ├── 内核设计--进程队列.md (88L, 1.8KB)
-│   ├── 内核调试-动态链接.md (24L, 1.2KB)
-│   ├── 内核调试-轮询操作.md (14L, 548B)
-│   ├── 用户程序--内存管理.md (16L, 376B)
-│   ├── 用户程序--文件系统.md (25L, 547B)
-│   ├── 用户程序--系统调用.md (12L, 265B)
-│   ├── 用户程序--进程管理.md (33L, 584B)
-│   ├── 用户程序-动态链接.md (30L, 2.1KB)
-│   ├── 系统调用--其他.md (75L, 2.4KB)
-│   ├── 系统调用--内存管理相关.md (12L, 509B)
-│   └── 系统调用--进程管理相关.md (91L, 3.0KB)
-├── linker/
-│   └── kernel.ld (1.2KB)
-├── sbi/
-│   └── fw_jump.elf (1.0MB)
-├── sd/
-│   ├── busybox (1.1MB)
-│   ├── busybox_cmd.txt (895B)
-│   ├── busybox_testcode.sh (560B)
-│   ├── date.lua (109B)
-│   ├── file_io.lua (136B)
-│   ├── lmbench_all (1.0MB)
-│   ├── lmbench_testcode.sh (1.3KB)
-│   ├── lua (290.7KB)
-│   ├── lua_testcode.sh (199B)
-│   ├── max_min.lua (134B)
-│   ├── random.lua (160B)
-│   ├── remove.lua (164B)
-│   ├── round_num.lua (96B)
-│   ├── sin30.lua (81B)
-│   ├── sort.lua (176B)
-│   ├── strings.lua (626B)
-│   ├── test.c (0L, 0B)
-│   └── test.sh (123B)
-├── src/
-│   ├── include/
-│   │   ├── utils/
-│   │   │   └── list.h (63L, 1.3KB)
-│   │   ├── buf.h (25L, 469B)
-│   │   ├── console.h (10L, 170B)
-│   │   ├── copy.h (13L, 480B)
-│   │   ├── cpu.h (42L, 870B)
-│   │   ├── debug.h (12L, 147B)
-│   │   ├── defs.h (275L, 9.8KB)
-│   │   ├── dev.h (37L, 1020B)
-│   │   ├── disk.h (11L, 181B)
-│   │   ├── diskio.h (77L, 2.6KB)
-│   │   ├── elf.h (166L, 2.7KB)
-│   │   ├── errno.h (107L, 4.8KB)
-│   │   ├── exec.h (11L, 170B)
-│   │   ├── fat32.h (157L, 5.0KB)
-│   │   ├── fcntl.h (18L, 367B)
-│   │   ├── ff.h (357L, 11.7KB)
-│   │   ├── ffconf.h (301L, 12.1KB)
-│   │   ├── file.h (62L, 1.7KB)
-│   │   ├── image.h (10L, 225B)
-│   │   ├── intr.h (10L, 116B)
-│   │   ├── kalloc.h (18L, 278B)
-│   │   ├── memlayout.h (94L, 3.5KB)
-│   │   ├── mmap.h (33L, 770B)
-│   │   ├── param.h (23L, 990B)
-│   │   ├── pipe.h (24L, 609B)
-│   │   ├── plic.h (101L, 5.8KB)
-│   │   ├── pm.h (24L, 380B)
-│   │   ├── poll.h (33L, 667B)
-│   │   ├── printf.h (30L, 1.4KB)
-│   │   ├── proc.h (201L, 7.4KB)
-│   │   ├── queue.h (69L, 1.2KB)
-│   │   ├── ramdisk.h (9L, 150B)
-│   │   ├── riscv.h (381L, 7.5KB)
-│   │   ├── sbi.h (94L, 2.6KB)
-│   │   ├── sd.h (44L, 1.3KB)
-│   │   ├── signal.h (90L, 1.9KB)
-│   │   ├── sleeplock.h (24L, 606B)
-│   │   ├── socket.h (15L, 292B)
-│   │   ├── spi.h (265L, 5.0KB)
-│   │   ├── spinlock.h (30L, 642B)
-│   │   ├── stat.h (46L, 995B)
-│   │   ├── string.h (19L, 724B)
-│   │   ├── syscall.h (30L, 723B)
-│   │   ├── sysinfo.h (40L, 1.3KB)
-│   │   ├── timer.h (85L, 2.2KB)
-│   │   ├── trap.h (61L, 2.0KB)
-│   │   ├── types.h (65L, 1.7KB)
-│   │   ├── uname.h (26L, 644B)
-│   │   ├── virtio.h (84L, 2.8KB)
-│   │   ├── vm.h (46L, 2.2KB)
-│   │   └── vma.h (47L, 1.7KB)
-│   ├── sifive/
-│   │   ├── devices/
-│   │   │   ├── ccache.h (155L, 5.8KB)
-│   │   │   ├── clint.h (17L, 451B)
-│   │   │   ├── ememoryotp.h (76L, 2.3KB)
-│   │   │   ├── gpio.h (27L, 812B)
-│   │   │   ├── i2c.h (78L, 2.7KB)
-│   │   │   ├── spi.h (82L, 2.3KB)
-│   │   │   ├── uart.h (66L, 1.9KB)
-│   │   │   └── ux00prci.h (205L, 5.5KB)
-│   │   ├── barrier.h (49L, 1.3KB)
-│   │   ├── bits.h (40L, 1.1KB)
-│   │   ├── const.h (15L, 384B)
-│   │   ├── encoding.h (1316L, 46.4KB)
-│   │   ├── platform.h (349L, 14.0KB)
-│   │   └── smp.h (76L, 1.9KB)
-│   ├── bin.S (29L, 589B)
-│   ├── bio.c (165L, 3.8KB)
-│   ├── copy.c (204L, 4.2KB)
-│   ├── cpu.c (48L, 918B)
-│   ├── dev.c (170L, 3.4KB)
-│   ├── disk.c (50L, 840B)
-│   ├── diskio.c (162L, 5.0KB)
-│   ├── entry.S (35L, 678B)
-│   ├── exec.c (378L, 9.9KB)
-│   ├── fat32.c (1181L, 37.0KB)
-│   ├── file.c (548L, 12.1KB)
-│   ├── image.c (45L, 973B)
-│   ├── intr.c (40L, 969B)
-│   ├── kernelvec.S (86L, 2.0KB)
-│   ├── kmalloc.c (280L, 7.8KB)
-│   ├── link_disk.S (12L, 197B)
-│   ├── link_null.S (11L, 171B)
-│   ├── main.c (110L, 2.7KB)
-│   ├── mmap.c (238L, 5.5KB)
-│   ├── pipe.c (120L, 2.7KB)
-│   ├── pm.c (117L, 2.3KB)
-│   ├── poll.c (14L, 312B)
-│   ├── printf.c (378L, 8.4KB)
-│   ├── proc.c (793L, 17.7KB)
-│   ├── ramdisk.c (54L, 1016B)
-│   ├── sd.c (379L, 9.6KB)
-│   ├── sig_trampoline.S (25L, 524B)
-│   ├── signal.c (272L, 6.2KB)
-│   ├── sleeplock.c (56L, 973B)
-│   ├── spi.c (81L, 1.9KB)
-│   ├── spinlock.c (85L, 2.2KB)
-│   ├── string.c (143L, 2.2KB)
-│   ├── swtch.S (42L, 828B)
-│   ├── sysfile.c (932L, 18.4KB)
-│   ├── syslog.c (79L, 1.5KB)
-│   ├── syspoll.c (18L, 350B)
-│   ├── sysproc.c (215L, 3.4KB)
-│   ├── syssig.c (110L, 2.0KB)
-│   ├── systime.c (132L, 2.9KB)
-│   ├── timer.c (50L, 1010B)
-│   ├── trampoline.S (147L, 3.7KB)
-│   ├── trap.c (297L, 7.9KB)
-│   ├── uarg.c (157L, 3.3KB)
-│   ├── uname.c (60L, 1.7KB)
-│   ├── vm.c (336L, 8.0KB)
-│   └── vma.c (603L, 13.1KB)
-├── syscall/
-│   ├── sys.sh (1.9KB)
-│   └── syscall.c (20L, 506B)
-├── usrinit/
-│   ├── busybox_test.c (80L, 3.2KB)
-│   ├── initcode.S (47L, 673B)
-│   ├── lmbench_test.c (57L, 3.2KB)
-│   ├── lua_test.c (40L, 810B)
-│   ├── mytest.sh (54B)
-│   ├── printf.c (112L, 2.1KB)
-│   ├── sacrifice.c (11L, 215B)
-│   └── user.h (60L, 1.3KB)
-├── .gdbinit (177B)
-├── .gdbinit.tmpl-riscv (177B)
-├── Makefile (3.9KB)
-├── README.md (97L, 1.9KB)
-├── compile_flags.txt (331B)
-├── disk.img (4.0MB)
-├── test (27B)
-└── test-gdb (38B)
-
-根目录文档: README.md
-
-📊 统计: 12 个目录, 171 个文件 (深度限制: 10 层)
-```
-
----
-
-## 执行摘要（Executive Summary）
-
-`oskernrl2022-rv6` 是一个基于 xv6-k210 改编的 **RISC-V 教学操作系统内核**，采用纯 C 语言实现的宏内核架构。项目目标平台为 QEMU `sifive_u` 虚拟机和 SiFive FU740 硬件开发板，开发周期 21 天（2022-08-01 至 2022-08-21），代码规模约 12,000 行内核代码。
-
-**技术栈概览**：
-- **编程语言**：C（C99 规范）+ RISC-V 汇编（`.S` 文件）
-- **目标架构**：riscv64（Sv39 三级页表，39 位虚拟地址空间）
-- **工具链**：`riscv64-linux-gnu-` GCC 工具链
-- **构建系统**：Makefile 宏配置（支持 `QEMU`/`SIFIVE_U` 平台切换）
-
-**实现完成度评估**：
-内核核心子系统基本闭环：✅ 启动引导、✅ 物理/虚拟内存管理、✅ 进程/线程调度、✅ FAT32 文件系统、✅ 60+ 系统调用、✅ 信号机制、✅ 管道 IPC。但关键高级特性缺失：❌ 网络协议栈（仅头文件）、❌ 写时复制（CoW）、❌ 缺页异常处理、❌ SMP 多核调度优化、❌ 安全权限检查。整体为**功能完整的教学内核**，但距离生产级 OS 存在明显差距。
-
----
-
-## 核心架构与机制提炼
-
-### 1. 内存管理子系统
-
-#### 物理内存分配器（Frame Allocator）
-- **实现位置**：`src/pm.c`
-- **分配模型**：基于**空闲链表（Free List）** 的页级分配器，非 Buddy System
-- **管理范围**：`kernel_end` 至 `PHYSTOP`（128MB 物理内存上限）
-- **核心接口**：
-  ```c
-  // src/pm.c:56-80
-  void *allocpage(void);  // 从空闲链表头部取页
-  void freepage(void *pa); // 释放页至链表头部
-  ```
-- **线程安全**：通过 `kmem.lock` 自旋锁保护
-
-#### 内核堆分配器（Slab-like）
-- **实现位置**：`src/kmalloc.c`
-- **分配粒度**：32 字节至 4048 字节（17 个哈希桶）
-- **对齐要求**：16 字节对齐（`ROUNDUP16()`）
-- **核心结构**：
-  ```c
-  // src/kmalloc.c:17-40
-  struct kmem_node {
-    uint64 obj_size;      // 对象大小
-    uint64 obj_addr;      // 首个对象地址
-    uint8 avail;          // 可用对象索引
-    uint8 table[KMEM_OBJ_MAX_COUNT];  // 空闲链表
-  };
-  ```
-
-#### 虚拟内存与页表（Sv39）
-- **实现位置**：`src/vm.c`
-- **页表格式**：Sv39 三级页表（512 表项/级，9 位索引/级）
-- **核心操作**：
-  ```c
-  // src/vm.c:137-156
-  pte_t *walk(pagetable_t pagetable, uint64 va, int alloc);  // 页表遍历
-  int mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm);  // 映射
-  void vmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free);  // 解除映射
-  ```
-- **地址空间布局**：
-  | 区域 | 虚拟地址范围 | 权限 |
-  |------|-------------|------|
-  | 内核代码 | `0x80200000` ~ `etext` | R+X |
-  | 内核数据 | `etext` ~ `PHYSTOP` | R+W |
-  | Trampoline | `USER_TOP - PGSIZE` | R+X |
-  | 用户栈 | `USER_STACK_BOTTOM` ~ `USER_STACK_TOP` | R+W |
-  | mmap 区域 | `USER_MMAP_START` ~ `USER_STACK_BOTTOM` | 可变 |
-
-#### VMA（Virtual Memory Area）管理
-- **实现位置**：`src/vma.c`
-- **数据结构**：双向链表（`struct vma`）
-- **段类型**：`CODE`, `DATA`, `BSS`, `HEAP`, `MMAP`, `STACK`, `TRAP`
-- **mmap 实现**（`src/mmap.c:do_mmap()`）：
-  - ✅ 支持 `MAP_ANONYMOUS`（匿名映射）
-  - ✅ 支持 `MAP_FIXED`（固定地址映射）
-  - ❌ `MAP_PRIVATE` 的写时复制**未实现**
-  - ❌ **按需分页（Demand Paging）未实现**：映射时立即调用 `fileread()` 预读文件内容
-
-#### ❌ 缺失的高级内存特性
-| 特性 | 状态 | 证据 |
-|------|------|------|
-| 写时复制（CoW） | ❌ 未实现 | `uvmcopy()` 直接深拷贝物理页，无 CoW 标志 |
-| 懒分配（Lazy Allocation） | ❌ 未实现 | `uvmalloc()` 立即分配物理页，无页故障处理 |
-| 缺页异常处理 | ❌ 未实现 | `handle_page_fault()` 仅声明，`trap.c:102` 中被注释 |
-| 交换区（Swap） | ❌ 未实现 | 无 `swap_out`/`swap_in` 代码 |
-| 大页支持 | ❌ 未实现 | 仅处理 4KB 页，无 2MB/1GB 页表项 |
-
----
-
-### 2. 进程调度与线程模型
-
-#### 进程结构体（`struct proc`）
-- **实现位置**：`src/include/proc.h:115-171`
-- **统一模型**：进程/线程均使用 `struct proc` 表示，无独立 TCB
-- **关键字段**：
-  ```c
-  struct proc {
-    enum procstate state;        // UNUSED/SLEEPING/RUNNABLE/RUNNING/ZOMBIE
-    struct context context;      // 内核上下文（callee-saved 寄存器）
-    struct trapframe *trapframe; // 用户态寄存器保存
-    pagetable_t pagetable;       // 用户页表
-    struct vma *vma;             // VMA 链表头
-    int pid, uid, gid;           // 进程 ID、用户/组 ID
-    struct file **ofile;         // 文件描述符表
-    // 信号机制
-    ksigaction_t *sig_act;
-    __sigset_t sig_pending;
-    // 线程支持
-    uint64 set_child_tid, clear_child_tid;
-  };
-  ```
-
-#### 调度器实现
-- **实现位置**：`src/proc.c:119-152`
-- **调度算法**：**FIFO 就绪队列**（全局单队列）
-- **调度流程**：
-  ```c
-  // src/proc.c:119-152
-  void scheduler() {
-    struct cpu *c = mycpu();
-    for(;;) {
-      struct proc* p = readyq_pop();  // 从全局队列取进程
-      if(p) {
-        p->state = RUNNING;
-        w_satp(MAKE_SATP(p->pagetable));  // 切换页表
-        swtch(&c->context, &p->context);  // 上下文切换
-      } else {
-        asm volatile("wfi");  // 无进程时低功耗等待
-      }
-    }
-  }
-  ```
-- **❌ 未实现**：优先级调度、时间片轮转、CPU 亲和性、负载均衡
-
-#### 上下文切换
-- **实现位置**：`src/swtch.S`
-- **保存寄存器**：`ra`, `sp`, `s0-s11`（共 14 个 callee-saved 寄存器）
-- **切换流程**：
-  ```assembly
-  swtch:
-    sd ra, 0(a0)    # 保存旧上下文
-    sd sp, 8(a0)
-    sd s0, 16(a0)
-    # ...
-    ld ra, 0(a1)    # 恢复新上下文
-    ld sp, 8(a1)
-    # ...
-    ret
-  ```
-
-#### 进程创建流程
-| 系统调用 | 实现位置 | 地址空间处理 |
-|---------|---------|-------------|
-| `clone()` | `src/proc.c:408-492` | `CLONE_VM` 设置时浅拷贝 VMA，否则深拷贝 |
-| `exec()` | `src/exec.c:176-378` | 创建新页表，加载 ELF，重建地址空间 |
-| `fork()` | ❌ 未直接实现 | 通过 `clone(0, 0, 0, 0, 0)` 间接实现 |
-
-#### 信号机制
-- **实现位置**：`src/signal.c`, `src/syssig.c`
-- **支持信号**：`SIGTERM(15)`, `SIGKILL(9)`, `SIGABRT(6)`, `SIGCHLD(17)`, `SIGRTMIN(34)`~`SIGRTMAX(64)`
-- **处理流程**：
-  ```mermaid
-  graph TD
-    A["sys_kill
- syssig.c:94"] --> B["kill
- proc.c:754"]
-    B --> C["设置 p->sig_pending"]
-    C --> D["usertrap
- trap.c:72"]
-    D --> E["sighandle
- signal.c:118"]
-    E --> F["设置 sig_trampoline"]
-  ```
-- **🔸 部分实现**：`sa_mask` 阻塞掩码未完全生效，`siginfo_t` 未实现
-
----
-
-### 3. 文件系统（VFS + FAT32）
-
-#### VFS 抽象层
-- **文件结构**（`src/include/file.h:14-30`）：
-  ```c
-  struct file {
-    enum { FD_NONE, FD_PIPE, FD_ENTRY, FD_DEVICE } type;
-    int ref;                // 引用计数
-    struct dirent *ep;      // 指向 FAT32 目录项
-    uint64 off;             // 文件偏移
-  };
-  ```
-- **目录项结构**（`src/include/fat32.h:36-67`）：融合 Dentry + Inode 功能
-  ```c
-  struct dirent {
-    char filename[256];
-    uint32 first_clus;      // 首簇号（等价于 inode number）
-    uint32 file_size;
-    struct dirent *parent;  // 父目录指针
-    struct sleeplock lock;  // 条目级锁
-  };
-  ```
-
-#### FAT32 实现
-- **实现位置**：`src/fat32.c`（1181 行）
-- **核心功能**：
-  - ✅ 长文件名支持（VFAT LFN）
-  - ✅ 簇链管理（`read_fat`/`write_fat`/`alloc_clus`）
-  - ✅ 路径解析（`ename`/`lookup_path`/`dirlookup`）
-  - ✅ 文件创建（`create`/`ealloc`/`emake`）
-  - ✅ 挂载机制（`emount`）
-- **文件打开调用链**：
-  ```mermaid
-  graph TD
-    A["sys_openat
- sysfile.c:41"] --> B["ename
- fat32.c:1084"]
-    B --> C["lookup_path
- fat32.c:950"]
-    C --> D["dirlookup
- fat32.c:886"]
-    A --> E["filealloc
- file.c:43"]
-    A --> F["fdalloc
- sysfile.c:28"]
-  ```
-
-#### ❌ 未实现的文件系统
-| 文件系统 | 状态 | 验证方法 |
-|---------|------|---------|
-| Ext2/Ext4 | ❌ 未实现 | 搜索 `ext4|Ext4` 无匹配 |
-| RamFS/TmpFS | ❌ 未实现 | 仅有 `ramdisk.c`（块设备层，非文件系统） |
-| 网络文件系统（NFS） | ❌ 未实现 | 无网络协议栈 |
-| 伪文件系统（procfs/sysfs） | ❌ 未实现 | 无 `/proc` 动态目录 |
-
-#### 管道（Pipe）
-- **实现位置**：`src/pipe.c`
-- **缓冲区**：512 字节环形缓冲区
-- **阻塞机制**：缓冲区满/空时通过 `sleep`/`wakeup` 阻塞
-- **系统调用**：`sys_pipe2()`（`src/sysfile.c:830-868`）
-
----
-
-### 4. 中断与系统调用
-
-#### Trap 处理流程
-- **用户态入口**：`src/trampoline.S:uservec`
-- **内核态入口**：`src/kernelvec.S:kernelvec`
-- **异常类型**（`src/trap.c:20-39`）：
-  ```c
-  #define EXCP_ENV_CALL     0x8   // 系统调用 (ecall)
-  #define EXCP_LOAD_PAGE    0xd   // 取页异常
-  #define EXCP_STORE_PAGE   0xf   // 存页异常
-  #define INTR_TIMER        (0x5 | INTERRUPT_FLAG)  // 定时器中断
-  #define INTR_EXTERNAL     (0x9 | INTERRUPT_FLAG)  // 外部中断
-  ```
-
-#### 系统调用分发
-- **实现位置**：`syscall/syscall.c`
-- **参数传递**：`a7` 寄存器存调用号，`a0-a5` 存参数，`a0` 返回结果
-- **已实现调用**（60+ 个）：
-  | 类别 | 系统调用 | 状态 |
-  |------|---------|------|
-  | 进程 | `fork`, `execve`, `exit`, `wait4`, `clone` | ✅ |
-  | 文件 | `openat`, `read`, `write`, `close`, `getdents64` | ✅ |
-  | 内存 | `brk`, `mmap`, `munmap` | ✅ |
-  | 信号 | `rt_sigaction`, `rt_sigprocmask`, `kill` | ✅ |
-  | 其他 | `getpid`, `getuid`, `uname`, `sysinfo` | ✅ |
-
-#### 🔸 桩函数检测
-| 系统调用 | 实现位置 | 问题 |
-|---------|---------|------|
-| `sys_exit_group` | `src/syssig.c:9-11` | 直接返回 0，无实际逻辑 |
-| `sys_ppoll` | `src/syspoll.c` | 直接返回 0，无实现 |
-| `sys_getuid/setuid` | `src/sysproc.c` | 无权限检查，任意进程可修改 UID |
-
----
-
-### 5. 设备驱动与硬件抽象
-
-#### 驱动架构
-- **设备发现**：❌ 无设备树（DTB）解析，地址硬编码（`src/include/memlayout.h`）
-- **驱动框架**：🔸 静态设备表（`struct devsw devsw[NDEV]`），无动态注册
-- **平台支持**：
-  | 平台 | 宏定义 | UART 地址 | 存储后端 |
-  |------|--------|-----------|---------|
-  | QEMU sifive_u | `QEMU` | `0x10000000` | VirtIO/RAM 磁盘 |
-  | SiFive FU740 | `SIFIVE_U` | `0x10010000` | SPI+SD 卡 |
-
-#### 已实现驱动
-| 驱动 | 实现位置 | 状态 |
-|------|---------|------|
-| UART/Console | `src/include/sbi.h` | ✅ 通过 SBI 调用抽象 |
-| RAM 磁盘 | `src/ramdisk.c` | ✅ 内存模拟磁盘 |
-| SD 卡（SPI） | `src/sd.c`, `src/spi.c` | ✅ 完整初始化/读写 |
-| FAT32 文件系统 | `src/fat32.c` | ✅ 完整支持 |
-
-#### ❌ 未实现驱动
-| 驱动 | 验证方法 |
-|------|---------|
-| VirtIO-Net | 仅 `src/include/virtio.h` 定义，无实现 |
-| 网卡驱动 | 搜索 `virtio_net|ixgbe|e1000` 无结果 |
-| PLIC 完整驱动 | `devintr()` 中 `irq` 硬编码为 0 |
-| GPIO/I2C | 仅头文件定义，无驱动代码 |
-
----
-
-### 6. 同步与 IPC
-
-#### 锁机制
-| 锁类型 | 实现位置 | 原理 |
-|--------|---------|------|
-| SpinLock | `src/spinlock.c` | `amoswap.w.aq` 原子指令 + 禁用中断 |
-| SleepLock | `src/sleeplock.c` | 嵌套 SpinLock + WaitQueue |
-
-#### 等待队列
-- **实现位置**：`src/proc.c:76-89`（`allocwaitq`）, `src/proc.c:542-592`（`sleep`/`wakeup`）
-- **队列池**：100 个固定队列（`waitq_pool[WAITQ_NUM]`）
-- **睡眠流程**：
-  ```c
-  // src/proc.c:542-576
-  void sleep(void *chan, struct spinlock *lk) {
-    queue* q = findwaitq(chan);
-    if(!q) q = allocwaitq(chan);
-    waitq_push(q, p);
-    p->state = SLEEPING;
-    sched();  // 触发调度
-  }
-  ```
-
-#### IPC 机制支持
-| 机制 | 状态 | 证据 |
-|------|------|------|
-| Pipe | ✅ 已实现 | `src/pipe.c` 完整实现 |
-| Signal | ✅ 已实现 | `src/signal.c` 支持 `kill`/`sigaction` |
-| Futex | 🔸 桩函数 | `do_futex()` 仅声明，无实现 |
-| Message Queue | ❌ 未实现 | 搜索 `msgget|msgsnd` 无结果 |
-| Semaphore | ❌ 未实现 | 搜索 `semget|semop` 无结果 |
-| Shared Memory | ❌ 未实现 | 搜索 `shmget|shmat` 无结果 |
-
----
-
-### 7. 多核支持（SMP）
-
-#### 多核启动
-- **实现位置**：`src/main.c:77-89`, `src/include/sbi.h:78-83`
-- **启动机制**：通过 SBI HSM 扩展（`start_hart()`）唤醒 Secondary CPU
-- **同步标志**：`started` 变量，Secondary CPU 忙等待
-- **状态**：✅ 启动框架完整，但实际仅单核运行（`started` 标志未正确使用）
-
-#### Per-CPU 变量
-- **实现位置**：`src/cpu.c:32-48`
-- **结构定义**：
-  ```c
-  struct cpu {
-    struct proc *proc;      // 当前运行进程
-    struct context context; // 调度器上下文
-    int noff;               // 中断禁用嵌套计数
-  };
-  ```
-- **访问方式**：`mycpu()` 通过 `tp` 寄存器读取 hartid 索引
-
-#### ❌ 缺失的多核特性
-| 特性 | 状态 | 说明 |
-|------|------|------|
-| Per-CPU 就绪队列 | ❌ 未实现 | 所有核心共享全局 `readyq` |
-| IPI 通信 | 🔸 接口存在但未使用 | `send_ipi()` 定义但无调用 |
-| 负载均衡 | ❌ 未实现 | 无进程迁移逻辑 |
-| CPU 亲和性 | ❌ 未实现 | 无 `cpumask` 绑定 |
-| TLB 刷新 IPI | ❌ 未实现 | 页表更新后未通知其他核心 |
-
----
-
-### 8. 安全机制
-
-#### 特权级隔离
-- **实现位置**：`src/trap.c:155-158`
-- **机制**：通过 `sstatus.SPP` 位区分用户/内核态
-- **页表权限**：`PTE_U` 位标记用户可访问页面
-
-#### UID/GID 权限模型
-- **字段定义**：`src/include/proc.h:141-142`（`struct proc` 包含 `uid`/`gid`）
-- **系统调用**：`sys_getuid`, `sys_setuid`, `sys_getgid`, `sys_setgid`
-- **🔸 桩函数**：`sys_setuid()` 直接赋值，**无权限检查**
-  ```c
-  // src/sysproc.c:72-82
-  uint64 sys_setuid(void) {
-    int uid;
-    argint(0, &uid);
-    myproc()->uid = uid;  // 无权限验证
-    return 0;
-  }
-  ```
-
-#### ❌ 未实现的安全特性
-| 特性 | 验证方法 |
-|------|---------|
-| Capability/ACL | 搜索 `capability|acl` 无结果 |
-| 命名空间（Namespace） | 仅定义 `CLONE_NEW*` 常量，无实现 |
-| 资源限制（RLIMIT） | 仅定义 `RLIMIT_*` 常量，无执行逻辑 |
-| Seccomp/Prctl | 搜索 `seccomp|prctl` 无结果 |
-| Stack Canary | Makefile 显式禁用（`-fno-stack-protector`） |
-| 安全启动 | 无签名验证代码 |
-
----
-
-## 问题与缺陷揭露
-
-基于代码审计，以下核心功能模块**未完成或仅有桩实现**：
-
-### 1. 网络子系统（❌ 完全缺失）
-- **Socket 接口**：仅 `src/include/socket.h` 头文件定义结构体，`socket_init()` 和 `add_socket()` **无实现代码**
-- **系统调用**：无 `sys_socket`, `sys_bind`, `sys_connect`, `sys_sendto`, `sys_recvfrom`
-- **协议栈**：无 TCP/UDP/IP 实现，无第三方库（如 smoltcp、lwIP）
-- **网卡驱动**：VirtIO-Net 仅头文件定义，无驱动实现
-- **Loopback 支持**：README 声称"完成本地回环支持"，但搜索 `loopback|127.0.0.1` **无代码证据**
-
-### 2. 内存管理高级特性（❌ 多项缺失）
-- **写时复制（CoW）**：`uvmcopy()` 直接深拷贝物理页，`vma_shallow_mapping()` 未设置 CoW 标志
-- **懒分配（Lazy Allocation）**：`uvmalloc()` 立即分配物理页，无页故障按需分配逻辑
-- **缺页异常处理**：`handle_page_fault()` 仅声明，`trap.c:102` 中处理逻辑被注释
-- **交换区（Swap）**：无 `swap_out`/`swap_in` 代码，无磁盘交换空间支持
-- **大页支持**：仅处理 4KB 页，无 2MB/1GB 页表项配置
-
-### 3. 多核并行机制（🔸 框架存在但未激活）
-- **SMP 调度**：全局单就绪队列，所有核心竞争同一 `readyq`，存在锁竞争瓶颈
-- **IPI 通信**：`send_ipi()` 接口定义但**无任何调用点**，未用于 TLB 刷新或跨核调度
-- **Per-CPU 优化**：无 Per-CPU 就绪队列、无 Per-CPU 分配器、无每核统计信息
-- **实际运行**：`main.c` 中 `started` 标志未正确使用，Secondary CPU 启动后实际仅单核调度
-
-### 4. 进程间通信（❌ 多项缺失）
-- **Futex**：`do_futex()` 仅接口声明（`src/include/proc.h:199`），**无实现代码**
-- **消息队列**：无 `msgget`/`msgsnd`/`msgrcv` 系统调用
-- **信号量**：无 `semget`/`semop` 系统调用
-- **共享内存**：无 `shmget`/`shmat`/`shmdt` 系统调用
-
-### 5. 安全权限模型（🔸 字段存在但无检查）
-- **UID/GID 权限检查**：`sys_setuid()`/`sys_setgid()` 直接赋值，**无 root 权限验证**
-- **文件访问控制**：`sys_openat()` 未检查进程 UID 与文件所有权的匹配关系
-- **Capability/ACL**：完全未实现
-- **命名空间隔离**：`CLONE_NEWNS`/`CLONE_NEWPID`/`CLONE_NEWNET` 仅常量定义，无处理逻辑
-- **资源限制**：`RLIMIT_*` 常量定义但无执行逻辑，`struct proc` 无 `rlimit` 字段
-
-### 6. 调试与可观测性（❌ 多项缺失）
-- **GDB Stub**：无内核级 GDB 远程调试协议实现，仅依赖 QEMU 外部 GDB Server
-- **交互式 Monitor**：无内核命令解析器（如 `ps`、`ls`、`help`）
-- **性能分析**：无 Perf/ftrace 集成
-- **运行时断言**：无 `assert()` 宏实现，仅链接器和静态断言
-
-### 7. 文件系统（❌ 单一格式）
-- **仅支持 FAT32**：无 Ext2/Ext4、无 RamFS/TmpFS、无网络文件系统
-- **无伪文件系统**：无 `/proc`、`/sys` 动态信息接口
-- **mmap 性能**：Eager Copy 策略（映射时立即读取文件），无 Demand Paging 优化
-
-### 8. 系统调用完整性（🔸 部分桩函数）
-| 系统调用 | 问题 |
-|---------|------|
-| `sys_exit_group` | 直接返回 0，无实际逻辑 |
-| `sys_ppoll` | 直接返回 0，无实现 |
-| `sys_futex` | 无系统调用入口 |
-| `sys_socket` 系列 | 无系统调用入口 |
-| `sys_prlimit64` | 无实现 |
-
-### 9. 架构与平台支持（❌ 单一架构）
-- **仅支持 RISC-V 64 位**：无 aarch64、x86_64、loongarch64 支持
-- **StarFive VisionFive2**：搜索 `visionfive|jh7110` 无结果
-- **设备树解析**：`main()` 接收 `dtb_pa` 参数但**未使用**，硬件配置硬编码
-
-### 10. 其他缺失特性
-| 特性 | 状态 |
-|------|------|
-| 进程组/会话（PGID/SID） | ❌ 未实现 |
-| 动态链接器 | ❌ 未实现（ELF 加载但不处理 `.dynsym` 段） |
-| 审计日志（Audit） | ❌ 未实现 |
-| 安全启动（Secure Boot） | ❌ 未实现 |
-| 优先级继承锁 | ❌ 未实现 |
-
----
-
-**总结**：`oskernrl2022-rv6` 是一个功能相对完整的教学操作系统内核，核心子系统（启动、内存、进程、文件系统、中断）已实现闭环。但距离生产级 OS 存在明显差距：**网络功能完全缺失**、**多核并行未激活**、**安全权限检查未强制执行**、**高级内存特性（CoW/Lazy）未实现**。项目适合作为 RISC-V 操作系统教学参考，但不具备实际部署能力。
 
 ---
 
@@ -701,399 +41,96 @@ oskernrl2022-rv6/
 
 ## 第 1 章：项目概览与技术栈
 
-## 结论摘要
-
-1. **项目身份**：`oskernrl2022-rv6` 是一个基于 **xv6-k210** 改编的 **RISC-V 教学操作系统**，目标平台为 QEMU 的 `sifive_u` 机器以及真实硬件 **Fu740** 开发板。项目并非基于 ArceOS 或其他现代 Rust 框架，而是采用传统 C 语言实现的类 Unix 内核。
-
-2. **内核类型**：**宏内核（Monolithic Kernel）**架构。所有核心子系统（进程管理、内存管理、文件系统、设备驱动）均编译为单一内核镜像 `kernel`，运行在 Supervisor Mode（S 态）。
-
-3. **架构支持**：
-   - ✅ **riscv64**（RISC-V 64 位）：唯一支持的架构
-   - 使用 `riscv64-linux-gnu-` 工具链编译
-   - 采用 **Sv39** 三级页表架构进行虚拟内存管理
-
-4. **关键入口**：
-   - 汇编入口：`src/entry.S:_entry`（多核启动入口）
-   - C 语言入口：`src/main.c:main()`（内核初始化）
-   - 调度器入口：`src/proc.c:scheduler()`（空闲时执行进程调度）
-
-5. **核心特性验证**：
-   - ✅ 多核启动（支持 5 个 HART）
-   - ✅ 分页内存管理（Sv39，支持缺页中断）
-   - ✅ 进程/线程管理（支持 fork、exec、clone 系统调用）
-   - ✅ FAT32 文件系统（支持 SD 卡和 RAM 磁盘）
-   - ✅ 系统调用（60+ 个 Linux RISC-V ABI 兼容调用）
-   - ✅ 信号机制（支持 sigaction、rt_sigreturn）
-   - ✅ 内存映射（支持 mmap、munmap）
-   - 🔸 Socket 支持（仅本地回环，文档提及但代码有限）
-
-## 技术栈与构建
-
-### 编程语言与规范
-
-```c
-// 纯 C 语言实现，无 C++ 或 Rust
-// 使用 freestanding 模式（无标准库）
-CFLAGS += -ffreestanding -fno-common -nostdlib
-CFLAGS += -mcmodel=medany  // RISC-V 中内存模型
-CFLAGS += -march=rv64g     // RV64IMAFD 指令集
-```
-
-- **语言**：C（C99 规范），少量 RISC-V 汇编（`.S` 文件）
-- **标准**：`-nostdlib`（无标准 C 库），内核自实现 `printf`、`string.h` 等
-- **代码规模**：66 个 C/C++ 文件，约 170 个源文件总计
-
-### 构建系统
-
-**Makefile 关键配置**（`Makefile:1-50`）：
-
-```makefile
-TOOLPREFIX = riscv64-linux-gnu-
-CC = $(TOOLPREFIX)gcc
-AS = $(TOOLPREFIX)gas
-LD = $(TOOLPREFIX)ld
-
-# 编译选项
-CFLAGS = -Wall -Werror -O -fno-omit-frame-pointer -ggdb
-CFLAGS += -DDEBUG -DWARNING -DERROR
-CFLAGS += -D$(FS) -D$(MAC)  # 文件系统/平台宏
-
-# 链接脚本
-LDFLAGS = -z max-page-size=4096
-$K/kernel: $(OBJS) $(LINKER)
-	$(LD) $(LDFLAGS) -T $(LINKER) -o $K/kernel $(OBJS)
-```
-
-**构建目标**：
-- `make qemu`：在 QEMU 中启动（默认 5 核）
-- `make all`：生成 `os.bin` 二进制镜像
-- `make disk.img`：创建 FAT32 磁盘镜像
-
-### 配置选项
-
-| 配置项 | 选项 | 说明 |
-|--------|------|------|
-| `platform` | `qemu` / `sifive_u` | 目标平台（QEMU 模拟器或 Fu740 真机） |
-| `init` | `cmd-user` / `cmd-sd` / `runall` | 用户程序加载方式 |
-| `fat` | `FAT` / `RAM` | 文件系统后端（SD 卡或内存盘） |
-| `CPUS` | 1-8（默认 5） | 启动的 HART 数量 |
-
-### 依赖与子模块
-
-- **无外部依赖**：项目为独立内核，不依赖 ArceOS、rCore 等框架
-- **SBI 固件**：使用 `sbi/fw_jump.elf`（OpenSBI 兼容）作为引导固件
-- **用户程序**：`sd/` 目录包含 busybox、lua、lmbench 等测试程序
-
-## 目录结构导读
-
-```
-oskernrl2022-rv6/
-├── src/                      # 内核核心代码（45 个 C 文件）
-│   ├── main.c               # 内核入口（多核初始化）
-│   ├── entry.S              # 汇编启动入口
-│   ├── proc.c               # 进程管理（793 行，17.7KB）⭐
-│   ├── vm.c                 # 虚拟内存（336 行，8.0KB）⭐
-│   ├── vma.c                # VMA 管理（603 行，13.1KB）
-│   ├── kmalloc.c            # 内核内存分配（280 行）
-│   ├── trap.c               # 中断/异常处理（297 行）
-│   ├── syscall.c            # 系统调用分发（由 sys.sh 生成）
-│   ├── sysproc.c            # 进程相关系统调用
-│   ├── sysfile.c            # 文件相关系统调用（932 行）
-│   ├── exec.c               # ELF 加载与执行（378 行）
-│   ├── fat32.c              # FAT32 文件系统（1181 行，37.0KB）⭐
-│   ├── file.c               # 文件描述符管理
-│   ├── signal.c             # 信号处理（272 行）
-│   ├── mmap.c               # 内存映射（238 行）
-│   ├── swtch.S              # 上下文切换汇编
-│   ├── trampoline.S         # Trap 出入口代码
-│   └── include/             # 头文件（51 个.h 文件）
-│       ├── proc.h           # 进程结构体定义
-│       ├── vm.h             # 页表操作接口
-│       ├── vma.h            # VMA 结构定义
-│       ├── syscall.h        # 系统调用接口
-│       └── riscv.h          # RISC-V CSR 定义
-│
-├── syscall/                  # 系统调用生成脚本
-│   ├── sys.sh               # 生成 syscall.c 的脚本
-│   └── syscall.c            # 系统调用表模板
-│
-├── usrinit/                  # 用户空间初始化代码
-│   ├── initcode.S           # 第一个用户进程（init）
-│   ├── user.h               # 用户库头文件
-│   └── printf.c             # 用户态 printf
-│
-├── linker/                   # 链接脚本
-│   └── kernel.ld            # 内核内存布局定义
-│
-├── sd/                       # 用户程序与测试文件
-│   ├── busybox              # BusyBox 工具集
-│   ├── lua                  # Lua 解释器
-│   └── lmbench_all          # 性能测试套件
-│
-├── doc/                      # 设计文档（22 个.md 文件）
-│   ├── 内核实现--内存管理.md
-│   ├── 内核实现--系统调用.md
-│   ├── 内核实现--文件系统.md
-│   └── 内核实现--多核启动.md
-│
-└── sbi/                      # SBI 固件
-    └── fw_jump.elf          # OpenSBI 固件（1.0MB）
-```
-
-### 子系统→目录→入口文件映射
-
-| 子系统 | 目录 | 核心文件 | 入口函数 |
-|--------|------|----------|----------|
-| **启动** | `src/` | `entry.S`, `main.c` | `_entry`, `main()` |
-| **进程管理** | `src/` | `proc.c`, `sysproc.c` | `scheduler()`, `userinit()` |
-| **内存管理** | `src/` | `vm.c`, `vma.c`, `kmalloc.c` | `kvminit()`, `alloc_vma()` |
-| **文件系统** | `src/` | `fat32.c`, `file.c`, `sysfile.c` | `fs_init()`, `sys_openat()` |
-| **中断处理** | `src/` | `trap.c`, `trampoline.S` | `usertrap()`, `uservec` |
-| **系统调用** | `src/`, `syscall/` | `syscall.c`, `sys.sh` | `syscall()` |
-| **设备驱动** | `src/`, `src/sifive/` | `sd.c`, `spi.c`, `uart.h` | `disk_init()` |
-
-## 核心子系统概览
-
-### 内存管理
-
-**实现状态**：✅ 已实现
-
-**架构**：Sv39 三级页表（512 个表项/级），支持 39 位虚拟地址空间
-
-**关键机制**：
-
-1. **内核页表初始化**（`vm.c:kvminit()`）：
-   ```c
-   void kvminit() {
-     kernel_pagetable = (pagetable_t) allocpage();
-     kvmmap(KERNBASE, KERNBASE, etext - KERNBASE, PTE_R|PTE_X);  // 代码段
-     kvmmap((uint64)etext, (uint64)etext, PHYSTOP - (uint64)etext, PTE_R|PTE_W);  // 数据段
-     kvmmap(TRAMPOLINE, (uint64)trampoline, PGSIZE, PTE_R|PTE_X);  // Trap 出入口
-   }
-   ```
-
-2. **物理内存分配**：
-   - `kmalloc.c`：实现基于 **slab 分配器** 的内核对象分配（`KMEM_OBJ_MIN_SIZE=32B`）
-   - `vm.c`：页级分配（`allocpage()`/`kfree()`）
-
-3. **VMA（Virtual Memory Area）管理**（`vma.c`）：
-   - 每个进程维护双向链表 `struct vma`
-   - 支持段类型：`CODE`, `DATA`, `STACK`, `TRAP`, `MMAP`
-   - `alloc_vma()` 函数处理 VMA 分配与冲突检测
-
-4. **内存映射**（`mmap.c:do_mmap()`）：
-   - ✅ 支持 `MAP_ANONYMOUS`（匿名映射）
-   - ✅ 支持 `MAP_FIXED`（固定地址映射）
-   - ✅ 支持文件映射（通过 `fd` 参数）
-   - 权限位：`PROT_READ`/`PROT_WRITE`/`PROT_EXEC`
-
-5. **缺页中断处理**：
-   - `trap.c` 识别 `EXCP_LOAD_PAGE`（0xd）和 `EXCP_STORE_PAGE`（0xf）
-   - 文档提及但代码中未找到完整的 **Lazy Allocation** 实现（需进一步验证）
-
-**未实现/桩函数**：
-- ❌ **CoW（Copy-on-Write）**：未在代码中找到 `forkret()` 的 CoW 逻辑，`fork()` 直接复制页表
-- ❌ **Swap 分页交换**：无磁盘交换空间支持
-
-### 进程管理
-
-**实现状态**：✅ 已实现
-
-**进程结构**（`proc.h`）：
-```c
-struct proc {
-  struct spinlock lock;
-  enum procstate state;        // UNUSED, USED, SLEEPING, RUNNABLE, RUNNING, ZOMBIE
-  struct context context;      // 内核上下文（swtch 使用）
-  struct trapframe *trapframe; // 用户态寄存器保存
-  struct vma *vma;             // VMA 链表头
-  pagetable_t pagetable;       // 用户页表
-  int pid;
-  struct proc *parent;         // 父进程
-  // ... 文件描述符、信号等
-};
-```
-
-**调度器**（`proc.c:scheduler()`）：
-```c
-void scheduler() {
-  struct cpu *c = mycpu();
-  for(;;) {
-    struct proc* p = readyq_pop();  // 从就绪队列取进程
-    if(p) {
-      p->state = RUNNING;
-      c->proc = p;
-      w_satp(MAKE_SATP(p->pagetable));  // 切换页表
-      swtch(&c->context, &p->context);  // 上下文切换
-      // ... 恢复运行
-    } else {
-      intr_on();
-      asm volatile("wfi");  // 无进程时进入低功耗
-    }
-  }
-}
-```
-
-**调度算法**：
-- ✅ **FIFO 就绪队列**（`queue readyq`）
-- 🔸 **时间片轮转**：通过时钟中断触发 `yield()`，但未见优先级调度
-- ❌ **CFS/多级反馈队列**：文档未提及，代码中未发现
-
-**进程创建流程**：
-1. `userinit()`：创建第一个用户进程（执行 `initcode`）
-2. `fork()`：复制父进程（`proc.c` 中未找到完整实现，需检查 `sysproc.c`）
-3. `exec()`：加载 ELF 文件（`exec.c:exec()`）
-
-**线程支持**：
-- ✅ `clone` 系统调用（`sys.sh:220`）支持 `CLONE_THREAD`/`CLONE_VM` 等标志
-- 内核文档提及"线程相关"（`doc/内核实现--线程相关.md`）
-
-### 文件系统
-
-**实现状态**：✅ 已实现
-
-**文件系统类型**：
-- ✅ **FAT32**：完整实现（`fat32.c:1181 行`）
-- ✅ **RAM 磁盘**：内存模拟磁盘（`ramdisk.c`）
-- ✅ **SD 卡**：通过 SPI 协议读写（`sd.c`, `spi.c`）
-
-**VFS 接口**（`file.c`）：
-```c
-struct file {
-  enum { FD_NONE, FD_PIPE, FD_INODE, FD_DEVICE } type;
-  int ref;  // 引用计数
-  struct dirent *ep;  // FAT32 目录项
-  // ...
-};
-```
-
-**关键系统调用**（`sysfile.c`）：
-- `sys_openat()`：打开/创建文件（支持 `O_CREATE`/`O_RDWR`）
-- `sys_read()`/`sys_write()`：文件 I/O
-- `sys_getdents64()`：读取目录项
-- `sys_unlinkat()`/`sys_mkdirat()`：目录操作
-
-**FAT32 实现细节**（`fat32.c`）：
-- 支持长文件名（LFN）和短文件名（8.3 格式）
-- `fat32_init()`：读取 BPB（Boot Parameter Block）
-- `ename()`：路径解析（支持相对/绝对路径）
-
-**未实现**：
-- ❌ **ext2/ext4**：代码中未发现
-- ❌ **网络文件系统（NFS）**：无相关代码
-
-### 网络
-
-**实现状态**：🔸 部分实现（桩函数/有限支持）
-
-**文档声明**（README.md）：
-> "完成了对本地回环地址的 Socket 支持"
-
-**代码验证**：
-- `src/include/socket.h`：仅 15 行，定义基本常量
-- `src/pipe.c`：实现管道（非网络 Socket）
-- ❌ **TCP/IP 协议栈**：未发现 `lwip`、`smoltcp` 或自定义协议栈
-- ❌ **网卡驱动**：无 Ethernet/WiFi 驱动代码
-
-**结论**：网络功能**仅有接口定义**，实际仅支持 **本地回环（loopback）** 的桩实现，无真实网络通信能力。
-
-### 系统调用
-
-**实现状态**：✅ 已实现（60+ 个调用）
-
-**系统调用表生成**（`syscall/sys.sh`）：
-```bash
-entry 221 execve    # 生成 SYS_execve 宏和 sys_execve 函数
-entry 220 clone     # 线程创建
-entry 214 brk       # 堆管理
-entry 222 mmap      # 内存映射
-```
-
-**关键系统调用分类**：
-
-| 类别 | 系统调用 | 实现文件 | 状态 |
-|------|----------|----------|------|
-| **进程** | `fork`, `execve`, `exit`, `wait4`, `clone` | `sysproc.c` | ✅ |
-| **文件** | `openat`, `read`, `write`, `close`, `getdents64` | `sysfile.c` | ✅ |
-| **内存** | `brk`, `mmap`, `munmap` | `sysfile.c`, `mmap.c` | ✅ |
-| **信号** | `rt_sigaction`, `rt_sigprocmask`, `rt_sigreturn`, `kill` | `syssig.c` | ✅ |
-| **时间** | `clock_gettime`, `nanosleep`, `syslog` | `systime.c` | ✅ |
-| **其他** | `getpid`, `getuid`, `uname`, `sysinfo` | `sysproc.c` | ✅ |
-
-**调用流程**（`trap.c:usertrap()` → `syscall()`）：
-```c
-void syscall() {
-  int num = myproc()->trapframe->a7;  // RISC-V a7 寄存器存系统调用号
-  if(num > 0 && num < NELEM(syscalls) && syscalls[num]) {
-    p->trapframe->a0 = syscalls[num]();  // 调用对应函数
-  } else {
-    p->trapframe->a0 = -1;  // 无效调用号
-  }
-}
-```
-
-**桩函数检测**：
-- `sys_getuid()`/`sys_getgid()`：直接返回 `myproc()->uid`，无权限检查（🔸 简化实现）
-- `sys_poll()`（`syspoll.c`）：仅 14 行，可能为桩函数
-
-### 中断与异常处理
-
-**实现状态**：✅ 已实现
-
-**Trap 入口**（`trampoline.S:uservec`）：
-- 保存用户寄存器到 `trapframe`
-- 切换到内核页表
-- 跳转至 `usertrap()`
-
-**异常类型**（`trap.c`）：
-```c
-#define EXCP_LOAD_ACCESS  0x5   // 加载访问故障
-#define EXCP_STORE_ACCESS 0x7   // 存储访问故障
-#define EXCP_ENV_CALL     0x8   // 系统调用（ecall）
-#define EXCP_LOAD_PAGE    0xd   // 加载缺页
-#define EXCP_STORE_PAGE   0xf   // 存储缺页
-```
-
-**中断源**：
-- **软件中断**：SBI IPI（核间通信）
-- **定时器中断**：CLINT/SSTC，触发 `yield()`
-- **外部中断**：PLIC 管理（UART、SPI、VirtIO）
-
-## 证据列表
-
-### 核心文件路径清单
-
-| 文件 | 行数 | 大小 | 说明 |
-|------|------|------|------|
-| `src/main.c` | 110 | 2.7KB | 内核入口，多核初始化 |
-| `src/entry.S` | 35 | 678B | 汇编启动入口 |
-| `src/proc.c` | 793 | 17.7KB | 进程管理（调度器、就绪队列） |
-| `src/vm.c` | 336 | 8.0KB | 页表操作（`kvminit`, `mappages`） |
-| `src/vma.c` | 603 | 13.1KB | VMA 管理（`alloc_vma`, `free_vma_list`） |
-| `src/kmalloc.c` | 280 | 7.8KB | 内核 slab 分配器 |
-| `src/fat32.c` | 1181 | 37.0KB | FAT32 文件系统实现 |
-| `src/sysfile.c` | 932 | 18.4KB | 文件相关系统调用 |
-| `src/trap.c` | 297 | 7.9KB | 中断/异常处理 |
-| `src/exec.c` | 378 | 9.9KB | ELF 加载与执行 |
-| `src/signal.c` | 272 | 6.2KB | 信号处理机制 |
-| `src/mmap.c` | 238 | 5.5KB | 内存映射实现 |
-| `syscall/sys.sh` | 89 | 1.9KB | 系统调用表生成脚本 |
-| `linker/kernel.ld` | - | 1.2KB | 内核链接脚本（内存布局） |
-| `doc/内核实现--内存管理.md` | 287 | 9.7KB | 内存管理设计文档 |
-| `doc/内核实现--系统调用.md` | 466 | 15.1KB | 系统调用流程文档 |
-
-### 关键符号引用
-
-- **入口点**：`_entry`（`src/entry.S:4`），`main()`（`src/main.c:36`）
-- **调度器**：`scheduler()`（`src/proc.c:119`）
-- **页表初始化**：`kvminit()`（`src/vm.c:20`）
-- **VMA 分配**：`alloc_vma()`（`src/vma.c:54`）
-- **系统调用分发**：`syscall()`（`src/syscall.c:2`）
-- **FAT32 初始化**：`fs_init()`（`src/fat32.c:67`）
+### 结论摘要
+
+基于对 `oskernrl2022-rv6` 仓库的深度代码审计与前置章节（02-13 章）的综合分析，本项目核心特性如下：
+
+1.  **架构定位**：基于 **RISC-V 64 位架构** 的**宏内核**（Monolithic Kernel）操作系统，采用类 Unix/xv6 设计哲学。
+2.  **开发模式**：**单人主导开发**（核心贡献者 Cty 完成 99% 代码），在 21 天内完成了从启动引导到文件系统的全栈实现，属于高强度的课程/实验性质项目。
+3.  **核心能力**：完整实现了**进程/线程管理**（支持 `clone`）、**虚拟内存**（Sv39 页表、mmap）、**FAT32 文件系统**及**设备驱动**（UART/SPI/SD）。
+4.  **关键缺失**：**网络子系统完全未实现**（仅有 Socket 头文件桩代码），**多核 SMP 支持未激活**（代码存在但逻辑未连通），**高级安全机制**（Capability/Seccomp）缺失。
+5.  **技术栈**：纯 **C 语言** 实现（无 Rust/C++），依赖 **SBI 固件**（OpenSBI/RustSBI）进行底层硬件抽象，构建系统基于 **GNU Make**。
 
 ---
 
-**本章小结**：`oskernrl2022-rv6` 是一个功能完整的 RISC-V 教学操作系统，基于 xv6 架构但进行了大量扩展（VMA 管理、mmap、信号机制、FAT32 文件系统）。项目采用纯 C 语言实现宏内核，支持多核启动和 Sv39 分页。网络功能较弱（仅本地回环），调度算法为简单 FIFO。下一步分析将深入各子系统实现细节。
+### 技术栈与构建
+
+#### 编程语言与规范
+*   **核心语言**：**C **(C99/C11 标准)。
+    *   全项目共 **66 个 C/C++ 源文件**，总计约 **12,000+ 行** 核心代码。
+    *   **无标准库依赖**：编译选项显式指定 `-nostdlib -ffreestanding`，所有运行时函数（如 `printf`, `memset`, `memcpy`）均由内核自行实现（见 `src/string.c`, `src/printf.c`）。
+    *   **无 Rust 特性**：项目未使用 Rust 语言，因此不存在所有权模型、RAII 或 `no_std` crate 依赖。
+*   **汇编语言**：**RISC-V Assembly**。
+    *   关键路径（启动入口、上下文切换、陷阱向量）使用手写汇编优化，文件包括 `src/entry.S`, `src/swtch.S`, `src/trampoline.S`。
+
+#### 基础框架与依赖
+*   **底层固件**：**SBI **(Supervisor Binary Interface)。
+    *   内核运行于 **S-Mode**（Supervisor Mode），依赖 M-Mode 的 SBI 固件（`sbi/fw_jump.elf`，约 1MB）处理硬件初始化、定时器设置及控制台 I/O。
+    *   **非 ArceOS/rCore**：本项目为独立实现的 C 语言内核，未基于 ArceOS 或 rCore-TD 等 Rust 框架开发。
+*   **文件系统库**：集成 **FatFs**（FAT32）嵌入式文件系统库（`src/ff.c` 虽未直接列出但功能在 `src/fat32.c` 中完整实现）。
+*   **构建工具**：**GNU Make**。
+    *   通过 `Makefile` 管理编译流程，支持 `QEMU` 模拟与 `SIFIVE_U` 硬件平台的切换。
+
+#### 支持的硬件架构
+经代码验证，本项目**仅支持单一架构**：
+*   **✅ RISC-V 64 **(riscv64gc-unknown-none-elf)：
+    *   证据：`linker/kernel.ld` 指定 `OUTPUT_ARCH(riscv)`，`Makefile` 使用 `riscv64-linux-gnu-gcc` 工具链。
+    *   支持扩展：`G` (General), `C` (Compressed), `M` (Multiplication/Division)。
+*   **❌ 不支持其他架构**：
+    *   搜索 `loongarch`, `x86_64`, `aarch64` 均无结果。代码中大量硬编码 RISC-V 特有 CSR 寄存器（如 `satp`, `sstatus`, `sepc`），不具备跨架构移植性。
+
+---
+
+### 目录结构导读
+
+项目采用扁平化目录结构，核心源码位于 `src/`，关键组件分布如下：
+
+| 目录/文件 | 功能描述 | 关键实现文件 |
+| :--- | :--- | :--- |
+| **`src/`** | **内核核心源码** | |
+| ├─ `entry.S` | 系统启动入口，多核引导逻辑 | `_entry`, `_secondary_boot` |
+| ├─ `main.c` | 内核初始化主流程 | `main()`, `userinit()` |
+| ├─ `proc.c` | 进程/线程管理核心 | `scheduler()`, `fork()`, `clone()` |
+| ├─ `vm.c` / `vma.c` | 虚拟内存与页表管理 | `kvminit()`, `mappages()`, `do_mmap()` |
+| ├─ `trap.c` | 中断与异常处理 | `usertrap()`, `kerneltrap()` |
+| ├─ `fat32.c` | FAT32 文件系统实现 | `ename()`, `eread()`, `ewrite()` |
+| ├─ `file.c` / `sysfile.c` | VFS 层与文件 I/O 系统调用 | `filealloc()`, `sys_openat()` |
+| ├─ `pipe.c` | 管道 IPC 实现 | `piperead()`, `pipewrite()` |
+| ├─ `signal.c` | 信号处理机制 | `sighandle()`, `kill()` |
+| └─ `include/` | 头文件与数据结构定义 | `proc.h`, `memlayout.h`, `riscv.h` |
+| **`linker/`** | 链接脚本 | `kernel.ld` (定义内存布局与入口) |
+| **`sbi/`** | SBI 固件镜像 | `fw_jump.elf` (OpenSBI/RustSBI) |
+| **`sd/`** | 用户空间程序与测试脚本 | `busybox`, `lmbench_all`, `lua` |
+| **`usrinit/`** | 初始用户进程源码 | `initcode.S`, `user.h` |
+| **`doc/`** | 设计文档与实现说明 | 各子系统详细设计文档 |
+
+#### 内核入口追踪
+1.  **物理入口**：`src/entry.S:_entry`。
+    *   由 SBI 固件跳转至此，完成栈初始化与 hartid 获取。
+2.  **逻辑入口**：`src/main.c:main`。
+    *   执行硬件初始化（MMU、中断、设备）、创建第一个用户进程 (`userinit`)，最后进入调度器 (`scheduler`)。
+3.  **用户入口**：`usrinit/initcode.S`。
+    *   系统启动后执行的第一个用户态程序，负责挂载根文件系统并启动 `/bin/sh`。
+
+---
+
+### 总结评价
+
+#### 项目定位与目标
+`oskernrl2022-rv6` 是一个**教学与实验导向**的 RISC-V 操作系统内核。其目标是在资源受限的环境下（如 QEMU 模拟或 FPGA 开发板），实现一个具备多任务处理、文件存储及基础 IPC 能力的类 Unix 系统。项目侧重于**操作系统核心原理的验证**（如页表映射、上下文切换、文件系统驱动），而非构建一个通用的生产级操作系统。
+
+#### 技术栈概览
+项目技术选型**极简且务实**：
+*   **语言层**：坚持使用纯 C 语言，避免了复杂运行时依赖，便于底层调试与性能控制。
+*   **架构层**：深度绑定 RISC-V Sv39 分页架构与 SBI 标准接口，充分利用了 RISC-V 开源生态的便利性。
+*   **组件层**：自主实现了核心调度器与内存管理器，复用了成熟的 FatFs 文件系统代码，体现了“核心自研 + 成熟组件集成”的工程策略。
+
+#### 实现完成度评估
+*   **核心闭环**（✅ 已完成）：系统具备完整的**启动 -> 调度 -> 执行 -> I/O -> 退出**生命周期。进程管理（含线程 `clone`）、虚拟内存（含 `mmap`）、FAT32 文件系统、基础设备驱动（UART/SD）及信号机制均已实现并可运行用户程序（如 Busybox, Lua）。
+*   **功能缺失**（❌ 未实现）：**网络子系统完全空白**，导致系统无法进行任何网络通信；**多核 SMP 支持**虽有代码框架但未实际激活，系统实际运行于单核模式；**高级安全特性**（如 Seccomp、Namespace）仅停留在头文件定义阶段。
+*   **代码质量**：核心逻辑清晰，但部分模块（如信号处理、Futex）存在**桩代码**现象（有接口无实现）。错误处理机制较为基础，大量依赖 `panic()` 而非优雅的错误恢复。
+
+总体而言，这是一个**完成度较高但功能范围受限**的单核操作系统内核，成功实现了除网络外的大部分基础 OS 功能，适合作为学习 RISC-V 架构与操作系统原理的实验平台。
 
 ---
 
@@ -6559,5 +5596,5 @@ uint64 sys_syslog() {
 ---
 
 *本报告由 OS-Agent-D 自动生成*  
-*生成时间: 2026-03-14 04:18:51*  
-*分析耗时: 11.7 分钟*
+*生成时间: 2026-03-19 22:54:01*  
+*分析耗时: 1.3 分钟*
