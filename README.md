@@ -34,7 +34,7 @@
 
 1. 🔍 **RAG 语义搜索（首选）**：`rag_search_code` 对整个仓库代码建立本地向量索引（Jina Embedding），支持语义级模糊搜索（如"查找页表映射实现"），穿透复杂目录结构直接定位相关代码块，大幅减少无效的目录遍历。
 2. 🌳 **LSP 拓扑展开**：通过 `lsp_get_call_graph`（多层递归调用树，包含变量到引用的智能降级）、`lsp_get_definition`（跨文件跳转）、`lsp_get_references` 构建精确的 AST 调用拓扑图。
-3. 🛠️ **Grep 降级兜底**：仅当 RAG 和 LSP 均无结果时，才触发 `grep_in_repo` 静态文本搜索。系统具备“智能三态切换”：LSP 函数图谱 -> LSP 语义引用 -> Grep 静态扫描。
+3. 🛠️ **分层降级兜底**：当 LSP 失败时，系统**首选 Tree-sitter AST 解析**（C/C++/Rust/Go/Zig），再退到语言感知正则、通用 Grep；仅在汇编或前述路径都失败时才使用 ASM 词法兜底。系统具备“智能分层切换”：LSP -> Tree-sitter -> Language-aware Static -> Grep -> ASM(最终兜底)。
 
 ### 2. OS-Agent D：自动报告评估 (`os_agent_d_evaluate.py`) ✨ **增强版**
 
@@ -44,8 +44,14 @@
 
 面向小型操作系统的分析比对，系统分为两阶段架构，快速在新旧作品间进行查重与创新点分析：
 
-- **粗筛模块 (`os_agent_c_coarse.py`)**：基于特征指纹（LLM 提取）与本地 Embedding（7维架构特征向量），计算目标仓库与历史库中所有作品的加权余弦相似度，极速锁定 Top-5 最相似候选项目。
-- **精比模块 (`os_agent_c_fine.py`)**：基于 LLM Agent 对粗筛出的 Top-5 候选进行源码级深度比对。包含技术栈与架构差异、Call Graph 对比、创新点挖掘及代码重合度详尽分析，最终输出完整的 Markdown 比对报告。
+- **粗筛模块 (`os_agent_c_coarse.py`)**：多维度加权余弦相似度检索，内置两项量化增强：
+  - **结构化精确特征**：LLM 额外从 D 报告中提取 JSON 精确字段（框架名、分配器、调度器、syscall 数量、TrapFrame 字节数等 13 项），与向量余弦相似度叠加加分（最高 +0.15）。
+  - **框架感知权重**：自动识别两个项目是否基于同一框架（ArceOS/rCore/xv6 等），同框架时将框架贡献维度（D1/D2/D7）权重减半，自研核心维度（D3~D8）权重上调 ×1.4，防止因共享框架导致虚高相似度。
+
+- **精比模块 (`os_agent_c_fine.py`)**：基于 LLM Agent 对粗筛出的 Top-K 候选进行源码级深度比对，包含两大量化相似度维度：
+  - **Token Jaccard 相似度**（`compare_function_tokens`）：对同名函数体 token 化后计算 Jaccard 指数，去除语言关键字后输出独有符号摘要，提供函数实现层面的客观数字证据。
+  - **Call Graph Jaccard 相似度**（`compare_call_graphs`）：对比两项目调用图的节点集合，输出节点 Jaccard = |交集| / |并集|，量化调用拓扑结构的相似程度。
+  - **综合评分锚定**：Agent 被强制要求对 5 个核心函数分别获取 Token Jaccard 与 CG Jaccard，以 `综合相似度 = Token Jaccard 均值 × 0.5 + CG Jaccard 均值 × 0.5` 为锚，结合 4 档评级区间（高度相似 / 改进版 / 受启发 / 独立）输出 0-100 最终评分，确保结论有量化依据可追溯。
 
 ### 4. 本地工具安全与沙盒限制
 
@@ -167,7 +173,25 @@ python check_env.py
 
 ### 2. 安装 Language Servers（LSP 工具依赖）
 
-> LSP 工具（`lsp_get_definition`、`lsp_get_references`、`lsp_get_document_outline`）需要本地安装对应语言的 Language Server。未安装时会自动降级为正则解析，但**精度大幅下降**。
+> LSP 工具（`lsp_get_definition`、`lsp_get_references`、`lsp_get_document_outline`）需要本地安装对应语言的 Language Server。未安装或超时时会**首选 Tree-sitter AST 解析**（C/C++/Rust/Go/Zig），再走语言感知正则、通用 Grep；仅在汇编或最终兜底场景才使用 ASM 正则。
+
+### 2.1 降级结果元数据
+
+当查询进入降级路径时，返回文本会追加结构化标记：
+
+`[Fallback Metadata] fallback_path=...; confidence=high|medium|low; reason=...`
+
+- `fallback_path`: 实际回退链路（如 `lsp->treesitter`、`lsp->lang_static->grep`）
+- `confidence`: 结果置信度（`high/medium/low`）
+- `reason`: 触发原因（如 `lsp_timeout`、`process_dead`）
+
+建议在自动报告中显式引用该标记，避免将低置信度结果当作 AST 级证据。
+
+### 2.2 回归验收建议（跨语言）
+
+- Rust/C/Go 各选 3 个符号，分别验证 `lsp_get_definition` 与 `lsp_get_references` 在 LSP 正常与降级场景下的一致性。
+- 统计降级后误命中率与空结果率，并与旧版“直接 ASM 降级”进行对照。
+- 记录平均耗时与 P95 耗时，确认分层降级未显著拉高整体分析时延。
 
 **按需安装**（只需安装你要分析的 OS 使用的语言）：
 
@@ -380,6 +404,15 @@ evaluation/
 
 > 从最早期的基础描述模块，本作在各个子版本的演进中不断填补了 LLM 的认知短板，并建立起牢不可破的沙盒机制。
 
+#### 🆕 **v3.3 OS-Agent C 客观量化查重增强 & 并发安全修复**（2026-03-20）
+- **结构化精确特征提取**：粗筛阶段新增 LLM JSON 精确字段提取（框架、分配器、调度器、syscall 数量、TrapFrame 字节数等 13 项），以加分项叠加到向量余弦相似度，减少单靠嵌入向量造成的误判。
+- **框架感知权重调整**：同框架项目间自动降低框架贡献维度（D1/D2/D7）权重、上调自研核心维度（D3~D8）权重，防止共享框架导致的虚高相似度评分。
+- **Token Jaccard 工具**：新增 `compare_function_tokens`，对两仓库中同名函数体进行 token 化并计算 Jaccard 相似度，输出独有关键词摘要，提供代码实现层面的客观数字证据。
+- **Call Graph Jaccard 输出**：增强 `compare_call_graphs`，在输出末尾追加节点集合 Jaccard = |交集| / |并集|，量化调用拓扑结构相似度。
+- **c09_innovation 双维量化锚定**：强制 Agent 对 5 个核心函数分别获取 Token Jaccard 与 CG Jaccard，以加权均值确定最终 0-100 评分区间，结论有量化证据可追溯。
+- **`lsp_set_target_arch` 竞争修复**：补加 `async with _lsp_global_lock`，确保 LSP 重启操作等待所有飞行中请求完成后才执行，消除并发调用时的竞态窗口。
+- **`compare_function_tokens` 类型安全**：`syscall_count_real` 和 `trapframe_bytes` 的精确加分逻辑增加 `int()` 类型规范化，防止 LLM 以字符串输出数字时导致的 `TypeError`。
+
 #### 🆕 **v3.2 终局合成与抗幻觉架构重构**（2026-03-19）
 - **报告生成逆向思维法**：颠覆了流程式生成的刻板印象，将 `01_overview` 移至分析大循环的最后一环执行。Agent 现在会携带前置 12 章的几万字上下文全集，以前所未有的上帝视角凝练出最终的项目概览与完成度评价，并通过首字母编排算法自动归位至报告首发位置。
 - **封杀数字虚构幻觉**：删除冗余旧阶段，并以硬性“防打分负向 Prompt”取代，有效抑制了大模型在评价完成度时随意虚构 `7.5/10` 一类不严谨的数字评分体系。
@@ -441,8 +474,8 @@ OS-Agent/
 ├── core/
 │   ├── agent_builder.py            # Agent 构建器（工具绑定、LSP、grep 等）
 │   ├── code_rag.py                 # 代码 RAG 引擎（AST 解析 + 向量索引）
-│   ├── vectorizer.py               # 本地 Embedding 向量化（Jina 模型）
-│   ├── vector_store.py             # 向量数据库存取
+│   ├── vectorizer.py               # 本地 Embedding 向量化（Jina 模型）+ 结构化精确特征提取
+│   ├── vector_store.py             # 向量数据库存取（含框架感知权重 + 精确字段加分）
 │   ├── utils.py                    # 公共工具函数（格式化、仓库名解析）
 │   └── error_handling.py           # 错误处理模块（分类、重试、追踪）
 ├── tools/
@@ -450,7 +483,7 @@ OS-Agent/
 │   ├── file_ops.py                 # 文件操作（read_code_segment、grep_in_repo）
 │   ├── git_ops.py                  # Git 操作（历史分析、作者贡献、Diff 透视）
 │   ├── callgraph_ops.py            # 调用图分析（跨文件调用关系）
-│   ├── compare_ops.py              # 项目比对工具（Agent C 精比辅助）
+│   ├── compare_ops.py              # 项目比对工具（Agent C 精比辅助，含 Token/CG Jaccard）
 │   ├── describe_ops.py             # 描述模块专用工具
 │   └── eval_ops.py                 # 评估专用工具（人类文档搜索、声明验证）
 ├── repos/                          # 克隆的 OS 仓库（运行时自动克隆，.gitignore 忽略）
