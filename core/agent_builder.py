@@ -95,7 +95,7 @@ If a requested file or directory does not exist, use `list_repo_structure` or `f
       - **节点限制**：整张图**严禁超过 5 个核心节点**。
       - **深度限制**：最多保留 3 层调用，只保留最关键的业务逻辑分支，剔除琐碎的辅助函数（如 `lock/unlock`, `printf`）。
       - **节点格式**：`FunctionName["func_name\\n relative/path.rs:line"]`。
-      - **降级标注**：若结果含 `Grep Fallback`，在图下方加注 `> ⚠️ 以上为静态 Grep 分析结果，精度有限`。
+      - **降级标注**：若 `lsp_get_call_graph` 结果含 `Grep Fallback`，在图下方加注 `> ⚠️ 以上为静态 Grep 分析结果，精度有限`；若 `lsp_get_definition` / `lsp_get_references` 含 `[Fallback Metadata]` 且 `confidence=low`，在引用该结论时也必须加注「静态分析，精度有限」。
 13. **Architecture Alignment (Target Triple)**: 
     - OS code heavily uses `#[cfg(target_arch = "...")]`. If you see code blocks "grayed out" or empty results from LSP despite the code being present, you MUST verify the target architecture.
     - **Discovery**: Look for the correct Target Triple in `rust-toolchain.toml`, `Makefile`, `.cargo/config.toml`, or architecture-specific directories (e.g., `os/src/arch/la64` → `loongarch64`).

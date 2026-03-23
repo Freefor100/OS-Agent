@@ -210,7 +210,10 @@ def run_coarse_screening(
     print("-" * len(header))
 
     for rank, r in enumerate(results, 1):
-        line = f"{rank:>2}  {r['name']:<20}  {r['total_score']:>6.4f}"
+        fw_tag = " [同框架]" if r.get("same_framework") else ""
+        line = (f"{rank:>2}  {r['name']:<20}  {r['total_score']:>6.4f}"
+                f"  (cos={r.get('cosine_score', r['total_score']):.4f}"
+                f" +sf={r.get('struct_score', 0):.4f}){fw_tag}")
         for d in dim_ids:
             line += f"  {r['dim_scores'].get(d, 0):>8.4f}"
         print(line)

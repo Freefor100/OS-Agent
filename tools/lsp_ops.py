@@ -839,6 +839,416 @@ class ASMLexicalParser:
         except Exception as e:
             return f"ASM 解析失败: {e}"
 
+
+def _fallback_metadata(fallback_path: str, confidence: str, reason: str) -> str:
+    return (
+        "\n"
+        f"[Fallback Metadata] fallback_path={fallback_path}; "
+        f"confidence={confidence}; reason={reason}"
+    )
+
+
+def _extract_hits_from_result(result: str) -> bool:
+    negative_tokens = ["未在", "未找到", "无匹配", "解析失败", "Error:"]
+    return bool(result) and not any(token in result for token in negative_tokens)
+
+
+class TreeSitterFallback:
+    """Tree-sitter AST 解析作为 LSP 首选降级，支持 C/C++/Rust/Go/Zig。"""
+
+    _SUPPORTED_LANGS = {"c", "cpp", "rust", "go", "zig"}
+    _langs: Optional[Dict[str, Any]] = None
+    _parser_cls: Optional[Any] = None
+
+    @classmethod
+    def _ensure_loaded(cls) -> bool:
+        if cls._langs is not None:
+            return True
+        cls._langs = {}
+        try:
+            from tree_sitter import Language, Parser
+            cls._parser_cls = Parser
+            for name, mod in [
+                ("c", "tree_sitter_c"),
+                ("cpp", "tree_sitter_cpp"),
+                ("rust", "tree_sitter_rust"),
+                ("go", "tree_sitter_go"),
+                ("zig", "tree_sitter_zig"),
+            ]:
+                try:
+                    imp = __import__(mod)
+                    cls._langs[name] = Language(getattr(imp, "language")())
+                except ImportError:
+                    logger.debug(f"Tree-sitter Fallback: 未安装 {mod}")
+            if cls._langs:
+                logger.info(f"Tree-sitter Fallback: 加载成功 ({', '.join(cls._langs)})")
+                return True
+        except ImportError as e:
+            logger.debug(f"Tree-sitter Fallback: 未安装或加载失败 ({e})，将跳过")
+        cls._langs = {}
+        return False
+
+    @classmethod
+    def _lang_for_ext(cls, ext: str) -> Optional[str]:
+        m = {".c": "c", ".h": "c", ".cc": "cpp", ".cpp": "cpp", ".hpp": "cpp",
+             ".rs": "rust", ".go": "go", ".zig": "zig"}
+        return m.get(ext)
+
+    @classmethod
+    def _get_definition_name(cls, node: Any, code_bytes: bytes, lang: str) -> Optional[str]:
+        """从定义节点中提取符号名。"""
+        def first_id(n: Any) -> Optional[str]:
+            for c in n.children:
+                if c.type in ("identifier", "type_identifier", "field_identifier") and c.child_count == 0:
+                    return code_bytes[c.start_byte:c.end_byte].decode("utf-8", errors="ignore")
+            return None
+
+        if lang == "rust":
+            for child in node.children:
+                if child.type in ("identifier", "type_identifier") and child.child_count == 0:
+                    return code_bytes[child.start_byte:child.end_byte].decode("utf-8", errors="ignore")
+        if lang in ("c", "cpp"):
+            if node.type == "function_definition":
+                for child in node.children:
+                    if child.type == "function_declarator":
+                        for sc in child.children:
+                            if sc.type == "identifier":
+                                return code_bytes[sc.start_byte:sc.end_byte].decode("utf-8", errors="ignore")
+            if node.type == "preproc_def":
+                for child in node.children[1:]:
+                    if child.type == "identifier":
+                        return code_bytes[child.start_byte:child.end_byte].decode("utf-8", errors="ignore")
+            if node.type in ("struct_specifier", "class_specifier"):
+                for child in node.children:
+                    if child.type in ("type_identifier", "identifier"):
+                        return code_bytes[child.start_byte:child.end_byte].decode("utf-8", errors="ignore")
+        if lang == "go":
+            if node.type in ("function_declaration", "method_declaration"):
+                return first_id(node)
+            if node.type == "type_declaration":
+                for child in node.children:
+                    if child.type == "type_spec":
+                        return first_id(child)
+            if node.type in ("var_declaration", "const_declaration"):
+                return first_id(node)
+        if lang == "zig":
+            if node.type == "function_declaration":
+                for child in node.children:
+                    if child.type == "_function_prototype":
+                        return first_id(child)
+            if node.type == "variable_declaration":
+                for child in node.children:
+                    if child.type == "_variable_declaration_header":
+                        for c2 in child.children:
+                            if c2.type == "identifier":
+                                return code_bytes[c2.start_byte:c2.end_byte].decode("utf-8", errors="ignore")
+        return None
+
+    @classmethod
+    def fallback_definition(cls, repo_path: str, file_path: str, symbol: str, lang: str) -> str:
+        if lang not in cls._SUPPORTED_LANGS:
+            return ""
+        if not cls._ensure_loaded() or lang not in cls._langs:
+            return ""
+        abs_path = _abspath(os.path.join(repo_path, file_path))
+        if not os.path.exists(abs_path):
+            return ""
+        try:
+            with open(abs_path, "rb") as f:
+                code_bytes = f.read()
+        except Exception:
+            return ""
+        parser = cls._parser_cls()
+        parser.language = cls._langs[lang]
+        try:
+            tree = parser.parse(code_bytes)
+        except Exception:
+            return ""
+        root = tree.root_node
+        if root.has_error:
+            return ""
+        matches = []
+        if lang == "rust":
+            def_types = ["function_item", "struct_item", "enum_item", "static_item", "const_item", "type_item", "macro_definition"]
+        elif lang in ("c", "cpp"):
+            def_types = ["function_definition", "preproc_def", "struct_specifier", "class_specifier"]
+        elif lang == "go":
+            def_types = ["function_declaration", "method_declaration", "type_declaration", "var_declaration", "const_declaration"]
+        elif lang == "zig":
+            def_types = ["function_declaration", "variable_declaration"]
+        else:
+            def_types = []
+        def traverse(node: Any) -> None:
+            if node.type in def_types:
+                name = cls._get_definition_name(node, code_bytes, lang)
+                if name == symbol:
+                    line = node.start_point[0] + 1
+                    snippet = code_bytes[node.start_byte:node.end_byte].decode("utf-8", errors="ignore")[:200]
+                    if len(snippet) >= 200:
+                        snippet += "..."
+                    matches.append(f"{file_path}:{line}: {snippet.strip()}")
+            for child in node.children:
+                traverse(child)
+        traverse(root)
+        if not matches:
+            return ""
+        return f"[Tree-sitter Fallback] 找到 {symbol} 的定义:\n" + "\n".join(matches[:15])
+
+    @classmethod
+    def fallback_references(cls, repo_path: str, file_path: str, symbol: str, lang: str) -> str:
+        if lang not in cls._SUPPORTED_LANGS:
+            return ""
+        if not cls._ensure_loaded() or lang not in cls._langs:
+            return ""
+        abs_repo = _abspath(repo_path)
+        _ext_map = {"c": {".c", ".h"}, "cpp": {".cc", ".cpp", ".hpp", ".h"}, "rust": {".rs"}, "go": {".go"}, "zig": {".zig"}}
+        allowed = _ext_map.get(lang, set())
+        files = LanguageAwareFallback._iter_candidate_files(repo_path, lang)
+        parser = cls._parser_cls()
+        parser.language = cls._langs[lang]
+        hits = []
+        for fpath in files:
+            if len(hits) >= 50:
+                break
+            ext = os.path.splitext(fpath)[1].lower()
+            if ext not in allowed:
+                continue
+            try:
+                with open(fpath, "rb") as f:
+                    code_bytes = f.read()
+            except Exception:
+                continue
+            try:
+                tree = parser.parse(code_bytes)
+            except Exception:
+                continue
+            if tree.root_node.has_error:
+                continue
+            def collect_ids(node: Any) -> None:
+                if node.type == "identifier" and node.child_count == 0:
+                    text = code_bytes[node.start_byte:node.end_byte].decode("utf-8", errors="ignore")
+                    if text == symbol:
+                        rel = os.path.relpath(fpath, abs_repo)
+                        line = node.start_point[0] + 1
+                        hits.append(f"{rel}:{line}")
+                for child in node.children:
+                    collect_ids(child)
+            collect_ids(tree.root_node)
+        if not hits:
+            return ""
+        return f"[Tree-sitter Fallback] 找到 {symbol} 的引用 (共 {len(hits)} 处):\n" + "\n".join(hits[:30])
+
+
+class LanguageAwareFallback:
+    """按语言进行静态词法回退，避免非汇编场景直接套用 ASM 规则。"""
+
+    _SUPPORTED_EXTS = {".c", ".cc", ".cpp", ".h", ".hpp", ".rs", ".go", ".zig"}
+
+    @staticmethod
+    def _iter_candidate_files(repo_path: str, lang: str) -> List[str]:
+        lang_ext_map = {
+            "c": {".c", ".h"},
+            "cpp": {".cc", ".cpp", ".hpp", ".h"},
+            "rust": {".rs"},
+            "go": {".go"},
+            "zig": {".zig"},
+        }
+        allowed_exts = lang_ext_map.get(lang, LanguageAwareFallback._SUPPORTED_EXTS)
+        files = []
+        abs_repo = _abspath(repo_path)
+        for root, dirs, fs in os.walk(abs_repo):
+            dirs[:] = [d for d in dirs if d not in {".git", "target", "build", "dist", "node_modules", ".os_agent_ra_target"}]
+            for f in fs:
+                ext = os.path.splitext(f)[1].lower()
+                if ext in allowed_exts:
+                    files.append(os.path.join(root, f))
+        return files
+
+    @staticmethod
+    def _is_comment_line(lang: str, line: str) -> bool:
+        stripped = line.strip()
+        if not stripped:
+            return True
+        if lang in {"c", "cpp", "rust", "go", "zig"} and (
+            stripped.startswith("//")
+            or stripped.startswith("/*")
+            or stripped.startswith("*")
+            or stripped.startswith("*/")
+        ):
+            return True
+        if lang == "c" and stripped.startswith("#"):
+            return True
+        return False
+
+    @staticmethod
+    def _definition_patterns(lang: str, symbol: str) -> List[str]:
+        s = re.escape(symbol)
+        if lang in {"c", "cpp"}:
+            return [
+                rf"^\s*#\s*define\s+{s}\b",
+                rf"^\s*(?:[\w\*\s]+)\b{s}\s*\([^;]*\)\s*\{{?",
+                rf"^\s*(?:extern\s+)?(?:const\s+)?[\w\*\s]+\b{s}\b\s*(?:=\s*.+)?;",
+            ]
+        if lang == "rust":
+            return [
+                rf"^\s*(?:pub\s+)?(?:async\s+)?fn\s+{s}\b",
+                rf"^\s*(?:pub\s+)?(?:static|const|type)\s+{s}\b",
+                rf"^\s*macro_rules!\s*{s}\b",
+            ]
+        if lang == "go":
+            return [
+                rf"^\s*func\s+{s}\s*\(",
+                rf"^\s*func\s+\([^)]+\)\s+{s}\s*\(",
+                rf"^\s*(?:var|const|type)\s+{s}\b",
+            ]
+        if lang == "zig":
+            return [
+                rf"^\s*(?:pub\s+)?fn\s+{s}\s*\(",
+                rf"^\s*(?:pub\s+)?(?:const|var)\s+{s}\b",
+            ]
+        return [rf"\b{s}\b"]
+
+    @staticmethod
+    def _reference_pattern(lang: str, symbol: str) -> str:
+        s = re.escape(symbol)
+        if lang in {"c", "cpp", "rust", "go", "zig"}:
+            return rf"\b{s}\b"
+        return rf"\b{s}\b"
+
+    @staticmethod
+    def fallback_definition(repo_path: str, file_path: str, symbol: str, lang: str) -> str:
+        abs_path = _abspath(os.path.join(repo_path, file_path))
+        if not os.path.exists(abs_path):
+            return f"[Lang Static Fallback] 文件不存在: {file_path}"
+
+        patterns = [re.compile(p) for p in LanguageAwareFallback._definition_patterns(lang, symbol)]
+        matches = []
+        try:
+            with open(abs_path, "r", encoding="utf-8", errors="ignore") as f:
+                for idx, line in enumerate(f, 1):
+                    if LanguageAwareFallback._is_comment_line(lang, line):
+                        continue
+                    if any(p.search(line) for p in patterns):
+                        matches.append(f"{file_path}:{idx}: {line.strip()}")
+        except Exception as e:
+            return f"[Lang Static Fallback] 解析失败: {e}"
+
+        if not matches:
+            return f"[Lang Static Fallback] 未在 {file_path} 找到 {symbol} 的定义。"
+        return f"[Lang Static Fallback] 找到 {symbol} 的定义:\n" + "\n".join(matches[:20])
+
+    @staticmethod
+    def fallback_references(repo_path: str, file_path: str, symbol: str, lang: str) -> str:
+        base_abs = _abspath(os.path.join(repo_path, file_path))
+        if not os.path.exists(base_abs):
+            return f"[Lang Static Fallback] 文件不存在: {file_path}"
+
+        pattern = re.compile(LanguageAwareFallback._reference_pattern(lang, symbol))
+        hits = []
+        for path in LanguageAwareFallback._iter_candidate_files(repo_path, lang):
+            try:
+                with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                    for idx, line in enumerate(f, 1):
+                        if LanguageAwareFallback._is_comment_line(lang, line):
+                            continue
+                        if pattern.search(line):
+                            rel = os.path.relpath(path, _abspath(repo_path))
+                            content = line.strip()
+                            if len(content) > 120:
+                                content = content[:120] + "..."
+                            hits.append(f"{rel}:{idx}: {content}")
+                            if len(hits) >= 50:
+                                break
+                if len(hits) >= 50:
+                    break
+            except Exception:
+                continue
+
+        if not hits:
+            return f"[Lang Static Fallback] 未找到 {symbol} 的引用。"
+        return f"[Lang Static Fallback] 找到 {symbol} 的引用 (共 {len(hits)} 处):\n" + "\n".join(hits[:30])
+
+
+class GenericLexicalFallback:
+    """通用 grep 风格回退，作为语言感知层失败后的后备。"""
+
+    _EXTS = {".c", ".cc", ".cpp", ".h", ".hpp", ".rs", ".go", ".zig", ".s", ".S", ".asm", ".inc"}
+
+    @staticmethod
+    def _scan(repo_path: str, symbol: str, max_hits: int = 40) -> List[str]:
+        pattern = re.compile(rf"\b{re.escape(symbol)}\b")
+        hits = []
+        abs_repo = _abspath(repo_path)
+        for root, dirs, files in os.walk(abs_repo):
+            dirs[:] = [d for d in dirs if d not in {".git", "target", "build", "dist", "node_modules", ".os_agent_ra_target"}]
+            for fname in files:
+                if os.path.splitext(fname)[1] not in GenericLexicalFallback._EXTS:
+                    continue
+                fpath = os.path.join(root, fname)
+                try:
+                    with open(fpath, "r", encoding="utf-8", errors="ignore") as f:
+                        for lineno, line in enumerate(f, 1):
+                            if pattern.search(line):
+                                rel = os.path.relpath(fpath, abs_repo)
+                                text = line.strip()
+                                if len(text) > 120:
+                                    text = text[:120] + "..."
+                                hits.append(f"{rel}:{lineno}: {text}")
+                                if len(hits) >= max_hits:
+                                    return hits
+                except Exception:
+                    continue
+        return hits
+
+    @staticmethod
+    def fallback_definition(repo_path: str, symbol: str) -> str:
+        hits = GenericLexicalFallback._scan(repo_path, symbol, max_hits=30)
+        if not hits:
+            return f"[Generic Fallback] 未找到 {symbol} 的定义候选。"
+        return f"[Generic Fallback] {symbol} 定义候选:\n" + "\n".join(hits[:20])
+
+    @staticmethod
+    def fallback_references(repo_path: str, symbol: str) -> str:
+        hits = GenericLexicalFallback._scan(repo_path, symbol, max_hits=50)
+        if not hits:
+            return f"[Generic Fallback] 未找到 {symbol} 的引用候选。"
+        return f"[Generic Fallback] {symbol} 引用候选 (共 {len(hits)} 处):\n" + "\n".join(hits[:30])
+
+
+def _resolve_non_asm_fallback(
+    repo_path: str, file_path: str, symbol: str, lang: str, method: str, reason: str
+) -> str:
+    # 1. 首选 Tree-sitter（仅 C/Rust，解析失败则空字符串会触发下层降级）
+    if method == "textDocument/definition":
+        ts_res = TreeSitterFallback.fallback_definition(repo_path, file_path, symbol, lang)
+        if _extract_hits_from_result(ts_res):
+            return ts_res + _fallback_metadata("lsp->treesitter", "high", reason)
+    else:
+        ts_res = TreeSitterFallback.fallback_references(repo_path, file_path, symbol, lang)
+        if _extract_hits_from_result(ts_res):
+            return ts_res + _fallback_metadata("lsp->treesitter", "high", reason)
+
+    # 2. 语言感知正则
+    path_prefix = "lsp->lang_static"
+    if method == "textDocument/definition":
+        lang_res = LanguageAwareFallback.fallback_definition(repo_path, file_path, symbol, lang)
+        if _extract_hits_from_result(lang_res):
+            return lang_res + _fallback_metadata(path_prefix, "medium", reason)
+        grep_res = GenericLexicalFallback.fallback_definition(repo_path, symbol)
+        if _extract_hits_from_result(grep_res):
+            return grep_res + _fallback_metadata("lsp->lang_static->grep", "low", reason)
+        asm_res = ASMLexicalParser.fallback_definition(repo_path, file_path, symbol)
+        return asm_res + _fallback_metadata("lsp->lang_static->grep->asm", "low", "parse_empty")
+
+    lang_res = LanguageAwareFallback.fallback_references(repo_path, file_path, symbol, lang)
+    if _extract_hits_from_result(lang_res):
+        return lang_res + _fallback_metadata(path_prefix, "medium", reason)
+    grep_res = GenericLexicalFallback.fallback_references(repo_path, symbol)
+    if _extract_hits_from_result(grep_res):
+        return grep_res + _fallback_metadata("lsp->lang_static->grep", "low", reason)
+    asm_res = ASMLexicalParser.fallback_references(repo_path, file_path, symbol)
+    return asm_res + _fallback_metadata("lsp->lang_static->grep->asm", "low", "parse_empty")
+
 def _find_symbol_positions(abs_path: str, symbol: str) -> List[Tuple[int, int]]:
     """在文件当中寻找符号的第一次出现的位置，用于提供给 LSP 锚点"""
     positions = []
@@ -893,12 +1303,9 @@ async def _async_lsp_request(repo_path: str, file_path: str, symbol: str, method
 
     client = await _gateway.get_client(repo_path, lang)
     if not client:
-        # 当高级语言的 LSP 进程由于依赖缺失而抛出错误，或本地未安装该 LSP 时，执行自动降级
-        logger.warning(f"LSP Process for language {lang} failed to start. Downgrading to ASMLexicalParser fallback.")
-        if method == "textDocument/definition":
-            return ASMLexicalParser.fallback_definition(repo_path, file_path, symbol)
-        else:
-            return ASMLexicalParser.fallback_references(repo_path, file_path, symbol)
+        # 非汇编场景优先走语言感知降级，再考虑 grep/ASM 最终兜底
+        logger.warning(f"LSP Process for language {lang} failed to start. Downgrading to language-aware fallback.")
+        return _resolve_non_asm_fallback(repo_path, file_path, symbol, lang, method, "lsp_start_failed")
 
     abs_file_unix = abs_file.replace(chr(92), '/')
     if not abs_file_unix.startswith('/'):
@@ -912,10 +1319,7 @@ async def _async_lsp_request(repo_path: str, file_path: str, symbol: str, method
         client = await _gateway.get_client(repo_path, lang)
         if not client:
             logger.warning(f"LSP reconnect failed for {lang}. Falling back.")
-            if method == "textDocument/definition":
-                return ASMLexicalParser.fallback_definition(repo_path, file_path, symbol)
-            else:
-                return ASMLexicalParser.fallback_references(repo_path, file_path, symbol)
+            return _resolve_non_asm_fallback(repo_path, file_path, symbol, lang, method, "process_dead")
     
     # 【新增强化】：位置打分机制。
     # 优先选择非注释、非预处理、且看起来像定义或活跃使用的行。
@@ -986,10 +1390,7 @@ async def _async_lsp_request(repo_path: str, file_path: str, symbol: str, method
                     logger.warning(f"LSP pipe broken during didOpen: {e}. Reconnecting...")
                     client = await _gateway.get_client(repo_path, lang)
                     if not client or not client.is_alive:
-                        if method == "textDocument/definition":
-                            return ASMLexicalParser.fallback_definition(repo_path, file_path, symbol)
-                        else:
-                            return ASMLexicalParser.fallback_references(repo_path, file_path, symbol)
+                        return _resolve_non_asm_fallback(repo_path, file_path, symbol, lang, method, "didopen_pipe_broken")
                     try:
                         if uri not in client.opened_uris:
                             await client.send_notification(did_open)
@@ -1005,13 +1406,10 @@ async def _async_lsp_request(repo_path: str, file_path: str, symbol: str, method
             try:
                 result = await asyncio.wait_for(client.send_request(req), timeout=25.0)
             except (asyncio.TimeoutError, TimeoutError):
-                logger.warning(f"LSP request timed out for {lang}. Engine deadlocked? Falling back to ASM parser.")
+                logger.warning(f"LSP request timed out for {lang}. Engine deadlocked? Falling back to language-aware parser.")
                 # Force restart the deadlocked client so it doesn't block future requests
                 asyncio.create_task(_gateway.force_restart_client(repo_path, lang))
-                if method == "textDocument/definition":
-                    return ASMLexicalParser.fallback_definition(repo_path, file_path, symbol)
-                else:
-                    return ASMLexicalParser.fallback_references(repo_path, file_path, symbol)
+                return _resolve_non_asm_fallback(repo_path, file_path, symbol, lang, method, "lsp_timeout")
             
         if "error" in result:
              raise RuntimeError(f"LSP Error Response: {result['error']}")
@@ -1055,12 +1453,9 @@ async def _async_lsp_request(repo_path: str, file_path: str, symbol: str, method
         return out_str
 
     except (TimeoutError, Exception) as e:
-        logger.warning(f"LSP execution for {symbol} triggered an exception or timeout: {e}. Executing ASM fallback downgrade.")
-        # 当由于大型项目带来的超时，或 AST 解析彻底失效触发异常，统一退化回落至轻量级正则匹配
-        if method == "textDocument/definition":
-            return ASMLexicalParser.fallback_definition(repo_path, file_path, symbol)
-        else:
-            return ASMLexicalParser.fallback_references(repo_path, file_path, symbol)
+        logger.warning(f"LSP execution for {symbol} triggered an exception or timeout: {e}. Executing language-aware fallback downgrade.")
+        # 当大型项目超时或 AST 解析失败时，非汇编先走语言感知回退
+        return _resolve_non_asm_fallback(repo_path, file_path, symbol, lang, method, "lsp_exception")
 
 
 @tool
@@ -1068,6 +1463,7 @@ def lsp_get_definition(repo_path: str, file_path: str, symbol: str) -> str:
     """
     基于底层 Language Server Protocol (LSP) 获取源代码中符号（函数、结构体、宏等）的精准全域定义。
     此工具专为高级语言设计（C/C++、Rust、Zig、Go），底层挂载真实的 clangd / rust-analyzer，并对大型操作系统架构实施动态上下文注入以保障解析可用性。若查询目标为系统底层汇编 (.s/.S) 或抛出未定义的异常错误，工具会自动将执行流路由降级并匹配汇编标签，确保防崩溃的稳健获取能力。
+    LSP 失败时会自动退避至 Tree-sitter / 语言感知正则 / grep / ASM，退避结果会附带 `[Fallback Metadata]` 供 Agent 判断置信度 (confidence=high|medium|low)。
     
     Args:
         repo_path: 仓库绝对或相对根路径 (e.g. repos/my-os)
@@ -1090,6 +1486,7 @@ def lsp_get_references(repo_path: str, file_path: str, symbol: str) -> str:
     """
     基于真实 LSP 查询符号在整个项目中的全局引用（跨文件级别的方法调用的引用图谱）。
     由于它使用了编译时的 AST 上下文信息，这对于生成反转调用图 (Reverse Call Graph) 及探测某个底层抽象接口的所有实现十分有效。同样地，该方法强制支持了异常捕捉后的汇编退化流程和预查填补机制。
+    LSP 失败时会自动退避至 Tree-sitter / 语言感知正则 / grep / ASM，退避结果会附带 `[Fallback Metadata]` 供 Agent 判断置信度 (confidence=high|medium|low)。
     
     Args:
         repo_path: 仓库根路径
@@ -1670,16 +2067,19 @@ async def _async_lsp_set_target_arch(repo_path: str, target: str) -> str:
     """内部异步实现：保存架构标记并强制重启 rust-analyzer。"""
     repo_path = _abspath(repo_path)
     marker = os.path.join(repo_path, ".os_agent_lsp_target")
-    
-    try:
-        with open(marker, 'w', encoding='utf-8') as f:
-            f.write(target)
-        
-        # 强制重启 rust-analyzer 以应用新架构
-        await _gateway.force_restart_client(repo_path, "rust")
-        return f"Successfully set LSP target to '{target}' and restarted rust-analyzer for {repo_path}."
-    except Exception as e:
-        return f"Error setting target arch: {e}"
+
+    # 必须持锁再重启：避免在其他 LSP 请求持有 _lsp_global_lock 期间
+    # force_restart_client 杀死进程，导致那些请求的 Future 收到异常后强制降级。
+    async with _lsp_global_lock:
+        try:
+            with open(marker, 'w', encoding='utf-8') as f:
+                f.write(target)
+
+            # 强制重启 rust-analyzer 以应用新架构
+            await _gateway.force_restart_client(repo_path, "rust")
+            return f"Successfully set LSP target to '{target}' and restarted rust-analyzer for {repo_path}."
+        except Exception as e:
+            return f"Error setting target arch: {e}"
 
 
 @tool

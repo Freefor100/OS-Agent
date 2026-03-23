@@ -123,15 +123,16 @@ def _build_base_context(repo_url: str, output_dir: str) -> str:
    - 🔍 **第一优先级：语义切入**。在分析任何子系统前，**必须首先调用 `rag_search_code` 进行语义搜索**（例如：“寻找页表映射的实现”）。这能帮你穿透复杂的目录结构，直接定位到最相关的代码块。
    - 🌳 **第二优先级：拓扑展开**。通过 RAG 获得核心符号后，立即使用 `lsp_get_call_graph` 展开多层递归调用树，利用 `lsp_get_definition` 等 LSP 工具构建精确的 AST 画布。
    - 🛠️ **第三优先级：降级与查漏**。仅当 RAG 和 LSP 均返回为空或需要确切宏定义时，才触发 `grep_in_repo`。读取代码片段必须使用 `read_code_segment` 且仅限于关键逻辑。
-4. **多模块搜索**：不要局限于单一目录。使用 `find_os_core_modules` 寻找分散的实现（例如驱动可能在 `drivers/` 也可能在 `modules/`）。
-5. **区分规划与实现**：README 中提到的功能可能是“画饼”，必须通过代码验证。未能验证的特性即使出现在文档中，也必须标注为“文档提及但未见代码”。
-6. **桩代码检测（Strict Stub Detection）**：
+4. **LSP 退避策略（必读）**：当 LSP 不可用或超时时，`lsp_get_definition` / `lsp_get_references` 会自动退避（Tree-sitter → 语言感知正则 → 通用 grep → ASM）。退避结果会附带 `[Fallback Metadata]`，含 `confidence=high|medium|low`。当 `confidence=low` 或结果含 `[Generic Fallback]` / `[ASM Fallback]` 时，在报告中必须标注「以上为静态分析结果，精度有限」，与 Call Graph 的 Grep 降级标注保持一致。
+5. **多模块搜索**：不要局限于单一目录。使用 `find_os_core_modules` 寻找分散的实现（例如驱动可能在 `drivers/` 也可能在 `modules/`）。
+6. **区分规划与实现**：README 中提到的功能可能是“画饼”，必须通过代码验证。未能验证的特性即使出现在文档中，也必须标注为“文档提及但未见代码”。
+7. **桩代码检测（Strict Stub Detection）**：
    - 遇到函数体为空、返回 `unimplemented!()`、`todo!()`、`ENOSYS` 或仅有一行 `Ok(0)` 的情况，**必须**标注为 **“桩函数”** 或 **“未实现”**。
    - **严禁**将桩函数描述为“已实现功能”。如果一个系统调用仅返回 0 而无实际逻辑（如 `sys_getuid` 始终返回 0），必须指出“仅有接口无实现”。
-7. **文件路径验证（Anti-Hallucination）**：
+8. **文件路径验证（Anti-Hallucination）**：
    - 在引用文件路径前，**必须**确保该文件在 `list_repo_structure` 或 `find_by_name` 的结果中真实存在。
    - **严禁**捏造不存在的文件路径（如声称 `riscv/boot.rs` 存在但实际不在）。如果不确定，不要写路径。
-8. **头文件 vs 实现**：
+9. **头文件 vs 实现**：
    - 不要把头文件（`.h`）或 Trait 定义（`.rs` 中的 `trait`）作为功能已实现的证据。必须找到对应的 C 文件（`.c`）或 Rust `impl` 代码块。
 
 输出使用 Markdown，面向"懂 OS 的读者"，每个小节都要解释组件原理 + 在本仓库的具体实现方式。

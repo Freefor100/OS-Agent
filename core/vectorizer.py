@@ -407,24 +407,114 @@ class LocalEmbedder:
 
 
 # ---------------------------------------------------------------------------
+# 结构化精确特征提取
+# ---------------------------------------------------------------------------
+STRUCT_FEATURE_PROMPT = """从以下 OS 项目 D 报告中提取精确特征。
+严格输出 JSON，不要多余文字，不要 markdown 代码块。
+每个字段从括号内候选值中选取唯一一个（勿将多个候选拼接输出）：
+
+{
+  "framework":        "ArceOS" | "rCore" | "xv6-derived" | "custom" | "unknown",
+  "lang":             "Rust" | "C" | "mixed",
+  "allocator_crate":  "buddy_system_allocator" | "custom" | "unknown",
+  "scheduler":        "FIFO" | "RR" | "CFS" | "Stride" | "custom",
+  "network_stack":    "smoltcp" | "lwip" | "custom" | null,
+  "cow":              true | false | null,
+  "lazy_alloc":       true | false | null,
+  "swap":             true | false | null,
+  "smp":              true | false | null,
+  "syscall_count_real": <非负整数，仅统计有完整逻辑的 syscall，桩函数不计入，不确定填 null>,
+  "trapframe_bytes":  <TrapFrame 结构体总字节数非负整数，不确定填 null>,
+  "fat32_source":     "custom" | "fatfs_crate" | null,
+  "vfs_trait":        "<VFS 核心 Trait/接口名称字符串>" | null
+}
+
+规则：
+- null 表示报告中未明确提及或无法确定，严禁猜测
+- 字段值必须是上述候选之一（字符串字段），不得输出其他任何字符串
+- 只输出 JSON，不要任何额外解释
+"""
+
+
+def extract_struct_features(sections_dir: str) -> dict:
+    """
+    从 sections/ 目录读取所有 D 报告，调用 LLM 提取精确结构化特征 JSON。
+
+    Args:
+        sections_dir: sections/ 目录路径
+
+    Returns:
+        结构化特征字典，提取失败时返回 {}
+    """
+    files = []
+    if os.path.isdir(sections_dir):
+        for fname in sorted(os.listdir(sections_dir)):
+            if fname.endswith(".md"):
+                files.append(os.path.join(sections_dir, fname))
+
+    if not files:
+        logger.warning(f"extract_struct_features: 未找到 section 文件 in {sections_dir}")
+        return {}
+
+    # 合并所有 section 文件（限制总长度，避免超出上下文）
+    parts = []
+    total_chars = 0
+    for fp in files:
+        try:
+            with open(fp, "r", encoding="utf-8", errors="ignore") as f:
+                text = f.read().strip()
+            # 每个 section 最多 3000 字符
+            if len(text) > 3000:
+                text = text[:3000] + "\n... [截断]"
+            parts.append(text)
+            total_chars += len(text)
+            if total_chars > 20000:
+                break
+        except Exception:
+            continue
+
+    combined = "\n\n---\n\n".join(parts)
+    prompt = STRUCT_FEATURE_PROMPT + "\n\n---\n以下是项目 D 报告内容：\n\n" + combined
+
+    llm = _get_llm()
+    try:
+        response = llm.invoke(prompt)
+        raw = response.content.strip()
+        # 去除可能的 markdown 代码块包装
+        if raw.startswith("```"):
+            raw = re.sub(r'^```[a-z]*\n?', '', raw)
+            raw = re.sub(r'\n?```$', '', raw)
+            raw = raw.strip()
+        result = json.loads(raw)
+        logger.info(f"结构化特征提取成功: {list(result.keys())}")
+        return result
+    except Exception as e:
+        logger.warning(f"结构化特征提取失败 ({e})，返回空字典")
+        return {}
+
+
+# ---------------------------------------------------------------------------
 # 项目指纹 (Fingerprint)
 # ---------------------------------------------------------------------------
 class Fingerprint:
     """
-    项目特征指纹：结构化特征文本 + 7 维向量。
+    项目特征指纹：结构化特征文本 + 10 维向量 + 精确结构化字段。
     """
 
     def __init__(self, name: str, features: Dict[str, str],
-                 embeddings: Dict[str, List[float]]):
+                 embeddings: Dict[str, List[float]],
+                 struct_features: Optional[dict] = None):
         self.name = name
-        self.features = features           # {dim_id: feature_text}
-        self.embeddings = embeddings       # {dim_id: [float, ...]}
+        self.features = features                        # {dim_id: feature_text}
+        self.embeddings = embeddings                    # {dim_id: [float, ...]}
+        self.struct_features = struct_features or {}    # 精确 JSON 特征
 
     def to_dict(self) -> dict:
         return {
             "name": self.name,
             "features": self.features,
             "embeddings": {k: v for k, v in self.embeddings.items()},
+            "struct_features": self.struct_features,
         }
 
     @classmethod
@@ -433,6 +523,7 @@ class Fingerprint:
             name=d["name"],
             features=d["features"],
             embeddings=d["embeddings"],
+            struct_features=d.get("struct_features", {}),  # 向后兼容
         )
 
     def save(self, path: str):
@@ -447,7 +538,7 @@ class Fingerprint:
             return cls.from_dict(json.load(f))
 
     def get_concat_vector(self) -> np.ndarray:
-        """将 7 维向量按固定顺序拼接为一个大向量。"""
+        """将各维向量按固定顺序拼接为一个大向量。"""
         vecs = []
         for dim_id in sorted(DIMENSION_MAP.keys()):
             if dim_id in self.embeddings:
@@ -480,9 +571,13 @@ def build_fingerprint(
         logger.info(f"加载已有指纹: {fp_path}")
         return Fingerprint.load(fp_path)
 
-    # Step 1: LLM 提取结构化特征
+    # Step 1: LLM 提取文本摘要特征
     print(f"📝 正在提取 {repo_name} 的结构化特征...")
     features = extract_features_from_report(sections_dir)
+
+    # Step 1.5: LLM 提取精确结构化特征（JSON）
+    print(f"🔩 正在提取 {repo_name} 的精确结构化特征...")
+    struct_features = extract_struct_features(sections_dir)
 
     # Step 2: 本地 Embedding
     if embedder is None:
@@ -498,7 +593,8 @@ def build_fingerprint(
         embeddings[dim_id] = vectors[i].tolist()
 
     # Step 3: 保存
-    fp = Fingerprint(name=repo_name, features=features, embeddings=embeddings)
+    fp = Fingerprint(name=repo_name, features=features,
+                     embeddings=embeddings, struct_features=struct_features)
     fp.save(fp_path)
     print(f"✅ 指纹已生成: {fp_path}")
     return fp

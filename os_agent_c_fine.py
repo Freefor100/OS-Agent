@@ -272,16 +272,36 @@ COMPARE_STAGES = [
     {
         "id": "c09_innovation",
         "title": "创新点与代码重合分析",
-        "prompt": """综合分析 {target} 相对于 {candidate} 的创新性：
+        "prompt": """综合分析 {target} 相对于 {candidate} 的创新性与代码重合度。
 
-1. **代码重合度评估**：
-   - 关键数据结构是否雷同（TaskInner / MemorySet / PageTable 字段对比）
-   - 核心算法是否相同（调度算法 / 内存分配器 / 页表操作）
-   - Call Graph 结构相似度（基于前面阶段的 compare_call_graphs 结果）
+1. **关键数据结构对比**：
+   - 使用 `search_code_snippets` 或 `read_code_segment` 获取两个项目的 TaskInner / MemorySet / PageTable 结构体字段
+   - 字段名和类型是否高度一致？如果一致，标注为【结构体相似证据】
 
-2. **【必须】补充源码比对**：
-   - 使用 `compare_call_graphs` 对比 `alloc_frame` 或 `alloc_pages` 物理内存分配调用链
-   - 如果遇到 LSP 解析失效、宏无法展开的问题，**必须**使用 `search_code_snippets` 对两个项目分别搜索相关代码片段供判断依据，而不要凭猜想。
+2. **【必须】双维量化相似度比对**：
+
+   对以下 5 个核心函数，**逐一**执行步骤 A 和步骤 B（函数不存在则跳过并注明）：
+   - `handle_page_fault`（内存管理核心）
+   - `sys_fork` 或 `do_clone`（进程管理核心）
+   - `schedule` 或 `pick_next_task`（调度核心）
+   - `trap_handler`（Trap 核心）
+   - `alloc_frame` 或 `kalloc`（分配器核心）
+
+   **步骤 A**：调用 `compare_function_tokens({target}, {candidate}, function_name)`
+     → 从返回文本中读取 `Jaccard 相似度: 0.xxx` → 记为该函数的 Token Jaccard
+
+   **步骤 B**：调用 `compare_call_graphs({target}, {candidate}, function_name)`
+     → 从返回文本中读取 `Call Graph 节点 Jaccard: 0.xxx` → 记为该函数的 CG Jaccard
+
+   **汇总表格**（在报告中输出）：
+   | 函数 | Token Jaccard | CG Jaccard |
+   |------|-------------|------------|
+   | ... | ... | ... |
+
+   计算：
+   - Token Jaccard 均值（仅对找到函数的项求均值）
+   - CG Jaccard 均值（同上）
+   - **综合相似度 = Token Jaccard 均值 × 0.5 + CG Jaccard 均值 × 0.5**
 
 3. **{target} 独有的技术创新点**（{candidate} 没有的特性）：
    - 有而对方没有的高级特性（如 CoW / Lazy / HugePage / Signal trampoline）
@@ -292,17 +312,20 @@ COMPARE_STAGES = [
 4. **{candidate} 独有的优势**：
    - 反向列出 {candidate} 有而 {target} 没有的特性
 
-5. **总体结论**：
-   - 按 [独立开发 / 受启发 / 改进版 / 高度相似] 四级评估
-   - 给出 0-100 相似度评分（含评分理由）
-   - 明确列出判断依据（哪些证据支撑了你的结论）
+5. **总体结论（评分须与综合相似度挂钩）**：
+   - 综合相似度 ≥ 0.60 → **高度相似**（建议分 75-100）
+   - 综合相似度 0.30-0.60 → **改进版**（建议分 40-75）
+   - 综合相似度 < 0.30 → **受启发或独立**（建议分 0-40）
+   - 在上述区间内，根据数据结构字段差异、功能覆盖差异综合微调最终分数
+   - 按 [独立开发 / 受启发 / 改进版 / 高度相似] 四级评定
+   - **必须**明确列出：综合相似度数值、Token 均值、CG 均值 作为客观依据
 
-使用 `load_project_fingerprint` 查看完整特征指纹进行综合判断。
+使用 `load_project_fingerprint` 查看完整特征指纹。
 使用 `compare_feature_summary` 对比所有 10 个维度的特征摘要。
 
-**容错与退避策略**：遇到 `compare_call_graphs` 降级或失败时，搭配使用 `search_code_snippets` 和 `grep_in_repo` 来获取代码级别的特征供比对。
+**容错策略**：若 `compare_function_tokens` 返回"未找到"，改用 `search_code_snippets` 搜索并通过 `read_code_segment` 手动比较；若 `compare_call_graphs` 降级，仍读取其输出中的 CG Jaccard 值（降级结果的节点数更少，属正常现象）。
 
-输出格式：## 代码重合度 → ## 源码/Call Graph 比对结果 → ## {target} 创新点列表 → ## {candidate} 优势列表 → ## 总体结论与评分""",
+输出格式：## 数据结构对比 → ## 双维 Jaccard 汇总表 → ## {target} 创新点列表 → ## {candidate} 优势列表 → ## 总体结论与评分""",
     },
 ]
 
@@ -316,6 +339,7 @@ def _build_compare_agent(target_name: str, candidate_name: str):
         compare_call_graphs,
         compare_feature_summary,
         search_code_snippets,
+        compare_function_tokens,
     )
     from tools.file_ops import read_code_segment, grep_in_repo
 
@@ -344,6 +368,7 @@ def _build_compare_agent(target_name: str, candidate_name: str):
         compare_call_graphs,
         compare_feature_summary,
         search_code_snippets,
+        compare_function_tokens,
         read_code_segment,
         grep_in_repo,
     ]

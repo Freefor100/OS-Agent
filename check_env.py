@@ -10,6 +10,27 @@ import os
 import platform
 import subprocess
 
+def _detect_linux_pkg_manager():
+    """检测 Linux 发行版并返回包管理器及是否需要 sudo。"""
+    if platform.system() != "Linux":
+        return None, False
+    try:
+        with open("/etc/os-release", encoding="utf-8") as f:
+            content = f.read().lower()
+        if "debian" in content or "ubuntu" in content or "pop" in content:
+            return "apt", True
+        if "arch" in content:
+            return "pacman", True
+        if "fedora" in content or "rhel" in content or "rocky" in content or "alma" in content:
+            return "dnf", True
+        if "opensuse" in content or "suse" in content:
+            return "zypper", True
+        if "alpine" in content:
+            return "apk", True
+    except Exception:
+        pass
+    return "apt", True  # 默认按 Debian 处理
+
 def _find_build_tool(tool_name):
     path = shutil.which(tool_name)
     if path:
@@ -31,6 +52,11 @@ def _find_build_tool(tool_name):
             matches = glob.glob(pattern)
             if matches:
                 return matches[0]
+    elif platform.system() == "Linux":
+        for d in ["/usr/bin", "/usr/local/bin", os.path.expanduser("~/.local/bin")]:
+            p = os.path.join(d, tool_name)
+            if os.path.isfile(p) and os.access(p, os.X_OK):
+                return p
     return None
 
 def get_git_usr_bin():
@@ -85,21 +111,22 @@ def main():
         "matplotlib": "matplotlib",
         "pymupdf4llm": "pymupdf4llm",
     }
-    # First check if we have a requirements.txt to install from
+    # 检查 requirements.txt 依赖：dry-run 预检，避免每次运行都触发 pip 重装
     req_path = "requirements.txt"
-    if os.path.isfile(req_path):
-        _check("requirements.txt", True)
-        # 先做 dry-run 预检：若所有包已满足则跳过安装，避免每次运行都触发 pip 重装
+    if not os.path.isfile(req_path):
+        all_ok = False
+        _check("requirements.txt 依赖", False, "文件不存在")
+    else:
         dry = subprocess.run(
             [sys.executable, "-m", "pip", "install", "--dry-run", "-r", req_path],
-            capture_output=True, text=True
+            capture_output=True, text=True, timeout=60
         )
-        needs_install = ("Would install" in dry.stdout) or (dry.returncode != 0)
+        needs_install = ("Would install" in dry.stdout or "Would upgrade" in dry.stdout) or (dry.returncode != 0)
         if needs_install:
             all_ok = False
-            _check("requirements.txt 依赖不满足", False, "请手动运行: pip install -r requirements.txt")
+            _check("requirements.txt 依赖", False, "部分包缺失或版本不符，请运行: pip install -r requirements.txt")
         else:
-            _check("requirements.txt 依赖已满足", True, "所有包版本均符合要求")
+            _check("requirements.txt 依赖", True, "所有包已满足")
     
 
     for imp, pip_name in pkgs.items():
@@ -117,15 +144,22 @@ def main():
 
     # --- C/C++ Build Tools ---
     print("\n🛠️  C/C++ Build Tools (OS 编译依赖):")
+    pkg_mgr, _ = _detect_linux_pkg_manager()
+    linux_make = {"apt": "sudo apt install build-essential", "pacman": "sudo pacman -S make",
+                  "dnf": "sudo dnf install make", "zypper": "sudo zypper install make",
+                  "apk": "sudo apk add make"}.get(pkg_mgr, "sudo apt install build-essential")
+    linux_cmake = {"apt": "sudo apt install cmake", "pacman": "sudo pacman -S cmake",
+                   "dnf": "sudo dnf install cmake", "zypper": "sudo zypper install cmake",
+                   "apk": "sudo apk add cmake"}.get(pkg_mgr, "sudo apt install cmake")
     build_tools = {
         "make": {
             "Windows": "scoop install make 或者 choco install make 或者 winget install ezwinports.make",
-            "Linux": "apt install build-essential",
+            "Linux": linux_make,
             "Darwin": "brew install make"
         },
         "cmake": {
             "Windows": "scoop install cmake 或者 winget install Kitware.CMake",
-            "Linux": "apt install cmake",
+            "Linux": linux_cmake,
             "Darwin": "brew install cmake"
         }
     }
@@ -148,9 +182,12 @@ def main():
         _check("C Compiler (gcc/clang)", True, compiler_path)
     else:
         all_ok = False
+        linux_cc = {"apt": "sudo apt install build-essential clang", "pacman": "sudo pacman -S gcc clang",
+                    "dnf": "sudo dnf install gcc clang", "zypper": "sudo zypper install gcc clang",
+                    "apk": "sudo apk add gcc clang"}.get(pkg_mgr, "sudo apt install build-essential clang")
         hints = {
             "Windows": "scoop install gcc 或者 winget install LLVM.LLVM",
-            "Linux": "apt install build-essential clang",
+            "Linux": linux_cc,
             "Darwin": "brew install gcc llvm"
         }
         _check("C Compiler (gcc/clang)", False, f"未找到，建议运行: {hints.get(sys_name, hints['Linux'])}")
@@ -173,42 +210,75 @@ def main():
 
     # --- Cross Compilers ---
     print("\n🌍 Cross Compilers (多架构支持):")
+    linux_riscv = {"apt": "sudo apt install gcc-riscv64-linux-gnu", "pacman": "sudo pacman -S riscv64-linux-gnu-gcc",
+                   "dnf": "sudo dnf install gcc-riscv64-linux-gnu"}.get(pkg_mgr, "apt 系: sudo apt install gcc-riscv64-linux-gnu")
+    linux_arm = {"apt": "sudo apt install gcc-arm-none-eabi", "pacman": "sudo pacman -S arm-none-eabi-gcc",
+                 "dnf": "sudo dnf install arm-none-eabi-gcc"}.get(pkg_mgr, "apt 系: sudo apt install gcc-arm-none-eabi")
     cross_compilers = {
         "riscv64-linux-musl-cc": {
             "label": "RISC-V CC",
-            "hint": "请前往 https://github.com/xpack-dev-tools/riscv-none-elf-gcc-xpack/releases 下载对应版本交叉工具链"
+            "hint": {"Windows": "请前往 https://github.com/xpack-dev-tools/riscv-none-elf-gcc-xpack/releases",
+                    "Linux": linux_riscv,
+                    "Darwin": "brew install riscv-none-elf-gcc"}
         },
         "loongarch64-unknown-elf-gcc": {
             "label": "LoongArch CC",
-            "hint": "请从龙芯社区 https://github.com/loongson/build-tools 下载对应版本交叉工具链"
+            "hint": {"Windows": "请从龙芯社区 https://github.com/loongson/build-tools 下载",
+                    "Linux": "请从 https://github.com/loongson/build-tools 下载或使用发行版包",
+                    "Darwin": "请从龙芯社区下载"}
         },
         "arm-none-eabi-gcc": {
             "label": "ARM CC",
-            "hint": "winget install Arm.GnuArmEmbeddedToolchain"
+            "hint": {"Windows": "winget install Arm.GnuArmEmbeddedToolchain",
+                    "Linux": linux_arm,
+                    "Darwin": "brew install arm-none-eabi-gcc"}
         }
     }
     
     for base_name, info in cross_compilers.items():
         found_path = _resolve_lsp_binary(base_name) if use_resolve else shutil.which(base_name)
+        hint_val = info["hint"]
+        hint_str = hint_val.get(sys_name, hint_val.get("Linux", str(hint_val))) if isinstance(hint_val, dict) else hint_val
         if found_path and found_path != base_name:
             _check(info["label"], True, found_path)
         else:
-            _check(info["label"], False, f"未找到。建议: {info['hint']}")
+            _check(info["label"], False, f"未找到。建议: {hint_str}")
 
     # --- LSP tools ---
     print("\n🔧 Language Servers (LSP):")
+    linux_rust = {"apt": "rustup component add rust-analyzer 或 sudo apt install rust-analyzer",
+                  "pacman": "rustup component add rust-analyzer 或 sudo pacman -S rust-analyzer",
+                  "dnf": "rustup component add rust-analyzer 或 sudo dnf install rust-analyzer",
+                  "zypper": "rustup component add rust-analyzer 或 sudo zypper install rust-analyzer",
+                  "apk": "rustup component add rust-analyzer 或 sudo apk add rust-analyzer"}.get(pkg_mgr, "rustup component add rust-analyzer")
+    linux_clangd = {"apt": "sudo apt install clangd", "pacman": "sudo pacman -S clang",
+                    "dnf": "sudo dnf install clang-tools-extra", "zypper": "sudo zypper install clang-tools",
+                    "apk": "sudo apk add clang"}.get(pkg_mgr, "sudo apt install clangd")
+    # install_cmd: 可自动执行的单条命令；install: 展示给用户的完整提示
     lsp_tools = {
         "rust-analyzer": {"required": "Rust OS 分析必需", "install": {
             "Windows": "rustup component add rust-analyzer",
-            "Linux":   "rustup component add rust-analyzer  或  apt install rust-analyzer",
-            "Darwin":  "brew install rust-analyzer  或  rustup component add rust-analyzer",
+            "Linux":   linux_rust,
+            "Darwin":  "brew install rust-analyzer 或 rustup component add rust-analyzer",
+        }, "install_cmd": {
+            "Windows": "rustup component add rust-analyzer",
+            "Linux":   "rustup component add rust-analyzer",
+            "Darwin":  "rustup component add rust-analyzer",
         }},
         "clangd": {"required": "C/C++ OS 分析必需", "install": {
             "Windows": "winget install LLVM.LLVM",
-            "Linux":   "apt install clangd  或  pacman -S clang",
-            "Darwin":  "brew install llvm  (clangd 已包含)",
+            "Linux":   linux_clangd,
+            "Darwin":  "brew install llvm",
+        }, "install_cmd": {
+            "Windows": "winget install LLVM.LLVM",
+            "Linux":   linux_clangd,
+            "Darwin":  "brew install llvm",
         }},
         "gopls": {"required": "Go OS 分析可选", "install": {
+            "Windows": "go install golang.org/x/tools/gopls@latest",
+            "Linux":   "go install golang.org/x/tools/gopls@latest",
+            "Darwin":  "go install golang.org/x/tools/gopls@latest",
+        }, "install_cmd": {
             "Windows": "go install golang.org/x/tools/gopls@latest",
             "Linux":   "go install golang.org/x/tools/gopls@latest",
             "Darwin":  "go install golang.org/x/tools/gopls@latest",
@@ -217,7 +287,7 @@ def main():
             "Windows": "请参考 https://github.com/zigtools/zls",
             "Linux":   "请参考 https://github.com/zigtools/zls",
             "Darwin":  "请参考 https://github.com/zigtools/zls",
-        }},
+        }, "install_cmd": None},
     }
 
     sys_name = platform.system()
@@ -235,7 +305,9 @@ def main():
             _check(name, True, path_info)
         else:
             install_hint = info["install"].get(sys_name, info["install"]["Linux"])
-            _check(name, False, f'{info["required"]} — 未找到，准备自动执行: {install_hint}')
+            install_cmd = info.get("install_cmd")
+            run_cmd = (install_cmd.get(sys_name, install_cmd.get("Linux")) if install_cmd else None)
+            _check(name, False, f'{info["required"]} — 未找到' + (f'，准备自动执行: {run_cmd}' if run_cmd else f'，建议: {install_hint}'))
             
             # Special auto-handle for rust-analyzer if rustup is missing
             if name == "rust-analyzer" and shutil.which("rustup") is None:
@@ -281,8 +353,12 @@ def main():
                 _check(f"{name} (无法自动安装)", False, f"{install_hint}")
                 continue
 
+            if not run_cmd:
+                all_ok = False
+                continue
+
             try:
-                subprocess.run(install_hint, shell=True, check=True)
+                subprocess.run(run_cmd, shell=True, check=True)
                 _check(f"{name} (自动安装成功)", True, "可能需要重新运行脚本或重启终端使 PATH 生效")
             except subprocess.CalledProcessError:
                 all_ok = False
