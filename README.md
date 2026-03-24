@@ -123,7 +123,7 @@ rag_search_code(repo_path, query, top_k=3)
 ```c
 void mappages(pagetable_t pagetable, uint64 va, ...) { ... }
 ```
-```
+
 
 每个结果含相似度分数、文件路径与起止行号、节点类型、代码体（≤800字符，超出提示使用 `read_code_segment` 读完整内容）。
 
