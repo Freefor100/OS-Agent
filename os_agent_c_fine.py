@@ -28,11 +28,17 @@ import json
 import logging
 import argparse
 from datetime import datetime
+from typing import Optional
 
 from dotenv import load_dotenv
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_openai import ChatOpenAI
-from langgraph.prebuilt import create_react_agent
+try:
+    # LangGraph v1+ 提示：create_react_agent 迁移到 langchain.agents
+    from langchain.agents import create_agent as create_react_agent
+except Exception:
+    # 兼容旧版依赖
+    from langgraph.prebuilt import create_react_agent
 
 from core.agent_builder import get_model_name
 from core.utils import repo_name_from_url, format_tool_call_summary, format_tool_result_summary
@@ -47,6 +53,29 @@ logging.getLogger("httpcore").setLevel(logging.WARNING)
 logger = logging.getLogger("os_agent_c_fine")
 
 DEFAULT_OUTPUT_DIR = "./output"
+
+def _strip_llm_preamble(text: str, *, announce: bool = True) -> str:
+    """剥掉 LLM 输出中第一个 Markdown 标题（# 开头）之前的过渡性口水文字。
+
+    例如：
+      “现在我已经收集了足够的证据来撰写完整的对比报告。让我整理所有发现的信息。”
+
+    策略：找到第一个以 '#' 开头的行，从该行开始作为有效内容。
+    若全文无标题行，则保留原文（避免误删真实内容）。
+    """
+    if not text:
+        return text
+    lines = text.splitlines()
+    for i, line in enumerate(lines):
+        if line.strip().startswith("#"):
+            kept = "\n".join(lines[i:]).strip()
+            dropped = "\n".join(lines[:i]).strip()
+            if announce and dropped:
+                preview = dropped[:120].replace("\n", " ")
+                print(f"      ✂️  已剥除 LLM 前缀（{len(dropped)} 字符）: {preview}...")
+            return kept
+    return text
+
 
 def print_step(step_num: int, node_name: str, state: dict, stage_step_num: int = 0, stage_limit: int = 100) -> int:
     token_count = 0
@@ -71,7 +100,7 @@ def print_step(step_num: int, node_name: str, state: dict, stage_step_num: int =
             elif content.strip():
                 preview = content.strip()[:200]
                 if len(content) > 200: preview += "..."
-                print(f"🤔 Agent: {preview}")
+                print(f"Agent: {preview}")
             
             usage = getattr(msg, "response_metadata", {}).get("token_usage", {})
             if usage:
@@ -438,7 +467,7 @@ def run_fine_compare(
         for stage in COMPARE_STAGES:
             title = stage["title"]
             prompt = stage["prompt"].format(target=target_name, candidate=cand_name)
-            print(f"\n   🧩 {stage['id']}: {title}")
+            print(f"\n======== {stage['id']}: {title} =========")
 
             stage_file_path = os.path.join(cand_sections_dir, f"{stage['id']}.md")
             if os.path.exists(stage_file_path) and os.path.getsize(stage_file_path) > 50:
@@ -483,6 +512,7 @@ def run_fine_compare(
                                     break
 
                     if stage_text:
+                        stage_text = _strip_llm_preamble(stage_text, announce=True)
                         succeeded = True
                         break
                     else:
@@ -523,6 +553,9 @@ def run_fine_compare(
             # ── 生成最终阶段文本 ──
             if not stage_text:
                 stage_text = f"> ⚠️ 阶段 {stage['id']} 未能生成有效对比（已重试 {retry} 次）"
+            else:
+                # 防御：兜底再剥一次（例如 stage_text 来自缓存/非 succeeded 分支）
+                stage_text = _strip_llm_preamble(stage_text, announce=False)
 
             stage_texts.append(stage_text)
             if succeeded:

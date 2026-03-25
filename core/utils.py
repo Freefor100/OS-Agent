@@ -22,6 +22,13 @@ def repo_name_from_url(repo_url: str) -> str:
 def format_tool_call_summary(tool_name: str, tool_args: dict) -> str:
     """格式化工具调用为简洁摘要（合并 describe + evaluate 两个版本的超集）"""
 
+    # OS-Agent C：调用图对比（避免只显示第一个参数）
+    if tool_name == "compare_call_graphs":
+        repo_a = tool_args.get("repo_a", "?")
+        repo_b = tool_args.get("repo_b", "?")
+        entry = tool_args.get("entry_function", tool_args.get("function_name", "?"))
+        return f"repo_a={repo_a}, repo_b={repo_b}, entry_function={entry}"
+
     # 文件读取类工具
     if tool_name in ("read_code_segment", "read_file", "read_human_doc"):
         file_path = tool_args.get("file_path", tool_args.get("path", "?"))
