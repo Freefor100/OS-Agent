@@ -561,9 +561,32 @@ def _resolve_lsp_binary(base_name: str, cwd: Optional[str] = None) -> str:
     
     # 别名映射：允许一个工具对应多个可能的名称（比如在不同系统或分发版下）
     aliases = {
-        "riscv64-linux-musl-cc": ["riscv64-linux-musl-cc", "riscv-none-elf-gcc", "riscv64-unknown-elf-gcc"],
-        "riscv64-linux-musl-ld": ["riscv64-linux-musl-ld", "riscv-none-elf-ld", "riscv64-unknown-elf-ld"],
-        "arm-none-eabi-gcc": ["arm-none-eabi-gcc", "arm-linux-gnueabi-gcc", "arm-none-linux-gnueabihf-gcc"],
+        # Arch/Debian 常见为 riscv64-linux-gnu-gcc（pacman/apt），而非 musl-cc / bare-metal 名
+        "riscv64-linux-musl-cc": [
+            "riscv64-linux-musl-cc",
+            "riscv64-linux-gnu-gcc",
+            "riscv-none-elf-gcc",
+            "riscv64-unknown-elf-gcc",
+        ],
+        "riscv64-linux-musl-ld": [
+            "riscv64-linux-musl-ld",
+            "riscv64-linux-gnu-ld",
+            "riscv-none-elf-ld",
+            "riscv64-unknown-elf-ld",
+        ],
+        "arm-none-eabi-gcc": [
+            "arm-none-eabi-gcc",
+            "aarch64-linux-gnu-gcc",
+            "arm-linux-gnueabi-gcc",
+            "arm-linux-gnueabihf-gcc",
+            "arm-none-linux-gnueabihf-gcc",
+        ],
+        "arm-none-eabi-ld": [
+            "arm-none-eabi-ld",
+            "aarch64-linux-gnu-ld",
+            "arm-linux-gnueabi-ld",
+            "arm-linux-gnueabihf-ld",
+        ],
         "loongarch64-unknown-elf-gcc": ["loongarch64-unknown-elf-gcc", "loongarch64-linux-gnu-gcc", "loongarch64-unknown-linux-gnu-gcc"],
         # xpack RISC-V 工具链别名（Windows 安装的实际可执行文件名）
         "riscv-none-elf-gcc": ["riscv-none-elf-gcc", "riscv64-unknown-elf-gcc", "riscv64-linux-musl-cc"],
