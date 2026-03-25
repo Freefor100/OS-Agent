@@ -163,7 +163,7 @@ def _print_eval_step(
                     print(f"   {tool_name}({summary})")
             elif content.strip():
                 preview = content.strip()[:200] + ("..." if len(content) > 200 else "")
-                print(f"🤔 Agent: {preview}")
+                print(f"Agent: {preview}")
 
             metadata = getattr(msg, "response_metadata", {})
             usage = metadata.get("token_usage", {})

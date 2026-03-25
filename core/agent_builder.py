@@ -3,7 +3,12 @@ import os
 
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
-from langgraph.prebuilt import create_react_agent
+try:
+    # LangGraph v1+ 提示：create_react_agent 迁移到 langchain.agents
+    from langchain.agents import create_agent as create_react_agent
+except Exception:
+    # 兼容旧版依赖
+    from langgraph.prebuilt import create_react_agent
 
 from tools.file_ops import read_code_segment, grep_in_repo, rag_search_code
 from tools.git_ops import (

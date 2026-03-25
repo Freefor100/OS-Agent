@@ -33,7 +33,9 @@ import sys
 import json
 import logging
 import argparse
+import time
 from datetime import datetime
+from typing import Any, Dict, Optional
 
 from dotenv import load_dotenv
 
@@ -55,6 +57,58 @@ logging.basicConfig(
 logger = logging.getLogger("os_agent_c_coarse")
 
 DEFAULT_OUTPUT_DIR = "./output"
+
+
+def _now_ts() -> str:
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _fmt_seconds(sec: float) -> str:
+    if sec < 1:
+        return f"{sec * 1000:.0f}ms"
+    return f"{sec:.2f}s"
+
+
+def _verbosity_rank(v: str) -> int:
+    v = (v or "").strip().lower()
+    if v == "debug":
+        return 2
+    if v == "verbose":
+        return 1
+    return 0  # normal
+
+
+def _sf_pick(struct_features: Dict[str, Any]) -> Dict[str, Any]:
+    """挑选 coarse 输出里最关键的 struct 字段（避免整坨 JSON 刷屏）。"""
+    keys = [
+        "framework",
+        "allocator_crate",
+        "network_stack",
+        "fat32_source",
+        "trapframe_bytes",
+        "syscall_count_real",
+    ]
+    out = {}
+    for k in keys:
+        if k in struct_features:
+            out[k] = struct_features.get(k)
+    return out
+
+
+def _fmt_kv(d: Dict[str, Any]) -> str:
+    parts = []
+    for k, v in d.items():
+        if v is None or v == "":
+            parts.append(f"{k}=null")
+        else:
+            parts.append(f"{k}={v}")
+    return ", ".join(parts) if parts else "-"
+
+
+def _print_header(title: str):
+    print("\n" + "=" * 80)
+    print(title)
+    print("=" * 80)
 
 
 def discover_projects(library_dir: str, filter_list: list = None) -> list:
@@ -97,6 +151,7 @@ def run_coarse_screening(
     top_k: int = 5,
     rebuild: bool = False,
     filter_list: list = None,
+    verbosity: str = "verbose",
 ) -> dict:
     """
     执行粗筛流程。
@@ -111,21 +166,29 @@ def run_coarse_screening(
     Returns:
         粗筛结果字典（同时保存为 JSON 文件）
     """
-    print("\n" + "=" * 80)
-    print("🔍 OS-Agent C 粗筛：向量相似度检索")
-    print("=" * 80)
-    print(f"   目标项目: {target_name}")
-    print(f"   历史库:   {os.path.abspath(library_dir)}")
-    print(f"   输出目录: {os.path.abspath(output_dir)}")
-    print(f"   Top-K:    {top_k}")
-    print(f"   ⏰ 开始:   {datetime.now().strftime('%H:%M:%S')}")
+    v_rank = _verbosity_rank(verbosity)
+    t0_total = time.perf_counter()
+
+    _print_header("🔍 OS-Agent C 粗筛：向量相似度检索")
+    print(f"   目标项目:   {target_name}")
+    print(f"   历史库:     {os.path.abspath(library_dir)}")
+    print(f"   输出目录:   {os.path.abspath(output_dir)}")
+    print(f"   Top-K:      {top_k}")
+    print(f"   rebuild:    {rebuild}")
+    print(f"   verbosity:  {verbosity}")
+    if filter_list:
+        print(f"   filter_list: {filter_list}")
+    print(f"   ⏰ 开始:     {_now_ts()}")
     print("=" * 80)
 
     # ── Step 1: 加载本地 Embedding 模型 ──
+    t0 = time.perf_counter()
     print("\n📦 Step 1/4: 加载本地 Embedding 模型...")
     embedder = LocalEmbedder()
+    print(f"   ✅ Embedder 就绪 ({_fmt_seconds(time.perf_counter() - t0)})")
 
     # ── Step 2: 生成目标项目指纹 ──
+    t0 = time.perf_counter()
     print(f"\n📝 Step 2/4: 生成目标项目 [{target_name}] 的特征指纹...")
     target_sections = os.path.join(library_dir, target_name, "sections")
     if not os.path.isdir(target_sections):
@@ -144,54 +207,110 @@ def run_coarse_screening(
     target_output = os.path.join(output_dir, target_name)
     os.makedirs(target_output, exist_ok=True)
 
+    target_fp_path = os.path.join(os.path.dirname(target_sections), "fingerprint.json")
+    target_action = "BUILD"
+    target_reason = None
+    if not rebuild and os.path.exists(target_fp_path):
+        target_action = "LOAD"
+    else:
+        if rebuild:
+            target_reason = "--rebuild"
+        elif not os.path.exists(target_fp_path):
+            target_reason = "fingerprint_missing"
+
     target_fp = build_fingerprint(
         repo_name=target_name,
         sections_dir=target_sections,
         embedder=embedder,
         force=rebuild,
     )
-    fp_path = os.path.join(os.path.dirname(target_sections), "fingerprint.json")
-    print(f"   ✅ 目标指纹: {fp_path}")
+    print(f"   ✅ 目标指纹: {target_fp_path}")
+    print(f"   动作:       {target_action}" + (f" (reason={target_reason})" if target_reason else ""))
+    print(f"   sections:    {os.path.abspath(target_sections)}")
     print(f"   向量维度数: {len(target_fp.embeddings)} 个维度")
     for dim_id, vec in sorted(target_fp.embeddings.items()):
         print(f"      {dim_id}: {len(vec)} 维向量")
+    if v_rank >= 1:
+        sf = getattr(target_fp, "struct_features", {}) or {}
+        print(f"   struct_features: {_fmt_kv(_sf_pick(sf))}")
+    print(f"   ✅ Step 2 完成 ({_fmt_seconds(time.perf_counter() - t0)})")
 
     # ── Step 3: 为历史库中所有项目生成指纹 ──
+    t0 = time.perf_counter()
     print(f"\n📂 Step 3/4: 扫描历史库并生成指纹...")
-    if filter_list:
-        print(f"   📋 使用过滤列表: {filter_list}")
     all_projects = discover_projects(library_dir, filter_list=filter_list)
     print(f"   发现 {len(all_projects)} 个历史项目")
 
     store = VectorStore(output_dir=output_dir)
 
-    for proj_name, proj_sections in all_projects:
+    n_load = 0
+    n_build = 0
+    n_fail = 0
+
+    for idx, (proj_name, proj_sections) in enumerate(all_projects, 1):
         # fingerprint.json 保存在 sections/ 的父目录（即 output/仓库名/）
         proj_fp_path = os.path.join(os.path.dirname(proj_sections), "fingerprint.json")
+        proj_t0 = time.perf_counter()
 
-        if not rebuild and os.path.exists(proj_fp_path):
-            print(f"   ⏭️  {proj_name} (指纹已存在)")
-            fp = Fingerprint.load(proj_fp_path)
-        else:
-            print(f"   🔄 生成 {proj_name} 的指纹...")
-            fp = build_fingerprint(
-                repo_name=proj_name,
-                sections_dir=proj_sections,
-                embedder=embedder,
-                force=rebuild,
-            )
+        try:
+            action = "BUILD"
+            reason = None
+            if not rebuild and os.path.exists(proj_fp_path):
+                action = "LOAD"
+                fp = Fingerprint.load(proj_fp_path)
+                n_load += 1
+            else:
+                if rebuild:
+                    reason = "--rebuild"
+                elif not os.path.exists(proj_fp_path):
+                    reason = "fingerprint_missing"
+                fp = build_fingerprint(
+                    repo_name=proj_name,
+                    sections_dir=proj_sections,
+                    embedder=embedder,
+                    force=rebuild,
+                )
+                n_build += 1
 
-        store.add_project(proj_name, fp)
+            sf = getattr(fp, "struct_features", {}) or {}
+            sf_short = _sf_pick(sf) if v_rank >= 1 else {}
+            suffix = f" | {action}"
+            if reason:
+                suffix += f"(reason={reason})"
+            suffix += f" | fp={proj_fp_path}"
+            if v_rank >= 1:
+                suffix += f" | {_fmt_kv(sf_short)}"
+            suffix += f" | {_fmt_seconds(time.perf_counter() - proj_t0)}"
+            print(f"   [{idx:>3}/{len(all_projects):<3}] {proj_name}{suffix}")
+
+            store.add_project(proj_name, fp)
+        except Exception as e:
+            n_fail += 1
+            print(f"   [{idx:>3}/{len(all_projects):<3}] {proj_name} | FAIL | {type(e).__name__}: {e}")
 
     # 也确保目标项目在 store 中
     if not store.has_project(target_name):
         store.add_project(target_name, target_fp)
 
     print(f"\n   📊 索引总项目数: {store.size}")
+    print(f"   统计: LOAD={n_load}, BUILD={n_build}, FAIL={n_fail}")
+    print(f"   ✅ Step 3 完成 ({_fmt_seconds(time.perf_counter() - t0)})")
 
     # ── Step 4: 向量检索 ──
+    t0 = time.perf_counter()
     print(f"\n🔎 Step 4/4: 执行向量相似度检索...")
+    if v_rank >= 1:
+        dim_ids = sorted(DIMENSION_MAP.keys())
+        weights = get_dimension_weights()
+        fw_shared = ", ".join(sorted(VectorStore.FRAMEWORK_SHARED_DIMS))
+        core_dims = ", ".join(sorted(VectorStore.CUSTOM_CORE_DIMS))
+        print("   相似度配置: 多维度加权余弦 + struct_features 精确字段加分")
+        print(f"   维度: {', '.join(dim_ids)}")
+        print(f"   权重: {_fmt_kv({d: round(weights.get(d, 0.0), 4) for d in dim_ids})}")
+        print(f"   同框架重权重: shared_half=[{fw_shared}], core_x1.4=[{core_dims}]")
+
     results = store.search_similar(target_fp, top_k=top_k, exclude_self=True)
+    print(f"   ✅ Step 4 完成 ({_fmt_seconds(time.perf_counter() - t0)})")
 
     # ── 输出结果 ──
     weights = get_dimension_weights()
@@ -231,7 +350,7 @@ def run_coarse_screening(
         "timestamp": datetime.now().isoformat(),
         "top_k": top_k,
         "dimension_weights": weights,
-        "target_fingerprint_path": fp_path,
+        "target_fingerprint_path": target_fp_path,
         "target_vectors": {
             dim_id: {
                 "feature_text": target_fp.features.get(dim_id, ""),
@@ -252,7 +371,15 @@ def run_coarse_screening(
     _save_coarse_markdown(md_path, target_name, results, dim_ids, weights)
     print(f"📄 可读报告已保存: {md_path}")
 
-    print(f"\n⏰ 完成: {datetime.now().strftime('%H:%M:%S')}")
+    print("\n" + "-" * 80)
+    print("📦 输出产物汇总")
+    print("-" * 80)
+    print(f"   target_sections: {os.path.abspath(target_sections)}")
+    print(f"   target_fingerprint: {target_fp_path}")
+    print(f"   coarse_json: {coarse_path}")
+    print(f"   coarse_md:   {md_path}")
+    print("-" * 80)
+    print(f"⏰ 完成: {_now_ts()} | 总耗时: {_fmt_seconds(time.perf_counter() - t0_total)}")
     return coarse_result
 
 
@@ -303,6 +430,7 @@ def main():
   python os_agent_c_coarse.py --target nonix --library ./output
   python os_agent_c_coarse.py --target nonix --library ./output --top-k 3
   python os_agent_c_coarse.py --target nonix --library ./output --rebuild
+  python os_agent_c_coarse.py --target nonix --library ./output --verbosity verbose
         """,
     )
     parser.add_argument(
@@ -325,6 +453,18 @@ def main():
         "--rebuild", action="store_true",
         help="强制重建所有项目的特征指纹（忽略已有缓存）",
     )
+    parser.add_argument(
+        "--verbosity",
+        type=str,
+        default="verbose",
+        choices=["normal", "verbose", "debug"],
+        help="终端输出详细级别（默认 verbose）",
+    )
+    parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="静默模式：等同于 --verbosity normal（兼容用）",
+    )
     args = parser.parse_args()
 
     # 确定目标项目名
@@ -338,6 +478,7 @@ def main():
             sys.exit(1)
 
     output_dir = args.output_dir or args.library
+    verbosity = "normal" if args.quiet else args.verbosity
 
     # 解析 .env 中的 HISTORY_PROJECTS
     history_projects_env = os.environ.get("HISTORY_PROJECTS", "").strip()
@@ -365,6 +506,7 @@ def main():
         top_k=args.top_k,
         rebuild=args.rebuild,
         filter_list=filter_list,
+        verbosity=verbosity,
     )
 
 

@@ -876,7 +876,7 @@ def print_step(step_num: int, node_name: str, state: dict, stage_step_num: int =
                 preview = content.strip()[:200]
                 if len(content) > 200:
                     preview += "..."
-                print(f"🤔 Agent: {preview}")
+                print(f"Agent: {preview}")
             
             # 打印 Token Usage
             metadata = getattr(msg, "response_metadata", {})
