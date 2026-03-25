@@ -61,7 +61,9 @@ tree-sitter-zig                # Zig 语言支持
 hf_transfer                    # 高速模型下载加速
 optimum                        # Jina 模型加速 (ONNX)
 optimum-onnx                   # Jina 模型加速 (ONNX)
-onnxruntime-gpu                # CUDA 加速后端
+# ONNX Runtime：本文件只声明 GPU 版。勿添加 onnxruntime（CPU 包），二者共用 onnxruntime 模块会冲突。
+# pymupdf-layout 可能在元数据里要求 onnxruntime 包名，pip 会提示冲突，以已安装的 onnxruntime-gpu 为准即可。
+onnxruntime-gpu>=1.23.0
 torch>=2.0.0                    # PyTorch 核心 (建议安装 CUDA 版本)
 
 # ===== 开发工具（可选）=====
