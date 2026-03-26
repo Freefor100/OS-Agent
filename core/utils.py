@@ -5,6 +5,26 @@
 合并为超集版本，兼容两者的工具名称映射。
 """
 import os
+import json
+
+
+def _stringify_tool_arg(v):
+    """尽量完整、单行地 stringify tool args（便于终端展示）。"""
+    if v is None:
+        return "null"
+    if isinstance(v, bool):
+        return "true" if v else "false"
+    if isinstance(v, (int, float)):
+        return str(v)
+    if isinstance(v, str):
+        # 终端里保持单行可读
+        return v.replace("\n", "\\n")
+    if isinstance(v, (list, tuple, dict)):
+        try:
+            return json.dumps(v, ensure_ascii=False)
+        except Exception:
+            return str(v).replace("\n", "\\n")
+    return str(v).replace("\n", "\\n")
 
 
 def repo_name_from_url(repo_url: str) -> str:
@@ -29,6 +49,13 @@ def format_tool_call_summary(tool_name: str, tool_args: dict) -> str:
         entry = tool_args.get("entry_function", tool_args.get("function_name", "?"))
         return f"repo_a={repo_a}, repo_b={repo_b}, entry_function={entry}"
 
+    # OS-Agent C：函数 Token 相似度（避免只显示第一个参数）
+    if tool_name == "compare_function_tokens":
+        repo_a = tool_args.get("repo_a", "?")
+        repo_b = tool_args.get("repo_b", "?")
+        fn = tool_args.get("function_name", tool_args.get("entry_function", "?"))
+        return f"repo_a={repo_a}, repo_b={repo_b}, function_name={fn}"
+
     # 文件读取类工具
     if tool_name in ("read_code_segment", "read_file", "read_human_doc"):
         file_path = tool_args.get("file_path", tool_args.get("path", "?"))
@@ -49,21 +76,28 @@ def format_tool_call_summary(tool_name: str, tool_args: dict) -> str:
     # 人类文档搜索
     elif tool_name == "find_human_docs":
         path = tool_args.get("repo_path", "?")
-        kw = tool_args.get("keywords", "")[:30]
+        kw = tool_args.get("keywords", "")
         dirname = os.path.basename(str(path).rstrip("/\\")) if path else "?"
         return f"{dirname}/" + (f' "{kw}"' if kw else "")
 
     # 声明验证
     elif tool_name == "verify_claim_in_source":
-        claim = str(tool_args.get("claim", ""))[:40]
-        return f'"{claim}..."' if len(claim) >= 40 else f'"{claim}"'
+        claim = str(tool_args.get("claim", ""))
+        return f'"{claim}"'
 
     # 搜索类工具
     elif tool_name in ("grep_search", "grep_in_repo"):
-        pattern = str(tool_args.get("pattern", tool_args.get("query", "?")))[:30]
+        pattern = str(tool_args.get("pattern", tool_args.get("query", "?")))
         path = tool_args.get("repo_path", tool_args.get("path", ""))
         dirname = os.path.basename(str(path).rstrip("/\\")) if path else ""
-        return f'"{pattern}"' + (f" in {dirname}/" if dirname else "")
+        extra = []
+        # 兼容 grep_in_repo 的可选参数（如果存在就一起展示）
+        if "file_extensions" in tool_args:
+            extra.append(f"ext={tool_args.get('file_extensions')}")
+        if "max_results" in tool_args:
+            extra.append(f"max={tool_args.get('max_results')}")
+        suffix = f" in {dirname}/" if dirname else ""
+        return f'"{pattern}"{suffix}' + (f" ({', '.join(extra)})" if extra else "")
 
     # 技术栈分析 / 核心模块发现
     elif tool_name in ("analyze_tech_stack", "find_os_core_modules"):
@@ -109,11 +143,13 @@ def format_tool_call_summary(tool_name: str, tool_args: dict) -> str:
 
     # 默认：显示第一个参数
     else:
-        if tool_args:
-            first_key = list(tool_args.keys())[0]
-            first_val = str(tool_args[first_key])[:120]
-            return f"{first_key}={first_val}"
-        return ""
+        # 默认：尽量显示全部参数（避免“括号内容显示不全”）
+        if not tool_args:
+            return ""
+        parts = []
+        for k in sorted(tool_args.keys()):
+            parts.append(f"{k}={_stringify_tool_arg(tool_args.get(k))}")
+        return ", ".join(parts)
 
 
 def format_tool_result_summary(tool_name: str, content: str) -> str:

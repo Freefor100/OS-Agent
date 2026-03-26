@@ -53,6 +53,8 @@ logging.getLogger("httpcore").setLevel(logging.WARNING)
 logger = logging.getLogger("os_agent_c_fine")
 
 DEFAULT_OUTPUT_DIR = "./output"
+DEFAULT_RECURSION_LIMIT = 150
+DEFAULT_STAGE_LIMIT = 150  # 仅用于终端展示，建议与 recursion_limit 保持一致
 
 def _strip_llm_preamble(text: str, *, announce: bool = True) -> str:
     """剥掉 LLM 输出中第一个 Markdown 标题（# 开头）之前的过渡性口水文字。
@@ -77,7 +79,7 @@ def _strip_llm_preamble(text: str, *, announce: bool = True) -> str:
     return text
 
 
-def print_step(step_num: int, node_name: str, state: dict, stage_step_num: int = 0, stage_limit: int = 100) -> int:
+def print_step(step_num: int, node_name: str, state: dict, stage_step_num: int = 0, stage_limit: int = DEFAULT_STAGE_LIMIT) -> int:
     token_count = 0
     messages = state.get("messages", [])
     if not messages: return 0
@@ -415,6 +417,8 @@ def run_fine_compare(
     target_name: str,
     candidates: list,
     output_dir: str = DEFAULT_OUTPUT_DIR,
+    recursion_limit: int = DEFAULT_RECURSION_LIMIT,
+    stage_limit: Optional[int] = None,
 ):
     """
     执行精比流程。
@@ -496,10 +500,11 @@ def run_fine_compare(
 
                     final_state = None
                     step_count = 0
-                    for event in agent.stream(inputs, config={"recursion_limit": 100}):
+                    effective_stage_limit = stage_limit or recursion_limit
+                    for event in agent.stream(inputs, config={"recursion_limit": recursion_limit}):
                         step_count += 1
                         for node_name, state in event.items():
-                            print_step(step_count, node_name, state, stage_step_num=step_count, stage_limit=100)
+                            print_step(step_count, node_name, state, stage_step_num=step_count, stage_limit=effective_stage_limit)
                             final_state = state
 
                     if final_state and final_state.get("messages"):
@@ -635,6 +640,14 @@ def main():
         "--output-dir", type=str, default=DEFAULT_OUTPUT_DIR,
         help="输出目录（默认 ./output）",
     )
+    parser.add_argument(
+        "--recursion-limit", type=int, default=DEFAULT_RECURSION_LIMIT,
+        help="LangGraph 递归步数上限（默认 150）",
+    )
+    parser.add_argument(
+        "--stage-limit", type=int, default=None,
+        help="终端打印展示的阶段步数上限（默认跟随 --recursion-limit）",
+    )
     args = parser.parse_args()
 
     # 确定目标
@@ -727,7 +740,13 @@ def main():
     for c in candidates:
         _ensure_cloned(c["name"], c.get("url"))
 
-    run_fine_compare(target_name, candidates, output_dir=args.output_dir)
+    run_fine_compare(
+        target_name,
+        candidates,
+        output_dir=args.output_dir,
+        recursion_limit=args.recursion_limit,
+        stage_limit=args.stage_limit,
+    )
 
 
 if __name__ == "__main__":
