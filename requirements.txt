@@ -1,6 +1,6 @@
 # OS-Agent D 依赖包
 # Python >= 3.10 recommended
-# 最后更新: 2025-02-14 (评估程序增强版 v2.0)
+# 最后更新: 2026-03-05 
 
 # ===== 核心框架 =====
 # LangChain - LLM 应用框架
@@ -48,6 +48,33 @@ pymupdf>=1.24.0
 # - 输入验证（os, sys）
 # - 超时控制（集成在 openai 包中）
 
+# ===== OS-Agent C/D: 本地向量 RAG & AST 解析 =====
+numpy>=1.24.0
+sentence-transformers>=2.2.0    # 本地 Embedding 模型
+transformers>=4.36.0,<4.58.0     # 兼容 optimum-onnx(>=4.36,<4.58) 和 Jina 模型
+tree-sitter>=0.23.2              # AST 解析接口
+tree-sitter-c                  # C 语言支持
+tree-sitter-cpp                # C++ 语言支持
+tree-sitter-rust               # Rust 语言支持
+tree-sitter-go                 # Go 语言支持
+tree-sitter-zig                # Zig 语言支持
+hf_transfer                    # 高速模型下载加速
+optimum                        # Jina 模型加速 (ONNX)
+optimum-onnx                   # Jina 模型加速 (ONNX)
+# ONNX Runtime：本文件只声明 GPU 版。勿添加 onnxruntime（CPU 包），二者共用 onnxruntime 模块会冲突。
+# pymupdf-layout 可能在元数据里要求 onnxruntime 包名，pip 会提示冲突，以已安装的 onnxruntime-gpu 为准即可。
+onnxruntime-gpu>=1.23.0
+torch>=2.0.0                    # PyTorch 核心 (建议安装 CUDA 版本)
+
 # ===== 开发工具（可选）=====
 # ipython>=8.0.0
 # jupyter>=1.0.0
+
+tree-sitter
+tree-sitter-c
+tree-sitter-cpp
+tree-sitter-rust
+tree-sitter-go
+tree-sitter-zig
+
+openpyxl

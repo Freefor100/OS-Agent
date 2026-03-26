@@ -8,7 +8,7 @@ OS-Agent D 评估模块（增强版：重试机制 + 错误追溯 + 鲁棒性）
 3. 每个章节启动独立 Agent（无共享记忆），对比人类文档与生成报告
 4. 冲突时以 OS 源码为权威，使用工具验证
 5. 输出至 evaluation/<os_name>/：sections/*.json、summary.json、evaluation_report.md
-6. 14(开发历史)、15(执行摘要) 不参与验证，评估仅覆盖 01-13 章
+6. 13(开发历史与里程碑) 不参与验证，评估仅覆盖 01-12 章
 
 增强功能：
 - 智能重试机制（指数退避、错误分类）
@@ -26,13 +26,14 @@ import glob
 import traceback
 from datetime import datetime
 from typing import List, Dict, Any, Optional, Tuple
-from enum import Enum
 
 from dotenv import load_dotenv
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langchain_openai import ChatOpenAI
 from langchain.agents import create_agent
 
+from core.utils import repo_name_from_url, format_tool_call_summary, format_tool_result_summary
+from core.error_handling import ErrorType, RetryConfig, classify_error, calculate_backoff, ErrorTracker
 from tools.eval_ops import (
     find_human_docs,
     read_human_doc,
@@ -44,177 +45,13 @@ from tools.eval_ops import (
 from tools.file_ops import read_code_segment, grep_in_repo
 from tools.describe_ops import analyze_tech_stack
 from tools.git_ops import get_dev_history_by_module
-from tools.lsp_ops import lsp_get_definition, lsp_get_references
+from tools.lsp_ops import lsp_get_definition, lsp_get_references, lsp_get_document_outline
 
 load_dotenv()
 
 
-# ============================================================
-# 错误分类与重试策略
-# ============================================================
-
-class ErrorType(Enum):
-    """错误类型枚举"""
-    NETWORK_ERROR = "网络错误"
-    API_ERROR = "API错误"
-    TIMEOUT_ERROR = "超时错误"
-    PARSE_ERROR = "解析错误"
-    VALIDATION_ERROR = "验证错误"
-    TOOL_ERROR = "工具执行错误"
-    UNKNOWN_ERROR = "未知错误"
-
-
-class RetryConfig:
-    """重试配置"""
-    MAX_RETRIES = 3  # 最大重试次数
-    INITIAL_BACKOFF = 2  # 初始退避时间（秒）
-    MAX_BACKOFF = 60  # 最大退避时间（秒）
-    BACKOFF_MULTIPLIER = 2  # 退避倍数
-
-    # 不同错误类型的重试策略
-    RETRYABLE_ERRORS = {
-        ErrorType.NETWORK_ERROR: True,
-        ErrorType.API_ERROR: True,
-        ErrorType.TIMEOUT_ERROR: True,
-        ErrorType.PARSE_ERROR: False,  # 解析错误重试无意义
-        ErrorType.VALIDATION_ERROR: False,
-        ErrorType.TOOL_ERROR: True,
-        ErrorType.UNKNOWN_ERROR: True,
-    }
-
-
-def classify_error(exception: Exception) -> ErrorType:
-    """分类异常类型"""
-    error_msg = str(exception).lower()
-    error_type_name = type(exception).__name__.lower()
-
-    # 网络相关错误
-    if any(keyword in error_msg for keyword in ["connection", "network", "socket", "dns"]):
-        return ErrorType.NETWORK_ERROR
-    if any(keyword in error_type_name for keyword in ["connection", "timeout", "socket"]):
-        return ErrorType.NETWORK_ERROR
-
-    # API 错误
-    if any(keyword in error_msg for keyword in ["api", "rate limit", "quota", "429", "503"]):
-        return ErrorType.API_ERROR
-    if "openai" in error_type_name or "api" in error_type_name:
-        return ErrorType.API_ERROR
-
-    # 超时错误
-    if "timeout" in error_msg or "timeout" in error_type_name:
-        return ErrorType.TIMEOUT_ERROR
-
-    # JSON 解析错误
-    if "json" in error_msg or "json" in error_type_name:
-        return ErrorType.PARSE_ERROR
-
-    # 工具执行错误
-    if "tool" in error_msg:
-        return ErrorType.TOOL_ERROR
-
-    return ErrorType.UNKNOWN_ERROR
-
-
-def calculate_backoff(retry_count: int) -> int:
-    """计算退避时间（指数退避）"""
-    backoff = RetryConfig.INITIAL_BACKOFF * (RetryConfig.BACKOFF_MULTIPLIER ** retry_count)
-    return min(backoff, RetryConfig.MAX_BACKOFF)
-
-
-# ============================================================
-# 错误记录与追溯
-# ============================================================
-
-class ErrorTracker:
-    """错误追踪器"""
-
-    def __init__(self, eval_dir: str):
-        self.eval_dir = eval_dir
-        self.errors = []
-        self.error_stats = {error_type: 0 for error_type in ErrorType}
-
-    def record_error(
-        self,
-        section_name: str,
-        error_type: ErrorType,
-        exception: Exception,
-        retry_count: int,
-        context: Dict[str, Any] = None
-    ):
-        """记录错误信息"""
-        error_record = {
-            "timestamp": datetime.now().isoformat(),
-            "section": section_name,
-            "error_type": error_type.value,
-            "exception_type": type(exception).__name__,
-            "exception_message": str(exception),
-            "traceback": traceback.format_exc(),
-            "retry_count": retry_count,
-            "context": context or {}
-        }
-
-        self.errors.append(error_record)
-        self.error_stats[error_type] += 1
-
-        # 记录到日志
-        logging.error(
-            f"[{section_name}] {error_type.value} (重试: {retry_count}): "
-            f"{type(exception).__name__}: {exception}"
-        )
-        logging.debug(f"错误堆栈:\n{error_record['traceback']}")
-
-    def save_error_report(self):
-        """保存错误报告"""
-        if not self.errors:
-            return
-
-        error_report_path = os.path.join(self.eval_dir, "error_report.json")
-        try:
-            with open(error_report_path, "w", encoding="utf-8") as f:
-                json.dump({
-                    "total_errors": len(self.errors),
-                    "error_statistics": {k.value: v for k, v in self.error_stats.items()},
-                    "errors": self.errors
-                }, f, ensure_ascii=False, indent=2)
-
-            logging.info(f"错误报告已保存: {error_report_path}")
-            print(f"📋 错误报告已保存: {error_report_path}")
-        except Exception as e:
-            logging.error(f"保存错误报告失败: {e}")
-
-    def generate_error_summary(self) -> str:
-        """生成错误摘要（Markdown格式）"""
-        if not self.errors:
-            return "## 错误统计\n\n✅ 无错误发生\n"
-
-        lines = [
-            "## 错误统计",
-            "",
-            f"- **总错误数**: {len(self.errors)}",
-            ""
-        ]
-
-        # 按错误类型统计
-        lines.append("### 错误类型分布")
-        lines.append("")
-        for error_type, count in self.error_stats.items():
-            if count > 0:
-                lines.append(f"- **{error_type.value}**: {count} 次")
-
-        lines.append("")
-        lines.append("### 详细错误列表")
-        lines.append("")
-
-        for i, error in enumerate(self.errors, 1):
-            lines.append(f"#### 错误 {i}: {error['section']}")
-            lines.append(f"- **类型**: {error['error_type']}")
-            lines.append(f"- **异常**: {error['exception_type']}")
-            lines.append(f"- **消息**: {error['exception_message']}")
-            lines.append(f"- **重试次数**: {error['retry_count']}")
-            lines.append(f"- **时间**: {error['timestamp']}")
-            lines.append("")
-
-        return "\n".join(lines)
+# ErrorType, RetryConfig, classify_error, calculate_backoff, ErrorTracker
+# 已移至 core.error_handling 模块
 
 # ============================================================
 # 配置与常量
@@ -263,6 +100,7 @@ EVAL_TOOLS = [
     get_dev_history_by_module,
     lsp_get_definition,
     lsp_get_references,
+    lsp_get_document_outline,
 ]
 
 # JSON Schema 示例（供 LLM 输出参考）
@@ -290,98 +128,8 @@ SECTION_JSON_SCHEMA = '''
 '''
 
 
-def _repo_name_from_url(repo_url: str) -> str:
-    name = repo_url.rstrip("/").split("/")[-1]
-    return name[:-4] if name.endswith(".git") else name
-
-
-def _format_tool_call_summary(tool_name: str, tool_args: dict) -> str:
-    """格式化工具调用为简洁摘要"""
-    if tool_name in ("read_code_segment", "read_human_doc"):
-        file_path = tool_args.get("file_path", tool_args.get("path", "?"))
-        start = tool_args.get("start_line", tool_args.get("start", ""))
-        end = tool_args.get("end_line", tool_args.get("end", ""))
-        if start and end:
-            return f"{file_path} L{start}-L{end}"
-        elif start:
-            return f"{file_path} L{start}"
-        return file_path or "?"
-
-    elif tool_name in ("list_directory", "list_section_files"):
-        path = tool_args.get("path", tool_args.get("output_dir", "?"))
-        dirname = os.path.basename(str(path).rstrip("/\\")) if path else "?"
-        return f"{dirname}/"
-
-    elif tool_name == "find_human_docs":
-        path = tool_args.get("repo_path", "?")
-        kw = tool_args.get("keywords", "")[:30]
-        dirname = os.path.basename(str(path).rstrip("/\\")) if path else "?"
-        return f"{dirname}/" + (f' "{kw}"' if kw else "")
-
-    elif tool_name == "verify_claim_in_source":
-        claim = str(tool_args.get("claim", ""))[:40]
-        return f'"{claim}..."' if len(claim) >= 40 else f'"{claim}"'
-
-    elif tool_name == "grep_in_repo":
-        path = tool_args.get("repo_path", "")
-        pattern = str(tool_args.get("pattern", "?"))[:30]
-        dirname = os.path.basename(str(path).rstrip("/\\")) if path else ""
-        return f'"{pattern}"' + (f" in {dirname}/" if dirname else "")
-
-    elif tool_name == "analyze_tech_stack":
-        path = tool_args.get("repo_path", "?")
-        dirname = os.path.basename(str(path).rstrip("/\\")) if path else "?"
-        return f"{dirname}/"
-
-    elif tool_name == "get_dev_history_by_module":
-        path = tool_args.get("repo_path", "?")
-        dirname = os.path.basename(str(path).rstrip("/\\")) if path else "?"
-        return f"{dirname}/"
-
-    elif tool_name in ("lsp_get_definition", "lsp_get_references"):
-        symbol = str(tool_args.get("symbol", "?"))
-        file_path = str(tool_args.get("file_path", "?"))
-        return f"{symbol} in {os.path.basename(file_path)}"
-
-    else:
-        if tool_args:
-            first_key = list(tool_args.keys())[0]
-            first_val = str(tool_args[first_key])[:40]
-            return f"{first_key}={first_val}"
-        return ""
-
-
-def _format_tool_result_summary(tool_name: str, content: str) -> str:
-    """格式化工具返回结果为简洁摘要"""
-    content_len = len(content)
-    line_count = len(content.split("\n")) if content else 0
-
-    if tool_name in ("read_code_segment", "read_human_doc"):
-        return f"返回 {line_count} 行 ({content_len} 字符)"
-    elif tool_name in ("list_directory", "list_section_files"):
-        return f"返回 {line_count} 项"
-    elif tool_name == "find_human_docs":
-        doc_count = content.count("[PDF") + content.count("[DOC") + content.count("[MATCH]")
-        return f"找到 {doc_count} 个文档" if doc_count else f"返回 {content_len} 字符"
-    elif tool_name == "verify_claim_in_source":
-        if "✅" in content or "找到" in content:
-            return "✓ 源码有匹配"
-        if "❌" in content:
-            return "✗ 源码无匹配"
-        return f"返回 {content_len} 字符"
-    elif tool_name == "grep_in_repo":
-        match_count = content.count("\n") if content.strip() else 0
-        return f"找到 {match_count} 个匹配"
-    elif tool_name in ("lsp_get_definition", "lsp_get_references"):
-        return f"返回 {line_count} 行关联信息"
-    elif tool_name == "analyze_tech_stack":
-        if "代码文件统计" in content or "Rust" in content:
-            return "返回技术栈与文件统计"
-        return f"返回 {len(content)} 字符"
-    elif tool_name == "get_dev_history_by_module":
-        return f"返回开发历史 ({line_count} 行)"
-    else:
-        return f"返回 {content_len} 字符 ({line_count} 行)"
+# _repo_name_from_url, _format_tool_call_summary, _format_tool_result_summary
+# 已移至 core.utils 模块
 
 
 def _print_eval_step(
@@ -411,11 +159,11 @@ def _print_eval_step(
                 for tc in tool_calls:
                     tool_name = tc.get("name", "unknown") if isinstance(tc, dict) else getattr(tc, "name", "unknown")
                     tool_args = tc.get("args", {}) if isinstance(tc, dict) else getattr(tc, "args", {})
-                    summary = _format_tool_call_summary(tool_name, tool_args)
+                    summary = format_tool_call_summary(tool_name, tool_args)
                     print(f"   {tool_name}({summary})")
             elif content.strip():
                 preview = content.strip()[:200] + ("..." if len(content) > 200 else "")
-                print(f"🤔 Agent: {preview}")
+                print(f"Agent: {preview}")
 
             metadata = getattr(msg, "response_metadata", {})
             usage = metadata.get("token_usage", {})
@@ -430,7 +178,7 @@ def _print_eval_step(
         elif isinstance(msg, ToolMessage):
             tool_name = getattr(msg, "name", "unknown")
             content = msg.content or ""
-            summary = _format_tool_result_summary(tool_name, content)
+            summary = format_tool_result_summary(tool_name, content)
             print(f"   ✅ {tool_name}: {summary}")
 
     sys.stdout.flush()
@@ -465,14 +213,25 @@ def _build_section_prompt(
 
     return f'''你是一个严格的 OS 报告评分员。你的任务是：对比【人类文档】和【Agent 生成报告】，以【OS 源码】为冲突时的最终权威，对生成报告进行非对称评估。
 
+**术语约定（贯穿全文）**：
+- 【人类文档】= 仓库中已有的人工撰写文档（PDF/README/Design Doc）
+- 【生成报告】= Agent 自动分析源码后生成的章节 Markdown
+- 在 accuracy.errors.desc 中描述问题时，必须明确指出是"生成报告"还是"人类文档"的问题（例如："生成报告称15个，实际源码中为12个"）
+
 ## 重要规则（必须遵守）
-1. **冲突裁决**：人类文档说 A、生成报告说 B 时，必须用 grep_in_repo 或 verify_claim_in_source 在源码中验证，以源码为准。
+1. **冲突裁决**：人类文档说 A、生成报告说 B 时，必须在源码中验证，以源码为准。优先使用 `lsp_get_definition` 定位符号的真实定义；辅以 `verify_claim_in_source` 或 `grep_in_repo` 搜索关键词。
 2. **缺失判别**：
+   - **项目名称豁免**：如果生成报告使用的项目名称与人类文档中的名称不一致，但该名称可以从代码仓库的 URL、所有者或上下文中合理推导出来，**绝对不要扣分，也不要将其计入 accuracy errors**。生成报告基于源码上下文分析，这不是幻觉。
    - 如果人类文档提到某功能（如“计划支持网络”），但源码未实现，而生成报告正确指出“未实现”，**不扣 Accuracy 分，但可能扣 Coverage 分（如果该功能是 OS 核心必需）**。
    - 如果人类文档未提到，但生成报告通过代码分析发现了隐藏特性，**加 Highlights 分**。
 3. **幻觉重罚**：
    - 如果生成报告声称实现了某高级特性（如 CoW、零拷贝），但源码中根本找不到对应实现（仅有定义或 TODO），视为**严重幻觉（Fabrication）**，必须重罚。
-   - **强制验证**：对于报告中提到的每一个“高级特性”，你必须调用 `verify_claim_in_source` 或 `lsp_get_definition`。如果验证失败，直接判定为幻觉。
+   - **强制验证**：对于报告中提到的每一个"高级特性"，你必须调用工具验证。**工具选择指南**：
+     - 验证某函数/结构体是否存在 → `lsp_get_definition`（最精确）
+     - 验证某功能关键词是否出现在源码中 → `verify_claim_in_source` 或 `grep_in_repo`
+     - 验证调用链是否真实 → `lsp_get_references` 追踪调用者
+     - 快速查看某文件有哪些函数 → `lsp_get_document_outline`
+     如果验证失败，直接判定为幻觉。
 
 ## 评估目标
 - 章节文件：{section_path}
@@ -486,9 +245,12 @@ def _build_section_prompt(
    **完成后，将关键设计点编号列成清单**（如 P1: xxx, P2: xxx, ...），便于后续逐条检查。
 3. 用 read_generated_section(file_path="{section_path}") 阅读 Agent 生成的章节报告。
 4. **结构化对照检查**：对照步骤 2 的关键点清单，逐条在生成报告中搜索是否覆盖。对于每个点，标注「已覆盖」或「缺失」。
-5. **核心论断验证（关键步骤）**：
-   - 对生成报告中的**每个重要技术论断**（尤其是涉及“支持 xxx”、“实现 xxx”的描述），必须用 `verify_claim_in_source` 或通过 `lsp_get_definition` 等深层代码探查工具验证。
-   - 必须特别验证：报告中引用的**函数名**、**结构体名**是否存在？报告描述的**调用链**是否真实存在？建议使用 `lsp_get_references` 追溯函数调用。
+5. **核心论断验证（关键步骤 — 必须使用 LSP 工具）**：
+   - 对生成报告中的**每个重要技术论断**，按以下方式验证：
+     - **函数/结构体名是否存在？** → 用 `lsp_get_definition(符号名)` 验证。如果 LSP 返回定义位置则存在（verified=true），返回空则不存在（fabrication）。
+     - **调用链是否真实？** → 用 `lsp_get_references(函数名)` 验证调用者列表，确认 A→B→C 的链路每一跳都真实存在。
+     - **文件中是否包含某功能？** → 用 `lsp_get_document_outline` 查看该文件的所有函数，比对报告描述。
+     - **关键词级别验证** → 用 `verify_claim_in_source` 或 `grep_in_repo` 搜索。
    - 对于每个验证结果，必须标注 "verified": "true"|"false"|"partial"。**禁止出现未经验证的 "verified": "false" 条目**。
    - **重要逻辑修正**：
      - 如果验证结果为 "verified": "true"（即报告所述与源码一致），**绝对不要**将其列入 `errors` 列表。
@@ -504,10 +266,11 @@ def _build_section_prompt(
 - 次要点（配置、可选特性）未覆盖：每点扣 2 分
 - **一致性保护**：如果 missing_points 为空（即全部覆盖），score 不得低于 (M/N)*80
 - 必须列出：covered_points、missing_points、human_doc_point_count、deduction_reasons
+- **章节边界规则（重要）**：某些特性可能跨章节（如 Futex 同时涉及"同步互斥"和"多核并行"）。评估覆盖率时，仅扣当前章节的**本职核心内容**缺失。如果某特性的主要分析已在其他章节充分完成，当前章节未重复不应扣分。
 
 ### accuracy（0-100）
 - **严重幻觉（Fabrication）**：声称实现了源码中不存在的功能（如“支持 CoW”验证失败）：每处 **扣 20 分**。
-- **捏造细节**：编造不存在的函数名、结构体字段：每处 **扣 25 分**。
+- **捏造细节**：编造不存在的函数名、结构体字段（用 `lsp_get_definition` 验证不存在）：每处 **扣 25 分**。
 - **事实错误**：与源码明显矛盾（如说是微内核其实是宏内核）：每处 **扣 15 分**。
 - 描述模糊或部分错误：每处扣 8 分
 - 细微不准确（参数顺序、常量值）：每处扣 3 分
@@ -517,7 +280,7 @@ def _build_section_prompt(
 - 仅复述人类文档：30 分
 - 有代码级分析但无引用：50 分
 - 引用具体文件/函数/行号：70 分
-- **深度追踪**：对关键流程（如 Trap, PageFault, Fork）有完整的**函数调用链追踪**（A->B->C）且验证属实：**90-100 分**
+- **深度追踪**：对关键流程（如 Trap, PageFault, Fork）有完整的**函数调用链追踪**（A->B->C）且用 `lsp_get_references` 验证属实：**90-100 分**
 
 ### citations（0-100）
 - 无路径引用：0 分
@@ -1056,7 +819,7 @@ def run_evaluation(
         print("❌ 未设置 REPO_URL，请在 .env 中配置或通过 --repo-url 传入")
         sys.exit(1)
 
-    repo_name = _repo_name_from_url(repo_url)
+    repo_name = repo_name_from_url(repo_url)
     repo_path = repo_path or os.path.normpath(os.path.join(".", "repos", repo_name))
     output_dir = output_dir or os.path.normpath(os.path.join(".", "output", repo_name))
     eval_dir = os.path.normpath(os.path.join(".", "evaluation", repo_name))
@@ -1085,6 +848,9 @@ def run_evaluation(
     logger.addHandler(file_handler)
     logger.addHandler(console_handler)
 
+    # 屏蔽 httpx 的 DEBUG 请求日志（解决终端显示 HTTP Request 刷屏问题）
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+
     logging.info("=" * 60)
     logging.info(f"评估任务启动: {repo_name}")
     logging.info(f"时间: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
@@ -1098,17 +864,26 @@ def run_evaluation(
         error_msg = f"未找到 sections 目录: {sections_dir}"
         logging.error(error_msg)
         print(f"❌ {error_msg}")
-        print("   请先运行 os_agent_d.py 生成报告")
+        print("   请先运行 os_agent_d_describe.py 生成报告")
         sys.exit(1)
 
-    if not os.path.isdir(repo_path):
-        error_msg = f"未找到仓库目录: {repo_path}"
-        logging.error(error_msg)
-        print(f"❌ {error_msg}")
-        sys.exit(1)
+    if not os.path.isdir(repo_path) or not os.listdir(repo_path):
+        print(f"\n📦 未找到仓库目录: {repo_path}，尝试自动克隆...")
+        try:
+            from tools.git_ops import clone_repository
+            result = clone_repository.invoke({"repo_url": repo_url})
+            print(f"✅ 克隆结果: {result}")
+        except Exception as e:
+            print(f"❌ 自动克隆失败: {e}")
+            sys.exit(1)
+        if not os.path.isdir(repo_path):
+            print(f"❌ 克隆后仍未找到仓库目录: {repo_path}")
+            sys.exit(1)
 
-    # 查找章节文件
-    sections = sorted(glob.glob(os.path.join(sections_dir, "*.md")))
+    # 查找章节文件，并过滤掉非标准的额外生成文件（只保留 01_xxx.md 格式）
+    import re
+    all_md_files = glob.glob(os.path.join(sections_dir, "*.md"))
+    sections = sorted([f for f in all_md_files if re.match(r"^\d{2}_", os.path.basename(f))])
     if not sections:
         error_msg = f"sections 目录为空: {sections_dir}"
         logging.error(error_msg)

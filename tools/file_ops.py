@@ -207,4 +207,54 @@ def grep_in_repo(repo_path: str, pattern: str, max_results: int = 20, file_exten
     except Exception as e:
         return f"Error: {str(e)}"
 
+@tool
+def rag_search_code(repo_path: str, query: str, top_k: int = 3) -> str:
+    """
+    使用 RAG 引擎在整个代码库中进行自然语言语义或模糊搜索。
+    当使用 grep_in_repo 和 lsp 工具由于无法猜准具体的函数名而找不到目标代码时，请使用本工具。
+    只需描述你要找的功能，例如："物理页面的分配与回收机制"、"page replacement" 等。
 
+    Args:
+        repo_path: 仓库本地路径（如 repos/my-os）
+        query: 自然语言描述的搜索意图或功能说明
+        top_k: 最多返回的匹配代码块数量（默认 3）
+
+    Returns:
+        包含最相关代码块详细信息（所处文件、行数和具体代码段）的字符串。
+    """
+    try:
+        from core.code_rag import CodeRAGEngine
+        if not _is_path_allowed(repo_path):
+            return f"❌ 安全限制：不允许访问 '{repo_path}'。"
+        if not os.path.exists(repo_path):
+            return f"Error: 目录不存在: {repo_path}"
+
+        project_name = os.path.basename(os.path.normpath(repo_path))
+        # CodeRAGEngine 默认会在 ./output/<project_name>/_vector_db 中建库
+        engine = CodeRAGEngine(project_name=project_name)
+        
+        # 构建或加载索引（force=False表示如果已有则直接加载）
+        engine.build_index(repo_path, force=False)
+
+        results = engine.search(query, top_k=top_k)
+        if not results:
+            return "❌ 未找到任何高度相关的代码片段。请尝试不同的关键词描述。"
+        
+        out = [f"RAG 语义搜索 '{query}' 找到的 Top {top_k} 代码块:\n"]
+        for i, res in enumerate(results, 1):
+            score = res.get('similarity_score', 0.0)
+            node_type = res.get('node_type', 'unknown')
+            file_path = res.get('file_path', 'unknown')
+            name = res.get('name', 'unnamed')
+            start_line = res.get('start_line', 0)
+            end_line = res.get('end_line', 0)
+            code = res.get('code', '')[:800] # 截断部分代码防止过长
+            out.append(f"[{i}] 相似度: {score:.4f} | 文件: {file_path}:{start_line}-{end_line} | 类型: {node_type} | 符号名: {name}")
+            out.append(f"```\n{code}\n```\n")
+            if len(res.get('code', '')) > 800:
+                out.append("... [代码段被截断，可使用 read_code_segment 工具查看完整内容]\n")
+                
+        return "\n".join(out)
+    except Exception as e:
+        import traceback
+        return f"Error running RAG search: {str(e)}\n{traceback.format_exc()}"
