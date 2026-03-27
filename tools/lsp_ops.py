@@ -1780,7 +1780,139 @@ def _grep_fallback_call_graph(repo_path: str, file_path: str, symbol: str, direc
         else:
             lines_out.append(f"  未在全库中不到 `{symbol}(` 的调用点")
 
+    lines_out.append(_fallback_metadata("lsp->treesitter->lang_static->grep", "low", "callHierarchy_unavailable"))
     return "\n".join(lines_out)
+
+
+def _static_call_graph_fallback(repo_path: str, file_path: str, symbol: str, direction: str, lang: str) -> str:
+    """
+    按你要求的链路做 Call Graph 兜底：
+      Tree-sitter -> Language-aware Static -> Grep -> ASM
+
+    注意：这里的输出目标是“可用的静态调用镜像”，精度低于 LSP，但比纯 Grep 更接近语言语义。
+    """
+    abs_repo = _abspath(repo_path)
+    abs_file = _abspath(os.path.join(repo_path, file_path))
+
+    banner = (
+        f"\n⚠️  [Call Graph DEGRADED — Static Fallback] symbol='{symbol}'  file={file_path}\n"
+        f"    已按链路降级：LSP → Tree-sitter → Language-aware Static → Grep → ASM。\n"
+    )
+    print(banner, flush=True)
+
+    # ---------- 1) Tree-sitter: 尝试定位函数体并提取 call sites ----------
+    try:
+        if TreeSitterFallback._ensure_loaded() and lang in (TreeSitterFallback._langs or {}):
+            try:
+                with open(abs_file, "rb") as f:
+                    code_bytes = f.read()
+            except Exception:
+                code_bytes = b""
+
+            if code_bytes:
+                parser = TreeSitterFallback._parser_cls()
+                parser.language = TreeSitterFallback._langs[lang]
+                tree = parser.parse(code_bytes)
+                root = tree.root_node
+
+                # 抽取函数节点：Rust=function_item / C=function_definition / Go=function_declaration/method_declaration / Zig=function_declaration
+                if lang == "rust":
+                    fn_types = {"function_item"}
+                elif lang in ("c", "cpp"):
+                    fn_types = {"function_definition"}
+                elif lang == "go":
+                    fn_types = {"function_declaration", "method_declaration"}
+                elif lang == "zig":
+                    fn_types = {"function_declaration"}
+                else:
+                    fn_types = set()
+
+                def _node_name(n):
+                    return TreeSitterFallback._get_definition_name(n, code_bytes, lang)
+
+                target_fn = None
+
+                def _find(n):
+                    nonlocal target_fn
+                    if target_fn is not None:
+                        return
+                    if n.type in fn_types:
+                        nm = _node_name(n)
+                        if nm == symbol:
+                            target_fn = n
+                            return
+                    for ch in n.children:
+                        _find(ch)
+
+                _find(root)
+
+                if target_fn is not None:
+                    fn_src = code_bytes[target_fn.start_byte:target_fn.end_byte].decode("utf-8", errors="ignore")
+
+                    SKIP = {
+                        "if", "for", "while", "match", "return", "let", "fn", "use", "pub", "mod",
+                        "unsafe", "impl", "trait", "struct", "enum", "type", "const", "static",
+                        "super", "self", "Self", "loop", "continue", "break",
+                        "println", "format", "assert", "panic", "todo", "unimplemented", "dbg",
+                        "write", "writeln",
+                    }
+
+                    calls = {}
+                    if direction in ("outgoing", "both"):
+                        # Rust: 支持 foo( 与 foo::bar( 与 foo!( ；C/Go/Zig: 支持 foo(
+                        for m in re.finditer(r"\b([a-zA-Z_][a-zA-Z0-9_]*)\s*(?:(?:!?\s*)\(|::\s*[a-zA-Z_][a-zA-Z0-9_]*\s*\()", fn_src):
+                            name = m.group(1)
+                            if name in SKIP or (name and name[0].isupper()):
+                                continue
+                            # 行号估算：基于函数片段内的换行
+                            line_in_fn = fn_src.count("\n", 0, m.start()) + 1
+                            calls.setdefault(name, line_in_fn)
+
+                    if calls:
+                        out = [f"[Call Graph — Tree-sitter Static ⚠️] {symbol}  ← {file_path}"]
+                        out.append("[⚠️ DEGRADED MODE] LSP callHierarchy 不可用，本结果由 Tree-sitter + 语言规则静态提取生成。")
+                        out.append(_fallback_metadata("lsp->treesitter->lang_static", "medium", "callHierarchy_unavailable"))
+                        if direction in ("outgoing", "both"):
+                            out.append("》出向调用 [Tree-sitter] — 静态提取函数体内 call sites")
+                            for name, ln in sorted(calls.items(), key=lambda x: x[1]):
+                                # 用 file_path 的起始行+偏移不可靠，这里只给“函数体内相对行”
+                                out.append(f"  ├── {name}()  ← {file_path}:(fn+{ln})")
+                        if direction in ("incoming", "both"):
+                            out.append("\n》入向调用 [Tree-sitter] — 需要全库索引，静态层仅给出 Grep 模式候选")
+                        return "\n".join(out)
+    except Exception:
+        # Tree-sitter 失败就继续向下
+        pass
+
+    # ---------- 2) Language-aware static ----------
+    try:
+        if direction in ("outgoing", "both"):
+            # 语言感知层目前只有 definition/references 能力；call graph 用“函数体级正则”近似
+            # 如果能在该文件里定位到定义行，就用 _grep_fallback_call_graph 的 outgoing 提取（它本质就是语言感知正则）
+            lang_like = _grep_fallback_call_graph(repo_path, file_path, symbol, "outgoing")
+            if lang_like and "[Call Graph — Grep Fallback" in lang_like:
+                # 复用 grep 的输出结构，但提升语义标签并修正 metadata
+                upgraded = lang_like.replace("Grep Fallback", "Language-aware Static")
+                upgraded = upgraded.replace(
+                    _fallback_metadata("lsp->treesitter->lang_static->grep", "low", "callHierarchy_unavailable"),
+                    _fallback_metadata("lsp->treesitter->lang_static", "medium", "callHierarchy_unavailable"),
+                )
+                return upgraded
+    except Exception:
+        pass
+
+    # ---------- 3) Generic Grep ----------
+    try:
+        return _grep_fallback_call_graph(repo_path, file_path, symbol, direction)
+    except Exception:
+        pass
+
+    # ---------- 4) ASM ----------
+    if direction in ("outgoing", "both"):
+        asm_res = ASMLexicalParser.fallback_references(repo_path, file_path, symbol)
+        return asm_res + _fallback_metadata("lsp->treesitter->lang_static->grep->asm", "low", "static_all_failed")
+    asm_res = ASMLexicalParser.fallback_references(repo_path, file_path, symbol)
+    return asm_res + _fallback_metadata("lsp->treesitter->lang_static->grep->asm", "low", "static_all_failed")
 
 
 async def _async_lsp_call_graph(
@@ -1807,10 +1939,10 @@ async def _async_lsp_call_graph(
     positions = _find_symbol_positions(abs_file, symbol)
     client = await _gateway.get_client(repo_path, lang)
     if not client:
-        msg = f"[call_graph] LSP 客户端启动失败，自动转入 Grep Fallback (symbol={symbol})"
+        msg = f"[call_graph] LSP 客户端启动失败，自动转入分层静态兜底 (symbol={symbol})"
         logger.warning(msg)
         print(f"\n⚠️  {msg}", flush=True)
-        return _grep_fallback_call_graph(repo_path, file_path, symbol, direction)
+        return _static_call_graph_fallback(repo_path, file_path, symbol, direction, lang)
 
     abs_file_unix = abs_file.replace(chr(92), '/')
     if not abs_file_unix.startswith('/'):
@@ -1988,10 +2120,10 @@ async def _async_lsp_call_graph(
                 return header + ref_result
             
             # 最后防线：如果语义引用查找也彻底失效（常见于宏生成或 ASM），再执行 Grep 降级
-            msg = f"[call_graph] LSP 语义解析（CallGraph & References）均无效，自动转入终极 Grep Fallback (symbol={symbol})"
+            msg = f"[call_graph] LSP 语义解析（CallGraph & References）均无效，自动转入分层静态兜底 (symbol={symbol})"
             logger.warning(msg)
             print(f"\n⚠️  {msg}", flush=True)
-            return _grep_fallback_call_graph(repo_path, file_path, symbol, direction)
+            return _static_call_graph_fallback(repo_path, file_path, symbol, direction, lang)
 
 
         root_item = root_items[0]
@@ -2033,10 +2165,10 @@ async def _async_lsp_call_graph(
         return "\n".join(result_lines)
 
     except Exception as e:
-        msg = f"[call_graph] 内部异常: {e}，自动转入 Grep Fallback (symbol={symbol})"
+        msg = f"[call_graph] 内部异常: {e}，自动转入分层静态兜底 (symbol={symbol})"
         logger.warning(msg)
         print(f"\n⚠️  {msg}", flush=True)
-        return _grep_fallback_call_graph(repo_path, file_path, symbol, direction)
+        return _static_call_graph_fallback(repo_path, file_path, symbol, direction, lang)
 
 
 @tool

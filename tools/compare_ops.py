@@ -101,25 +101,11 @@ KEY_ENTRY_POINTS = [
 
 
 def _extract_fallback_confidence(text: str) -> str:
-    """解析新回退元数据中的 confidence，默认为 low。"""
+    """解析回退元数据中的 confidence，默认为 low。"""
     m = re.search(r"confidence=(high|medium|low)", text or "")
     if m:
         return m.group(1)
     return "low"
-
-
-def _needs_stronger_fallback(text: str) -> bool:
-    """判断是否应触发 Doxygen 回退。"""
-    raw = text or ""
-    if not raw.strip():
-        return True
-    if "[⚠️ DEGRADED MODE]" in raw:
-        return True
-    if "[Fallback Metadata]" in raw:
-        # low 可信度结果再尝试 Doxygen；medium/high 不强制
-        return _extract_fallback_confidence(raw) == "low"
-    # 历史错误字符串兼容
-    return any(token in raw for token in ["Error:", "未找到函数", "Call Graph 获取失败"])
 
 
 def _parse_call_tree_nodes(tree_text: str) -> set:
@@ -167,6 +153,39 @@ def compare_call_graphs(
     from tools.lsp_ops import lsp_get_call_graph
     from tools.file_ops import grep_in_repo
 
+    def _find_entry_file(repo_name: str, symbol: str) -> Optional[str]:
+        """
+        优先用 ASTParser（tree-sitter）定位函数定义文件；失败再退回 grep。
+        这样可以避免宏/模块同名导致“看起来像命中但其实不是函数”的误选文件。
+        """
+        try:
+            _, rel = _find_function_chunk(repo_name, symbol)
+            if rel:
+                return rel.replace("\\", "/")
+        except Exception:
+            pass
+
+        repo_path_local = f"repos/{repo_name}"
+        try:
+            grep_result = grep_in_repo.invoke({
+                "repo_path": repo_path_local,
+                "pattern": (
+                    rf"\bfn\s+{symbol}\b|"
+                    rf"\bdef\s+{symbol}\b|"
+                    rf"\bfunc\s+{symbol}\s*\(|"
+                    rf"\bfunc\s+\([^)]+\)\s+{symbol}\s*\(|"
+                    rf"\b{symbol}\s*\([^;]*\)\s*\{{"
+                ),
+                "max_results": 8,
+                "file_extensions": "rs,c,cc,cpp,h,hpp,go,zig,S,asm",
+            })
+            for line in str(grep_result).splitlines():
+                if ":" in line and not line.startswith("搜索") and not line.startswith("未找到"):
+                    return line.split(":")[0].strip().replace("\\", "/")
+        except Exception:
+            pass
+        return None
+
     results = {}
     for repo_name in [repo_a, repo_b]:
         repo_path = f"repos/{repo_name}"
@@ -174,35 +193,14 @@ def compare_call_graphs(
             results[repo_name] = f"[仓库不存在: {repo_path}]"
             continue
 
-        # 先用 grep 找到函数所在文件
-        grep_result = grep_in_repo.invoke({
-            "repo_path": repo_path,
-            "pattern": (
-                rf"\bfn\s+{entry_function}\b|"
-                rf"\bdef\s+{entry_function}\b|"
-                rf"\bfunc\s+{entry_function}\s*\(|"
-                rf"\bfunc\s+\([^)]+\)\s+{entry_function}\s*\(|"
-                rf"\b{entry_function}\s*\([^;]*\)\s*\{{"
-            ),
-            "max_results": 5,
-            "file_extensions": "rs,c,cc,cpp,h,hpp,go,zig,S,asm",
-        })
-
-        # 解析第一个匹配的文件路径
-        file_path = None
-        for line in str(grep_result).splitlines():
-            if ":" in line and not line.startswith("搜索") and not line.startswith("未找到"):
-                file_path = line.split(":")[0].strip()
-                break
+        file_path = _find_entry_file(repo_name, entry_function)
 
         if not file_path:
             results[repo_name] = f"[未找到函数 {entry_function} 的定义]"
             continue
 
-        # 调用 Call Graph 首选 LSP，如果失败或降级则使用 Doxygen 备份
-        cg_text = ""
+        # 调用 Call Graph：首选 LSP，失败/降级时由 lsp_get_call_graph 内部自动走分层兜底
         try:
-            from tools.callgraph_ops import generate_fallback_callgraph
             cg = lsp_get_call_graph.invoke({
                 "repo_path": repo_path,
                 "file_path": file_path,
@@ -210,19 +208,9 @@ def compare_call_graphs(
                 "direction": "outgoing",
                 "max_depth": 3,
             })
-            cg_text = str(cg)
-            if _needs_stronger_fallback(cg_text):
-                fallback = generate_fallback_callgraph(repo_path, entry_function)
-                if fallback:
-                    cg_text = fallback + "\n\n> ℹ️ Generated via Doxygen Fallback"
-            results[repo_name] = cg_text
+            results[repo_name] = str(cg)
         except Exception as e:
-            from tools.callgraph_ops import generate_fallback_callgraph
-            fallback = generate_fallback_callgraph(repo_path, entry_function)
-            if fallback:
-                results[repo_name] = fallback + "\n\n> ℹ️ Generated via Doxygen Fallback"
-            else:
-                results[repo_name] = f"[Call Graph 获取失败: {e}]"
+            results[repo_name] = f"[Call Graph 获取失败: {e}]"
 
     # 解析差异
     nodes_a = _parse_call_tree_nodes(results.get(repo_a, ""))
@@ -271,15 +259,30 @@ def compare_feature_summary(repo_a: str, repo_b: str, dimension: str) -> str:
     """
     import json
 
+    fp_a = os.path.join(OUTPUT_DIR, repo_a, "fingerprint.json")
+    fp_b = os.path.join(OUTPUT_DIR, repo_b, "fingerprint.json")
+    missing = []
+    if not os.path.exists(fp_a):
+        missing.append(f"- {repo_a}: {fp_a}")
+    if not os.path.exists(fp_b):
+        missing.append(f"- {repo_b}: {fp_b}")
+    if missing:
+        # 强失败：避免 LLM 把占位内容当作真实特征摘要
+        return (
+            "❌ compare_feature_summary 失败：缺少 fingerprint.json（无法进行维度特征对比）\n\n"
+            "缺失文件：\n"
+            + "\n".join(missing)
+            + "\n\n"
+            "请先生成指纹（粗筛阶段会自动生成）：\n"
+            f"- python os_agent_c_coarse.py --target {repo_a} --library ./output --rebuild\n"
+            f"- python os_agent_c_coarse.py --target {repo_b} --library ./output --rebuild\n"
+        )
+
     summaries = {}
-    for name in [repo_a, repo_b]:
-        fp_path = os.path.join(OUTPUT_DIR, name, "fingerprint.json")
-        if os.path.exists(fp_path):
-            with open(fp_path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            summaries[name] = data.get("features", {}).get(dimension, "[无此维度数据]")
-        else:
-            summaries[name] = "[未找到指纹文件]"
+    for name, fp_path in [(repo_a, fp_a), (repo_b, fp_b)]:
+        with open(fp_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        summaries[name] = data.get("features", {}).get(dimension, "[无此维度数据]")
 
     return (
         f"## {dimension} 特征对比\n\n"

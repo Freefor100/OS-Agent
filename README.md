@@ -482,7 +482,6 @@ OS-Agent/
 │   ├── lsp_ops.py                  # LSP 封装（callHierarchy、定义、引用、大纲）
 │   ├── file_ops.py                 # 文件操作（read_code_segment、grep_in_repo）
 │   ├── git_ops.py                  # Git 操作（历史分析、作者贡献、Diff 透视）
-│   ├── callgraph_ops.py            # 调用图分析（跨文件调用关系）
 │   ├── compare_ops.py              # 项目比对工具（Agent C 精比辅助，含 Token/CG Jaccard）
 │   ├── describe_ops.py             # 描述模块专用工具
 │   └── eval_ops.py                 # 评估专用工具（人类文档搜索、声明验证）

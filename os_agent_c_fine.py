@@ -393,6 +393,26 @@ def _build_compare_agent(target_name: str, candidate_name: str):
 6. **差异大的维度重点分析**，差异小的维度简要总结
 7. **输出格式**：最终输出完整 Markdown 格式对比报告"""
 
+    system_prompt += """
+
+**工具使用规约（必须遵守，用于确保 LSP 与兜底链路有效）**：
+
+1. **Call Graph 工具入口选择**：
+   - 调用 `compare_call_graphs(repo_a, repo_b, entry_function)` 前，必须确保 `entry_function` 是“真实函数/方法定义名”。
+   - 禁止把模块名、文件名、宏名、trait 声明名、重导出别名当作 entry_function 直接传入。
+
+2. **如何找到正确的 entry_function**（按优先级）：
+   - 优先用 `search_code_snippets(repo_name, query="<你要找的入口含义/关键词>")` 定位真正的 handler/dispatch 函数；
+   - 或用 `grep_in_repo(repo_path, pattern)` 搜索 `fn xxx` / `xxx(...) {` 的定义形态；
+   - 若某阶段 prompt 给出的是概念入口（如 trap_handler），但仓库真实入口是 `trap::handler`/`syscall_dispatch` 等，必须改用真实函数名再调用 `compare_call_graphs`。
+
+3. **理解降级与置信度**：
+   - `compare_call_graphs` 内部优先走 LSP；当 LSP 不可用会按链路降级：LSP → Tree-sitter → Language-aware Static → Grep → ASM。
+   - 若输出末尾包含 `[Fallback Metadata] ... confidence=low` 或出现 “DEGRADED”，必须在报告中明确标注“降级分析”，并尽量通过换入口函数名/换更靠近核心路径的函数再跑一次以提升置信度。
+
+4. **输出约束**：
+   - 报告中的每个调用链结论必须能落到文件路径/符号名；若只能得到低置信度调用镜像，必须写明局限（宏/内联/间接调用不可追踪）。"""
+
     tools = [
         load_project_report,
         load_project_fingerprint,
