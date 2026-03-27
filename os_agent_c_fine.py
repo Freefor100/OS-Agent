@@ -32,7 +32,6 @@ from typing import Optional
 
 from dotenv import load_dotenv
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
-from langchain_openai import ChatOpenAI
 try:
     # LangGraph v1+ 提示：create_react_agent 迁移到 langchain.agents
     from langchain.agents import create_agent as create_react_agent
@@ -40,8 +39,13 @@ except Exception:
     # 兼容旧版依赖
     from langgraph.prebuilt import create_react_agent
 
-from core.agent_builder import get_model_name
+from core.agent_builder import get_model_name, build_chat_model, build_reviewer_llm
 from core.utils import repo_name_from_url, format_tool_call_summary, format_tool_result_summary
+from core.per_types import StageState
+from core.per_planner import build_dynamic_context, build_repo_profile, plan_stage, render_plan_context
+from core.per_executor import extract_stage_artifacts
+from core.per_reviewer import review_stage, re_review_stage
+from core.per_repair import repair_stage
 
 load_dotenv()
 logging.basicConfig(
@@ -55,6 +59,15 @@ logger = logging.getLogger("os_agent_c_fine")
 DEFAULT_OUTPUT_DIR = "./output"
 DEFAULT_RECURSION_LIMIT = 150
 DEFAULT_STAGE_LIMIT = 150  # 仅用于终端展示，建议与 recursion_limit 保持一致
+
+
+def _save_json(path: str, payload: dict):
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"      ⚠️ 无法写入 JSON 文件 {path}: {e}")
 
 def _strip_llm_preamble(text: str, *, announce: bool = True) -> str:
     """剥掉 LLM 输出中第一个 Markdown 标题（# 开头）之前的过渡性口水文字。
@@ -424,12 +437,7 @@ def _build_compare_agent(target_name: str, candidate_name: str):
         grep_in_repo,
     ]
 
-    llm = ChatOpenAI(
-        model=get_model_name(),
-        temperature=0,
-        request_timeout=240,
-        max_retries=2,
-    )
+    llm = build_chat_model(model=get_model_name(), temperature=0, request_timeout=240, max_retries=2)
     return create_react_agent(llm, tools), system_prompt
 
 
@@ -463,6 +471,12 @@ def run_fine_compare(
         ErrorTracker, classify_error, calculate_backoff, RetryConfig,
     )
     error_tracker = ErrorTracker(comparison_dir)
+    reviewer_llm = build_reviewer_llm()
+    target_repo_path = os.path.normpath(os.path.join("./repos", target_name))
+    target_profile = build_repo_profile(
+        repo_url=os.environ.get("REPO_URL", "").strip() or target_name,
+        repo_path=target_repo_path,
+    )
 
     all_reports = []
 
@@ -484,31 +498,55 @@ def run_fine_compare(
 
         agent, system_prompt = _build_compare_agent(target_name, cand_name)
         stage_texts = []
+        candidate_repo_path = os.path.normpath(os.path.join("./repos", cand_name))
+        candidate_profile = build_repo_profile(repo_url=cand_name, repo_path=candidate_repo_path)
+        candidate_memory = {
+            "section_summaries": {},
+            "mentioned_paths": [],
+            "external_background": {},
+            "target_profile": target_profile,
+            "candidate_profile": candidate_profile,
+        }
 
         cand_sections_dir = os.path.join(comparison_dir, f"vs_{cand_name}_sections")
         os.makedirs(cand_sections_dir, exist_ok=True)
+        meta_dir = os.path.join(comparison_dir, f"vs_{cand_name}_per")
+        os.makedirs(meta_dir, exist_ok=True)
+        _save_json(os.path.join(meta_dir, "candidate_profile.json"), candidate_profile)
 
         for stage in COMPARE_STAGES:
             title = stage["title"]
             prompt = stage["prompt"].format(target=target_name, candidate=cand_name)
             print(f"\n======== {stage['id']}: {title} =========")
+            stage_state = StageState(
+                stage_id=stage["id"],
+                stage_title=title,
+                stage_type="fine_compare",
+                stage_prompt=prompt,
+            )
+            stage_state.plan = plan_stage(stage_state, repo_profile=candidate_profile, global_memory=candidate_memory)
+            stage_state.dynamic_context = build_dynamic_context(stage_state, repo_profile=candidate_profile, global_memory=candidate_memory)
+            planned_prompt = render_plan_context(stage_state)
 
             stage_file_path = os.path.join(cand_sections_dir, f"{stage['id']}.md")
             if os.path.exists(stage_file_path) and os.path.getsize(stage_file_path) > 50:
                 print(f"      ⏭️  跳过（找到本地缓存: {stage['id']}.md）")
                 with open(stage_file_path, "r", encoding="utf-8") as sf:
-                    stage_texts.append(sf.read())
+                    cached_text = sf.read()
+                    stage_texts.append(cached_text)
+                    candidate_memory["section_summaries"][stage["id"]] = cached_text[:500]
                 continue
 
             inputs = {
                 "messages": [
                     SystemMessage(content=system_prompt),
-                    HumanMessage(content=prompt),
+                    HumanMessage(content=planned_prompt + "\n\n" + prompt),
                 ]
             }
 
             stage_text = ""
             succeeded = False
+            execution_messages = []
 
             # ── 重试循环（参考 Agent D 的退避机制） ──
             for retry in range(RetryConfig.MAX_RETRIES + 1):
@@ -528,6 +566,7 @@ def run_fine_compare(
                             final_state = state
 
                     if final_state and final_state.get("messages"):
+                        execution_messages = final_state["messages"]
                         for m in reversed(final_state["messages"]):
                             if isinstance(m, AIMessage):
                                 content = (m.content or "").strip()
@@ -582,12 +621,39 @@ def run_fine_compare(
                 # 防御：兜底再剥一次（例如 stage_text 来自缓存/非 succeeded 分支）
                 stage_text = _strip_llm_preamble(stage_text, announce=False)
 
+            artifacts = extract_stage_artifacts(stage_text, execution_messages)
+            stage_state.draft_markdown = artifacts["draft_markdown"] or stage_text
+            stage_state.draft_document = artifacts["draft_document"]
+            stage_state.evidence_index = artifacts["evidence_index"]
+            stage_state.status = "executed"
+            _save_json(os.path.join(meta_dir, f"{stage['id']}_plan.json"), stage_state.plan.to_dict() if stage_state.plan else {})
+            _save_json(
+                os.path.join(meta_dir, f"{stage['id']}_evidence_index.json"),
+                {"items": [item.to_dict() for item in stage_state.evidence_index]},
+            )
+
+            review_result = review_stage(stage_state)
+            _save_json(os.path.join(meta_dir, f"{stage['id']}_review.json"), review_result.to_dict())
+            if not review_result.passed:
+                touched_paragraph_ids = repair_stage(
+                    stage_state,
+                    agent=agent,
+                    llm=reviewer_llm,
+                    base_messages=execution_messages,
+                    recursion_limit=min(18, recursion_limit),
+                )
+                if touched_paragraph_ids:
+                    review_result = re_review_stage(stage_state, touched_paragraph_ids)
+                    _save_json(os.path.join(meta_dir, f"{stage['id']}_review_after_repair.json"), review_result.to_dict())
+            stage_text = stage_state.draft_markdown
+
             stage_texts.append(stage_text)
             if succeeded:
                 retry_info = f"，重试 {retry} 次" if retry > 0 else ""
                 with open(stage_file_path, "w", encoding="utf-8") as sf:
                     sf.write(stage_text)
                 print(f"      ✅ 完成 ({len(stage_text)} 字符{retry_info}) -> 已存档: {stage['id']}.md")
+                candidate_memory["section_summaries"][stage["id"]] = stage_text[:500]
             else:
                 print(f"      ❌ 失败（已重试 {retry} 次）")
 

@@ -1,6 +1,7 @@
 import os
 from collections import defaultdict
 from typing import Optional
+import threading
 
 import git  # 依赖 gitpython 库
 from langchain.tools import tool
@@ -15,6 +16,16 @@ WORKSPACE_DIR = "./repos"
 
 # 忽略的顶层目录（如 vendor、.git 等），不参与“按模块”统计
 EXCLUDE_TOP_DIRS = {"vendor", ".git", ".github", "target", "node_modules", ".devcontainer", "__pycache__"}
+_clone_lock_guard = threading.Lock()
+_clone_repo_locks = {}
+
+
+def _get_clone_lock(local_path: str):
+    key = os.path.abspath(local_path)
+    with _clone_lock_guard:
+        if key not in _clone_repo_locks:
+            _clone_repo_locks[key] = threading.RLock()
+        return _clone_repo_locks[key]
 
 
 def _module_from_path(path: str) -> Optional[str]:
@@ -45,36 +56,37 @@ def clone_repository(repo_url: str) -> str:
         repo_name = repo_name_from_url(repo_url)
         local_path = os.path.normpath(os.path.join(WORKSPACE_DIR, repo_name))
         
-        # 2. 检查目录是否存在
-        if os.path.exists(local_path):
-            # 检查目录是否为空
-            if os.listdir(local_path):
-                return f"Repository already exists at: {local_path}"
-        else:
-            os.makedirs(local_path, exist_ok=True)
-            
-        # 3. 如果不存在或为空，执行克隆
-        print(f"Cloning {repo_url} to {local_path}...")
-        try:
-            # First try normal clone, but with protectNTFS=false to bypass Windows colon issues
-            git.Repo.clone_from(repo_url, local_path, c='core.protectNTFS=false', allow_unsafe_protocols=True, allow_unsafe_options=True)
-        except git.exc.GitCommandError as e:
-            # If clone succeeds but checkout failed (e.g. invalid path with colon on Windows)
-            err_str = str(e).lower()
-            if "invalid path" in err_str or "clone succeeded, but checkout failed" in err_str:
-                print(f"\n--- [Git Native Error Log] ---")
-                print(e.stderr if e.stderr else str(e))
-                print(f"------------------------------\n")
-                print(f"Clone succeeded but checkout failed due to invalid paths. Attempting force checkout...")
-                # Open the partially cloned repo
-                repo = git.Repo(local_path)
-                # Ensure the config is set for this specific repo
-                with repo.config_writer() as cw:
-                    cw.set_value("core", "protectNTFS", "false")
-                # Force checkout to HEAD
-                repo.git.checkout('-f', 'HEAD')
+        with _get_clone_lock(local_path):
+            # 2. 检查目录是否存在
+            if os.path.exists(local_path):
+                # 检查目录是否为空
+                if os.listdir(local_path):
+                    return f"Repository already exists at: {local_path}"
             else:
-                return e.stderr if e.stderr else str(e)
+                os.makedirs(local_path, exist_ok=True)
+
+            # 3. 如果不存在或为空，执行克隆
+            print(f"Cloning {repo_url} to {local_path}...")
+            try:
+                # First try normal clone, but with protectNTFS=false to bypass Windows colon issues
+                git.Repo.clone_from(repo_url, local_path, c='core.protectNTFS=false', allow_unsafe_protocols=True, allow_unsafe_options=True)
+            except git.exc.GitCommandError as e:
+                # If clone succeeds but checkout failed (e.g. invalid path with colon on Windows)
+                err_str = str(e).lower()
+                if "invalid path" in err_str or "clone succeeded, but checkout failed" in err_str:
+                    print(f"\n--- [Git Native Error Log] ---")
+                    print(e.stderr if e.stderr else str(e))
+                    print(f"------------------------------\n")
+                    print(f"Clone succeeded but checkout failed due to invalid paths. Attempting force checkout...")
+                    # Open the partially cloned repo
+                    repo = git.Repo(local_path)
+                    # Ensure the config is set for this specific repo
+                    with repo.config_writer() as cw:
+                        cw.set_value("core", "protectNTFS", "false")
+                    # Force checkout to HEAD
+                    repo.git.checkout('-f', 'HEAD')
+                else:
+                    return e.stderr if e.stderr else str(e)
         
         return f"Successfully cloned to: {local_path}"
         

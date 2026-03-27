@@ -159,6 +159,16 @@ class ASTParser:
 
 class CodeRAGEngine:
     _model_lock = threading.Lock()
+    _project_locks_guard = threading.Lock()
+    _project_locks = {}
+
+    @classmethod
+    def _get_project_lock(cls, key: str):
+        with cls._project_locks_guard:
+            if key not in cls._project_locks:
+                cls._project_locks[key] = threading.RLock()
+            return cls._project_locks[key]
+
     def __init__(self, project_name: str, output_dir: str = "./output"):
         self.project_name = project_name
         self.db_dir = os.path.join(output_dir, project_name, "_vector_db")
@@ -206,41 +216,43 @@ class CodeRAGEngine:
                     raise RuntimeError(msg)
 
     def build_index(self, repo_path: str, force: bool = False):
-        if not force and os.path.exists(self.chunks_file) and os.path.exists(self.vectors_file):
-            logger.info("发现现有向量索引，直接加载...")
-            self.load()
-            return
-            
-        logger.info(f"正在扫描 {repo_path} 解析 AST 代码块...")
-        parser = ASTParser()
-        all_chunks = []
-        
-        for root, _, files in os.walk(repo_path):
-            if '.git' in root or 'target' in root or 'build' in root:
-                continue
-            for file in files:
-                if file.endswith(('.c', '.h', '.rs')):
-                    file_path = os.path.join(root, file)
-                    file_chunks = parser.parse_file(file_path)
-                    all_chunks.extend(file_chunks)
-                    
-        self.chunks = all_chunks
-        logger.info(f"解析完成：共提取 {len(self.chunks)} 个代码块。")
-        
-        if len(self.chunks) == 0:
-            return
-            
-        self._load_model()
-        if self.model:
-            logger.info("正在生成代码向量...")
-            texts = [f"Name: {c.name}\nPath: {c.file_path}\nType: {c.node_type}\nCode:\n{c.code[:2000]}" for c in self.chunks]
-            self.vectors = self.model.encode(texts, normalize_embeddings=True)
-            self.vectors = np.array(self.vectors, dtype=np.float32)
-            self.save()
-            logger.info("代码向量生成完毕并保存。")
-        else:
-            logger.warning("未检测到 SentenceTransformers，无法生成向量。只保存代码块文本。")
-            self.save()
+        lock = CodeRAGEngine._get_project_lock(os.path.abspath(self.db_dir))
+        with lock:
+            if not force and os.path.exists(self.chunks_file) and os.path.exists(self.vectors_file):
+                logger.info("发现现有向量索引，直接加载...")
+                self.load()
+                return
+
+            logger.info(f"正在扫描 {repo_path} 解析 AST 代码块...")
+            parser = ASTParser()
+            all_chunks = []
+
+            for root, _, files in os.walk(repo_path):
+                if '.git' in root or 'target' in root or 'build' in root:
+                    continue
+                for file in files:
+                    if file.endswith(('.c', '.h', '.rs')):
+                        file_path = os.path.join(root, file)
+                        file_chunks = parser.parse_file(file_path)
+                        all_chunks.extend(file_chunks)
+
+            self.chunks = all_chunks
+            logger.info(f"解析完成：共提取 {len(self.chunks)} 个代码块。")
+
+            if len(self.chunks) == 0:
+                return
+
+            self._load_model()
+            if self.model:
+                logger.info("正在生成代码向量...")
+                texts = [f"Name: {c.name}\nPath: {c.file_path}\nType: {c.node_type}\nCode:\n{c.code[:2000]}" for c in self.chunks]
+                self.vectors = self.model.encode(texts, normalize_embeddings=True)
+                self.vectors = np.array(self.vectors, dtype=np.float32)
+                self.save()
+                logger.info("代码向量生成完毕并保存。")
+            else:
+                logger.warning("未检测到 SentenceTransformers，无法生成向量。只保存代码块文本。")
+                self.save()
 
     def save(self):
         with open(self.chunks_file, "w", encoding="utf-8") as f:

@@ -48,6 +48,7 @@ from core.vectorizer import (
     Fingerprint,
 )
 from core.vector_store import VectorStore
+from core.per_planner import build_coarse_preplan
 
 load_dotenv()
 logging.basicConfig(
@@ -206,6 +207,14 @@ def run_coarse_screening(
     # 指纹保存在 output_dir 下
     target_output = os.path.join(output_dir, target_name)
     os.makedirs(target_output, exist_ok=True)
+    coarse_preplan = build_coarse_preplan(target_name=target_name, target_sections_dir=target_sections)
+    preplan_path = os.path.join(target_output, "coarse_preplan.json")
+    try:
+        with open(preplan_path, "w", encoding="utf-8") as f:
+            json.dump(coarse_preplan, f, ensure_ascii=False, indent=2)
+        print(f"   🧭 pre-plan: framework={coarse_preplan.get('framework_guess', [])} arch={coarse_preplan.get('arch_guess', [])}")
+    except Exception as e:
+        print(f"   ⚠️ 保存 coarse_preplan 失败: {e}")
 
     target_fp_path = os.path.join(os.path.dirname(target_sections), "fingerprint.json")
     target_action = "BUILD"
@@ -349,6 +358,8 @@ def run_coarse_screening(
         "library_dir": os.path.abspath(library_dir),
         "timestamp": datetime.now().isoformat(),
         "top_k": top_k,
+        "coarse_preplan_path": preplan_path,
+        "coarse_preplan": coarse_preplan,
         "dimension_weights": weights,
         "target_fingerprint_path": target_fp_path,
         "target_vectors": {
@@ -360,6 +371,7 @@ def run_coarse_screening(
         },
         "results": results,
     }
+    coarse_result["validation"] = validate_coarse_output(coarse_result)
 
     coarse_path = os.path.join(target_output, "coarse_screening.json")
     with open(coarse_path, "w", encoding="utf-8") as f:
@@ -416,6 +428,21 @@ def _save_coarse_markdown(
             f.write(f"- **{name}**: {weights[d]:.2f}\n")
 
         f.write(f"\n---\n*本报告由 OS-Agent-C 粗筛模块自动生成*\n")
+
+
+def validate_coarse_output(coarse_result: dict) -> dict:
+    issues = []
+    if not coarse_result.get("results"):
+        issues.append("empty_results")
+    preplan = coarse_result.get("coarse_preplan", {}) or {}
+    if not preplan.get("available_sections"):
+        issues.append("missing_sections")
+    if not preplan.get("framework_guess"):
+        issues.append("framework_unknown")
+    return {
+        "passed": len([x for x in issues if x not in {"framework_unknown"}]) == 0,
+        "issues": issues,
+    }
 
 
 # ═══════════════════════════════════════════════════════════════════

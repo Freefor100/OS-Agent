@@ -10,9 +10,14 @@ import langchain
 from dotenv import load_dotenv
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage, SystemMessage
 
-from core.agent_builder import build_agent, SYSTEM_PROMPT
+from core.agent_builder import build_executor_agent, build_reviewer_llm, SYSTEM_PROMPT
 from core.utils import repo_name_from_url, format_tool_call_summary, format_tool_result_summary
 from core.error_handling import ErrorType, RetryConfig, classify_error, calculate_backoff, ErrorTracker
+from core.per_types import StageState
+from core.per_planner import build_repo_profile, build_dynamic_context, plan_stage, render_plan_context
+from core.per_executor import extract_stage_artifacts
+from core.per_reviewer import review_stage, re_review_stage
+from core.per_repair import repair_stage
 
 langchain.debug = True
 load_dotenv()
@@ -898,6 +903,41 @@ def print_step(step_num: int, node_name: str, state: dict, stage_step_num: int =
     return token_count
 
 
+def _save_json(path: str, payload: dict):
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        import json
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"  ⚠️  无法写入 JSON 文件 {path}: {e}")
+
+
+def _summarize_section_text(text: str, max_chars: int = 500) -> str:
+    text = _strip_llm_preamble((text or "").strip())
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    if len(text) <= max_chars:
+        return text
+    return text[: max_chars - 3] + "..."
+
+
+def _extract_path_mentions(text: str) -> list[str]:
+    pattern = re.compile(r"`([^`\n]*/[^`\n]+\.(?:rs|c|h|cpp|go|zig|S|s|toml|ld|md|py)(?::\d+(?:-\d+)?)?)`")
+    return [m.group(1) for m in pattern.finditer(text or "")]
+
+
+def _print_review_result(result, title: str):
+    print(f"\n🧪 Reviewer: {title}")
+    print(f"   - passed: {result.passed}")
+    print(f"   - score: {result.score}")
+    if result.failed_rules:
+        print(f"   - failed_rules: {', '.join(result.failed_rules)}")
+    if result.missed_modules:
+        print(f"   - missed_modules: {', '.join(result.missed_modules[:4])}")
+    if result.repair_actions:
+        print(f"   - repair_actions: {len(result.repair_actions)}")
+
+
 def main():
     repo_url = os.environ.get("REPO_URL", "").strip()
     
@@ -961,11 +1001,26 @@ def main():
     except Exception as e:
         print(f"⚠️ RAG 预索引跳过 (将在首次调用时重试): {e}")
     # ------------------------------------------
-    
+
+    reviewer_llm = build_reviewer_llm()
+    repo_profile = build_repo_profile(repo_url=repo_url, repo_path=repo_local_path)
+    _save_json(os.path.join(repo_output_dir, "repo_profile.json"), repo_profile)
+    global_memory = {
+        "section_summaries": {},
+        "mentioned_paths": [],
+        "external_background": {},
+    }
+
     for idx, stage in enumerate(STAGES, 1):
         stage_id = stage["id"]
         title = stage["title"]
         prompt = stage["prompt"]
+        stage_state = StageState(
+            stage_id=stage_id,
+            stage_title=title,
+            stage_type="describe",
+            stage_prompt=prompt,
+        )
 
 
         # 检查是否跳过此阶段
@@ -997,6 +1052,14 @@ def main():
                 print("=" * 80)
                 if not skip_in_report:
                     all_section_paths.append(section_path)
+                    try:
+                        with open(section_path, "r", encoding="utf-8", errors="ignore") as existing_f:
+                            existing_text = existing_f.read().strip()
+                        global_memory["section_summaries"][stage_id] = _summarize_section_text(existing_text)
+                        global_memory["mentioned_paths"].extend(_extract_path_mentions(existing_text))
+                        global_memory["mentioned_paths"] = list(dict.fromkeys(global_memory["mentioned_paths"]))[-100:]
+                    except Exception:
+                        pass
                 continue
             else:
                 print(f"♻️  检测到残留的失败文件 (Size: {os.path.getsize(section_path)} bytes)，将删除并重试: {section_name}")
@@ -1008,6 +1071,9 @@ def main():
 
         # 每个阶段构建 base_ctx
         base_ctx = _build_base_context(repo_url=repo_url, output_dir=repo_output_dir)
+        stage_state.plan = plan_stage(stage_state, repo_profile=repo_profile, global_memory=global_memory)
+        stage_state.dynamic_context = build_dynamic_context(stage_state, repo_profile=repo_profile, global_memory=global_memory)
+        plan_context = render_plan_context(stage_state)
         
         # 如果是最后整合阶段，需要读取前面所有 section 的内容
         previous_sections_content = ""
@@ -1060,9 +1126,9 @@ def main():
 （你的分析内容）
 
 """
-            task = base_ctx + "\n" + chapter_hint + prompt + previous_sections_content
+            task = base_ctx + "\n" + chapter_hint + "\n" + plan_context + "\n\n" + prompt + previous_sections_content
         else:
-            task = base_ctx + "\n" + f"## 阶段 {idx}/{len(STAGES)}：{title}\n\n" + prompt + previous_sections_content
+            task = base_ctx + "\n" + f"## 阶段 {idx}/{len(STAGES)}：{title}\n\n" + plan_context + "\n\n" + prompt + previous_sections_content
         
         inputs = {"messages": [SystemMessage(content=SYSTEM_PROMPT), HumanMessage(content=task)]}
 
@@ -1072,7 +1138,7 @@ def main():
         print(f"🚀 开始执行 Agent (模型: {os.getenv('MODEL_NAME')})...")
         sys.stdout.flush()  # 强制刷新输出缓冲区
 
-        agent = build_agent(stage_id=stage_id)
+        agent = build_executor_agent(stage_id=stage_id)
         
         final_state = None
         stage_step_count = 0  # 阶段内步骤计数
@@ -1156,9 +1222,11 @@ def main():
         stage_text = ""
         is_complete = False
         all_ai_content = []  # 收集所有 AI 回复内容
+        execution_messages = []
         
         if final_state and final_state.get("messages"):
             messages = final_state["messages"]
+            execution_messages = messages
             if messages:
                 # 收集所有 AIMessage 的内容（降低阈值到 20 字符）
                 for m in messages:
@@ -1228,6 +1296,7 @@ def main():
                                             if content and not tool_calls and len(content) > 100:
                                                 print(f"\n✅ 追问后获得有效回复（长度: {len(content)} 字符）")
                                                 stage_text = content
+                                                execution_messages = state["messages"]
                                                 is_complete = True
                                                 break
                                     if is_complete:
@@ -1245,6 +1314,40 @@ def main():
         if not stage_text.strip():
              stage_text = "> ⚠️ **生成警告**: Agent 未返回有效内容。"
 
+        stage_text = _strip_llm_preamble(stage_text.strip())
+        artifacts = extract_stage_artifacts(stage_text, execution_messages)
+        stage_state.draft_markdown = artifacts["draft_markdown"] or stage_text
+        stage_state.draft_document = artifacts["draft_document"]
+        stage_state.evidence_index = artifacts["evidence_index"]
+        stage_state.status = "executed"
+
+        sidecar_dir = os.path.join(repo_output_dir, "_per_stage")
+        _save_json(os.path.join(sidecar_dir, f"{stage_id}_plan.json"), stage_state.plan.to_dict() if stage_state.plan else {})
+        _save_json(
+            os.path.join(sidecar_dir, f"{stage_id}_evidence_index.json"),
+            {"items": [item.to_dict() for item in stage_state.evidence_index]},
+        )
+
+        if not skip_in_report:
+            review_result = review_stage(stage_state)
+            _print_review_result(review_result, title)
+            _save_json(os.path.join(sidecar_dir, f"{stage_id}_review.json"), review_result.to_dict())
+
+            if not review_result.passed:
+                print(f"\n🩹 进入定向修补：{title}")
+                stage_state.metadata["repair_context"] = review_result.repair_actions
+                touched_paragraph_ids = repair_stage(
+                    stage_state,
+                    agent=agent,
+                    llm=reviewer_llm,
+                    base_messages=execution_messages,
+                    recursion_limit=18,
+                )
+                if touched_paragraph_ids:
+                    re_result = re_review_stage(stage_state, touched_paragraph_ids)
+                    _print_review_result(re_result, f"{title} (re-review)")
+                    _save_json(os.path.join(sidecar_dir, f"{stage_id}_review_after_repair.json"), re_result.to_dict())
+
         # 保存阶段结果（除非标记为 skip_in_report）
         # skip_in_report 在前面文件命名时已经获取
         if skip_in_report:
@@ -1253,12 +1356,20 @@ def main():
             try:
                 os.makedirs(os.path.dirname(section_path), exist_ok=True)
                 with open(section_path, "w", encoding="utf-8") as f:
-                    # 不添加一级标题，由拼接时统一添加
-                    # LLM输出应从二级标题开始
-                    # 剥除 LLM 在报告内容前的过渡性思考文字
-                    clean_text = _strip_llm_preamble(stage_text.strip())
+                    clean_text = _strip_llm_preamble(stage_state.draft_markdown.strip())
                     f.write(clean_text + "\n")
                 all_section_paths.append(section_path)
+                global_memory["section_summaries"][stage_id] = _summarize_section_text(clean_text)
+                global_memory["mentioned_paths"].extend(_extract_path_mentions(clean_text))
+                global_memory["mentioned_paths"] = list(dict.fromkeys(global_memory["mentioned_paths"]))[-100:]
+                if stage_id == "01_overview":
+                    background_items = [
+                        item.excerpt[:300]
+                        for item in stage_state.evidence_index
+                        if item.source_type == "web_background" and item.excerpt
+                    ]
+                    if background_items:
+                        global_memory["external_background"]["competition_background"] = background_items[:4]
                 print(f"\n✅ 已保存阶段输出: {section_path}")
             except Exception as e:
                 print(f"\n⚠️  无法写入阶段文件 {section_path}: {e}")

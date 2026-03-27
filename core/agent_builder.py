@@ -33,6 +33,7 @@ from tools.lsp_ops import (
     lsp_get_call_graph,
     lsp_set_target_arch,
 )
+from tools.web_search import web_search
 
 load_dotenv()
 
@@ -45,7 +46,6 @@ Your role is to analyze complex OS codebases (Rust, C, etc.) and generate profes
 
 ## Core Principles:
 1. **Evidence-Based**: Never guess. If you claim a feature exists, you must verify it in code.
-
    **工具优先级规则（Tool Priority — 语义探测优先架构）**:
    - 🥇 **语义发现层 (Semantic Discovery)**：`rag_search_code`。
      *用途：**绝对的首选入口工具**。在分析任何新模块或功能之前，必须先调用 RAG 进行自然语言搜索（如“查找物理内存管理实现”）。这能帮你瞬间锁定核心文件和函数名，避免在庞大的目录树中迷失。*
@@ -113,15 +113,26 @@ def get_model_name() -> str:
     return os.environ.get("MODEL_NAME", DEFAULT_MODEL)
 
 
-def build_agent(model: str = None, stage_id: str = ""):
+def build_chat_model(
+    model: str = None,
+    *,
+    temperature: float = 0,
+    request_timeout: int = 240,
+    max_retries: int = 2,
+):
+    model_name = model or get_model_name()
+    return ChatOpenAI(
+        model=model_name,
+        temperature=temperature,
+        request_timeout=request_timeout,
+        max_retries=max_retries,
+    )
+
+
+def get_describe_tools(stage_id: str = ""):
     """
-    构建分析 Agent
-    
-    Args:
-        model: 模型名称，如果不指定则从环境变量 MODEL_NAME 读取，默认 deepseek/deepseek-v3.2
-        stage_id: 当前分析阶段的 ID，用于动态分配工具
+    获取 describe 主链路的工具列表。
     """
-    # 通用工具（所有阶段可用）
     base_tools = [
         get_repo_local_path,
         list_repo_structure,
@@ -140,14 +151,13 @@ def build_agent(model: str = None, stage_id: str = ""):
         # │ 辅助
         convert_md_to_pdf,
     ]
-    
+
     tools = base_tools.copy()
 
-    # 阶段 01 专用工具
     if "01_overview" in stage_id:
         tools.append(analyze_tech_stack)
+        tools.append(web_search)
 
-    # 历史分析阶段专用工具
     if "13_history" in stage_id:
         tools.extend([
             get_git_history_summary,
@@ -157,17 +167,31 @@ def build_agent(model: str = None, stage_id: str = ""):
             analyze_authors_contribution,
             get_commit_diff_summary,
         ])
-    
+    return tools
 
-    model_name = model or get_model_name()
-    llm = ChatOpenAI(
-        model=model_name, 
-        temperature=0,
-        request_timeout=240,  # 240秒超时，防止请求卡住
-        max_retries=2  # 失败后重试2次
-    )
-    
-    # 兼容旧版本 langgraph，不使用 state_modifier
-    agent = create_react_agent(llm, tools)
+
+def build_executor_agent(model: str = None, stage_id: str = "", tools=None):
+    """构建执行阶段使用的 ReAct Agent。"""
+    llm = build_chat_model(model=model)
+    agent = create_react_agent(llm, tools or get_describe_tools(stage_id))
     return agent
+
+
+def build_reviewer_llm(model: str = None):
+    """构建轻量 reviewer/repair 使用的普通 LLM。"""
+    return build_chat_model(model=model, temperature=0)
+
+
+def build_sub_agent(model: str = None, stage_id: str = "", tool_names=None):
+    """构建受限工具集的子 Agent。"""
+    tools = get_describe_tools(stage_id)
+    if tool_names:
+        wanted = set(tool_names)
+        tools = [tool for tool in tools if getattr(tool, "name", getattr(tool, "__name__", "")) in wanted]
+    return build_executor_agent(model=model, stage_id=stage_id, tools=tools)
+
+
+def build_agent(model: str = None, stage_id: str = ""):
+    """兼容旧接口，默认构建 describe 执行 Agent。"""
+    return build_executor_agent(model=model, stage_id=stage_id)
 

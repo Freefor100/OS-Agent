@@ -4,9 +4,22 @@ Describe 相关工具：列出仓库结构、写文件、MD 转 PDF 等。
 import os
 import glob
 import re
+import threading
 from typing import List, Optional
 
 from langchain.tools import tool
+
+
+_path_lock_guard = threading.Lock()
+_path_locks = {}
+
+
+def _get_path_lock(path: str):
+    key = os.path.abspath(path)
+    with _path_lock_guard:
+        if key not in _path_locks:
+            _path_locks[key] = threading.RLock()
+        return _path_locks[key]
 
 
 @tool
@@ -136,10 +149,11 @@ def write_file(file_path: str, content: str) -> str:
     try:
         path = os.path.normpath(file_path)
         parent = os.path.dirname(path)
-        if parent:
-            os.makedirs(parent, exist_ok=True)
-        with open(path, "w", encoding="utf-8") as f:
-            f.write(content)
+        with _get_path_lock(path):
+            if parent:
+                os.makedirs(parent, exist_ok=True)
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(content)
         return f"Written: {os.path.abspath(path)}"
     except Exception as e:
         return f"Error writing file: {str(e)}"
@@ -171,32 +185,33 @@ def convert_md_to_pdf(md_path: str, pdf_path: Optional[str] = None) -> str:
         base = os.path.splitext(md_path)[0]
         pdf_path = base + ".pdf"
     pdf_path = os.path.normpath(pdf_path)
-    os.makedirs(os.path.dirname(pdf_path) or ".", exist_ok=True)
 
     try:
-        with open(md_path, "r", encoding="utf-8") as f:
-            md_text = f.read()
-        exts = ["extra", "tables", "toc"]
-        try:
-            import pygments  # noqa: F401
-            exts.append("codehilite")
-        except ImportError:
-            pass
-        kwargs = {"extensions": exts}
-        if "codehilite" in exts:
-            kwargs["extension_configs"] = {"codehilite": {"css_class": "highlight"}}
-        html_text = markdown.markdown(md_text, **kwargs)
-        html_full = (
-            f'<!DOCTYPE html><html><head><meta charset="utf-8"/>'
-            f'<style>body {{ font-family: "SimSun", "Microsoft YaHei", sans-serif; '
-            f'margin: 1.5em; line-height: 1.5; }} '
-            f'pre {{ background: #f5f5f5; padding: 0.8em; overflow-x: auto; }} '
-            f'img {{ max-width: 100%; }} '
-            f'table {{ border-collapse: collapse; }} '
-            f'th, td {{ border: 1px solid #ccc; padding: 4px 8px; }}</style></head><body>'
-            f"{html_text}</body></html>"
-        )
-        HTML(string=html_full).write_pdf(pdf_path)
+        with _get_path_lock(pdf_path):
+            os.makedirs(os.path.dirname(pdf_path) or ".", exist_ok=True)
+            with open(md_path, "r", encoding="utf-8") as f:
+                md_text = f.read()
+            exts = ["extra", "tables", "toc"]
+            try:
+                import pygments  # noqa: F401
+                exts.append("codehilite")
+            except ImportError:
+                pass
+            kwargs = {"extensions": exts}
+            if "codehilite" in exts:
+                kwargs["extension_configs"] = {"codehilite": {"css_class": "highlight"}}
+            html_text = markdown.markdown(md_text, **kwargs)
+            html_full = (
+                f'<!DOCTYPE html><html><head><meta charset="utf-8"/>'
+                f'<style>body {{ font-family: "SimSun", "Microsoft YaHei", sans-serif; '
+                f'margin: 1.5em; line-height: 1.5; }} '
+                f'pre {{ background: #f5f5f5; padding: 0.8em; overflow-x: auto; }} '
+                f'img {{ max-width: 100%; }} '
+                f'table {{ border-collapse: collapse; }} '
+                f'th, td {{ border: 1px solid #ccc; padding: 4px 8px; }}</style></head><body>'
+                f"{html_text}</body></html>"
+            )
+            HTML(string=html_full).write_pdf(pdf_path)
         return f"PDF saved: {os.path.abspath(pdf_path)}"
     except Exception as e:
         return f"Error converting to PDF: {str(e)}"
