@@ -61,9 +61,11 @@
 
 面向小型操作系统的分析比对，系统分为两阶段架构，快速在新旧作品间进行查重与创新点分析：
 
-- **粗筛模块 (`os_agent_c_coarse.py`)**：采用 **`pre-plan + deterministic pipeline`**，不引入完整 reviewer 闭环。先通过轻量 `coarse_preplan` 判断框架生态、关键 section 和粗筛锚点，再进入多维度加权余弦相似度检索。内置两项量化增强：
-  - **结构化精确特征**：LLM 额外从 D 报告中提取 JSON 精确字段（框架名、分配器、调度器、syscall 数量、TrapFrame 字节数等 13 项），与向量余弦相似度叠加加分（最高 +0.15）。
+- **粗筛模块 (`os_agent_c_coarse.py`)**：采用 **`pre-plan + deterministic pipeline`**，不引入完整 reviewer 闭环。先通过轻量 `coarse_preplan` 判断框架生态、关键 section 和粗筛锚点，再进入多维度加权余弦相似度检索。内置三项量化增强：
+  - **结构化精确特征（扩展版）**：LLM 会额外从 D 报告中提取更宽的 JSON 精确字段集，不再只覆盖少量校正项，而是同时覆盖框架/架构/内核类型、页表模式、物理页与堆分配器、任务模型、调度器、信号/Futex/IPC、VFS/主次文件系统、`mmap`/共享内存、socket 真实实现形态、`poll/select`、块设备/网卡/设备发现、`procfs/devfs/tmpfs`、安全权限模型，以及 `syscall_count_real`、`trapframe_bytes` 等数值字段。
+  - **精确字段加分规则（更新版）**：粗筛会先计算原始分 `raw_total = cosine_score + struct_score`，其中 `struct_score` 会按字段精确匹配叠加加分，覆盖内存管理、任务/IPC、文件系统、网络/驱动、安全与 SMP 等稳定事实字段，最高原始加分为 **+0.30**。最终再将总分**严格归一化到 `0~1`**（同时输出 `0~100%`），保证“完全相似 = `1.0` = `100%`”，避免查重场景中出现 `>1` 的误导。
   - **框架感知权重**：自动识别两个项目是否基于同一框架（ArceOS/rCore/xv6 等），同框架时将框架贡献维度（D1/D2/D7）权重减半，自研核心维度（D3~D8）权重上调 ×1.4，防止因共享框架导致虚高相似度。
+  - **阶段缓存与断点续跑**：粗筛的指纹构建已支持分阶段落盘。`features`、`struct_features`、`embeddings` 会保存在 `output/<repo>/_coarse_stage/` 下，重跑时自动检查本地阶段缓存并跳过已完成阶段，避免因单次超时或中断整轮白跑。现在**最终 `fingerprint.json` 也依赖阶段缓存完整性**：只要某个阶段缓存缺失，即使 `fingerprint.json` 仍在，也会自动判定为需要重组最终指纹，而不是直接命中旧总缓存。
 
 - **精比模块 (`os_agent_c_fine.py`)**：现已升级为**阶段级 PER**。对粗筛出的 Top-K 候选逐阶段执行 `plan -> execute -> review -> repair`，在源码级深度比对的基础上，增加“代码相似 vs 设计相似”区分、证据账本与定向修补。并保留两大量化相似度维度：
   - **Token Jaccard 相似度**（`compare_function_tokens`）：对同名函数体 token 化后计算 Jaccard 指数，去除语言关键字后输出独有符号摘要，提供函数实现层面的客观数字证据。
@@ -293,6 +295,14 @@ output/
     │   ├── 03_mem_mgmt_evidence_index.json
     │   ├── 03_mem_mgmt_review.json
     │   └── ...
+    ├── _coarse_stage/          # 粗筛阶段缓存（按项目）
+    │   ├── fingerprint_features.json
+    │   ├── fingerprint_struct_features.json
+    │   └── fingerprint_embeddings.json
+    ├── coarse_preplan.json     # 粗筛 pre-plan 结果
+    ├── fingerprint.json        # 粗筛最终指纹（features + struct_features + embeddings）
+    ├── coarse_screening.json   # 粗筛 Top-K 结果
+    ├── coarse_screening.md     # 粗筛可读报告
     ├── OS技术分析报告_<os-name>.md
     └── describe_error_report.json
 ```
@@ -436,8 +446,9 @@ evaluation/
 > 从最早期的基础描述模块，本作在各个子版本的演进中不断填补了 LLM 的认知短板，并建立起牢不可破的沙盒机制。
 
 #### 🆕 **v3.3 OS-Agent C 客观量化查重增强 & 并发安全修复**（2026-03-20）
-- **结构化精确特征提取**：粗筛阶段新增 LLM JSON 精确字段提取（框架、分配器、调度器、syscall 数量、TrapFrame 字节数等 13 项），以加分项叠加到向量余弦相似度，减少单靠嵌入向量造成的误判。
+- **结构化精确特征提取**：粗筛阶段新增 LLM JSON 精确字段提取，并在后续版本中从最初 13 项少量校正字段扩展为覆盖更广的精确特征集（框架/架构/内核类型、页表模式、分配器、任务模型、IPC、VFS/FS、socket 形态、I/O 多路复用、驱动/设备发现、`procfs/devfs/tmpfs`、安全权限模型及关键数值字段），显著减少单靠嵌入向量造成的误判。
 - **框架感知权重调整**：同框架项目间自动降低框架贡献维度（D1/D2/D7）权重、上调自研核心维度（D3~D8）权重，防止共享框架导致的虚高相似度评分。
+- **精确字段加分升级**：`struct_score` 由原先少数字段的最高 **+0.15**，升级为覆盖多类稳定实现事实字段的最高 **+0.30**；同时粗筛最终分改为**严格归一化到 `0~1 / 0~100%`**，确保“完全相似 = 100%”语义稳定，更适合查重排序与阈值判断。
 - **Token Jaccard 工具**：新增 `compare_function_tokens`，对两仓库中同名函数体进行 token 化并计算 Jaccard 相似度，输出独有关键词摘要，提供代码实现层面的客观数字证据。
 - **Call Graph Jaccard 输出**：增强 `compare_call_graphs`，在输出末尾追加节点集合 Jaccard = |交集| / |并集|，量化调用拓扑结构相似度。
 - **c09_innovation 双维量化锚定**：强制 Agent 对 5 个核心函数分别获取 Token Jaccard 与 CG Jaccard，以加权均值确定最终 0-100 评分区间，结论有量化证据可追溯。
@@ -454,6 +465,7 @@ evaluation/
 - **受限 `web_search`**：新增 `tools/web_search.py`，默认关闭，只允许用于“全国大学生操作系统比赛”背景、赛道定位、目标要求和技术概览；禁止作为源码实现证据或查重依据。
 - **细粒度并发保护而非降并发**：保留多 tool call / 多阶段并行能力，只对共享状态热点加最小粒度保护。当前已覆盖同仓库 LSP polyfill/目标架构切换、同项目 RAG 向量索引落盘、同仓库 clone，以及同目标文件写入/导出 PDF，避免把正常的只读检索也串行化。
 - **中断后不留“锁死”状态**：并发保护统一采用进程内锁，不落磁盘锁文件；`LSP` 的 `run_coroutine_threadsafe(...).result(timeout=...)` 在超时、异常或手动中断时会主动取消后台 future，避免同一进程里下一次运行被残留协程继续占锁。
+- **粗筛最终缓存语义收紧**：`fingerprint.json` 不再单独视为充分缓存命中条件；只有当 `features`、`struct_features`、`embeddings` 三个阶段缓存也完整且 schema 版本匹配时才会直接加载。只要任一阶段缓存缺失，即使最终指纹仍在，也会自动进入重组流程。
 
 #### 🆕 **v3.2 终局合成与抗幻觉架构重构**（2026-03-19）
 - **报告生成逆向思维法**：颠覆了流程式生成的刻板印象，将 `01_overview` 移至分析大循环的最后一环执行。Agent 现在会携带前置 12 章的几万字上下文全集，以前所未有的上帝视角凝练出最终的项目概览与完成度评价，并通过首字母编排算法自动归位至报告首发位置。

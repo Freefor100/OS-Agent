@@ -1,0 +1,33 @@
+{
+  "stage": "feature_summaries",
+  "sections_dir": "G:\\OS-Agent\\output\\oskernrl2022-rv6\\sections",
+  "features": {
+    "D1_tech_stack": "oskernrl2022-rv6 是采用 C 语言 (C99/C11) 编写的完全自研宏内核，运行于 -nostdlib 自由站立环境。目标架构仅支持 RISC-V 64 位，未见 x86_64 等架构代码。内核设计参考 xv6 哲学但非基于其框架，无 Rust 依赖。关键依赖包括集成的 FatFs 库及 SBI 固件。构建系统基于 GNU Make，命令 make。SMP 未激活。",
+    "D2_boot_arch": "启动链为 SBI(M 模) 直跳内核 (S 模)，无 U-Boot。CPU 经 SBI 切换 M 模至 S 模，内核无显式 M 模初始化。MMU 用 Sv39 页表，kvminit 后写 satp 启用。入口文件 src/entry.S _entry。FPU 未实现。仅支持 SiFive/QEMU，未支持 StarFive 和 LoongArch。",
+    "D3_memory": "物理内存采用空闲链表管理。页表基于 Sv39 三级架构，`pagetable_t`。内核堆实现 Slab 分配器 `kmalloc`。高级特性仅 `mmap` 已实现；CoW、懒分配、Swap、大页、共享内存、rmap 未实现。缺页异常处理链（`handle_page_fault`）未实现。用户指针安全通过 `copyin`/`copyout` 结合 `walkaddr` 验证，无 `UserInPtr` 机制。",
+    "D4_process_sched": "统一 struct proc 模型，未区分 PCB/TCB。调度为 FIFO，代码仅有 FIFO，无多调度器。swtch.S 切换上下文，保存 14 寄存器，无浮点。无进程组/会话/PGID/SID。信号部分实现，支持 sigaction/kill，含跳板。Futex/rlimit 为桩函数，未实现。fork 经 clone 实现，深拷贝地址，无写时复制。",
+    "D5_trap_syscall": "Trap 入口为汇编 trap.S。TrapFrame 含 28 寄存器 224 字节。系统调用由 C 函数指针表分发。已实现约 25 个 syscall（文件/进程/信号），sys_clone/exec 完整，sys_exit_group 为桩，sys_mmap 未实现。无 sys_xxx_impl 分离，直调内核 helper。信号于 Trap 返回前检查。缺页异常未实现，无 CoW/Lazy。用户指针无 UserInPtr 包装，用 argaddr 校验。",
+    "D6_filesystem": "VFS 合并 Inode/Dentry 为 `dirent`，`file` 经函数指针访问 `fs`。仅自研 FAT32（非 crate），Ext4/RamFS/TmpFS/ProcFS 未支持。FD 表 Per-Process，`file` 对象全局池。Pipe 为 512 字节环形缓冲区。Socket 未实现。mmap 支持映射但无零拷贝。poll/epoll 均为桩实现。打开流程解析获 `dirent`，分配全局 `file` 注册至进程 `fd` 表。",
+    "D7_device_driver": "驱动框架采用静态设备表注册，无 Trait。设备发现硬编码地址，未实现设备树。支持 UART（SBI）、块设备（RAM/SD 卡，VirtIO 未实现）、无网络。中断支持 CLINT 定时器，PLIC 为桩函数。构建用 Makefile。支持 QEMU sifive 和 SiFive FU740。",
+    "D8_sync_ipc": "锁含自旋锁（禁中断，GCC 原子内置）与睡眠锁（含等待队列）。等待队列基于数组池与双向链表。IPC 中，管道已实现（环形缓冲）；信号已实现（sys_kill 分发）；消息队列、共享内存、信号量均无完整实现；Futex 为桩函数（仅接口声明无调用链）。原子操作源自 GCC 内置。",
+    "D9_smp_security": "内核采用 SMP 架构，支持最多 5 核，从核经 SBI 启动。IPI 仅为桩函数。每核变量基于 cpu 数组。调度为全局单队列，无负载均衡及亲和性。安全机制上，基本用户/内核隔离，无 KPTI 等机制。UID/GID 已定义但系统调用无权限检查。无 Seccomp 沙箱。用户指针经 walkaddr 验证。C 语言无 Rust 安全特性。无 Capability/ACL 支持。",
+    "D10_net_debug": "网络部分未实现网络功能。无协议栈，Socket 接口仅为桩代码，不支持网卡及 TCP/UDP 协议。调试部分日志基于 printf 实现三级日志与缓冲区。Panic 处理支持帧指针栈回溯，无 DWARF 解析。无交互式 Shell 或 GDB Stub，仅依赖 QEMU 外部调试。支持基础系统调用追踪，无性能追踪工具。整体调试机制基础，网络子系统完全缺失。"
+  },
+  "completed_dims": [
+    "D1_tech_stack",
+    "D2_boot_arch",
+    "D3_memory",
+    "D4_process_sched",
+    "D5_trap_syscall",
+    "D6_filesystem",
+    "D7_device_driver",
+    "D8_sync_ipc",
+    "D9_smp_security",
+    "D10_net_debug"
+  ],
+  "token_usage_total": {
+    "prompt_tokens": 57920,
+    "completion_tokens": 101222,
+    "total_tokens": 159142
+  }
+}

@@ -39,9 +39,10 @@ from typing import Any, Dict, Optional
 
 from dotenv import load_dotenv
 
-from core.utils import repo_name_from_url
+from core.utils import repo_name_from_url, parse_env_repo_list
 from core.vectorizer import (
     build_fingerprint,
+    get_fingerprint_stage_status,
     LocalEmbedder,
     get_dimension_weights,
     DIMENSION_MAP,
@@ -49,12 +50,17 @@ from core.vectorizer import (
 )
 from core.vector_store import VectorStore
 from core.per_planner import build_coarse_preplan
+from core.error_handling import RetryConfig
 
 load_dotenv()
 logging.basicConfig(
     level=logging.INFO,
     format="%(name)s | %(levelname)s | %(message)s",
 )
+logging.getLogger("openai").setLevel(logging.WARNING)
+logging.getLogger("openai._base_client").setLevel(logging.WARNING)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
 logger = logging.getLogger("os_agent_c_coarse")
 
 DEFAULT_OUTPUT_DIR = "./output"
@@ -179,6 +185,7 @@ def run_coarse_screening(
     print(f"   verbosity:  {verbosity}")
     if filter_list:
         print(f"   filter_list: {filter_list}")
+    print(f"   重试配置:   最大{RetryConfig.MAX_RETRIES}次, 退避{RetryConfig.INITIAL_BACKOFF}-{RetryConfig.MAX_BACKOFF}秒")
     print(f"   ⏰ 开始:     {_now_ts()}")
     print("=" * 80)
 
@@ -207,6 +214,14 @@ def run_coarse_screening(
     # 指纹保存在 output_dir 下
     target_output = os.path.join(output_dir, target_name)
     os.makedirs(target_output, exist_ok=True)
+    print("   - 子步骤: 读取 01_ 概览并生成 coarse pre-plan")
+    print("   - 子步骤: 调用 LLM 提取维度特征摘要")
+    print("   - 子步骤: 调用 LLM 提取精确结构化特征")
+    print("   - 子步骤: 使用本地 embedding 模型生成向量并保存 fingerprint.json")
+    stage_status = get_fingerprint_stage_status(target_sections, force=rebuild)
+    print(f"   - 构建模式: {stage_status['mode']}")
+    print(f"   - 已命中缓存: {', '.join(stage_status['cache_hits']) if stage_status['cache_hits'] else '无'}")
+    print(f"   - 将重跑阶段: {', '.join(stage_status['rerun_stages']) if stage_status['rerun_stages'] else '无'}")
     coarse_preplan = build_coarse_preplan(target_name=target_name, target_sections_dir=target_sections)
     preplan_path = os.path.join(target_output, "coarse_preplan.json")
     try:
@@ -313,7 +328,7 @@ def run_coarse_screening(
         weights = get_dimension_weights()
         fw_shared = ", ".join(sorted(VectorStore.FRAMEWORK_SHARED_DIMS))
         core_dims = ", ".join(sorted(VectorStore.CUSTOM_CORE_DIMS))
-        print("   相似度配置: 多维度加权余弦 + struct_features 精确字段加分")
+        print("   相似度配置: 多维度加权余弦 + struct_features 精确字段加分（最终分归一化到 0~1 / 0~100%）")
         print(f"   维度: {', '.join(dim_ids)}")
         print(f"   权重: {_fmt_kv({d: round(weights.get(d, 0.0), 4) for d in dim_ids})}")
         print(f"   同框架重权重: shared_half=[{fw_shared}], core_x1.4=[{core_dims}]")
@@ -331,7 +346,7 @@ def run_coarse_screening(
 
     # 表头
     dim_short = [d.split("_", 1)[1][:8] for d in dim_ids]
-    header = f"{'#':>2}  {'项目':<20}  {'总分':>6}"
+    header = f"{'#':>2}  {'项目':<20}  {'总分':>6}  {'百分比':>8}"
     for s in dim_short:
         header += f"  {s:>8}"
     print(header)
@@ -340,8 +355,10 @@ def run_coarse_screening(
     for rank, r in enumerate(results, 1):
         fw_tag = " [同框架]" if r.get("same_framework") else ""
         line = (f"{rank:>2}  {r['name']:<20}  {r['total_score']:>6.4f}"
-                f"  (cos={r.get('cosine_score', r['total_score']):.4f}"
-                f" +sf={r.get('struct_score', 0):.4f}){fw_tag}")
+                f"  {r.get('similarity_percent', r['total_score'] * 100):>7.2f}%"
+                f"  (raw={r.get('raw_total_score', r['total_score']):.4f}"
+                f", cos={r.get('cosine_score', r['total_score']):.4f}"
+                f", sf={r.get('struct_score', 0):.4f}){fw_tag}")
         for d in dim_ids:
             line += f"  {r['dim_scores'].get(d, 0):>8.4f}"
         print(line)
@@ -406,21 +423,37 @@ def _save_coarse_markdown(
         f.write("---\n\n")
 
         f.write("## 相似度排名\n\n")
-        f.write("| 排名 | 项目 | 总相似度 |")
+        f.write(
+            "| 排名 | 项目 | 总相似度(0~1) | 百分比 | "
+            "raw(cos+sf) | cos | sf |"
+        )
         for d in dim_ids:
             short = d.split("_", 1)[1]
             f.write(f" {short} |")
         f.write("\n")
-        f.write("|------|------|----------|")
+        f.write("|------|------|---------------|--------|-------------|-----|-----|")
         for _ in dim_ids:
             f.write("--------|")
         f.write("\n")
 
         for rank, r in enumerate(results, 1):
-            f.write(f"| {rank} | {r['name']} | {r['total_score']:.4f} |")
+            raw_v = r.get("raw_total_score", r["total_score"])
+            cos_v = r.get("cosine_score", 0.0)
+            sf_v = r.get("struct_score", 0.0)
+            f.write(
+                f"| {rank} | {r['name']} | {r['total_score']:.4f} | "
+                f"{r.get('similarity_percent', r['total_score'] * 100):.2f}% | "
+                f"{raw_v:.4f} | {cos_v:.4f} | {sf_v:.4f} |"
+            )
             for d in dim_ids:
                 f.write(f" {r['dim_scores'].get(d, 0):.4f} |")
             f.write("\n")
+
+        cap = VectorStore.TOTAL_SCORE_CAP
+        f.write(
+            f"\n> **说明**：`raw = cosine_score + struct_score`（未除以 {cap:.2f} 的原始合成）；"
+            f"`总相似度 = raw / {cap:.2f}` 后钳在 0~1，与 `coarse_screening.json` 字段一致。\n"
+        )
 
         f.write(f"\n## 维度权重\n\n")
         for d in dim_ids:
@@ -507,21 +540,14 @@ def main():
     output_dir = args.output_dir or args.library
     verbosity = "normal" if args.quiet else args.verbosity
 
-    # 解析 .env 中的 HISTORY_PROJECTS
-    history_projects_env = os.environ.get("HISTORY_PROJECTS", "").strip()
+    # 解析 .env 中的 HISTORY_PROJECTS（支持单行/多行列表）
     filter_list = None
-    if history_projects_env:
-        try:
-            if history_projects_env.startswith("[") and history_projects_env.endswith("]"):
-                import ast
-                filter_list = ast.literal_eval(history_projects_env)
-            elif history_projects_env.startswith("{") and history_projects_env.endswith("}"):
-                inner = history_projects_env[1:-1]
-                filter_list = [x.strip().strip("'\"") for x in inner.split(",") if x.strip()]
-            else:
-                filter_list = [x.strip() for x in history_projects_env.split(",") if x.strip()]
-        except Exception as e:
-            print(f"⚠️ 解析 HISTORY_PROJECTS 环境变量失败: {e}，将扫描库目录下所有项目")
+    try:
+        parsed_history_projects = parse_env_repo_list("HISTORY_PROJECTS")
+        if parsed_history_projects:
+            filter_list = parsed_history_projects
+    except Exception as e:
+        print(f"⚠️ 解析 HISTORY_PROJECTS 环境变量失败: {e}，将扫描库目录下所有项目")
 
     if filter_list:
         filter_list = [repo_name_from_url(x) if x.startswith("http") or x.startswith("git@") else x for x in filter_list]

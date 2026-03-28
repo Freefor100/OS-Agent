@@ -4,8 +4,10 @@
 从 os_agent_d_describe.py 和 os_agent_d_evaluate.py 中提取的共享函数，
 合并为超集版本，兼容两者的工具名称映射。
 """
+import ast
 import os
 import json
+import re
 
 
 def _stringify_tool_arg(v):
@@ -37,6 +39,112 @@ def repo_name_from_url(repo_url: str) -> str:
     if name.lower().endswith(".git"):
         name = name[:-4]
     return name
+
+
+def _split_env_list_items(text: str) -> list:
+    text = (text or "").strip()
+    if not text:
+        return []
+    normalized = text.replace("\r\n", "\n").replace("\r", "\n")
+    parts = []
+    for item in re.split(r"[\n,]", normalized):
+        item = item.strip().strip("'\"")
+        if item:
+            parts.append(item)
+    return parts
+
+
+def _parse_env_list_value(text: str):
+    text = (text or "").strip()
+    if not text:
+        return []
+    if text in {"{", "["}:
+        return None
+
+    if (text.startswith("[") and text.endswith("]")) or (text.startswith("(") and text.endswith(")")):
+        try:
+            value = ast.literal_eval(text)
+            if isinstance(value, (list, tuple, set)):
+                return [str(x).strip() for x in value if str(x).strip()]
+        except Exception:
+            pass
+
+    if text.startswith("{") and text.endswith("}"):
+        return _split_env_list_items(text[1:-1])
+
+    return _split_env_list_items(text)
+
+
+def _read_raw_env_assignment(var_name: str, dotenv_path: str = ".env") -> str:
+    if not os.path.exists(dotenv_path):
+        return ""
+
+    try:
+        with open(dotenv_path, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+    except Exception:
+        return ""
+
+    pattern = re.compile(rf"^\s*{re.escape(var_name)}\s*=\s*(.*)$")
+    idx = 0
+    while idx < len(lines):
+        line = lines[idx].rstrip("\n")
+        match = pattern.match(line)
+        if not match:
+            idx += 1
+            continue
+
+        value = match.group(1).strip()
+        if value.startswith("{") and not value.endswith("}"):
+            collected = [value[1:]]
+            idx += 1
+            while idx < len(lines):
+                current = lines[idx].rstrip("\n")
+                stripped = current.strip()
+                if stripped.endswith("}"):
+                    collected.append(stripped[:-1])
+                    break
+                collected.append(current)
+                idx += 1
+            return "{" + "\n".join(collected) + "}"
+
+        if value.startswith("[") and not value.endswith("]"):
+            collected = [value[1:]]
+            idx += 1
+            while idx < len(lines):
+                current = lines[idx].rstrip("\n")
+                stripped = current.strip()
+                if stripped.endswith("]"):
+                    collected.append(stripped[:-1])
+                    break
+                collected.append(current)
+                idx += 1
+            return "[" + "\n".join(collected) + "]"
+
+        return value
+
+    return ""
+
+
+def parse_env_repo_list(var_name: str, dotenv_path: str = ".env") -> list:
+    """
+    解析 .env 中的仓库列表变量，支持以下格式：
+    - 单行逗号分隔：a,b,c
+    - 单行大括号：{a, b, c}
+    - 多行大括号：
+      {
+      a,
+      b
+      }
+    - Python 风格列表：["a", "b"]
+    """
+    parsed = _parse_env_list_value(os.environ.get(var_name, ""))
+    if parsed is not None:
+        return parsed
+
+    raw_value = _read_raw_env_assignment(var_name, dotenv_path=dotenv_path)
+    parsed = _parse_env_list_value(raw_value)
+    return parsed or []
 
 
 def format_tool_call_summary(tool_name: str, tool_args: dict) -> str:

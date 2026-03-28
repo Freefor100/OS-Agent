@@ -40,7 +40,7 @@ except Exception:
     from langgraph.prebuilt import create_react_agent
 
 from core.agent_builder import get_model_name, build_chat_model, build_reviewer_llm
-from core.utils import repo_name_from_url, format_tool_call_summary, format_tool_result_summary
+from core.utils import repo_name_from_url, format_tool_call_summary, format_tool_result_summary, parse_env_repo_list
 from core.per_types import StageState
 from core.per_planner import build_dynamic_context, build_repo_profile, plan_stage, render_plan_context
 from core.per_executor import extract_stage_artifacts
@@ -59,6 +59,31 @@ logger = logging.getLogger("os_agent_c_fine")
 DEFAULT_OUTPUT_DIR = "./output"
 DEFAULT_RECURSION_LIMIT = 150
 DEFAULT_STAGE_LIMIT = 150  # 仅用于终端展示，建议与 recursion_limit 保持一致
+
+
+def _get_coarse_score_info(cand_info: dict) -> dict:
+    """兼容新旧 coarse_screening.json 的粗筛分数字段。"""
+    total_score = float(cand_info.get("total_score", 0.0) or 0.0)
+    similarity_percent = cand_info.get("similarity_percent")
+    raw_total_score = cand_info.get("raw_total_score")
+
+    if similarity_percent is None:
+        if total_score > 1.0:
+            # 兼容旧版粗筛：旧 total_score 可能是未归一化原始分
+            raw_total_score = total_score if raw_total_score is None else raw_total_score
+            total_score = min(total_score, 1.0)
+            similarity_percent = total_score * 100.0
+        else:
+            similarity_percent = total_score * 100.0
+
+    if raw_total_score is None:
+        raw_total_score = total_score
+
+    return {
+        "total_score": float(total_score),
+        "similarity_percent": float(similarity_percent),
+        "raw_total_score": float(raw_total_score),
+    }
 
 
 def _save_json(path: str, payload: dict):
@@ -482,7 +507,10 @@ def run_fine_compare(
 
     for rank, cand_info in enumerate(candidates, 1):
         cand_name = cand_info["name"]
-        total_score = cand_info.get("total_score", 0)
+        score_info = _get_coarse_score_info(cand_info)
+        total_score = score_info["total_score"]
+        similarity_percent = score_info["similarity_percent"]
+        raw_total_score = score_info["raw_total_score"]
 
         report_path = os.path.join(comparison_dir, f"vs_{cand_name}.md")
 
@@ -493,7 +521,10 @@ def run_fine_compare(
             continue
 
         print(f"\n{'=' * 60}")
-        print(f"🆚 #{rank}: {target_name} vs {cand_name} (粗筛得分: {total_score:.4f})")
+        print(
+            f"🆚 #{rank}: {target_name} vs {cand_name} "
+            f"(粗筛相似度: {total_score:.4f} / {similarity_percent:.2f}%, raw={raw_total_score:.4f})"
+        )
         print(f"{'=' * 60}")
 
         agent, system_prompt = _build_compare_agent(target_name, cand_name)
@@ -660,7 +691,8 @@ def run_fine_compare(
         # 合并为单个候选的对比报告
         with open(report_path, "w", encoding="utf-8") as f:
             f.write(f"# {target_name} vs {cand_name} 对比报告\n\n")
-            f.write(f"> **粗筛相似度**: {total_score:.4f}\n")
+            f.write(f"> **粗筛相似度**: {total_score:.4f} / {similarity_percent:.2f}%\n")
+            f.write(f"> **粗筛原始分**: {raw_total_score:.4f}\n")
             f.write(f"> **生成时间**: {datetime.now().strftime('%Y-%m-%d %H:%M')}\n\n")
             f.write("---\n\n")
             for text in stage_texts:
@@ -686,9 +718,18 @@ def _generate_summary(target: str, candidates: list, reports: list, output_dir: 
         f.write(f"# {target} 相似度对比总报告\n\n")
         f.write(f"> **生成时间**: {datetime.now().strftime('%Y-%m-%d %H:%M')}\n")
         f.write(f"> **分析工具**: OS-Agent-C (精比模块)\n\n---\n\n")
-        f.write("## 粗筛结果\n\n| 排名 | 项目 | 相似度 |\n|------|------|--------|\n")
+        f.write(
+            "## 粗筛结果\n\n"
+            "| 排名 | 项目 | 相似度(0~1) | 百分比 | raw(cos+sf) |\n"
+            "|------|------|-------------|--------|-------------|\n"
+        )
         for i, c in enumerate(candidates, 1):
-            f.write(f"| {i} | {c['name']} | {c.get('total_score', 0):.4f} |\n")
+            score_info = _get_coarse_score_info(c)
+            f.write(
+                f"| {i} | {c['name']} | {score_info['total_score']:.4f} | "
+                f"{score_info['similarity_percent']:.2f}% | "
+                f"{score_info['raw_total_score']:.4f} |\n"
+            )
         f.write("\n## 精比报告\n\n")
         for rp in reports:
             f.write(f"- [{os.path.basename(rp)}](comparison_details/{os.path.basename(rp)})\n")
@@ -754,20 +795,11 @@ def main():
     candidates = []
 
     # 尝试读取环境变量中的 COMPARE_CANDIDATES
-    env_candidates = os.environ.get("COMPARE_CANDIDATES", "").strip()
     env_candidates_list = []
-    if env_candidates:
-        try:
-            if env_candidates.startswith("[") and env_candidates.endswith("]"):
-                import ast
-                env_candidates_list = ast.literal_eval(env_candidates)
-            elif env_candidates.startswith("{") and env_candidates.endswith("}"):
-                inner = env_candidates[1:-1]
-                env_candidates_list = [x.strip().strip("'\"") for x in inner.split(",") if x.strip()]
-            else:
-                env_candidates_list = [x.strip() for x in env_candidates.split(",") if x.strip()]
-        except Exception as e:
-            print(f"⚠️ 解析 COMPARE_CANDIDATES 环境变量失败: {e}")
+    try:
+        env_candidates_list = parse_env_repo_list("COMPARE_CANDIDATES")
+    except Exception as e:
+        print(f"⚠️ 解析 COMPARE_CANDIDATES 环境变量失败: {e}")
 
     if env_candidates_list:
         parsed_list = []
