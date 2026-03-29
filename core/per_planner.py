@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import re
+from dataclasses import replace
 from typing import Any, Dict, List
 
 from core.per_types import PlanSpec, StageState
@@ -347,6 +348,77 @@ def plan_stage(state: StageState, repo_profile: Dict[str, Any], global_memory: D
     )
 
 
+def _coerce_str_list(val: Any, max_items: int = 16) -> List[str]:
+    if not isinstance(val, list):
+        return []
+    out: List[str] = []
+    for x in val:
+        if isinstance(x, (str, int, float)):
+            s = str(x).strip()
+            if s:
+                out.append(s[:400])
+        if len(out) >= max_items:
+            break
+    return out
+
+
+def apply_llm_plan_overlay(base: PlanSpec, patch: Dict[str, Any]) -> PlanSpec:
+    """将 LLM 规划 JSON 合并进启发式 PlanSpec（LLM 列表优先去重拼接）。"""
+    if not patch:
+        return base
+    g = patch.get("goal")
+    new_goal = _norm(str(g))[:120] if isinstance(g, str) and g.strip() else base.goal
+
+    must_llm = _coerce_str_list(patch.get("must_cover"), 16)
+    must_cover = _dedupe_keep_order(must_llm + base.must_cover)[:22]
+
+    et_llm = _coerce_str_list(patch.get("evidence_targets"), 12)
+    evidence_targets = _dedupe_keep_order(et_llm + base.evidence_targets)[:16]
+
+    seed_llm = _coerce_str_list(patch.get("seed_paths"), 12)
+    seed_paths = (
+        _dedupe_keep_order(seed_llm + base.seed_paths)[:14]
+        if seed_llm
+        else base.seed_paths
+    )
+
+    sym_llm = _coerce_str_list(patch.get("entry_symbols"), 10)
+    entry_symbols = _dedupe_keep_order(sym_llm + base.entry_symbols)[:12]
+
+    pt_llm = _coerce_str_list(patch.get("preferred_tools"), 8)
+    preferred_tools = pt_llm if pt_llm else base.preferred_tools
+
+    steps_llm = _coerce_str_list(patch.get("execution_steps"), 12)
+    execution_steps = steps_llm if steps_llm else base.execution_steps
+
+    return replace(
+        base,
+        goal=new_goal,
+        must_cover=must_cover,
+        evidence_targets=evidence_targets,
+        seed_paths=seed_paths,
+        entry_symbols=entry_symbols,
+        preferred_tools=preferred_tools,
+        execution_steps=execution_steps,
+    )
+
+
+def ensure_execution_steps(plan: PlanSpec) -> PlanSpec:
+    """若尚无逐步清单，用通用三步 + must_cover 摘要补齐，保证 Execute 总有锁定步骤。"""
+    if plan.execution_steps:
+        return plan
+    steps = [
+        "对照 seed_paths、entry_symbols，用 rag_search_code / list_repo_structure / LSP 锁定与本阶段相关的关键文件与符号。",
+        "对核心入口使用 lsp_get_document_outline → lsp_get_call_graph（单入口、浅深度）→ 必要时 read_code_segment 精读。",
+        "按 must_cover 逐项输出结论，每条附反引号源码路径；无实现则显式写「未发现/桩函数」等，勿臆测。",
+    ]
+    for q in plan.must_cover[:5]:
+        qn = _norm(q)[:120]
+        if qn:
+            steps.append(f"覆盖要点：{qn}")
+    return replace(plan, execution_steps=steps[:12])
+
+
 def _shorten(text: str, limit: int = 400) -> str:
     text = _norm(text)
     if len(text) <= limit:
@@ -398,12 +470,24 @@ def render_plan_context(state: StageState) -> str:
         f"- entry_symbols: {', '.join(plan.entry_symbols[:8]) or '无'}",
         f"- preferred_tools: {' -> '.join(plan.preferred_tools)}",
         f"- avoid_tools: {', '.join(plan.avoid_tools)}",
-        "",
-        "## 动态上下文摘要",
-        f"- recent_sections: {len(dynamic_context.get('recent_sections', []))}",
-        f"- repair_actions: {len(dynamic_context.get('repair_context', []))}",
-        f"- cached_evidence: {len(dynamic_context.get('evidence_cache', []))}",
     ]
+    llm_notes = (state.metadata or {}).get("llm_plan_notes")
+    if llm_notes:
+        lines.append(f"- llm_structure_notes: {_shorten(str(llm_notes), 500)}")
+    if plan.execution_steps:
+        lines.append("")
+        lines.append("## 须按序完成的执行步骤（Execute 阶段必须遵守；未列事项勿擅自长篇展开）")
+        for i, st in enumerate(plan.execution_steps[:14], 1):
+            lines.append(f"{i}. {st}")
+    lines.extend(
+        [
+            "",
+            "## 动态上下文摘要",
+            f"- recent_sections: {len(dynamic_context.get('recent_sections', []))}",
+            f"- repair_actions: {len(dynamic_context.get('repair_context', []))}",
+            f"- cached_evidence: {len(dynamic_context.get('evidence_cache', []))}",
+        ]
+    )
     recent_sections = dynamic_context.get("recent_sections", [])
     if recent_sections:
         lines.append("")

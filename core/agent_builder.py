@@ -170,6 +170,59 @@ def get_describe_tools(stage_id: str = ""):
     return tools
 
 
+def get_planning_tools(stage_id: str = ""):
+    """
+    规划阶段工具：在出 JSON 计划前摸底仓库。
+    含目录/语义搜索 + LSP 鸟瞰 + 小段精读（与执行阶段能力对齐，但系统提示要求少轮次、浅调用）。
+    """
+    tools = [
+        get_repo_local_path,
+        list_repo_structure,
+        find_os_core_modules,
+        rag_search_code,
+        grep_in_repo,
+        read_code_segment,
+        lsp_get_definition,
+        lsp_get_document_outline,
+        lsp_get_references,
+        lsp_get_call_graph,
+        lsp_set_target_arch,
+    ]
+    if "01_overview" in stage_id:
+        tools.append(analyze_tech_stack)
+        tools.append(web_search)
+    if "13_history" in stage_id:
+        tools.extend(
+            [
+                get_git_history_summary,
+                analyze_git_history,
+                find_symbol_first_commit,
+                trace_file_evolution,
+                analyze_authors_contribution,
+                get_commit_diff_summary,
+            ]
+        )
+    return tools
+
+
+def build_planner_agent(model: str = None, stage_id: str = ""):
+    """构建「先摸底再出计划 JSON」的 ReAct Agent；工具集随 stage_id 变化（概览/历史等）。"""
+    llm = build_chat_model(model=model, temperature=0)
+    return create_react_agent(llm, get_planning_tools(stage_id))
+
+
+def build_verifier_agent(model: str = None, stage_id: str = ""):
+    """③ Verify：与 Execute 同构的 ReAct Agent；工具集同 `get_planning_tools`（只读摸底/LSP/精读）。"""
+    llm = build_chat_model(model=model, temperature=0)
+    return create_react_agent(llm, get_planning_tools(stage_id))
+
+
+def build_patch_plan_agent(model: str = None, stage_id: str = ""):
+    """④ Patch 计划：同构 ReAct；可选工具辅助核对段落与仓库后再输出压缩 JSON。"""
+    llm = build_chat_model(model=model, temperature=0)
+    return create_react_agent(llm, get_planning_tools(stage_id))
+
+
 def build_executor_agent(model: str = None, stage_id: str = "", tools=None):
     """构建执行阶段使用的 ReAct Agent。"""
     llm = build_chat_model(model=model)

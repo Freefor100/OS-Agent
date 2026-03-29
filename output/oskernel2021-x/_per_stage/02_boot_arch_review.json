@@ -1,0 +1,29 @@
+{
+  "passed": true,
+  "score": 0.9,
+  "severity": "minor",
+  "failed_rules": [
+    "suspicious_evidence_path"
+  ],
+  "missing_evidence": [],
+  "weak_claims": [
+    {
+      "claim": "RustSBI 模式切换代码引用",
+      "reason": "引用了 main.back.rs 备份文件而非正式源码 main.rs，可能存在版本不一致或臆测风险"
+    }
+  ],
+  "format_issues": [],
+  "missed_modules": [],
+  "repair_actions": [
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "RustSBI 模式切换机制",
+      "hint": "请核实 bootloader/SBI/rustsbi-k210/src/ 下的正式入口文件（通常为 main.rs），替换 .back.rs 备份文件引用，确保代码行号与正式构建版本一致"
+    },
+    {
+      "action_type": "normalize_terminology",
+      "target_paragraph_id": "启动入口与链接脚本分析",
+      "hint": "建议统一 entry_qemu.S 和 entry_k210.S 的代码片段展示格式，确保行号引用精确到具体指令行"
+    }
+  ]
+}

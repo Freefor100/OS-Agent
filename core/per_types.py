@@ -19,6 +19,8 @@ class PlanSpec:
     avoid_tools: List[str] = field(default_factory=list)
     review_checklist: List[str] = field(default_factory=list)
     context_budget: Dict[str, int] = field(default_factory=dict)
+    # 须按序完成的执行步骤（Plan 阶段锁定，Execute 严格遵守，类似 Cursor 的 scoped plan）
+    execution_steps: List[str] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)

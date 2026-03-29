@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from typing import Dict, List, Optional, Sequence
+from typing import Any, Callable, Dict, List, Optional, Sequence
 
 from core.per_types import EvidenceItem, ParagraphRecord, ReviewResult, StageState
 
@@ -220,8 +220,33 @@ def _review_paragraphs(state: StageState, target_paragraph_ids: Optional[Sequenc
     )
 
 
-def review_stage(state: StageState) -> ReviewResult:
-    result = _review_paragraphs(state)
+def review_stage(
+    state: StageState,
+    llm: Any = None,
+    *,
+    llm_primary: bool = False,
+    on_llm_stream_step: Optional[Callable[[str, Dict[str, Any]], None]] = None,
+) -> ReviewResult:
+    rule_result = _review_paragraphs(state)
+    if llm_primary and llm is not None:
+        from core.per_llm_stages import run_llm_review
+
+        llm_result = run_llm_review(
+            state,
+            llm,
+            on_stream_step=on_llm_stream_step,
+            stage_id=state.stage_id,
+        )
+        result = llm_result if llm_result is not None else rule_result
+    else:
+        print(
+            "   📤 ③ Verify: 仅规则审阅（无 LLM；内置检查路径引用、README 证据、must_cover 关键词等）"
+        )
+        print(
+            f"   📥 ③ Verify 结果: passed={rule_result.passed}, score={rule_result.score}, "
+            f"repair_actions={len(rule_result.repair_actions)} 条"
+        )
+        result = rule_result
     state.review_result = result
     state.status = "done" if result.passed else "review_failed"
     return result

@@ -1,4 +1,14 @@
 # os_agent_d_describe.py
+#
+# 每阶段 Cursor 式管线（固定）:
+#   ① Plan     — 阶段提示词 + 启发式 plan + LLM 自主探索 → 锁定计划与 execution_steps（须按序执行）
+#   ② Execute  — 按锁定步骤与「执行契约」ReAct 写章节
+#   ③ Verify   — ReAct+stream 审阅（与 ② 同构；JSON 失败则 invoke 回退，再失败则规则审阅）
+#   ④ Patch 计划 — ReAct+stream 压缩为 ≤6 条修补步骤（失败则 invoke 回退）
+#   ⑤ Apply    — 仅按 ④ 执行 repair；必要时 re-review
+#
+# API Key / MODEL_NAME 等仍从仓库根目录 .env 读取（load_dotenv）。
+#
 import os
 import re
 import sys
@@ -10,19 +20,50 @@ import langchain
 from dotenv import load_dotenv
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage, SystemMessage
 
-from core.agent_builder import build_executor_agent, build_reviewer_llm, SYSTEM_PROMPT
+from core.agent_builder import (
+    build_executor_agent,
+    build_planner_agent,
+    build_reviewer_llm,
+    SYSTEM_PROMPT,
+)
 from core.utils import repo_name_from_url, format_tool_call_summary, format_tool_result_summary
 from core.error_handling import ErrorType, RetryConfig, classify_error, calculate_backoff, ErrorTracker
 from core.per_types import StageState
-from core.per_planner import build_repo_profile, build_dynamic_context, plan_stage, render_plan_context
+from core.per_planner import (
+    apply_llm_plan_overlay,
+    build_repo_profile,
+    build_dynamic_context,
+    ensure_execution_steps,
+    plan_stage,
+    render_plan_context,
+)
 from core.per_executor import extract_stage_artifacts
 from core.per_reviewer import review_stage, re_review_stage
-from core.per_repair import repair_stage
+from core.per_llm_stages import (
+    PATCH_PLAN_RECURSION_LIMIT,
+    PLANNER_RECURSION_LIMIT,
+    VERIFY_RECURSION_LIMIT,
+    run_llm_planning_agent,
+    run_llm_patch_plan,
+)
+from core.per_repair import DEFAULT_REPAIR_RECURSION_LIMIT, repair_stage
 
 langchain.debug = True
 load_dotenv()
 
 OUTPUT_DIR = "./output"
+
+# 注入 Execute 任务：约束范围与顺序（对齐 Cursor scoped agent）
+CURSOR_EXECUTION_CONTRACT = """
+---
+## 【执行契约 — 已锁定计划】
+上文「阶段执行计划」与「须按序完成的执行步骤」为本阶段**唯一**工作范围与顺序约束。你必须：
+1. **严格按 execution_steps 顺序** 调用工具并组织正文，勿跳步、勿倒序。
+2. 步骤未点名的话题不要擅自展开成长篇；优先满足 must_cover 与 evidence_targets。
+3. 结论须带可核验的源码路径（反引号）；证据不足时显式降级，禁止无路径硬断言。
+---
+"""
+
 import openpyxl
 def normalize_url(url: str) -> str:
     """标准化仓库 URL，剔除 .git 后缀、结尾斜杠并统一小写"""
@@ -1071,7 +1112,44 @@ def main():
 
         # 每个阶段构建 base_ctx
         base_ctx = _build_base_context(repo_url=repo_url, output_dir=repo_output_dir)
+        print("\n" + "━" * 26 + " ① Plan · 探索并锁定本阶段计划 " + "━" * 26)
         stage_state.plan = plan_stage(stage_state, repo_profile=repo_profile, global_memory=global_memory)
+        try:
+            planner_agent = build_planner_agent(stage_id=stage_id)
+            plan_stream_step = 0
+
+            def _on_plan_stream(node_name: str, st: dict) -> None:
+                nonlocal overall_step_count, plan_stream_step
+                overall_step_count += 1
+                plan_stream_step += 1
+                print_step(
+                    overall_step_count,
+                    node_name,
+                    st,
+                    plan_stream_step,
+                    GLOBAL_ESTIMATED_STEPS,
+                    PLANNER_RECURSION_LIMIT,
+                )
+
+            patch, plan_notes = run_llm_planning_agent(
+                planner_agent,
+                stage_state,
+                repo_profile,
+                repo_local_path,
+                global_memory=global_memory,
+                on_stream_step=_on_plan_stream,
+            )
+            stage_state.metadata["llm_plan_patch_applied"] = bool(patch)
+            if patch:
+                stage_state.plan = apply_llm_plan_overlay(stage_state.plan, patch)
+            if plan_notes:
+                stage_state.metadata["llm_plan_notes"] = plan_notes
+            if patch or plan_notes:
+                print(f"   🧩 LLM 规划已合并（patch_keys={list(patch.keys()) if patch else []}）")
+        except Exception as e:
+            stage_state.metadata["llm_plan_patch_applied"] = False
+            logging.warning("LLM 规划失败，沿用启发式计划: %s", e)
+        stage_state.plan = ensure_execution_steps(stage_state.plan)
         stage_state.dynamic_context = build_dynamic_context(stage_state, repo_profile=repo_profile, global_memory=global_memory)
         plan_context = render_plan_context(stage_state)
         
@@ -1126,16 +1204,39 @@ def main():
 （你的分析内容）
 
 """
-            task = base_ctx + "\n" + chapter_hint + "\n" + plan_context + "\n\n" + prompt + previous_sections_content
+            task = (
+                base_ctx
+                + "\n"
+                + chapter_hint
+                + "\n"
+                + plan_context
+                + "\n"
+                + CURSOR_EXECUTION_CONTRACT
+                + "\n\n"
+                + prompt
+                + previous_sections_content
+            )
         else:
-            task = base_ctx + "\n" + f"## 阶段 {idx}/{len(STAGES)}：{title}\n\n" + plan_context + "\n\n" + prompt + previous_sections_content
+            task = (
+                base_ctx
+                + "\n"
+                + f"## 阶段 {idx}/{len(STAGES)}：{title}\n\n"
+                + plan_context
+                + "\n"
+                + CURSOR_EXECUTION_CONTRACT
+                + "\n\n"
+                + prompt
+                + previous_sections_content
+            )
         
         inputs = {"messages": [SystemMessage(content=SYSTEM_PROMPT), HumanMessage(content=task)]}
 
         print("\n" + "=" * 80)
         print(f"🧩 阶段 {idx}/{len(STAGES)}：{title}")
         print("=" * 80)
-        print(f"🚀 开始执行 Agent (模型: {os.getenv('MODEL_NAME')})...")
+        print("   ✅ ① Plan 已锁定 → 执行步骤条数:", len(stage_state.plan.execution_steps) if stage_state.plan else 0)
+        print("━" * 26 + " ② Execute · 按锁定计划执行 " + "━" * 26)
+        print(f"   模型: {os.getenv('MODEL_NAME')} — 以下 Tool 日志均为 Execute")
         sys.stdout.flush()  # 强制刷新输出缓冲区
 
         agent = build_executor_agent(stage_id=stage_id)
@@ -1329,19 +1430,97 @@ def main():
         )
 
         if not skip_in_report:
-            review_result = review_stage(stage_state)
+            print("\n" + "━" * 28 + " ③ Verify · 审查 " + "━" * 28)
+            verify_stream_step = 0
+
+            def _on_verify_stream(node_name: str, st: dict) -> None:
+                nonlocal overall_step_count, verify_stream_step
+                overall_step_count += 1
+                verify_stream_step += 1
+                print_step(
+                    overall_step_count,
+                    node_name,
+                    st,
+                    verify_stream_step,
+                    GLOBAL_ESTIMATED_STEPS,
+                    VERIFY_RECURSION_LIMIT,
+                )
+
+            review_result = review_stage(
+                stage_state,
+                reviewer_llm,
+                llm_primary=True,
+                on_llm_stream_step=_on_verify_stream,
+            )
             _print_review_result(review_result, title)
             _save_json(os.path.join(sidecar_dir, f"{stage_id}_review.json"), review_result.to_dict())
 
             if not review_result.passed:
-                print(f"\n🩹 进入定向修补：{title}")
-                stage_state.metadata["repair_context"] = review_result.repair_actions
+                print("\n" + "━" * 22 + " ④ Patch 计划 · 收缩为小范围步骤 " + "━" * 22)
+                patch_stream_step = 0
+
+                def _on_patch_stream(node_name: str, st: dict) -> None:
+                    nonlocal overall_step_count, patch_stream_step
+                    overall_step_count += 1
+                    patch_stream_step += 1
+                    print_step(
+                        overall_step_count,
+                        node_name,
+                        st,
+                        patch_stream_step,
+                        GLOBAL_ESTIMATED_STEPS,
+                        PATCH_PLAN_RECURSION_LIMIT,
+                    )
+
+                patch_actions, patch_summary = run_llm_patch_plan(
+                    stage_state,
+                    review_result,
+                    reviewer_llm,
+                    max_actions=6,
+                    on_stream_step=_on_patch_stream,
+                    stage_id=stage_id,
+                )
+                stage_state.metadata["patch_plan_summary"] = patch_summary
+                if patch_actions:
+                    stage_state.metadata["patch_plan_actions"] = patch_actions
+                    _save_json(
+                        os.path.join(sidecar_dir, f"{stage_id}_patch_plan.json"),
+                        {"summary": patch_summary, "actions": patch_actions},
+                    )
+                    if patch_summary:
+                        print(f"   📌 {patch_summary}")
+                    print(
+                        f"   → 已生成 {len(patch_actions)} 条定向修补（详见 _per_stage/{stage_id}_patch_plan.json）"
+                    )
+                else:
+                    print("   ⚠️ 未生成小型 patch 计划，将使用审阅返回的全部 repair_actions（最多 8 条）")
+                print("━" * 26 + " ⑤ Apply patches " + "━" * 26)
+                stage_state.metadata["repair_context"] = (
+                    patch_actions if patch_actions else review_result.repair_actions
+                )
+                repair_stream_step = 0
+
+                def _on_repair_stream(node_name: str, st: dict) -> None:
+                    nonlocal overall_step_count, repair_stream_step
+                    overall_step_count += 1
+                    repair_stream_step += 1
+                    print_step(
+                        overall_step_count,
+                        node_name,
+                        st,
+                        repair_stream_step,
+                        GLOBAL_ESTIMATED_STEPS,
+                        DEFAULT_REPAIR_RECURSION_LIMIT,
+                    )
+
                 touched_paragraph_ids = repair_stage(
                     stage_state,
                     agent=agent,
                     llm=reviewer_llm,
                     base_messages=execution_messages,
-                    recursion_limit=18,
+                    repair_actions_override=patch_actions if patch_actions else None,
+                    on_stream_step=_on_repair_stream,
+                    repair_verbose=True,
                 )
                 if touched_paragraph_ids:
                     re_result = re_review_stage(stage_state, touched_paragraph_ids)

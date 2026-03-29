@@ -671,7 +671,7 @@ def run_fine_compare(
                     agent=agent,
                     llm=reviewer_llm,
                     base_messages=execution_messages,
-                    recursion_limit=min(18, recursion_limit),
+                    recursion_limit=min(80, recursion_limit),
                 )
                 if touched_paragraph_ids:
                     review_result = re_review_stage(stage_state, touched_paragraph_ids)

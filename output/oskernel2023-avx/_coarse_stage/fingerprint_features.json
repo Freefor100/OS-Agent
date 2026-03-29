@@ -1,0 +1,33 @@
+{
+  "stage": "feature_summaries",
+  "sections_dir": "G:\\OS-Agent\\output\\oskernel2023-avx\\sections",
+  "features": {
+    "D1_tech_stack": "本项目基于 xv6-riscv 扩展，为 64 位 RISC-V 宏内核。编程语言为 C (C99 标准) 及汇编，采用 no_std 裸机环境。目标架构仅支持 RISC-V 64 (riscv64gc)。内核类型为宏内核。关键依赖包括集成 lwIP 网络栈与自研 FAT32 驱动。构建系统使用 Makefile 配合 riscv64-unknown-elf-gcc 工具链，主要命令为 make build。",
+    "D2_boot_arch": "平台 QEMU/VF2，LoongArch 未实现。链 SBI→U-Boot→Kernel。入口 kernel/entry_qemu.S/entry_visionfive.S。固件切 M-Mode 至 S-Mode，内核无码。MMU 经 kvminit 建表、kvminithart 写 satp 启用。FPU 无。",
+    "D3_memory": "物理内存用空闲链表。页表 Sv39 三级，`pagetable_t`，`walk`/`mappages`。用户堆隐式链表，内核仅页级分配。mmap(FIXED/ANON) 已实现；CoW、懒分配、Swap、大页、共享、rmap 未实现。缺页异常链：`usertrap`→`handle_stack_page_fault`→`uvmalloc1`。指针无显式验证，依赖 `walkaddr` 隐式检查。",
+    "D4_process_sched": "采用 Process+Thread 分离模型，有 struct proc/thread。调度简单轮转，代码仅有 FIFO，无多调度器。swtch.S 切换，存 14 个寄存器，无浮点上下文。进程支持 PGID，无 Session/SID。信号支持 sigaction/kill/trampoline。Futex 实现，rlimit 桩函数，fork 用 uvmcopy 复制地址空间 (COW)。",
+    "D5_trap_syscall": "Trap 入口为汇编 trap.S，TrapFrame 含 36 字段 288 字节。系统调用用指针表，注册 100 个，70 个完整，15 个桩函数。核心 sys_clone/exec/mmap 均完整，覆盖文件/进程/内存。接口层 sys_xxx 调内部函数，无 impl 层。信号在 Trap 返回前检查。缺页触发栈懒分配，无 CoW。用户指针无 UserInPtr，用 copyin。",
+    "D6_filesystem": "VFS 无独立 Inode/Dentry Trait，struct file 与 dirent 直接耦合。FAT32 完全自研，ext4 未支持，TmpFS 仅桩函数，ProcFS/DevFS 未实现。文件描述符表为 Per-Process (proc->ofile) 加全局 ftable。Pipe 系 512 字节环形缓冲区。Socket 集成 LWIP。mmap 支持标志位但无零拷贝，munmap 为桩实现。poll/select/epoll 均未实现。打开流程由隐式 SuperBlock、dirent、file 与进程 fd 表协同。",
+    "D7_device_driver": "驱动基于 Makefile 编译，无注册机制。设备地址硬编码，无 DT 解析。支持 QEMU（仅测试）与 VisionFive。字符 16550aUART（仅 QEMU）与 UART8250。块设备 VirtIO-Blk（仅 QEMU）、SD 卡、RAMDisk。网络 lwIP 回环。中断 PLIC，分 M/S 模式。",
+    "D8_sync_ipc": "锁机制含 SpinLock（禁中断，GCC 原子指令）及 Mutex(SleepLock)，RwLock 未实现。等待队列基于 chan 数组扫描。原子操作源自 GCC 内置。IPC 方面 Pipe 已实现环形缓冲区；MessageQueue 与 SharedMem 未实现；Semaphore 仅内核态实现；Signal 已实现但 sys_kill 存在缺陷。Futex 完整实现 wait/wake 调用链。",
+    "D9_smp_security": "本项目仅支持单核，从核仅轮询串口未进调度器。IPI 仅有接口未实现。Per-CPU 为全局数组，无 axns。调度无负载均衡与亲和性。页表 PTE_U 位隔离用户/内核态，未实现 KPTI/SMEP/SMAP。UID/GID 仅有定义未强制检查，文件硬编码 root。无 Seccomp/prctl 沙箱。用户指针经 copyin 验证。纯 C 无 Rust。无 Capability。",
+    "D10_net_debug": "网络集成 lwIP 协议栈，实现完整 Socket 系统调用，支持 TCP/UDP/DNS。但仅支持 QEMU 回环模式，无真实网卡驱动，不支持 DHCP/ICMP 及跨机通信。调试含三级日志与 Panic 处理，支持基于帧指针的栈回溯及寄存器 dump。提供用户态 Shell 与系统调用追踪，未实现内核 Monitor、GDB Stub。无性能追踪，不具备真实网络通信能力。"
+  },
+  "completed_dims": [
+    "D1_tech_stack",
+    "D2_boot_arch",
+    "D3_memory",
+    "D4_process_sched",
+    "D5_trap_syscall",
+    "D6_filesystem",
+    "D7_device_driver",
+    "D8_sync_ipc",
+    "D9_smp_security",
+    "D10_net_debug"
+  ],
+  "token_usage_total": {
+    "prompt_tokens": 72994,
+    "completion_tokens": 110269,
+    "total_tokens": 183263
+  }
+}
