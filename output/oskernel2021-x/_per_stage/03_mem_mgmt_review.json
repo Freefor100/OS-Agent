@@ -1,0 +1,74 @@
+{
+  "passed": false,
+  "score": 0.72,
+  "severity": "major",
+  "failed_rules": [
+    "missing_path_citation",
+    "must_cover_gap"
+  ],
+  "missing_evidence": [
+    {
+      "paragraph_id": "高级内存特性清单",
+      "claim_id": "CoW 未实现",
+      "reason": "否定断言'搜索无 cow/copy_on_write 代码'未提供 grep 搜索结果或 RAG 搜索证据，仅有文字声明"
+    },
+    {
+      "paragraph_id": "高级内存特性清单",
+      "claim_id": "共享内存未实现",
+      "reason": "否定断言'搜索无 sys_shm/shm 相关代码'未提供 grep 搜索结果作为证据"
+    },
+    {
+      "paragraph_id": "高级内存特性清单",
+      "claim_id": "反向映射未实现",
+      "reason": "否定断言'搜索无 rmap/reverse_map 代码'未提供 grep 搜索结果作为证据"
+    },
+    {
+      "paragraph_id": "物理内存管理实现",
+      "claim_id": "大页未实现",
+      "reason": "否定断言'搜索无 HugePage、2M、1G 相关代码'未提供 grep 搜索结果作为证据"
+    }
+  ],
+  "weak_claims": [
+    {
+      "claim": "CoW 未实现",
+      "reason": "仅有文字声明'搜索无...代码'，无实际 grep/RAG 搜索结果支撑，无法验证该否定断言的真实性"
+    },
+    {
+      "claim": "共享内存未实现",
+      "reason": "仅有文字声明'搜索无...代码'，无实际 grep/RAG 搜索结果支撑"
+    },
+    {
+      "claim": "零拷贝 sendfile 为桩函数",
+      "reason": "声称'sysproc.c:425 sys_sendfile() 仅返回 0'，但未提供代码片段或行号验证"
+    }
+  ],
+  "format_issues": [
+    {
+      "issue": "部分代码片段行号范围过大",
+      "detail": "如 kernel/trap.c:56-140 覆盖 84 行，建议缩小到关键分支（如 scause=13/15 处理的具体行）"
+    }
+  ],
+  "missed_modules": [],
+  "repair_actions": [
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "高级内存特性清单",
+      "hint": "对 CoW、共享内存、反向映射、大页等否定断言，使用 grep_in_repo 添加搜索结果（如 pattern='cow|copy_on_write'、pattern='shm|shmat|shmdt'、pattern='rmap|reverse_map'、pattern='HugePage|2M|1G'）作为证据"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "堆管理（sbrk/brk）",
+      "hint": "对'零拷贝 sendfile 为桩函数'断言，使用 read_code_segment 读取 sysproc.c:425 附近代码片段作为证据"
+    },
+    {
+      "action_type": "normalize_terminology",
+      "target_paragraph_id": "虚拟内存与页表操作",
+      "hint": "统一术语：草稿中混用 'vmunmap()' 和 'uvmdealloc()'，应明确区分两者功能（vmunmap 解除映射，uvmdealloc 回收用户空间）"
+    },
+    {
+      "action_type": "rewrite_paragraph",
+      "target_paragraph_id": "缺页异常处理",
+      "hint": "usertrap 代码片段中引用了 'elock/eread/eunlock' 等函数，但这些函数在 xv6 标准实现中不存在，需验证是否为项目自定义扩展并提供定义位置"
+    }
+  ]
+}

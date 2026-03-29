@@ -47,6 +47,15 @@
    - 仅术语或格式问题 → `pass = true`，但给修订建议
 4. 🩹 **Repair**：仅补缺失证据、仅重写受影响段落、仅对改动范围做二次 reviewer，尽量避免整章重跑。
 
+**Describe：`os_agent_d_describe` 中 ③ Verify / ④ Patch 的实现说明（详见代码，不在终端重复念稿）**
+
+| 阶段 | 实现要点 |
+|------|----------|
+| **③ Verify** | `build_verifier_agent` + LangGraph `stream`，工具集与摸底一致（`get_planning_tools`），`VERIFY_RECURSION_LIMIT=48`。若末轮仍无可用 JSON，回退单次 `llm.invoke`（无工具），再失败则用规则审阅。 |
+| **④ Patch 计划** | `build_patch_plan_agent` + `stream`，`PATCH_PLAN_RECURSION_LIMIT=40`；同样支持 invoke 回退。 |
+| **控制台** | 解析成功时**只打一份**结构化长预览（避免模型原始输出与解析结果各打一遍）。更完整的 JSON 见输出目录 `_per_stage/{stage_id}_review.json`、`_patch_plan.json` 等。 |
+| **④ 校验** | `patch_plan` 里每条 `target_paragraph_id` 必须是段落模型里的 id（如 `p001`），**不能**写章节标题字符串；否则校验会清空动作并回退到审阅自带的 `repair_actions` 或再走 invoke。 |
+
 **v4.0 受限外部背景补充**
 
 - 新增 `web_search` 工具，但**默认关闭**。

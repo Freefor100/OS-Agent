@@ -185,19 +185,20 @@ def run_llm_planning_agent(
             print(f"      · execution_steps: {n_steps} 条")
         print(f"      · repo_structure_notes: {'有' if notes else '无'}")
         raw_out = (text or "").strip()
-        if raw_out:
-            print_agent_long_preview(
-                "【① Plan】(规划子图) Agent:",
-                raw_out,
-                max_chars=8000,
-                max_lines=150,
-            )
         if data:
+            # 解析成功：只打一份规范化 JSON（避免与「原始含围栏的回复」重复刷屏）
             print_agent_long_preview(
                 "【① Plan】解析 JSON（将合并进 PlanSpec） Agent:",
                 json.dumps(data, ensure_ascii=False, indent=2),
                 max_chars=8000,
                 max_lines=200,
+            )
+        elif raw_out:
+            print_agent_long_preview(
+                "【① Plan】未解析到有效 JSON，原始回复 Agent:",
+                raw_out,
+                max_chars=8000,
+                max_lines=150,
             )
     return data, notes
 
@@ -273,19 +274,11 @@ def _review_result_from_parsed_dict(data: Dict[str, Any], log_io: bool) -> Optio
                 f"   📥 ③ Verify 结果: passed={passed}, score={score}, severity={severity}, "
                 f"repair_actions={len(repair_actions_f)} 条, failed_rules={len(failed_rules_f)} 条"
             )
-            preview_obj: Dict[str, Any] = {
-                "passed": passed,
-                "score": score,
-                "severity": severity,
-                "failed_rules": failed_rules_f,
-                "missing_evidence": _obj_list("missing_evidence")[:6],
-                "repair_actions": repair_actions_f[:10],
-            }
             print_agent_long_preview(
-                "【③ Verify】解析结构化结果预览 Agent:",
-                json.dumps(preview_obj, ensure_ascii=False, indent=2),
-                max_chars=7000,
-                max_lines=200,
+                "【③ Verify】解析结果 Agent:",
+                json.dumps(data, ensure_ascii=False, indent=2),
+                max_chars=8000,
+                max_lines=220,
             )
         return ReviewResult(
             passed=passed,
@@ -324,7 +317,6 @@ def run_llm_review(
 
     checklist = (plan.review_checklist if plan else []) or []
     must_cover = (plan.must_cover if plan else [])[:12]
-    n_ev = len(state.evidence_index or [])
     sid = stage_id or state.stage_id
 
     prompt = f"""你是技术报告审阅员。根据「草稿正文 + 证据摘要 + 必答要点」输出**仅一段** ```json 代码块。
@@ -360,16 +352,6 @@ def run_llm_review(
 
 最后一轮回复**只包含** ```json ... ```，不要其它文字。"""
 
-    if log_io:
-        print(
-            f"   📤 ③ Verify: ReAct Agent（与 ② Execute 同构：langgraph.stream + 工具集=get_planning_tools）"
-        )
-        print(
-            f"      · recursion_limit={VERIFY_RECURSION_LIMIT}；Human ≈{len(prompt):,} 字符；"
-            f"stage_id={sid}；证据 {n_ev} 条；must_cover {len(must_cover)} 条"
-        )
-        print("      · 若 ReAct 未产出可解析 JSON，将自动回退「单次 llm.invoke」（无工具）")
-
     messages = [
         SystemMessage(content=VERIFIER_AGENT_SYSTEM),
         HumanMessage(content=prompt),
@@ -399,18 +381,8 @@ def run_llm_review(
                 if isinstance(m, AIMessage) and (m.content or "").strip():
                     meta = getattr(m, "response_metadata", None) or {}
                     if isinstance(meta, dict) and meta.get("token_usage"):
-                        log_llm_response_tokens("③ Verify ReAct（末条含 usage 的 AI）", m)
+                        log_llm_response_tokens("③ Verify ReAct", m)
                         break
-            else:
-                print(
-                    "   📄 ③ Verify ReAct: 各轮 token 见上方 print_step；末条 AI 无 token_usage 聚合"
-                )
-            print_agent_long_preview(
-                "【③ Verify】ReAct 最终 JSON 文本预览 Agent:",
-                content,
-                max_chars=8000,
-                max_lines=150,
-            )
 
     data = extract_json_object(content) if content else None
     if data:
@@ -419,11 +391,7 @@ def run_llm_review(
     if log_io:
         print("   ⚠️ ③ Verify: ReAct 未得到可解析 JSON → 回退单次 llm.invoke（无工具）")
     if log_io:
-        log_llm_text_call_out(
-            "③ Verify（回退 invoke）",
-            prompt,
-            extras=[f"阶段: {state.stage_id}", "与上方 ReAct 共用同一 Human 文本"],
-        )
+        log_llm_text_call_out("③ Verify（回退 invoke）", prompt, extras=[])
     try:
         resp = llm.invoke(prompt)
         content_fb = (getattr(resp, "content", None) or "").strip()
@@ -435,18 +403,19 @@ def run_llm_review(
 
     if log_io:
         log_llm_response_tokens("③ Verify invoke", resp)
-        print_agent_long_preview(
-            "【③ Verify】invoke 回退 · 模型回复预览 Agent:",
-            content_fb,
-            max_chars=8000,
-            max_lines=150,
-        )
 
     data_fb = extract_json_object(content_fb)
     if not data_fb:
         logger.warning("run_llm_review 无法解析 JSON")
         if log_io:
             print("   📥 ③ Verify 结果: JSON 解析失败，将回退规则审阅")
+            if content_fb:
+                print_agent_long_preview(
+                    "【③ Verify】invoke 未解析 · 原文 Agent:",
+                    content_fb,
+                    max_chars=8000,
+                    max_lines=150,
+                )
         return None
 
     return _review_result_from_parsed_dict(data_fb, log_io)
@@ -470,14 +439,6 @@ def _patch_plan_from_parsed_dict(
         if log_io and invalid_json_msg:
             print("   📥 ④ Patch 计划 结果: JSON 无效，将回退使用全部 repair_actions")
         return None, ""
-
-    if log_io:
-        print_agent_long_preview(
-            "【④ Patch 计划】解析 JSON 预览 Agent:",
-            json.dumps(data, ensure_ascii=False, indent=2),
-            max_chars=7000,
-            max_lines=180,
-        )
 
     rows: List[Dict[str, Any]] = []
     for item in data["patch_plan"]:
@@ -510,6 +471,12 @@ def _patch_plan_from_parsed_dict(
     if not cleaned:
         if log_io:
             print("   📥 ④ Patch 计划 结果: 校验后无有效动作，回退全部 repair_actions")
+            print_agent_long_preview(
+                "【④ Patch 计划】校验失败 · 模型 JSON Agent:",
+                json.dumps(data, ensure_ascii=False, indent=2),
+                max_chars=7000,
+                max_lines=180,
+            )
         return None, ""
     summary = ""
     ps = data.get("patch_summary")
@@ -519,7 +486,7 @@ def _patch_plan_from_parsed_dict(
     if log_io:
         print(f"   📥 ④ Patch 计划 结果: 有效动作 {len(cleaned)} 条；summary={'有' if summary else '无'}")
         print_agent_long_preview(
-            "【④ Patch 计划】最终动作队列（将交给 ⑤ Apply） Agent:",
+            "【④ Patch 计划】→ ⑤ Apply Agent:",
             json.dumps({"patch_summary": summary, "patch_plan": cleaned}, ensure_ascii=False, indent=2),
             max_chars=5000,
             max_lines=100,
@@ -583,17 +550,6 @@ def run_llm_patch_plan(
 - target_paragraph_id 必须与上面列表一致，否则不要该项。
 - 不要编造不存在的 paragraph_id。"""
 
-    if log_io:
-        print(
-            f"   📤 ④ Patch 计划: ReAct Agent（langgraph.stream + get_planning_tools；"
-            f"recursion_limit={PATCH_PLAN_RECURSION_LIMIT}）"
-        )
-        print(
-            f"      · Human ≈{len(prompt):,} 字符；stage_id={sid}；"
-            f"repair_actions 输入约 {len(ra)} 条；合法段落 id 约 {len(valid_para)} 个；输出上限 {max_actions} 条"
-        )
-        print("      · 若 ReAct 未产出有效 JSON，将回退「单次 llm.invoke」")
-
     messages = [
         SystemMessage(content=PATCH_PLAN_AGENT_SYSTEM),
         HumanMessage(content=prompt),
@@ -623,18 +579,8 @@ def run_llm_patch_plan(
                 if isinstance(m, AIMessage) and (m.content or "").strip():
                     meta = getattr(m, "response_metadata", None) or {}
                     if isinstance(meta, dict) and meta.get("token_usage"):
-                        log_llm_response_tokens("④ Patch 计划 ReAct（末条含 usage 的 AI）", m)
+                        log_llm_response_tokens("④ Patch 计划 ReAct", m)
                         break
-            else:
-                print(
-                    "   📄 ④ Patch 计划 ReAct: 各轮 token 见上方 print_step；末条 AI 无 token_usage 聚合"
-                )
-            print_agent_long_preview(
-                "【④ Patch 计划】ReAct 最终 JSON 文本预览 Agent:",
-                content,
-                max_chars=6000,
-                max_lines=120,
-            )
 
     data = extract_json_object(content) if content else None
     cleaned, summary = _patch_plan_from_parsed_dict(
@@ -646,15 +592,7 @@ def run_llm_patch_plan(
     if log_io:
         print("   ⚠️ ④ Patch 计划: ReAct 未得到有效 patch JSON → 回退单次 llm.invoke")
     if log_io:
-        log_llm_text_call_out(
-            "④ Patch 计划（回退 invoke）",
-            prompt,
-            extras=[
-                f"阶段: {state.stage_id}",
-                f"repair_actions 约 {len(ra)} 条",
-                "与上方 ReAct 共用同一 Human 文本",
-            ],
-        )
+        log_llm_text_call_out("④ Patch 计划（回退 invoke）", prompt, extras=[])
 
     try:
         resp = llm.invoke(prompt)
@@ -667,12 +605,13 @@ def run_llm_patch_plan(
 
     if log_io:
         log_llm_response_tokens("④ Patch 计划 invoke", resp)
+
+    data_fb = extract_json_object(content_fb)
+    if not data_fb and log_io and content_fb.strip():
         print_agent_long_preview(
-            "【④ Patch 计划】invoke 回退 · 模型回复预览 Agent:",
+            "【④ Patch 计划】invoke 未解析 · 原文 Agent:",
             content_fb,
             max_chars=6000,
             max_lines=120,
         )
-
-    data_fb = extract_json_object(content_fb)
     return _patch_plan_from_parsed_dict(data_fb, valid_para, max_actions, log_io, invalid_json_msg=True)

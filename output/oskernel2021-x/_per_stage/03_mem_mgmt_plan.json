@@ -1,0 +1,120 @@
+{
+  "stage_id": "03_mem_mgmt",
+  "goal": "分析 xv6-riscv 移植版的内存管理：物理页分配器（链表）、虚拟内存（页表 walk/map）、堆管理（sbrk/brk）、缺页异常处理（含 mmap 支持）、用户指针验证机制，并确认 CoW/懒分配/共享内存等高级特性实现状态。",
+  "must_cover": [
+    "物理页分配：kalloc.c 使用空闲链表（free list）+ 自旋锁，非 Buddy/Bitmap",
+    "虚拟内存：vm.c 实现 walk/mappages/uvmalloc/uvmdealloc，支持双页表（用户/内核）",
+    "堆管理：sys_sbrk/sys_brk 通过 growproc 调用 uvmalloc 立即分配物理页，非惰性",
+    "用户指针安全：使用 copyin/copyout/copyin2/copyout2/either_copyin/out 验证，非 UserInPtr 包装器",
+    "缺页异常：trap.c usertrap 处理 scause=13/15，支持 mmap 区域按需分配（类似懒分配但非完整 CoW）",
+    "进程级映射：proc.h 含 vma 链表（非 BTreeMap），sys_mmap/sys_munmap 实现内存映射文件",
+    "CoW：❌ 未实现（搜索无 cow/copy_on_write 相关代码）",
+    "懒分配：🔸 部分实现（mmap 区域缺页时分配，但 sbrk 仍立即分配）",
+    "共享内存：❌ 未实现（无 shm/shmdt/shmat 系统调用）",
+    "物理内存管理：使用什么算法（Bitmap/Buddy System）？FrameAllocator 接口在哪里？",
+    "虚拟内存管理：页表如何操作（PageTable 结构、walk/map/unmap 实现）？",
+    "内核与用户地址空间设计：是否独立？内核重映射？",
+    "堆分配器：使用了什么 Allocator（GlobalAlloc, slab, buddy）？",
+    "**堆管理 (brk/sbrk)**：搜索 `sys_brk`，是否支持惰性分配（仅调整边界不立即分配物理页）？",
+    "**用户指针安全**：搜索 `UserInPtr|UserOutPtr|verify_area|check_region`，分析系统调用入口处如何验证用户空间指针合法性。",
+    "缺页异常（Page Fault）处理逻辑（如有）。**追踪 handle_page_fault 调用链**。",
+    "**进程级映射管理**：搜索地址空间管理结构（如 `VmAreaStruct`、`BTreeMap` 管理的映射区间），分析是否有反向映射表（rmap）支持。",
+    "**高级特性验证**（必须分类为 `✅ 已实现`、`🔸 桩函数`、`❌ 未实现`，并寻找具体代码）：",
+    "写时复制（Copy-on-Write）：搜索 `cow|copy_on_write`，确认是否在 page fault 中处理了 CoW。",
+    "懒分配（Lazy Allocation）：搜索 `lazy|populate`，确认是否推迟了物理页分配。",
+    "共享内存管理（SharedMem）：是否有 `shm` 相关系统调用和数据结构？**深入分析**：搜索 `sys_shmdt` 实现，检查是否使用 `BTreeMap` 进行 O(log n) 定位。搜索 `SharedMemoryManager`，分析 `IPC_RMID` 删除策略（立即删除 vs Arc 引用计数延迟释放）。"
+  ],
+  "evidence_targets": [
+    "物理页分配器（kalloc.c 链表实现）",
+    "页表映射（vm.c walk/mappages）",
+    "堆管理（sysproc.c sys_sbrk/sys_brk + proc.c growproc）",
+    "缺页异常处理（trap.c usertrap scause 13/15 分支）",
+    "用户指针验证（vm.c copyin/copyout + proc.c either_copyin/out）",
+    "VMA 管理（proc.h struct vma + sysfile.c sys_mmap）",
+    "物理页分配",
+    "页表映射",
+    "页故障处理",
+    "堆分配器"
+  ],
+  "seed_paths": [
+    "kernel/kalloc.c",
+    "kernel/vm.c",
+    "kernel/trap.c",
+    "kernel/proc.c",
+    "kernel/sysproc.c",
+    "kernel/sysfile.c",
+    "kernel/include/vm.h",
+    "kernel/include/proc.h",
+    "kernel/include/kalloc.h",
+    "xv6-user/umalloc.c",
+    "mm",
+    "memory",
+    "vm",
+    "kernel/mm"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "kalloc",
+    "kfree",
+    "kinit",
+    "walk",
+    "mappages",
+    "uvmalloc",
+    "sys_sbrk",
+    "sys_brk",
+    "usertrap",
+    "sys_mmap",
+    "handle_page_fault",
+    "alloc_frame"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "bootloader",
+    "bootloader/SBI",
+    "debug",
+    "debug/kendryte_openocd",
+    "debug/openocd_cfg",
+    "doc",
+    "img",
+    "kernel",
+    "kernel/include"
+  ],
+  "preferred_tools": [
+    "read_code_segment",
+    "lsp_get_call_graph",
+    "lsp_get_references",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "review_checklist": [
+    "关键问题是否回答",
+    "重要结论是否给出源码路径",
+    "是否避免将 README 当成实现证据",
+    "是否标出未实现/桩函数",
+    "must_cover_count=12"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "精读 kalloc.c 全文（已定位 100 行），确认物理页分配器为空闲链表 + 自旋锁实现，记录 kmem 结构体细节",
+    "精读 vm.c 关键函数：walk(117 行)、mappages(201 行)、uvmalloc(292 行)、uvmdealloc(328 行)，分析页表创建与映射逻辑",
+    "追踪 sys_sbrk/sys_brk 调用链：从 sysproc.c(157/171 行) → proc.c growproc(333 行) → vm.c uvmalloc，确认是否惰性分配",
+    "分析 trap.c usertrap(约 55 行起) 中 scause=13/15 缺页处理分支，确认 mmap 区域按需分配机制及与 vma 链表关联",
+    "检查用户指针验证：读取 vm.c copyin/copyout 实现，对比 proc.c either_copyin/out，确认系统调用入口如何调用",
+    "分析 sysfile.c sys_mmap(682 行起) 实现，确认 vma 链表分配逻辑、文件映射读取流程，验证是否有反向映射",
+    "使用 lsp_get_call_graph 对 usertrap 进行 incoming 调用分析（max_depth=2），确认缺页异常触发路径",
+    "汇总证据：对 must_cover 中 12 项逐一标注✅/🔸/❌，并附上源码文件路径与行号作为证据"
+  ]
+}

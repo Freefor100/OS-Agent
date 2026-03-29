@@ -1,0 +1,25 @@
+{
+  "summary": "修复内存章节的引用缺失、术语混淆及代码断言缺口",
+  "actions": [
+    {
+      "action_type": "normalize_terminology",
+      "target_paragraph_id": "p025",
+      "hint": "统一 vmunmap(解除映射) 与 uvmdealloc(回收空间) 术语"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "p055",
+      "hint": "读取 sysproc.c:425 验证 sbrk/brk 实现路径"
+    },
+    {
+      "action_type": "rewrite_paragraph",
+      "target_paragraph_id": "p075",
+      "hint": "核实 usertrap 中 elock/eread 是否存在或为扩展，补充定义"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "p105",
+      "hint": "grep 验证 CoW、shm、rmap、HugePage 等特性代码路径"
+    }
+  ]
+}
