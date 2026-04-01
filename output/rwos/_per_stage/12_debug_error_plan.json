@@ -1,0 +1,95 @@
+{
+  "stage_id": "12_debug_error",
+  "goal": "目标：分析调试支持、日志系统与错误处理机制。",
+  "must_cover": [
+    "日志系统：print/log 宏如何实现？日志级别设计？",
+    "Panic 处理：panic! 触发后的流程（栈回溯、寄存器 dump、停机）。",
+    "**栈回溯 (Backtrace)**：是否支持 `dwarf` 解析或基于 FramePointer 的回溯？使用 grep 搜索 `backtrace` 或 `unwind`。**注意不要被 panic 时的简单 PC 打印误导，Backtrace 指的是打印完整的函数调用栈。**",
+    "异常处理：未处理异常的默认行为。",
+    "调试接口：",
+    "**交互式 Shell**: 是否提供 Monitor/Shell？支持哪些命令（`ps`, `ls`, `help`）？",
+    "GDB stub 支持（如有）：**严格检查**。搜索 `handle_gdb_packet`。如果找不到数据包解析循环，就不是 GDB Stub。",
+    "调试控制台/Monitor",
+    "内核调试选项",
+    "是否支持 `perf` 或 `ftrace`？**Tracepoints** 是否插入到了关键路径？",
+    "错误码设计：Result/Error 类型定义。",
+    "断言与检查：debug_assert、运行时检查。"
+  ],
+  "evidence_targets": [
+    "panic/debug",
+    "日志系统",
+    "回溯",
+    "错误处理"
+  ],
+  "seed_paths": [
+    "debug",
+    "log",
+    "panic",
+    "assert",
+    "backtrace",
+    "kern/driver",
+    "kern/fs",
+    "kern/mm",
+    "kern/sync",
+    "kern/trap",
+    "kern/fs/pipe/pipe_state.c:103-135",
+    "kern/fs/pipe/pipe_state.c:137-169"
+  ],
+  "framework_guess": [
+    "uCore"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "panic_handler",
+    "backtrace",
+    "log",
+    "assert"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "kern",
+    "kern/debug",
+    "kern/driver",
+    "kern/fs",
+    "kern/init",
+    "kern/libs",
+    "kern/mm",
+    "kern/process",
+    "kern/schedule"
+  ],
+  "preferred_tools": [
+    "rag_search_code",
+    "lsp_get_call_graph",
+    "lsp_get_definition",
+    "read_code_segment"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "review_checklist": [
+    "关键问题是否回答",
+    "重要结论是否给出源码路径",
+    "是否避免将 README 当成实现证据",
+    "是否标出未实现/桩函数",
+    "must_cover_count=12"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "对照 seed_paths、entry_symbols，用 rag_search_code / list_repo_structure / LSP 锁定与本阶段相关的关键文件与符号。",
+    "对核心入口使用 lsp_get_document_outline → lsp_get_call_graph（单入口、浅深度）→ 必要时 read_code_segment 精读。",
+    "按 must_cover 逐项输出结论，每条附反引号源码路径；无实现则显式写「未发现/桩函数」等，勿臆测。",
+    "覆盖要点：日志系统：print/log 宏如何实现？日志级别设计？",
+    "覆盖要点：Panic 处理：panic! 触发后的流程（栈回溯、寄存器 dump、停机）。",
+    "覆盖要点：**栈回溯 (Backtrace)**：是否支持 `dwarf` 解析或基于 FramePointer 的回溯？使用 grep 搜索 `backtrace` 或 `unwind`。**注意不要被 panic 时的简单 PC 打印误导，Bac",
+    "覆盖要点：异常处理：未处理异常的默认行为。",
+    "覆盖要点：调试接口："
+  ]
+}

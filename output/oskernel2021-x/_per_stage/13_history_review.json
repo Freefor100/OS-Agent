@@ -1,0 +1,96 @@
+{
+  "passed": false,
+  "score": 0.35,
+  "severity": "major",
+  "failed_rules": [
+    "missing_path_citation",
+    "must_cover_gap",
+    "evidence_insufficient",
+    "symbol_query_not_merged"
+  ],
+  "missing_evidence": [
+    {
+      "paragraph_id": "总规模与协作模式",
+      "claim_id": "11位贡献者/200次提交/代码规模统计",
+      "reason": "证据索引摘要为空，未提供 analyze_authors_contribution 的具体输出或源码路径"
+    },
+    {
+      "paragraph_id": "初始完成功能",
+      "claim_id": "find_symbol_first_commit 查询结果表格",
+      "reason": "未提供 find_symbol_first_commit 的实际调用记录和返回结果，且 must_cover 要求合并为 1-2 次调用，草稿显示分开查询"
+    },
+    {
+      "paragraph_id": "初始版本工作量评估",
+      "claim_id": "初始代码规模约 5,000-8,000 行",
+      "reason": "未从 get_git_history_summary 中提取最早 commit 的具体增删行数，仅为估算"
+    },
+    {
+      "paragraph_id": "重大 Commit 演进轨迹",
+      "claim_id": "8 次关键性大变动的变更规模和影响模块",
+      "reason": "多数 commit 未提供 get_commit_diff_summary 的具体输出或源码路径引用"
+    },
+    {
+      "paragraph_id": "内存管理/进程任务符号查询",
+      "claim_id": "must_cover 要求的 FrameAllocator/PageTable/MemorySet 和 TaskInner/spawn_task/ProcessInner",
+      "reason": "草稿完全未提及这些符号的查询结果，违反 must_cover 要求"
+    }
+  ],
+  "weak_claims": [
+    {
+      "claim": "初始代码规模约 5,000-8,000 行（基于 xv6-riscv 移植）",
+      "reason": "无具体证据支撑，仅为推测"
+    },
+    {
+      "claim": "网络子系统完全缺失（无 socket/tcp/udp/smoltcp 等关键词）",
+      "reason": "未提供 grep 或 RAG 搜索的具体结果作为证据"
+    }
+  ],
+  "format_issues": [
+    {
+      "issue": "find_symbol_first_commit 未按 must_cover 要求合并调用",
+      "detail": "must_cover 明确要求'严格合并为 1-2 次统一调用'，但草稿显示启动入口、内存管理、进程任务、文件系统分开查询"
+    },
+    {
+      "issue": "最早 commit 代码行数未汇总",
+      "detail": "must_cover 要求'从 get_git_history_summary 的返回中找到最早的几个 commit，汇总其增加的代码行数'，草稿仅给出估算范围"
+    }
+  ],
+  "missed_modules": [
+    "FrameAllocator/PageTable/MemorySet 符号查询结果",
+    "TaskInner/spawn_task/ProcessInner 符号查询结果",
+    "VfsNode/ramfs 符号查询结果",
+    "rust_main/kernel_main 启动入口符号查询"
+  ],
+  "repair_actions": [
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "总规模与协作模式",
+      "hint": "调用 analyze_authors_contribution(repo_path, days=9999) 获取完整贡献者统计，并引用具体输出数据"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "初始完成功能",
+      "hint": "调用 find_symbol_first_commit(repo_path, keywords=['_start','rust_main','kernel_main','FrameAllocator','PageTable','MemorySet','TaskInner','spawn_task','ProcessInner','VfsNode','fat32','ramfs','sys_open']) 合并为 1 次调用，引用完整返回结果"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "初始版本工作量评估",
+      "hint": "调用 get_git_history_summary(repo_path, max_commits=10) 提取最早 3-5 个 commit 的具体增删行数并汇总"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "重大 Commit 演进轨迹",
+      "hint": "对每个关键 commit 调用 get_commit_diff_summary(repo_path, commit_sha='xxx') 获取具体变更语义，并引用核心文件路径"
+    },
+    {
+      "action_type": "rewrite_paragraph",
+      "target_paragraph_id": "初始完成功能",
+      "hint": "将 find_symbol_first_commit 的分开查询合并为 1-2 次批量调用，按 must_cover 要求执行"
+    },
+    {
+      "action_type": "append_missing_module",
+      "target_paragraph_id": "初始完成功能",
+      "hint": "补充 must_cover 要求的内存管理符号（FrameAllocator/PageTable/MemorySet）和进程任务符号（TaskInner/spawn_task/ProcessInner）的查询结果"
+    }
+  ]
+}

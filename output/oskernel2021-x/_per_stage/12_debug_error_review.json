@@ -1,0 +1,72 @@
+{
+  "passed": false,
+  "score": 0.72,
+  "severity": "minor",
+  "failed_rules": [
+    "missing_path_citation",
+    "must_cover_gap"
+  ],
+  "missing_evidence": [
+    {
+      "paragraph_id": "GDB Stub 支持情况",
+      "claim_id": "GDB stub 未实现",
+      "reason": "结论称'搜索 146 个文件未找到 handle_gdb_packet|gdbstub|gdb_stub'，但未提供具体 grep 搜索结果的文件路径/行号证据，无法验证搜索是否充分"
+    },
+    {
+      "paragraph_id": "断言与运行时检查",
+      "claim_id": "断言机制未实现",
+      "reason": "结论称'搜索 assert(|ASSERT 仅找到注释'，但未提供具体 grep 搜索结果的文件路径/行号证据"
+    },
+    {
+      "paragraph_id": "寄存器 Dump",
+      "claim_id": "trapframedump() 实现位置",
+      "reason": "声称 trapframedump() 在 kernel/trap.c:278-310，但未提供该函数定义的验证证据"
+    }
+  ],
+  "weak_claims": [
+    {
+      "paragraph_id": "GDB Stub 支持情况",
+      "claim_id": "依赖 OpenOCD 硬件调试",
+      "reason": "关于调试流程依赖 OpenOCD+GDB 硬件调试的描述缺乏项目配置文件（如 .gdbinit、Makefile 调试目标）的源码路径支撑"
+    },
+    {
+      "paragraph_id": "日志与打印系统",
+      "claim_id": "DEBUG 宏使用位置统计 25 处",
+      "reason": "表格列出 8 个文件的行号，但合计仅约 18 处，与声称的 25 处不符，统计准确性存疑"
+    }
+  ],
+  "format_issues": [
+    {
+      "issue": "Mermaid 图表在纯文本报告中无法渲染",
+      "suggestion": "建议改用文字描述调用链或提供代码片段替代流程图"
+    }
+  ],
+  "missed_modules": [],
+  "repair_actions": [
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "GDB Stub 支持情况",
+      "hint": "使用 grep_in_repo 搜索 'handle_gdb_packet|gdbstub|gdb_stub|remote_debug'，返回具体匹配结果（文件或明确标注无匹配），作为 GDB stub 未实现的证据"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "断言与运行时检查",
+      "hint": "使用 grep_in_repo 搜索 '\\bassert\\b|ASSERT|debug_assert'，返回具体匹配结果的文件路径和行号，验证是否真的无断言实现"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "寄存器 Dump",
+      "hint": "使用 lsp_get_definition 或 grep_in_repo 验证 trapframedump 函数在 kernel/trap.c 中的实际定义位置，确认行号引用准确"
+    },
+    {
+      "action_type": "rewrite_paragraph",
+      "target_paragraph_id": "日志与打印系统",
+      "hint": "修正 DEBUG 宏使用位置统计：重新使用 grep_in_repo 搜索 '#ifdef DEBUG|#ifndef DEBUG'，更新表格中的文件/行号列表，确保总数与声称的 25 处一致"
+    },
+    {
+      "action_type": "normalize_terminology",
+      "target_paragraph_id": "全章",
+      "hint": "统一术语：草稿中混用 'panic()'（C 风格）和 'panic!'（Rust 风格），本项目为纯 C 实现，应统一为 'panic()'"
+    }
+  ]
+}

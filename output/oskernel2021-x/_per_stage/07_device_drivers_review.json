@@ -1,0 +1,36 @@
+{
+  "passed": false,
+  "score": 0.6,
+  "severity": "major",
+  "failed_rules": [
+    "missing_evidence"
+  ],
+  "missing_evidence": [
+    {
+      "paragraph_id": null,
+      "claim_id": "all_code_claims",
+      "reason": "Evidence Index Summary is empty. All code snippets and file paths (e.g., rustsbi-qemu/src/main.rs, kernel/disk.c) cannot be verified against provided evidence context."
+    }
+  ],
+  "weak_claims": [
+    {
+      "paragraph_id": null,
+      "claim_id": "rustsbi_integration",
+      "reason": "Claim cites 'bootloader/SBI/rustsbi-qemu' as part of the project structure. RustSBI is typically an external dependency/submodule; clarity on repo boundary is needed."
+    }
+  ],
+  "format_issues": [],
+  "missed_modules": [],
+  "repair_actions": [
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": null,
+      "hint": "Attach evidence retrieval logs or search results for cited files (kernel/disk.c, rustsbi-qemu/src/main.rs, Makefile) to verify existence and line content."
+    },
+    {
+      "action_type": "normalize_terminology",
+      "target_paragraph_id": null,
+      "hint": "Clarify if rustsbi-qemu is a submodule or external dependency to avoid confusion about project scope."
+    }
+  ]
+}

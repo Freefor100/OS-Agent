@@ -1,0 +1,35 @@
+{
+  "summary": "压缩 9 条动作为 6 条，合并 11.1 的 3 条为 1 条 rewrite，合并 11.2.2 的 2 条为 1 条 normalize，保留关键证据验证",
+  "actions": [
+    {
+      "action_type": "rewrite_paragraph",
+      "target_paragraph_id": "p001",
+      "hint": "修正目录结构描述（无 net/ 子目录）和协议栈说明（无 smoltcp/lwip），移除 Cargo.toml 误导表述，补充 kern/ 目录结构证据"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "p002",
+      "hint": "读取 libs/unistd.h:195-275 验证 syscall 号定义"
+    },
+    {
+      "action_type": "normalize_terminology",
+      "target_paragraph_id": "p003",
+      "hint": "将'约 60 个 syscall'改为精确描述，引用 kern/syscall/syscall.c:420-500 syscalls[] 表最大索引"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "p004",
+      "hint": "grep 验证无 loopback/127.0.0.1/LOOPBACK 相关实现"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "p006",
+      "hint": "读取 libs/error.h:1-40 验证错误码定义范围"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "p007",
+      "hint": "grep 验证无 zero-copy/zerocopy/DMA/multi-queue 高级特性"
+    }
+  ]
+}

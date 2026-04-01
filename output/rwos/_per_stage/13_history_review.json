@@ -1,0 +1,104 @@
+{
+  "passed": false,
+  "score": 0.35,
+  "severity": "major",
+  "failed_rules": [
+    "missing_path_citation",
+    "unsupported_claim",
+    "evidence_gap"
+  ],
+  "missing_evidence": [
+    {
+      "paragraph_id": "13.1.1",
+      "claim_id": "author_contribution_stats",
+      "reason": "作者贡献数据（rrrzh 67次/+843,373行、Sword-Horse 4次、阮志涵3次）无证据支撑，证据索引为空"
+    },
+    {
+      "paragraph_id": "13.2.1",
+      "claim_id": "initial_commit_scale",
+      "reason": "初始提交+49,491行代码及各子目录具体行数（如kern/mm/ +2,898行）无analyze_git_history证据"
+    },
+    {
+      "paragraph_id": "13.2.2",
+      "claim_id": "symbol_first_commit",
+      "reason": "关键符号首次引入时间表格无find_symbol_first_commit调用证据"
+    },
+    {
+      "paragraph_id": "13.3.1",
+      "claim_id": "major_evolution_nodes",
+      "reason": "3个重大演进节点的commit SHA、消息、代码变更详情无get_commit_diff_summary或analyze_git_history证据"
+    },
+    {
+      "paragraph_id": "13.3.2",
+      "claim_id": "file_evolution",
+      "reason": "vfsfile.c和proc.c的生命周期表格无trace_file_evolution证据"
+    }
+  ],
+  "weak_claims": [
+    {
+      "claim": "rrrzh累计+843,373/-771,034行",
+      "reason": "精确到个位数的增删行数无证据，疑似臆测"
+    },
+    {
+      "claim": "kern/process/proc.c初始版本1,118行",
+      "reason": "具体文件行数无read_code_segment或list_repo_structure证据"
+    },
+    {
+      "claim": "管道子系统6个文件共+645行核心代码",
+      "reason": "各文件具体行数无证据支撑"
+    },
+    {
+      "claim": "Sword-Horse在kern/process/proc.c +3/-1行",
+      "reason": "精确增删行数无analyze_git_history证据"
+    }
+  ],
+  "format_issues": [
+    {
+      "issue": "源码路径引用不足",
+      "detail": "重要结论仅有目录级路径（如kern/mm/），缺乏file:line级别引用"
+    }
+  ],
+  "missed_modules": [],
+  "repair_actions": [
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "13.1.1",
+      "hint": "调用analyze_authors_contribution(repo_path, days=9999)获取真实作者贡献分布，替换臆测数据"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "13.1.1",
+      "hint": "调用get_git_history_summary(repo_path, max_commits=200)获取全局提交历史摘要，验证74次提交和开发周期"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "13.2.1",
+      "hint": "调用analyze_git_history(repo_path, max_commits=1, skip=0)获取初始commit详情，验证+49,491行代码规模"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "13.2.2",
+      "hint": "调用find_symbol_first_commit(repo_path, keywords=['_start','sys_open','sys_pipe','trap_handler'])批量验证关键符号引入时间"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "13.3.1",
+      "hint": "对节点1调用analyze_git_history(repo_path, max_commits=1, skip=N, path_filter='kern/fs/pipe')下钻管道子系统；对节点2/3同理使用path_filter下钻"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "13.3.2",
+      "hint": "调用trace_file_evolution(repo_path, file_path='kern/fs/vfs/vfsfile.c')和trace_file_evolution(repo_path, file_path='kern/process/proc.c')获取真实文件演进轨迹"
+    },
+    {
+      "action_type": "rewrite_paragraph",
+      "target_paragraph_id": "13.2.1",
+      "hint": "删除无法验证的子目录具体行数表格，或为每行数据添加file:line引用"
+    },
+    {
+      "action_type": "normalize_terminology",
+      "target_paragraph_id": "13.2.2",
+      "hint": "统一符号命名表述，如'trap_dispatch'与'trap_handler'需明确区分或说明等价关系"
+    }
+  ]
+}

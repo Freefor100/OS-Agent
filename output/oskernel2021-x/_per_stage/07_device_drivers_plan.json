@@ -1,0 +1,116 @@
+{
+  "stage_id": "07_device_drivers",
+  "goal": "分析设备驱动框架：UART/SDCard/VirtIO-Blk驱动实现、PLIC中断控制器、平台适配机制（QEMU vs K210）、MMU前后地址切换。",
+  "must_cover": [
+    "设备发现机制：验证是否解析DTB还是硬编码地址（检查rustsbi-qemu的device_tree解析）",
+    "驱动框架：无统一Driver Trait，通过条件编译(#ifdef QEMU)选择不同驱动实现",
+    "平台适配：Makefile中platform变量切换K210/QEMU，disk.c中条件编译选择virtio-blk或sdcard",
+    "UART驱动：uart.c使用物理地址UART/UART_V，MMU启用后通过VIRT_OFFSET切换虚拟地址",
+    "块设备：virtio_disk.c(QEMU)和sdcard.c(K210)的实现差异，disk_init()统一入口",
+    "中断控制器：plic.c中plicinit/plicinithart配置UART和DISK中断，区分QEMU/K210的中使能方式",
+    "构建配置：Makefile中OBJS条件编译，不同平台链接不同驱动对象文件",
+    "设备发现：Device Tree (DTS) 解析或 PCI/Bus 扫描？**必须验证**是否真的解析了 `.dtb` 文件，还是硬编码了地址？",
+    "驱动框架：Driver Trait，如何注册/初始化驱动？",
+    "**组件化与配置**：搜索构建配置文件（Cargo.toml 的 features、Kconfig、条件编译宏），分析如何通过编译选项选择不同的驱动/模块实现。",
+    "**平台适配**：搜索 `platform/` 或 `boards/` 目录，列出所有支持的目标平台/开发板及其特有驱动，分析项目如何适配不同硬件。",
+    "常见设备：",
+    "UART/Serial（控制台输出）",
+    "Block Device（磁盘读写，VirtIO-Blk）",
+    "Net Device（网卡，VirtIO-Net）及网络协议栈（TCP/IP, smoltcp 等实现）",
+    "GPU/Input（如有）",
+    "中断控制器：PLIC/CLINT/APIC 驱动。",
+    "**MMU 前后串口地址切换**：分析 UART 驱动在 MMU 启用前（使用物理地址）和 MMU 启用后（使用虚拟地址）的地址切换机制。搜索串口基址常量的不同定义。",
+    "**语义发现（🥇 首选）**：使用 `rag_search_code` 搜索 \"device driver trait\", \"virtio-blk driver\", \"UART initialization\", \"PCI bus scanning\" 快速锁定驱动程序。"
+  ],
+  "evidence_targets": [
+    "UART驱动初始化流程与地址映射机制",
+    "VirtIO-Blk与SDCard驱动的条件编译切换",
+    "PLIC中断注册与使能流程",
+    "平台适配的编译配置与运行时判断",
+    "驱动框架",
+    "中断注册",
+    "块设备/网卡",
+    "平台适配"
+  ],
+  "seed_paths": [
+    "kernel/uart.c",
+    "kernel/virtio_disk.c",
+    "kernel/sdcard.c",
+    "kernel/disk.c",
+    "kernel/plic.c",
+    "kernel/console.c",
+    "kernel/include/memlayout.h",
+    "kernel/main.c",
+    "Makefile",
+    "bootloader/SBI/rustsbi-qemu/src/main.rs",
+    "driver",
+    "device",
+    "net",
+    "pci"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "uartinit",
+    "virtio_disk_init",
+    "sdcard_init",
+    "disk_init",
+    "plicinit",
+    "plicinithart",
+    "consoleinit",
+    "main",
+    "probe",
+    "init_driver",
+    "uart_init",
+    "virtio"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "bootloader",
+    "bootloader/SBI",
+    "debug",
+    "debug/kendryte_openocd",
+    "debug/openocd_cfg",
+    "doc",
+    "img",
+    "kernel",
+    "kernel/include"
+  ],
+  "preferred_tools": [
+    "read_code_segment",
+    "lsp_get_definition",
+    "lsp_get_references",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "review_checklist": [
+    "关键问题是否回答",
+    "重要结论是否给出源码路径",
+    "是否避免将 README 当成实现证据",
+    "是否标出未实现/桩函数",
+    "must_cover_count=12"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "使用read_code_segment精读kernel/uart.c全文，分析UART地址映射(UART/UART_V)和uartinit初始化流程",
+    "对比阅读kernel/virtio_disk.c和kernel/sdcard.c，记录VirtIO-MMIO与SPI-SDCard的接口差异",
+    "使用lsp_get_definition追踪disk_init()的调用链，验证main()→disk_init()→virtio_disk_init/sdcard_init的条件分支",
+    "分析kernel/plic.c中plicinit和plicinithart，记录QEMU与K210在中断使能寄存器上的配置差异",
+    "检查bootloader/SBI/rustsbi-qemu/src/main.rs中device_tree解析逻辑，确认DTB是否被实际使用",
+    "使用grep_in_repo搜索'#ifdef QEMU'和'#ifndef QEMU'，统计平台相关条件编译的分布",
+    "阅读Makefile中OBJS的条件编译块，记录不同平台链接的驱动对象文件列表",
+    "对照memlayout.h中的地址定义，验证UART/VIRTIO0/PLIC在MMU启用前后的地址切换机制"
+  ]
+}

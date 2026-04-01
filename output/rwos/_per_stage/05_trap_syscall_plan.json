@@ -1,0 +1,119 @@
+{
+  "stage_id": "05_trap_syscall",
+  "goal": "分析 rwos 的 Trap 处理流程与系统调用分发机制，涵盖中断/异常入口、上下文保存结构、syscall 分发表及实现覆盖度。",
+  "must_cover": [
+    "Trap 入口：__alltraps (trapentry.S) → idt_init 设置 stvec → trap_dispatch 区分中断/异常",
+    "TrapFrame 结构：trap.h 中 struct trapframe (含 struct pushregs 32 个通用寄存器 + status/epc/tval/cause 共 36 字段)",
+    "系统调用分发：exception_handler 处理 CAUSE_*_ECALL → syscall() → syscalls[] 分发表",
+    "Syscall 覆盖度：统计 syscalls[] 数组中已实现的 syscall 数量，检查是否有桩函数",
+    "用户指针校验：copy_to_user/copy_from_user + user_mem_check 机制",
+    "中断流：interrupt_handler 处理 IRQ_S_TIMER (时钟) 与 IRQ_S_EXT (外部中断)",
+    "接口/实现分离：检查是否存在 _impl 后缀函数或类似模式",
+    "具体 syscall 追踪：以 sys_write 为例追踪完整路径",
+    "Trap 入口：trap_handler / trap_vector 在哪里？如何区分中断（Interrupt）和异常（Exception）？",
+    "上下文保存：TrapFrame / GeneralRegisters 结构体。**必须用 `lsp_get_definition` 或 `read_code_segment` 读取结构体定义，精确统计包含的寄存器数量和总字节数**，不要凭经验估算。",
+    "**系统调用分发追踪**：",
+    "用户态 `ecall`/`syscall` 指令。",
+    "内核态 `syscall_handler` 分发逻辑。",
+    "**必须找到分发表**（syscall table 或 match 语句）。",
+    "**Stub验证**：检查核心 syscall（如 `sys_clone`, `sys_exec`, `sys_mmap`, `sys_write`）等是否直接返回错误、返回 0，或者包含了 `todo!()`/`unimplemented!()`？",
+    "**覆盖度统计**：基于上述验证，明确区分并列出“已注册但仅为桩特征（`🔸 桩函数`）”的 syscall 数量，与“完整功能实现（`✅ 已实现`）”的 syscall 数量。",
+    "选择一个具体 syscall（如 `sys_write`）追踪其从 Trap 到真正处理逻辑的路径。",
+    "**接口/实现分离模式**：如果项目采用了 syscall 接口与实现分离的设计（如 `sys_xxx` 为接口，`sys_xxx_impl` 为实现），必须明确描述此模式。搜索 `_impl` 后缀函数。",
+    "**用户指针语义化包装**：搜索 `UserInPtr|UserOutPtr|UserInOutPtr`，如果存在此类类型安全包装，需描述其在 syscall 入口处的作用。",
+    "**外部中断流**：详细分析时钟中断（Timer）处理流程与外部设备中断（如 PLIC/APIC）的分发处理。"
+  ],
+  "evidence_targets": [
+    "trap 入口 (trapentry.S:__alltraps, trap.c:idt_init)",
+    "TrapFrame 定义 (trap.h:41-52)",
+    "syscall 分发 (syscall.c:syscalls[], syscall())",
+    "用户指针校验 (vmm.c:copy_to_user/copy_from_user)",
+    "中断处理 (trap.c:interrupt_handler)",
+    "trap 入口",
+    "syscall 分发",
+    "TrapFrame",
+    "用户指针校验"
+  ],
+  "seed_paths": [
+    "kern/trap/trap.h",
+    "kern/trap/trap.c",
+    "kern/trap/trapentry.S",
+    "kern/syscall/syscall.c",
+    "kern/mm/vmm.c",
+    "kern/mm/vmm.h",
+    "kern/driver/clock.c",
+    "libs/riscv.h",
+    "trap",
+    "syscall",
+    "interrupt",
+    "exception",
+    "kernel/trap",
+    "kern/driver"
+  ],
+  "framework_guess": [
+    "uCore"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "__alltraps",
+    "trap",
+    "trap_dispatch",
+    "exception_handler",
+    "interrupt_handler",
+    "syscall",
+    "syscalls",
+    "trapframe",
+    "pushregs",
+    "copy_to_user",
+    "trap_handler",
+    "syscall_dispatch"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "kern",
+    "kern/debug",
+    "kern/driver",
+    "kern/fs",
+    "kern/init",
+    "kern/libs",
+    "kern/mm",
+    "kern/process",
+    "kern/schedule"
+  ],
+  "preferred_tools": [
+    "lsp_get_definition",
+    "lsp_get_references",
+    "lsp_get_call_graph",
+    "read_code_segment",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "review_checklist": [
+    "关键问题是否回答",
+    "重要结论是否给出源码路径",
+    "是否避免将 README 当成实现证据",
+    "是否标出未实现/桩函数",
+    "must_cover_count=12"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "使用 lsp_get_definition 精确定位 trapframe/pushregs 结构体，统计寄存器数量与总字节数",
+    "读取 trapentry.S 的__alltraps 入口与 SAVE_ALL 宏，分析上下文保存流程",
+    "追踪 trap.c 中 trap_dispatch → exception_handler/interrupt_handler 的分支逻辑",
+    "分析 syscall.c 中的 syscalls[] 分发表，逐一检查每个 syscall 实现是否为完整功能或桩函数",
+    "选择 sys_write 追踪完整路径：syscall() → sys_write() → sysfile_write()",
+    "检查 vmm.c 中 copy_to_user/copy_from_user 的实现，确认用户指针校验机制",
+    "分析 interrupt_handler 中 IRQ_S_TIMER 与 IRQ_S_EXT 的处理逻辑",
+    "统计已实现 syscall 数量与桩函数数量，生成覆盖度报告"
+  ]
+}

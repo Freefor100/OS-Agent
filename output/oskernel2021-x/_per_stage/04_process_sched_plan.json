@@ -1,0 +1,122 @@
+{
+  "stage_id": "04_process_sched",
+  "goal": "分析 oskernel2021-x 的进程/线程模型、调度机制、上下文切换实现，并验证 fork/exec 流程及高级特性（信号/Futex）支持情况。",
+  "must_cover": [
+    "任务模型：proc 结构体字段（context, state, trapframe, pagetable, ofile 等）",
+    "进程状态机：UNUSED/SLEEPING/RUNNABLE/RUNNING/ZOMBIE 五状态流转",
+    "调度算法：scheduler() 采用 FIFO 轮询，无优先级/Stride/CFS 实现",
+    "上下文切换：swtch.S 保存/恢复 ra,sp,s0-s11 共 13 个寄存器",
+    "fork() 流程：allocproc → uvmcopy(复制地址空间) → filedup(复制文件表)",
+    "exec() 流程：加载 ELF → uvmalloc 分配栈 → 重建页表 → 更新 trapframe",
+    "信号机制：仅 kill 标志位，无 signal/sigaction 注册分发机制",
+    "Futex：未实现（搜索 futex/wait_queue 无结果）",
+    "clone() 实现：类似 fork 但支持自定义 ra/sp（线程雏形）",
+    "执行实体：Process/Thread/Task 结构体包含哪些字段（Context, State, TrapFrame）？",
+    "**任务模型扩展**：使用 grep_in_repo 搜索 `Process|ProcessGroup|Session|process`，检查是否存在进程组、会话管理以及 PID/TID 分配机制。",
+    "调度策略：算法是什么（FIFO, RR, Priority, Stride, CFS）？Scheduler 实现细节。",
+    "状态流转：Ready/Running/Blocked/Exited 状态机。",
+    "上下文切换：switch.S 或类似汇编代码，保存了哪些寄存器？",
+    "**高级特性验证**（必须分类为 `✅ 已实现`、`🔸 桩函数`、`❌ 未实现`，并寻找具体代码）：",
+    "**信号机制 (Signal)**：使用 grep_in_repo 搜索 `signal|sigaction|kill`，确认是否实现了信号注册与分发？",
+    "**Futex**：搜索 `futex|wait_queue`，是否支持快速用户态互斥锁？",
+    "**深度调用链追踪（必须）**：",
+    "`fork()`: 追踪从系统调用到 `clone_task` / `copy_task` 的完整流程。**必须验证**是否真的复制了地址空间（`memory_set.copy()`）和文件表？",
+    "`exec()`: 如何加载 ELF？如何重建地址空间？",
+    "`schedule()`: 调度器被谁调用？**验证优先级**：`pick_next_task` 是否真的使用了 `priority` / `stride`，还是仅仅 FIFO？"
+  ],
+  "evidence_targets": [
+    "proc 结构体定义 (kernel/include/proc.h:60-87)",
+    "scheduler 实现 (kernel/proc.c:550-592)",
+    "swtch 汇编 (kernel/swtch.S)",
+    "fork 调用链 (kernel/proc.c:353)",
+    "exec 调用链 (kernel/exec.c:47)",
+    "kill 实现 (kernel/proc.c:722)",
+    "clone 实现 (kernel/proc.c:875)",
+    "任务模型",
+    "调度器",
+    "上下文切换",
+    "信号/Futex"
+  ],
+  "seed_paths": [
+    "kernel/include/proc.h",
+    "kernel/proc.c",
+    "kernel/swtch.S",
+    "kernel/exec.c",
+    "kernel/sysproc.c",
+    "kernel/include/trap.h",
+    "kernel/include/proc.h:60-87",
+    "kernel/proc.c:550-600",
+    "kernel/proc.c:350-400",
+    "kernel/swtch.S:1-42",
+    "task",
+    "proc",
+    "process",
+    "sched"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "scheduler",
+    "sched",
+    "swtch",
+    "fork",
+    "exec",
+    "clone",
+    "allocproc",
+    "yield",
+    "sleep",
+    "wakeup",
+    "schedule",
+    "sys_fork"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "bootloader",
+    "bootloader/SBI",
+    "debug",
+    "debug/kendryte_openocd",
+    "debug/openocd_cfg",
+    "doc",
+    "img",
+    "kernel",
+    "kernel/include"
+  ],
+  "preferred_tools": [
+    "lsp_get_call_graph",
+    "lsp_get_definition",
+    "read_code_segment",
+    "grep_in_repo",
+    "lsp_get_document_outline"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "review_checklist": [
+    "关键问题是否回答",
+    "重要结论是否给出源码路径",
+    "是否避免将 README 当成实现证据",
+    "是否标出未实现/桩函数",
+    "must_cover_count=12"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "使用 lsp_get_document_outline 鸟瞰 kernel/proc.c 和 kernel/include/proc.h，确认 proc 结构体字段和状态枚举定义",
+    "使用 read_code_segment 精读 scheduler() (proc.c:550-592) 和 swtch.S，验证调度算法为 FIFO 轮询、上下文切换保存 13 个寄存器",
+    "使用 lsp_get_call_graph 追踪 fork() 的 outgoing 调用链，确认 uvmcopy 复制地址空间、filedup 复制文件表",
+    "使用 read_code_segment 读取 exec.c:47-180，分析 ELF 加载、页表重建、trapframe 更新流程",
+    "使用 grep_in_repo 搜索 signal/sigaction/futex，确认高级特性未实现（仅 kill 标志位）",
+    "使用 lsp_get_call_graph 追踪 sched() 的 incoming 调用链，验证 yield/sleep/exit 如何触发调度",
+    "读取 clone() 实现 (proc.c:875-923)，对比 fork 差异，确认线程创建雏形",
+    "汇总证据，标注已实现/桩函数/未实现特性，准备撰写正式分析报告"
+  ]
+}

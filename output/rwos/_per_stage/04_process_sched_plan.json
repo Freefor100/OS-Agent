@@ -1,0 +1,118 @@
+{
+  "stage_id": "04_process_sched",
+  "goal": "深挖 rwos 的进程/线程模型、Stride 调度算法、上下文切换机制，并验证 fork/exec 实现细节与信号/Futex 支持情况。",
+  "must_cover": [
+    "proc_struct 结构体字段详解（state, context, tf, mm, sigactions, lab6_stride/priority）",
+    "进程状态机：PROC_UNINIT/SLEEPING/RUNNABLE/ZOMBIE 流转",
+    "调度策略：Stride Scheduler 实现（skew_heap 优先队列，BIG_STRIDE=1<<30）",
+    "上下文切换：switch.S 保存/恢复 ra,sp,s0-s11 共 14 个寄存器",
+    "fork 流程：alloc_proc→setup_kstack→copy_mm→copy_thread→hash_proc→wakeup_proc",
+    "exec 流程：load_icode 解析 ELF、重建地址空间",
+    "信号机制：sigactions 数组、do_rt_sigaction 已实现，但缺信号分发/处理入口",
+    "Futex：仅 SYS_futex 宏定义，无实现代码",
+    "执行实体：Process/Thread/Task 结构体包含哪些字段（Context, State, TrapFrame）？",
+    "**任务模型扩展**：使用 grep_in_repo 搜索 `Process|ProcessGroup|Session|process`，检查是否存在进程组、会话管理以及 PID/TID 分配机制。",
+    "调度策略：算法是什么（FIFO, RR, Priority, Stride, CFS）？Scheduler 实现细节。",
+    "状态流转：Ready/Running/Blocked/Exited 状态机。",
+    "上下文切换：switch.S 或类似汇编代码，保存了哪些寄存器？",
+    "**高级特性验证**（必须分类为 `✅ 已实现`、`🔸 桩函数`、`❌ 未实现`，并寻找具体代码）：",
+    "**信号机制 (Signal)**：使用 grep_in_repo 搜索 `signal|sigaction|kill`，确认是否实现了信号注册与分发？",
+    "**Futex**：搜索 `futex|wait_queue`，是否支持快速用户态互斥锁？",
+    "**深度调用链追踪（必须）**：",
+    "`fork()`: 追踪从系统调用到 `clone_task` / `copy_task` 的完整流程。**必须验证**是否真的复制了地址空间（`memory_set.copy()`）和文件表？",
+    "`exec()`: 如何加载 ELF？如何重建地址空间？",
+    "`schedule()`: 调度器被谁调用？**验证优先级**：`pick_next_task` 是否真的使用了 `priority` / `stride`，还是仅仅 FIFO？"
+  ],
+  "evidence_targets": [
+    "proc_struct 定义 (kern/process/proc.h:47-77)",
+    "Stride 调度器 (kern/schedule/default_sched_stride.c:117-132)",
+    "switch_to 汇编 (kern/process/switch.S)",
+    "do_fork 调用链 (kern/process/proc.c:439)",
+    "load_icode ELF 加载 (kern/process/proc.c:628)",
+    "信号处理桩函数 (kern/process/signal.c)",
+    "任务模型",
+    "调度器",
+    "上下文切换",
+    "信号/Futex"
+  ],
+  "seed_paths": [
+    "kern/process/proc.h",
+    "kern/process/proc.c",
+    "kern/process/switch.S",
+    "kern/process/signal.c",
+    "kern/schedule/sched.c",
+    "kern/schedule/sched.h",
+    "kern/schedule/default_sched_stride.c",
+    "kern/syscall/syscall.c",
+    "task",
+    "proc",
+    "process",
+    "sched",
+    "kernel/task",
+    "kernel/proc"
+  ],
+  "framework_guess": [
+    "uCore"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "do_fork",
+    "do_execve",
+    "schedule",
+    "stride_pick_next",
+    "switch_to",
+    "load_icode",
+    "copy_mm",
+    "do_rt_sigaction",
+    "sys_fork",
+    "spawn",
+    "Task"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "kern",
+    "kern/debug",
+    "kern/driver",
+    "kern/fs",
+    "kern/init",
+    "kern/libs",
+    "kern/mm",
+    "kern/process",
+    "kern/schedule"
+  ],
+  "preferred_tools": [
+    "lsp_get_call_graph",
+    "lsp_get_definition",
+    "read_code_segment",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "review_checklist": [
+    "关键问题是否回答",
+    "重要结论是否给出源码路径",
+    "是否避免将 README 当成实现证据",
+    "是否标出未实现/桩函数",
+    "must_cover_count=12"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "用 lsp_get_definition 定位 proc_struct 完整定义，确认 state/context/tf/mm/sigactions 字段布局",
+    "用 read_code_segment 精读 switch.S，列出保存/恢复的寄存器清单（ra,sp,s0-s11）",
+    "用 lsp_get_call_graph 追踪 do_fork 出向调用，验证 copy_mm 是否调用 dup_mmap 复制地址空间",
+    "用 read_code_segment 读取 load_icode 前 100 行，确认 ELF 解析与地址空间重建逻辑",
+    "用 read_code_segment 读取 stride_pick_next 实现，验证 stride+=BIG_STRIDE/priority 公式",
+    "用 grep_in_repo 搜索 futex 实现体，确认仅 syscall 号定义而无处理函数",
+    "用 read_code_segment 读取 signal.c 全文，标注信号分发缺失（无 do_sigreturn/信号栈切换）",
+    "汇总证据，按 must_cover 逐条标注✅已实现/🔸桩函数/❌未实现"
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "summary": "修复网络子系统段落中缺失的代码路径引用，将原有 5 项验证合并为 2 项针对有效段落 ID 的修改。",
+  "actions": [
+    {
+      "action_type": "rewrite_paragraph",
+      "target_paragraph_id": "p001",
+      "hint": "在提及系统调用（SYS_socket 等）、文件描述符及 sys_sendfile 实现时，补充 kernel/sysproc.c 等具体文件路径引用。"
+    },
+    {
+      "action_type": "rewrite_paragraph",
+      "target_paragraph_id": "p005",
+      "hint": "在提及网卡驱动（virtio）、协议栈（tcp/udp）及无相关代码验证时，补充 kernel/virtio_net.c 等具体文件路径引用。"
+    }
+  ]
+}

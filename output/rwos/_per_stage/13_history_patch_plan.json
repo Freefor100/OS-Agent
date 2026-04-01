@@ -1,0 +1,30 @@
+{
+  "summary": "压缩为 5 条核心修补：补全作者贡献与提交历史证据、验证关键符号引入时间、追踪核心文件演进、删除无法验证的子目录行数表格、统一 trap_handler 术语表述",
+  "actions": [
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "p001",
+      "hint": "调用 analyze_authors_contribution(repo_path, days=9999) 和 get_git_history_summary(repo_path, max_commits=200) 获取真实作者分布与提交统计，替换臆测数据"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "p002",
+      "hint": "调用 analyze_git_history(repo_path, max_commits=1, skip=0) 验证初始 commit 的 +49,491 行代码规模；调用 find_symbol_first_commit(repo_path, keywords=['_start','sys_open','sys_pipe','trap_handler']) 验证关键符号引入时间"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "p003",
+      "hint": "调用 trace_file_evolution(repo_path, file_path='kern/fs/vfs/vfsfile.c') 和 trace_file_evolution(repo_path, file_path='kern/process/proc.c') 获取真实文件演进轨迹；对 pipe 子系统使用 analyze_git_history path_filter='kern/fs/pipe' 下钻"
+    },
+    {
+      "action_type": "rewrite_paragraph",
+      "target_paragraph_id": "p002",
+      "hint": "删除无法验证的子目录具体行数表格，或为每行数据添加 file:line 引用"
+    },
+    {
+      "action_type": "normalize_terminology",
+      "target_paragraph_id": "p002",
+      "hint": "统一符号命名表述，明确区分 'trap_dispatch' 与 'trap_handler' 或说明等价关系"
+    }
+  ]
+}

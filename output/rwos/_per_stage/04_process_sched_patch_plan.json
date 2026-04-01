@@ -1,0 +1,30 @@
+{
+  "summary": "合并7条证据添加为5条，修正段落id格式为p001-p085，聚焦核心代码路径引用与证据验证",
+  "actions": [
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "p001",
+      "hint": "grep_in_repo 搜索 struct proc_struct 或 read_code_segment 读取 kern/process/proc.h 验证进程结构体定义及行号"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "p004",
+      "hint": "read_code_segment 读取 kern/schedule/default_sched_stride.c 验证 BIG_STRIDE 宏及 stride_pick_next 函数实现"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "p008",
+      "hint": "read_code_segment 读取 kern/process/switch.S 验证 switch_to 汇编中 ra,sp,s0-s11 共14个寄存器的保存/恢复逻辑"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "p012",
+      "hint": "read_code_segment 读取 kern/process/signal.c 验证 do_rt_sigaction 实现，grep_in_repo 搜索 do_sigreturn 确认信号分发机制状态"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "p015",
+      "hint": "lsp_get_call_graph 或 read_code_segment 验证 do_fork 调用链(alloc_proc→setup_kstack→copy_mm→copy_thread→hash_proc→wakeup_proc)及 load_icode ELF 解析逻辑"
+    }
+  ]
+}

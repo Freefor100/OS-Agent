@@ -1,0 +1,76 @@
+{
+  "passed": false,
+  "score": 0.72,
+  "severity": "major",
+  "failed_rules": [
+    "missing_path_citation",
+    "must_cover_gap",
+    "incomplete_evidence_for_signal"
+  ],
+  "missing_evidence": [
+    {
+      "paragraph_id": "8.1.1",
+      "claim_id": "atomic_amo_implementation",
+      "reason": "草稿引用 libs/atomic.h:32-47，但实际代码显示 __AMO 宏定义在行 14-16，__op_bit 在行 18-21，set_bit/clear_bit 未在读取范围内显示，需补充完整行号证据"
+    },
+    {
+      "paragraph_id": "8.4.2",
+      "claim_id": "signal_handler_invocation",
+      "reason": "草稿声称'未实现信号处理函数调用'，但未提供 trap.c 中缺少 sigreturn 或信号分发代码的具体证据行号"
+    },
+    {
+      "paragraph_id": "8.6",
+      "claim_id": "spinlock_macro_only",
+      "reason": "草稿称无独立 SpinLock 实现，但 kmalloc.c 中存在 spin_lock_irqsave 宏定义（行 43），需澄清这是宏别名而非独立模块"
+    }
+  ],
+  "weak_claims": [
+    {
+      "paragraph_id": "8.4.2",
+      "claim": "信号处理基础框架已实现",
+      "weakness": "do_rt_sigaction 仅支持注册，但草稿未说明信号实际触发时如何调用用户处理函数（或缺失该机制），证据链不完整"
+    },
+    {
+      "paragraph_id": "8.3",
+      "claim": "Monitor 完整实现 Hoare 语义",
+      "weakness": "代码中 cond_signal/cond_wait 有 LAB7 EXERCISE 注释，表明这是练习答案而非原始实现，需标注"
+    }
+  ],
+  "format_issues": [
+    {
+      "issue": "部分代码块引用行号与实际文件内容不完全匹配",
+      "suggestion": "建议使用 lsp_get_document_outline 或 read_code_segment 二次确认行号"
+    }
+  ],
+  "missed_modules": [
+    "spin_lock_irqsave 宏在 kmalloc.c 中作为 local_intr_save 别名存在，虽非独立模块但应提及",
+    "signal.c 中 do_rt_sigaction 实现完整但信号分发机制缺失，需明确标注为'半实现'"
+  ],
+  "repair_actions": [
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "8.1.1",
+      "hint": "补充 libs/atomic.h 中 set_bit/clear_bit 函数的完整行号（使用 grep_in_repo 定位后 read_code_segment 确认）"
+    },
+    {
+      "action_type": "rewrite_paragraph",
+      "target_paragraph_id": "8.4.2",
+      "hint": "明确说明信号机制仅支持 PF_EXITING 终止进程，不支持用户自定义信号处理函数调用，并补充 trap.c 中缺失 sigreturn 的证据"
+    },
+    {
+      "action_type": "append_missing_module",
+      "target_paragraph_id": "8.1",
+      "hint": "在锁机制章节补充说明 kmalloc.c 中 spin_lock_irqsave 宏作为 intr_save 别名的存在，澄清其非独立 SpinLock 实现"
+    },
+    {
+      "action_type": "normalize_terminology",
+      "target_paragraph_id": "8.3",
+      "hint": "在 Monitor 实现描述中添加注释说明代码包含 LAB7 EXERCISE 标记，表明这是练习参考答案"
+    },
+    {
+      "action_type": "drop_unsupported_claim",
+      "target_paragraph_id": "8.6",
+      "hint": "移除'无 SpinLock 独立实现'的绝对化表述，改为'无独立 SpinLock 模块，但存在 spin_lock_irqsave 宏别名'"
+    }
+  ]
+}

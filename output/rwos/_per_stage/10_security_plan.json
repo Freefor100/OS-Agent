@@ -1,0 +1,118 @@
+{
+  "stage_id": "10_security",
+  "goal": "分析 rwos 的安全机制与权限模型，覆盖 UID/GID 权限检查、Capability/ACL、安全沙箱、用户态/内核态隔离等关键主题，并验证实现深度。",
+  "must_cover": [
+    "多架构覆盖要求：确认项目仅支持 RISC-V 64 (K210)，无多架构安全机制差异",
+    "Rust 安全性机制：项目为 C 语言实现，不适用 RAII/所有权机制",
+    "用户态/内核态隔离：页表隔离（KPTI）、SMEP/SMAP 实现状态",
+    "权限模型深度验证：UID/GID 字段定义及在 open/write/exec 中的实际检查逻辑",
+    "Capability/ACL 机制实现状态",
+    "安全沙箱 (Seccomp/Prctl) 实现状态及是否为桩函数",
+    "审计与安全启动机制",
+    "**多架构覆盖要求**：本章分析必须覆盖项目支持的所有架构（riscv64, aarch64, x86_64, loongarch64 等），不得仅以某一个架构为视角描述。",
+    "**Rust 安全性机制**：如果项目使用 Rust 编写，必须指出 RAII、所有权分析、基于生命周期的锁等机制带来的安全性。",
+    "用户态/内核态隔离：页表隔离（KPTI）、SMEP/SMAP 是否开启？",
+    "**权限模型深度验证（关键）**：",
+    "**用户/组（UID/GID）**：不仅要看 `Task` 结构体是否有 `uid` 字段，**必须验证**这些字段是否在 `open/write/exec` 等系统调用中被用于权限检查！（grep `check_perm`, `inode_permission`）。如果仅有字段但无检查逻辑，必须注明“**仅有定义但未强制执行（🔸 桩函数）**”。",
+    "**Capability/ACL**：搜索 `capability`, `acl`。",
+    "**安全沙箱 (Seccomp/Prctl)**：",
+    "搜索 `prctl` 或 `seccomp`。",
+    "**必须检查实现**：是返回 `ENOSYS`（未实现），还是直接返回 `0`（假装成功），还是真的解析了 BPF 规则？",
+    "**Stub判断**：如果 `sys_prctl` 只是 returning 0 without doing anything，标记为 **`🔸 桩函数`**。",
+    "如未找到，明确写“未实现安全沙箱（❌ 未实现）”。",
+    "**审计与安全启动**："
+  ],
+  "evidence_targets": [
+    "权限模型：proc_struct 中 uid/gid 字段是否存在，sys_open/sys_write 中是否有权限检查",
+    "用户身份：sys_getuid/sys_getgid 返回值及实现",
+    "隔离边界：PTE_U 位使用、SSTATUS_SUM/PUM 配置、用户/内核地址空间隔离",
+    "安全机制：prctl/seccomp 系统调用实现、capability 检查",
+    "权限模型",
+    "用户身份",
+    "隔离边界",
+    "安全机制"
+  ],
+  "seed_paths": [
+    "kern/process/proc.h",
+    "kern/process/proc.c",
+    "kern/syscall/syscall.c",
+    "kern/fs/file.c",
+    "kern/fs/sysfile.c",
+    "kern/fs/vfs/inode.h",
+    "kern/fs/sfs/sfs_inode.c",
+    "kern/mm/mmu.h",
+    "kern/mm/pmm.c",
+    "libs/riscv.h",
+    "kern/fs/fs.c",
+    "libs/unistd.h",
+    "security",
+    "capability"
+  ],
+  "framework_guess": [
+    "uCore"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "sys_getuid",
+    "sys_getgid",
+    "sys_prctl",
+    "sys_seccomp",
+    "file_open",
+    "sysfile_open",
+    "do_execve",
+    "files_cloexec",
+    "page_insert",
+    "boot_map_segment",
+    "cap",
+    "permission"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "kern",
+    "kern/debug",
+    "kern/driver",
+    "kern/fs",
+    "kern/init",
+    "kern/libs",
+    "kern/mm",
+    "kern/process",
+    "kern/schedule"
+  ],
+  "preferred_tools": [
+    "read_code_segment",
+    "grep_in_repo",
+    "lsp_get_definition",
+    "lsp_get_references",
+    "lsp_get_call_graph",
+    "rag_search_code"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "review_checklist": [
+    "关键问题是否回答",
+    "重要结论是否给出源码路径",
+    "是否避免将 README 当成实现证据",
+    "是否标出未实现/桩函数",
+    "must_cover_count=12"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "使用 lsp_get_definition 定位 sys_getuid/sys_getgid 实现，确认返回值是否为硬编码 0（桩函数）",
+    "使用 read_code_segment 精读 proc.h 中 proc_struct 定义，验证是否存在 uid/gid 字段",
+    "使用 grep_in_repo 搜索 sys_open/file_open 中是否有 uid/gid 权限检查逻辑（如 check_perm/inode_permission）",
+    "使用 read_code_segment 读取 syscall.c 中 sys_prctl/sys_seccomp 实现（若存在），判断是返回 ENOSYS、返回 0 还是真实实现",
+    "使用 read_code_segment 分析 mmu.h 和 pmm.c 中 PTE_U 位的使用，确认用户/内核页表隔离机制",
+    "使用 grep_in_repo 搜索 SSTATUS_SUM/PUM 配置，确认是否启用用户态访问内核内存保护",
+    "使用 lsp_get_call_graph 分析 file_open 的调用链，验证 open_flags 中权限位是否传递到 VFS 层",
+    "使用 read_code_segment 读取 files_cloexec 实现，确认 close-on-exec 机制是否完整实现"
+  ]
+}

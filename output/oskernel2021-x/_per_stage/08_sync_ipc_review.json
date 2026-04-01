@@ -1,0 +1,87 @@
+{
+  "passed": false,
+  "score": 0.65,
+  "severity": "major",
+  "failed_rules": [
+    "must_cover_gap",
+    "missing_path_citation"
+  ],
+  "missing_evidence": [
+    {
+      "paragraph_id": null,
+      "claim_id": "spinlock_atomic",
+      "reason": "kernel/spinlock.c 中__sync_lock_test_and_set 生成 amoswap 指令的声称缺乏独立编译验证或 objdump 输出"
+    },
+    {
+      "paragraph_id": null,
+      "claim_id": "trap_no_signal_handler",
+      "reason": "trap.c:56-140 中无 do_signal/handle_pending_signal 的声称缺乏具体 grep 结果或行号引用"
+    },
+    {
+      "paragraph_id": null,
+      "claim_id": "unimplemented_ipc_grep",
+      "reason": "消息队列/信号量/共享内存/Futex 未实现的 grep 搜索结果未提供具体搜索命令、文件范围和输出"
+    },
+    {
+      "paragraph_id": null,
+      "claim_id": "stub_functions",
+      "reason": "sys_rt_sigaction/sys_rt_sigprocmask 桩函数的声称缺乏 kernel/sysproc.c 中的具体行号验证"
+    }
+  ],
+  "weak_claims": [
+    {
+      "claim": "SleepLock 功能上类似 Mutex",
+      "reason": "must_cover 第 12 项明确要求讨论 Mutex 实现情况，草稿未明确说明 Mutex 是否作为独立原语存在或与 SleepLock 等价"
+    },
+    {
+      "claim": "RwLock 实现情况未讨论",
+      "reason": "must_cover 第 12 项要求讨论 RwLock 实现，草稿完全未提及"
+    },
+    {
+      "claim": "信号处理时机分析",
+      "reason": "声称 trap.c 中无 do_signal 调用，但未提供 usertrap() 函数返回路径的具体代码片段证明无信号递达检查"
+    }
+  ],
+  "format_issues": [],
+  "missed_modules": [
+    "Mutex",
+    "RwLock"
+  ],
+  "repair_actions": [
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": null,
+      "hint": "对 kernel/spinlock.c 执行 grep '__sync_lock_test_and_set|__sync_lock_release' 并提供输出，验证原子操作使用"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": null,
+      "hint": "对 kernel/trap.c 执行 grep 'do_signal|handle_pending_signal|sig' 并提供输出，验证信号处理缺失"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": null,
+      "hint": "对 kernel/sysproc.c 执行 grep 'sys_msgget|sys_semget|sys_shmget|futex' 并提供输出，验证 IPC 未实现"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": null,
+      "hint": "对 kernel/ 目录执行 grep 'struct mutex|struct rw_lock|MUTEX|RWLOCK' 验证 Mutex/RwLock 是否存在"
+    },
+    {
+      "action_type": "append_missing_module",
+      "target_paragraph_id": null,
+      "hint": "在锁机制章节补充 Mutex 和 RwLock 的实现状态说明（已实现/未实现/与 SleepLock 的关系）"
+    },
+    {
+      "action_type": "rewrite_paragraph",
+      "target_paragraph_id": null,
+      "hint": "在信号处理时机分析中补充 usertrap() 函数返回用户态前的具体代码片段，证明无信号递达检查逻辑"
+    },
+    {
+      "action_type": "normalize_terminology",
+      "target_paragraph_id": null,
+      "hint": "明确区分 SleepLock 与 Mutex 的术语使用，或说明在本项目中 SleepLock 即承担 Mutex 功能"
+    }
+  ]
+}

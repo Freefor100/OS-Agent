@@ -1,0 +1,46 @@
+{
+  "passed": true,
+  "score": 0.85,
+  "severity": "minor",
+  "failed_rules": [
+    "missing_path_citation"
+  ],
+  "missing_evidence": [
+    {
+      "paragraph_id": "启动入口与链接脚本分析",
+      "claim_id": "跳转到 Rust 入口",
+      "reason": "must_cover 要求展示 entry.S 中 'jr t0' 跳转到 kern_init 的具体汇编指令，但草稿仅描述了流程未展示该指令代码片段"
+    }
+  ],
+  "weak_claims": [
+    {
+      "paragraph_id": "模式切换验证",
+      "claim_id": "M-Mode→S-Mode 由 RustSBI 完成",
+      "reason": "此为推测性结论（通过搜索未找到代码），虽已标注假设但缺乏固件侧证据支撑"
+    }
+  ],
+  "format_issues": [
+    {
+      "issue": "部分源码路径引用不完整",
+      "example": "entry.S:25 应写为 kern/init/entry.S:25 以保持一致性"
+    }
+  ],
+  "missed_modules": [],
+  "repair_actions": [
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "启动入口与链接脚本分析",
+      "hint": "在 entry.S 代码片段中补充展示 'jr t0' 或等效跳转指令的具体行号与代码"
+    },
+    {
+      "action_type": "normalize_terminology",
+      "target_paragraph_id": null,
+      "hint": "统一所有源码引用格式为 '完整相对路径:行号'（如 kern/init/entry.S:25 而非 entry.S:25）"
+    },
+    {
+      "action_type": "rewrite_paragraph",
+      "target_paragraph_id": "模式切换验证",
+      "hint": "将 '假设由 RustSBI 固件完成' 明确标注为 '未验证假设'，或补充 RustSBI 文档/源码引用作为旁证"
+    }
+  ]
+}

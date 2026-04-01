@@ -1,0 +1,87 @@
+{
+  "passed": false,
+  "score": 0.45,
+  "severity": "major",
+  "failed_rules": [
+    "missing_path_citation",
+    "must_cover_gap",
+    "inaccurate_claim"
+  ],
+  "missing_evidence": [
+    {
+      "paragraph_id": "TrapFrame 结构定义段",
+      "claim_id": "trapframe_size_288_bytes",
+      "reason": "声称 struct trapframe 为 288 字节，但 33×8=264 字节，计算自相矛盾；未使用 lsp_get_definition 或 read_code_segment 验证实际结构体大小"
+    },
+    {
+      "paragraph_id": "桩函数检测段",
+      "claim_id": "stub_functions_13_count",
+      "reason": "声称 13 个桩函数位于 kernel/sysproc.c:379-433，但证据摘要为空，未用 grep_in_repo 或 read_code_segment 验证函数是否存在且返回 0"
+    },
+    {
+      "paragraph_id": "Trap 入口与异常向量表段",
+      "claim_id": "trap_handler_location",
+      "reason": "must_cover 要求回答 trap_handler/trap_vector 位置，但草稿仅提及 uservec/kernelvec，未明确 trap_handler/trap_vector 是否存在及位置"
+    },
+    {
+      "paragraph_id": "系统调用分发机制段",
+      "claim_id": "syscalls_array_range",
+      "reason": "声称 syscalls[] 定义在 kernel/syscall.c:155-220，但未用 read_code_segment 验证实际行号范围和内容"
+    }
+  ],
+  "weak_claims": [
+    {
+      "paragraph_id": "TrapFrame 结构段",
+      "claim": "总大小为 288 字节（33 × 8 = 264 字节数据 + 24 字节内核元数据）",
+      "reason": "数学计算错误：33 个 uint64 字段应为 264 字节，不存在额外 24 字节填充；需读取实际结构体验证 sizeof"
+    },
+    {
+      "paragraph_id": "接口/实现分离模式段",
+      "claim": "搜索 '_impl' 的结果：0 个匹配",
+      "reason": "声称进行了 grep 搜索但证据摘要为空，未展示实际工具调用结果"
+    },
+    {
+      "paragraph_id": "用户指针语义化包装段",
+      "claim": "搜索 'UserInPtr|UserOutPtr' 的结果：0 个匹配",
+      "reason": "声称进行了 grep 搜索但证据摘要为空，未展示实际工具调用结果"
+    }
+  ],
+  "format_issues": [
+    {
+      "issue": "TrapFrame 字节数计算自相矛盾",
+      "location": "TrapFrame 结构体定义节",
+      "suggestion": "应使用 read_code_segment 读取 trap.h 完整结构体，用 sizeof 或字段数×8 精确计算"
+    }
+  ],
+  "missed_modules": [
+    "trap_handler 或 trap_vector 入口位置未明确",
+    "GeneralRegisters 结构体未提及（must_cover 要求 TrapFrame/GeneralRegisters 两者）"
+  ],
+  "repair_actions": [
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "TrapFrame 结构定义段",
+      "hint": "使用 read_code_segment 读取 kernel/include/trap.h 或 kernel/trap.h 的 struct trapframe 完整定义，精确统计字段数和 sizeof 大小"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "桩函数检测段",
+      "hint": "使用 grep_in_repo 搜索 'sys_mprotect|sys_set_tid_address|sys_getuid' 等桩函数名，验证其是否存在于 sysproc.c 且返回 0"
+    },
+    {
+      "action_type": "rewrite_paragraph",
+      "target_paragraph_id": "Trap 入口与异常向量表段",
+      "hint": "明确回答 trap_handler/trap_vector 是否存在及位置；若不存在，说明 xv6-riscv 使用 uservec/kernelvec 作为 Trap 入口"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "上下文保存段",
+      "hint": "使用 grep_in_repo 搜索 'struct.*GeneralRegisters|GeneralRegisters' 验证是否存在该结构体，若不存在则修正 must_cover 表述"
+    },
+    {
+      "action_type": "normalize_terminology",
+      "target_paragraph_id": "TrapFrame 结构段",
+      "hint": "修正字节数计算错误：33 个 uint64 字段 = 264 字节，删除'288 字节'和'24 字节内核元数据'等错误表述"
+    }
+  ]
+}

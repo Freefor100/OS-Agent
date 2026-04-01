@@ -1,0 +1,122 @@
+{
+  "stage_id": "03_mem_mgmt",
+  "goal": "深挖 rwos 内存管理：物理页分配器（First-Fit）、虚拟内存（vma_struct 线性链表）、页故障处理、堆分配器（SLOB/kmalloc）、brk 系统调用及用户指针验证机制。",
+  "must_cover": [
+    "物理内存管理：default_pmm_manager 实现 First-Fit 算法，pmm.c 统一管理",
+    "虚拟内存管理：vma_struct 线性链表（非红黑树），insert_vma_struct 按地址排序插入",
+    "页表操作：get_pte、page_insert、pgdir_alloc_page 在 pmm.c/vmm.c 中实现",
+    "内核与用户地址空间：独立 mm_struct，内核重映射在 pmm_init 完成",
+    "堆分配器：SLOB 算法（kmalloc.c），非 Buddy/Slab",
+    "堆管理 (brk/sbrk)：sys_brk→do_brk→mm_brk，支持惰性分配（仅调整 vma 边界）",
+    "用户指针安全：user_mem_check 验证地址范围 + copy_from_user/to_user 封装",
+    "缺页异常处理：trap.c→pgfault_handler→do_pgfault，调用链清晰",
+    "进程级映射管理：vma_struct 线性链表管理，无反向映射表（rmap）",
+    "高级特性：CoW❌未实现、Lazy❌未实现（仅注释提及）、SharedMem❌未实现（仅 syscall 号定义）",
+    "物理内存管理：使用什么算法（Bitmap/Buddy System）？FrameAllocator 接口在哪里？",
+    "虚拟内存管理：页表如何操作（PageTable 结构、walk/map/unmap 实现）？",
+    "内核与用户地址空间设计：是否独立？内核重映射？",
+    "堆分配器：使用了什么 Allocator（GlobalAlloc, slab, buddy）？",
+    "**堆管理 (brk/sbrk)**：搜索 `sys_brk`，是否支持惰性分配（仅调整边界不立即分配物理页）？",
+    "**用户指针安全**：搜索 `UserInPtr|UserOutPtr|verify_area|check_region`，分析系统调用入口处如何验证用户空间指针合法性。",
+    "缺页异常（Page Fault）处理逻辑（如有）。**追踪 handle_page_fault 调用链**。",
+    "**进程级映射管理**：搜索地址空间管理结构（如 `VmAreaStruct`、`BTreeMap` 管理的映射区间），分析是否有反向映射表（rmap）支持。",
+    "**高级特性验证**（必须分类为 `✅ 已实现`、`🔸 桩函数`、`❌ 未实现`，并寻找具体代码）：",
+    "写时复制（Copy-on-Write）：搜索 `cow|copy_on_write`，确认是否在 page fault 中处理了 CoW。",
+    "懒分配（Lazy Allocation）：搜索 `lazy|populate`，确认是否推迟了物理页分配。",
+    "共享内存管理（SharedMem）：是否有 `shm` 相关系统调用和数据结构？**深入分析**：搜索 `sys_shmdt` 实现，检查是否使用 `BTreeMap` 进行 O(log n) 定位。搜索 `SharedMemoryManager`，分析 `IPC_RMID` 删除策略（立即删除 vs Arc 引用计数延迟释放）。"
+  ],
+  "evidence_targets": [
+    "物理页分配：kern/mm/default_pmm.c (default_alloc_pages First-Fit)",
+    "页表映射：kern/mm/pmm.c (get_pte, page_insert, boot_map_segment)",
+    "页故障处理：kern/mm/vmm.c (do_pgfault), kern/trap/trap.c (pgfault_handler)",
+    "堆分配器：kern/mm/kmalloc.c (SLOB 实现), kern/mm/vmm.c (mm_brk)",
+    "用户指针验证：kern/mm/vmm.c (user_mem_check, copy_from_user)",
+    "brk 系统调用：kern/syscall/syscall.c (sys_brk), kern/process/proc.c (do_brk)",
+    "物理页分配",
+    "页表映射",
+    "页故障处理",
+    "堆分配器"
+  ],
+  "seed_paths": [
+    "kern/mm/pmm.c",
+    "kern/mm/pmm.h",
+    "kern/mm/default_pmm.c",
+    "kern/mm/vmm.c",
+    "kern/mm/vmm.h",
+    "kern/mm/kmalloc.c",
+    "kern/trap/trap.c",
+    "kern/process/proc.c",
+    "kern/syscall/syscall.c",
+    "kern/mm/memlayout.h",
+    "mm",
+    "memory",
+    "vm",
+    "kernel/mm"
+  ],
+  "framework_guess": [
+    "uCore"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "do_pgfault",
+    "pgfault_handler",
+    "alloc_pages",
+    "get_pte",
+    "page_insert",
+    "insert_vma_struct",
+    "find_vma",
+    "mm_brk",
+    "do_brk",
+    "user_mem_check",
+    "handle_page_fault",
+    "alloc_frame"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "kern",
+    "kern/debug",
+    "kern/driver",
+    "kern/fs",
+    "kern/init",
+    "kern/libs",
+    "kern/mm",
+    "kern/process",
+    "kern/schedule"
+  ],
+  "preferred_tools": [
+    "lsp_get_call_graph",
+    "lsp_get_definition",
+    "lsp_get_references",
+    "read_code_segment",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "review_checklist": [
+    "关键问题是否回答",
+    "重要结论是否给出源码路径",
+    "是否避免将 README 当成实现证据",
+    "是否标出未实现/桩函数",
+    "must_cover_count=12"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "用 lsp_get_call_graph 分析 do_pgfault 的 incoming 调用链（从 trap_dispatch 到 do_pgfault）",
+    "用 lsp_get_definition 定位 default_alloc_pages 和 default_free_pages，验证 First-Fit 逻辑",
+    "用 lsp_get_references 查找 insert_vma_struct 的所有调用点，确认 vma 插入时机",
+    "精读 kern/mm/kmalloc.c 前 150 行，确认 SLOB 分配器核心结构（slob_block, bigblock）",
+    "用 lsp_get_call_graph 分析 sys_brk→do_brk→mm_brk 的 outgoing 调用链（max_depth=2）",
+    "精读 user_mem_check 实现（vmm.c 中搜索），确认用户地址验证逻辑",
+    "用 grep_in_repo 搜索 PTE_U|PTE_W|PTE_R，确认页表权限位定义和使用",
+    "对照 must_cover 清单，标记 CoW/Lazy/SharedMem 为❌未实现，整理证据路径"
+  ]
+}

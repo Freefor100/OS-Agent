@@ -1,74 +1,98 @@
 {
   "passed": false,
-  "score": 0.72,
+  "score": 0.62,
   "severity": "major",
   "failed_rules": [
     "missing_path_citation",
-    "must_cover_gap"
+    "must_cover_gap",
+    "unverified_evidence"
   ],
   "missing_evidence": [
     {
-      "paragraph_id": "高级内存特性清单",
-      "claim_id": "CoW 未实现",
-      "reason": "否定断言'搜索无 cow/copy_on_write 代码'未提供 grep 搜索结果或 RAG 搜索证据，仅有文字声明"
-    },
-    {
-      "paragraph_id": "高级内存特性清单",
-      "claim_id": "共享内存未实现",
-      "reason": "否定断言'搜索无 sys_shm/shm 相关代码'未提供 grep 搜索结果作为证据"
-    },
-    {
-      "paragraph_id": "高级内存特性清单",
-      "claim_id": "反向映射未实现",
-      "reason": "否定断言'搜索无 rmap/reverse_map 代码'未提供 grep 搜索结果作为证据"
-    },
-    {
       "paragraph_id": "物理内存管理实现",
-      "claim_id": "大页未实现",
-      "reason": "否定断言'搜索无 HugePage、2M、1G 相关代码'未提供 grep 搜索结果作为证据"
+      "claim_id": "kalloc.c 空闲链表实现",
+      "reason": "代码片段 kernel/kalloc.c:24-91 未经验证，证据索引摘要为空"
+    },
+    {
+      "paragraph_id": "虚拟内存与页表操作",
+      "claim_id": "vm.c walk/mappages 实现",
+      "reason": "代码片段 kernel/vm.c:118-252 未经验证，证据索引摘要为空"
+    },
+    {
+      "paragraph_id": "堆分配器解析",
+      "claim_id": "uvmalloc 立即分配物理页",
+      "reason": "代码片段 kernel/vm.c:280-308 未经验证"
+    },
+    {
+      "paragraph_id": "缺页异常处理",
+      "claim_id": "usertrap 处理 mmap 区域缺页",
+      "reason": "代码片段 kernel/trap.c:60-127 未经验证，且与 must_cover 中'page fault 直接 panic 或未显式处理'描述存在矛盾"
+    },
+    {
+      "paragraph_id": "VMA 管理",
+      "claim_id": "struct vma 链表及 sys_mmap/sys_munmap",
+      "reason": "代码片段 kernel/include/proc.h:47-56 及 kernel/sysfile.c:623-703 未经验证"
     }
   ],
   "weak_claims": [
     {
-      "claim": "CoW 未实现",
-      "reason": "仅有文字声明'搜索无...代码'，无实际 grep/RAG 搜索结果支撑，无法验证该否定断言的真实性"
+      "claim": "FrameAllocator 接口位置未回答",
+      "reason": "must_cover 明确要求回答'FrameAllocator 接口在哪里'，草稿仅说明空闲链表但未提及接口定义位置"
     },
     {
-      "claim": "共享内存未实现",
-      "reason": "仅有文字声明'搜索无...代码'，无实际 grep/RAG 搜索结果支撑"
+      "claim": "缺页异常处理描述与 must_cover 矛盾",
+      "reason": "must_cover 称'page fault 直接 panic 或未显式处理'，但草稿显示 usertrap() 中有 mmap 区域缺页处理逻辑"
     },
     {
-      "claim": "零拷贝 sendfile 为桩函数",
-      "reason": "声称'sysproc.c:425 sys_sendfile() 仅返回 0'，但未提供代码片段或行号验证"
+      "claim": "所有代码行号引用未验证",
+      "reason": "证据索引摘要为空，无法确认 kernel/kalloc.c:24-91 等路径是否真实存在及行号是否准确"
     }
   ],
   "format_issues": [
     {
-      "issue": "部分代码片段行号范围过大",
-      "detail": "如 kernel/trap.c:56-140 覆盖 84 行，建议缩小到关键分支（如 scause=13/15 处理的具体行）"
+      "issue": "代码片段未标注验证状态",
+      "suggestion": "应标注代码片段是否经工具验证（如 grep_in_repo 或 read_code_segment）"
     }
   ],
-  "missed_modules": [],
+  "missed_modules": [
+    "FrameAllocator 接口定义位置",
+    "PHYSTOP 及内存边界常量定义"
+  ],
   "repair_actions": [
     {
       "action_type": "add_evidence",
-      "target_paragraph_id": "高级内存特性清单",
-      "hint": "对 CoW、共享内存、反向映射、大页等否定断言，使用 grep_in_repo 添加搜索结果（如 pattern='cow|copy_on_write'、pattern='shm|shmat|shmdt'、pattern='rmap|reverse_map'、pattern='HugePage|2M|1G'）作为证据"
+      "target_paragraph_id": "物理内存管理实现",
+      "hint": "使用 grep_in_repo 验证 kernel/kalloc.c 中 struct run 和 kmem 结构体是否存在，确认行号准确性"
     },
     {
       "action_type": "add_evidence",
-      "target_paragraph_id": "堆管理（sbrk/brk）",
-      "hint": "对'零拷贝 sendfile 为桩函数'断言，使用 read_code_segment 读取 sysproc.c:425 附近代码片段作为证据"
+      "target_paragraph_id": "虚拟内存与页表操作",
+      "hint": "使用 read_code_segment 读取 kernel/vm.c 中 walk() 和 mappages() 函数，验证行号及实现细节"
     },
     {
-      "action_type": "normalize_terminology",
-      "target_paragraph_id": "虚拟内存与页表操作",
-      "hint": "统一术语：草稿中混用 'vmunmap()' 和 'uvmdealloc()'，应明确区分两者功能（vmunmap 解除映射，uvmdealloc 回收用户空间）"
+      "action_type": "add_evidence",
+      "target_paragraph_id": "堆分配器解析",
+      "hint": "验证 kernel/vm.c 中 uvmalloc() 是否确实立即调用 kalloc()，确认无懒分配逻辑"
     },
     {
       "action_type": "rewrite_paragraph",
       "target_paragraph_id": "缺页异常处理",
-      "hint": "usertrap 代码片段中引用了 'elock/eread/eunlock' 等函数，但这些函数在 xv6 标准实现中不存在，需验证是否为项目自定义扩展并提供定义位置"
+      "hint": "澄清 must_cover 与草稿的矛盾：说明无 handle_page_fault 函数但 usertrap() 中有 mmap 区域缺页处理，堆区域无懒分配缺页处理"
+    },
+    {
+      "action_type": "append_missing_module",
+      "target_paragraph_id": "物理内存管理实现",
+      "hint": "补充说明 xv6 风格无 FrameAllocator 接口，物理页分配直接通过 kalloc()/kfree() 进行，相关常量在 param.h 或 memlayout.h 中定义"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "VMA 管理",
+      "hint": "使用 grep_in_repo 验证 struct vma 定义及 sys_mmap/sys_munmap 函数是否存在"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "高级内存特性清单",
+      "hint": "使用 grep_in_repo 验证 'cow'、'lazy'、'shm' 等关键词搜索结果，确认未实现特性"
     }
   ]
 }

@@ -1,0 +1,123 @@
+{
+  "stage_id": "12_debug_error",
+  "goal": "分析 oskernel2021-x 的调试机制与错误处理：日志系统、panic 处理、栈回溯实现、异常处理、调试接口（Shell/strace）、错误码设计。",
+  "must_cover": [
+    "日志系统：printf.c 实现，无日志级别，仅 DEBUG 宏条件编译",
+    "Panic 处理：panic() 调用 backtrace() 后死循环停机",
+    "栈回溯：基于 FramePointer 的简单回溯（无 DWARF），打印 RA 寄存器",
+    "异常处理：usertrap/unhandled trap 默认打印信息并 exit",
+    "调试接口：用户态 Shell（sh.c），无内核 Monitor",
+    "GDB stub：未实现（搜索 handle_gdb_packet 无结果）",
+    "Trace 支持：sys_trace 系统调用 + tmask 实现简单 syscall 追踪",
+    "错误码设计：C 风格返回值（0 成功/-1 错误），无 Result/Error 类型",
+    "断言：无 debug_assert，仅 DEBUG 宏条件打印",
+    "寄存器 dump：trapframedump() 打印 trapframe 全部寄存器",
+    "日志系统：print/log 宏如何实现？日志级别设计？",
+    "Panic 处理：panic! 触发后的流程（栈回溯、寄存器 dump、停机）。",
+    "**栈回溯 (Backtrace)**：是否支持 `dwarf` 解析或基于 FramePointer 的回溯？使用 grep 搜索 `backtrace` 或 `unwind`。**注意不要被 panic 时的简单 PC 打印误导，Backtrace 指的是打印完整的函数调用栈。**",
+    "异常处理：未处理异常的默认行为。",
+    "调试接口：",
+    "**交互式 Shell**: 是否提供 Monitor/Shell？支持哪些命令（`ps`, `ls`, `help`）？",
+    "GDB stub 支持（如有）：**严格检查**。搜索 `handle_gdb_packet`。如果找不到数据包解析循环，就不是 GDB Stub。",
+    "调试控制台/Monitor",
+    "内核调试选项",
+    "是否支持 `perf` 或 `ftrace`？**Tracepoints** 是否插入到了关键路径？",
+    "错误码设计：Result/Error 类型定义。",
+    "断言与检查：debug_assert、运行时检查。"
+  ],
+  "evidence_targets": [
+    "panic/backtrace 实现 (kernel/printf.c:121-143)",
+    "日志系统 (kernel/printf.c)",
+    "DEBUG 宏使用 (多处#ifdef DEBUG)",
+    "异常处理 (kernel/trap.c usertrap)",
+    "Shell (xv6-user/sh.c)",
+    "strace 支持 (kernel/sysproc.c sys_trace, kernel/syscall.c trace)",
+    "寄存器 dump (kernel/trap.c trapframedump)",
+    "错误码约定 (返回值 0/-1)",
+    "panic/debug",
+    "日志系统",
+    "回溯",
+    "错误处理"
+  ],
+  "seed_paths": [
+    "kernel/printf.c",
+    "kernel/trap.c",
+    "kernel/syscall.c",
+    "kernel/sysproc.c",
+    "kernel/include/proc.h",
+    "kernel/include/defs.h",
+    "xv6-user/sh.c",
+    "xv6-user/strace.c",
+    "debug",
+    "log",
+    "panic",
+    "assert",
+    "backtrace",
+    "kernel/file.c:18-21"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "panic",
+    "backtrace",
+    "trapframedump",
+    "usertrap",
+    "sys_trace",
+    "syscall",
+    "consoleintr",
+    "parsecmd",
+    "panic_handler",
+    "log",
+    "assert",
+    "_start"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "bootloader",
+    "bootloader/SBI",
+    "debug",
+    "debug/kendryte_openocd",
+    "debug/openocd_cfg",
+    "doc",
+    "img",
+    "kernel",
+    "kernel/include"
+  ],
+  "preferred_tools": [
+    "read_code_segment",
+    "lsp_get_call_graph",
+    "lsp_get_definition",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "review_checklist": [
+    "关键问题是否回答",
+    "重要结论是否给出源码路径",
+    "是否避免将 README 当成实现证据",
+    "是否标出未实现/桩函数",
+    "must_cover_count=12"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "精读 kernel/printf.c 的 panic() 和 backtrace() 实现，确认回溯算法基于 FramePointer",
+    "查看 kernel/trap.c 的 usertrap() 和 trapframedump()，分析异常处理流程和寄存器 dump 格式",
+    "检查 kernel/syscall.c 的 syscall() 函数，验证 tmask 追踪逻辑如何插入关键路径",
+    "阅读 xv6-user/strace.c 和 kernel/sysproc.c 的 sys_trace()，确认 strace 工具实现",
+    "浏览 xv6-user/sh.c 的 parsecmd() 和主循环，确认 Shell 支持的命令集",
+    "grep 搜索#ifdef DEBUG 的使用位置，统计调试输出覆盖范围",
+    "检查 kernel/include/ 头文件，确认无 Result/Error 类型定义，记录错误码约定",
+    "汇总结论：标注已实现功能（backtrace/strace/panic）和缺失功能（GDB stub/DWARF/日志级别）"
+  ]
+}

@@ -1,0 +1,121 @@
+{
+  "stage_id": "07_device_drivers",
+  "goal": "分析 rwos 设备驱动架构：基于 SBI 的 UART 控制台、ramdisk/SDCard 块设备、VFS 设备注册框架、中断处理机制，验证无 Device Tree/PCI，明确 MMU 前后地址切换方式。",
+  "must_cover": [
+    "设备发现：无 DTS/PCI，采用硬编码物理地址（io.h 定义）+ SBI 调用",
+    "驱动框架：struct device 函数指针表 + dev_init() 宏注册 + vfs_add_dev() 挂载",
+    "组件化与配置：无 Kconfig/Cargo features，通过 Makefile 和条件编译宏选择驱动",
+    "平台适配：仅支持 K210 (kendryte)，地址定义于 io.h，无 platform/boards 目录",
+    "UART/Serial：通过 SBI (sbi_console_putchar/getchar) 实现，无直接 MMIO",
+    "Block Device：ramdisk (内存镜像) + SDCard (SPI 模式)，ide.c 抽象层",
+    "中断控制器：无 PLIC/CLINT 驱动，依赖 SBI 注册中断 (sbi_register_devintr)",
+    "MMU 前后串口地址：UART 通过 SBI 抽象，无需地址切换；SDCard/SPI 使用硬编码物理地址",
+    "设备发现：Device Tree (DTS) 解析或 PCI/Bus 扫描？**必须验证**是否真的解析了 `.dtb` 文件，还是硬编码了地址？",
+    "驱动框架：Driver Trait，如何注册/初始化驱动？",
+    "**组件化与配置**：搜索构建配置文件（Cargo.toml 的 features、Kconfig、条件编译宏），分析如何通过编译选项选择不同的驱动/模块实现。",
+    "**平台适配**：搜索 `platform/` 或 `boards/` 目录，列出所有支持的目标平台/开发板及其特有驱动，分析项目如何适配不同硬件。",
+    "常见设备：",
+    "UART/Serial（控制台输出）",
+    "Block Device（磁盘读写，VirtIO-Blk）",
+    "Net Device（网卡，VirtIO-Net）及网络协议栈（TCP/IP, smoltcp 等实现）",
+    "GPU/Input（如有）",
+    "中断控制器：PLIC/CLINT/APIC 驱动。",
+    "**MMU 前后串口地址切换**：分析 UART 驱动在 MMU 启用前（使用物理地址）和 MMU 启用后（使用虚拟地址）的地址切换机制。搜索串口基址常量的不同定义。",
+    "**语义发现（🥇 首选）**：使用 `rag_search_code` 搜索 \"device driver trait\", \"virtio-blk driver\", \"UART initialization\", \"PCI bus scanning\" 快速锁定驱动程序。"
+  ],
+  "evidence_targets": [
+    "驱动框架：dev.c 的 init_device 宏、dev_create_inode、vfs_add_dev",
+    "设备结构体：dev.h 的 struct device (d_open/d_close/d_io/d_ioctl)",
+    "UART 实现：console.c 通过 sbi_console_* 调用，无 MMIO 地址",
+    "块设备：ide.c + ramdisk.c + sdcard.c 初始化流程",
+    "中断注册：stdin.c 的 dev_intr + sbi_register_devintr",
+    "平台硬编码：io.h 的 UARTHS_DATA_REG、SPI_BASE_ADDR 等物理地址",
+    "初始化顺序：init.c 的 sd_init → pic_init → ide_init → fs_init",
+    "驱动框架",
+    "中断注册",
+    "块设备/网卡",
+    "平台适配"
+  ],
+  "seed_paths": [
+    "kern/driver/io.h",
+    "kern/driver/console.c",
+    "kern/driver/ide.c",
+    "kern/driver/ramdisk.c",
+    "kern/driver/sdcard.c",
+    "kern/driver/intr.c",
+    "kern/driver/picirq.c",
+    "kern/fs/devs/dev.c",
+    "kern/fs/devs/dev.h",
+    "kern/fs/devs/dev_stdin.c",
+    "kern/fs/devs/dev_stdout.c",
+    "kern/fs/devs/dev_disk0.c",
+    "driver",
+    "device"
+  ],
+  "framework_guess": [
+    "uCore"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "dev_init",
+    "init_device",
+    "dev_create_inode",
+    "vfs_add_dev",
+    "cons_init",
+    "serial_intr",
+    "sd_init",
+    "ramdisk_init",
+    "ide_init",
+    "dev_intr",
+    "probe",
+    "init_driver"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "kern",
+    "kern/debug",
+    "kern/driver",
+    "kern/fs",
+    "kern/init",
+    "kern/libs",
+    "kern/mm",
+    "kern/process",
+    "kern/schedule"
+  ],
+  "preferred_tools": [
+    "read_code_segment",
+    "lsp_get_definition",
+    "lsp_get_references",
+    "lsp_get_call_graph",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "review_checklist": [
+    "关键问题是否回答",
+    "重要结论是否给出源码路径",
+    "是否避免将 README 当成实现证据",
+    "是否标出未实现/桩函数",
+    "must_cover_count=12"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "1. 精读 kern/driver/io.h 确认所有硬件物理地址硬编码定义 (UARTHS、SPI、GPIOHS 等)",
+    "2. 分析 kern/fs/devs/dev.c 的 init_device 宏和 dev_init()，理解驱动注册机制",
+    "3. 追踪 kern/fs/devs/dev_stdin.c 的 dev_intr + sbi_register_devintr，验证中断注册流程",
+    "4. 对比 console.c (SBI 调用) 与 sdcard.c (MMIO 访问)，区分 MMU 前后地址使用方式",
+    "5. 使用 lsp_get_call_graph 分析 dev_init → init_device → dev_init_* 调用链",
+    "6. 检查 kern/init/init.c 初始化顺序，确认 sd_init/pic_init/ide_init/fs_init 依赖关系",
+    "7. 验证 libs/sbi.h 的 SBI 调用接口，确认无 PLIC/CLINT 直接操作",
+    "8. 汇总证据：无 DTS 解析、无 PCI 扫描、驱动全硬编码、平台仅 K210"
+  ]
+}

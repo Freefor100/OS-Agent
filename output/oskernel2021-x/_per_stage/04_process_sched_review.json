@@ -1,0 +1,92 @@
+{
+  "passed": false,
+  "score": 0.75,
+  "severity": "major",
+  "failed_rules": [
+    "missing_path_citation",
+    "must_cover_gap",
+    "unverified_grep_claim"
+  ],
+  "missing_evidence": [
+    {
+      "paragraph_id": "进程组与会话管理",
+      "claim_id": "grep_ProcessGroup_Session",
+      "reason": "声称搜索了 ProcessGroup|Session|setpgid 等关键词但未在证据索引中提供实际 grep 输出，无法验证结论真实性"
+    },
+    {
+      "paragraph_id": "Futex（快速用户态互斥锁）",
+      "claim_id": "grep_futex_wait_queue",
+      "reason": "声称搜索 futex|wait_queue 未找到匹配，但证据索引为空，缺少实际工具执行记录"
+    },
+    {
+      "paragraph_id": "线程创建：clone() 函数",
+      "claim_id": "clone_implementation",
+      "reason": "引用 kernel/proc.c:875-923 但未提供 LSP 或 read_code_segment 验证该函数确实存在且实现如所述"
+    },
+    {
+      "paragraph_id": "调度算法与策略",
+      "claim_id": "no_time_slice_preemption",
+      "reason": "声称无时钟中断强制抢占但未提供时钟中断处理代码的搜索或分析证据"
+    }
+  ],
+  "weak_claims": [
+    {
+      "paragraph_id": "PID 分配机制",
+      "claim": "简单递增分配，无 PID 回收复用机制",
+      "reason": "未验证 allocpid() 是否有 PID 回收逻辑，仅展示了递增分配代码片段"
+    },
+    {
+      "paragraph_id": "信号机制",
+      "claim": "sys_rt_sigaction 为桩函数仅返回 0",
+      "reason": "引用了 kernel/sysproc.c:400-402 但未用 read_code_segment 实际读取验证"
+    }
+  ],
+  "format_issues": [
+    {
+      "issue": "证据索引摘要为空",
+      "description": "草稿正文引用了大量具体文件路径和行号，但证据索引摘要显示为（无），不符合审阅流程要求"
+    }
+  ],
+  "missed_modules": [
+    "时钟中断与抢占机制验证",
+    "trapframe 结构体完整字段分析",
+    "initproc 初始化流程"
+  ],
+  "repair_actions": [
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "进程组与会话管理",
+      "hint": "使用 grep_in_repo 搜索 'ProcessGroup|Session|setpgid|setsid|pgid' 并记录实际输出结果"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "Futex（快速用户态互斥锁）",
+      "hint": "使用 grep_in_repo 搜索 'futex|wait_queue|futex_wait' 并记录实际输出结果"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "线程创建：clone() 函数",
+      "hint": "使用 read_code_segment 读取 kernel/proc.c:875-923 验证 clone() 函数实际实现"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "调度算法与策略",
+      "hint": "使用 grep_in_repo 搜索 'timer|clock|interrupt|yield' 验证是否存在时钟中断强制抢占机制"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "信号机制",
+      "hint": "使用 read_code_segment 读取 kernel/sysproc.c:400-402 验证 sys_rt_sigaction 确实为桩函数"
+    },
+    {
+      "action_type": "append_missing_module",
+      "target_paragraph_id": null,
+      "hint": "补充 trapframe 结构体字段分析（kernel/include/trap.h），说明其在 fork/exec 中的作用"
+    },
+    {
+      "action_type": "normalize_terminology",
+      "target_paragraph_id": "调度算法与策略",
+      "hint": "明确区分 'FIFO 轮询' 与 '时间片轮转(RR)' 的概念，当前描述可能引起混淆"
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "summary": "合并同类证据验证操作，聚焦于调试机制核心路径的代码证据补充与缺失模块说明",
+  "actions": [
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "p002",
+      "hint": "使用 read_code_segment 读取 kern/debug/kdebug.c 验证 print_stackframe() 实现，使用 grep_in_repo 搜索 print_debuginfo 提供代码证据"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "p004",
+      "hint": "使用 read_code_segment 读取 kern/debug/kmonitor.c 验证 commands 数组定义及调试命令实现"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "p001",
+      "hint": "使用 grep_in_repo 搜索 log_|LOG_|printk 验证日志级别宏是否存在，提供完整输出作为证据"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "p005",
+      "hint": "使用 grep_in_repo 搜索 tracepoint|ftrace|perf_event 验证高级调试追踪机制，提供搜索结果"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "p008",
+      "hint": "使用 grep_in_repo 搜索 handle_gdb_packet|gdbstub|gdb_serial 验证 GDB 远程调试支持情况，提供完整输出"
+    },
+    {
+      "action_type": "append_missing_module",
+      "target_paragraph_id": "",
+      "hint": "补充内核调试选项说明，检查编译时配置选项（如 Kconfig、Makefile 中的调试相关宏定义）"
+    }
+  ]
+}

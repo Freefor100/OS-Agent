@@ -1,0 +1,95 @@
+{
+  "stage_id": "13_history",
+  "goal": "目标：自主阅读 Git 原始提交记录，推演操作系统的开发时间线。你需要总结\"初始版本工作量\"、\"后续版本的功能演进轨迹\"，并将历次重要 Commit 涉及的具体变更归类到对应的操作系统模块中。",
+  "must_cover": [
+    "**严禁**把 `get_git_history_summary` 放在循环里调用。你只需要调用**一次**，它会自动返回贯穿仓库生命周期的浓缩摘要。",
+    "**严禁**无脑遍历所有的历史节点。",
+    "当 `get_git_history_summary` 的结果显示某次重大 Commit 涉及了海量文件（如 `[arceos/modules/] 3500 files`）且你需要知道具体加了什么功能时，**必须且只能**使用 `analyze_git_history(repo_path, max_commits=1, skip=N, path_filter=\"arceos/modules\")` 对该重点目录进行定点下钻。",
+    "**绝不允许**在未设定 `path_filter` 的情况下对几千个文件的重大提交使用 `analyze_git_history`，这会导致上万行的输出撑爆监控。",
+    "`find_symbol_first_commit` 可以批量传入多个关键词，请严格合并为 1-2 次统一调用。",
+    "识别出提交密集期（快速开发阶段）和平稳期。",
+    "从 `get_git_history_summary` 的返回中找到最早的几个 commit，汇总其增加的代码行数。",
+    "观察这些最早 commit 涉及的模块，总结第一版已经搭起了哪几个子系统。",
+    "启动入口：`[\"_start\", \"rust_main\", \"kernel_main\"]`",
+    "内存管理：`[\"FrameAllocator\", \"PageTable\", \"MemorySet\"]`",
+    "进程/任务：`[\"TaskInner\", \"spawn_task\", \"ProcessInner\"]`",
+    "文件系统：`[\"VfsNode\", \"fat32\", \"ramfs\", \"sys_open\"]`"
+  ],
+  "evidence_targets": [
+    "作者贡献",
+    "重大提交",
+    "模块演进",
+    "当前缺口"
+  ],
+  "seed_paths": [
+    "git",
+    "history",
+    "README.md",
+    "kernel/sysfile.c:682",
+    "kernel/trap.c:88-115",
+    "kernel/include/file.h",
+    "kernel/include/fat32.h",
+    "kernel/file.c",
+    "kernel/pipe.c",
+    "kernel/trap.c:88",
+    "kernel/disk.c:17",
+    "bootloader/SBI/rustsbi-qemu/src/main.rs:133-142"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "git",
+    "_start",
+    "start",
+    "main"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "bootloader",
+    "bootloader/SBI",
+    "debug",
+    "debug/kendryte_openocd",
+    "debug/openocd_cfg",
+    "doc",
+    "img",
+    "kernel",
+    "kernel/include"
+  ],
+  "preferred_tools": [
+    "rag_search_code",
+    "lsp_get_call_graph",
+    "lsp_get_definition",
+    "read_code_segment"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "review_checklist": [
+    "关键问题是否回答",
+    "重要结论是否给出源码路径",
+    "是否避免将 README 当成实现证据",
+    "是否标出未实现/桩函数",
+    "must_cover_count=12"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 4000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "对照 seed_paths、entry_symbols，用 rag_search_code / list_repo_structure / LSP 锁定与本阶段相关的关键文件与符号。",
+    "对核心入口使用 lsp_get_document_outline → lsp_get_call_graph（单入口、浅深度）→ 必要时 read_code_segment 精读。",
+    "按 must_cover 逐项输出结论，每条附反引号源码路径；无实现则显式写「未发现/桩函数」等，勿臆测。",
+    "覆盖要点：**严禁**把 `get_git_history_summary` 放在循环里调用。你只需要调用**一次**，它会自动返回贯穿仓库生命周期的浓缩摘要。",
+    "覆盖要点：**严禁**无脑遍历所有的历史节点。",
+    "覆盖要点：当 `get_git_history_summary` 的结果显示某次重大 Commit 涉及了海量文件（如 `[arceos/modules/] 3500 files`）且你需要知道具体加了什么功能时，**必须且只能**使用 `analy",
+    "覆盖要点：**绝不允许**在未设定 `path_filter` 的情况下对几千个文件的重大提交使用 `analyze_git_history`，这会导致上万行的输出撑爆监控。",
+    "覆盖要点：`find_symbol_first_commit` 可以批量传入多个关键词，请严格合并为 1-2 次统一调用。"
+  ]
+}

@@ -1,0 +1,109 @@
+{
+  "stage_id": "01_overview",
+  "goal": "建立 RWOS 技术字典：明确其基于 uCore 的 RISC-V 64 教学 OS 定位、构建方式、支持架构、关键入口函数及核心模块布局，为后续章节提供客观定性评价依据。",
+  "must_cover": [
+    "项目定位与 OS 类型（基于 uCore 的教学 OS）",
+    "技术栈详情（C 语言、RISC-V 64、QEMU/K210 双目标）",
+    "构建系统与编译工具链（Makefile/CMake、riscv64-unknown-elf）",
+    "目录结构与关键模块对应关系（kern 下 11 个子目录功能）",
+    "入口函数调用链（_start → kern_entry → kern_init）",
+    "完成度定性评价（主要功能模块闭环情况）",
+    "## 结论摘要（3-5 条，基于前置报告明确项目特性及内核类型）",
+    "## 技术栈与构建（含编程语言版本、所有支持的架构完整列表）",
+    "## 目录结构导读（列出系统关键目录与源码入口）",
+    "## 总结评价（完成度评估）",
+    "深度结合下文附带的各模块报告情况，用200-300字概括：项目定位与目标、技术栈概览、实现完成度评估（系统主要功能模块是否闭环）。**注意：只做客观的定性评价，绝不要打分（如不要出现x/10这样的评分）。**"
+  ],
+  "evidence_targets": [
+    "语言与框架来源（Readme.md 明确基于 uCore）",
+    "支持架构（Makefile 中 riscv64-unknown-elf、k210 烧录脚本）",
+    "入口函数（kern/init/entry.S 的 kern_entry、kern/init/init.c 的 kern_init）",
+    "关键目录（kern 下 debug/driver/fs/mm/process/schedule/sync/syscall/trap）",
+    "语言与框架来源",
+    "支持架构",
+    "入口函数",
+    "关键目录"
+  ],
+  "seed_paths": [
+    "Readme.md",
+    "Makefile",
+    "CMakeLists.txt",
+    "kern/init/entry.S",
+    "kern/init/init.c",
+    "kern/process/proc.c",
+    "kern/mm/pmm.c",
+    "kern/fs",
+    "kern/syscall/syscall.c",
+    "tools/rustsbi-k210.bin",
+    "libs/riscv.h",
+    "user/libs/ulib.c",
+    "README.md",
+    "Cargo.toml"
+  ],
+  "framework_guess": [
+    "uCore"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "kern_entry",
+    "kern_init",
+    "_start",
+    "proc_init",
+    "pmm_init",
+    "vmm_init",
+    "trap_init",
+    "fs_init",
+    "cpu_idle",
+    "do_fork",
+    "main",
+    "kernel_main"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "kern",
+    "kern/debug",
+    "kern/driver",
+    "kern/fs",
+    "kern/init",
+    "kern/libs",
+    "kern/mm",
+    "kern/process",
+    "kern/schedule"
+  ],
+  "preferred_tools": [
+    "lsp_get_call_graph",
+    "lsp_get_definition",
+    "lsp_get_references",
+    "read_code_segment",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "review_checklist": [
+    "关键问题是否回答",
+    "重要结论是否给出源码路径",
+    "是否避免将 README 当成实现证据",
+    "是否标出未实现/桩函数",
+    "must_cover_count=5"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 12000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 18,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "使用 lsp_get_call_graph 追踪 kern_entry → kern_init 的启动调用链（direction=outgoing, max_depth=2）",
+    "使用 lsp_get_definition 定位 proc_init、pmm_init、fs_init 等关键初始化函数的定义位置",
+    "使用 grep_in_repo 验证 syscalls[] 表中的系统调用实现情况（对比已完成的 security/network 章节结论）",
+    "使用 read_code_segment 精读 kern/syscall/syscall.c 前 100 行，确认系统调用分发机制",
+    "使用 lsp_get_references 查找 kern_init 中被调用的模块初始化函数，验证模块依赖关系",
+    "结合 Readme.md 与 Makefile 交叉验证构建流程与目标架构配置",
+    "汇总已识别的 11 个核心模块目录，对照 must_cover 列出各模块完成状态（基于前置章节报告）",
+    "生成定性评价：基于代码存在性与前置章节结论，描述系统主要功能（进程/内存/文件系统）是否形成闭环"
+  ]
+}

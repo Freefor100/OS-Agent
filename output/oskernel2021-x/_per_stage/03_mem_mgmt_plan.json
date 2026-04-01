@@ -1,16 +1,17 @@
 {
   "stage_id": "03_mem_mgmt",
-  "goal": "分析 xv6-riscv 移植版的内存管理：物理页分配器（链表）、虚拟内存（页表 walk/map）、堆管理（sbrk/brk）、缺页异常处理（含 mmap 支持）、用户指针验证机制，并确认 CoW/懒分配/共享内存等高级特性实现状态。",
+  "goal": "分析内存管理模块：物理页分配器(kalloc)、页表映射(walk/mappages)、缺页异常处理、堆分配(sbrk/brk)、用户指针验证、VMA 管理，并验证 COW/懒分配/共享内存等高级特性实现状态。",
   "must_cover": [
-    "物理页分配：kalloc.c 使用空闲链表（free list）+ 自旋锁，非 Buddy/Bitmap",
-    "虚拟内存：vm.c 实现 walk/mappages/uvmalloc/uvmdealloc，支持双页表（用户/内核）",
-    "堆管理：sys_sbrk/sys_brk 通过 growproc 调用 uvmalloc 立即分配物理页，非惰性",
-    "用户指针安全：使用 copyin/copyout/copyin2/copyout2/either_copyin/out 验证，非 UserInPtr 包装器",
-    "缺页异常：trap.c usertrap 处理 scause=13/15，支持 mmap 区域按需分配（类似懒分配但非完整 CoW）",
-    "进程级映射：proc.h 含 vma 链表（非 BTreeMap），sys_mmap/sys_munmap 实现内存映射文件",
-    "CoW：❌ 未实现（搜索无 cow/copy_on_write 相关代码）",
-    "懒分配：🔸 部分实现（mmap 区域缺页时分配，但 sbrk 仍立即分配）",
-    "共享内存：❌ 未实现（无 shm/shmdt/shmat 系统调用）",
+    "物理页分配：kalloc.c 使用空闲链表(freelist)管理 4KB 页，非 Buddy/Bitmap",
+    "页表操作：vm.c 中 walk() 实现三级页表遍历，mappages() 完成映射",
+    "内核/用户地址空间：独立页表(pagetable/kpagetable)，内核重映射在 kvminit()",
+    "堆分配器：sys_sbrk/sys_brk 调用 growproc()，通过 uvmalloc 立即分配物理页",
+    "用户指针验证：syscall 入口使用 fetchaddr/copyin2 验证地址是否 < p->sz",
+    "缺页异常：无 handle_page_fault 函数，page fault 直接 panic 或未显式处理",
+    "VMA 管理：struct vma 链表管理映射区间，sys_mmap/sys_munmap 操作，无 BTreeMap",
+    "COW: ❌ 未实现 (grep 无 cow 关键词，uvmcopy 直接复制物理页)",
+    "懒分配: ❌ 未实现 (uvmalloc 立即 kalloc 分配物理页)",
+    "共享内存: ❌ 未实现 (无 sys_shm/shmat/shmdt，仅 mmap 文件映射)",
     "物理内存管理：使用什么算法（Bitmap/Buddy System）？FrameAllocator 接口在哪里？",
     "虚拟内存管理：页表如何操作（PageTable 结构、walk/map/unmap 实现）？",
     "内核与用户地址空间设计：是否独立？内核重映射？",
@@ -25,12 +26,12 @@
     "共享内存管理（SharedMem）：是否有 `shm` 相关系统调用和数据结构？**深入分析**：搜索 `sys_shmdt` 实现，检查是否使用 `BTreeMap` 进行 O(log n) 定位。搜索 `SharedMemoryManager`，分析 `IPC_RMID` 删除策略（立即删除 vs Arc 引用计数延迟释放）。"
   ],
   "evidence_targets": [
-    "物理页分配器（kalloc.c 链表实现）",
-    "页表映射（vm.c walk/mappages）",
-    "堆管理（sysproc.c sys_sbrk/sys_brk + proc.c growproc）",
-    "缺页异常处理（trap.c usertrap scause 13/15 分支）",
-    "用户指针验证（vm.c copyin/copyout + proc.c either_copyin/out）",
-    "VMA 管理（proc.h struct vma + sysfile.c sys_mmap）",
+    "物理页分配: kernel/kalloc.c (kalloc/kfree/freerange)",
+    "页表映射: kernel/vm.c (walk/mappages/vmunmap)",
+    "堆分配: kernel/proc.c (growproc), kernel/sysproc.c (sys_sbrk/sys_brk)",
+    "用户指针验证: kernel/syscall.c (fetchaddr/copyin2), kernel/vm.c (walkaddr)",
+    "VMA 管理: kernel/proc.h (struct vma), kernel/sysfile.c (sys_mmap/sys_munmap)",
+    "fork 内存复制: kernel/vm.c (uvmcopy), kernel/proc.c (fork)",
     "物理页分配",
     "页表映射",
     "页故障处理",
@@ -39,14 +40,14 @@
   "seed_paths": [
     "kernel/kalloc.c",
     "kernel/vm.c",
-    "kernel/trap.c",
     "kernel/proc.c",
     "kernel/sysproc.c",
     "kernel/sysfile.c",
+    "kernel/syscall.c",
     "kernel/include/vm.h",
     "kernel/include/proc.h",
     "kernel/include/kalloc.h",
-    "xv6-user/umalloc.c",
+    "kernel/trap.c",
     "mm",
     "memory",
     "vm",
@@ -61,13 +62,13 @@
   "entry_symbols": [
     "kalloc",
     "kfree",
-    "kinit",
     "walk",
     "mappages",
+    "vmunmap",
     "uvmalloc",
+    "uvmcopy",
+    "growproc",
     "sys_sbrk",
-    "sys_brk",
-    "usertrap",
     "sys_mmap",
     "handle_page_fault",
     "alloc_frame"
@@ -87,8 +88,8 @@
   "preferred_tools": [
     "read_code_segment",
     "lsp_get_call_graph",
-    "lsp_get_references",
-    "grep_in_repo"
+    "lsp_get_definition",
+    "lsp_get_references"
   ],
   "avoid_tools": [
     "blind_read_large_files",
@@ -108,13 +109,13 @@
     "max_memory_items": 8
   },
   "execution_steps": [
-    "精读 kalloc.c 全文（已定位 100 行），确认物理页分配器为空闲链表 + 自旋锁实现，记录 kmem 结构体细节",
-    "精读 vm.c 关键函数：walk(117 行)、mappages(201 行)、uvmalloc(292 行)、uvmdealloc(328 行)，分析页表创建与映射逻辑",
-    "追踪 sys_sbrk/sys_brk 调用链：从 sysproc.c(157/171 行) → proc.c growproc(333 行) → vm.c uvmalloc，确认是否惰性分配",
-    "分析 trap.c usertrap(约 55 行起) 中 scause=13/15 缺页处理分支，确认 mmap 区域按需分配机制及与 vma 链表关联",
-    "检查用户指针验证：读取 vm.c copyin/copyout 实现，对比 proc.c either_copyin/out，确认系统调用入口如何调用",
-    "分析 sysfile.c sys_mmap(682 行起) 实现，确认 vma 链表分配逻辑、文件映射读取流程，验证是否有反向映射",
-    "使用 lsp_get_call_graph 对 usertrap 进行 incoming 调用分析（max_depth=2），确认缺页异常触发路径",
-    "汇总证据：对 must_cover 中 12 项逐一标注✅/🔸/❌，并附上源码文件路径与行号作为证据"
+    "1. 精读 kernel/kalloc.c 全文，确认物理页分配器使用空闲链表而非 Buddy/Bitmap，记录 kinit/kalloc/kfree 实现细节",
+    "2. 精读 kernel/vm.c 关键函数：walk() 页表遍历、mappages() 映射、uvmalloc()/uvmcopy() 分配与复制，确认无 COW 机制",
+    "3. 追踪 sys_sbrk/sys_brk 调用链：sysproc.c → growproc(proc.c) → uvmalloc(vm.c)，验证是否惰性分配",
+    "4. 分析用户指针验证：读取 syscall.c 中 fetchaddr/copyin2 实现，确认验证逻辑为地址 < p->sz 检查",
+    "5. 深入 VMA 管理：读取 sysfile.c 中 sys_mmap/sys_munmap 完整实现，分析 vma 链表操作，确认无 BTreeMap/rmap",
+    "6. 检查 trap.c 中 usertrap/kerneltrap 处理逻辑，搜索 page fault 相关 scause 值处理，确认无 handle_page_fault",
+    "7. 使用 lsp_get_call_graph 分析 growproc 调用链(深度 2)，验证内存分配路径完整性",
+    "8. 汇总证据：对 COW/懒分配/共享内存三项分类标记(❌未实现)，引用具体代码行号作为证据"
   ]
 }

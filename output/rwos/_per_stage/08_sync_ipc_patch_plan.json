@@ -1,0 +1,20 @@
+{
+  "summary": "针对 missing_path_citation、incomplete_evidence_for_signal、must_cover_gap 三条失败规则，压缩为 3 条精准修补：补充 atomic 函数证据、修正信号机制描述、统一 SpinLock 术语表述",
+  "actions": [
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "p001",
+      "hint": "补充 libs/atomic.h 中 set_bit/clear_bit 函数的完整行号证据，使用 grep 定位后 read_code_segment 确认"
+    },
+    {
+      "action_type": "rewrite_paragraph",
+      "target_paragraph_id": "p004",
+      "hint": "明确说明信号机制仅支持 PF_EXITING 终止进程，不支持用户自定义信号处理函数，补充 trap.c 中缺失 sigreturn 的证据"
+    },
+    {
+      "action_type": "drop_unsupported_claim",
+      "target_paragraph_id": "p006",
+      "hint": "将'无 SpinLock 独立实现'改为'无独立 SpinLock 模块，但存在 spin_lock_irqsave 宏别名（见 kmalloc.c）'"
+    }
+  ]
+}
