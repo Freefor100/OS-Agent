@@ -830,12 +830,33 @@ C. **使用 grep_in_repo 探索隐藏功能**（可选）：
         4) **寻找架构支持**：代码验证并明确列出该项目支持的所有架构（x86_64, aarch64, riscv64, loongarch64 等）。
         5) **寻找入口**：搜索并确定真正的 OS 内核入口函数（可借用 LSP 或 grep 快速定位）。
 
-        输出格式要求：
-        - ## 结论摘要（3-5 条，基于前置报告明确项目特性及内核类型）
+        输出格式要求（严格按此顺序输出，不得调换）：
+
+        - ## 快速总览
+          **必须是报告的第一个内容块**，让评委在30秒内掌握全貌。包含以下两部分，不得省略：
+
+          **第一部分：一句话定位**（≤60字）
+          格式："[OS名称] 是一个基于 [框架/从零] 开发的 [架构] [内核类型]，采用 [主要语言]，[最突出的1个技术特点]。"
+          若基于已有框架（xv6/rCore/ArceOS/往年参赛作品等），必须在此明确说明，并指出在原框架基础上新增/修改了什么。
+
+          **第二部分：子系统完成度矩阵**（固定表格，不得删减行）
+          | 子系统 | 完成度 | 关键实现 |
+          |--------|--------|---------|
+          | 启动与初始化 | ✅完整 / 🔸部分 / ❌缺失 | 一句话 |
+          | 内存管理 | ... | ... |
+          | 进程/线程调度 | ... | ... |
+          | 中断与系统调用 | ... | ... |
+          | 文件系统 | ... | ... |
+          | 设备驱动 | ... | ... |
+          | 同步与IPC | ... | ... |
+          | 多核支持 | ... | ... |
+          | 网络协议栈 | ... | ... |
+          | 安全机制 | ... | ... |
+
         - ## 技术栈与构建（含编程语言版本、所有支持的架构完整列表）
         - ## 目录结构导读（列出系统关键目录与源码入口）
         - ## 总结评价（完成度评估）
-        - 深度结合下文附带的各模块报告情况，用200-300字概括：项目定位与目标、技术栈概览、实现完成度评估（系统主要功能模块是否闭环）。**注意：只做客观的定性评价，绝不要打分（如不要出现x/10这样的评分）。**
+          深度结合下文附带的各模块报告情况，用200-300字概括：项目定位与目标、技术栈概览、实现完成度评估（系统主要功能模块是否闭环）。**注意：只做客观的定性评价，绝不要打分（如不要出现x/10这样的评分）。**
 
         **重要**：完成所有工具调用后，你必须输出一个完整的 Markdown 格式分析报告。
         """,
@@ -1567,21 +1588,34 @@ def main():
             print(f"{'='*80}")
             sys.stdout.flush()
 
+    # 生成 Call Graph 概览块
+    callgraph_md = ""
+    try:
+        from tools.callgraph_overview import generate_callgraph_section
+        callgraph_md = generate_callgraph_section(
+            repo_path=repo_local_path,
+            output_dir=repo_output_dir,
+            top_k=30,
+            use_embedding=True,
+            lsp_refine=True,
+        )
+        print(f"\n✅ Call Graph 概览生成完成")
+    except Exception as e:
+        print(f"\n⚠️  Call Graph 生成失败: {e}")
+        import traceback; traceback.print_exc()
+
     # 合并总报告 - 生成专业的、类似人类撰写的技术文档
     final_report_path = os.path.join(repo_output_dir, f"OS技术分析报告_{repo_name}.md")
     try:
-        final_stage_path = None
-        executive_summary = ""
-        project_evaluation = ""
+        # 01_overview 排最前，其余按文件名排序
+        overview_sections = [p for p in all_section_paths if os.path.basename(p).startswith("01_")]
+        other_sections = sorted([p for p in all_section_paths if not os.path.basename(p).startswith("01_")])
+        content_sections = overview_sections + other_sections
 
-        
-        # 其他章节（排除第15阶段）
-        content_sections = sorted([p for p in all_section_paths if p != final_stage_path])
-        
         with open(final_report_path, "w", encoding="utf-8") as out:
             # 标题和元数据
             out.write(f"# {repo_name} 操作系统技术分析报告\n\n")
-            
+
             # 加载作者信息
             author_info = get_author_info(repo_url)
             if author_info:
@@ -1600,77 +1634,58 @@ def main():
             out.write(f"> **分析日期**: {datetime.now().strftime('%Y年%m月%d日')}\n\n")
             out.write(f"> **分析工具**: OS-Agent-D\n\n")
             out.write("---\n\n")
-            
-            # 执行摘要
-            if executive_summary:
-                out.write(executive_summary + "\n\n")
-                out.write("---\n\n")
-            
+
             # 目录
             out.write("## 目录\n\n")
             for i, p in enumerate(content_sections, 1):
-                # 从文件名提取章节标题（因为section文件不再包含一级标题）
                 try:
-                    # 文件名格式：01_项目概览与技术栈.md
                     filename = os.path.basename(p)
-                    # 去除编号前缀和.md后缀
                     title = os.path.splitext(filename)[0]
                     if '_' in title:
-                        title = title.split('_', 1)[1]  # 去除 "01_" 前缀
-                    # 将下划线替换为空格（如果有）
+                        title = title.split('_', 1)[1]
                     title = title.replace('_', ' ')
                     out.write(f"{i}. {title}\n")
                 except Exception:
                     filename = os.path.splitext(os.path.basename(p))[0]
                     out.write(f"{i}. {filename}\n")
-            
-            # 添加总结评价到目录
-            if project_evaluation:
-                out.write(f"{len(content_sections) + 1}. 项目总结与评价\n")
-            
+
             out.write("\n---\n\n")
-            
+
+            # Call Graph 概览（放在目录之后、章节正文之前）
+            if callgraph_md:
+                out.write(callgraph_md)
+                out.write("\n---\n\n")
+
             # 正文：依次输出各章节内容
             for i, p in enumerate(content_sections, 1):
                 try:
-                    # 从文件名提取标题
                     filename = os.path.basename(p)
                     chapter_title = os.path.splitext(filename)[0]
                     if '_' in chapter_title:
                         chapter_title = chapter_title.split('_', 1)[1]
                     chapter_title = chapter_title.replace('_', ' ')
-                    
+
                     with open(p, "r", encoding="utf-8", errors="ignore") as f:
                         content = f.read().strip()
-                        
-                        # 添加章节标题（一级标题）
+
                         out.write(f"\n# {chapter_title}\n\n")
-                        
-                        # 内容应该从二级标题开始，直接写入
-                        # 如果LLM错误地输出了一级标题，降级处理
+
                         if content.startswith("# "):
-                            # 将一级标题转为二级标题
                             content = "##" + content[1:]
-                        
+
                         out.write(content + "\n\n")
                         out.write("---\n\n")
                 except Exception as e:
                     print(f"  ⚠️  无法读取章节 {p}: {e}")
-            
-            # 总结评价
-            if project_evaluation:
-                out.write(f"\n# 项目总结与评价\n\n")
-                out.write(project_evaluation + "\n\n")
-                out.write("---\n\n")
-            
+
             # 页脚
             out.write(f"\n---\n\n")
             out.write(f"*本报告由 OS-Agent-D 自动生成*  \n")
             out.write(f"*生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*  \n")
             out.write(f"*分析耗时: {(datetime.now() - start_time).total_seconds()/60:.1f} 分钟*\n")
-        
+
         print(f"\n📄 已生成最终报告: {final_report_path}")
-        print(f"   报告包含 {len(content_sections)} 个主要章节{'+ 执行摘要和总结' if executive_summary else ''}")
+        print(f"   报告包含 {len(content_sections)} 个主要章节")
     except Exception as e:
         print(f"\n⚠️  无法生成总报告: {e}")
         import traceback

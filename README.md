@@ -62,6 +62,23 @@
 - 该工具只允许查询“全国大学生操作系统比赛”背景、赛道定位、目标要求、功能要求和公开技术背景。
 - `web_search` 结果只能用于**技术概览 / 概述总结**，**绝不能**作为仓库实现事实、查重判断或源码证据。
 
+**报告拼装（13阶段结束后）：Call Graph 概览块** (`tools/callgraph_overview.py`) ✨ **新增**
+
+所有分析阶段完成后，在报告 TOC 之后、各章节正文之前，自动插入 **Call Graph 概览块**，让评委一眼看懂 OS 的架构枢纽与调用关系。
+
+| 步骤 | 内容 |
+|------|------|
+| 1. Tree-sitter 全库解析 | 遍历所有 `.c/.rs/.go/.zig`，提取函数定义（节点）与单文件 outgoing 调用（边），构建 NetworkX `DiGraph` |
+| 2. PageRank Top-30 | `nx.pagerank(alpha=0.85)` 选出架构枢纽函数 |
+| 3. LSP 精化 | 对 Top-30 节点调用 `lsp_get_call_graph(max_depth=2)`，补充跨文件调用边 |
+| 4. LLM 批量分类 | 路径正则规则优先（~80%），剩余节点附函数体前 20 行批量发 LLM（Domain 93% / Layer 100%） |
+| 5. SVG 渲染 | `domain`（列）× `layer`（行）二维网格，Bezier 曲线连线，base64 嵌入 Markdown |
+| 6. 文件级表格 | 函数级调用聚合为文件级有向图，输出调用关系表 |
+
+结果缓存到 `output/<repo>/callgraph_overview.json`，重跑时自动跳过。
+
+---
+
 ### 2. OS-Agent D：自动报告评估 (`os_agent_d_evaluate.py`) ✨ **增强版**
 
 使用 Agent 将自动生成的报告与仓库内人类撰写的文档进行对比评估。
