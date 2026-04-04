@@ -31,6 +31,37 @@ def _detect_linux_pkg_manager():
         pass
     return "apt", True  # 默认按 Debian 处理
 
+
+def _libclang_optional_fail_hint() -> str:
+    """Call Graph 语义过滤失败时的跨平台安装说明（不阻断 check_env 主流程）。"""
+    sys_name = platform.system()
+    if sys_name == "Windows":
+        return (
+            "未就绪 — 请 pip install clang，并安装 LLVM（常见: C:\\Program Files\\LLVM）"
+            " 或设置 LIBCLANG_PATH 指向 libclang.dll"
+        )
+    if sys_name == "Darwin":
+        return (
+            "未就绪 — 请 pip install clang，并 brew install llvm；"
+            "若仍失败可设置 LIBCLANG_PATH 为 $(brew --prefix llvm)/lib/libclang.dylib"
+        )
+    if sys_name == "Linux":
+        pkg_mgr, _ = _detect_linux_pkg_manager()
+        hint = {
+            "apt": "sudo apt install libclang1 或 libclang-dev（包名因发行版而异）；"
+            "也可设置 LIBCLANG_PATH 指向具体 .so（如 /usr/lib/x86_64-linux-gnu/libclang-18.so.1）",
+            "pacman": "sudo pacman -S llvm llvm-libs；必要时设置 LIBCLANG_PATH",
+            "dnf": "sudo dnf install llvm llvm-libs；必要时设置 LIBCLANG_PATH",
+            "zypper": "sudo zypper install llvm llvm-clang；必要时设置 LIBCLANG_PATH",
+            "apk": "sudo apk add llvm-libs；必要时设置 LIBCLANG_PATH",
+        }.get(
+            pkg_mgr,
+            "安装 llvm/libclang（含 libclang 共享库），并 pip install clang；必要时设置 LIBCLANG_PATH",
+        )
+        return "未就绪 — 请 pip install clang；" + hint
+    return "未就绪 — 请 pip install clang，并安装系统 LLVM/libclang，或设置 LIBCLANG_PATH"
+
+
 def _find_build_tool(tool_name):
     path = shutil.which(tool_name)
     if path:
@@ -364,6 +395,36 @@ def main():
                 all_ok = False
                 _check(f"{name} (自动安装失败)", False, f"请手动运行: {install_hint}")
 
+    # --- Call Graph：Clang 语义过滤（可选，与 clangd 独立）---
+    print("\n📊 Call Graph 语义过滤（可选）:")
+    print(
+        "   说明：按 compile_flags 剔除条件编译未进入 TU 的符号；需 pip install clang，"
+        "且系统可加载 libclang（Linux 多为 libclang.so，Windows 为 libclang.dll）。"
+    )
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from tools.callgraph_semantic import (  # noqa: E402
+            _find_libclang_library_path,
+            libclang_runtime_ok,
+        )
+
+        libclang_path = _find_libclang_library_path()
+        if libclang_runtime_ok():
+            _check(
+                "libclang（Call Graph 语义）",
+                True,
+                libclang_path or "已加载",
+            )
+        else:
+            # 不纳入 all_ok：缺省仍可走 Tree-sitter + LSP 精化
+            _check(
+                "libclang（Call Graph 语义）",
+                False,
+                _libclang_optional_fail_hint(),
+            )
+    except Exception as e:
+        _check("libclang（Call Graph 语义）", False, f"检查异常: {e}")
+
     # --- Summary ---
     print("\n" + "=" * 60)
     if all_ok:
@@ -371,6 +432,7 @@ def main():
     else:
         print("⚠️  部分检查未通过，请按上述提示安装缺失组件。")
         print("   LSP 工具缺失不会导致崩溃（自动降级为正则解析），但分析精度会降低。")
+        print("   Call Graph 的 libclang 缺失时仅跳过语义裁剪，不会阻止生成报告。")
     return 0 if all_ok else 1
 
 if __name__ == "__main__":

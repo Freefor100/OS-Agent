@@ -1588,7 +1588,7 @@ def main():
             print(f"{'='*80}")
             sys.stdout.flush()
 
-    # 生成 Call Graph 概览块
+    # 生成 Call Graph 概览块（缓存由 compile 配置/git/管线指纹自动失效，无需环境变量）
     callgraph_md = ""
     try:
         from tools.callgraph_overview import generate_callgraph_section
@@ -1598,8 +1598,8 @@ def main():
             top_k=30,
             use_embedding=True,
             lsp_refine=True,
+            force_regenerate=False,
         )
-        print(f"\n✅ Call Graph 概览生成完成")
     except Exception as e:
         print(f"\n⚠️  Call Graph 生成失败: {e}")
         import traceback; traceback.print_exc()

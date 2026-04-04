@@ -68,14 +68,25 @@
 
 | 步骤 | 内容 |
 |------|------|
-| 1. Tree-sitter 全库解析 | 遍历所有 `.c/.rs/.go/.zig`，提取函数定义（节点）与单文件 outgoing 调用（边），构建 NetworkX `DiGraph` |
-| 2. PageRank Top-30 | `nx.pagerank(alpha=0.85)` 选出架构枢纽函数 |
-| 3. LSP 精化 | 对 Top-30 节点调用 `lsp_get_call_graph(max_depth=2)`，补充跨文件调用边 |
-| 4. LLM 批量分类 | 路径正则规则优先（~80%），剩余节点附函数体前 20 行批量发 LLM（Domain 93% / Layer 100%） |
-| 5. SVG 渲染 | `domain`（列）× `layer`（行）二维网格，Bezier 曲线连线，base64 嵌入 Markdown |
-| 6. 文件级表格 | 函数级调用聚合为文件级有向图，输出调用关系表 |
+| 1. Tree-sitter 全库解析 | 遍历配置的源码扩展名（含 `.c/.h/.rs/.go/.zig` 等），提取函数/宏/typedef（节点）与单文件调用（边），构建 NetworkX `DiGraph` |
+| 2. Clang 语义过滤（C/C++） | 用 **libclang** 按 `compile_flags.txt` / `compile_commands.json` 解析 TU，收集**预处理后可进入 AST 的函数定义**；从图中剔除条件编译裁掉的符号，使 PageRank 更接近真实构建。**环境**：`pip install clang`（Python 绑定）+ 系统安装 **LLVM**（含 `libclang.dll`；Windows 下代码会尝试 `C:\\Program Files\\LLVM\\bin\\libclang.dll`）。也可设 `LIBCLANG_PATH` 指向该文件。不可用时跳过并打日志。 |
+| 3. PageRank Top-k | `nx.pagerank(alpha=0.85)` 选出枢纽（默认 k=30，可改） |
+| 4. LSP 精化（可选） | 对前 30 个枢纽调用 `lsp_get_call_graph(..., max_depth=4 或参数 lsp_max_depth)`，补充跨文件边；若 LSP 返回降级/空则跳过 |
+| 5. LLM 批量分类 | 对 Top-k 做 domain×layer 单次 LLM 分类（终端会打印 token） |
+| 6. SVG 渲染 | `domain`（列）× `layer`（行）二维网格，Bezier 连线 |
+| 7. 表格与缓存 | 文件级表、枢纽表；落盘 `callgraph_overview.{svg,md,meta.json}`；**缓存**由 `input_fingerprint`（compile 配置、git HEAD、管线版本、`top_k`/`lsp_max_depth`、libclang 可用性）自动失效，**无需**设置 Call Graph 相关环境变量 |
 
-结果缓存到 `output/<repo>/callgraph_overview.json`，重跑时自动跳过。
+**代码参数（非环境变量）**：在 `os_agent_d_describe.py` 中调用 `generate_callgraph_section(top_k=30, lsp_refine=True, lsp_max_depth=None, force_regenerate=False)`；`lsp_max_depth` 为 `None` 时用默认 `4`；`force_regenerate=True` 仅用于强制忽略缓存。
+
+**LSP 精化**：建议目标仓库有与真实编译一致的 `compile_flags.txt` 或 `compile_commands.json`（Bear/CMake），减轻条件编译符号上的 `DEGRADED`。
+
+若终端显示 **「LSP 成功精化节点数: 0」**：表示对 Top 枢纽的每次 `lsp_get_call_graph` 均得到**空结果**或含 **`DEGRADED`**（clangd/rust-analyzer 无法可靠索引），常见原因是 **C/C++ 工程根目录缺少 `compile_commands.json`**。可在仓库内用 Bear/CMake 等生成该文件后重跑；未精化时调用图仍以 **Tree-sitter + 语义过滤后的边**为主。
+
+结果落盘（`output/<repo>/`，指纹未变时命中缓存）：
+
+- `callgraph_overview.svg`：矢量图，可单独打开、做 diff  
+- `callgraph_overview.md`：章节正文，用**相对路径**引用同目录 SVG（体积小、可读）  
+- `callgraph_overview_meta.json`：统计、k、Top-k、`classified`、`input_fingerprint` 等  
 
 ---
 
@@ -299,7 +310,6 @@ ENABLE_WEB_SEARCH=false
 | `REPO_URL` | ✅ | 要分析的 OS 仓库 Git 地址 |
 | `ENABLE_WEB_SEARCH` | ❌ | 是否启用 `web_search`（默认关闭，仅用于比赛背景与技术概览） |
 | `TAVILY_API_KEY` / `SERPER_API_KEY` | ❌ | `web_search` 的 provider 密钥，至少配置一种 |
-
 ### 4. 运行分析
 
 ```bash

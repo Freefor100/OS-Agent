@@ -155,14 +155,36 @@ def _walk_core_paths(repo_path: str, max_depth: int = 2) -> List[str]:
 
 
 def _guess_framework(readme_text: str, root_entries: List[str]) -> List[str]:
+    """
+    基于 README / 构建文件片段 / 仓库根目录名的子串匹配，推断「小型 OS / 教学内核」框架。
+
+    多为 Rust 生态常见项目名；短词易与英文混淆（如 tock ⊂ stock），故对 Tock 等使用 tock-os、
+    tock/ 等更稳的形态。命中多个则列表中保留多项（去重保序）。
+    """
     text = (readme_text + "\n" + "\n".join(root_entries)).lower()
     guesses = []
     for keyword, label in (
+        # 原有
         ("arceos", "ArceOS"),
         ("rcore", "rCore"),
         ("xv6", "xv6"),
         ("ucore", "uCore"),
         ("unikraft", "Unikraft"),
+        # Rust 常见小型 / 教学 / 研究型 OS（关键词尽量可区分于普通英文）
+        ("asterinas", "Asterinas"),
+        ("blog-os", "blog_os"),
+        ("blog_os", "blog_os"),
+        ("dragonos", "DragonOS"),
+        ("hubris", "Hubris"),
+        ("minerva", "Minerva"),
+        ("redox", "Redox"),
+        ("starlight-os", "Starlight"),
+        ("theseus", "Theseus"),
+        ("tock-os", "Tock"),
+        ("tock/", "Tock"),
+        ("tock_", "Tock"),
+        ("zcore", "zCore"),
+        ("rust-for-linux", "Rust-for-Linux"),
     ):
         if keyword in text:
             guesses.append(label)
