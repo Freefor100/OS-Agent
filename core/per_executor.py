@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import os
 import re
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 from langchain_core.messages import AIMessage, ToolMessage
 
@@ -129,6 +130,59 @@ def extract_evidence_index(messages: List[Any]) -> List[EvidenceItem]:
     return evidence_items
 
 
+def _path_covered_by_tool_evidence(path: str, tool_items: List[EvidenceItem]) -> bool:
+    """报告内路径若已被某条工具证据覆盖，则不再生成弱引用条目。"""
+    norm = (path or "").replace("\\", "/").lower().strip()
+    if not norm:
+        return True
+    base = os.path.basename(norm)
+    for it in tool_items:
+        p = (it.path or "").replace("\\", "/").lower().strip()
+        if not p:
+            continue
+        if p == norm or norm.endswith("/" + p) or p.endswith("/" + norm):
+            return True
+        if os.path.basename(p) == base and base:
+            return True
+    return False
+
+
+def merge_report_citation_evidence(
+    tool_evidence: List[EvidenceItem],
+    stage_text: str,
+) -> List[EvidenceItem]:
+    """
+    在 ToolMessage 证据之后，从终稿 Markdown 中抽取反引号/裸路径形式的源码路径，
+    生成低置信度 report_citation 条目，供 Verify 与段落链接；不与已有工具路径重复。
+    """
+    out: List[EvidenceItem] = list(tool_evidence)
+    counter = len(out)
+    seen_paths: Set[str] = set()
+    for match in PATH_RE.finditer(stage_text or ""):
+        raw_path = match.group(1).replace("\\", "/")
+        lines = match.group(2)
+        key = raw_path.lower().strip()
+        if not key or key in seen_paths:
+            continue
+        seen_paths.add(key)
+        if _path_covered_by_tool_evidence(raw_path, tool_evidence):
+            continue
+        counter += 1
+        out.append(
+            EvidenceItem(
+                evidence_id=f"ev_{counter:03d}",
+                path=raw_path,
+                lines=lines,
+                symbol=None,
+                source_type="report_citation",
+                confidence="low",
+                excerpt="",
+                tool_name=None,
+            )
+        )
+    return out
+
+
 def _path_mentions(text: str) -> List[str]:
     return [match.group(1).replace("\\", "/") for match in PATH_RE.finditer(text or "")]
 
@@ -197,7 +251,8 @@ def build_draft_document(markdown: str, evidence_index: List[EvidenceItem]) -> D
 
 def extract_stage_artifacts(stage_text: str, messages: Optional[List[Any]] = None) -> Dict[str, Any]:
     messages = messages or []
-    evidence_index = extract_evidence_index(messages)
+    tool_evidence = extract_evidence_index(messages)
+    evidence_index = merge_report_citation_evidence(tool_evidence, stage_text)
     draft_document = build_draft_document(stage_text, evidence_index)
     return {
         "draft_markdown": draft_document.to_markdown() or stage_text.strip(),

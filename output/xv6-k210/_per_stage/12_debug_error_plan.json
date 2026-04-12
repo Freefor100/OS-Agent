@@ -1,0 +1,118 @@
+{
+  "stage_id": "12_debug_error",
+  "goal": "分析 xv6-k210 的调试机制与错误处理：panic 流程、backtrace 实现、日志系统、shell 命令、GDB stub 状态、trace 支持及错误码设计。",
+  "must_cover": [
+    "panic 处理流程：__panic() 调用 backtrace() 后停机",
+    "backtrace 实现：基于 FramePointer 的简单回溯（无 DWARF 解析）",
+    "日志系统：仅 printf 宏，无分级日志（无 log_/printk）",
+    "交互式 Shell：xv6-user/sh.c 实现，非内核 monitor",
+    "GDB stub：未实现（无 handle_gdb_packet）",
+    "trace 支持：SYS_trace 系统调用 + tmask，但实现简陋",
+    "错误码：include/errno.h 定义标准 POSIX 错误码",
+    "assert 宏：include/utils/debug.h 提供 __assert/__debug_assert",
+    "若存在 monitor/shell：**命令实现文件**列表；若无：明确「未发现」。",
+    "日志系统：print/log 宏如何实现？日志级别设计？",
+    "Panic 处理：panic! 触发后的流程（栈回溯、寄存器 dump、停机）。",
+    "**栈回溯 (Backtrace)**：是否支持 `dwarf` 解析或基于 FramePointer 的回溯？使用 grep 搜索 `backtrace` 或 `unwind`。**注意不要被 panic 时的简单 PC 打印误导，Backtrace 指的是打印完整的函数调用栈。**",
+    "异常处理：未处理异常的默认行为。",
+    "调试接口：",
+    "**交互式 Shell**: 是否提供 Monitor/Shell？支持哪些命令（`ps`, `ls`, `help`）？",
+    "GDB stub 支持（如有）：**严格检查**。搜索 `handle_gdb_packet`。如果找不到数据包解析循环，就不是 GDB Stub。",
+    "调试控制台/Monitor",
+    "内核调试选项",
+    "是否支持 `perf` 或 `ftrace`？**Tracepoints** 是否插入到了关键路径？",
+    "错误码设计：Result/Error 类型定义。"
+  ],
+  "evidence_targets": [
+    "panic 路径：kernel/printf.c:__panic() → backtrace()",
+    "backtrace 实现：kernel/printf.c:backtrace() 基于 FP 回溯",
+    "日志系统：无独立日志模块，仅 printf",
+    "Shell 实现：xv6-user/sh.c 用户态 shell",
+    "trace 机制：kernel/syscall/sysproc.c:sys_trace() + include/sched/proc.h:tmask",
+    "错误码定义：include/errno.h",
+    "assert 宏：include/utils/debug.h",
+    "panic/debug",
+    "日志系统",
+    "回溯",
+    "错误处理"
+  ],
+  "seed_paths": [
+    "kernel/printf.c",
+    "include/utils/debug.h",
+    "xv6-user/sh.c",
+    "kernel/syscall/sysproc.c",
+    "include/sched/proc.h",
+    "include/errno.h",
+    "include/printf.h",
+    "doc/构建调试 - 调试指南.md",
+    "debug",
+    "log",
+    "panic",
+    "assert",
+    "backtrace",
+    "include/fs"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "__panic",
+    "backtrace",
+    "sys_trace",
+    "parsecmd",
+    "__assert",
+    "__debug_assert",
+    "panic_handler",
+    "log",
+    "assert",
+    "_start",
+    "start"
+  ],
+  "repo_hotspots": [
+    "Cargo.toml",
+    "Makefile",
+    "bootloader",
+    "bootloader/SBI",
+    "debug",
+    "debug/kendryte_openocd",
+    "debug/openocd_cfg",
+    "doc",
+    "doc/img",
+    "include"
+  ],
+  "preferred_tools": [
+    "read_code_segment",
+    "lsp_get_call_graph",
+    "lsp_get_definition",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "review_checklist": [
+    "关键问题是否回答",
+    "重要结论是否给出源码路径",
+    "是否避免将 README 当成实现证据",
+    "是否标出未实现/桩函数",
+    "must_cover_count=12"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "精读 kernel/printf.c 中 __panic() 和 backtrace() 实现，确认回溯逻辑基于 FramePointer",
+    "检查 include/utils/debug.h 中 assert 宏设计，区分 DEBUG 模式与非 DEBUG 模式行为",
+    "分析 xv6-user/sh.c 的 parsecmd() 和命令执行流程，确认 Shell 为用户态程序",
+    "验证 kernel/syscall/sysproc.c:sys_trace() 实现，确认 trace 功能简陋（仅设置 tmask=1）",
+    "确认无 GDB stub（grep 已验证无 handle_gdb_packet）",
+    "整理 include/errno.h 错误码列表，确认采用标准 POSIX 错误码",
+    "对照 must_cover 逐条输出结论，标注源码路径"
+  ]
+}

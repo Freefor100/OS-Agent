@@ -752,14 +752,14 @@ def _extract_token_usage_from_response(response) -> Dict[str, int]:
     }
 
 
-def _llm_classify_batch(nodes: List[dict]) -> Dict[str, dict]:
+def _llm_classify_batch(nodes: List[dict]) -> Tuple[dict, int]:
     """
     用 LLM 批量分类 domain × layer。
     nodes: fn_name, file_path, symbol_kind, code_snippet, snippet_note, caller_hints
-    返回: {fn_name: {"domain": ..., "layer": ...}}
+    返回: ({fn_name: {"domain": ..., "layer": ...}}, 本次 invoke 的 total_tokens；失败为 0)
     """
     if not nodes:
-        return {}
+        return {}, 0
 
     domain_desc = (
         "arch_platform: 启动汇编、平台初始化、硬件驱动（uart/virtio/plic/timer等）\n"
@@ -819,41 +819,25 @@ def _llm_classify_batch(nodes: List[dict]) -> Dict[str, dict]:
         '{"fn_name": {"domain": "...", "layer": "..."}, ...}'
     )
 
-    n_fn = len(nodes)
-    prompt_chars = len(prompt)
-    rough_tok = max(1, prompt_chars // 4)
-    print(
-        f"   📤 发送 LLM：domain×layer 分类 · {n_fn} 个符号 · "
-        f"prompt {prompt_chars:,} 字符（粗估约 {rough_tok:,} tokens）"
-    )
-    sys.stdout.flush()
-
     try:
         from core.agent_builder import build_chat_model
         from langchain_core.messages import HumanMessage
         llm = build_chat_model(temperature=0)
         resp = llm.invoke([HumanMessage(content=prompt)])
         u = _extract_token_usage_from_response(resp)
-        if u.get("total_tokens", 0) > 0:
-            print(
-                f"   📄 Tokens: {u['total_tokens']:,} "
-                f"(输入:{u['prompt_tokens']:,} + 输出:{u['completion_tokens']:,})"
-            )
-        else:
-            print("   📄 Tokens: （本响应未携带 token_usage，以服务商计费面板为准）")
-        sys.stdout.flush()
+        total_tok = int(u.get("total_tokens", 0) or 0)
         text = resp.content.strip()
         if text.startswith("```"):
             parts = text.split("```")
             text = parts[1] if len(parts) > 1 else text
             if text.startswith("json"):
                 text = text[4:]
-        return json.loads(text.strip())
+        return json.loads(text.strip()), total_tok
     except Exception as e:
         logger.warning(f"[ClassifyNodes] LLM 批量分类失败: {e}")
         print(f"   ⚠️  LLM domain×layer 分类失败: {e}")
         sys.stdout.flush()
-        return {}
+        return {}, 0
 
 
 def _refine_layer_after_llm(fn: str, rel_path: str, layer: str) -> str:
@@ -888,10 +872,11 @@ def _normalize_llm_classify_result(preds: dict) -> Dict[str, Dict[str, str]]:
 
 def classify_nodes(top_k: List[str], G: nx.DiGraph,
                    fn_meta: Dict[str, dict],
-                   repo_path: str = "") -> Dict[str, dict]:
+                   repo_path: str = "") -> Tuple[Dict[str, dict], int]:
     """
     对 Top-k 节点分类 domain × layer。
     **仅**通过 LLM（一次请求，含代码片段）分类。
+    返回 (classified 字典, 本次 LLM total_tokens)。
     """
     batch_items: List[dict] = []
     for fn in top_k:
@@ -955,7 +940,7 @@ def classify_nodes(top_k: List[str], G: nx.DiGraph,
             "caller_hints": caller_hints,
         })
 
-    raw = _llm_classify_batch(batch_items)
+    raw, classify_llm_tokens = _llm_classify_batch(batch_items)
     llm_preds = _normalize_llm_classify_result(raw)
     result: Dict[str, dict] = {}
 
@@ -989,7 +974,7 @@ def classify_nodes(top_k: List[str], G: nx.DiGraph,
             "method": "llm",
         }
 
-    return result
+    return result, classify_llm_tokens
 
 
 # ---------------------------------------------------------------------------
@@ -1656,9 +1641,10 @@ def generate_callgraph_section(
     use_embedding: bool = True,  # 保留参数兼容旧调用，已不使用
     force_regenerate: bool = False,
     lsp_max_depth: Optional[int] = None,
-) -> str:
+) -> Tuple[str, int]:
     """
     生成完整的 Call Graph 报告块（Markdown + SVG）。
+    返回 ``(markdown 字符串, domain×layer LLM 消耗的 total_tokens)``；缓存命中或未调用 LLM 时第二项为 0。
 
     缓存（output_dir 下）：
       - ``callgraph_overview.svg``、``callgraph_overview.md``、``callgraph_overview_meta.json``
@@ -1706,7 +1692,7 @@ def generate_callgraph_section(
                     print(f"   上次统计: {fn_n} 个节点, {e_n} 条边（见 meta.json）")
                     print("=" * 80)
                     sys.stdout.flush()
-                    return md
+                    return md, 0
         except Exception:
             pass
 
@@ -1722,7 +1708,7 @@ def generate_callgraph_section(
     # Step 1-3: 构建 DiGraph
     G, fn_meta = build_digraph(repo_path)
     if G.number_of_nodes() == 0:
-        return "> ⚠️  Call Graph 构建失败：未检测到函数\n"
+        return "> ⚠️  Call Graph 构建失败：未检测到函数\n", 0
 
     print(
         f"   [CallGraph 1/6] Tree-sitter 扫描完成: {G.number_of_nodes()} 个符号节点, "
@@ -1751,7 +1737,10 @@ def generate_callgraph_section(
             semantic_note = sem_msg + "。"
 
     if G.number_of_nodes() == 0:
-        return "> ⚠️  Call Graph 构建失败：图中无节点（语义过滤后为空，请检查 libclang 与 compile 配置）\n"
+        return (
+            "> ⚠️  Call Graph 构建失败：图中无节点（语义过滤后为空，请检查 libclang 与 compile 配置）\n",
+            0,
+        )
 
     # Step 4: PageRank Top-k
     pr = nx.pagerank(G, alpha=0.85, max_iter=200) if G.number_of_nodes() > 0 else {}
@@ -1789,10 +1778,10 @@ def generate_callgraph_section(
 
     _backfill_fn_meta_refs(G, fn_meta)
 
-    print(
-        "   [CallGraph 4/6] domain 与 layer 分类（单次 LLM，终端将打印 token 用量）"
+    print("   [CallGraph 4/6] domain×layer 分类（LLM）")
+    classified, cg_llm_tokens = classify_nodes(
+        top_k_nodes, G, fn_meta, repo_path=repo_path
     )
-    classified = classify_nodes(top_k_nodes, G, fn_meta, repo_path=repo_path)
     dc = Counter(info.get("domain", "?") for info in classified.values())
     print(
         "   分类结果 domain 分布: "
@@ -1865,4 +1854,4 @@ def generate_callgraph_section(
     print("   Call Graph 概览块就绪（内容已并入总报告前的独立章节文件）")
     print("=" * 80)
     sys.stdout.flush()
-    return markdown
+    return markdown, cg_llm_tokens

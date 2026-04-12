@@ -1,0 +1,117 @@
+{
+  "stage_id": "10_security",
+  "goal": "分析 xv6-k210 的安全隔离与权限控制机制，重点验证 syscall 路径上权限检查是否真实生效，识别桩函数与能力边界。",
+  "must_cover": [
+    "UID/GID 字段定义但无 syscall 检查链（sys_getuid 恒返回 0）",
+    "无 inode_permission/check_perm 等权限检查函数",
+    "PUM 位用于用户/内核页表隔离（RISC-V PUM，非 KPTI）",
+    "无 SMEP/SMAP 硬件保护机制",
+    "无 prctl/seccomp 安全沙箱实现",
+    "无 Capability/ACL 机制",
+    "文件访问仅检查 O_CREATE/O_DIRECTORY 等标志，无 UID 匹配检查",
+    "Rust 安全性机制：本项目内核为 C 实现，无 Rust 所有权/RAII 保护",
+    "每个声称的安全特性：**检查链**从入口到策略函数是否贯通；与页表隔离（若有关）的**耦合文件**。",
+    "若整体机制单薄：一节内写清能力边界（如仅有凭证字段、无 syscall 检查链）即可。",
+    "**多架构覆盖要求**：本章分析必须覆盖项目支持的所有架构（riscv64, aarch64, x86_64, loongarch64 等），不得仅以某一个架构为视角描述。",
+    "**Rust 安全性机制**：如果项目使用 Rust 编写，必须指出 RAII、所有权分析、基于生命周期的锁等机制带来的安全性。",
+    "用户态/内核态隔离：页表隔离（KPTI）、SMEP/SMAP 是否开启？",
+    "**权限模型深度验证（关键）**：",
+    "**用户/组（UID/GID）**：不仅要看 `Task` 结构体是否有 `uid` 字段，**必须验证**这些字段是否在 `open/write/exec` 等系统调用中被用于权限检查！（grep `check_perm`, `inode_permission`）。如果仅有字段但无检查逻辑，必须注明“**仅有定义但未强制执行（🔸 桩函数）**”。",
+    "**Capability/ACL**：搜索 `capability`, `acl`。",
+    "**安全沙箱 (Seccomp/Prctl)**：",
+    "搜索 `prctl` 或 `seccomp`。",
+    "**必须检查实现**：是返回 `ENOSYS`（未实现），还是直接返回 `0`（假装成功），还是真的解析了 BPF 规则？",
+    "**Stub判断**：如果 `sys_prctl` 只是 returning 0 without doing anything，标记为 **`🔸 桩函数`**。"
+  ],
+  "evidence_targets": [
+    "权限模型：仅有 uid/gid 字段定义，无强制执行逻辑",
+    "用户身份：sys_getuid/sys_getgid 恒返回 0，无实际身份管理",
+    "隔离边界：PUM 位实现用户/内核地址空间隔离",
+    "安全机制：无 seccomp/prctl，无 capability",
+    "权限模型",
+    "用户身份",
+    "隔离边界",
+    "安全机制"
+  ],
+  "seed_paths": [
+    "include/sched/proc.h",
+    "include/fs/stat.h",
+    "kernel/syscall/sysproc.c",
+    "kernel/syscall/sysfile.c",
+    "kernel/fs/file.c",
+    "kernel/exec.c",
+    "include/hal/riscv.h",
+    "include/mm/vm.h",
+    "kernel/mm/vm.c",
+    "kernel/trap/trap.c",
+    "security",
+    "capability",
+    "uid",
+    "perm"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "sys_getuid",
+    "sys_getgid",
+    "sys_openat",
+    "sys_write",
+    "execve",
+    "protect_usr_mem",
+    "permit_usr_mem",
+    "fdalloc",
+    "cap",
+    "permission",
+    "check_perm",
+    "_start"
+  ],
+  "repo_hotspots": [
+    "Cargo.toml",
+    "Makefile",
+    "bootloader",
+    "bootloader/SBI",
+    "debug",
+    "debug/kendryte_openocd",
+    "debug/openocd_cfg",
+    "doc",
+    "doc/img",
+    "include"
+  ],
+  "preferred_tools": [
+    "read_code_segment",
+    "grep_in_repo",
+    "lsp_get_call_graph",
+    "lsp_get_definition"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "review_checklist": [
+    "关键问题是否回答",
+    "重要结论是否给出源码路径",
+    "是否避免将 README 当成实现证据",
+    "是否标出未实现/桩函数",
+    "must_cover_count=12"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "确认 proc 结构体是否包含 uid/gid 字段（已确认：无）",
+    "验证 sys_getuid/sys_getgid 实现（已确认：恒返回 0，桩函数）",
+    "搜索 inode_permission/check_perm 等权限检查函数（已确认：不存在）",
+    "分析 sys_openat/sys_write 是否使用 uid 进行权限校验（已确认：无检查）",
+    "确认 PUM/SUM 位的使用场景与隔离效果（已确认：用于用户/内核地址隔离）",
+    "搜索 prctl/seccomp/sandbox 关键词（已确认：无实现）",
+    "检查 exec.c 中 execve 是否有权限验证逻辑（需进一步确认）",
+    "汇总结论：标记所有桩函数，明确能力边界（仅有 PUM 隔离，无 UID 检查链）"
+  ]
+}

@@ -3,10 +3,11 @@ import sys
 import time
 from huggingface_hub import hf_hub_download
 
-# 配置加速和镜像
-os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
-os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "1"
-os.environ["HF_HUB_READ_TIMEOUT"] = "1000"
+from core.hf_env import apply_hf_hub_env_defaults
+
+apply_hf_hub_env_defaults()
+os.environ.setdefault("HF_HUB_ENABLE_HF_TRANSFER", "1")
+os.environ.setdefault("HF_HUB_READ_TIMEOUT", "1000")
 
 MODEL_ID = "jinaai/jina-embeddings-v2-base-code"
 FILENAME = "model.safetensors"

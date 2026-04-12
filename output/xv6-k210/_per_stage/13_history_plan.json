@@ -1,0 +1,116 @@
+{
+  "stage_id": "13_history",
+  "goal": "分析 xv6-k210 开发历史与里程碑，识别重大变更、作者贡献、模块演进及关键符号首次引入时间。",
+  "must_cover": [
+    "识别 3-5 次重大变更提交（新增/删除/重写），标注代表性路径",
+    "总结作者贡献分布（retrhelo/Lu Sitong/YongkangLi 等）及主力模块",
+    "追踪关键符号（_start/rust_main）首次引入的 commit 及上下文",
+    "识别开发密集期（2021-07~08）与平稳期",
+    "汇总最早 commit 的代码增量与初始子系统搭建情况",
+    "说明文件系统从 imgfs 到 diskfs 的演进",
+    "标注信号处理、mmap/munmap、lazy ELF 加载等重大功能引入节点",
+    "对每次重大变更：若工具或 diff 能支持，标注**新增/删除/大面积重写**之一，并给出**代表性路径**。",
+    "**严禁**把 `get_git_history_summary` 放在循环里调用。你只需要调用**一次**，它会自动返回贯穿仓库生命周期的浓缩摘要。",
+    "**严禁**无脑遍历所有的历史节点。",
+    "当 `get_git_history_summary` 的结果显示某次重大 Commit 涉及了海量文件（如 `[arceos/modules/] 3500 files`）且你需要知道具体加了什么功能时，**必须且只能**使用 `analyze_git_history(repo_path, max_commits=1, skip=N, path_filter=\"arceos/modules\")` 对该重点目录进行定点下钻。",
+    "**绝不允许**在未设定 `path_filter` 的情况下对几千个文件的重大提交使用 `analyze_git_history`，这会导致上万行的输出撑爆监控。",
+    "`find_symbol_first_commit` 可以批量传入多个关键词，请严格合并为 1-2 次统一调用。",
+    "识别出提交密集期（快速开发阶段）和平稳期。",
+    "从 `get_git_history_summary` 的返回中找到最早的几个 commit，汇总其增加的代码行数。",
+    "观察这些最早 commit 涉及的模块，总结第一版已经搭起了哪几个子系统。",
+    "启动入口：`[\"_start\", \"rust_main\", \"kernel_main\"]`",
+    "内存管理：`[\"FrameAllocator\", \"PageTable\", \"MemorySet\"]`",
+    "进程/任务：`[\"TaskInner\", \"spawn_task\", \"ProcessInner\"]`"
+  ],
+  "evidence_targets": [
+    "作者贡献图谱与模块分工",
+    "重大提交的 diff 语义摘要",
+    "关键符号首次出现位置",
+    "文件系统/内存管理/进程模块演进轨迹",
+    "作者贡献",
+    "重大提交",
+    "模块演进",
+    "当前缺口"
+  ],
+  "seed_paths": [
+    "kernel/main.c",
+    "kernel/entry_k210.S",
+    "kernel/fs.c",
+    "kernel/driver_fs.c",
+    "kernel/kalloc.c",
+    "kernel/proc.c",
+    "kernel/trap.c",
+    "Makefile",
+    "git",
+    "history",
+    "README.md",
+    "include/fs",
+    "include/mm",
+    "include/sync"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "_start",
+    "rust_main",
+    "main",
+    "kinit",
+    "disk_fs_init",
+    "fat32_init",
+    "scheduler",
+    "userinit",
+    "git",
+    "start"
+  ],
+  "repo_hotspots": [
+    "Cargo.toml",
+    "Makefile",
+    "bootloader",
+    "bootloader/SBI",
+    "debug",
+    "debug/kendryte_openocd",
+    "debug/openocd_cfg",
+    "doc",
+    "doc/img",
+    "include"
+  ],
+  "preferred_tools": [
+    "get_git_history_summary",
+    "analyze_git_history",
+    "get_commit_diff_summary",
+    "find_symbol_first_commit",
+    "analyze_authors_contribution",
+    "trace_file_evolution"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "review_checklist": [
+    "关键问题是否回答",
+    "重要结论是否给出源码路径",
+    "是否避免将 README 当成实现证据",
+    "是否标出未实现/桩函数",
+    "must_cover_count=12"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 4000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "调用 get_git_history_summary 获取全局提交概览，识别增删行数最多的 5 次重大提交",
+    "对重大提交（如 f3643d55/2fd938bb/56ea7cdc）调用 get_commit_diff_summary 提取核心变更语义",
+    "调用 find_symbol_first_commit 批量查询 _start/rust_main/FrameAllocator 等符号的首次引入 commit",
+    "调用 analyze_authors_contribution 分析贡献者分布，标注每位作者主力贡献的 Top-3 目录",
+    "对关键文件（kernel/fs.c/kernel/main.c）调用 trace_file_evolution 追踪其生命周期演进",
+    "针对文件系统重构节点，使用 analyze_git_history(path_filter=\"kernel/fs\", max_commits=5) 下钻分析",
+    "汇总最早 5 个 commit 的增删行数，总结第一版已搭建的子系统（入口/内存/控制台）",
+    "对照 must_cover 清单，整理重大变更的时间线、作者分工、模块演进缺口，输出历史章节报告"
+  ]
+}

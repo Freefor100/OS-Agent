@@ -1,0 +1,122 @@
+{
+  "stage_id": "07_device_drivers",
+  "goal": "分析 xv6-k210 设备驱动架构：驱动框架、设备发现机制（DTB vs 硬编码）、各外设驱动实现、平台适配方式及 MMU 前后地址切换",
+  "must_cover": [
+    "驱动框架：是否存在 Driver Trait/注册机制，还是直接函数调用初始化",
+    "设备发现：验证是否解析 DTB 文件，或采用硬编码 MMIO 地址（memlayout.h）",
+    "UART/Serial 驱动：控制台输出路径，SBI 调用 vs 直接 MMIO",
+    "Block Device：VirtIO-Blk（QEMU）与 SD 卡（K210）双路径实现",
+    "Net Device/GPU/Input：确认是否未实现",
+    "中断控制器：PLIC/CLINT 驱动初始化与中断注册流程",
+    "MMU 前后串口地址切换：UART 物理地址 vs 虚拟地址（VIRT_OFFSET）",
+    "平台适配：QEMU vs K210 的条件编译机制（#ifdef QEMU）",
+    "驱动初始化调用链：main.c → disk_init → virtio_disk_init/sdcard_init",
+    "每个外设子系统：**本仓支持的硬件列表 + 对应驱动文件**；未支持则写「未接入」而非默认假设 QEMU。",
+    "设备发现：Device Tree (DTS) 解析或 PCI/Bus 扫描？**必须验证**是否真的解析了 `.dtb` 文件，还是硬编码了地址？",
+    "驱动框架：Driver Trait，如何注册/初始化驱动？",
+    "**组件化与配置**：搜索构建配置文件（Cargo.toml 的 features、Kconfig、条件编译宏），分析如何通过编译选项选择不同的驱动/模块实现。",
+    "**平台适配**：搜索 `platform/` 或 `boards/` 目录，列出所有支持的目标平台/开发板及其特有驱动，分析项目如何适配不同硬件。",
+    "常见设备：",
+    "UART/Serial（控制台输出）",
+    "Block Device（磁盘读写，VirtIO-Blk）",
+    "Net Device（网卡，VirtIO-Net）及网络协议栈（TCP/IP, smoltcp 等实现）",
+    "GPU/Input（如有）",
+    "中断控制器：PLIC/CLINT/APIC 驱动。",
+    "**MMU 前后串口地址切换**：分析 UART 驱动在 MMU 启用前（使用物理地址）和 MMU 启用后（使用虚拟地址）的地址切换机制。搜索串口基址常量的不同定义。"
+  ],
+  "evidence_targets": [
+    "驱动框架（有无注册机制）",
+    "设备树解析（DTB 处理）",
+    "UART 驱动实现与控制台路径",
+    "块设备驱动（VirtIO/SD 卡）",
+    "中断控制器 PLIC/CLINT 初始化",
+    "平台适配条件编译",
+    "MMU 地址切换机制",
+    "驱动框架",
+    "中断注册",
+    "块设备/网卡",
+    "平台适配"
+  ],
+  "seed_paths": [
+    "kernel/hal/virtio_disk.c",
+    "kernel/hal/sdcard.c",
+    "kernel/hal/plic.c",
+    "kernel/console.c",
+    "kernel/main.c",
+    "include/memlayout.h",
+    "include/hal/plic.h",
+    "include/hal/virtio.h",
+    "Makefile",
+    "bootloader/SBI/rustsbi-k210/kendryte-k210.dtsi",
+    "driver",
+    "device",
+    "net",
+    "pci"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "disk_init",
+    "virtio_disk_init",
+    "sdcard_init",
+    "plicinit",
+    "plicinithart",
+    "consoleinit",
+    "uart_init",
+    "main",
+    "trapinithart",
+    "probe",
+    "init_driver",
+    "virtio"
+  ],
+  "repo_hotspots": [
+    "Cargo.toml",
+    "Makefile",
+    "bootloader",
+    "bootloader/SBI",
+    "debug",
+    "debug/kendryte_openocd",
+    "debug/openocd_cfg",
+    "doc",
+    "doc/img",
+    "include"
+  ],
+  "preferred_tools": [
+    "lsp_get_call_graph",
+    "lsp_get_definition",
+    "lsp_get_references",
+    "read_code_segment",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "review_checklist": [
+    "关键问题是否回答",
+    "重要结论是否给出源码路径",
+    "是否避免将 README 当成实现证据",
+    "是否标出未实现/桩函数",
+    "must_cover_count=12"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "用 lsp_get_call_graph 分析 disk_init 的调用链（direction=both, max_depth=2），确认驱动初始化入口与调用层次",
+    "用 lsp_get_definition 定位 plicinit、plicinithart、consoleinit 的定义，阅读其实现细节",
+    "用 read_code_segment 精读 kernel/hal/virtio_disk.c 和 kernel/hal/sdcard.c 的关键函数（init、read、write）",
+    "用 grep_in_repo 搜索 DTB、fdt、device_tree 等关键词，验证内核是否真的解析设备树",
+    "用 read_code_segment 查看 include/memlayout.h 中 UART/VIRTIO/PLIC/CLINT 的地址定义，对比 QEMU vs K210 的差异",
+    "用 lsp_get_references 追踪 UART_IRQ/DISK_IRQ 的引用，分析中断注册与处理流程",
+    "用 read_code_segment 阅读 kernel/trap/trap.c 中的中断处理逻辑，确认外设中断如何被响应",
+    "对照 must_cover 逐项收束：整理驱动文件列表、地址来源、平台适配方式、未实现设备清单"
+  ]
+}

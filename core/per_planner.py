@@ -275,16 +275,51 @@ def build_repo_profile(repo_url: str, repo_path: str) -> Dict[str, Any]:
 
 
 def extract_stage_questions(prompt: str) -> List[str]:
-    questions: List[str] = []
-    for raw in prompt.splitlines():
-        line = raw.strip()
-        if not line:
-            continue
-        if line.startswith("- "):
-            candidate = re.sub(r"^\-\s*", "", line).strip()
-            if len(candidate) >= 4:
-                questions.append(candidate)
-    return _dedupe_keep_order(questions[:12])
+    """从阶段 prompt 抽取 must_cover：优先「必须回答」段内条项，再拼接其前的「本章侧重/本阶段须额外覆盖」等条项。
+
+    避免把「要求/强制要求」里偏流程的 `-` 条混进前 12 条（旧逻辑按全文顺序截断会挤掉真正必答项）。
+    """
+    lines = prompt.splitlines()
+
+    def _bullet_text(stripped: str) -> str | None:
+        if not stripped.startswith("- ") or len(stripped) < 6:
+            return None
+        candidate = re.sub(r"^\-\s*", "", stripped).strip()
+        if len(candidate) >= 4:
+            return candidate
+        return None
+
+    must_start = next((i for i, ln in enumerate(lines) if "必须回答" in ln.strip()), -1)
+    if must_start < 0:
+        # 无「必须回答」标题的章节（如 01_overview）：保持全文顺序取前 12 条
+        questions: List[str] = []
+        for raw in lines:
+            t = _bullet_text(raw.strip())
+            if t:
+                questions.append(t)
+        return _dedupe_keep_order(questions[:12])
+
+    must_end = next(
+        (
+            i
+            for i in range(must_start + 1, len(lines))
+            if re.match(r"^(\*\*强制要求\*\*|要求：|输出格式)", lines[i].strip())
+        ),
+        len(lines),
+    )
+    preferred: List[str] = []
+    for raw in lines[must_start:must_end]:
+        t = _bullet_text(raw.strip())
+        if t:
+            preferred.append(t)
+    secondary: List[str] = []
+    for raw in lines[:must_start]:
+        t = _bullet_text(raw.strip())
+        if t:
+            secondary.append(t)
+    # 先 must_cover 核心（必须回答），再补本章侧重/额外覆盖，避免被 secondary 占满 12 条
+    merged = _dedupe_keep_order(preferred + secondary)
+    return merged[:12]
 
 
 def _match_stage_hints(stage_id: str) -> Dict[str, List[str]]:
@@ -384,33 +419,33 @@ def _coerce_str_list(val: Any, max_items: int = 16) -> List[str]:
     return out
 
 
-def apply_llm_plan_overlay(base: PlanSpec, patch: Dict[str, Any]) -> PlanSpec:
+def apply_llm_plan_overlay(base: PlanSpec, overlay: Dict[str, Any]) -> PlanSpec:
     """将 LLM 规划 JSON 合并进启发式 PlanSpec（LLM 列表优先去重拼接）。"""
-    if not patch:
+    if not overlay:
         return base
-    g = patch.get("goal")
+    g = overlay.get("goal")
     new_goal = _norm(str(g))[:120] if isinstance(g, str) and g.strip() else base.goal
 
-    must_llm = _coerce_str_list(patch.get("must_cover"), 16)
+    must_llm = _coerce_str_list(overlay.get("must_cover"), 16)
     must_cover = _dedupe_keep_order(must_llm + base.must_cover)[:22]
 
-    et_llm = _coerce_str_list(patch.get("evidence_targets"), 12)
+    et_llm = _coerce_str_list(overlay.get("evidence_targets"), 12)
     evidence_targets = _dedupe_keep_order(et_llm + base.evidence_targets)[:16]
 
-    seed_llm = _coerce_str_list(patch.get("seed_paths"), 12)
+    seed_llm = _coerce_str_list(overlay.get("seed_paths"), 12)
     seed_paths = (
         _dedupe_keep_order(seed_llm + base.seed_paths)[:14]
         if seed_llm
         else base.seed_paths
     )
 
-    sym_llm = _coerce_str_list(patch.get("entry_symbols"), 10)
+    sym_llm = _coerce_str_list(overlay.get("entry_symbols"), 10)
     entry_symbols = _dedupe_keep_order(sym_llm + base.entry_symbols)[:12]
 
-    pt_llm = _coerce_str_list(patch.get("preferred_tools"), 8)
+    pt_llm = _coerce_str_list(overlay.get("preferred_tools"), 8)
     preferred_tools = pt_llm if pt_llm else base.preferred_tools
 
-    steps_llm = _coerce_str_list(patch.get("execution_steps"), 12)
+    steps_llm = _coerce_str_list(overlay.get("execution_steps"), 12)
     execution_steps = steps_llm if steps_llm else base.execution_steps
 
     return replace(
@@ -469,7 +504,6 @@ def build_dynamic_context(
         },
         "plan_summary": state.plan.to_dict() if state.plan else {},
         "recent_sections": recent_sections,
-        "repair_context": state.metadata.get("repair_context", []),
         "evidence_cache": [item.to_dict() for item in state.evidence_index[: state.plan.context_budget.get("max_evidence_items", 12)]],
         "external_background": global_memory.get("external_background", {}),
     }
@@ -506,7 +540,6 @@ def render_plan_context(state: StageState) -> str:
             "",
             "## 动态上下文摘要",
             f"- recent_sections: {len(dynamic_context.get('recent_sections', []))}",
-            f"- repair_actions: {len(dynamic_context.get('repair_context', []))}",
             f"- cached_evidence: {len(dynamic_context.get('evidence_cache', []))}",
         ]
     )
@@ -516,12 +549,6 @@ def render_plan_context(state: StageState) -> str:
         lines.append("### 最近章节摘要")
         for item in recent_sections:
             lines.append(f"- {item['stage_id']}: {item['summary']}")
-    repair_context = dynamic_context.get("repair_context", [])
-    if repair_context:
-        lines.append("")
-        lines.append("### 本轮修补要求")
-        for action in repair_context[:6]:
-            lines.append(f"- {action}")
     return "\n".join(lines).strip()
 
 

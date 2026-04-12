@@ -39,15 +39,16 @@ except Exception:
     # 兼容旧版依赖
     from langgraph.prebuilt import create_react_agent
 
-from core.agent_builder import get_model_name, build_chat_model, build_reviewer_llm
+from core.agent_builder import get_model_name, build_chat_model
 from core.utils import repo_name_from_url, format_tool_call_summary, format_tool_result_summary, parse_env_repo_list
 from core.per_types import StageState
 from core.per_planner import build_dynamic_context, build_repo_profile, plan_stage, render_plan_context
-from core.per_executor import extract_stage_artifacts
-from core.per_reviewer import review_stage, re_review_stage
-from core.per_repair import repair_stage
 
 load_dotenv()
+from core.hf_env import apply_hf_hub_env_defaults
+
+apply_hf_hub_env_defaults()
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(name)s | %(levelname)s | %(message)s",
@@ -496,7 +497,6 @@ def run_fine_compare(
         ErrorTracker, classify_error, calculate_backoff, RetryConfig,
     )
     error_tracker = ErrorTracker(comparison_dir)
-    reviewer_llm = build_reviewer_llm()
     target_repo_path = os.path.normpath(os.path.join("./repos", target_name))
     target_profile = build_repo_profile(
         repo_url=os.environ.get("REPO_URL", "").strip() or target_name,
@@ -577,7 +577,6 @@ def run_fine_compare(
 
             stage_text = ""
             succeeded = False
-            execution_messages = []
 
             # ── 重试循环（参考 Agent D 的退避机制） ──
             for retry in range(RetryConfig.MAX_RETRIES + 1):
@@ -597,7 +596,6 @@ def run_fine_compare(
                             final_state = state
 
                     if final_state and final_state.get("messages"):
-                        execution_messages = final_state["messages"]
                         for m in reversed(final_state["messages"]):
                             if isinstance(m, AIMessage):
                                 content = (m.content or "").strip()
@@ -652,31 +650,7 @@ def run_fine_compare(
                 # 防御：兜底再剥一次（例如 stage_text 来自缓存/非 succeeded 分支）
                 stage_text = _strip_llm_preamble(stage_text, announce=False)
 
-            artifacts = extract_stage_artifacts(stage_text, execution_messages)
-            stage_state.draft_markdown = artifacts["draft_markdown"] or stage_text
-            stage_state.draft_document = artifacts["draft_document"]
-            stage_state.evidence_index = artifacts["evidence_index"]
-            stage_state.status = "executed"
             _save_json(os.path.join(meta_dir, f"{stage['id']}_plan.json"), stage_state.plan.to_dict() if stage_state.plan else {})
-            _save_json(
-                os.path.join(meta_dir, f"{stage['id']}_evidence_index.json"),
-                {"items": [item.to_dict() for item in stage_state.evidence_index]},
-            )
-
-            review_result = review_stage(stage_state)
-            _save_json(os.path.join(meta_dir, f"{stage['id']}_review.json"), review_result.to_dict())
-            if not review_result.passed:
-                touched_paragraph_ids = repair_stage(
-                    stage_state,
-                    agent=agent,
-                    llm=reviewer_llm,
-                    base_messages=execution_messages,
-                    recursion_limit=min(80, recursion_limit),
-                )
-                if touched_paragraph_ids:
-                    review_result = re_review_stage(stage_state, touched_paragraph_ids)
-                    _save_json(os.path.join(meta_dir, f"{stage['id']}_review_after_repair.json"), review_result.to_dict())
-            stage_text = stage_state.draft_markdown
 
             stage_texts.append(stage_text)
             if succeeded:

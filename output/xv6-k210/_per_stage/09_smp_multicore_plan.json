@@ -1,0 +1,125 @@
+{
+  "stage_id": "09_smp_multicore",
+  "goal": "分析 xv6-k210 的多核/SMP 支持实现，明确区分「真 SMP」与「仅宏/注释」，给出 AP 启动证据链或单核结论，并分析 IPI、Per-CPU 变量、锁实现与多核调度策略。",
+  "must_cover": [
+    "SMP 真伪判定：BSP(hart0) 通过 SBI IPI 唤醒 AP(hart1) 的完整证据链，或明确单核结论",
+    "AP 启动流程：mp_hook() 中从核等待 IPI 的 wfi 循环机制",
+    "IPI 实现：sbi_send_ipi/sbi_clear_ipi 在 main.c 和 trap.c 中的调用",
+    "Per-CPU 变量：cpus[NCPU] 数组设计与 mycpu() 通过 tp 寄存器访问",
+    "SpinLock 实现：acquire() 中 push_off() 禁用中断，无优先级继承",
+    "多核调度：scheduler() 每核独立运行，无负载均衡/亲和性",
+    "交叉引用：__pid 全局 PID 分配、双级注册机制、Futex 缺失",
+    "NCPU=2 配置与 link-k210.ld 中_max_hart_id=1 的对应关系",
+    "**SMP 真伪**：要么给出 AP 在线全链证据（谁唤醒、何处进 idle）；要么明确单核结论，并说明「未找到 AP 启动链」或有关 API 未编译/未调用等依据——勿仅凭宏断言多核。",
+    "**核心任务：一定要极其仔细地在源码中寻找有没有真正实现多核！** 架构设计是 SMP 还是 AMP？**绝不能仅凭看到一两个宏定义就断言支持多核，必须找到唤醒其他核的切实验证。如果不支持多核，务必明确写“仅支持单核（❌ 未实现）”**。",
+    "Secondary CPU 启动等主要功能机制：**必须清晰、详尽地描述其详细的底层工作机制**。具体描述 BSP（主核）是如何通过 IPI 或中断控制器发送信号唤醒 AP（从核）的链条，精确到对应文件的代码逻辑。搜索 `smp_boot`, `__cpu_up`。如果找不到启动其他核的代码，那就是单核。",
+    "核间中断 (IPI)：搜索 `send_ipi`, `ipi_handler`。",
+    "**锁的实现**：SpinLock 是否禁用了中断？Mutex 是否支持优先级继承？",
+    "Per-CPU 变量设计与访问方式。搜索 `axns` 模块，分析 PerCPU 命名空间实现。",
+    "多核调度策略：负载均衡、CPU 亲和性（affinity）。",
+    "自旋锁/RCU 在多核下的实现差异。",
+    "**交叉引用前面章节（必须）**：本章与前面章节有大量交叉，必须引用并深化：",
+    "进程调度中的全局唯一 ID 池（搜索 `AtomicUsize` 用于 PID/TID 分配）",
+    "双级注册机制（线程注册到 Process + 全局管理器）",
+    "同步互斥中的 Futex 实现（在多核场景下的行为）"
+  ],
+  "evidence_targets": [
+    "kernel/main.c:66-74 BSP 发送 IPI 唤醒 AP 的循环",
+    "kernel/main.c:76-85 AP(hart1) 等待 started 标志的忙等",
+    "bootloader/SBI/rustsbi-k210/src/main.rs:47-75 mp_hook() 从核等待 IPI",
+    "kernel/sched/proc.c:94-100 cpus 数组与 mycpu()",
+    "kernel/sync/spinlock.c:26-73 acquire/release 中 push_off/pop_off",
+    "kernel/intr.c:12-41 push_off/pop_off 中断嵌套计数",
+    "kernel/hal/plic.c:34-65 plicinithart 每核中断使能",
+    "include/param.h:5 NCPU=2 定义",
+    "link-k210.ld:7 _max_hart_id=1",
+    "kernel/sched/proc.c:671-710 scheduler() 每核独立调度循环",
+    "kernel/trap/trap.c:300-320 IPI 处理与注释掉的广播代码",
+    "kernel/sched/proc.c:38-41 __pid 全局 PID 分配器",
+    "多核启动",
+    "CPU 本地状态",
+    "IPI",
+    "并发保护"
+  ],
+  "seed_paths": [
+    "kernel/main.c",
+    "kernel/sched/proc.c",
+    "kernel/sync/spinlock.c",
+    "kernel/intr.c",
+    "kernel/hal/plic.c",
+    "kernel/trap/trap.c",
+    "bootloader/SBI/rustsbi-k210/src/main.rs",
+    "include/param.h",
+    "include/sched/proc.h",
+    "include/sync/spinlock.h",
+    "linker/k210.ld",
+    "bootloader/SBI/rustsbi-k210/link-k210.ld",
+    "smp",
+    "cpu"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "main",
+    "mp_hook",
+    "sbi_send_ipi",
+    "sbi_clear_ipi",
+    "cpuinit",
+    "mycpu",
+    "acquire",
+    "release",
+    "push_off",
+    "scheduler",
+    "start_secondary",
+    "boot_secondary"
+  ],
+  "repo_hotspots": [
+    "Cargo.toml",
+    "Makefile",
+    "bootloader",
+    "bootloader/SBI",
+    "debug",
+    "debug/kendryte_openocd",
+    "debug/openocd_cfg",
+    "doc",
+    "doc/img",
+    "include"
+  ],
+  "preferred_tools": [
+    "read_code_segment",
+    "lsp_get_call_graph",
+    "lsp_get_references",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "review_checklist": [
+    "关键问题是否回答",
+    "重要结论是否给出源码路径",
+    "是否避免将 README 当成实现证据",
+    "是否标出未实现/桩函数",
+    "must_cover_count=12"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "精读 kernel/main.c:34-97，确认 BSP 发送 IPI 循环(hartid=0 时 for i=1 to NCPU) 与 AP 忙等 started 标志的完整启动链",
+    "分析 bootloader/SBI/rustsbi-k210/src/main.rs mp_hook()，描述从核如何通过 wfi 等待软中断、清除 IPI 后返回 false 进入内核",
+    "追踪 sbi_send_ipi/sbi_clear_ipi 在 include/sbi.h 的定义及 kernel/trap/trap.c 中的处理逻辑，验证 IPI 传递机制",
+    "读取 kernel/sched/proc.c:94-100 与 include/sched/proc.h:158-163，说明 cpus 数组结构与 mycpu() 通过 tp 寄存器索引的实现",
+    "分析 kernel/sync/spinlock.c:26-73，确认 acquire 调用 push_off 关中断、release 调用 pop_off 恢复，无优先级继承",
+    "读取 kernel/intr.c:12-41，解释 push_off/pop_off 的中断嵌套计数机制(noff/intena)",
+    "检查 kernel/sched/proc.c:671-710 scheduler()，确认每核独立调度循环，无负载均衡/亲和性代码",
+    "交叉引用 kernel/sched/proc.c:38-41 __pid 全局分配器，说明多核下无原子保护(需确认是否用锁保护)"
+  ]
+}

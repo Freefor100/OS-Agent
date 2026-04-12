@@ -1,0 +1,123 @@
+{
+  "stage_id": "08_sync_ipc",
+  "goal": "分析 xv6-k210 的同步原语（SpinLock/SleepLock/WaitQueue）与 IPC 机制（Pipe/Signal），验证锁的原子操作实现、睡眠/唤醒不变量，以及 IPC 各路径的缓冲区形态，区分真实实现与桩函数。",
+  "must_cover": [
+    "SpinLock 实现：使用 `__sync_lock_test_and_set` 原子操作（RISC-V amoswap），非自定义汇编",
+    "SleepLock 实现：基于 SpinLock + sleep/wakeup 机制，支持进程挂起",
+    "WaitQueue 机制：基于双向链表 (dlist)，线程获取锁失败时通过 sleep() 挂起到等待队列",
+    "Pipe 实现：✅ 已实现 - 使用环形缓冲区 (data[PIPE_SIZE] + pdata 扩展)，支持动态扩容 (size_shift)",
+    "Pipe 同步：使用 WaitQueue (rqueue/wqueue) 实现读写阻塞/唤醒，pipelock/pipeunlock 保证 FIFO 顺序",
+    "Signal IPC：✅ 已实现 - sys_kill 发送信号，kill() 设置 killed 字段并唤醒睡眠进程",
+    "Futex：❌ 未实现 - 搜索无结果，sysnum.h 无 SYS_futex",
+    "消息队列/信号量/共享内存：❌ 未实现 - sys_msgget/sys_semget/shmget 均无定义，仅 resource.h 有 ru_msgsnd 统计字段（桩）",
+    "原子操作验证：使用 GCC 内置 `__sync_*` 系列函数，对应 RISC-V AMO 指令",
+    "sleep/wakeup 不变量：sleep 必须持有 proc_lock 或传入的 spinlock，wakeup 遍历 proc_sleep 链表唤醒",
+    "`sys_msgget`/`sys_semget`/`sys_pipe` 等：**队列/环形缓冲**是否真实存在；与 futex 的复用或分叉（路径）。",
+    "锁机制：SpinLock / Mutex / Semaphore / RwLock 实现。",
+    "**原子操作**：是使用 Rust `core::sync::atomic` 还是自定义汇编？(grep `ldxr/stxr`, `lock xchg`)",
+    "**等待队列 (WaitQueue)**：线程获取锁失败时如何挂起？（find `WaitQueue`, `sleep`, `block`）",
+    "**IPC 机制（必须代码验证并分类为 `✅ 已实现`、`🔸 桩函数`、`❌ 未实现`，谨防桩代码）**：",
+    "管道 (Pipe)：**实现验证**：是否使用了环形缓冲区 (Ring Buffer) 还是简单字节流？",
+    "消息队列 (MessageQueue)：**必须检查实现**。grep `sys_msgget` 或 `msgget`。",
+    "如果函数体为空、`Ok(0)` 但没有队列逻辑，必须标记为 **`🔸 桩函数`**。",
+    "只有看到了完整的队列结构体操作（push/pop），才可标记为 **`✅ 已实现`**。",
+    "共享内存 (SharedMem)：结合内存管理章节分析（SharedMemoryManager 实现）。",
+    "信号量 (Semaphore)：PV 操作实现。同样需要检查 `sys_semget`, `semop` 区分是否为桩代码。",
+    "**信号 (Signal) 作为 IPC**：搜索 `sys_kill|sig_send|signal_send`，分析信号分发机制是否也用于进程间通信。"
+  ],
+  "evidence_targets": [
+    "SpinLock 原子操作 (kernel/sync/spinlock.c:30-70)",
+    "SleepLock 实现 (kernel/sync/sleeplock.c)",
+    "WaitQueue 数据结构 (include/sync/waitqueue.h)",
+    "Pipe 环形缓冲与 WaitQueue (kernel/fs/pipe.c, include/fs/pipe.h)",
+    "sys_pipe 系统调用 (kernel/syscall/sysfile.c:318-)",
+    "Signal 发送与处理 (kernel/sched/proc.c:kill, kernel/sched/signal.c)",
+    "sys_kill 系统调用 (kernel/syscall/syssignal.c)",
+    "sleep/wakeup 核心逻辑 (kernel/sched/proc.c:582-400)",
+    "锁与同步原语",
+    "IPC",
+    "Futex",
+    "管道/信号"
+  ],
+  "seed_paths": [
+    "kernel/sync/spinlock.c",
+    "kernel/sync/sleeplock.c",
+    "include/sync/waitqueue.h",
+    "kernel/fs/pipe.c",
+    "include/fs/pipe.h",
+    "kernel/sched/proc.c",
+    "kernel/sched/signal.c",
+    "kernel/syscall/sysfile.c",
+    "kernel/syscall/syssignal.c",
+    "include/sysnum.h",
+    "sync",
+    "lock",
+    "ipc",
+    "futex"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "acquire",
+    "release",
+    "acquiresleep",
+    "releasesleep",
+    "sleep",
+    "wakeup",
+    "kill",
+    "pipealloc",
+    "pipewrite",
+    "piperead",
+    "Mutex",
+    "SpinLock"
+  ],
+  "repo_hotspots": [
+    "Cargo.toml",
+    "Makefile",
+    "bootloader",
+    "bootloader/SBI",
+    "debug",
+    "debug/kendryte_openocd",
+    "debug/openocd_cfg",
+    "doc",
+    "doc/img",
+    "include"
+  ],
+  "preferred_tools": [
+    "read_code_segment",
+    "lsp_get_call_graph",
+    "lsp_get_definition",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "review_checklist": [
+    "关键问题是否回答",
+    "重要结论是否给出源码路径",
+    "是否避免将 README 当成实现证据",
+    "是否标出未实现/桩函数",
+    "must_cover_count=12"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "1. 读取 kernel/sync/spinlock.c 全文，验证 acquire/release 使用 __sync_lock_test_and_set/__sync_lock_release 原子操作",
+    "2. 读取 kernel/sync/sleeplock.c，分析 acquiresleep 如何调用 sleep() 实现进程挂起",
+    "3. 读取 include/sync/waitqueue.h，理解 wait_queue 基于 dlist 的 FIFO 队列设计",
+    "4. 精读 kernel/fs/pipe.c 关键函数：pipealloc(初始化)、pipelock/pipeunlock(队列管理)、pipewrite/piperead(环形缓冲操作)",
+    "5. 读取 kernel/sched/proc.c:kill() 和 sleep()/wakeup()，分析信号发送如何唤醒睡眠进程",
+    "6. 读取 kernel/sched/signal.c:sighandle()，理解信号处理框架（trapframe 保存/恢复）",
+    "7. 检查 kernel/syscall/sysfile.c:sys_pipe 和 syscalls[] 表，确认 pipe2  syscall 已注册",
+    "8. 验证 sysnum.h 无 SYS_futex/SYS_msgget/SYS_semget/SYS_shmget，确认这些 IPC 机制未实现"
+  ]
+}

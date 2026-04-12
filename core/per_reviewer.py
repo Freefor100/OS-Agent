@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import re
-from typing import Any, Callable, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence
 
 from core.per_types import EvidenceItem, ParagraphRecord, ReviewResult, StageState
+from core.per_executor import PATH_RE as LOOSE_SOURCE_PATH_RE
 
 
 PATH_CITATION_RE = re.compile(
@@ -12,7 +13,10 @@ PATH_CITATION_RE = re.compile(
 
 
 def _has_path_citation(text: str) -> bool:
-    return bool(PATH_CITATION_RE.search(text or ""))
+    """优先要求反引号路径（规范引用）；否则若正文已有典型源码路径形态也视为已引用，避免误报刷屏审阅建议。"""
+    if PATH_CITATION_RE.search(text or ""):
+        return True
+    return bool(LOOSE_SOURCE_PATH_RE.search(text or ""))
 
 
 def _contains_readme_reference(text: str) -> bool:
@@ -81,14 +85,14 @@ def _review_paragraphs(state: StageState, target_paragraph_ids: Optional[Sequenc
             severity="critical",
             failed_rules=["empty_draft"],
             missing_evidence=[{"reason": "草稿为空"}],
-            repair_actions=[{"action_type": "replan_stage", "hint": "草稿为空，需重新规划并执行"}],
+            review_suggestions=[{"action_type": "replan_stage", "hint": "草稿为空，需重新规划并执行"}],
         )
 
     hard_failures: List[str] = []
     missing_evidence: List[Dict[str, str]] = []
     weak_claims: List[Dict[str, str]] = []
     format_issues: List[Dict[str, str]] = []
-    repair_actions: List[Dict[str, str]] = []
+    suggestions: List[Dict[str, str]] = []
     missed_modules: List[str] = []
 
     target_ids = set(target_paragraph_ids or [])
@@ -109,17 +113,12 @@ def _review_paragraphs(state: StageState, target_paragraph_ids: Optional[Sequenc
                 "claim_id": paragraph.claim_ids[0] if paragraph.claim_ids else "",
                 "reason": "重要结论缺少源码路径引用",
             })
-            repair_actions.append({
-                "action_type": "add_evidence",
-                "target_paragraph_id": paragraph.paragraph_id,
-                "target_claim_id": paragraph.claim_ids[0] if paragraph.claim_ids else "",
-                "hint": "补充源码路径或符号定义后重写本段",
-            })
-            repair_actions.append({
+            # 每段只生成一条改稿建议（避免同类重复条目翻倍）
+            suggestions.append({
                 "action_type": "rewrite_paragraph",
                 "target_paragraph_id": paragraph.paragraph_id,
                 "target_claim_id": paragraph.claim_ids[0] if paragraph.claim_ids else "",
-                "hint": "保留原意，仅补充缺失的源码证据与路径引用",
+                "hint": "补充反引号源码路径（如 `kernel/mm/vm.c:12`）及必要工具证据后重写本段",
             })
 
         if _contains_readme_reference(paragraph.text) and not strong_evidence:
@@ -129,17 +128,11 @@ def _review_paragraphs(state: StageState, target_paragraph_ids: Optional[Sequenc
                 "claim_id": paragraph.claim_ids[0] if paragraph.claim_ids else "",
                 "reason": "本段结论主要依赖 README/文档，缺少源码证据",
             })
-            repair_actions.append({
-                "action_type": "add_evidence",
-                "target_paragraph_id": paragraph.paragraph_id,
-                "target_claim_id": paragraph.claim_ids[0] if paragraph.claim_ids else "",
-                "hint": "仅补充源码证据；若确无实现，则降级为文档提及但未见代码",
-            })
-            repair_actions.append({
+            suggestions.append({
                 "action_type": "rewrite_paragraph",
                 "target_paragraph_id": paragraph.paragraph_id,
                 "target_claim_id": paragraph.claim_ids[0] if paragraph.claim_ids else "",
-                "hint": "补充源码证据后重写；若仍无实现，则显式降级该结论",
+                "hint": "用 read_code_segment/LSP 补源码证据后重写；若确无实现则显式降级结论",
             })
 
         if any(ev.confidence == "low" for ev in linked_evidence) and not strong_evidence:
@@ -154,7 +147,7 @@ def _review_paragraphs(state: StageState, target_paragraph_ids: Optional[Sequenc
                 "paragraph_id": paragraph.paragraph_id,
                 "reason": "建议将术语“分页表”统一为“页表”",
             })
-            repair_actions.append({
+            suggestions.append({
                 "action_type": "normalize_terminology",
                 "target_paragraph_id": paragraph.paragraph_id,
                 "hint": "统一专业术语，不改变结论",
@@ -170,7 +163,7 @@ def _review_paragraphs(state: StageState, target_paragraph_ids: Optional[Sequenc
                     "claim_id": "",
                     "reason": f"阶段关键问题未回答: {question}",
                 })
-                repair_actions.append({
+                suggestions.append({
                     "action_type": "append_missing_module",
                     "hint": f"补充回答该问题并给出源码证据: {question}",
                 })
@@ -187,7 +180,7 @@ def _review_paragraphs(state: StageState, target_paragraph_ids: Optional[Sequenc
         weak_claims.append({
             "reason": f"计划中的关键路径尚未覆盖: {', '.join(missed_modules[:4])}",
         })
-        repair_actions.append({
+        suggestions.append({
             "action_type": "append_missing_module",
             "hint": f"优先检查以下关键路径: {', '.join(missed_modules[:4])}",
         })
@@ -216,45 +209,58 @@ def _review_paragraphs(state: StageState, target_paragraph_ids: Optional[Sequenc
         weak_claims=weak_claims,
         format_issues=format_issues,
         missed_modules=missed_modules,
-        repair_actions=_dedupe_actions(repair_actions),
+        review_suggestions=_dedupe_actions(suggestions),
     )
 
 
-def review_stage(
-    state: StageState,
-    llm: Any = None,
-    *,
-    llm_primary: bool = False,
-    on_llm_stream_step: Optional[Callable[[str, Dict[str, Any]], None]] = None,
-) -> ReviewResult:
-    rule_result = _review_paragraphs(state)
-    if llm_primary and llm is not None:
+def review_stage(state: StageState, llm: Any = None) -> ReviewResult:
+    """
+    对 `state` 中已写好的 `draft_markdown` / 段落模型做审阅。
+    - 传入 `llm`：仅单次 LLM JSON 审阅（Describe），不做规则预检、不与规则机合并。
+    - 不传 `llm`：仅 `_review_paragraphs` 规则审阅（精比等）。
+    """
+    if llm is not None:
         from core.per_llm_stages import run_llm_review
 
-        llm_result = run_llm_review(
-            state,
-            llm,
-            on_stream_step=on_llm_stream_step,
-            stage_id=state.stage_id,
-        )
-        result = llm_result if llm_result is not None else rule_result
-    else:
-        print(
-            "   📤 ③ Verify: 仅规则审阅（无 LLM；内置检查路径引用、README 证据、must_cover 关键词等）"
-        )
-        print(
-            f"   📥 ③ Verify 结果: passed={rule_result.passed}, score={rule_result.score}, "
-            f"repair_actions={len(rule_result.repair_actions)} 条"
-        )
-        result = rule_result
-    state.review_result = result
-    state.status = "done" if result.passed else "review_failed"
-    return result
+        llm_result = run_llm_review(state, llm, include_evidence_brief=False)
+        if llm_result is not None:
+            result = llm_result
+            print(
+                f"   📥 ③ Verify（LLM）: passed={result.passed}, score={result.score}, "
+                f"severity={result.severity}, review_suggestions={len(result.review_suggestions)} 条"
+            )
+        else:
+            result = ReviewResult(
+                passed=False,
+                score=0.0,
+                severity="minor",
+                failed_rules=["llm_review_failed"],
+                missing_evidence=[],
+                weak_claims=[],
+                format_issues=[],
+                missed_modules=[],
+                review_suggestions=[
+                    {
+                        "action_type": "rewrite_paragraph",
+                        "hint": "LLM 审阅未返回可解析 JSON，请检查模型输出或提示词",
+                    }
+                ],
+            )
+            print(
+                f"   📥 ③ Verify（LLM）: JSON 无效或调用失败 — 已记 failed_rules=llm_review_failed"
+            )
+        state.review_result = result
+        state.status = "done" if result.passed else "review_failed"
+        return result
 
-
-def re_review_stage(state: StageState, target_paragraph_ids: Sequence[str]) -> ReviewResult:
-    result = _review_paragraphs(state, target_paragraph_ids=target_paragraph_ids)
-    state.review_result = result
-    if result.passed:
-        state.status = "patched"
-    return result
+    rule_result = _review_paragraphs(state)
+    print(
+        "   📤 ③ Verify: 仅规则审阅（无 LLM；内置检查路径引用、README 证据、must_cover 关键词等）"
+    )
+    print(
+        f"   📥 ③ Verify 结果: passed={rule_result.passed}, score={rule_result.score}, "
+        f"review_suggestions={len(rule_result.review_suggestions)} 条"
+    )
+    state.review_result = rule_result
+    state.status = "done" if rule_result.passed else "review_failed"
+    return rule_result

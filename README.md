@@ -10,7 +10,7 @@
 
 ### 1. OS-Agent D：自动源码描述 (`os_agent_d_describe.py`) ✨ **增强版**
 
-对 OS 仓库进行 **13 阶段**的深度技术分析，现已升级为**阶段级 Plan-Execute-Review (PER)** 架构，内置本地 RAG 语义搜索、LSP 调用图分析、智能重试、精细 reviewer 与定向修补机制：
+对 OS 仓库进行 **13 阶段**的深度技术分析，现已升级为**阶段级 Plan-Execute-Review (PER)** 架构，内置本地 RAG 语义搜索、LSP 调用图分析、智能重试与章节审阅落盘；Execute 阶段受锁定 **`execution_steps`** 与执行契约约束，审阅结果仅落盘供人工改稿。
 
 | 阶段 | 内容 |
 |------|------|
@@ -38,23 +38,18 @@
 
 **v4.0 新增：阶段级 PER 闭环**
 
-1. 🧭 **Plan**：每章先生成结构化 `PlanSpec`，提前产出 `seed_paths`、`framework_guess`、`arch_guess`、`entry_symbols`，减少 Execute 阶段的盲搜与 Token 消耗。
-2. 🧠 **Execute**：继续复用 ReAct Agent 做证据搜集与报告草稿生成，同时抽取 `evidence_index` 与段落级 `claim_map`。
-3. 🧪 **Review**：按硬规则检查：
-   - 重要结论无源码路径引用 → `pass = false`
-   - 阶段关键问题未回答 → `pass = false`
-   - 结论主要基于 README 而不是源码 → `pass = false`
-   - 仅术语或格式问题 → `pass = true`，但给修订建议
-4. 🩹 **Repair**：仅补缺失证据、仅重写受影响段落、仅对改动范围做二次 reviewer，尽量避免整章重跑。
+1. 🧭 **Plan**：每章生成结构化 `PlanSpec`（`seed_paths`、`must_cover`、`entry_symbols` 等），并锁定 **`execution_steps`**（4～8 条短句）；Execute **须按该顺序**调工具与收束正文（见 `render_plan_context` + `CURSOR_EXECUTION_CONTRACT`）。
+2. 🧠 **Execute**：ReAct Agent 做证据搜集与章节 Markdown；可抽取 `evidence_index` / `claim_map` 供侧车参考。
+3. 🧪 **Review（Describe）**：**仅**单次 **`llm.invoke` JSON 审阅**（`run_llm_review`），**不做**规则机预检、也**不与**规则机结果合并；提示词含草稿、`must_cover`、`review_checklist`。解析失败则记 `llm_review_failed`。
+4. **人工改稿**：`_per_stage/{stage_id}_review.json` 与 `{stage_id}_review_human.md` 落盘结构化审阅与 `review_suggestions` 等字段；由人改 prompt/章节后重跑。
 
-**Describe：`os_agent_d_describe` 中 ③ Verify / ④ Patch 的实现说明（详见代码，不在终端重复念稿）**
+**Describe：`os_agent_d_describe` 中 ③ Verify 的实现说明（详见代码）**
 
 | 阶段 | 实现要点 |
 |------|----------|
-| **③ Verify** | `build_verifier_agent` + LangGraph `stream`，工具集与摸底一致（`get_planning_tools`），`VERIFY_RECURSION_LIMIT=48`。若末轮仍无可用 JSON，回退单次 `llm.invoke`（无工具），再失败则用规则审阅。 |
-| **④ Patch 计划** | `build_patch_plan_agent` + `stream`，`PATCH_PLAN_RECURSION_LIMIT=40`；同样支持 invoke 回退。 |
-| **控制台** | 解析成功时**只打一份**结构化长预览（避免模型原始输出与解析结果各打一遍）。更完整的 JSON 见输出目录 `_per_stage/{stage_id}_review.json`、`_patch_plan.json` 等。 |
-| **④ 校验** | `patch_plan` 里每条 `target_paragraph_id` 必须是段落模型里的 id（如 `p001`），**不能**写章节标题字符串；否则校验会清空动作并回退到审阅自带的 `repair_actions` 或再走 invoke。 |
+| **③ Verify** | `run_llm_review`：`llm.invoke` 单次 JSON；提示词含草稿、`must_cover`、`review_checklist`；**不含**证据索引摘要，**不与**规则机预检合并。解析失败则 `failed_rules=llm_review_failed`。 |
+| **侧车落盘** | `_per_stage/{stage_id}_review.json`（结构化）与 `{stage_id}_review_human.md`（人类可读摘要）。 |
+| **控制台** | 解析成功时**只打一份**结构化长预览。 |
 
 **v4.0 受限外部背景补充**
 
@@ -72,11 +67,11 @@
 | 2. Clang 语义过滤（C/C++） | 用 **libclang** 按 `compile_flags.txt` / `compile_commands.json` 解析 TU，收集**预处理后可进入 AST 的函数定义**；从图中剔除条件编译裁掉的符号，使 PageRank 更接近真实构建。**环境**：`pip install clang`（Python 绑定）+ 系统安装 **LLVM**（含 `libclang.dll`；Windows 下代码会尝试 `C:\\Program Files\\LLVM\\bin\\libclang.dll`）。也可设 `LIBCLANG_PATH` 指向该文件。不可用时跳过并打日志。 |
 | 3. PageRank Top-k | `nx.pagerank(alpha=0.85)` 选出枢纽（默认 k=30，可改） |
 | 4. LSP 精化（可选） | 对前 30 个枢纽调用 `lsp_get_call_graph(..., max_depth=4 或参数 lsp_max_depth)`，补充跨文件边；若 LSP 返回降级/空则跳过 |
-| 5. LLM 批量分类 | 对 Top-k 做 domain×layer 单次 LLM 分类（终端会打印 token） |
+| 5. LLM 批量分类 | 对 Top-k 做 domain×layer **单次** LLM 分类；返回的 token 计入 `describe` 总用量（见阶段结束与收尾汇总） |
 | 6. SVG 渲染 | `domain`（列）× `layer`（行）二维网格，Bezier 连线 |
 | 7. 表格与缓存 | 文件级表、枢纽表；落盘 `callgraph_overview.{svg,md,meta.json}`；**缓存**由 `input_fingerprint`（compile 配置、git HEAD、管线版本、`top_k`/`lsp_max_depth`、libclang 可用性）自动失效，**无需**设置 Call Graph 相关环境变量 |
 
-**代码参数（非环境变量）**：在 `os_agent_d_describe.py` 中调用 `generate_callgraph_section(top_k=30, lsp_refine=True, lsp_max_depth=None, force_regenerate=False)`；`lsp_max_depth` 为 `None` 时用默认 `4`；`force_regenerate=True` 仅用于强制忽略缓存。
+**代码参数（非环境变量）**：在 `os_agent_d_describe.py` 中调用 `generate_callgraph_section(top_k=30, lsp_refine=True, lsp_max_depth=None, force_regenerate=False)`；返回 **`(markdown, llm_total_tokens)`**，第二项为步骤 5 的 LLM token，**已并入** `describe` 末尾「总Token使用」。`lsp_max_depth` 为 `None` 时用默认 `4`；`force_regenerate=True` 仅用于强制忽略缓存。
 
 **LSP 精化**：建议目标仓库有与真实编译一致的 `compile_flags.txt` 或 `compile_commands.json`（Bear/CMake），减轻条件编译符号上的 `DEGRADED`。
 
@@ -104,7 +99,7 @@
   - **框架感知权重**：自动识别两个项目是否基于同一框架（ArceOS/rCore/xv6 等），同框架时将框架贡献维度（D1/D2/D7）权重减半，自研核心维度（D3~D8）权重上调 ×1.4，防止因共享框架导致虚高相似度。
   - **阶段缓存与断点续跑**：粗筛的指纹构建已支持分阶段落盘。`features`、`struct_features`、`embeddings` 会保存在 `output/<repo>/_coarse_stage/` 下，重跑时自动检查本地阶段缓存并跳过已完成阶段，避免因单次超时或中断整轮白跑。现在**最终 `fingerprint.json` 也依赖阶段缓存完整性**：只要某个阶段缓存缺失，即使 `fingerprint.json` 仍在，也会自动判定为需要重组最终指纹，而不是直接命中旧总缓存。
 
-- **精比模块 (`os_agent_c_fine.py`)**：现已升级为**阶段级 PER**。对粗筛出的 Top-K 候选逐阶段执行 `plan -> execute -> review -> repair`，在源码级深度比对的基础上，增加“代码相似 vs 设计相似”区分、证据账本与定向修补。并保留两大量化相似度维度：
+- **精比模块 (`os_agent_c_fine.py`)**：**阶段级 Plan → Execute**（无审阅侧车）。对粗筛出的 Top-K 候选逐阶段生成对比草稿，在源码级深度比对的基础上，增加“代码相似 vs 设计相似”区分。并保留两大量化相似度维度：
   - **Token Jaccard 相似度**（`compare_function_tokens`）：对同名函数体 token 化后计算 Jaccard 指数，去除语言关键字后输出独有符号摘要，提供函数实现层面的客观数字证据。
   - **Call Graph Jaccard 相似度**（`compare_call_graphs`）：对比两项目调用图的节点集合，输出节点 Jaccard = |交集| / |并集|，量化调用拓扑结构的相似程度。
   - **综合评分锚定**：Agent 被强制要求对 5 个核心函数分别获取 Token Jaccard 与 CG Jaccard，以 `综合相似度 = Token Jaccard 均值 × 0.5 + CG Jaccard 均值 × 0.5` 为锚，结合 4 档评级区间（高度相似 / 改进版 / 受启发 / 独立）输出 0-100 最终评分，确保结论有量化依据可追溯。
@@ -200,6 +195,17 @@ void mappages(pagetable_t pagetable, uint64 va, ...) { ... }
 | 索引位置 | `output/<proj>/_vector_db/`（与分析报告同级） |
 | 建索引时代码截断 | ≤ 2000 字符/块 |
 | 搜索结果截断 | ≤ 800 字符/块（防 Token 溢出） |
+
+#### Hugging Face Hub（嵌入模型拉取）
+
+逻辑在 **`core/hf_env.py`** 的 `apply_hf_hub_env_defaults()`（各入口在 `load_dotenv` 之后会调用）：
+
+| 情况 | 行为 |
+|------|------|
+| **`HF_ENDPOINT` 未设置** | 默认写入国内镜像 **`https://hf-mirror.com`**（可用 `OS_AGENT_HF_ENDPOINT` 改默认基址；`OS_AGENT_USE_HF_MIRROR=false` 则不改写，走库默认官方）。 |
+| **`.env` / 环境已设置 `HF_ENDPOINT`** | **原样使用**（写官方即官方，写镜像即镜像）。 |
+
+`os_agent_d_describe.py` 使用 **`load_dotenv(override=True)`**，避免系统里误带的 `HF_ENDPOINT` 盖住仓库 `.env`。详见仓库根目录 **`.env.example`** 中 Hugging Face 小节。
 
 ---
 
@@ -298,6 +304,7 @@ REPO_URL=https://github.com/example/os-project.git
 ENABLE_WEB_SEARCH=false
 # TAVILY_API_KEY=
 # SERPER_API_KEY=
+# 嵌入模型与 HF 镜像（默认国内镜像）：见 .env.example「Hugging Face」一节
 ```
 
 #### 配置项说明
@@ -310,6 +317,8 @@ ENABLE_WEB_SEARCH=false
 | `REPO_URL` | ✅ | 要分析的 OS 仓库 Git 地址 |
 | `ENABLE_WEB_SEARCH` | ❌ | 是否启用 `web_search`（默认关闭，仅用于比赛背景与技术概览） |
 | `TAVILY_API_KEY` / `SERPER_API_KEY` | ❌ | `web_search` 的 provider 密钥，至少配置一种 |
+| `HF_ENDPOINT` 等 | ❌ | 代码嵌入拉取：见上文「Hugging Face Hub」与 `.env.example` |
+
 ### 4. 运行分析
 
 ```bash
@@ -325,11 +334,11 @@ output/
     │   ├── 01_项目概览与技术栈.md
     │   ├── 02_启动流程与架构初始化.md
     │   └── ...
-    ├── _per_stage/             # v4.0 新增：PER 中间产物
+    ├── _per_stage/             # 审阅侧车（章节先写入 sections/ 后再生成）
     │   ├── repo_profile.json
     │   ├── 03_mem_mgmt_plan.json
-    │   ├── 03_mem_mgmt_evidence_index.json
     │   ├── 03_mem_mgmt_review.json
+    │   ├── 03_mem_mgmt_review_human.md
     │   └── ...
     ├── _coarse_stage/          # 粗筛阶段缓存（按项目）
     │   ├── fingerprint_features.json
@@ -491,12 +500,11 @@ evaluation/
 - **`lsp_set_target_arch` 竞争修复**：补加 `async with _lsp_global_lock`，确保 LSP 重启操作等待所有飞行中请求完成后才执行，消除并发调用时的竞态窗口。
 - **`compare_function_tokens` 类型安全**：`syscall_count_real` 和 `trapframe_bytes` 的精确加分逻辑增加 `int()` 类型规范化，防止 LLM 以字符串输出数字时导致的 `TypeError`。
 
-#### 🆕 **v4.0 阶段级 PER、精细 Reviewer 与定向修补**（2026-03-27）
-- **阶段级 Plan-Execute-Review**：`os_agent_d_describe.py` 与 `os_agent_c_fine.py` 引入显式的阶段状态对象 `StageState`，在每个阶段执行前生成 `PlanSpec`，提前给出 `seed_paths`、`framework_guess`、`entry_symbols` 和 `review_checklist`。
-- **动态上下文结构化升级**：在原有 `_build_base_context()` 与 `previous_sections_content` 基础上，新增 `repo_profile`、`evidence_cache`、`repair_context`、`external_background`，从“纯文本拼接”升级为“结构化上下文对象 + 摘要注入”。
-- **证据账本 (`evidence_index`)**：执行阶段会从工具轨迹中抽取路径、符号、调用链入口、证据类型与置信度，供 reviewer 使用，避免重新吞整段 ReAct 历史。
-- **精细 Reviewer 硬规则**：若存在无路径引用的重要结论、阶段关键问题未回答、或结论主要依赖 README 而非源码，review 直接判定失败；术语与格式问题仅给修订建议。
-- **定向修补 (`repair_stage`)**：不再默认整章重跑，而是针对 `paragraph_id` / `claim_id` 做最小修补，只补证据、只改受影响段落、只对改动范围做二次 reviewer。
+#### 🆕 **v4.0 阶段级 PER、LLM 审阅与执行契约**（2026-03-27；后续迭代）
+- **阶段级 Plan-Execute**：`os_agent_d_describe.py` 与 `os_agent_c_fine.py` 使用 `StageState` / `PlanSpec`；Describe 在 Plan 中锁定 **`execution_steps`**，Execute 提示词注入 **`CURSOR_EXECUTION_CONTRACT`**（证据路径、文风与粒度等）。
+- **动态上下文**：`repo_profile`、`evidence_cache`、`external_background` 等经 `render_plan_context` 注入；③ Verify（Describe）为 **单次 LLM JSON 审阅**，**不做**规则预检合并（规则审阅仅在不传 `llm` 的路径使用，如精比侧）。
+- **证据账本 (`evidence_index`)**：可从工具轨迹抽取供侧车参考；Verify 的 LLM 提示默认**不含**证据索引摘要。
+- **审阅落盘**：`*_review.json`、`*_review_human.md`；不改写仓库正文，仅输出侧车供人工处理。
 - **粗筛链路保持轻量**：`os_agent_c_coarse.py` 没有硬套完整 PER，而是新增 `coarse_preplan` 与 `validate_coarse_output()`，继续保持“预侦察 + 指纹构建 + 向量检索”的确定性流水线。
 - **受限 `web_search`**：新增 `tools/web_search.py`，默认关闭，只允许用于“全国大学生操作系统比赛”背景、赛道定位、目标要求和技术概览；禁止作为源码实现证据或查重依据。
 - **细粒度并发保护而非降并发**：保留多 tool call / 多阶段并行能力，只对共享状态热点加最小粒度保护。当前已覆盖同仓库 LSP polyfill/目标架构切换、同项目 RAG 向量索引落盘、同仓库 clone，以及同目标文件写入/导出 PDF，避免把正常的只读检索也串行化。
@@ -552,7 +560,7 @@ OS-Agent/
 ├── os_agent_d_describe.py          # Agent D：OS 源码深度描述（13 个分析阶段 + 仓库准备/RAG 预索引）
 ├── os_agent_d_evaluate.py          # Agent D：报告自动评估
 ├── os_agent_c_coarse.py            # Agent C：粗筛（pre-plan + 向量相似度检索）
-├── os_agent_c_fine.py              # Agent C：精比（阶段级 PER + 定向修补）
+├── os_agent_c_fine.py              # Agent C：精比（阶段级 Plan→Execute，无审阅）
 ├── check_env.py                    # 环境检查脚本（含依赖预检与 LSP 自动安装）
 ├── test_api.py                     # LLM API 连通性快速测试
 ├── force_download_jina.py          # Jina 嵌入模型强制下载脚本
@@ -571,8 +579,8 @@ OS-Agent/
 │   ├── per_types.py                # v4.0：PER 核心数据结构
 │   ├── per_planner.py              # v4.0：plan 阶段、repo_profile、dynamic_context
 │   ├── per_executor.py             # v4.0：草稿与 evidence_index 抽取
-│   ├── per_reviewer.py             # v4.0：reviewer 规则与判定
-│   └── per_repair.py               # v4.0：定向修补控制器
+│   ├── per_reviewer.py             # v4.0：Describe=LLM 审阅；无 llm 时规则审阅
+│   └── hf_env.py                   # Hugging Face 默认镜像、嵌入模型加载
 ├── tools/
 │   ├── lsp_ops.py                  # LSP 封装（callHierarchy、定义、引用、大纲）
 │   ├── file_ops.py                 # 文件操作（read_code_segment、grep_in_repo）
@@ -585,7 +593,7 @@ OS-Agent/
 ├── output/                         # 描述模块输出（按项目名划分）
 │   └── <os-name>/
 │       ├── sections/               # 各章节分段报告
-│       ├── _per_stage/             # v4.0：PER 中间产物（plan/evidence/review）
+│       ├── _per_stage/             # v4.0：PER 中间产物（plan/evidence/review 等）
 │       ├── OS技术分析报告_<os-name>.md
 │       └── describe_error_report.json  # 错误报告（如有）
 └── evaluation/                     # 评估模块输出（按项目名划分）
@@ -617,17 +625,16 @@ OS-Agent/
 - `prompt`: 分析提示词
 - `skip_in_report`: 是否跳过写入最终报告
 
-### v4.0：PER 中间产物
+### v4.0：侧车审阅产物
 
-从 v4.0 开始，`describe` 和 `fine compare` 会额外输出 PER 中间产物，方便排查 reviewer 与 repair 行为：
+`describe` 在章节写入 `sections/` 后，对同一草稿做 **LLM 单次 JSON 审阅**（**不与**规则机预检合并），并落盘：
 
 - `repo_profile.json`：仓库级先验（框架猜测、架构、关键目录、语言混合）
-- `*_plan.json`：阶段计划对象 `PlanSpec`
-- `*_evidence_index.json`：执行阶段抽取的证据账本
-- `*_review.json`：第一次 reviewer 判定
-- `*_review_after_repair.json`：修补后 reviewer 判定（如果发生）
+- `*_plan.json`：阶段 `PlanSpec`（含 **`execution_steps`**、`must_cover` 等，便于对照 Execute 与审阅）
+- `*_review.json`：LLM 审阅结果（`ReviewResult`）
+- `*_review_human.md`：人类可读的审阅摘要
 
-这些文件用于**调试、断点恢复与策略优化**，不直接作为最终报告的一部分。
+`evidence_index` 仅在内存中用于 Execute / 工具侧逻辑，**不**写入 `_per_stage`。`fine compare` 仅在 `vs_<候选>_per/` 下保留 `*_plan.json`（无 `review.json`）。
 
 ### 支持的 CPU 架构
 
@@ -684,12 +691,9 @@ OS-Agent/
 - 单阶段失败不影响后续阶段执行
 - 运行结束时输出错误摘要，并生成 `output/<os-name>/describe_error_report.json`
 
-**v4.0** 还会保留阶段级 PER 元数据，便于定位：
-- 是 `plan` 起点不准
-- 还是 `review` 判定失败
-- 还是 `repair` 没有补上足够证据
+**v4.0** 可结合 `_per_stage/*_review.json` 与 `*_review_human.md` 定位审阅意见；章节正文以 `sections/*.md` 为准。
 
-优先检查 `output/<os-name>/_per_stage/` 下的 `*_review.json` 与 `*_evidence_index.json`。
+优先检查 `output/<os-name>/_per_stage/` 下的 `*_review.json` 与 `*_review_human.md`。
 
 并发保护相关的运行时保证：
 - 当前锁都是**进程内锁**，不会在磁盘上遗留 `.lock` 一类文件，因此程序被终止后，下次启动不会因为旧锁残留而无法运行。
@@ -766,7 +770,13 @@ VERBOSE_LOGGING=true
 - C 实现的 OS（如 xv6, Linux）
 - 混合实现的 OS
 
----
+### Q: 终端里大量 `LSP [...] STDERR: I[...]` 是什么？
+
+本地 **clangd / rust-analyzer** 等会把运行日志写到 **stderr**，属于**正常索引/编译数据库加载信息**，一般**不是**分析失败。若需降噪，可自行调低对应 Language Server 的日志级别或重定向 stderr。
+
+### Q: 嵌入模型仍连 `huggingface.co`？
+
+先确认进程内实际基址：日志里应有 `HF_ENDPOINT=...`（`apply_hf_hub_env_defaults` 打出）。若 `.env` 已写官方地址则会**按官方**访问；若未写 `HF_ENDPOINT` 仍走官方，检查是否设置了 **`OS_AGENT_USE_HF_MIRROR=false`**，或系统环境变量是否抢先于 `.env`（Describe 已 `load_dotenv(override=True)`）。
 
 ---
 

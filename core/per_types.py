@@ -80,7 +80,7 @@ class ReviewResult:
     weak_claims: List[Dict[str, Any]] = field(default_factory=list)
     format_issues: List[Dict[str, Any]] = field(default_factory=list)
     missed_modules: List[str] = field(default_factory=list)
-    repair_actions: List[Dict[str, Any]] = field(default_factory=list)
+    review_suggestions: List[Dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -98,7 +98,6 @@ class StageState:
     draft_document: Optional[DraftDocument] = None
     evidence_index: List[EvidenceItem] = field(default_factory=list)
     review_result: Optional[ReviewResult] = None
-    repair_history: List[Dict[str, Any]] = field(default_factory=list)
     status: str = "init"
     metadata: Dict[str, Any] = field(default_factory=dict)
 
@@ -114,7 +113,6 @@ class StageState:
             "draft_document": self.draft_document.to_dict() if self.draft_document else None,
             "evidence_index": [e.to_dict() for e in self.evidence_index],
             "review_result": self.review_result.to_dict() if self.review_result else None,
-            "repair_history": self.repair_history,
             "status": self.status,
             "metadata": self.metadata,
         }

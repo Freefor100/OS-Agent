@@ -632,35 +632,29 @@ class LocalEmbedder:
                 
             try:
                 import torch
-                from sentence_transformers import SentenceTransformer
-                # 强制离线模式
-                os.environ["HF_HUB_OFFLINE"] = "1"
-                os.environ["TRANSFORMERS_OFFLINE"] = "1"
-                
+                from core.hf_env import load_sentence_transformer_for_embedding
+
                 device = "cuda" if torch.cuda.is_available() else "cpu"
                 logger.info(f"加载 Embedding 模型: {self.model_name} (Device: {device}, Global Load) ...")
-                
-                # 显式指定 dtype 和 device 以避免 meta tensor 错误，且必须 trust_remote_code=True
-                # 显式指定 local_files_only=True 以阻止 trust_remote_code=True 在底层发起网络检验
+
                 model_kwargs = {
                     "dtype": torch.float32,
                     "low_cpu_mem_usage": False,
-                    "trust_remote_code": True
+                    "trust_remote_code": True,
                 }
-                
-                # 先在 CPU 加载再移动到 CUDA
-                model = SentenceTransformer(
-                    self.model_name, 
+
+                # 先在 CPU 加载再移动到 CUDA（与原先行为一致）
+                model = load_sentence_transformer_for_embedding(
+                    self.model_name,
                     trust_remote_code=True,
-                    local_files_only=True,
-                    device="cpu", 
-                    model_kwargs=model_kwargs
+                    device="cpu",
+                    model_kwargs=model_kwargs,
                 )
-                
+
                 if device == "cuda":
                     logger.info(f"正在将模型移动到 {device}...")
                     model = model.to(device)
-                
+
                 LocalEmbedder._shared_models[self.model_name] = model
                 logger.info(f"模型加载完成，向量维度: {model.get_sentence_embedding_dimension()}")
             except ImportError:

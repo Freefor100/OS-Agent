@@ -1,0 +1,121 @@
+{
+  "stage_id": "02_boot_arch",
+  "goal": "分析 xv6-k210 从复位到内核 main 的启动链：SBI 固件交接、链接脚本 ENTRY、汇编入口、多板分支、早期 MMU/串口/FPU 初始化，落到具体路径与符号。",
+  "must_cover": [
+    "链接脚本 ENTRY 点：k210.ld 用 _start，qemu.ld 用 _entry；基地址分别为 0x80020000 和 0x80200000",
+    "汇编入口文件：entry_k210.S (_start)、entry_qemu.S (_entry)、entry.S (_entry) — 直接 call main",
+    "SBI 固件链：bootloader/SBI/rustsbi-k210/link-k210.ld ENTRY(_start)，内核由 SBI 跳转进入",
+    "多平台分支：Makefile platform:=k210|qemu 决定 SRC 包含 entry_k210.S 或 entry_qemu.S，-D QEMU 宏控制条件编译",
+    "模式切换验证：未找到 M-Mode→S-Mode 显式切换代码（无 mstatus.mpp/sstatus.spp 写操作），SBI 可能已完成模式切换",
+    "关键寄存器设置：entry*.S 设置 SP(boot_stack)，main.c 调用 kvminithart() 写 satp，trapinithart() 写 stvec",
+    "跳转到 Rust/C 入口：entry*.S 中 call main 直接跳转，main(hartid, dtb_pa) 为 C 入口",
+    "早期初始化顺序：cpuinit→floatinithart→consoleinit→kvminit→kvminithart→trapinithart→procinit 等",
+    "FPU 初始化：include/hal/riscv.h 中 floatinithart() 写 sstatus.fs 位，已实现并启用",
+    "多平台适配：未发现 VisionFive2/JH7110/LoongArch 相关代码，仅支持 k210 和 qemu 两种 RISC-V 平台",
+    "页表初始化时机：main() 中 hart0 先 kvminit() 创建内核页表，再 kvminithart() 启用；hart1 仅 kvminithart()",
+    "trap 向量设置：trapinithart() 写 stvec=(uint64)kernelvec，usertrapret() 设置用户态 trap 向量到 trampoline",
+    "链接脚本 ENTRY、`#[cfg]`/board 分支、固件链中**实际进入镜像**的环节；未编译路径写明「未进入镜像」。",
+    "多平台/多板：差异入口与互斥关系（证据不足标待核实）。",
+    "构建轮廓（与本章相关者）：`Cargo.toml`/`Cargo.lock` 的 path/patch/git 依赖、默认 feature、`boards/`/`platform/` 等与启动/板级的对应，有则写、无则略。",
+    "启动入口在哪里？（汇编文件如 entry.S 或 head.S，链接脚本 linker.ld 中的 ENTRY）",
+    "CPU 模式切换与初始化（如 RISC-V M-Mode -> S-Mode，x86实模式->保护模式->长模式）。**必须验证是否真的发生了模式切换（查找 sstatus.spp, mstatus.mpp, cr0 等寄存器操作）。**",
+    "关键寄存器设置（栈指针 SP、页表基址 SATP/CR3、中断向量表 stvec 等）。",
+    "它是如何跳转到 Rust/C 入口函数的？",
+    "早期初始化做了什么（BSS 清零、早期串口打印、设备树解析、页表初始化时机）？",
+    "**浮点单元 (FPU) 初始化**：搜索 `sstatus.fs` (RISC-V) 或 `cpacr_el1` (AArch64) 或 `cr4` (x86_64)。如果没有找到相关代码，**必须明确说明未启用 FPU（状态为未实现）**。",
+    "**多平台适配**："
+  ],
+  "evidence_targets": [
+    "启动入口 (entry*.S, linker.ld)",
+    "模式切换 (未实现，依赖 SBI)",
+    "页表/MMU (vm.c kvminit/kvminithart)",
+    "trap 向量 (trap.c trapinithart, trampoline.S)",
+    "FPU 初始化 (riscv.h floatinithart)",
+    "多平台分支 (Makefile, entry_k210.S/entry_qemu.S)",
+    "启动入口",
+    "模式切换",
+    "页表/MMU",
+    "trap 向量"
+  ],
+  "seed_paths": [
+    "kernel/entry.S",
+    "kernel/entry_k210.S",
+    "kernel/entry_qemu.S",
+    "kernel/main.c",
+    "linker/k210.ld",
+    "linker/qemu.ld",
+    "include/hal/riscv.h",
+    "kernel/trap/trap.c",
+    "kernel/trap/trampoline.S",
+    "kernel/mm/vm.c",
+    "bootloader/SBI/rustsbi-k210/link-k210.ld",
+    "Makefile",
+    "arch",
+    "boot"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "_start",
+    "_entry",
+    "main",
+    "floatinithart",
+    "kvminit",
+    "kvminithart",
+    "trapinithart",
+    "kernelvec",
+    "uservec",
+    "cpuinit",
+    "start",
+    "rust_main"
+  ],
+  "repo_hotspots": [
+    "Cargo.toml",
+    "Makefile",
+    "bootloader",
+    "bootloader/SBI",
+    "debug",
+    "debug/kendryte_openocd",
+    "debug/openocd_cfg",
+    "doc",
+    "doc/img",
+    "include"
+  ],
+  "preferred_tools": [
+    "read_code_segment",
+    "lsp_get_call_graph",
+    "lsp_get_definition",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "review_checklist": [
+    "关键问题是否回答",
+    "重要结论是否给出源码路径",
+    "是否避免将 README 当成实现证据",
+    "是否标出未实现/桩函数",
+    "must_cover_count=12"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "确认链接脚本 ENTRY：读取 linker/k210.ld 和 qemu.ld，记录 ENTRY 符号和 BASE_ADDRESS",
+    "追踪汇编入口：读取 entry_k210.S、entry_qemu.S、entry.S，确认 _start/_entry 如何设置 SP 并 call main",
+    "分析 SBI 固件链：读取 bootloader/SBI/rustsbi-k210/link-k210.ld，确认 SBI 的 ENTRY 和加载地址",
+    "验证模式切换：grep 搜索 mstatus.mpp、sstatus.spp、medeleg/mideleg 等寄存器操作，确认是否有 M→S 切换代码",
+    "追踪 MMU 初始化：读取 vm.c 中 kvminit() 和 kvminithart()，确认页表创建和 satp 设置时机",
+    "分析 trap 向量设置：读取 trap.c trapinithart() 和 trampoline.S，确认 stvec 设置和 user/kernel trap 路径",
+    "验证 FPU 初始化：读取 riscv.h floatinithart()，确认 sstatus.fs 位设置和 FPU 启用状态",
+    "对照 Makefile 多平台分支：确认 platform=k210|qemu 如何影响 SRC 选择和编译宏"
+  ]
+}

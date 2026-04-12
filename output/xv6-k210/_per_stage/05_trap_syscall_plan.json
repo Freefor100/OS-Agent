@@ -1,0 +1,124 @@
+{
+  "stage_id": "05_trap_syscall",
+  "goal": "分析 xv6-k210 的 Trap/中断/异常处理机制与系统调用链路，包括入口向量、上下文保存、分发表、Stub 验证及与缺页/信号的交汇点。",
+  "must_cover": [
+    "Trap 入口：usertrap/kerneltrap/kernelvec 的位置与中断/异常区分逻辑（INTERRUPT_FLAG 判断）",
+    "TrapFrame 结构体精确定义：读取 include/trap.h，统计寄存器数量（含 FPU）与总字节数（552 字节）",
+    "系统调用分发：syscall() 函数通过 syscalls[] 表分发，a7 寄存器传递 syscall 号",
+    "分发表验证：kernel/syscall/syscall.c 中 syscalls[] 数组（约 70 项）与 sysnames[] 对应关系",
+    "Stub 验证：检查核心 syscall（sys_clone/sys_exec/sys_mmap/sys_write）是否完整实现或返回错误",
+    "覆盖度统计：区分已实现 syscall 与桩函数（本仓无 todo!/unimplemented!，多数为真实实现）",
+    "Trap/缺页/信号三链交汇：usertrap → handle_excp → handle_page_fault；usertrap → sighandle",
+    "用户指针校验：fetchaddr/copyin2/copyinstr2 在 vm.c 中的实现",
+    "接口/实现分离模式：检查是否存在 _impl 后缀函数（本仓未见此模式）",
+    "具体 syscall 追踪：以 sys_write 为例，从 usertrap→syscall→sys_write→filewrite 的完整路径",
+    "对「高价值 syscall」列表：**实现深度分级**（真逻辑 / 仅 ENOSYS / 返回 0 / todo），并说明与 README 声称是否冲突。",
+    "Trap/信号/缺页三条链的**交汇点**（文件+符号），写清本仓实际存在的衔接代码或缺失。",
+    "Trap 入口：trap_handler / trap_vector 在哪里？如何区分中断（Interrupt）和异常（Exception）？",
+    "上下文保存：TrapFrame / GeneralRegisters 结构体。**必须用 `lsp_get_definition` 或 `read_code_segment` 读取结构体定义，精确统计包含的寄存器数量和总字节数**，不要凭经验估算。",
+    "**系统调用分发追踪**：",
+    "用户态 `ecall`/`syscall` 指令。",
+    "内核态 `syscall_handler` 分发逻辑。",
+    "**必须找到分发表**（syscall table 或 match 语句）。",
+    "**Stub验证**：检查核心 syscall（如 `sys_clone`, `sys_exec`, `sys_mmap`, `sys_write`）等是否直接返回错误、返回 0，或者包含了 `todo!()`/`unimplemented!()`？",
+    "**覆盖度统计**：基于上述验证，明确区分并列出“已注册但仅为桩特征（`🔸 桩函数`）”的 syscall 数量，与“完整功能实现（`✅ 已实现`）”的 syscall 数量。",
+    "选择一个具体 syscall（如 `sys_write`）追踪其从 Trap 到真正处理逻辑的路径。",
+    "**接口/实现分离模式**：如果项目采用了 syscall 接口与实现分离的设计（如 `sys_xxx` 为接口，`sys_xxx_impl` 为实现），必须明确描述此模式。搜索 `_impl` 后缀函数。"
+  ],
+  "evidence_targets": [
+    "trap 入口：kernel/trap/trap.c:usertrap(75 行), kerneltrap(197 行), handle_intr(246 行), handle_excp(328 行)",
+    "syscall 分发：kernel/syscall/syscall.c:syscall(332 行), syscalls[] 表 (188 行)",
+    "TrapFrame 定义：include/trap.h:19-90 行（552 字节，含 32 个 GPR+32 个 FPR+fcsr）",
+    "中断/异常宏定义：kernel/trap/trap.c:24-39 行（INTR_SOFTWARE/INTR_TIMER/INTR_EXTERNAL, EXCP_ENV_CALL 等）",
+    "缺页处理：kernel/mm/vm.c:handle_page_fault(1039 行)",
+    "信号处理：kernel/sched/signal.c:sighandle(177 行)",
+    "用户指针校验：kernel/mm/vm.c:copyin2(837 行), copyinstr2(904 行)",
+    "sys_write 实现：kernel/syscall/sysfile.c:118 行",
+    "trap 入口",
+    "syscall 分发",
+    "TrapFrame",
+    "用户指针校验"
+  ],
+  "seed_paths": [
+    "kernel/trap/trap.c",
+    "kernel/trap/kernelvec.S",
+    "kernel/trap/trampoline.S",
+    "kernel/syscall/syscall.c",
+    "kernel/syscall/sysfile.c",
+    "kernel/syscall/sysproc.c",
+    "kernel/syscall/sysmem.c",
+    "include/trap.h",
+    "include/sysnum.h",
+    "kernel/mm/vm.c",
+    "kernel/sched/signal.c",
+    "kernel/sched/proc.c",
+    "trap",
+    "syscall"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "usertrap",
+    "kerneltrap",
+    "syscall",
+    "trapframe",
+    "handle_page_fault",
+    "sighandle",
+    "sys_write",
+    "sys_clone",
+    "sys_mmap",
+    "copyin2",
+    "trap_handler",
+    "syscall_dispatch"
+  ],
+  "repo_hotspots": [
+    "Cargo.toml",
+    "Makefile",
+    "bootloader",
+    "bootloader/SBI",
+    "debug",
+    "debug/kendryte_openocd",
+    "debug/openocd_cfg",
+    "doc",
+    "doc/img",
+    "include"
+  ],
+  "preferred_tools": [
+    "read_code_segment",
+    "lsp_get_definition",
+    "lsp_get_references",
+    "lsp_get_call_graph",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "review_checklist": [
+    "关键问题是否回答",
+    "重要结论是否给出源码路径",
+    "是否避免将 README 当成实现证据",
+    "是否标出未实现/桩函数",
+    "must_cover_count=12"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "1. 读取 include/trap.h:19-90 行，精确统计 trapframe 结构体的寄存器字段数量与总字节数（确认 552 字节）",
+    "2. 读取 kernel/trap/trap.c:1-75 行，分析 INTERRUPT_FLAG 宏与中断/异常宏定义，理解 usertrap 中 cause 判断逻辑",
+    "3. 读取 kernel/syscall/syscall.c:188-260 行，统计 syscalls[] 表中已注册的 syscall 数量，对照 sysnames[] 列出所有 syscall 名称",
+    "4. 读取 kernel/syscall/sysfile.c:118-130 行（sys_write）、kernel/syscall/sysproc.c:91-100 行（sys_clone）、kernel/syscall/sysmem.c:80-110 行（sys_mmap），验证这些核心 syscall 是否包含真实逻辑或仅返回错误",
+    "5. 使用 lsp_get_references 查询 syscalls 数组在哪些文件被引用，确认分发表的唯一性",
+    "6. 读取 kernel/mm/vm.c:1039-1105 行（handle_page_fault）与 kernel/sched/signal.c:177-260 行（sighandle），分析 usertrap 中三链交汇点（handle_excp→handle_page_fault 与 sighandle 调用条件）",
+    "7. 使用 lsp_get_call_graph 追踪 sys_write 的 incoming 调用链（syscall→sys_write→filewrite），绘制完整路径",
+    "8. 汇总统计：列出 syscalls[] 表中所有 syscall 号与名称，标注哪些是完整实现、哪些返回 -ENOSYS/-1、哪些是桩函数，给出覆盖度百分比"
+  ]
+}

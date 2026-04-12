@@ -1,4 +1,4 @@
-"""终端长预览与 LLM 调用日志（Plan / Verify / Patch / Repair 共用）。"""
+"""终端长预览与 LLM 调用日志（Plan / Verify 等共用）。"""
 from __future__ import annotations
 
 from typing import Any, List, Optional

@@ -1,0 +1,22 @@
+# 审阅说明 · 启动流程与架构初始化
+
+- **stage_id**: `02_boot_arch`
+- **passed**: False
+- **score**: 0.85
+- **severity**: minor
+
+## failed_rules
+- `must_cover_gap`
+
+## missing_evidence
+- {'paragraph_id': '多平台启动流程', 'claim_id': 'must_cover_4', 'reason': 'Makefile 代码片段展示了 platform 变量和 SBI 选择，但未展示 SRC 包含 entry_k210.S 或 entry_qemu.S 的具体逻辑行'}
+- {'paragraph_id': 'Trap 向量设置', 'claim_id': 'must_cover_12', 'reason': '仅展示了 trapinithart() 设置 stvec，未展示 usertrapret() 设置用户态 trap 向量到 trampoline 的代码或说明'}
+
+## weak_claims
+- {'paragraph_id': '多平台启动流程', 'claim': 'Makefile 决定 SRC 包含特定入口文件', 'reason': '缺乏对应的 Makefile 源码行号证据支持 SRC 变量赋值逻辑'}
+
+## repair_actions（人工改进建议，不自动执行）
+1. `add_evidence` — 补充 Makefile 中根据 platform 变量添加 entry_k210.S 或 entry_qemu.S 到 SRC/OBJS 的具体代码行
+2. `add_evidence` — 补充 usertrapret() 函数中设置用户态 trap 向量指向 trampoline 的代码片段及简要说明
+
+_结构化完整数据：`02_boot_arch_review.json`_

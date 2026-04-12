@@ -1,8 +1,8 @@
 """
 LLM 驱动的 Plan / Review 阶段（与规则式 per_planner / per_reviewer 配合）。
 
-describe 主流程中：每阶段调用「LLM 规划 Agent」、③ Verify / ④ Patch 计划（默认 ReAct + stream，与 ② 同构）及失败时的 invoke 回退；
-审阅 JSON 仍失败时回退规则审阅（见 per_reviewer.review_stage）。
+describe 主流程中：每阶段调用「LLM 规划 Agent」；③ Verify 为基于正文与规则清单的单次 `llm.invoke`（无工具）；
+解析失败时返回 `None`，由 `per_reviewer.review_stage` 记 `llm_review_failed`（Describe）或精比侧仅规则审阅。
 """
 from __future__ import annotations
 
@@ -13,8 +13,6 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langgraph.errors import GraphRecursionError
-
-from core.agent_builder import build_patch_plan_agent, build_verifier_agent
 from core.per_io_preview import (
     log_llm_response_tokens,
     log_llm_text_call_out,
@@ -25,17 +23,7 @@ from core.per_types import PlanSpec, ReviewResult, StageState
 logger = logging.getLogger(__name__)
 
 PLANNER_RECURSION_LIMIT = 64
-VERIFY_RECURSION_LIMIT = 48
-PATCH_PLAN_RECURSION_LIMIT = 40
 
-VERIFIER_AGENT_SYSTEM = """你是 describe 流水线里「③ Verify」子过程的 ReAct 智能体，与「② Execute」使用**同一套工具类型**（`get_planning_tools`：目录/RAG/LSP/小段精读等，只读）。
-- 若对某条结论是否真有代码支撑存疑，可**按需**调用工具做 spot-check；不要漫无目的扫仓，建议工具轮次 ≤10。
-- 你也可以在证据已足时**不调用工具**，直接根据用户给出的草稿与证据摘要下判断。
-- 当你准备给出最终审查结论时：**最后一条**助手消息必须**只包含**一段 ```json ... ```，字段与用户在 Human 消息中要求的 JSON 完全一致；不要在代码块外再写任何文字。"""
-
-PATCH_PLAN_AGENT_SYSTEM = """你是「④ Patch 计划」子过程的 ReAct 智能体，工具集与 Plan/Verify 相同（只读）。
-- 若需确认某 `paragraph_id` 与仓库是否匹配，可少量用 `list_repo_structure` / `grep_in_repo` 等；多数情况可直接压缩用户给出的 repair_actions。
-- **最后一条**助手消息必须**只包含** ```json ... ```，内含 patch_summary 与 patch_plan；代码块外勿写文字。"""
 PLANNER_SYSTEM = """你是操作系统代码分析任务的「规划员」，只做两件事：
 1) 使用工具摸清本仓库与当前阶段相关的目录/模块/符号/调用关系（不要写正式分析报告）。
 2) 在信息足够后，输出**唯一**一段 Markdown 的 ```json ... ``` 围栏，其中为一个 JSON 对象，字段如下（均为选填，与启发式计划合并）：
@@ -105,8 +93,8 @@ def run_llm_planning_agent(
     log_io: bool = True,
 ) -> Tuple[Dict[str, Any], str]:
     """
-    运行规划 Agent，返回 (patch 字典, repo_structure_notes)。
-    patch 可交给 per_planner.apply_llm_plan_overlay。
+    运行规划 Agent，返回 (规划增量 JSON 字典, repo_structure_notes)。
+    字典可交给 per_planner.apply_llm_plan_overlay 合并进 PlanSpec。
     on_stream_step(node_name, state)：每个 graph 事件回调，便于与 Execute 一样打印 Tool/Token。
     """
     global_memory = global_memory or {}
@@ -268,11 +256,11 @@ def _review_result_from_parsed_dict(data: Dict[str, Any], log_io: bool) -> Optio
             severity = "minor"
 
         failed_rules_f = _str_list("failed_rules")
-        repair_actions_f = _obj_list("repair_actions")
+        review_suggestions_f = _obj_list("review_suggestions")
         if log_io:
             print(
                 f"   📥 ③ Verify 结果: passed={passed}, score={score}, severity={severity}, "
-                f"repair_actions={len(repair_actions_f)} 条, failed_rules={len(failed_rules_f)} 条"
+                f"review_suggestions={len(review_suggestions_f)} 条, failed_rules={len(failed_rules_f)} 条"
             )
             print_agent_long_preview(
                 "【③ Verify】解析结果 Agent:",
@@ -289,7 +277,7 @@ def _review_result_from_parsed_dict(data: Dict[str, Any], log_io: bool) -> Optio
             weak_claims=_obj_list("weak_claims"),
             format_issues=_obj_list("format_issues"),
             missed_modules=_str_list("missed_modules"),
-            repair_actions=repair_actions_f,
+            review_suggestions=review_suggestions_f,
         )
     except (TypeError, ValueError) as e:
         logger.warning("run_llm_review 字段解析失败: %s", e)
@@ -303,13 +291,9 @@ def run_llm_review(
     llm: Any,
     *,
     log_io: bool = True,
-    on_stream_step: Optional[Callable[[str, Dict[str, Any]], None]] = None,
-    stage_id: str = "",
+    include_evidence_brief: bool = False,
 ) -> Optional[ReviewResult]:
-    """
-    ③ Verify：默认与 ② Execute 同构 —— ReAct + stream +（可选）print_step；
-    若未产出可解析 JSON，则回退为单次 llm.invoke（仍无工具）。
-    """
+    """③ Verify：单次 llm.invoke，无工具；依据草稿正文、must_cover、review_checklist（可选证据摘要）。"""
     plan = state.plan
     draft = state.draft_markdown or ""
     if not draft.strip():
@@ -317,25 +301,29 @@ def run_llm_review(
 
     checklist = (plan.review_checklist if plan else []) or []
     must_cover = (plan.must_cover if plan else [])[:12]
-    sid = stage_id or state.stage_id
 
-    prompt = f"""你是技术报告审阅员。根据「草稿正文 + 证据摘要 + 必答要点」输出**仅一段** ```json 代码块。
+    evidence_block = ""
+    if include_evidence_brief:
+        evidence_block = f"""
+## 证据索引摘要
+{_evidence_brief(state.evidence_index)}
+"""
+
+    prompt = f"""你是技术报告审阅员。仅根据下方「草稿正文」与「规则/要点」独立判断，**不要假设**存在未展示的工具轨迹或隐藏证据。
+请输出**仅一段** ```json 代码块。
 
 ## 审阅原则
 1. 重要技术结论是否带有具体源码路径（反引号路径或 file:line）？
-2. 是否明显把 README 当实现证据、或臆测未在证据中出现的实现？
+2. 是否明显把 README 当实现证据、或正文中断言超出合理依据？
 3. 阶段 must_cover 是否在正文中有实质回答（允许同义表述）？
-4. 宁严勿松：证据不足应判未通过并给出可执行的修补动作。
+4. 宁严勿松：依据不足应判未通过；`review_suggestions` 仅填**供人工改稿**的可执行建议（本流水线不会自动执行它们）。
 
 ## must_cover（阶段要点）
 {json.dumps(must_cover, ensure_ascii=False, indent=2)}
 
 ## review_checklist
 {json.dumps(checklist, ensure_ascii=False, indent=2)}
-
-## 证据索引摘要
-{_evidence_brief(state.evidence_index)}
-
+{evidence_block}
 ## 草稿正文
 {_truncate(draft, 36000)}
 
@@ -348,50 +336,13 @@ def run_llm_review(
 - weak_claims: object[]
 - format_issues: object[]
 - missed_modules: string[]
-- repair_actions: object[]  每项须含 action_type（add_evidence|rewrite_paragraph|append_missing_module|normalize_terminology|drop_unsupported_claim）、可选 target_paragraph_id、hint
+- review_suggestions: object[]  每项须含 action_type（add_evidence|rewrite_paragraph|append_missing_module|normalize_terminology|drop_unsupported_claim）、可选 target_paragraph_id、hint
 
 最后一轮回复**只包含** ```json ... ```，不要其它文字。"""
 
-    messages = [
-        SystemMessage(content=VERIFIER_AGENT_SYSTEM),
-        HumanMessage(content=prompt),
-    ]
-    final_state = None
-    try:
-        agent = build_verifier_agent(stage_id=sid)
-        for event in agent.stream(
-            {"messages": messages},
-            config={"recursion_limit": VERIFY_RECURSION_LIMIT},
-        ):
-            for node_name, current_state in event.items():
-                final_state = current_state
-                if on_stream_step is not None:
-                    on_stream_step(node_name, current_state)
-    except GraphRecursionError:
-        logger.warning(
-            "run_llm_review ReAct 已达 recursion_limit=%s，尝试解析已生成消息或回退 invoke",
-            VERIFY_RECURSION_LIMIT,
-        )
-
-    content = ""
-    if final_state and final_state.get("messages"):
-        content = _final_ai_text_for_json(final_state["messages"])
-        if log_io and content:
-            for m in reversed(final_state["messages"]):
-                if isinstance(m, AIMessage) and (m.content or "").strip():
-                    meta = getattr(m, "response_metadata", None) or {}
-                    if isinstance(meta, dict) and meta.get("token_usage"):
-                        log_llm_response_tokens("③ Verify ReAct", m)
-                        break
-
-    data = extract_json_object(content) if content else None
-    if data:
-        return _review_result_from_parsed_dict(data, log_io)
-
     if log_io:
-        print("   ⚠️ ③ Verify: ReAct 未得到可解析 JSON → 回退单次 llm.invoke（无工具）")
-    if log_io:
-        log_llm_text_call_out("③ Verify（回退 invoke）", prompt, extras=[])
+        log_llm_text_call_out("③ Verify（invoke）", prompt, extras=[])
+
     try:
         resp = llm.invoke(prompt)
         content_fb = (getattr(resp, "content", None) or "").strip()
@@ -408,7 +359,7 @@ def run_llm_review(
     if not data_fb:
         logger.warning("run_llm_review 无法解析 JSON")
         if log_io:
-            print("   📥 ③ Verify 结果: JSON 解析失败，将回退规则审阅")
+            print("   📥 ③ Verify 结果: JSON 解析失败")
             if content_fb:
                 print_agent_long_preview(
                     "【③ Verify】invoke 未解析 · 原文 Agent:",
@@ -419,199 +370,3 @@ def run_llm_review(
         return None
 
     return _review_result_from_parsed_dict(data_fb, log_io)
-
-
-_PATCH_ACTION_TYPES = frozenset(
-    {"add_evidence", "rewrite_paragraph", "append_missing_module", "normalize_terminology", "drop_unsupported_claim"}
-)
-
-
-def _patch_plan_from_parsed_dict(
-    data: Optional[Dict[str, Any]],
-    valid_para: set[str],
-    max_actions: int,
-    log_io: bool,
-    *,
-    invalid_json_msg: bool = True,
-) -> Tuple[Optional[List[Dict[str, Any]]], str]:
-    """从 LLM 解析出的 dict 生成 (cleaned_actions, patch_summary)；无效时 (None, '')。"""
-    if not data or not isinstance(data.get("patch_plan"), list):
-        if log_io and invalid_json_msg:
-            print("   📥 ④ Patch 计划 结果: JSON 无效，将回退使用全部 repair_actions")
-        return None, ""
-
-    rows: List[Dict[str, Any]] = []
-    for item in data["patch_plan"]:
-        if not isinstance(item, dict):
-            continue
-        at = str(item.get("action_type") or "").strip()
-        if at not in _PATCH_ACTION_TYPES:
-            continue
-        pid = str(item.get("target_paragraph_id") or "").strip()
-        if at == "append_missing_module":
-            if pid and pid not in valid_para:
-                continue
-        else:
-            if not pid or pid not in valid_para:
-                continue
-        hint = str(item.get("hint") or "").strip()[:800]
-        order = item.get("order")
-        try:
-            oi = int(order) if order is not None else len(rows) + 1
-        except (TypeError, ValueError):
-            oi = len(rows) + 1
-        rows.append({"order": oi, "action_type": at, "target_paragraph_id": pid, "hint": hint})
-
-    rows.sort(key=lambda x: x.get("order", 99))
-    cleaned = [
-        {"action_type": x["action_type"], "target_paragraph_id": x["target_paragraph_id"], "hint": x["hint"]}
-        for x in rows[:max_actions]
-    ]
-
-    if not cleaned:
-        if log_io:
-            print("   📥 ④ Patch 计划 结果: 校验后无有效动作，回退全部 repair_actions")
-            print_agent_long_preview(
-                "【④ Patch 计划】校验失败 · 模型 JSON Agent:",
-                json.dumps(data, ensure_ascii=False, indent=2),
-                max_chars=7000,
-                max_lines=180,
-            )
-        return None, ""
-    summary = ""
-    ps = data.get("patch_summary")
-    if isinstance(ps, str) and ps.strip():
-        summary = ps.strip()[:500]
-        logger.info("patch_plan: %s", summary[:200])
-    if log_io:
-        print(f"   📥 ④ Patch 计划 结果: 有效动作 {len(cleaned)} 条；summary={'有' if summary else '无'}")
-        print_agent_long_preview(
-            "【④ Patch 计划】→ ⑤ Apply Agent:",
-            json.dumps({"patch_summary": summary, "patch_plan": cleaned}, ensure_ascii=False, indent=2),
-            max_chars=5000,
-            max_lines=100,
-        )
-    return cleaned, summary
-
-
-def run_llm_patch_plan(
-    state: StageState,
-    review_result: ReviewResult,
-    llm: Any,
-    *,
-    max_actions: int = 6,
-    log_io: bool = True,
-    on_stream_step: Optional[Callable[[str, Dict[str, Any]], None]] = None,
-    stage_id: str = "",
-) -> Tuple[Optional[List[Dict[str, Any]]], str]:
-    """
-    ④ Patch 计划：默认与 ② Execute 同构 —— ReAct + stream；
-    若未产出有效 patch JSON，回退单次 llm.invoke。
-    """
-    if not state.draft_document:
-        return None, ""
-    valid_para = {p.paragraph_id for p in state.draft_document.paragraphs}
-    ra = review_result.repair_actions[:24]
-    ra_json = json.dumps(ra, ensure_ascii=False, indent=2)[:12000]
-    para_list = ", ".join(sorted(valid_para))[:2000]
-    sid = stage_id or state.stage_id
-
-    prompt = f"""你是技术编辑。审阅未通过，但修补要**小而准**（类似 IDE 里只改几处），不要大而全重写。
-
-## 阶段
-{state.stage_title} ({state.stage_id})
-
-## 段落 id（target_paragraph_id 只能从中选；append_missing_module 可无 id）
-{para_list}
-
-## failed_rules
-{json.dumps(review_result.failed_rules, ensure_ascii=False)}
-
-## 当前 repair_actions（可能过多，请你压缩为最少步骤）
-{ra_json}
-
-## 要求
-输出**仅一段** ```json```，结构如下：
-{{
-  "patch_summary": "一句话说明本轮只修什么",
-  "patch_plan": [
-    {{
-      "order": 1,
-      "action_type": "add_evidence|rewrite_paragraph|append_missing_module|normalize_terminology|drop_unsupported_claim",
-      "target_paragraph_id": "p001 或空字符串",
-      "hint": "给执行修补用的最短提示"
-    }}
-  ]
-}}
-
-规则：
-- patch_plan 最多 {max_actions} 条，按 order 升序；合并同类项。
-- 优先：补路径引用、改一段、术语统一；避免无的放矢的 append。
-- target_paragraph_id 必须与上面列表一致，否则不要该项。
-- 不要编造不存在的 paragraph_id。"""
-
-    messages = [
-        SystemMessage(content=PATCH_PLAN_AGENT_SYSTEM),
-        HumanMessage(content=prompt),
-    ]
-    final_state = None
-    try:
-        agent = build_patch_plan_agent(stage_id=sid)
-        for event in agent.stream(
-            {"messages": messages},
-            config={"recursion_limit": PATCH_PLAN_RECURSION_LIMIT},
-        ):
-            for node_name, current_state in event.items():
-                final_state = current_state
-                if on_stream_step is not None:
-                    on_stream_step(node_name, current_state)
-    except GraphRecursionError:
-        logger.warning(
-            "run_llm_patch_plan ReAct 已达 recursion_limit=%s，尝试解析或回退 invoke",
-            PATCH_PLAN_RECURSION_LIMIT,
-        )
-
-    content = ""
-    if final_state and final_state.get("messages"):
-        content = _final_ai_text_for_json(final_state["messages"])
-        if log_io and content:
-            for m in reversed(final_state["messages"]):
-                if isinstance(m, AIMessage) and (m.content or "").strip():
-                    meta = getattr(m, "response_metadata", None) or {}
-                    if isinstance(meta, dict) and meta.get("token_usage"):
-                        log_llm_response_tokens("④ Patch 计划 ReAct", m)
-                        break
-
-    data = extract_json_object(content) if content else None
-    cleaned, summary = _patch_plan_from_parsed_dict(
-        data, valid_para, max_actions, log_io, invalid_json_msg=False
-    )
-    if cleaned is not None:
-        return cleaned, summary
-
-    if log_io:
-        print("   ⚠️ ④ Patch 计划: ReAct 未得到有效 patch JSON → 回退单次 llm.invoke")
-    if log_io:
-        log_llm_text_call_out("④ Patch 计划（回退 invoke）", prompt, extras=[])
-
-    try:
-        resp = llm.invoke(prompt)
-        content_fb = (getattr(resp, "content", None) or "").strip()
-    except Exception as e:
-        logger.warning("run_llm_patch_plan invoke 失败: %s", e)
-        if log_io:
-            print(f"   📥 ④ Patch 计划 结果: invoke 失败 — {e}")
-        return None, ""
-
-    if log_io:
-        log_llm_response_tokens("④ Patch 计划 invoke", resp)
-
-    data_fb = extract_json_object(content_fb)
-    if not data_fb and log_io and content_fb.strip():
-        print_agent_long_preview(
-            "【④ Patch 计划】invoke 未解析 · 原文 Agent:",
-            content_fb,
-            max_chars=6000,
-            max_lines=120,
-        )
-    return _patch_plan_from_parsed_dict(data_fb, valid_para, max_actions, log_io, invalid_json_msg=True)

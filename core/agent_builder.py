@@ -211,18 +211,6 @@ def build_planner_agent(model: str = None, stage_id: str = ""):
     return create_react_agent(llm, get_planning_tools(stage_id))
 
 
-def build_verifier_agent(model: str = None, stage_id: str = ""):
-    """③ Verify：与 Execute 同构的 ReAct Agent；工具集同 `get_planning_tools`（只读摸底/LSP/精读）。"""
-    llm = build_chat_model(model=model, temperature=0)
-    return create_react_agent(llm, get_planning_tools(stage_id))
-
-
-def build_patch_plan_agent(model: str = None, stage_id: str = ""):
-    """④ Patch 计划：同构 ReAct；可选工具辅助核对段落与仓库后再输出压缩 JSON。"""
-    llm = build_chat_model(model=model, temperature=0)
-    return create_react_agent(llm, get_planning_tools(stage_id))
-
-
 def build_executor_agent(model: str = None, stage_id: str = "", tools=None):
     """构建执行阶段使用的 ReAct Agent。"""
     llm = build_chat_model(model=model)
@@ -231,7 +219,7 @@ def build_executor_agent(model: str = None, stage_id: str = "", tools=None):
 
 
 def build_reviewer_llm(model: str = None):
-    """构建轻量 reviewer/repair 使用的普通 LLM。"""
+    """构建轻量 reviewer 使用的普通 LLM（③ Verify 单次 invoke）。"""
     return build_chat_model(model=model, temperature=0)
 
 

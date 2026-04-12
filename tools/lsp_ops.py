@@ -1317,6 +1317,49 @@ def _find_symbol_positions(abs_path: str, symbol: str) -> List[Tuple[int, int]]:
         pass
     return positions
 
+
+def _diagnose_call_graph_prepare_failure(symbol: str, file_lines: List[str]) -> str:
+    """
+    prepareCallHierarchy 在所有锚点均为空时，根据当前文件内容给出**可打印的成因说明**
+    （常见：宏名、token 拼接宏、索引/编译数据库问题、锚点落在非函数实体等）。
+    """
+    if not file_lines:
+        return (
+            f"无法读取 `{symbol}` 所在文件内容，无法判断根因；"
+            "请确认路径与编码。后续将尝试语义引用或静态兜底。"
+        )
+    text = "\n".join(line.rstrip("\r") for line in file_lines)
+    # 符号作为 #define 的宏名（callHierarchy 通常不支持以宏名为根）
+    if re.search(rf"(?m)^\s*#\s*define\s+{re.escape(symbol)}\b", text):
+        return (
+            f"宏名：本文件存在 `#define {symbol}`，该名是预处理宏而非函数实体；"
+            "callHierarchy 无法以宏名为根，故 prepareCallHierarchy 为空。"
+        )
+    # token 粘贴类宏（如 SYSCALL(name) → sys_##name），展开处常无稳定函数根节点
+    if re.search(
+        rf"(?m)^\s*#\s*define\b.*##.*\b{re.escape(symbol)}\b", text
+    ) or re.search(rf"(?m)^\s*#\s*define\b.*\b{re.escape(symbol)}\b.*##", text):
+        return (
+            f"宏展开/token 拼接：`{symbol}` 出现在带 ## 的 #define 附近，符号可能由宏展开生成；"
+            "LSP 常无法对其建立标准 callHierarchy，prepareCallHierarchy 为空。"
+        )
+    # 非 # 行中是否存在「标识符 + (」形态（粗判函数定义/声明）
+    non_pp = "\n".join(
+        ln.rstrip("\r")
+        for ln in file_lines
+        if ln.strip() and not ln.lstrip().startswith("#")
+    )
+    if re.search(rf"\b{re.escape(symbol)}\s*\(", non_pp):
+        return (
+            f"索引或实体类别：本文件非 # 行中存在 `{symbol}(...)` 形声明/定义，但 prepareCallHierarchy 仍全空；"
+            "多见 compile_commands 与当前 TU 不一致、条件编译导致索引不全，或该实体不被视为可层级化的函数根。"
+        )
+    return (
+        f"锚点/定义形态：预处理行外未见典型 `{symbol}(...)` 定义；"
+        f"可能仅在 syscall 表、extern 或宏体中出现，callHierarchy 锚点无效。"
+    )
+
+
 async def _async_lsp_request(repo_path: str, file_path: str, symbol: str, method: str) -> str:
     ext = os.path.splitext(file_path)[1].lower()
     
@@ -1727,7 +1770,7 @@ def _grep_fallback_call_graph(repo_path: str, file_path: str, symbol: str, direc
 
     # --- Outgoing: 解析函数体，提取调用 ---
     if direction in ("outgoing", "both"):
-        lines_out.append("》出升调用 [Grep Fallback] — 正则解析函数体")
+        lines_out.append("》出向调用 [Grep Fallback] — 正则解析函数体")
         try:
             with open(abs_file, "r", encoding="utf-8", errors="ignore") as f:
                 src = f.read()
@@ -1975,6 +2018,17 @@ async def _async_lsp_call_graph(
         return f"Error: 文件未找到 {file_path}"
 
     positions = _find_symbol_positions(abs_file, symbol)
+    if not positions:
+        msg = (
+            f"Error: [call_graph] 符号 `{symbol}` 在 `{file_path}` 中未出现，无法生成调用图。"
+            "请先用 `grep_in_repo` 或 `read_code_segment` 确认定义所在文件，"
+            "再以「定义所在路径 + 符号名」重新调用 `lsp_get_call_graph`。"
+            "（不在此场景下做静态兜底，以免在错误文件上产生误导性结果。）"
+        )
+        logger.warning(msg)
+        print(f"\n⚠️  {msg}", flush=True)
+        return msg
+
     client = await _gateway.get_client(repo_path, lang)
     if not client:
         msg = f"[call_graph] LSP 客户端启动失败，自动转入分层静态兜底 (symbol={symbol})"
@@ -2056,7 +2110,7 @@ async def _async_lsp_call_graph(
         lines_out = [f"{prefix}├── {name}{detail_str}{loc_str}"]
 
         if node_key in visited:
-            lines_out[-1] += "  (循环引用，已剩略)"
+            lines_out[-1] += "  (循环引用，已省略)"
             return lines_out
         visited.add(node_key)
 
@@ -2084,7 +2138,7 @@ async def _async_lsp_call_graph(
         lines_out = [f"{prefix}├── {name}{detail_str}{loc_str}"]
 
         if node_key in visited:
-            lines_out[-1] += "  (循环引用，已剩略)"
+            lines_out[-1] += "  (循环引用，已省略)"
             return lines_out
         visited.add(node_key)
 
@@ -2143,25 +2197,32 @@ async def _async_lsp_call_graph(
                     break
 
         if not root_items or not isinstance(root_items, list) or len(root_items) == 0:
-            # 【新增强化】：Semantic Fallback for Variables/Statics
-            # 当调用图准备失败时（通常是因为符号是变量而非函数），由于变量没有“控制流”调用关系，
-            # 我们自动转向“语义引用查找”，这能提供比单纯 Grep 更精准的跨文件符号使用分析。
-            reason = f"注意：符号 '{symbol}' 似乎是一个变量、常量或静态引用（LSP 调用图协议仅支持函数/方法）。系统已自动为您切换至【高精度语义引用查找】以分析其数据流向。"
-            logger.info(f"[call_graph] {symbol} is not a function. Falling back to semantic references.")
-            
-            # 异步调用引用查找逻辑 (reuse existing _async_lsp_request)
+            # prepareCallHierarchy 全空：先用源码启发式判断根因（宏 / 宏展开 / 索引问题等），再降级
+            diag = _diagnose_call_graph_prepare_failure(symbol, _file_lines)
+            print(f"\n💡 [call_graph] prepareCallHierarchy 全空 — 根因分析:\n   {diag}", flush=True)
+            logger.info(
+                "[call_graph] prepareCallHierarchy empty for symbol=%s file=%s — %s",
+                symbol,
+                file_path,
+                diag.replace("\n", " "),
+            )
+
+            reason = (
+                f"{diag} "
+                "系统将依次尝试【语义引用 textDocument/references】；若仍无效则进入分层静态兜底。"
+            )
+
             ref_result = await _async_lsp_request(repo_path, file_path, symbol, "textDocument/references")
-            
-            # 如果解析出了有效的引用列表（非 Error 且非“未解析出”提示）
+
             if "结果列表" in ref_result or "共被解析出" in ref_result:
-                header = f"\n💡 {reason}\n"
+                header = f"\n💡 [call_graph] {reason}\n"
                 return header + ref_result
-            
-            # 最后防线：如果语义引用查找也彻底失效（常见于宏生成或 ASM），再执行 Grep 降级
+
             msg = f"[call_graph] LSP 语义解析（CallGraph & References）均无效，自动转入分层静态兜底 (symbol={symbol})"
-            logger.warning(msg)
-            print(f"\n⚠️  {msg}", flush=True)
-            return _static_call_graph_fallback(repo_path, file_path, symbol, direction, lang)
+            logger.warning("%s | %s", msg, diag.replace("\n", " "))
+            print(f"\n⚠️  {msg}\n   根因摘要: {diag}", flush=True)
+            static_body = _static_call_graph_fallback(repo_path, file_path, symbol, direction, lang)
+            return f"[call_graph 根因] {diag}\n\n{static_body}"
 
 
         root_item = root_items[0]
@@ -2174,7 +2235,7 @@ async def _async_lsp_call_graph(
 
         if direction in ("outgoing", "both"):
             visited.clear()
-            result_lines.append("\n》出吐调用 (Outgoing Calls) — '{root_name}' 调用了谁？")
+            result_lines.append(f"\n》出向调用 (Outgoing Calls) — '{root_name}' 调用了谁？")
             async with _lsp_global_lock:
                 calls = await get_calls(root_item, "callHierarchy/outgoingCalls")
             child_items = [c.get("to", {}) for c in calls]

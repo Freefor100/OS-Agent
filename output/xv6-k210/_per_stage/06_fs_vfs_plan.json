@@ -1,0 +1,121 @@
+{
+  "stage_id": "06_fs_vfs",
+  "goal": "分析 xv6-k210 的 VFS 抽象层、具体文件系统(FAT32)实现、fd 表结构、pipe/mmap/socket 支持状态，验证伪文件系统(devfs/procfs)实现。",
+  "must_cover": [
+    "VFS 抽象层：struct inode/file/dentry/superblock 定义及 file_op/inode_op/dentry_op 操作集",
+    "具体文件系统：FAT32 自研实现(kernel/fs/fat32/)，无 Ext4 实现",
+    "伪文件系统：devfs/procfs 在 rootfs.c 中初始化并挂载",
+    "fd 表：Per-Process 的 struct fdtable 链表结构(支持动态扩展)",
+    "pipe 支持：✅ 已实现(kernel/fs/pipe.c, sys_pipe)",
+    "mmap 支持：✅ 已实现(kernel/mm/mmap.c, sys_mmap/sys_munmap)，需验证 MAP_SHARED 处理",
+    "socket 支持：❌ 未实现(仅 errno 定义，无 sys_socket)",
+    "自研边界：纯 C 实现，无 Rust crate 依赖",
+    "自研 vs 直接依赖 crate 的**边界文件**；`feature` 切换导致的 FS 组合差异；同一功能多目录重复实现时**以谁为准**（证据）。",
+    "VFS 抽象层：File/Inode/Dentry Traits 定义。",
+    "**具体文件系统（必须代码验证）**：",
+    "FAT32/Ext4：是否自己实现了？还是用的 crate？（check Cargo.toml）。**注意：对于组件化的 OS（如 ArceOS），具体的文件系统实现可能独立于 VFS 存在于诸如 `arceos/modules/axfs-ng/src/fs/fat/` 或 `ext4/` 目录中，务必使用搜索功能仔细查找，绝对不要仅仅因为特定目录下没有就断言未实现！**",
+    "**具体 FS 的抽象层结构**：搜索 `FatFilesystemInner|Ext4Filesystem|FatFileNode|FatDirNode` 等，分析各层如何实现 VFS trait。这是文件系统架构的核心。",
+    "RamFS/TmpFS：是否有内存文件系统？",
+    "**伪文件系统**：使用 grep_in_repo 搜索 `devfs|procfs|sysfs` 检查是否实现了伪文件系统。若有，分析其实现方式。",
+    "文件描述符表：Global 还是 Per-Process？`fd_table` 结构在哪？",
+    "**功能细节**（必须分类为 `✅ 已实现`、`🔸 桩函数`、`❌ 未实现`）：",
+    "是否支持 `pipe` 套接字？",
+    "是否支持网络 `socket`？",
+    "是否支持 `mmap`？**注意**：必须检查 `sys_mmap` 实现。如果是 **零拷贝**，必须看到 `VmArea` 结构体中有 `shared` 字段或 `MAP_SHARED` 处理逻辑。如果是 `sys_mmap` 仅返回 Ok(0) 没有处理标志位，标注为'桩函数'。"
+  ],
+  "evidence_targets": [
+    "VFS 设计：include/fs/fs.h(105-140 行 inode/superblock 定义), include/fs/file.h",
+    "FAT32 实现：kernel/fs/fat32/fat32.c(操作集定义), kernel/fs/fat32/fat32.h",
+    "fd table：include/fs/file.h(32-38 行), include/sched/proc.h(89 行)",
+    "pipe 实现：kernel/fs/pipe.c(pipealloc), include/fs/pipe.h",
+    "mmap 实现：kernel/mm/mmap.c(do_mmap), kernel/syscall/sysmem.c(sys_mmap 70-115 行)",
+    "伪文件系统：kernel/fs/rootfs.c(244-290 行 devfs/procfs 初始化)",
+    "mount 机制：kernel/fs/mount.c, kernel/fs/fs.c(create/namei)",
+    "VFS 设计",
+    "具体文件系统",
+    "fd table",
+    "pipe/mmap"
+  ],
+  "seed_paths": [
+    "include/fs/fs.h",
+    "include/fs/file.h",
+    "kernel/fs/fat32",
+    "kernel/fs/rootfs.c",
+    "kernel/fs/pipe.c",
+    "kernel/fs/mount.c",
+    "kernel/mm/mmap.c",
+    "kernel/syscall/sysmem.c",
+    "include/sched/proc.h",
+    "fs",
+    "vfs",
+    "file",
+    "inode",
+    "kernel/fs"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "sys_open",
+    "sys_mmap",
+    "sys_pipe",
+    "filealloc",
+    "fdalloc",
+    "pipealloc",
+    "fat32_init",
+    "rootfs_init",
+    "create",
+    "namei",
+    "vfs_open",
+    "openat"
+  ],
+  "repo_hotspots": [
+    "Cargo.toml",
+    "Makefile",
+    "bootloader",
+    "bootloader/SBI",
+    "debug",
+    "debug/kendryte_openocd",
+    "debug/openocd_cfg",
+    "doc",
+    "doc/img",
+    "include"
+  ],
+  "preferred_tools": [
+    "read_code_segment",
+    "lsp_get_definition",
+    "lsp_get_references",
+    "lsp_get_call_graph",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "review_checklist": [
+    "关键问题是否回答",
+    "重要结论是否给出源码路径",
+    "是否避免将 README 当成实现证据",
+    "是否标出未实现/桩函数",
+    "must_cover_count=12"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "精读 include/fs/fs.h(105-140 行) 确认 struct inode/superblock 字段及 VFS 操作集定义",
+    "分析 kernel/fs/fat32/fat32.c(1-80 行) 验证 FAT32 如何实现 fat32_inode_op/fat32_file_op",
+    "读取 kernel/fs/rootfs.c(244-290 行) 取证 devfs/procfs 的初始化与挂载流程",
+    "检查 include/fs/file.h(32-38 行) 和 include/sched/proc.h(89 行) 确认 fd 表为 Per-Process 链表结构",
+    "精读 kernel/syscall/sysmem.c(70-115 行) sys_mmap 实现，验证 MAP_SHARED/MAP_PRIVATE 标志位处理逻辑",
+    "读取 kernel/fs/pipe.c(40-100 行) pipealloc 实现，确认 pipe 套接字完整支持",
+    "grep 搜索 sys_socket/socket_create 确认网络 socket 未实现(仅 errno 定义)",
+    "对照 must_cover 分类标记：pipe✅/mmap✅(需确认共享)/socket❌/devfs✅/procfs✅/Ext4❌"
+  ]
+}

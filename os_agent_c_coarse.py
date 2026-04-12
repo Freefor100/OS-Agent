@@ -53,6 +53,10 @@ from core.per_planner import build_coarse_preplan
 from core.error_handling import RetryConfig
 
 load_dotenv()
+from core.hf_env import apply_hf_hub_env_defaults
+
+apply_hf_hub_env_defaults()
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(name)s | %(levelname)s | %(message)s",

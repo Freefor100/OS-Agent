@@ -49,6 +49,10 @@ from tools.lsp_ops import lsp_get_definition, lsp_get_references, lsp_get_docume
 
 load_dotenv()
 
+from core.hf_env import apply_hf_hub_env_defaults
+
+apply_hf_hub_env_defaults()
+
 
 # ErrorType, RetryConfig, classify_error, calculate_backoff, ErrorTracker
 # 已移至 core.error_handling 模块

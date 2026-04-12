@@ -1,0 +1,127 @@
+{
+  "stage_id": "01_overview",
+  "goal": "完成项目概览与技术栈章节：整理 xv6-k210 的编程语言、构建工具、支持架构、核心模块布局、入口链、关键数据结构与算法，并对照 02-13 章已生成报告逐模块汇总技术实现证据。",
+  "must_cover": [
+    "语言与框架：C/Rust 混合、RustSBI 引导、xv6-riscv 衍生",
+    "支持架构：riscv64（k210 与 QEMU 双平台）",
+    "启动链：_entry → main → scheduler，SBI 引导流程",
+    "内存管理：物理页分配器、虚拟内存、页表、COW/Lazy 特性",
+    "进程调度：proc 结构体、调度算法、上下文切换",
+    "中断与系统调用：Trap 处理、系统调用分发、用户指针校验",
+    "文件系统：VFS 层、FAT32 实现、缓冲层 bio",
+    "设备驱动：SD 卡、DMA、PLIC 中断控制器",
+    "同步机制：自旋锁、睡眠锁、等待队列",
+    "多核 SMP：双核启动、IPI、每 CPU 数据",
+    "调试机制：Panic、Backtrace、日志宏",
+    "网络功能：明确标注未实现",
+    "02 启动与架构初始化 → 启动链、模式切换、MMU/FPU、平台适配、构建与链接",
+    "03 内存管理 → 物理/虚拟内存、页表、分配器、CoW/Lazy/Swap 等高级特性",
+    "04 进程/线程与调度 → 任务模型、调度算法、上下文切换、信号/Futex 等",
+    "05 中断与系统调用 → Trap、系统调用分发、TrapFrame、用户指针校验等",
+    "06 文件系统与 VFS → VFS、具体 FS、fd/mmap 等",
+    "07 设备驱动 → 驱动框架、中断、块/网设备等",
+    "08 同步与 IPC → 锁、管道、IPC、Futex 等",
+    "09 多核与 SMP → 多核启动、IPI、每 CPU 数据等",
+    "10 安全机制 → 权限、Capability、隔离等",
+    "11 网络协议栈 → socket、协议栈实现形态等"
+  ],
+  "evidence_targets": [
+    "Cargo.toml 与 Makefile 构建配置",
+    "kernel/entry.S 与 kernel/main.c 入口链",
+    "include/memlayout.h 内存布局定义",
+    "kernel/mm/ 下物理/虚拟内存实现",
+    "kernel/sched/proc.c 进程管理核心",
+    "kernel/trap/trap.c 中断处理",
+    "kernel/syscall/syscall.c 系统调用分发",
+    "kernel/fs/ 文件系统实现",
+    "kernel/hal/ 硬件抽象层驱动",
+    "doc/ 目录下设计文档作为辅助参考",
+    "语言与框架来源",
+    "支持架构",
+    "入口函数",
+    "关键目录"
+  ],
+  "seed_paths": [
+    "README.md",
+    "Makefile",
+    "Cargo.toml",
+    "kernel/entry.S",
+    "kernel/main.c",
+    "include/memlayout.h",
+    "include/param.h",
+    "kernel/mm/vm.c",
+    "kernel/sched/proc.c",
+    "kernel/trap/trap.c",
+    "kernel/fs/fs.c",
+    "doc/总言.md",
+    ".cargo",
+    "arch"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "_entry",
+    "main",
+    "scheduler",
+    "cpuinit",
+    "kvminit",
+    "procinit",
+    "trapinithart",
+    "userinit",
+    "kernel_main",
+    "rust_main",
+    "_start",
+    "start"
+  ],
+  "repo_hotspots": [
+    "Cargo.toml",
+    "Makefile",
+    "bootloader",
+    "bootloader/SBI",
+    "debug",
+    "debug/kendryte_openocd",
+    "debug/openocd_cfg",
+    "doc",
+    "doc/img",
+    "include"
+  ],
+  "preferred_tools": [
+    "lsp_get_document_outline",
+    "lsp_get_definition",
+    "lsp_get_references",
+    "lsp_get_call_graph",
+    "read_code_segment",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "review_checklist": [
+    "关键问题是否回答",
+    "重要结论是否给出源码路径",
+    "是否避免将 README 当成实现证据",
+    "是否标出未实现/桩函数",
+    "must_cover_count=12"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 12000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 18,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "使用 lsp_get_document_outline 鸟瞰 kernel/main.c、kernel/sched/proc.c、kernel/mm/vm.c 文件结构，锁定关键函数位置",
+    "使用 lsp_get_definition 定位 _entry、main、scheduler 等入口符号的精确定义",
+    "使用 lsp_get_call_graph（max_depth=2）分析 main() 的调用链，梳理启动初始化顺序",
+    "使用 grep_in_repo 搜索 COW、Lazy、mmap 等关键词，验证高级内存特性实现位置",
+    "使用 lsp_get_references 追踪 proc、trapframe、pagetable 等关键结构体的全域引用",
+    "读取 kernel/entry.S、kernel/main.c 小段代码（各≤50 行），取证启动链与 hart 初始化逻辑",
+    "对照 must_cover 12 项，逐项从 kernel/mm/、kernel/sched/、kernel/trap/、kernel/fs/、kernel/hal/ 提取关键函数名与文件路径",
+    "汇总技术栈信息（RISC-V 工具链、SBI 版本、NCPU=2、NPROC=50 等参数），标注网络功能未实现"
+  ]
+}
