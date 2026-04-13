@@ -105,7 +105,14 @@ If a requested file or directory does not exist, use `list_repo_structure` or `f
     - OS code heavily uses `#[cfg(target_arch = "...")]`. If you see code blocks "grayed out" or empty results from LSP despite the code being present, you MUST verify the target architecture.
     - **Discovery**: Look for the correct Target Triple in `rust-toolchain.toml`, `Makefile`, `.cargo/config.toml`, or architecture-specific directories (e.g., `os/src/arch/la64` → `loongarch64`).
     - **Action**: Call `lsp_set_target_arch` to explicitly command the LSP to use the correct Target Triple (e.g., `loongarch64-unknown-none-elf`).
-    - This will **force restart** the LSP with the correct context. After setting, retry your previous LSP calls to get full semantic data."""
+    - This will **force restart** the LSP with the correct context. After setting, retry your previous LSP calls to get full semantic data.
+14. **评测/交付适配层（启发式，非臆测具体赛题）**:
+    - You do **not** know any single competition's secret tests. Infer **evaluation / submission glue** only from **this repo**: build scripts, CI, names of artifacts, strings in code, and **README/docs** as *claims* to be cross-checked against source.
+    - **Document use (allowed)**: Use `list_repo_structure` and `read_code_segment` on `README.md`, `docs/*.md`, and similar for **how to build**, **how to run** (e.g. QEMU command lines), dependencies, directory map, and **stated** grading/competition/CI goals.
+    - **Document use (forbidden for proof)**: Never treat README/docs alone as proof that a kernel mechanism is implemented. After reading docs, you MUST verify with `grep_in_repo`, LSP, or `read_code_segment` on **source**; state **README 声称 vs 代码实际** with paths when they differ.
+    - **Signal gradient (weak → strong)**: (weak) README mentions "submit"/"grade"/"CI"/"autograde" → (strong) `Makefile` targets like `all` with fixed artifact names (`kernel-rv`, `kernel-la`, `disk.img`), scripts under `scripts/`, `grep` hits for test harness markers (e.g. fixed banner strings, `*testcode*`, serial test drivers), multiple virtio-blk / dual-drive hints, or workflow files (`.github/workflows`, `gitlab-ci`).
+    - **Layered reporting when signals exist**: Briefly separate **Delivery** (artifact names, `make` goals), **Harness** (in-kernel or userland test runner, output contract, shutdown path), **PlatformProfile** (QEMU `virt` vs physical board `#[cfg]`), and **SubsystemDepth** (syscall/FS/net depth for heavy libc-style tests)—each bullet backed by file paths or say **未发现相关适配**.
+    - **No fabrication**: If no strong signals, write explicitly that no evaluation-specific glue was found; do not invent a specific contest year or undisclosed test list."""
 
 
 def get_model_name() -> str:

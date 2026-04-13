@@ -38,7 +38,7 @@
 
 **v4.0 新增：阶段级 PER 闭环**
 
-1. 🧭 **Plan**：每章生成结构化 `PlanSpec`（`seed_paths`、`must_cover`、`entry_symbols` 等），并锁定 **`execution_steps`**（4～8 条短句）；Execute **须按该顺序**调工具与收束正文（见 `render_plan_context` + `CURSOR_EXECUTION_CONTRACT`）。
+1. 🧭 **Plan**：每章生成结构化 `PlanSpec`（`seed_paths`、`must_cover`、`entry_symbols` 等），并锁定 **`execution_steps`**（4～8 条短句）；Execute **须按该顺序**调工具与收束正文（见 `render_plan_context` + `STAGE_EXECUTION_CONTRACT`）。
 2. 🧠 **Execute**：ReAct Agent 做证据搜集与章节 Markdown；可抽取 `evidence_index` / `claim_map` 供侧车参考。
 3. 🧪 **Review（Describe）**：**仅**单次 **`llm.invoke` JSON 审阅**（`run_llm_review`），**不做**规则机预检、也**不与**规则机结果合并；提示词含草稿、`must_cover`、`review_checklist`。解析失败则记 `llm_review_failed`。
 4. **人工改稿**：`_per_stage/{stage_id}_review.json` 与 `{stage_id}_review_human.md` 落盘结构化审阅与 `review_suggestions` 等字段；由人改 prompt/章节后重跑。
@@ -501,7 +501,7 @@ evaluation/
 - **`compare_function_tokens` 类型安全**：`syscall_count_real` 和 `trapframe_bytes` 的精确加分逻辑增加 `int()` 类型规范化，防止 LLM 以字符串输出数字时导致的 `TypeError`。
 
 #### 🆕 **v4.0 阶段级 PER、LLM 审阅与执行契约**（2026-03-27；后续迭代）
-- **阶段级 Plan-Execute**：`os_agent_d_describe.py` 与 `os_agent_c_fine.py` 使用 `StageState` / `PlanSpec`；Describe 在 Plan 中锁定 **`execution_steps`**，Execute 提示词注入 **`CURSOR_EXECUTION_CONTRACT`**（证据路径、文风与粒度等）。
+- **阶段级 Plan-Execute**：`os_agent_d_describe.py` 与 `os_agent_c_fine.py` 使用 `StageState` / `PlanSpec`；Describe 在 Plan 中锁定 **`execution_steps`**，Execute 提示词注入 **`STAGE_EXECUTION_CONTRACT`**（证据路径、文风与粒度等）。
 - **动态上下文**：`repo_profile`、`evidence_cache`、`external_background` 等经 `render_plan_context` 注入；③ Verify（Describe）为 **单次 LLM JSON 审阅**，**不做**规则预检合并（规则审阅仅在不传 `llm` 的路径使用，如精比侧）。
 - **证据账本 (`evidence_index`)**：可从工具轨迹抽取供侧车参考；Verify 的 LLM 提示默认**不含**证据索引摘要。
 - **审阅落盘**：`*_review.json`、`*_review_human.md`；不改写仓库正文，仅输出侧车供人工处理。

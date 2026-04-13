@@ -673,7 +673,10 @@ def _resolve_lsp_binary(base_name: str, cwd: Optional[str] = None) -> str:
             candidates.append(f"/usr/bin/{name}")
             candidates.append(f"/usr/local/bin/{name}")
             candidates.append(os.path.join(home, ".local", "bin", name))
-        
+        # 龙芯交叉工具链常见解压路径（未加入 PATH 时 check_env / LSP 仍可探测）
+            if "loongarch" in name:
+                candidates.append(os.path.join("/opt", "loongarch64-tools", "bin", name))
+           
         for c in candidates:
             if os.path.isfile(c):
                 logger.info(f"Resolved {base_name} via {name} at fallback path: {c}")
