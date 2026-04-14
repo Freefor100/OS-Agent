@@ -1,0 +1,5 @@
+{
+  "stage_id": "03_mem_mgmt",
+  "stage_title": "内存管理（物理/虚拟/分配器）",
+  "prompt": "目标：物理/虚拟内存、页表、帧与堆分配器；**字段、锁、错误路径与缺页链路**写透。\n\n**本阶段须额外覆盖**：\n- 页表/分配器/缺页路径上**非默认命名或自研子模块**；`feature` 控制的内存子系统裁剪；与 trap/进程模块的**实际调用边**（给路径）。\n- 高级特性逐项必须写清「真实现 / 桩 / 未找到」的**判定依据**（代码形态），避免泛泛结论。\n- **并发与多核（Concurrency & SMP）与内存子系统的耦合**：在 **Buddy/Slab/帧分配器** 与 **页表 walk/map/unmap** 路径上，必须判定**锁粒度**并附证据；若结论为「无显式锁」，须说明是否依赖单核/关中断/原子-only 及依据。\n- **TLB 一致性（TLB shootdown / 远程 TLB 刷新）**：搜索 `sfence.vma|tlbi|invlpg|flush_tlb|shootdown|smp_call_function|ipi.*tlb|remote_flush` 等；若存在多核或页表在多个 hart 上可见，必须写清刷新策略与 IPI 联动；若未发现，写未发现并列出已搜模式。\n- **章节交叉引用（与 09 多核）**：正文须写明与第 9 章结论是否一致。\n\n**强制要求**：\n- 语义发现优先：`rag_search_code` 搜索 page table/buddy/slab/mmap/TLB shootdown/page cache/writeback。\n- 每个结论都必须有代码证据；不支持则明确写未发现。\n\n**【评测与交付适配 — 本阶段启发式】**（须源码证据；无则略）：\n- 自动化评测常压力 `mmap`/`brk`/缺页/解映射：若 README 声称可跑 libc-test/LTP 等，须与 `sys_mmap`/`sys_brk`/`handle_page_fault` 对照。\n- Delivery 信号：`Makefile`/`build.rs` 固定产物名与内存子系统关联证据。\n"
+}

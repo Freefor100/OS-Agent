@@ -1,0 +1,244 @@
+{
+  "stage_id": "03_mem_mgmt",
+  "stage_title": "内存管理（物理/虚拟/分配器）",
+  "questions": [
+    {
+      "question_id": "Q03_001",
+      "question_type": "single_choice",
+      "stem": "该 OS 的内存管理实现语言/形态更接近哪类？（只选最贴近的一项）",
+      "choices": [
+        "Rust no_std 内核内存子系统",
+        "C/Makefile 风格内核（xv6 类）",
+        "混合（Rust + C 或多 crate 组件化）",
+        "未发现内存管理实现（仅接口/文档）"
+      ]
+    },
+    {
+      "question_id": "Q03_002",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在“物理页帧分配器 (Physical Frame Allocator)”的真实实现？（必须三态）"
+    },
+    {
+      "question_id": "Q03_003",
+      "question_type": "single_choice",
+      "stem": "物理内存分配算法更接近哪种？",
+      "choices": [
+        "伙伴系统 (伙伴系统 (Buddy System))",
+        "Bitmap（位图）",
+        "Slab/对象池（Slab Allocator / Object Pool）为主",
+        "空闲链表 run list（xv6 风格）",
+        "其他/自研（简答说明）",
+        "未发现"
+      ]
+    },
+    {
+      "question_id": "Q03_004",
+      "question_type": "short_answer",
+      "stem": "物理页帧分配器的核心数据结构是什么？（例如 bitmap 数组、buddy free list、slab cache 表、`struct run` 单链表等；必须引用结构体/字段证据）"
+    },
+    {
+      "question_id": "Q03_005",
+      "question_type": "short_answer",
+      "stem": "物理分配器的并发控制锁粒度是什么？（全局大锁 / per-CPU / 分桶 / 无锁+关中断 / 其他；必须给锁对象类型与持锁范围证据）"
+    },
+    {
+      "question_id": "Q03_006",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在“页表 (page table) 结构体 + walk/map/unmap”的真实实现？（必须三态）"
+    },
+    {
+      "question_id": "Q03_007",
+      "question_type": "short_answer",
+      "stem": "页表操作 API（walk/map/unmap 或等价）对应的函数名/模块是什么？列出 1-3 个关键入口并给证据。"
+    },
+    {
+      "question_id": "Q03_008",
+      "question_type": "short_answer",
+      "stem": "页表修改路径的并发控制是什么？（锁粒度、是否需要关中断、是否使用每进程地址空间锁等；必须引用锁/临界区证据）"
+    },
+    {
+      "question_id": "Q03_009",
+      "question_type": "single_choice",
+      "stem": "内核与用户地址空间关系更接近哪种？",
+      "choices": [
+        "内核与用户独立页表（切换 CR3/SATP）",
+        "共享同一页表（内核映射常驻，高半核等）",
+        "仅内核态/无用户态（无用户页表）",
+        "未发现/待核实"
+      ]
+    },
+    {
+      "question_id": "Q03_010",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在缺页异常 (Page Fault) 处理逻辑并与内存分配/映射联动？（必须三态）"
+    },
+    {
+      "question_id": "Q03_011",
+      "question_type": "short_answer",
+      "stem": "追踪一条缺页链路：trap/异常入口 → 缺页处理函数（handle_page_fault 或等价）→ 分配页帧 → 建立映射。用 3-5 个关键节点描述并给每节点证据。"
+    },
+    {
+      "question_id": "Q03_012",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现写时复制 (Copy-on-Write, CoW)？（必须三态；若 implemented 需说明触发点在 fault 中还是 fork 中）"
+    },
+    {
+      "question_id": "Q03_013",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现惰性分配 (Lazy Allocation)？（必须三态；若 implemented 需说明是在 brk/mmap 还是 fault 中分配）"
+    },
+    {
+      "question_id": "Q03_014",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 swap（swap_in/swap_out 或等价页面置换）？（必须三态）"
+    },
+    {
+      "question_id": "Q03_015",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 mmap（文件映射/匿名映射）且处理标志位（MAP_FIXED/MAP_ANON/MAP_SHARED 等）？（必须三态；stub 需说明形态如 ENOSYS/return 0）"
+    },
+    {
+      "question_id": "Q03_016",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 Page Cache（页缓存/文件页缓存）管理？（必须三态）"
+    },
+    {
+      "question_id": "Q03_017",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在脏页回写 (dirty page writeback) 机制？（必须三态；若 implemented 需指出同步/异步与触发条件）"
+    },
+    {
+      "question_id": "Q03_018",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 TLB 射击 (TLB Shootdown / Remote TLB Flush)机制以支持多核页表一致性？（必须三态；若 implemented 需指向 IPI/跨核调用证据）"
+    },
+    {
+      "question_id": "Q03_019",
+      "question_type": "short_answer",
+      "stem": "TLB 刷新指令/函数点是什么？（RISC-V sfence.vma / AArch64 tlbi / x86 invlpg 等，或仓库中等价的 TLB 刷新封装；必须给证据）"
+    },
+    {
+      "question_id": "Q03_020",
+      "question_type": "short_answer",
+      "stem": "用户指针安全检查机制是什么？（access_ok/verify_area/UserInPtr 等；列出入口点与校验逻辑证据）"
+    },
+    {
+      "question_id": "Q03_021",
+      "question_type": "single_choice",
+      "stem": "若实现了页面置换 (Page Replacement)，使用的算法最接近哪种？（Stallings Ch8：OPT 理想算法 / LRU 最近最少使用 / Clock 近似 LRU / FIFO / 未实现）",
+      "choices": [
+        "OPT（最优置换，理论基准 Optimal Replacement）",
+        "LRU（最近最少使用 Least Recently Used）",
+        "Clock（时钟算法 / 第二次机会 Second-Chance Approximation）",
+        "FIFO（先进先出 First-In First-Out）",
+        "其他算法（short_answer 说明）",
+        "未实现页面置换（无 swap）"
+      ]
+    },
+    {
+      "question_id": "Q03_022",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在工作集模型 (Working Set Model, WSM) 或抖动检测/防止 (Thrashing Prevention) 机制？（必须三态；Stallings Ch8 核心概念；若 not_found 需列出已搜关键字 working_set|thrash|resident_set）"
+    },
+    {
+      "question_id": "Q03_023",
+      "question_type": "fill_in",
+      "stem": "物理内存总量（Physical Memory Size）：____ KB/MB；页大小（Page Size）：____ bytes；最大进程虚拟地址空间（Virtual Address Space）：____ bits。（必须从代码常量/链接脚本/配置中给出证据；无法确定则写 unknown 并说明已搜路径）"
+    },
+    {
+      "question_id": "Q03_024",
+      "question_type": "single_choice",
+      "stem": "内存保护机制 (Memory Protection) 的实现形式更接近哪种？（Stallings Ch7.1）",
+      "choices": [
+        "纯硬件页表权限位（R/W/X/U 位，MMU 负责拒绝非法访问）",
+        "纯软件用户指针检查（内核显式 copyin/copyout/access_ok 校验）",
+        "硬件页表 + 软件指针检查双重保护",
+        "无显式保护（单一特权级或无用户态）",
+        "未发现"
+      ]
+    },
+    {
+      "question_id": "Q03_025",
+      "question_type": "short_answer",
+      "stem": "逻辑内存组织 (Logical Memory Organization, Stallings Ch7.1)：进程地址空间中 text/data/heap/stack/mmap 各区域（或等价区间）是否由统一的映射管理结构（VMA/区间表/链表/BTreeMap 等）维护？（如存在请给结构体证据；不存在则写未发现等价结构）"
+    },
+    {
+      "question_id": "Q03_026",
+      "question_type": "single_choice",
+      "stem": "是否存在显式的硬件分段机制 (Hardware Segmentation, Stallings Ch7.4)？",
+      "choices": [
+        "存在硬件分段（x86 GDT/LDT 或等价段描述符机制）",
+        "仅软件逻辑分区（VMA/区间表，无硬件段机制）",
+        "纯分页无分段（RISC-V/AArch64 常见）",
+        "未发现"
+      ]
+    },
+    {
+      "question_id": "Q03_027",
+      "question_type": "single_choice",
+      "stem": "取页策略 (Fetch Policy, Stallings Ch8.2) 更接近哪种？",
+      "choices": [
+        "按需调页 (Demand Paging)：缺页时才分配物理页",
+        "惰性分配 (Lazy Allocation)：分配虚拟地址但推迟物理页到缺页时",
+        "预取 (Prepaging)：提前批量映射物理页",
+        "预分配 (Pre-allocation)：进程创建时立即分配全部物理页",
+        "未发现/不适用"
+      ]
+    },
+    {
+      "question_id": "Q03_028",
+      "question_type": "short_answer",
+      "stem": "放置策略 (Placement Policy, Stallings Ch8.2)：新的匿名映射或堆区域增长时，系统如何选择虚拟地址区间？（固定起始地址 / mmap_base 向下生长 / 首次适配 / 最佳适配 等；必须给实现证据或写未发现等价策略）"
+    },
+    {
+      "question_id": "Q03_029",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在驻留集管理/内存负载控制 (Resident Set Management / Load Control, Stallings Ch8.2)？（包括工作集动态调整、内存回收守护线程、OOM killer、驻留页数限制等；若 not_found 需列出已搜关键字）"
+    },
+    {
+      "question_id": "Q03_030",
+      "question_type": "short_answer",
+      "stem": "内存主链路（必须给出，尽量以 Mermaid graph TD 表达）：从确认的最强内存入口（缺页处理入口/mmap 入口/brk 入口/等价入口）出发，追踪到页表操作核心点或物理页分配核心点，写出 3-6 个关键节点。节点格式：FuncName [path:line]。若链路未被源码证据完全闭合，标注候选主链路而非确认的主链路。只画一条主链，不要并列展开多条支线。"
+    },
+    {
+      "question_id": "Q03_031",
+      "question_type": "single_choice",
+      "stem": "该系统更容易出现哪种内存碎片 (Memory Fragmentation, Stallings Ch7.2)？",
+      "choices": [
+        "内部碎片 (Internal Fragmentation)：固定大小分区内的浪费空间",
+        "外部碎片 (External Fragmentation)：空闲块分散无法满足大连续请求",
+        "两者均有",
+        "无明显碎片问题（buddy/slab 等机制缓解）",
+        "未发现相关机制"
+      ]
+    },
+    {
+      "question_id": "Q03_032",
+      "question_type": "single_choice",
+      "stem": "地址重定位 (Address Relocation, Stallings Ch7.1) 的绑定时机更接近哪种？",
+      "choices": [
+        "编译时静态绑定 (Compile-time / Static Relocation)：绝对地址写死",
+        "加载时绑定 (Load-time Relocation)：加载器调整地址",
+        "运行时动态绑定 (Run-time / Dynamic Relocation)：通过 MMU 基址+界限或页表在每次访问时转换",
+        "未发现/不适用"
+      ]
+    },
+    {
+      "question_id": "Q03_033",
+      "question_type": "single_choice",
+      "stem": "页面置换的作用域策略 (Replacement Scope, Stallings Ch8.2) 更接近哪种？",
+      "choices": [
+        "全局置换 (Global Replacement)：可从任意进程回收页帧",
+        "局部置换 (Local Replacement)：只从当前进程自身的帧集合中置换",
+        "未实现置换（无 swap）",
+        "未发现"
+      ]
+    },
+    {
+      "question_id": "Q03_034",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在清理策略 (Cleaning Policy, Stallings Ch8.2)？（即脏页预先后台写回，而非仅在置换时才写回；搜索 background writeback / kswapd / cleaner_thread 或等价；必须三态；若 not_found 需列出已搜关键字）"
+    }
+  ],
+  "stage_constraints_md": "**本阶段须额外覆盖**：\n- 页表/分配器/缺页路径上**非默认命名或自研子模块**；`feature` 控制的内存子系统裁剪；与 trap/进程模块的**实际调用边**（给路径）。\n- 高级特性逐项必须写清「真实现 / 桩 / 未找到」的**判定依据**（代码形态），避免泛泛结论。\n- **并发与多核（Concurrency & SMP）与内存子系统的耦合**：在 **Buddy/Slab/帧分配器** 与 **页表 walk/map/unmap** 路径上，必须判定**锁粒度**并附证据；若结论为「无显式锁」，须说明是否依赖单核/关中断/原子-only 及依据。\n- **TLB 一致性（TLB shootdown / 远程 TLB 刷新）**：搜索 `sfence.vma|tlbi|invlpg|flush_tlb|shootdown|smp_call_function|ipi.*tlb|remote_flush` 等；若存在多核或页表在多个 hart 上可见，必须写清刷新策略与 IPI 联动；若未发现，写未发现并列出已搜模式。\n- **章节交叉引用（与 09 多核）**：正文须写明与第 9 章结论是否一致。\n\n**强制要求**：\n- 语义发现优先：`rag_search_code` 搜索 page table/buddy/slab/mmap/TLB shootdown/page cache/writeback。\n- 每个结论都必须有代码证据；不支持则明确写未发现。\n\n**【评测与交付适配 — 本阶段启发式】**（须源码证据；无则略）：\n- 自动化评测常压力 `mmap`/`brk`/缺页/解映射：若 README 声称可跑 libc-test/LTP 等，须与 `sys_mmap`/`sys_brk`/`handle_page_fault` 对照，标 ✅/🔸/❌ 并附路径。\n- **Delivery 信号**：`Makefile`/`build.rs` 中固定产物名与内存子系统无直接耦合时，仅在「与测例根因相关」处一句带过并引用路径。"
+}

@@ -1,0 +1,112 @@
+{
+  "stage_id": "07_device_drivers",
+  "stage_title": "设备驱动与硬件抽象",
+  "questions": [
+    {
+      "question_id": "Q07_001",
+      "question_type": "single_choice",
+      "stem": "设备发现/枚举机制更接近哪种？",
+      "choices": [
+        "Device Tree (DTB/DTS) 解析",
+        "PCI/总线扫描",
+        "硬编码设备表/固定 MMIO 地址",
+        "混合（多种并存）",
+        "未发现/待核实"
+      ]
+    },
+    {
+      "question_id": "Q07_002",
+      "question_type": "tri_state_impl",
+      "stem": "是否能在代码中证实解析了 `.dtb`/DeviceTree？（必须三态；若 implemented 必须指出解析入口）"
+    },
+    {
+      "question_id": "Q07_003",
+      "question_type": "short_answer",
+      "stem": "驱动框架接口是什么？（Rust Driver trait / C driver ops / 注册表；必须引用接口定义证据）"
+    },
+    {
+      "question_id": "Q07_004",
+      "question_type": "short_answer",
+      "stem": "驱动注册与初始化顺序是什么？（init_drivers/probe/driver_manager 等；列出 3-6 个关键节点并给证据）"
+    },
+    {
+      "question_id": "Q07_005",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 UART/Console 驱动用于早期输出？（必须三态）"
+    },
+    {
+      "question_id": "Q07_006",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现块设备驱动（virtio-blk/ramdisk/其他）？（必须三态）"
+    },
+    {
+      "question_id": "Q07_007",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现网络设备驱动（virtio-net/e1000/rtl8139 等）？（必须三态）"
+    },
+    {
+      "question_id": "Q07_008",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现中断控制器驱动（PLIC/CLINT/APIC 等）？（必须三态；需指出中断源到 handler 的分发证据）"
+    },
+    {
+      "question_id": "Q07_009",
+      "question_type": "short_answer",
+      "stem": "MMIO 地址来源是什么？（DTB 提供 / 常量硬编码 / 物理→虚拟转换；必须给证据）"
+    },
+    {
+      "question_id": "Q07_010",
+      "question_type": "short_answer",
+      "stem": "多平台适配是如何通过构建/条件编译选择驱动的？（features/Kconfig/Makefile 规则；必须给证据）"
+    },
+    {
+      "question_id": "Q07_011",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 MMU 启用前后串口地址切换（phys/virt 切换）逻辑？（必须三态）"
+    },
+    {
+      "question_id": "Q07_012",
+      "question_type": "single_choice",
+      "stem": "I/O 缓冲模式 (I/O Buffering) 最接近哪种？（Stallings Ch11：单缓冲 Single Buffer / 双缓冲 Double Buffer / 循环缓冲 Circular Buffer / 缓冲池 Buffer Pool / 无缓冲 No Buffer）",
+      "choices": [
+        "单缓冲 (Single Buffer)",
+        "双缓冲 (Double Buffer / Ping-Pong Buffer)",
+        "循环缓冲 (Circular Buffer / Ring Buffer)",
+        "缓冲池 (Buffer Pool)",
+        "无缓冲（直接 I/O / Unbuffered）",
+        "未发现缓冲机制"
+      ]
+    },
+    {
+      "question_id": "Q07_013",
+      "question_type": "single_choice",
+      "stem": "块设备（磁盘/eMMC/NVMe）I/O 请求调度算法 (Scheduling Algorithm) (Disk Scheduling Algorithm) 更接近哪种？（Stallings Ch11；若无显式调度则选「FCFS 顺序提交」）",
+      "choices": [
+        "FCFS（先来先服务 First-Come First-Served）",
+        "SSTF（最短寻道时间优先 Shortest Seek Time First）",
+        "SCAN / Elevator（电梯算法）",
+        "C-SCAN（循环扫描 Circular SCAN）",
+        "基于 virtio 环（queue 顺序提交，无显式磁盘调度）",
+        "未发现"
+      ]
+    },
+    {
+      "question_id": "Q07_014",
+      "question_type": "single_choice",
+      "stem": "I/O 控制技术 (I/O Control Techniques, Stallings Ch11) 更接近哪种？",
+      "choices": [
+        "程序控制 I/O (Programmed I/O / Polling)：CPU 主动轮询设备状态",
+        "中断驱动 I/O (Interrupt-Driven I/O)：设备完成后发中断通知 CPU",
+        "DMA (Direct Memory Access)：DMA 控制器直接在内存与设备间传输",
+        "混合（小传输用中断，大传输用 DMA）",
+        "未发现"
+      ]
+    },
+    {
+      "question_id": "Q07_015",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 DMA (Direct Memory Access, Stallings Ch11) 传输路径？（必须三态；搜索 dma_alloc / dma_map / dma_buf / virtio 描述符环等；virtio 的描述符环也算 DMA 等价机制）"
+    }
+  ],
+  "stage_constraints_md": "**本阶段须额外覆盖**：\n- 每个外设子系统：**本仓支持的硬件列表 + 对应驱动文件**；未支持则写「未接入」而非默认假设 QEMU。\n\n必须回答：\n- 设备发现：Device Tree (DTS) 解析或 PCI/Bus 扫描？**必须验证**是否真的解析了 `.dtb` 文件，还是硬编码了地址？\n- 驱动框架：Driver Trait，如何注册/初始化驱动？\n- **组件化与配置**：搜索构建配置文件（Cargo.toml 的 features、Kconfig、条件编译宏），分析如何通过编译选项选择不同的驱动/模块实现。\n- **平台适配**：搜索 `platform/` 或 `boards/` 目录，列出所有支持的目标平台/开发板及其特有驱动，分析项目如何适配不同硬件。\n- 常见设备：\n    - UART/Serial（控制台输出）\n    - Block Device（磁盘读写，VirtIO-Blk）\n    - Net Device（网卡，VirtIO-Net）及网络协议栈（TCP/IP, smoltcp 等实现）\n    - GPU/Input（如有）\n- 中断控制器：PLIC/CLINT/APIC 驱动。\n- **MMU 前后串口地址切换**：分析 UART 驱动在 MMU 启用前（使用物理地址）和 MMU 启用后（使用虚拟地址）的地址切换机制。搜索串口基址常量的不同定义。\n\n要求：\n- **语义发现（🥇 首选）**：使用 `rag_search_code` 搜索 \"device driver trait\", \"virtio-blk driver\", \"UART initialization\", \"PCI bus scanning\" 快速锁定驱动程序。\n- 使用 `lsp_get_definition` 定位 Driver trait 定义和各设备驱动的 trait impl。\n- 使用 `lsp_get_references` 追踪 `init_drivers` / `probe` 的调用链，理解驱动注册与初始化顺序。\n- 使用 `lsp_get_document_outline` 浏览驱动文件结构，快速发现所有设备相关的 struct 和 impl。\n- 辅以 grep_in_repo 搜索 `axdriver` 或 `driver::` 和构建配置中的 feature flags。\n\n**【评测与交付适配 — 本阶段启发式】**（须源码证据；无则略）：\n- 若 README/Makefile 出现**多 virtio-blk/virtio-net 实例**，须与驱动代码对应 `路径:行号` 给出「能否同时挂载」结论。\n- 仅在有 `grep` 命中驱动相关符号或 README 明确描述时写评测相关内容；禁止臆测赛题。"
+}

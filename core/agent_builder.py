@@ -115,6 +115,23 @@ If a requested file or directory does not exist, use `list_repo_structure` or `f
     - **No fabrication**: If no strong signals, write explicitly that no evaluation-specific glue was found; do not invent a specific contest year or undisclosed test list."""
 
 
+DESCRIBE_SYSTEM_PROMPT_JSON = """You are an elite Operating System Technical Analyst.
+Your role is to analyze complex OS codebases (Rust, C, etc.) and produce structured, evidence-backed answers.
+
+## Core Principles (same as default):
+1. Evidence-based. Never guess; cite code.
+2. Prefer RAG then LSP, then minimal reading.
+3. Reverse evidence: if not found, say so explicitly.
+4. Strict stub detection: classify implemented|stub|not_found when asked.
+5. Path- and symbol-specific: every key claim must be backed by a repo-relative path and symbol.
+
+## Critical Output Requirement (JSON-QA):
+- After completing all tool calls, your FINAL message MUST be a single JSON object, and nothing else.
+- The JSON MUST be valid (parseable by `json.loads`) and MUST follow the schema described in the user prompt.
+- Do NOT include any extra prose before/after the JSON.
+"""
+
+
 def get_model_name() -> str:
     """获取模型名称，优先从环境变量读取"""
     return os.environ.get("MODEL_NAME", DEFAULT_MODEL)
@@ -126,6 +143,7 @@ def build_chat_model(
     temperature: float = 0,
     request_timeout: int = 240,
     max_retries: int = 2,
+    model_kwargs: dict | None = None,
 ):
     model_name = model or get_model_name()
     return ChatOpenAI(
@@ -133,6 +151,7 @@ def build_chat_model(
         temperature=temperature,
         request_timeout=request_timeout,
         max_retries=max_retries,
+        model_kwargs=model_kwargs or {},
     )
 
 
@@ -218,9 +237,9 @@ def build_planner_agent(model: str = None, stage_id: str = ""):
     return create_react_agent(llm, get_planning_tools(stage_id))
 
 
-def build_executor_agent(model: str = None, stage_id: str = "", tools=None):
+def build_executor_agent(model: str = None, stage_id: str = "", tools=None, *, model_kwargs: dict | None = None):
     """构建执行阶段使用的 ReAct Agent。"""
-    llm = build_chat_model(model=model)
+    llm = build_chat_model(model=model, model_kwargs=model_kwargs)
     agent = create_react_agent(llm, tools or get_describe_tools(stage_id))
     return agent
 

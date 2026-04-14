@@ -1,0 +1,82 @@
+{
+  "stage_id": "02_boot_arch",
+  "stage_title": "启动流程与架构初始化",
+  "questions": [
+    {
+      "question_id": "Q02_001",
+      "question_type": "short_answer",
+      "stem": "启动入口在哪里？（例如 linker.ld 的 ENTRY、`_start`/`start`/`head`/`entry` 标签；必须给文件路径+符号证据）"
+    },
+    {
+      "question_id": "Q02_002",
+      "question_type": "single_choice",
+      "stem": "启动链更接近哪种交接方式？",
+      "choices": [
+        "固件/引导加载器 → 内核入口（如 SBI/OpenSBI/U-Boot/BIOS/UEFI）",
+        "自带 bootloader（内核内含加载逻辑）",
+        "未知/未发现"
+      ]
+    },
+    {
+      "question_id": "Q02_003",
+      "question_type": "tri_state_impl",
+      "stem": "是否能在代码中证实发生了 CPU 特权级/模式切换？（RISC-V M→S、x86 实→保→长等；必须三态）"
+    },
+    {
+      "question_id": "Q02_004",
+      "question_type": "short_answer",
+      "stem": "模式切换涉及的关键寄存器/位是什么？（例如 RISC-V mstatus/sstatus、x86 cr0/cr4/eflags；必须给证据摘录）"
+    },
+    {
+      "question_id": "Q02_005",
+      "question_type": "tri_state_impl",
+      "stem": "是否启用/初始化了 MMU（设置 SATP/CR3 等并建立页表）？（必须三态）"
+    },
+    {
+      "question_id": "Q02_006",
+      "question_type": "short_answer",
+      "stem": "从入口汇编/固件交接到 C/Rust 主入口函数的跳转链是什么？（列出 3-6 个关键节点并给证据）"
+    },
+    {
+      "question_id": "Q02_007",
+      "question_type": "fill_in",
+      "stem": "早期初始化 (Early Initialization) 各项状态（每项必须 implemented / stub / not_found + 证据路径，格式：`项目: 状态 [路径]`）：\n- BSS 清零 (BSS Clearing): ___\n- 早期串口输出 (Early Serial/UART Output): ___\n- 设备树解析 (Device Tree Blob parsing, DTB): ___\n- 页表初始化时机 (Page Table Init): ___（在 MMU 启用前/后？）"
+    },
+    {
+      "question_id": "Q02_008",
+      "question_type": "tri_state_impl",
+      "stem": "是否初始化/启用了 FPU（如 sstatus.fs / cpacr_el1 / cr4）？（必须三态）"
+    },
+    {
+      "question_id": "Q02_009",
+      "question_type": "tri_state_impl",
+      "stem": "是否设置 trap/中断向量（如 stvec/idt 等）并能指出设置点？（必须三态）"
+    },
+    {
+      "question_id": "Q02_010",
+      "question_type": "short_answer",
+      "stem": "构建系统如何选择目标平台/架构与入口文件？（Cargo features/Kconfig/Makefile 条件；必须引用配置证据）"
+    },
+    {
+      "question_id": "Q02_011",
+      "question_type": "tri_state_impl",
+      "stem": "对 RISC-V 平台：是否能证实 SBI/OpenSBI/U-Boot 固件链（固件将控制权移交内核）？（必须三态；搜索 sbi|opensbi|u-boot；非 RISC-V 平台写 not_found 并说明架构）"
+    },
+    {
+      "question_id": "Q02_012",
+      "question_type": "tri_state_impl",
+      "stem": "MMU 启用前后是否存在串口/UART 地址切换逻辑（物理地址→虚拟地址）？（必须三态；搜索 phys_to_virt|virt_to_phys 及 UART 基址常量）"
+    },
+    {
+      "question_id": "Q02_013",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在从内核返回用户态的路径（usertrapret/trap_return/trampoline/eret 等）并设置 stvec/VBAR/IDT？（必须三态）"
+    },
+    {
+      "question_id": "Q02_014",
+      "question_type": "short_answer",
+      "stem": "是否支持多平台启动（StarFive VisionFive2/LoongArch/多板型）？（搜索 visionfive|jh7110|loongarch；有则描述差异入口与互斥关系；无则写未发现）"
+    }
+  ],
+  "stage_constraints_md": "要求：\n- **语义发现（🥇 首选）**：使用 `rag_search_code` 搜索 \"boot\", \"_start\", \"kernel_main\", \"architecture initialization\" 锁定启动入口文件。\n- 使用 `lsp_get_document_outline` **先**查看 arch 初始化文件的整体结构（函数列表+行号），然后有目的地 `read_code_segment` 关键段。\n- 使用 `lsp_get_definition` 追踪 `_start` → `rust_main` / `kernel_main` 的跨文件调用链。每一跳都用 LSP 定位下一个函数的定义位置，**不要凭经验猜路径**。\n- **【必须】使用 `lsp_get_call_graph` 生成启动函数完整调用链**：\n  - 对 `rust_main` 或 `kernel_main`（定位到实际文件后）调用 `lsp_get_call_graph(repo_path, file_path, \"rust_main\", direction=\"outgoing\", max_depth=4)`\n  - 如返回 `[⚠️ DEGRADED MODE]`，说明 LSP 降级至 Grep 分析，仍需使用该结果并在报告中标注\"DEGRADED — 静态 Grep 分析\"。\n- 使用 `lsp_get_references` 查找谁调用了关键初始化函数（如 `init_mmu`、`setup_trap`），验证其在启动流程中的位置。\n- 辅以 `grep_in_repo` 搜索汇编入口（`entry.S`/`start.S`）和 `list_repo_structure` 浏览目录。\n- 重点关注 arch/、platform/、boot/ 目录下的初始化代码。\n- **完整追踪**：从 `_start` 到内核 main 函数的每一步调用链，引用文件路径和行号。\n- **严禁幻觉**：\n    1. **汇编入口**：先在 `arch/` 或 `platform/` 下找 `entry.S`, `head.S`, `start.S`。\n    2. **Rust入口**：如果找不到汇编入口，可能是通过 SBI/U-Boot 直接跳转到 Rust 入口，请寻找 `#[entry]`。\n    3. **路径验证**：写下任何文件路径前，必须确认该文件真实存在。\n- **FPU/模式切换验证**：\n    - RISC-V: 搜索 `sstatus.fs` 或 `FS:` 常量。\n    - AArch64: 搜索 `cpacr_el1` 或 `CPACR`。\n    - x86_64: 搜索 `cr0`, `cr4` 寄存器位操作。\n\n**【评测与交付适配 — 本阶段启发式】**（无 grep/README 证据则写「未发现」或略过）：\n- 区分**物理板型**与 **QEMU `virt`/评测常用机**：README 中的运行命令若含 `qemu-system-*`、`-machine virt`、多 `-device virtio-*`，须在正文点明与本仓 `#[cfg]`/默认 feature 是否一致，并附 `Makefile`/`README.md` 路径。\n- 启动链中与**多块 virtio-blk、virtio-net、RTC（`-rtc`）**相关的早期初始化：有则给 `路径:行号`；无命中不写。"
+}

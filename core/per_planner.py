@@ -420,9 +420,10 @@ def extract_stage_questions(prompt: str) -> List[str]:
         t = _bullet_text(raw.strip())
         if t:
             secondary.append(t)
-    # 先 must_cover 核心（必须回答），再补本章侧重/额外覆盖，避免被 secondary 占满 12 条
+    # 先 must_cover 核心（必须回答），再补本章侧重/额外覆盖。
+    # JSON-QA 题单可能较长：上限放宽，避免截断导致 planner 覆盖不足。
     merged = _dedupe_keep_order(preferred + secondary)
-    return merged[:12]
+    return merged[:30]
 
 
 def _match_stage_hints(stage_id: str) -> Dict[str, List[str]]:

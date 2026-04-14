@@ -25,6 +25,7 @@ from core.agent_builder import (
     build_executor_agent,
     build_planner_agent,
     SYSTEM_PROMPT,
+    DESCRIBE_SYSTEM_PROMPT_JSON,
 )
 from core.utils import repo_name_from_url, format_tool_call_summary, format_tool_result_summary
 from core.error_handling import ErrorType, RetryConfig, classify_error, calculate_backoff, ErrorTracker
@@ -38,6 +39,15 @@ from core.per_planner import (
     render_plan_context,
 )
 from core.per_executor import extract_stage_artifacts
+from core.describe_stage_qa import load_stage_qa, list_question_ids
+from core.describe_json_qa import (
+    SCHEMA_VERSION as JSON_QA_SCHEMA_VERSION,
+    build_bailian_response_format_json_schema,
+    coerce_answers_payload_defaults,
+    parse_answers_json,
+    render_answers_to_markdown,
+    validate_answers_payload,
+)
 from core.per_llm_stages import (
     PLANNER_RECURSION_LIMIT,
     run_llm_planning_agent,
@@ -245,718 +255,173 @@ def _build_base_context(repo_url: str, output_dir: str) -> str:
 """
 
 
+def _build_json_qa_prompt(stage_id: str, stage_title: str) -> tuple[str, list[str]]:
+    """从 core/describe_stage_qa/<stage_id>.json 组装本阶段 prompt，并返回 expected_question_ids。"""
+    stage_qa = load_stage_qa(stage_id)
+    questions = stage_qa.get("questions", []) if isinstance(stage_qa, dict) else []
+    expected_ids = list_question_ids(stage_qa)
+    stage_constraints_md = stage_qa.get("stage_constraints_md", "") if isinstance(stage_qa, dict) else ""
+    if not isinstance(stage_constraints_md, str):
+        stage_constraints_md = ""
+
+    # 题单（评委友好）+ 必须回答（供 planner must_cover 抽取）
+    # + 阶段强相关约束（从 legacy prompt 迁移，避免“只剩题目没剩规范”）
+    # + 输出契约（强约束 JSON）
+    lines: list[str] = []
+    lines.append("## 题单（评委用，小题作答）")
+    lines.append("")
+    for q in questions if isinstance(questions, list) else []:
+        if not isinstance(q, dict):
+            continue
+        qid = str(q.get("question_id", "")).strip()
+        qtype = str(q.get("question_type", "")).strip()
+        stem = str(q.get("stem", "")).strip()
+        if not (qid and qtype and stem):
+            continue
+        lines.append(f"- **{qid}** ({qtype})：{stem}")
+        choices = q.get("choices")
+        if isinstance(choices, list) and choices:
+            for i, c in enumerate(choices):
+                label = chr(ord("A") + i)
+                lines.append(f"  - {label}. {str(c).strip()}")
+    lines.append("")
+
+    lines.append("## 必须回答")
+    lines.append("")
+    for q in questions if isinstance(questions, list) else []:
+        if not isinstance(q, dict):
+            continue
+        qid = str(q.get("question_id", "")).strip()
+        stem = str(q.get("stem", "")).strip()
+        if qid and stem:
+            lines.append(f"- [{qid}] {stem}")
+    lines.append("")
+
+    # 等价实现原则 + 停止条件（来自外部 QA 最佳实践）
+    lines.append("## 分析原则（必须遵守）")
+    lines.append("")
+    lines.append(
+        "**等价实现原则**：题目中出现的算法名、函数名、结构体名、宏名、系统调用名，"
+        "都只是候选关键词或示例，**不是仓库里必须存在的精确标识符**。"
+        "如果仓库采用不同命名，只要语义等价，就应按\u201c等价实现 / 等价接口 / 等价结构\u201d分析，"
+        "**不要持续追逐不存在的名字**，不要因为特定函数名缺失就直接报 `not_found`。"
+    )
+    lines.append("")
+    lines.append(
+        "**停止条件**：一旦你已经能够稳定回答当前问题并闭合一条"
+        "\u201c\u5165\u53e3 \u2192 \u6838\u5fc3\u64cd\u4f5c\uff08\u9875\u8868/\u5206\u914d/\u9501/\u8c03\u5ea6\u7b49\uff09\u201d"
+        "的主链路，就**立即停止扩大搜索范围**，"
+        "不要横向罗列大量相邻能力。已验证负向结论时写\u201c未发现实现\u201d，"
+        "**不要在无直接证据时强行写\u201c未实现\u201d**。"
+    )
+    lines.append("")
+
+    # 阶段强相关约束：一次性迁移到题库 JSON 中，运行时不再读取 legacy_stage_prompts。
+    if stage_constraints_md.strip():
+        lines.append("## 阶段强相关约束")
+        lines.append("")
+        lines.append(stage_constraints_md.strip())
+        lines.append("")
+
+    lines.append("## 输出契约（严格）")
+    lines.append("")
+    lines.append("你在本阶段**最终输出**必须是**唯一一个 JSON 对象**（允许使用 ```json 围栏包裹），不得输出任何额外解释文字。")
+    lines.append("JSON 顶层字段必须包含：`schema_version`、`stage_id`、`stage_title`、`terminology_profile`、`answers`。")
+    lines.append("其中 `answers` 是数组，每个元素必须包含：`question_id`、`question_type`、`stem`、`value`、`evidence`。")
+    lines.append("`tri_state_impl` 的 `value` 只允许：`implemented` / `stub` / `not_found`。")
+    lines.append("每条证据 `evidence[]` 必须包含：`path`（仓库相对路径）、`symbol_kind`、`symbol_name`、可选 `excerpt`。")
+    lines.append("")
+    lines.append("你必须使用本仓库代码证据作答。若未发现实现，按三态要求输出 `not_found`，且不得编造路径/符号。")
+    lines.append("")
+    lines.append("你必须按题单顺序输出 answers，且 question_id 必须与题单完全一致（不多不少）。")
+    lines.append("")
+    lines.append("JSON 示例（缩略，仅示意字段；不要复用其中路径/符号）：")
+    lines.append("")
+    lines.append("```json")
+    lines.append("{")
+    lines.append(f"  \"schema_version\": \"{JSON_QA_SCHEMA_VERSION}\",")
+    lines.append(f"  \"stage_id\": \"{stage_id}\",")
+    lines.append(f"  \"stage_title\": \"{stage_title}\",")
+    lines.append("  \"terminology_profile\": \"stallings_en_zh\",")
+    lines.append("  \"answers\": [")
+    lines.append("    {")
+    lines.append("      \"question_id\": \"QXX_001\",")
+    lines.append("      \"question_type\": \"tri_state_impl\",")
+    lines.append("      \"stem\": \"...\",")
+    lines.append("      \"value\": \"not_found\",")
+    lines.append("      \"evidence\": []")
+    lines.append("    }")
+    lines.append("  ]")
+    lines.append("}")
+    lines.append("```")
+    lines.append("")
+
+    return "\n".join(lines).strip() + "\n", expected_ids
+
+
 STAGES = [
 
     {
         "id": "02_boot_arch",
         "title": "启动流程与架构初始化",
-        "prompt": """目标：从复位到内核 `main` 的启动链与架构初始化：汇编/固件交接、板级分支、链接脚本与早期 MMU/串口等，**落到路径与符号**。
-
-**本章侧重**：
-- 链接脚本 ENTRY、`#[cfg]`/board 分支、固件链中**实际进入镜像**的环节；未编译路径写明「未进入镜像」。
-- 多平台/多板：差异入口与互斥关系（证据不足标待核实）。
-- 构建轮廓（与本章相关者）：`Cargo.toml`/`Cargo.lock` 的 path 与 git 依赖、workspace 覆盖、默认 feature、`boards/`/`platform/` 等与启动/板级的对应，有则写、无则略。
-
-必须回答：
-- 启动入口在哪里？（汇编文件如 entry.S 或 head.S，链接脚本 linker.ld 中的 ENTRY）
-- CPU 模式切换与初始化（如 RISC-V M-Mode -> S-Mode，x86实模式->保护模式->长模式）。**必须验证是否真的发生了模式切换（查找 sstatus.spp, mstatus.mpp, cr0 等寄存器操作）。**
-- 关键寄存器设置（栈指针 SP、页表基址 SATP/CR3、中断向量表 stvec 等）。
-- 它是如何跳转到 Rust/C 入口函数的？
-- 早期初始化做了什么（BSS 清零、早期串口打印、设备树解析、页表初始化时机）？
-- **浮点单元 (FPU) 初始化**：搜索 `sstatus.fs` (RISC-V) 或 `cpacr_el1` (AArch64) 或 `cr4` (x86_64)。如果没有找到相关代码，**必须明确说明未启用 FPU（状态为未实现）**。
-- **多平台适配**：
-    - **StarFive VisionFive2**：搜索 `visionfive` 或 `jh7110`，分析其启动流程特异性（SBI -> U-Boot）。
-    - **LoongArch**：搜索 `loongarch`，分析其启动流程。
-- **平台与构建配置**：使用 grep_in_repo 搜索 `.toml`/`defconfig`/`Kconfig`/`Makefile` 配置文件，分析构建系统如何选择编译目标和平台参数。
-- **Makefile/构建入口（C/Makefile 项目必选）**：打开仓库根或 `kernel/` 等目录下 `Makefile`，用 `read_code_segment` 引用**选择 `platform`/板型**的规则行，以及将 `entry_k210.S`/`entry_qemu.S`（或本仓等价汇编入口）加入 `SRC`/`OBJS`/`ASM` 变量列表的行（须 `路径:行号`）。
-- **Trap 返回与用户向量（RISC-V C 内核常见）**：定位 `usertrapret`（或等价返回用户态路径）、trampoline/用户页与 `stvec` 写入处；须 `read_code_segment`/`grep_in_repo` 给出文件与行号，**先列关键 if/平台宏再下结论**，描述须与代码分支一致。
-- **固件级启动链（RISC-V 必须）**：如果是 RISC-V，必须描述 SBI->U-Boot->OS 的完整固件级启动链。搜索 `sbi|opensbi|u-boot` 关键词。分析 SBI 如何将控制权移交给内核。
-- **MMU 启用前后串口地址切换**：在 UART 初始化代码中，分析 MMU 启用前（物理地址直接访问）和 MMU 启用后（虚拟地址访问）的串口地址切换逻辑。搜索 `phys_to_virt|virt_to_phys` 或 UART 基址相关常量。
-- **架构对齐检查（Architecture Alignment Check）**：在深入分析初始化代码前，先确认当前 LSP 的 Target Triple 与你正在分析的架构分支（如 `arch/riscv64`）是否匹配。通过读取 `.cargo/config.toml` 或 `Makefile` 获取精准 Triple。**如果发现不匹配或代码块被 `#[cfg]` 灰化，必须调用 `lsp_set_target_arch` 进行强制校准并重启分析。**
-
-要求：
-- **语义发现（🥇 首选）**：使用 `rag_search_code` 搜索 "boot", "_start", "kernel_main", "architecture initialization" 锁定启动入口文件。
-- 使用 `lsp_get_document_outline` **先**查看 arch 初始化文件的整体结构（函数列表+行号），然后有目的地 `read_code_segment` 关键段。
-- 使用 `lsp_get_definition` 追踪 `_start` → `rust_main` / `kernel_main` 的跨文件调用链。每一跳都用 LSP 定位下一个函数的定义位置，**不要凭经验猜路径**。
-- **【必须】使用 `lsp_get_call_graph` 生成启动函数完整调用链**：
-  - 对 `rust_main` 或 `kernel_main`（定位到实际文件后）调用 `lsp_get_call_graph(repo_path, file_path, "rust_main", direction="outgoing", max_depth=4)`
-  - 如返回 `[⚠️ DEGRADED MODE]`，说明 LSP 降级至 Grep 分析，仍需使用该结果并在报告中标注"DEGRADED — 静态 Grep 分析"。
-- 使用 `lsp_get_references` 查找谁调用了关键初始化函数（如 `init_mmu`、`setup_trap`），验证其在启动流程中的位置。
-- 辅以 `grep_in_repo` 搜索汇编入口（`entry.S`/`start.S`）和 `list_repo_structure` 浏览目录。
-- 重点关注 arch/、platform/、boot/ 目录下的初始化代码。
-- **完整追踪**：从 `_start` 到内核 main 函数的每一步调用链，引用文件路径和行号。
-- **严禁幻觉**：
-    1. **汇编入口**：先在 `arch/` 或 `platform/` 下找 `entry.S`, `head.S`, `start.S`。
-    2. **Rust入口**：如果找不到汇编入口，可能是通过 SBI/U-Boot 直接跳转到 Rust 入口，请寻找 `#[entry]`。
-    3. **路径验证**：写下任何文件路径前，必须确认该文件真实存在。
-- **FPU/模式切换验证**：
-    - RISC-V: 搜索 `sstatus.fs` 或 `FS:` 常量。
-    - AArch64: 搜索 `cpacr_el1` 或 `CPACR`。
-    - x86_64: 搜索 `cr0`, `cr4` 寄存器位操作。
-
-**【评测与交付适配 — 本阶段启发式】**（无 `grep`/README 证据则写「未发现」或略过）：
-- 区分 **物理板型** 与 **QEMU `virt`/评测常用机**：README 中的运行命令若含 `qemu-system-*`、`-machine virt`、多 `-device virtio-*`，须在正文点明与本仓 `#[cfg]`/默认 feature 是否一致，并附 `Makefile`/`README.md` 等路径。
-- 启动链中与 **多块 virtio-blk、virtio-net、RTC（`-rtc`）** 相关的早期初始化：有则给 `路径:行号`；无命中不写。
-
-输出格式：
-- ## 启动入口与链接脚本分析
-- ## 架构初始化流程（模式切换/FPU/MMU）
-- ## 到达内核主函数的路径（完整调用链）
-- ## 多平台启动流程（StarFive/LoongArch 等）
-- ## 平台配置与构建机制
-- ## 关键代码片段分析
-""",
+        "prompt": "",  # legacy prompt archived under legacy_stage_prompts/
     },
     {
         "id": "03_mem_mgmt",
         "title": "内存管理（物理/虚拟/分配器）",
-        "prompt": """目标：物理/虚拟内存、页表、帧与堆分配器；**字段、锁、错误路径与缺页链路**写透。
-
-**本阶段须额外覆盖**：
-- 页表/分配器/缺页路径上**非默认命名或自研子模块**；`feature` 控制的内存子系统裁剪；与 trap/进程模块的**实际调用边**（给路径）。
-- 高级特性逐项必须写清「真实现 / 桩 / 未找到」的**判定依据**（代码形态），避免泛泛结论。
-- **并发与多核（Concurrency & SMP）与内存子系统的耦合**（教材将并发视为 OS 核心切入点）：在 **Buddy/Slab/帧分配器** 与 **页表 walk/map/unmap** 路径上，必须判定**锁粒度**（例如全局大锁 `Mutex<...>`、per-CPU、细粒度 per-bucket、RCU 等）并附 `路径:行号`；若结论为「无显式锁」，须说明是否依赖单核/关中断/原子-only 及依据。
-- **TLB 一致性（TLB shootdown / 远程 TLB 刷新）**：搜索 `sfence.vma|tlbi|invlpg|flush_tlb|shootdown|smp_call_function|ipi.*tlb|remote_flush` 等；若存在多核或页表在多个 hart 上可见，必须写清：**谁在何种事件下**刷新 TLB（本地 vs 广播）、是否与 **IPI** 联动；若未发现，写「未发现 TLB shootdown / 仅本地 sfence」并列出已搜模式。
-- **章节交叉引用（与 09 多核）**：正文须用一小段（可放在「并发、锁与 TLB」小结）写明与 **第 9 章「多核支持与并行机制」** 的结论是否一致——若 09 已判定 **真 SMP**，则本章对 **远程 hart 可见的页表变更** 与 **TLB shootdown / IPI** 的叙述必须与 09 的 IPI、每核上线证据链**互指路径**（或明确「本仓单核故 09 与本章均无 shootdown 需求」），避免两章矛盾。
-
-必须回答（并在源码中找到对应实现）：
-- 物理内存管理：使用什么算法（Bitmap/Buddy System）？FrameAllocator 接口在哪里？
-- 虚拟内存管理：页表如何操作（PageTable 结构、walk/map/unmap 实现）？
-- 内核与用户地址空间设计：是否独立？内核重映射？
-- 堆分配器：使用了什么 Allocator（GlobalAlloc, slab, buddy）？
-- **堆管理 (brk/sbrk)**：搜索 `sys_brk`，是否支持惰性分配（仅调整边界不立即分配物理页）？
-- **用户指针安全**：搜索 `UserInPtr|UserOutPtr|verify_area|check_region`，分析系统调用入口处如何验证用户空间指针合法性。
-- 缺页异常（Page Fault）处理逻辑（如有）。**追踪 handle_page_fault 调用链**。
-- **进程级映射管理**：搜索地址空间管理结构（如 `VmAreaStruct`、`BTreeMap` 管理的映射区间），分析是否有反向映射表（rmap）支持。
-- **解映射与 tear-down**：`grep_in_repo` 搜索 `uvmunmap|unmappages|unmap|munmap`；若存在须 `read_code_segment` 引用实现片段；若不存在写「未发现等价符号」并说明已搜模式。
-- **物理分配器术语**：结论前 `read_code_segment` 读 `kalloc`/`freerange`/`alloc` 等实现；数据结构须与代码一致（如 xv6 风格 `struct run` **单链表**——勿误写为双链表）。
-- **README/feature 与内存子系统**：若 README 声称某特性，用 `grep`/`read_code_segment` 对照代码并各附路径；**无 README** 则写明「无 README，仅以代码为准」。对 `#ifdef`/feature 裁剪须列宏名与命中路径，或写「已搜关键字 xxx 未见相关分支」。
-- **高级特性验证**（必须分类为 `✅ 已实现`、`🔸 桩函数`、`❌ 未实现`，并寻找具体代码）：
-  - 写时复制（Copy-on-Write）：搜索 `cow|copy_on_write`，确认是否在 page fault 中处理了 CoW。
-  - 懒分配（Lazy Allocation）：搜索 `lazy|populate`，确认是否推迟了物理页分配。
-  - 共享内存管理（SharedMem）：是否有 `shm` 相关系统调用和数据结构？**深入分析**：搜索 `sys_shmdt` 实现，检查是否使用 `BTreeMap` 进行 O(log n) 定位。搜索 `SharedMemoryManager`，分析 `IPC_RMID` 删除策略（立即删除 vs Arc 引用计数延迟释放）。
-  - **反向映射表（rmap）**：搜索 `rmap|reverse_map|page_to_vma`，检查是否有物理页到虚拟页的反向映射机制。
-  - 交换区/页面置换（Swap）：是否实现了 `swap_out`/`swap_in`？若存在 swap：**是否与块设备/文件层联动**（读回页、写回页）？
-  - **大页支持（Huge Page）**：在页表映射中是否处理了 2M/1G 页面？搜索 `HugePage|MapSize::2M|MapSize::1G`。
-  - **零拷贝与 mmap**：搜索 `mmap` 实现，验证是否支持文件映射？是否支持零拷贝IO（sendfile/splice）？**注意：如果是 `mmap` 系统调用，检查它是否真的实现了 MAP_FIXED/MAP_ANON 等标志的处理，还是仅仅是一个空壳？（如果是空壳/仅返回0，标注为桩函数）**
-  - **页缓存（Page Cache）与脏页回写（Dirty Page Writeback）**（内存与 I/O/文件管理联动）：搜索 `page_cache|buffer_cache|bcache|get_block|bread|bwrite|bio|writeback|sync_page|mark_dirty|set_page_dirty|flush_inode|fsync` 等；必须分类：`✅ 已实现` / `🔸 桩` / `❌ 未实现`。若存在缓存：写明**缓存粒度**（块 vs 页）、**脏页标记**路径、是否有**异步回写/workqueue 等价物**或仅同步 `write` 刷盘；若无，写「未发现 page cache / 未发现 dirty writeback」并附已搜关键字。
-
-**强制要求**：
-- **语义发现（🥇 首选）**：调用 `rag_search_code` 搜索 "page table", "buddy system", "slab allocator", "mmap implementation", "TLB shootdown", "page cache", "writeback" 定位核心内存管理源码。
-- 对于上述每一个特性，如果支持，必须引用代码文件和行号。
-- 如果不支持，必须明确写“未发现实现”或“❌ 未实现”。
-- 追踪一个完整的 `page fault` -> `alloc_frame` -> `map_page` 流程。
-- **LSP 工具使用要求**：
-    - 使用 `lsp_get_definition` 定位 `PageTable`、`FrameAllocator`、`MemorySet` 等核心结构体的精确定义，**不要凭记忆描述字段**。
-    - **【必须】使用 `lsp_get_call_graph` 追踪缺页异常完整链路**：
-      - `lsp_get_call_graph(repo_path, file_of_handle_page_fault, "handle_page_fault", direction="both", max_depth=3)` — 谁触发缺页，它又调用什么？
-      - `lsp_get_call_graph(repo_path, file_of_alloc_frame, "alloc_frame", direction="incoming", max_depth=2)` — 谁调用了物理页分配？
-      - 如返回 `[⚠️ DEGRADED MODE]`，在报告中标注"DEGRADED — 基于 Grep 静态分析"并继续使用结果。
-    - 使用 `lsp_get_references` 追踪 `handle_page_fault` 的调用方（谁调用了它？）。
-    - 使用 `lsp_get_document_outline` 快速浏览内存管理大文件的函数列表，再有目的地读取关键实现。
-- **防幻觉检查**：
-    - **mmap**: 不要看到 `Mmap` 结构体就认为实现了 mmap。检查系统调用入口 `sys_mmap`。
-    - **Stub检测**：如果 `sys_mmap` 只是返回 `0` 或 `Ok`，没有处理 `MAP_FIXED` / `MAP_ANON` 等标志，必须标记为 **Stub**。
-    - **Swap**: 必须找到 `swap_out` / `swap_in` 的实际逻辑，而不仅仅是特质定义。
-
-**【评测与交付适配 — 本阶段启发式】**（须源码证据；无则略）：
-- 自动化评测/深度用户态测例常压力 **`mmap`/`brk`/缺页/解映射`**：若 README 声称「可跑 libc-test/LTP/iozone」等，须与 `sys_mmap`/`sys_brk`/`handle_page_fault` 实际实现对照，标 ✅/🔸/❌ 并附路径。
-- **Delivery 信号**：`Makefile`/`build.rs` 中固定产物名（如 `kernel-rv`、`disk.img`）与内存子系统无直接耦合时，仅在「与测例根因相关」处一句带过并引用构建文件路径。
-
-输出格式：
-- ## 物理内存管理实现（代码引用）
-- ## 虚拟内存与页表操作（代码引用）
-- ## 地址空间布局（内核 vs 用户）
-- ## 堆分配器解析
-- ## 高级内存特性清单（CoW/Lazy/Swap/HugePage/PageCache/Writeback - 已实现/未实现）
-- ## 并发、锁粒度与 TLB 一致性（含 SMP 时 shootdown）
-- ## 关键代码片段与调用链分析
-""",
+        "prompt": "",
     },
     {
         "id": "04_process_sched",
         "title": "进程/线程与调度机制",
-        "prompt": """目标：任务/进程模型、调度器与上下文切换；**结构体字段、队列不变量、锁与唤醒路径**写透。
-
-**本阶段须额外覆盖**：
-- `pick_next_task`/`schedule` 是否**真**使用优先级/时间片/stride 或仅为 FIFO（给证据）；与地址空间/信号模块的**硬耦合点**（路径）。
-- 进程组/会话/rlimit 等扩展：是**实检查**还是仅占位字段。
-- **章节交叉引用（与 09 多核）**：若存在 **每核运行队列**、**负载均衡**、**IPI 触发 resched**、任务迁移，须与 **第 9 章** 的 SMP 证据链互指（路径一致）；若 09 判定单核，本章对「多核调度/迁移」一句写明不适用即可，避免与 09 矛盾。
-
-必须回答：
-- 执行实体：Process/Thread/Task 结构体包含哪些字段（Context, State, TrapFrame）？**禁止**仅凭存在 `fork`/`exec` 等标准接口名就推断「已完整实现」；须用 `read_code_segment` 对照**数据结构体与资源复制路径**。
-- **任务模型扩展**：使用 grep_in_repo 搜索 `Process|ProcessGroup|Session|process`，检查是否存在进程组、会话管理以及 PID/TID 分配机制。
-- 调度策略：算法是什么（FIFO, RR, Priority, Stride, CFS）？Scheduler 实现细节。
-- 状态流转：Ready/Running/Blocked/Exited 状态机。
-- **上下文切换（Context Switch）**：`grep_in_repo` 搜索 `switch.S|context_switch|__switch|swtch`；用 `read_code_segment` 判定保存的寄存器集合是**完整被调用者保存寄存器**（如 RISC-V `s0-s11` 等）还是**裁剪/仅保存子集**；结论须附 `路径:行号`。
-- **PID 分配与回收**：搜索 `PidAllocator|pid_alloc|alloc_pid|next_pid|free_pid|release_pid`；判定 PID 是**单调自增**、**bitmap 复用**、**空闲栈/队列**复用，还是**只分配不回收**（常见比赛半成品）；须附证据片段。
-- **父子进程树（Process Tree）**：在 `TaskControlBlock`/`Process`/`TaskInner`（或本仓等价）中判定子进程/线程的挂载方式：例如 `Vec<Arc<...>>`、`LinkedList`、显式 `parent`/`children`/`sibling` 指针等；说明遍历与删除复杂度相关实现点 `路径:行号`。
-- **调度算法鉴定（防“看着像 RR”）**：搜索 `pick_next|scheduler|schedule`；**强制**写出本仓实际算法名（Round-Robin / Stride / MLFQ / FIFO 等）并给出**代码级证明**（如存在 `stride` 字段与比较、`VecDeque` 多级队列、`timeslice`/`slice` 递减、`priority` 参与排序等）；禁止无代码仅凭命名猜测。
-- **阻塞与唤醒（Sleep/Wakeup）**：追踪 `waitpid|sys_waitpid|wait4`（或等价）；判定是 **yield/轮询忙等**、还是 **从就绪队列移出并进入等待队列**（`WaitQueue`/`sleep`/`block_on` 等）；附 `路径:行号`。
-- **高级特性验证**（必须分类为 `✅ 已实现`、`🔸 桩函数`、`❌ 未实现`，并寻找具体代码）：
-    - **信号机制 (Signal)**：使用 grep_in_repo 搜索 `signal|sigaction|kill`，确认是否实现了信号注册与分发？
-    - **Futex**：搜索 `futex|wait_queue`，是否支持快速用户态互斥锁？
-- **深度调用链追踪（必须）**：
-    - `fork()`: 追踪从系统调用到 `clone_task` / `copy_task` 的完整流程。**必须验证**是否真的复制了地址空间（`memory_set.copy()`）和文件表？
-    - `exec()`: 如何加载 ELF？如何重建地址空间？
-    - `schedule()`: 调度器被谁调用？**验证优先级**：`pick_next_task` 是否真的使用了 `priority` / `stride`，还是仅仅 FIFO？
-    - `exit()`: 资源回收流程，父进程通知。
-- 进程与线程的区别：代码中是否区分了 TCB 和 PCB？还是只有 Task？
-- **层次结构 ID 规则**：搜索 `pgid|session_id|set_sid|setpgid`，分析 PGID（进程组 ID = 组长 PID）和 SID（会话 ID = 会话组长 PGID）的分配规则。
-- **POSIX 资源限制**（必须分类为 `✅ 已实现`、`🔸 桩函数`、`❌ 未实现`）：搜索 `rlimit|RLIMIT|getrlimit|setrlimit|resource_limit`，检查是否实现了资源限制。如果找到，列出支持的资源类型数量（POSIX 定义了 16 种）及软/硬限制双机制。
-- **时间片 / `proc_tick`（或本仓等价）**：阅读实现中的 **if/条件分支** 再叙述「是否时间片轮转/RR」；禁止凭术语臆断，须 `路径:行号`。
-- **调度与地址空间耦合**：若在调度或返回用户路径中存在 `w_satp`/`sfence.vma`/切换页表，须显式标出调用点 `路径:行号` 及触发条件。
-
-要求：
-- **语义发现（🥇 首选）**：使用 `rag_search_code` 搜索 "task structure", "scheduler algorithm", "context switch", "fork implementation", "PidAllocator", "waitpid", "switch.S" 快速锁定进程管理模块。
-- 使用 `lsp_get_definition` 定位 `Task`/`Process`/`TaskInner` 结构体定义，精确列出其字段（不要猜）。
-- 使用 `lsp_get_references` 追踪 `fork`/`exec`/`schedule`/`exit` 的完整跨文件调用链。
-- 使用 `lsp_get_document_outline` 快速查看调度器文件中的所有函数，找到 `pick_next_task`、`schedule` 等关键入口。
-- **【必须】使用 `lsp_get_call_graph` 生成核心进程操作的调用树**：
-  - `lsp_get_call_graph(repo_path, file_of_sys_fork, "sys_fork", direction="outgoing", max_depth=4)` — fork 从 syscall 到内存复制的完整下行链
-  - `lsp_get_call_graph(repo_path, file_of_schedule, "schedule", direction="both", max_depth=3)` — 谁触发调度？调度器下一步调什么？
-  - 如返回 `[⚠️ DEGRADED MODE]`，标注"DEGRADED — 基于 Grep 静态分析"并继续使用结果。
-- 进程与调度实现常分散在多目录，请用 `find_os_core_modules` 与 `grep_in_repo` 扫全仓。
-- 查找 context_switch 汇编代码。
-
-**【评测与交付适配 — 本阶段启发式】**（须源码证据；无则略）：
-- **脚本驱动测例**依赖可靠的 **`fork`/`execve`/`wait`、文件描述符继承、当前工作目录**：若存在自测主控或 README 描述串行跑 shell 脚本，须指出本仓这些路径上与「仅交互 shell」的差异及证据 `路径:行号`。
-- 与 **Harness 输出契约**无直接代码关联时不要臆测赛题；仅在有 `grep` 命中测试调度相关符号或 README 明确描述时写一小段。
-
-输出格式：
-- ## 任务模型与核心数据结构
-- ## 调度算法与策略（代码证据）
-- ## 任务状态机
-- ## 上下文切换实现（汇编分析：寄存器集合与切换点）
-- ## PID 分配回收与进程树结构
-- ## 阻塞与唤醒（waitpid / WaitQueue 路径）
-- ## 进程间通信与同步（Signal/Futex）
-- ## 关键流程追踪（Fork/Exec/Schedule/Exit）
-- ## 与 09 多核的调度/迁移一致性（如适用）
-- ## 进程/线程管理模块扩展
-
-""",
+        "prompt": "",  # legacy prompt archived under legacy_stage_prompts/
     },
     {
         "id": "05_trap_syscall",
         "title": "中断、异常与系统调用",
-        "prompt": """目标：Trap 与系统调用：向量入口、上下文保存、分发表与 stub；**TrapFrame 与缺页/信号等链路的衔接**写透。
-
-**注意**：不要假设所有代码都在 `src/` 下。若 Trap 分散在组件目录，逐文件给路径，避免只写模块名。
-
-**本阶段须额外覆盖**：
-- 对「高价值 syscall」列表：**实现深度分级**（真逻辑 / 仅 ENOSYS / 返回 0 / todo），并说明与 README 声称是否冲突。
-- Trap/信号/缺页三条链的**交汇点**（文件+符号），写清本仓实际存在的衔接代码或缺失。
-- **章节交叉引用（与 09 多核）**：若存在 **每 CPU 陷阱栈**、`tp`/`gsbase` 存 per-cpu、`cpuid()`/`hartid` 分支的 trap 入口，须与 **第 9 章** 的 AP 启动、`percpu`/次级核初始化**对照**（谁先初始化 per-cpu 再设 `stvec` 等）；单核实现则一句写明「与 09 单核结论一致即可」。
-
-必须回答：
-- Trap 入口：trap_handler / trap_vector 在哪里？如何区分中断（Interrupt）和异常（Exception）？
-- **特权级切换与陷阱上下文存放位置**：搜索 `trap_handler|__alltraps|alltraps|trap_entry`；判定 **TrapContext/TrapFrame** 保存在**内核栈**、**每 CPU 陷阱栈**、还是**用户地址空间预留页**（如 `TRAMPOLINE`/`trap_context` 页）；须 `路径:行号` 说明切换栈的指令路径。
-- 上下文保存：TrapFrame / GeneralRegisters 结构体。**必须用 `lsp_get_definition` 或 `read_code_segment` 读取结构体定义，精确统计包含的寄存器数量和总字节数**，不要凭经验估算。
-- **系统调用分发追踪**：
-    - 用户态 `ecall`/`syscall` 指令。
-    - 内核态 `syscall_handler` 分发逻辑。
-    - **必须找到分发表**（syscall table 或 match 语句）。
-    - **系统调用号边界检查**：分发前是否校验 `syscall_id` / `a7` 等寄存器范围？越界是返回错误、panic、还是静默落入默认分支？须 `路径:行号`。
-    - **Stub验证**：检查核心 syscall（如 `sys_clone`, `sys_exec`, `sys_mmap`, `sys_write`）等是否直接返回错误、返回 0，或者包含了 `todo!()`/`unimplemented!()`？
-    - **覆盖度统计**：基于上述验证，明确区分并列出“已注册但仅为桩特征（`🔸 桩函数`）”的 syscall 数量，与“完整功能实现（`✅ 已实现`）”的 syscall 数量。
-    - 选择一个具体 syscall（如 `sys_write`）追踪其从 Trap 到真正处理逻辑的路径。
-- **接口与实现分层**：仅当仓库**确实存在**「syscall 分发与实现体拆分」时描述并给符号与路径。关于 `_impl` 后缀：**必须** `grep_in_repo` 搜索 `_impl\\b|sys_[a-z0-9_]*_impl`，单列一小节写清搜索范围、命中列表或**「未见该命名模式」**（纯 C 单文件分发须同样给出结论）。**禁止**虚构 `sys_xxx_impl`。
-- **README 与 syscall 声称**：若存在根目录或内核目录 `README.md`，摘录其中与 syscall/兼容性相关声称并与分发表对照；**无 README** 则写明「无 README，仅以代码为准」。
-- **用户内存访问（C 内核并列证据）**：除 `copyin`/`copyout` 外，若存在 `fetchaddr`/`fetchstr`（或等价），须一并 `read_code_segment` 引用 `路径:行号` 说明用途与调用边。
-- **用户指针语义化包装**：搜索 `UserInPtr|UserOutPtr|UserInOutPtr`，如果存在此类类型安全包装，需描述其在 syscall 入口处的作用。
-- **外部中断流**：详细分析时钟中断（Timer）处理流程与外部设备中断（如 PLIC/APIC）的分发处理。
-- **时钟中断与抢占（Preemption）**：搜索 `SupervisorTimer|timer interrupt|mtimecmp|tick_handler|time_irq|IRQ.*TIMER`；判定时钟中断处理路径中是否调用 `yield|schedule|resched` 等触发**抢占**；若仅为 `tick` 计数无调度调用，须明确写「未发现基于时钟的抢占」并附证据。
-- **信号机制（必须深入）**：
-    - 搜索 `handle_signal|do_signal|POST_TRAP`，分析信号是否在 Trap 返回前被处理。
-    - **三种粒度**：搜索 `sys_kill|sys_tkill|sys_tgkill`，分析是否支持线程级/进程级/进程组级信号发送。
-    - **SIGSEGV**：搜索 `SIGSEGV|sig_segv`，分析非法内存访问时是否发送 SIGSEGV 信号。
-    - **用户自定义信号处理函数**：搜索 `sigreturn|signal_trampoline|trampoline`，分析是否有从内核跳到用户态信号处理函数的跳板代码机制。
-- **缺页异常与内存特性关联（必须）**：
-    - 追踪缺页异常处理链，分析它如何触发 **CoW**（写时复制）和 **Lazy Allocation**（懒分配）。
-    - 搜索 `handle_page_fault|do_page_fault|cow|lazy|alloc`，追踪从 Trap 入口到内存管理模块的完整调用链。
-
-要求：
-- **语义发现（🥇 首选）**：使用 `rag_search_code` 搜索 "trap handler", "syscall table", "interrupt vector", "ecall handling", "trap context kernel stack", "timer interrupt preempt" 精准定位异常分发代码。
-- 使用 `lsp_get_definition` 追踪 syscall 分发链：从 `trap_handler` → `syscall_handler` → 具体 `sys_xxx`，每一跳精确定位。
-- 使用 `lsp_get_document_outline` 查看 trap.rs / syscall.rs 的完整函数列表，掌握所有已实现的 syscall。
-- 使用 `lsp_get_references` 查找 `TrapFrame` 在哪些函数中被使用，验证上下文保存/恢复的完整性。
-- **【必须】使用 `lsp_get_call_graph` 追踪 Trap 完整调用链**：
-  - `lsp_get_call_graph(repo_path, file_of_trap_handler, "trap_handler", direction="outgoing", max_depth=4)` — 从 trap 入口展开完整分发树
-  - `lsp_get_call_graph(repo_path, file_of_sys_write, "sys_write", direction="incoming", max_depth=2)` — 谁调用了 sys_write？
-  - 如返回 `[⚠️ DEGRADED MODE]`，标注降级模式继续使用，关注 outgoing 结果中分发表函数的覆盖情况。
-- 辅以 `grep_in_repo` 搜索 `trap_handler|trap_return|syscall_handler` 确定文件位置。
-- 找到 trap.S / trap.rs，分析 syscall 分发表。
-
-**【评测与交付适配 — 本阶段启发式】**（须源码证据；无则略）：
-- **errno 语义**与桩：`EAGAIN`/`EINVAL`/`ENOSYS` 等与 Linux 接近度会影响 libc-test/LTP；对高频 syscall 抽样对比 README（若有 syscall 表）与分发表实现，写「README 声称 vs 代码实际」。
-- 深度测例敏感点：**边界检查**、**部分写**、**重入/锁**；仅在有 `read_code_segment` 证据时关联「评测压力」叙述。
-
-输出格式：
-- ## Trap 处理流程（用户态 <-> 内核态）
-- ## 特权级切换、陷阱栈与 TrapContext 存放位置
-- ## 异常向量表与入口
-- ## 系统调用分发机制（追踪 sys_write）
-- ## 系统调用号边界检查与错误路径
-- ## 核心 Syscall 实现列表
-- ## 中断处理与信号关联
-- ## 时钟中断与抢占
-- ## 与 09 多核的 per-CPU trap / 计时器初始化顺序（如适用）
-- ## 关键代码片段
-""",
+        "prompt": "",  # legacy prompt archived under legacy_stage_prompts/
     },
     {
         "id": "06_fs_vfs",
         "title": "文件系统（VFS + 具体 FS）",
-        "prompt": """目标：深挖"VFS 抽象 + 挂载 + 具体文件系统实现"；**VFS 抽象（Trait 或 C op 表）实现链、具体 FS crate/目录、fd 表与 mmap/poll 真实现**须可比对。
-
-**本阶段须额外覆盖**：
-- 自研 vs 直接依赖 crate 的**边界文件**；`feature` 切换导致的 FS 组合差异；同一功能多目录重复实现时**以谁为准**（证据）。
-
-必须回答：
-- VFS 抽象层：若为 Rust 则写 File/Inode/Dentry **Traits**；若为 **纯 C**，则写 **VFS op 表/函数指针结构**（如 `struct file_operations`/`inode_operations` 等）及挂载点，**勿强行套用 Trait 叙事**。
-- **VFS 与真实后端（防“内存 mock”）**：`grep_in_repo` 搜索 `inode|File trait|disk_inode|fat32|ext4|lwext` 等；**强制**回答：底层是**真实磁盘 FS**（FAT32/Ext4 等）、**仅 RamFS/TmpFS 内存文件系统**、还是**无后端桩**；结论须能指向具体 `路径:行号` 或 `Cargo.toml` 依赖证据。
-- **具体文件系统（必须代码验证）**：
-  - FAT32/Ext4：是否自己实现了？还是用的 crate？（**Rust**：`Cargo.toml`/`Cargo.lock`；**C/Makefile 项目**：同步检查 `Makefile`/`*.mk` 是否引入外部子目录或第三方 FS 源码路径）。**注意：对于组件化的 OS（如 ArceOS），具体的文件系统实现可能独立于 VFS 存在于诸如 `arceos/modules/axfs-ng/src/fs/fat/` 或 `ext4/` 目录中，务必使用搜索功能仔细查找，绝对不要仅仅因为特定目录下没有就断言未实现！**
-  - **具体 FS 的抽象层结构**：搜索 `FatFilesystemInner|Ext4Filesystem|FatFileNode|FatDirNode` 等，分析各层如何实现 VFS trait。这是文件系统架构的核心。
-  - RamFS/TmpFS：是否有内存文件系统？
-- **伪文件系统**：使用 grep_in_repo 搜索 `devfs|procfs|sysfs` 检查是否实现了伪文件系统。若有，分析其实现方式。
-- 文件描述符表：Global 还是 Per-Process？`fd_table` 结构在哪？**须进一步判定实现形态**：例如固定长度数组 `[Option<Arc<dyn File>>; N]`、`Vec<Option<...>>`、`BTreeMap<u32, ...>` 等；引用结构体定义 `路径:行号`，勿泛泛说“有 fd 表”。
-- **页缓存 / 块缓存（Buffer Cache）**：搜索 `block_cache|get_block_cache|bread|bwrite|BufBlock|PageCache`；若存在：**驱逐策略**（LRU、Clock、简单 FIFO、无驱逐）须在代码层指出判断依据 `路径:行号`；若不存在写「未发现块/页缓存」并列出已搜符号。
-- **路径解析（Path Resolution）**：搜索 `namei|path_walk|lookup|resolve_path`（或等价）；检查是否支持**绝对路径**（`/` 开头）与**相对路径**；是否正确处理 `.` / `..`；若声称支持**符号链接（symlink）**，须在 `readlink`/`open` 路径上给出跟随逻辑或写「未发现 symlink 处理」。
-- **功能细节**（必须分类为 `✅ 已实现`、`🔸 桩函数`、`❌ 未实现`）：
-  - 是否支持 `pipe` 套接字？
-  - 是否支持网络 `socket`？
-  - 是否支持 `mmap`？**注意**：必须检查 `sys_mmap` 实现。如果是 **零拷贝**，必须看到 `VmArea` 结构体中有 `shared` 字段或 `MAP_SHARED` 处理逻辑。如果是 `sys_mmap` 仅返回 Ok(0) 没有处理标志位，标注为'桩函数'。
-  - **高级特性**：`poll`/`select`/`epoll` 是否实现？搜索 `sys_poll` / `sys_select` / `sys_epoll`，检查是一律返回 Ready 还是真的检查了文件状态？
-  - **如果上述功能未找到代码，明确写“未实现（❌ 未实现）”**。
-
-- **文件打开流程**：追踪从 `sys_open` 到最终获得文件描述符的完整调用链，说明超级块、Inode、Dentry、File 四大核心数据结构如何协同。
-
-要求：
-- **语义发现（🥇 首选）**：使用 `rag_search_code` 搜索 "VFS trait", "FAT32 implementation", "file descriptor table", "mount logic", "block cache", "namei", "path resolution" 锁定文件系统核心实现。
-- 使用 `lsp_get_definition` 定位 `File` trait、`Inode` trait、`SuperBlock` 等 VFS 核心抽象的精确定义。
-- 使用 `lsp_get_references` 追踪 `sys_open` → `vfs_open` → 具体 FS `open` 的完整调用链。
-- **【必须】使用 `lsp_get_call_graph` 追踪文件打开完整路径**：
-  - `lsp_get_call_graph(repo_path, file_of_sys_open, "sys_open", direction="outgoing", max_depth=4)` — 从 syscall 到 VFS 再到具体 FS 的完整下行链
-  - `lsp_get_call_graph(repo_path, file_of_vfs_open, "vfs_open", direction="both", max_depth=3)` — VFS 中枢节点双向（谁调它，它调谁）
-  - 如返回 `[⚠️ DEGRADED MODE]`，标注"DEGRADED — 静态 Grep 分析"并继续使用，重点关注 outgoing 中 FS trait impl 的调用。
-- 使用 `lsp_get_document_outline` 快速摸清 VFS 和具体 FS 实现文件的内部结构。
-- 使用 grep_in_repo 搜索 "FdTable|FileDescriptor|fd_table" 确认文件描述符表实际命名。
-- **路径精确性（关键）**：注意区分相似目录（如 `core/file/` vs `core/fs/`，`src/fs/imp/` vs `api/src/core/fs/imp/`）。引用每个文件前必须用 `lsp_get_definition` 确认函数的真实定义位置。如果同一模块在多个目录中有实现（如 TmpFS 在 `src/` 和 `api/src/` 中都有），必须全部列出。
-- **多目录重复实现**：若检出多处 VFS/FS 实现，须用构建规则或条件编译行号说明**哪一路径参与当前 profile 链接**，避免仅列目录而无取舍依据。
-
-**【评测与交付适配 — 本阶段启发式】**（须 `grep`/README 与源码交叉验证；无则写未发现）：
-- **整盘挂载 / 无分区表 EXT4**、根目录 **扫测试脚本**（如 `*testcode*`、固定横幅字符串）往往落在 **VFS/mount/init 用户态**交界：有命中则单列一小节「Harness 与文件系统交界」并列出文件；无命中不写赛题名。
-- **双盘或多 virtio-blk** 挂载点：仅在代码或 README 中出现第二块盘、`disk.img` 等证据时描述。
-
-输出格式：
-- ## VFS 架构与接口设计
-- ## 具体文件系统支持情况（FAT32/Ext4/RamFS）
-- ## 文件描述符与进程关联
-- ## 管道(Pipe)与套接字(Socket)支持情况
-- ## 缓存机制（Block Cache / Page Cache 与驱逐策略）
-- ## 路径解析与符号链接（namei / lookup）
-- ## 零拷贝映射验证（mmap 实现分析）
-- ## 关键代码验证
-""",
+        "prompt": "",  # legacy prompt archived under legacy_stage_prompts/
     },
     {
         "id": "07_device_drivers",
         "title": "设备驱动与硬件抽象",
-        "prompt": """目标：分析“设备树/总线 + 驱动框架 + 具体设备驱动”；**probe 顺序、feature 选板、MMIO 地址来源（DTB vs 硬编码）**写细，并列出实际参与构建的驱动源路径。
-
-**注意**：驱动可能分散在组件 crate；**列出实际参与链接的驱动源文件**，不要只写目录名。
-
-**本阶段须额外覆盖**：
-- 每个外设子系统：**本仓支持的硬件列表 + 对应驱动文件**；未支持则写「未接入」而非默认假设 QEMU。
-
-必须回答：
-- 设备发现：Device Tree (DTS) 解析或 PCI/Bus 扫描？**必须验证**是否真的解析了 `.dtb` 文件，还是硬编码了地址？
-- 驱动框架：Driver Trait，如何注册/初始化驱动？
-- **组件化与配置**：搜索构建配置文件（Cargo.toml 的 features、Kconfig、条件编译宏），分析如何通过编译选项选择不同的驱动/模块实现。
-- **平台适配**：搜索 `platform/` 或 `boards/` 目录，列出所有支持的目标平台/开发板及其特有驱动，分析项目如何适配不同硬件。
-- 常见设备：
-    - UART/Serial（控制台输出）
-    - Block Device（磁盘读写，VirtIO-Blk）
-    - Net Device（网卡，VirtIO-Net）及网络协议栈（TCP/IP, smoltcp 等实现）
-    - GPU/Input（如有）
-- 中断控制器：PLIC/CLINT/APIC 驱动。
-- **MMU 前后串口地址切换**：分析 UART 驱动在 MMU 启用前（使用物理地址）和 MMU 启用后（使用虚拟地址）的地址切换机制。搜索串口基址常量的不同定义。
-
-要求：
-- **语义发现（🥇 首选）**：使用 `rag_search_code` 搜索 "device driver trait", "virtio-blk driver", "UART initialization", "PCI bus scanning" 快速锁定驱动程序。
-- 使用 `lsp_get_definition` 定位 Driver trait 定义和各设备驱动的 trait impl。
-- 使用 `lsp_get_references` 追踪 `init_drivers` / `probe` 的调用链，理解驱动注册与初始化顺序。
-- 使用 `lsp_get_document_outline` 浏览驱动文件结构，快速发现所有设备相关的 struct 和 impl。
-- 辅以 grep_in_repo 搜索 `axdriver` 或 `driver::` 和构建配置中的 feature flags。
-
-**【评测与交付适配 — 本阶段启发式】**（须源码证据；无则略）：
-- **多 virtio-blk 实例**（不同 MMIO/transport ID）与 **virtio-net** 是否与 README/QEMU 参数中的 `-device virtio-blk-device`、`-netdev user` 等一致；列驱动 probe 顺序与 `路径:行号`。
-- 区分「课设单盘」与「评测双盘/网卡同启」仅在仓库内存在第二块块设备或 net 初始化代码时展开。
-
-输出格式：
-- ## 驱动框架与设备发现
-- ## 组件化设计与配置机制
-- ## 字符设备驱动（UART/Console）
-- ## 块设备驱动（VirtIO-Blk等）
-- ## 网络设备驱动
-- ## 中断控制器驱动
-- ## 目标平台适配情况
-- ## 其他外设支持
-
-""",
+        "prompt": "",  # legacy prompt archived under legacy_stage_prompts/
     },
     {
         "id": "08_sync_ipc",
         "title": "同步互斥与进程间通信",
-        "prompt": """目标：分析“同步原语 + 锁机制 + IPC”；**锁与 WaitQueue 的睡眠/唤醒不变量、IPC 每条路径的缓冲区形态**写细，桩与真实现须用代码形态区分。
-
-**本阶段须额外覆盖**：
-- `sys_msgget`/`sys_semget`/`sys_pipe` 等：**队列/环形缓冲**是否真实存在；与 futex 的复用或分叉（路径）。
-
-必须回答：
-- 锁机制：SpinLock / Mutex / Semaphore / RwLock 实现。
-    - **RwLock**：`grep_in_repo`/`read_code_segment` 判断是否**真有**读写锁实现或仅为自旋锁/互斥包装；结论须附 `路径:行号`。
-    - **原子操作**：是使用 Rust `core::sync::atomic` 还是自定义汇编？(grep `ldxr/stxr`, `lock xchg`)
-    - **等待队列 (WaitQueue)**：线程获取锁失败时如何挂起？（find `WaitQueue`, `sleep`, `block`）
-    - **sleep / wakeup 不变量**：用文字写出「持有什么锁进入 sleep、是否防丢 wakeup、唤醒与锁顺序」等可核对陈述，并引用 `sleep`/`wakeup`（或等价）实现片段 `路径:行号`。
-- **IPC 机制（必须代码验证并分类为 `✅ 已实现`、`🔸 桩函数`、`❌ 未实现`，谨防桩代码）**：
-    - 管道 (Pipe)：搜索 `Pipe|sys_pipe|pipe2`。**实现验证**：底层是**字节环形缓冲区**、**页级传递**、还是**无缓冲占位**？读写阻塞时：是**挂起当前任务/线程**（`block`/`WaitQueue`）、还是**返回 EAGAIN 非阻塞语义**、还是 **busy-loop/yield**？须 `路径:行号`。
-    - 消息队列 (MessageQueue)：**必须检查实现**。grep `sys_msgget` 或 `msgget`。
-        - 如果函数体为空、`Ok(0)` 但没有队列逻辑，必须标记为 **`🔸 桩函数`**。
-        - 只有看到了完整的队列结构体操作（push/pop），才可标记为 **`✅ 已实现`**。
-    - 共享内存 (SharedMem)：结合内存管理章节分析（SharedMemoryManager 实现）。
-    - 信号量 (Semaphore)：PV 操作实现。同样需要检查 `sys_semget`, `semop` 区分是否为桩代码。
-    - **信号 (Signal) 作为 IPC**：搜索 `sys_kill|sig_send|signal_send`，分析信号分发机制是否也用于进程间通信。
-    - **信号处理时机**：搜索 `POST_TRAP|do_signal|handle_pending_signal`，分析信号在 Trap 返回用户态前的确切处理位置。
-    - **信号处理函数（Signal Handler）上下文**：搜索 `sys_sigaction|sigaction|sigreturn|signal_trampoline|trampoline`；判定用户态 handler 的**陷阱帧/用户栈**如何构建、是否存在 **`sigreturn` 恢复原上下文**；若仅有 `todo!`/`ENOSYS`，标 `🔸 桩函数`。
-- **Mutex / Semaphore 形态鉴定**：对 `Mutex`/`Semaphore` 的 `lock`/`wait` 实现**强制区分**：**自旋锁（spin：忙等 CPU）** vs **阻塞型（blocking：入等待队列并挂起）**；若为混合（短 spin + block），写明条件与 `路径:行号`。
-- **关键流程的跨文件调用链**：对 Futex 等待/唤醒流程，使用 `lsp_get_call_graph` 递归展开完整调用树（优先于 `lsp_get_references` 的单层查找）。
-
-要求：
-- **语义发现（🥇 首选）**：使用 `rag_search_code` 搜索 "SpinLock implementation", "Mutex wait queue", "Pipe ring buffer", "shared memory manager", "sys_pipe", "sigreturn" 锁定同步与 IPC 源码。
-- 使用 `lsp_get_definition` 定位 `Mutex`、`SpinLock`、`WaitQueue` 的结构体定义和 `lock()`/`unlock()` 实现。
-- **【必须】使用 `lsp_get_call_graph` 展开关键 IPC 流程调用链**（`sys_futex` → `futex_wait` → `WaitQueue::sleep`）：
-  - `lsp_get_call_graph(repo_path, file_of_sys_futex, "sys_futex", direction="outgoing", max_depth=4)`
-  - 如返回 `[⚠️ DEGRADED MODE]`，标注后继续使用 Grep 结果。
-- 使用 `lsp_get_references` 查找单节点引用（如哪些地方调用了 `futex_wake`）。
-- 使用 `lsp_get_document_outline` 浏览 IPC 模块文件，发现所有 Pipe/Sem/Shm 实现。
-- 辅以 grep_in_repo 搜索 sync/、ipc/ 模块。
-- **验证消息队列与信号量**：务必区分 Stub（桩）与 Real Implementation（真实实现）。
-
-**【评测与交付适配 — 本阶段启发式】**（须源码证据；无则略）：
-- **libc/LTP 类测例**常压 **pipe/futex/文件锁**；若 README 声称可跑相关套件，须用本章结论对照 05 章 syscall 桩态，标潜在缺口并附路径。
-- 无 README/`grep` 命中时不要写具体赛题名称。
-
-输出格式：
-- ## 同步与互斥原语（锁与原子操作；自旋 vs 阻塞）
-- ## 等待队列实现机制
-- ## 进程间通信（Pipe/MsgQueue/Sem）
-- ## 信号与 sigreturn / trampoline（如适用）
-- ## 关键代码片段
-- ## 未实现/桩函数功能列表（明确列出哪些是“画饼”）
-""",
+        "prompt": "",  # legacy prompt archived under legacy_stage_prompts/
     },
     {
         "id": "09_smp_multicore",
         "title": "多核支持与并行机制",
-        "prompt": """目标：分析多核/SMP（对称多处理）支持实现；**AP 启动证据链、IPI 与每核数据结构**写细，区分「真 SMP」与「仅宏/注释」。
-
-**本阶段须额外覆盖**：
-- **SMP 真伪**：要么给出 AP 在线全链证据（谁唤醒、何处进 idle）；要么明确单核结论，并说明「未找到 AP 启动链」或有关 API 未编译/未调用等依据——勿仅凭宏断言多核。
-
-必须回答：
-- **核心任务：一定要极其仔细地在源码中寻找有没有真正实现多核！** 架构设计是 SMP 还是 AMP？**绝不能仅凭看到一两个宏定义就断言支持多核，必须找到唤醒其他核的切实验证。如果不支持多核，务必明确写“仅支持单核（❌ 未实现）”**。
-- Secondary CPU 启动等主要功能机制：**必须清晰、详尽地描述其详细的底层工作机制**。具体描述 BSP（主核）是如何通过 IPI 或中断控制器发送信号唤醒 AP（从核）的链条，精确到对应文件的代码逻辑。搜索 `smp_boot`, `__cpu_up`。如果找不到启动其他核的代码，那就是单核。
-- 核间中断 (IPI)：搜索 `send_ipi`, `ipi_handler`。
-- **锁的实现**：SpinLock 是否禁用了中断？Mutex 是否支持优先级继承？
-- Per-CPU 变量设计与访问方式。搜索 `axns` 模块，分析 PerCPU 命名空间实现。
-- 多核调度策略：负载均衡、CPU 亲和性（affinity）。
-- 自旋锁/RCU 在多核下的实现差异。
-- **`NCPU` / `MAXCPU` 与链接脚本**：将 `NCPU`（或本仓等价宏）与 `link-k210.ld`/`kernel.ld` 等中的 `_max_hart_id`、每 hart 栈/入口布局**对照引用**（须 `路径:行号`），避免仅口述宏而未对照链接脚本。
-- **交叉引用前面章节（必须）**：本章与前面章节有大量交叉，必须引用并深化（各条均须落到**具体路径:行号**或明确「前文未涉及故本章首次给出」）：
-    - **03 内存管理**：Buddy/Slab/帧分配与 **页表 map/unmap** 上的**锁粒度**；**TLB shootdown** 或与 `sfence`/`tlbi`/`invlpg`、**IPI** 联动的远程刷新路径。若本章发现多核下 TLB 刷新而 03 未写清，须在本章**显式补齐**并说明与 03 的关系（补充证据而非口头否定前文）。
-    - **04 进程/调度**：全局/每核运行队列、迁移（migration）、在 IPI 或 **resched** 路径上与调度的耦合。
-    - **05 中断与系统调用**：每核时钟/计时器中断、**per-CPU trap 栈** 或 trampoline 与次级核上线的先后顺序。
-    - **08 同步与 IPC**：自旋锁 vs 阻塞锁在多核下的行为；`WaitQueue` 唤醒是否可能跨核竞争。
-    - 进程调度中的全局唯一 ID 池（搜索 `AtomicUsize` 用于 PID/TID 分配）
-    - 双级注册机制（线程注册到 Process + 全局管理器）
-    - 同步互斥中的 Futex 实现（在多核场景下的行为）
-    - 原子操作（`core::sync::atomic`）在多核下的内存序保证
-
-要求：
-- **语义发现（🥇 首选）**：使用 `rag_search_code` 搜索 "SMP boot", "IPI send", "Per-CPU variables", "multicore scheduler" 锁定多核支持代码。
-- 使用 `lsp_get_definition` 定位 `PerCpu` 结构和 `smp_boot`/`__cpu_up` 的定义。
-- **【必须】使用 `lsp_get_call_graph` 追踪 Secondary CPU 启动链**：
-  - `lsp_get_call_graph(repo_path, file_of_start_secondary, "start_secondary", direction="outgoing", max_depth=4)` — 从 secondary 入口到初始化完成
-  - 如返回 `[⚠️ DEGRADED MODE]`，标注后继续使用 Grep 结果。
-- 使用 `lsp_get_references` 追踪 IPI 分发路径（单层引用）。
-- 辅以 grep_in_repo 搜索 smp/、cpu/、percpu 相关模块。
-- 分析多核安全的数据结构设计。
-
-**【评测与交付适配 — 本阶段启发式】**（须源码证据；无则略）：
-- 若 README/`Makefile`/脚本中出现 **`-smp`>1** 或 `SMP=1` 等，须把 **AP 启动链、IPI、每核计时器/调度** 与「评测串行跑测例但仍多核在线」的稳定性风险写清；无多核证据则维持单核结论。
-- 禁止仅凭宏名断言「能跑多核评测」。
-
-输出格式：
-- ## 多核架构设计（SMP/AMP）
-- ## Secondary CPU 启动流程
-- ## 核间通信与 IPI 机制
-- ## Per-CPU 变量与数据结构
-- ## 多核调度策略
-- ## 与 03/04/05/08 的交叉一致性（TLB、trap、锁与调度）
-- ## 关键代码片段
-""",
+        "prompt": "",  # legacy prompt archived under legacy_stage_prompts/
     },
     {
         "id": "10_security",
         "title": "安全机制与权限模型",
-        "prompt": """目标：分析安全隔离与权限控制机制；**权限检查是否在 syscall 路径上真实生效**写细，有字段无检查链须明确标出。
-
-**本阶段须额外覆盖**：
-- 每个声称的安全特性：**检查链**从入口到策略函数是否贯通；与页表隔离（若有关）的**耦合文件**。
-- 若整体机制单薄：一节内写清能力边界（如仅有凭证字段、无 syscall 检查链）即可。
-
-**严格反幻觉要求**：
-1. **证据为王**：描述任何特性（如 Seccomp, Audit, ACL）必须附带 `[Source: path/to/file:L1-L10]` 引用。
-2. **否定确认**：如果搜索不到相关关键词，你必须明确地写“**未发现实现**”。
-3. **禁止臆测**：禁止将 Linux 通用机制套用到当前 OS。
-
-必须回答：
-- **多架构覆盖要求**：本章分析必须覆盖项目支持的所有架构（riscv64, aarch64, x86_64, loongarch64 等），不得仅以某一个架构为视角描述。
-- **Rust 安全性机制**：如果项目使用 Rust 编写，必须指出 RAII、所有权分析、基于生命周期的锁等机制带来的安全性。
-- 用户态/内核态隔离：页表隔离（KPTI）、SMEP/SMAP 是否开启？
-- **权限模型深度验证（关键）**：
-    - **用户/组（UID/GID）**：不仅要看 `Task` 结构体是否有 `uid` 字段，**必须验证**这些字段是否在 `open/write/exec` 等系统调用中被用于权限检查！（grep `check_perm`, `inode_permission`）。如果仅有字段但无检查逻辑，必须注明“**仅有定义但未强制执行（🔸 桩函数）**”。
-    - **Capability/ACL**：搜索 `capability`, `acl`。
-- **安全沙箱 (Seccomp/Prctl)**：
-    - 搜索 `prctl` 或 `seccomp`。
-    - **必须检查实现**：是返回 `ENOSYS`（未实现），还是直接返回 `0`（假装成功），还是真的解析了 BPF 规则？
-    - **Stub判断**：如果 `sys_prctl` 只是 returning 0 without doing anything，标记为 **`🔸 桩函数`**。
-    - 如未找到，明确写“未实现安全沙箱（❌ 未实现）”。
-- **审计与安全启动**：
-    - 搜索 `audit`（审计日志）、`secure_boot`、`signature`（签名验证）。
-- **内存安全**：
-    - 用户指针验证：搜索 `UserInPtr`, `verify_area`, `access_ok`。确认系统调用入口是否严格检查了用户指针？
-    - 缓冲区溢出保护：是否有 `stack_guard`, `canary`？
-
-要求：
-- **语义发现（🥇 首选）**：使用 `rag_search_code` 搜索 "capability check", "seccomp filter", "user pointer verification", "stack canary" 锁定安全机制实现。
-- 使用 `lsp_get_definition` 定位 `Credential`/`UID`/`GID` 等安全相关结构体的定义。
-- **【必须】使用 `lsp_get_call_graph` 追踪权限检查链**：
-  - `lsp_get_call_graph(repo_path, file_of_check_perm, "check_perm", direction="incoming", max_depth=3)` — 哪些 syscall 调用了权限检查？
-  - 如返回 `[⚠️ DEGRADED MODE]`，标注后继续使用 Grep 结果，并用 `lsp_get_references` 补充单层引用。
-- 辅以 grep_in_repo 搜索 security/、auth/、capability 相关模块和 "seccomp|sandbox|prctl"。
-- 查找 syscall 入口处的权限检查逻辑，分析用户/组/权限位的实现。
-
-**【评测与交付适配 — 本阶段启发式】**（须源码证据；无则略）：
-- 自动化评测可能依赖 **真实 `uid/gid` 检查** 或 **沙箱拒绝**；若 README 声称权限模型与代码均为桩，须显式写「评测相关 syscall 可能全通过或全失败」并附检查链路径。
-- 不扩大 web_search；仅本仓与执行契约允许的文档。
-
-输出格式：
-- ## 特权级与隔离机制
-- ## 权限检查与访问控制
-- ## 用户/组/权限模型
-- ## 进程间隔离与资源限制（追踪检查链路）
-- ## 安全沙箱与过滤机制（如无则写“未发现”）
-- ## 审计与安全启动机制（如无则写“未发现”）
-- ## 内存安全与系统调用检查
-- ## Rust 语言级安全性机制（如适用）
-- ## 关键代码片段
-""",
+        "prompt": "",  # legacy prompt archived under legacy_stage_prompts/
     },
     {
         "id": "11_network",
         "title": "网络子系统与协议栈",
-        "prompt": """目标：深入分析网络子系统与 TCP/IP 协议栈实现；**自研边界 vs smoltcp/lwip 等依赖边界**、驱动到 socket 的**真实数据面**写细。
-
-**本阶段须额外覆盖**：
-- 若仅回环/仅 QEMU：写明**限制**；若多网卡：列**各自入口文件**与 feature 开关。
-- 若无网络实现：单列一节说明依据即可。
-
-必须回答：
-- 网络协议栈架构：自实现还是使用 `smoltcp`/`lwip` 等库？（**检查 Cargo.toml 依赖**）**如果完全没有网络支持，明确写“未实现网络功能（❌ 未实现）”**。
-- Socket 接口实现：是否有 `socket`/`bind`/`connect` 等 syscall？还是仅有 Loopback？
-- **功能限制声明（必须）**：分析项目是否已在真实物理网卡上测试过网络功能。如果仅在 QEMU 环境测试或仅支持本地回环通信，必须明确写出该限制。搜索 `loopback|LOOPBACK|127.0.0.1` 确认是否仅有回环设备。
-- **网卡驱动细节**：
-  - 搜索 `drivers/net/`, `virtio-drivers`, `ixgbe` 等。
-  - 列出支持的网卡类型（VirtIO, E1000, RTL8139, Intel 82599 等）。
-  - **PHY/MAC 层抽象**：是否存在独立的 PHY 驱动层？
-  - **错误处理**：描述一个网络操作失败（如 connect timeout）时的错误码传递流程。
-- **高级特性验证（必须 grep 代码）**：
-  - 零拷贝（Zero Copy）：搜索 `DMA` 或 `shared` buffer。只有在驱动层看到 DMA 描述符操作，或者协议栈层有 `mbuf` 传递引用，才算零拷贝。
-  - 多队列（Multi-queue）：是否有 RSS 支持？
-  - **协议支持**：DHCP, DNS, ARP, ICMP, TCP, UDP。
-  - **如果未找到代码，明确说明“不支持”**。
-- 数据包收发流程：追踪从 `virtio-net` 中断到 `tcp_recv` 的路径。
-- **禁止仅靠 README 断言**「支持某网卡/某平台/零拷贝」；须 `read_code_segment`/`grep_in_repo` 到驱动或协议栈源码。DMA/零拷贝声称须在驱动或 DMA 描述符路径上给出片段，否则标「未发现」。
-
-要求：
-- **语义发现（🥇 首选）**：使用 `rag_search_code` 搜索 "smoltcp integration", "socket syscall", "VirtIO-Net driver", "network stack architecture" 锁定网络源码。
-- 使用 `lsp_get_definition` 定位 `Socket` trait、`TcpSocket`/`UdpSocket` 结构体定义。
-- **【必须】使用 `lsp_get_call_graph` 追踪数据发送路径**（`sys_sendto` → 协议栈 → 网卡驱动）：
-  - `lsp_get_call_graph(repo_path, file_of_sys_sendto, "sys_sendto", direction="outgoing", max_depth=4)`
-  - 如返回 `[⚠️ DEGRADED MODE]`，标注后继续使用 Grep 结果。
-- 使用 `lsp_get_references` 查找单层引用（如哪些地方调用了 `socket_write`、`tcp_send`）。
-- 使用 `lsp_get_document_outline` 浏览网络模块文件，发现所有 socket 操作和协议处理函数。
-- 辅以 grep_in_repo 搜索 net/、socket/、tcp/ 相关模块。
-- **严格区分**：使用了网络库（如 smoltcp）vs 自己实现了协议栈。
-
-**【评测与交付适配 — 本阶段启发式】**（须源码证据；无则略）：
-- **iperf/netperf 类压测**需要稳定 **TCP/UDP + 阻塞/非阻塞 + 错误码** 与 **virtio-net 数据面**；README 若写 hostfwd/端口，须与驱动+协议栈实现对照，无代码则标「未发现与压测等价的实现证据」。
-- 禁止把「依赖 smoltcp」直接等同于「能过某具体测例」。
-
-输出格式：
-- ## 网络子系统架构（自研 vs 第三方库）
-- ## Socket 接口与系统调用
-- ## 协议栈支持详情（TCP/UDP/IP/Ethernet）
-- ## 数据包收发流程追踪
-- ## 高级特性支持验证（零拷贝等）
-""",
+        "prompt": "",  # legacy prompt archived under legacy_stage_prompts/
     },
     {
         "id": "12_debug_error",
         "title": "调试机制与错误处理",
-        "prompt": """目标：分析调试支持、日志系统与错误处理机制；**panic 路径、日志后端、GDB stub 是否真有包解析循环**写细，避免把打印寄存器当成完整 backtrace。
-
-**本阶段须额外覆盖**：
-- 若存在 monitor/shell：**命令实现文件**列表；若无：明确「未发现」。
-
-必须回答：
-- 日志系统：print/log 宏如何实现？日志级别设计？
-- Panic 处理：panic! 触发后的流程（栈回溯、寄存器 dump、停机）。**须一句话结论**：是否包含寄存器 dump、是否调用回溯辅助函数，并附 `路径:行号`。
-- **栈回溯 (Backtrace)**：是否支持 `dwarf` 解析或基于 FramePointer 的回溯？**必须** `grep_in_repo` 搜索 `backtrace|unwind|stack_trace|StackTrace`，在正文**摘录关键命中行或明确写零命中**。**注意**：不要被 panic 时仅打印若干寄存器/`ra` 误导为完整回溯；`doc/*.md` 不得单独作为「已实现回溯」的证据，须 C/Rust 源码 `路径:行号`。
-- 异常处理：未处理异常的默认行为。
-- 调试接口：
-    - **交互式 Shell**: 是否提供 Monitor/Shell？支持哪些命令（`ps`, `ls`, `help`）？
-    - GDB stub 支持（如有）：**严格检查**。搜索 `handle_gdb_packet`。如果找不到数据包解析循环，就不是 GDB Stub。
-    - 调试控制台/Monitor
-    - 内核调试选项
-    - 是否支持 `perf` 或 `ftrace`？**Tracepoints** 是否插入到了关键路径？
-- 错误码设计：Result/Error 类型定义。
-- 断言与检查：debug_assert、运行时检查。
-
-要求：
-- 使用 `lsp_get_definition` 定位 `panic_handler`、`log` 宏的实现位置。
-- **【必须】使用 `lsp_get_call_graph` 追踪 panic 处理链**（`panic!` → `panic_handler` → 栈回溯 → 停机）：
-  - `lsp_get_call_graph(repo_path, file_of_panic_handler, "panic_handler", direction="incoming", max_depth=3)` — 谁触发了 panic？
-  - 如返回 `[⚠️ DEGRADED MODE]`，标注后继续使用，用 `lsp_get_references` 补充单层引用。
-- 使用 `lsp_get_document_outline` 浏览调试模块，发现所有调试相关函数（backtrace、dump、monitor命令）。
-- 辅以 grep_in_repo 搜索 `gdbstub|monitor|perf|trace` 确认调试工具支持。
-
-**【评测与交付适配 — 本阶段启发式】**（须源码证据；无则略）：
-- 长时间测例（LTP/iozone 等）下 **日志风暴、panic、资源泄漏** 会导致评测超时；若有 `Arc`/fd 表/块缓存的释放路径证据，可一句点明与「评测稳定性」相关，否则不写。
-
-输出格式：
-- ## 日志与打印系统
-- ## Panic 处理与栈回溯（明确是否支持 Backtrace）
-- ## 错误码与 Result 设计
-- ## 调试接口与交互式 Shell
-- ## GDB Stub 支持情况（验证代码，排除配置文件干扰）
-- ## 断言与运行时检查
-- ## 关键代码片段
-""",
+        "prompt": "",  # legacy prompt archived under legacy_stage_prompts/
     },
 
 
     {
         "id": "13_history",
         "title": "开发历史与里程碑",
-        "prompt": """目标：用本阶段 Git/差异类工具（如 `get_git_history_summary`、`analyze_git_history`、`get_commit_diff_summary`、`find_symbol_first_commit`）的**实际返回**写时间线：初始规模、子系统首次出现、后续若干次代表性大变动在各模块的落点。可引用返回值中的 SHA、路径、增删行数与已有摘要；仓外关系与提交动机无工具明文则从略。忌写成泛化 OS 通史。
-
-**强烈注意：本阶段不使用任何第三方脚本生成图表。你需要完全依赖自己的代码语义理解能力。**
-
-**本阶段须额外覆盖**：
-- 对每次重大变更：若工具或 diff 能支持，标注**新增/删除/大面积重写**之一，并给出**代表性路径**。
-- **Git 事实口径**：提交数、时间线、SHA 须与同次 `get_git_history_summary`/`analyze_git_history` 等工具**实际返回**一致；禁止编造未出现在当次输出中的短 hash。作者—模块对应须落到**具体文件路径**（非泛化目录名）；超大 commit 下钻必须带 `path_filter`（见下文红线）。
-
-**⚠️ Token 节约与防死循环规则（绝对红线）**：
-- **严禁**把 `get_git_history_summary` 放在循环里调用。你只需要调用**一次**，它会自动返回贯穿仓库生命周期的浓缩摘要。
-- **严禁**无脑遍历所有的历史节点。
-- 当 `get_git_history_summary` 的结果显示某次重大 Commit 涉及了海量文件（如 `[arceos/modules/] 3500 files`）且你需要知道具体加了什么功能时，**必须且只能**使用 `analyze_git_history(repo_path, max_commits=1, skip=N, path_filter="arceos/modules")` 对该重点目录进行定点下钻。
-- **绝不允许**在未设定 `path_filter` 的情况下对几千个文件的重大提交使用 `analyze_git_history`，这会导致上万行的输出撑爆监控。
-- `find_symbol_first_commit` 可以批量传入多个关键词，请严格合并为 1-2 次统一调用。
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-阶段一：【总体提交浏览与模块分类】
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-1) **调用且仅调用一次** `get_git_history_summary(repo_path)` 获取全局提交概览。
-   该工具会自动返回精炼摘要，包含：日期、SHA、作者、总增删行数、以及**变更量最大的前 3 个确切目录**。
-2) **调用且仅调用一次** `analyze_authors_contribution(repo_path)` 获取该项目的开发者图谱。
-   分析该操作系统是属于“单人独立开发”还是“多人模块化协作”，各个核心目录的主力作者是谁。
-3) 根据以上返回摘要进行**语义归类**：
-   - 识别出提交密集期（快速开发阶段）和平稳期。
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-阶段二：【初始版本工作量深度核实】
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-定义"初始版本"为时间线最早的一批 commit（通常是建立仓库骨架的那几天）。
-
-A. **初始代码规模评估**
-   - 从 `get_git_history_summary` 的返回中找到最早的几个 commit，汇总其增加的代码行数。
-   - 观察这些最早 commit 涉及的模块，总结第一版已经搭起了哪几个子系统。
-
-B. **核心子系统首次引入时间（重点查验）**：
-   调用 `find_symbol_first_commit(repo_path, keywords=[...])` 批量查询以下关键词是何时从无到有被加入的（**尽量合并为 1-2 次调用**）：
-   - 启动入口：`["_start", "rust_main", "kernel_main"]`
-   - 内存管理：`["FrameAllocator", "PageTable", "MemorySet"]`
-   - 进程/任务：`["TaskInner", "spawn_task", "ProcessInner"]`
-   - 文件系统：`["VfsNode", "fat32", "ramfs", "sys_open"]`
-   - 系统调用：`["syscall_handler", "sys_write", "sys_read", "sys_exec"]`
-   - 中断/Trap：`["trap_handler", "TrapFrame", "stvec"]`
-   - 进程间通信(IPC)：`["sys_pipe", "Mailbox", "sys_msgget", "sys_shmget"]`
-   - 设备驱动：`["virtio_blk", "UART", "plic", "device_init"]`
-   - 网络(Network)：`["sys_socket", "smoltcp", "TcpSocket", "udp_send"]`
-
-   根据工具返回的时间：
-   - 若【首次引入】日期在仓库头几天 → 标记为 "**初始版本已有**"
-   - 若【首次引入】日期在中后期 → 标记为 "**后续版本引入**"
-   - 若查询结果显示未找到 → 标记为 "**暂不支持该功能**"
-
-C. **使用 grep_in_repo 探索隐藏功能**（可选）：
-   - 如果遇到分析瓶颈，可用 `grep_in_repo` 搜索关键字（如 `SMP`, `signal`, `mmap`）核实功能是否存在。
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-阶段三：【后续重要功能的代码演进轨迹】
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-根据 `get_git_history_summary` 返回的概览，挑选 **最有代表性的 8-12 次大变动**（通过增删行数和模块判断）。
-对每次大变动，基于概览中的信息写出分析：
-1. **所属模块**：这是在改网络、改内存，还是在改驱动？
-2. **改动性质**：
-   - 【新增功能】：引入了全新的机制（如第一次带入多核 SMP）
-   - 【重构/优化】：大面积重写了既有模块
-   - 【Bug修复】：修复了重大架构缺陷
-3. **工作量与事实**：列出增删规模 (+xxx/-yyy) 以及涉及的主要模块。
-
-**【高级钻取工具（按需使用）】**：
-- 如果某个大变动在 `get_git_history_summary` 中显示修改了大量的核心子系统（例如 `[arceos/modules/] 3500 files`），你需要弄清楚里面包含了什么文件，**必须**使用带目录过滤的精确下钻：`analyze_git_history(repo_path, max_commits=1, skip=N, path_filter="arceos/modules")`。
-- 如果你看到一个极其关键的 Commit（比如标为"Add Network Stack"），但你想知道它到底在底层新增了什么函数接口？调用 `get_commit_diff_summary(repo_path, commit_sha)` 一键透视其底层增删的具体代码逻辑，而不是光靠猜。
-- 如果你想知道一个至关重要的大文件（如 `kernel/sched.rs`）从立项起经历了几次重构，调用 `trace_file_evolution(repo_path, "kernel/sched.rs")` 拉出它演进的生命线。
-
-**【评测与交付适配 — 本阶段启发式】**（仅使用 Git 工具实际输出 + 可选 `grep_in_repo`；禁编 SHA）：
-- 在演进叙述中，若摘要/diff 显示曾新增 **`Makefile` 的 `all` 目标、固定内核产物名、`scripts/`、`.github/workflows`、自测横幅字符串、多 virtio 相关驱动**，可单列子点「**评测/CI/交付契约相关演进**」并只写工具返回中可证的事实。
-- 无工具命中则不在历史中编造「为某届赛题而改」。
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-输出格式要求（纯文本 Markdown 历史报告）
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-**必须**严格按照以下结构输出，清晰回答这三个核心问题：
-
-- ## 一、 项目概览与人员协作
-  - **总规模与协作模式**：基于代码规模和作者贡献图，总结这是个单人作业还是社区协作项目？各作者主力负责什么模块。
-  - **初始完成功能**：第一版建立时就已经搭起了哪几个子系统（核心功能引入时点检测结果）。
-
-- ## 二、 后续版本演进与功能完善
-  - 详细罗列后续的历次重大 Commit/迭代中，完成（完善/修改）了哪些 OS 功能模块。
-  - 按模块分类（如：内存管理、驱动、文件系统）列出其演进轨迹及其增加/减少的代码量估算。列出最具代表性的演进记录。
-
-- ## 三、 现状评估与后续修改建议（核心总结）
-  - **目前还缺什么**：基于前面对整个仓库历史和现状的分析，目前这个 OS 还有哪些明显的缺失功能或尚未完善的半成品模块？
-  - **现在还需要怎么改**：给出 3-5 条对该项目当下最迫切的代码修改、架构重构或功能补全的建议方向。
-- ## 演进锚点（Git 可证事实，可选）
-  - 若干条：每条含 **SHA 或确切路径** + 一句基于工具输出的事实（该次提交主要触及哪类机制）；无证据则省略本节。
-""",
+        "prompt": "",  # legacy prompt archived under legacy_stage_prompts/
     },
     {
         "id": "01_overview",
@@ -987,7 +452,7 @@ C. **使用 grep_in_repo 探索隐藏功能**（可选）：
         3) list_repo_structure(repo_path, max_depth=5)：核对关键目录与入口线索。
         4) **架构支持**：列出本仓库实际支持的架构（可与前置报告交叉验证）。
         5) **内核入口**：用 LSP/grep 等**轻量**手段确认主入口符号与文件路径即可。
-        6) **评测与交付信号（轻量）**：`read_code_segment` 阅读根目录 `README.md` 前几屏（若存在则扫 `docs/*.md` 标题区）提取构建/运行/QEMU 命令与作者**声称**的评测或 CI 环境；`grep_in_repo` 检索 `kernel-rv|kernel-la|disk.img|testcode|OS COMP|autograde|gitlab-ci|\.github/workflows` 等中性模式。仅当有命中或 README 明确描述且能与前置章节或源码锚点交叉时写入下一节；否则在该节写「未发现仓库内评测专用适配信号」。
+        6) **评测与交付信号（轻量）**：`read_code_segment` 阅读根目录 `README.md` 前几屏（若存在则扫 `docs/*.md` 标题区）提取构建/运行/QEMU 命令与作者**声称**的评测或 CI 环境；`grep_in_repo` 检索 `kernel-rv|kernel-la|disk.img|testcode|OS COMP|autograde|gitlab-ci|\\.github/workflows` 等中性模式。仅当有命中或 README 明确描述且能与前置章节或源码锚点交叉时写入下一节；否则在该节写「未发现仓库内评测专用适配信号」。
 
         输出格式要求（**严格按此顺序**，不得调换；`## 各模块技术全景` 不得省略）：
 
@@ -1252,6 +717,15 @@ def main():
         stage_id = stage["id"]
         title = stage["title"]
         prompt = stage["prompt"]
+        expected_question_ids: list[str] = []
+        # JSON-QA 阶段：如果该 stage_id 存在题库文件，则运行时组装 prompt
+        try:
+            qa_prompt, expected_question_ids = _build_json_qa_prompt(stage_id=stage_id, stage_title=title)
+            # 若题库非空，则覆盖 prompt（让 planner must_cover 也从题单抽取）
+            if expected_question_ids:
+                prompt = qa_prompt
+        except Exception:
+            expected_question_ids = []
         stage_state = StageState(
             stage_id=stage_id,
             stage_title=title,
@@ -1430,7 +904,7 @@ def main():
         combined_execute_prompt = human_plan_block.rstrip() + "\n\n" + human_write_block
         inputs = {
             "messages": [
-                SystemMessage(content=SYSTEM_PROMPT),
+                SystemMessage(content=DESCRIBE_SYSTEM_PROMPT_JSON),
                 HumanMessage(content=combined_execute_prompt),
             ]
         }
@@ -1440,7 +914,9 @@ def main():
         print(f"   模型: {os.getenv('MODEL_NAME')} ")
         sys.stdout.flush()  # 强制刷新输出缓冲区
 
-        agent = build_executor_agent(stage_id=stage_id)
+        # 若本阶段为题库 JSON-QA，则请求后端强制 json_schema 输出（百炼 OpenAI 兼容支持 response_format.json_schema）
+        model_kwargs = build_bailian_response_format_json_schema(name=f"os_agent_{stage_id}") if expected_question_ids else None
+        agent = build_executor_agent(stage_id=stage_id, model_kwargs=model_kwargs)
         
         final_state = None
         stage_step_count = 0  # 阶段内步骤计数
@@ -1618,9 +1094,45 @@ def main():
                     stage_text = f"> ⚠️ **生成警告**: 该章节未能完整生成. Last msg type: {type(last_msg).__name__}"
 
         if not stage_text.strip():
-             stage_text = "> ⚠️ **生成警告**: Agent 未返回有效内容。"
+            stage_text = "> ⚠️ **生成警告**: Agent 未返回有效内容。"
 
         stage_text = _strip_llm_preamble(stage_text.strip())
+
+        # --- JSON-QA 后处理：解析/校验/落盘答案 JSON，并渲染为 Markdown 供现有审阅器使用 ---
+        if expected_question_ids:
+            sidecar_dir = os.path.join(repo_output_dir, "_per_stage")
+            os.makedirs(sidecar_dir, exist_ok=True)
+            raw_path = os.path.join(sidecar_dir, f"{stage_id}_answers_raw.txt")
+            json_path = os.path.join(sidecar_dir, f"{stage_id}_answers.json")
+            try:
+                with open(raw_path, "w", encoding="utf-8") as f:
+                    f.write(stage_text.strip() + "\n")
+            except Exception:
+                pass
+
+            try:
+                payload = parse_answers_json(stage_text)
+                payload = coerce_answers_payload_defaults(payload)
+                issues = validate_answers_payload(
+                    payload,
+                    stage_id=stage_id,
+                    stage_title=title,
+                    expected_question_ids=expected_question_ids,
+                )
+                if issues:
+                    _save_json(
+                        os.path.join(sidecar_dir, f"{stage_id}_answers_validate_issues.json"),
+                        {"issues": [{"path": x.path, "reason": x.reason} for x in issues]},
+                    )
+                else:
+                    _save_json(json_path, payload)
+                    stage_text = render_answers_to_markdown(payload).strip()
+            except Exception as e:
+                _save_json(
+                    os.path.join(sidecar_dir, f"{stage_id}_answers_parse_error.json"),
+                    {"error": f"{type(e).__name__}: {e}"},
+                )
+
         artifacts = extract_stage_artifacts(stage_text, execution_messages)
         stage_state.draft_markdown = artifacts["draft_markdown"] or stage_text
         stage_state.draft_document = artifacts["draft_document"]
