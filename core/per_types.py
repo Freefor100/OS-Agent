@@ -17,7 +17,6 @@ class PlanSpec:
     repo_hotspots: List[str] = field(default_factory=list)
     preferred_tools: List[str] = field(default_factory=list)
     avoid_tools: List[str] = field(default_factory=list)
-    review_checklist: List[str] = field(default_factory=list)
     context_budget: Dict[str, int] = field(default_factory=dict)
     # 须按序完成的执行步骤（Plan 阶段锁定，Execute 严格遵守，类似 Cursor 的 scoped plan）
     execution_steps: List[str] = field(default_factory=list)
@@ -71,22 +70,6 @@ class DraftDocument:
 
 
 @dataclass
-class ReviewResult:
-    passed: bool
-    score: float
-    severity: str = "minor"
-    failed_rules: List[str] = field(default_factory=list)
-    missing_evidence: List[Dict[str, Any]] = field(default_factory=list)
-    weak_claims: List[Dict[str, Any]] = field(default_factory=list)
-    format_issues: List[Dict[str, Any]] = field(default_factory=list)
-    missed_modules: List[str] = field(default_factory=list)
-    review_suggestions: List[Dict[str, Any]] = field(default_factory=list)
-
-    def to_dict(self) -> Dict[str, Any]:
-        return asdict(self)
-
-
-@dataclass
 class StageState:
     stage_id: str
     stage_title: str
@@ -97,7 +80,6 @@ class StageState:
     draft_markdown: str = ""
     draft_document: Optional[DraftDocument] = None
     evidence_index: List[EvidenceItem] = field(default_factory=list)
-    review_result: Optional[ReviewResult] = None
     status: str = "init"
     metadata: Dict[str, Any] = field(default_factory=dict)
 
@@ -112,7 +94,6 @@ class StageState:
             "draft_markdown": self.draft_markdown,
             "draft_document": self.draft_document.to_dict() if self.draft_document else None,
             "evidence_index": [e.to_dict() for e in self.evidence_index],
-            "review_result": self.review_result.to_dict() if self.review_result else None,
             "status": self.status,
             "metadata": self.metadata,
         }

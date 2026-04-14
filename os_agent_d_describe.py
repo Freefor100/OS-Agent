@@ -3,7 +3,6 @@
 # 每阶段 Cursor 式管线（固定）:
 #   ① Plan     — 阶段提示词 + 启发式 plan + LLM 自主探索 → 锁定计划与 execution_steps（须按序执行）
 #   ② Execute  — System + 单条 Human（计划+任务合并）后 ReAct 写章节
-#   ③ Verify   — 章节落盘后：单次 LLM JSON 审阅（must_cover / review_checklist）；失败记 llm_review_failed；意见落盘供人工改稿
 #
 # API Key / MODEL_NAME 等仍从仓库根目录 .env 读取（load_dotenv）。
 #
@@ -25,7 +24,6 @@ from langchain_core.messages import AIMessage, HumanMessage, ToolMessage, System
 from core.agent_builder import (
     build_executor_agent,
     build_planner_agent,
-    build_reviewer_llm,
     SYSTEM_PROMPT,
 )
 from core.utils import repo_name_from_url, format_tool_call_summary, format_tool_result_summary
@@ -40,7 +38,6 @@ from core.per_planner import (
     render_plan_context,
 )
 from core.per_executor import extract_stage_artifacts
-from core.per_reviewer import review_stage
 from core.per_llm_stages import (
     PLANNER_RECURSION_LIMIT,
     run_llm_planning_agent,
@@ -1136,54 +1133,6 @@ def print_step(step_num: int, node_name: str, state: dict, stage_step_num: int =
     return token_count
 
 
-def _save_review_human_md(sidecar_dir: str, stage_id: str, stage_title: str, result) -> None:
-    """将审阅结果写成 Markdown，便于人工改 prompt / 规则 / 章节（不触发自动修补）。"""
-    path = os.path.join(sidecar_dir, f"{stage_id}_review_human.md")
-    lines: list[str] = [
-        f"# 审阅说明 · {stage_title}",
-        "",
-        f"- **stage_id**: `{stage_id}`",
-        f"- **passed**: {result.passed}",
-        f"- **score**: {result.score}",
-        f"- **severity**: {result.severity}",
-        "",
-    ]
-    if result.failed_rules:
-        lines.append("## failed_rules")
-        lines.extend(f"- `{r}`" for r in result.failed_rules)
-        lines.append("")
-    if result.missed_modules:
-        lines.append("## missed_modules")
-        lines.extend(f"- `{m}`" for m in result.missed_modules[:20])
-        lines.append("")
-    if result.missing_evidence:
-        lines.append("## missing_evidence")
-        for item in result.missing_evidence[:12]:
-            lines.append(f"- {item}")
-        if len(result.missing_evidence) > 12:
-            lines.append(f"- … 共 {len(result.missing_evidence)} 条，详见 `_review.json`")
-        lines.append("")
-    if result.weak_claims:
-        lines.append("## weak_claims")
-        for item in result.weak_claims[:8]:
-            lines.append(f"- {item}")
-        lines.append("")
-    if result.review_suggestions:
-        lines.append("## review_suggestions（人工改稿参考）")
-        for i, act in enumerate(result.review_suggestions[:16], 1):
-            lines.append(f"{i}. `{act.get('action_type', '')}` — {act.get('hint', '')[:240]}")
-        if len(result.review_suggestions) > 16:
-            lines.append(f"\n… 另有 {len(result.review_suggestions) - 16} 条，见 `{stage_id}_review.json`。")
-        lines.append("")
-    lines.append(f"_结构化完整数据：`{stage_id}_review.json`_")
-    try:
-        os.makedirs(sidecar_dir, exist_ok=True)
-        with open(path, "w", encoding="utf-8") as f:
-            f.write("\n".join(lines).strip() + "\n")
-    except OSError as e:
-        print(f"  ⚠️  无法写入 {path}: {e}")
-
-
 def _save_json(path: str, payload: dict):
     try:
         os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -1225,18 +1174,6 @@ def _summarize_section_text(text: str, max_chars: int = 500) -> str:
 def _extract_path_mentions(text: str) -> list[str]:
     pattern = re.compile(r"`([^`\n]*/[^`\n]+\.(?:rs|c|h|cpp|go|zig|S|s|toml|ld|md|py)(?::\d+(?:-\d+)?)?)`")
     return [m.group(1) for m in pattern.finditer(text or "")]
-
-
-def _print_review_result(result, title: str):
-    print(f"\n🧪 Reviewer: {title}")
-    print(f"   - passed: {result.passed}")
-    print(f"   - score: {result.score}")
-    if result.failed_rules:
-        print(f"   - failed_rules: {', '.join(result.failed_rules)}")
-    if result.missed_modules:
-        print(f"   - missed_modules: {', '.join(result.missed_modules[:4])}")
-    if result.review_suggestions:
-        print(f"   - review_suggestions: {len(result.review_suggestions)}")
 
 
 def main():
@@ -1303,7 +1240,6 @@ def main():
         print(f"⚠️ RAG 预索引跳过 (将在首次调用时重试): {e}")
     # ------------------------------------------
 
-    reviewer_llm = build_reviewer_llm()
     repo_profile = build_repo_profile(repo_url=repo_url, repo_path=repo_local_path)
     _save_json(os.path.join(repo_output_dir, "repo_profile.json"), repo_profile)
     global_memory = {
@@ -1697,7 +1633,7 @@ def main():
             stage_state.plan.to_dict() if stage_state.plan else {},
         )
 
-        # 先落盘章节正文，再审阅（审阅读的是已保存的同一套 draft 状态）
+        # 落盘章节正文
         if skip_in_report:
             print(f"\n⏭️  阶段 {idx} 标记为 skip_in_report，不写入报告")
         else:
@@ -1722,13 +1658,6 @@ def main():
             except Exception as e:
                 print(f"\n⚠️  无法写入阶段文件 {section_path}: {e}")
 
-            print("\n" + "━" * 28 + " ③ Verify · 审查 " + "━" * 28)
-            review_result = review_stage(stage_state, reviewer_llm)
-            _print_review_result(review_result, title)
-            _save_json(os.path.join(sidecar_dir, f"{stage_id}_review.json"), review_result.to_dict())
-            _save_review_human_md(sidecar_dir, stage_id, title, review_result)
-        
-        
         # 统计本阶段的token使用（已在 print_step 中累加）
         # stage_tokens 已准备好
         

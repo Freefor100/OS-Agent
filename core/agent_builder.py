@@ -225,11 +225,6 @@ def build_executor_agent(model: str = None, stage_id: str = "", tools=None):
     return agent
 
 
-def build_reviewer_llm(model: str = None):
-    """构建轻量 reviewer 使用的普通 LLM（③ Verify 单次 invoke）。"""
-    return build_chat_model(model=model, temperature=0)
-
-
 def build_sub_agent(model: str = None, stage_id: str = "", tool_names=None):
     """构建受限工具集的子 Agent。"""
     tools = get_describe_tools(stage_id)

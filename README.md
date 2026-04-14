@@ -10,7 +10,7 @@
 
 ### 1. OS-Agent D：自动源码描述 (`os_agent_d_describe.py`) ✨ **增强版**
 
-对 OS 仓库进行 **13 阶段**的深度技术分析，现已升级为**阶段级 Plan-Execute-Review (PER)** 架构，内置本地 RAG 语义搜索、LSP 调用图分析、智能重试与章节审阅落盘；Execute 阶段受锁定 **`execution_steps`** 与执行契约约束，审阅结果仅落盘供人工改稿。
+对 OS 仓库进行 **13 阶段**的深度技术分析，现已升级为**阶段级 Plan-Execute (PE)** 架构，内置本地 RAG 语义搜索、LSP 调用图分析、智能重试；Execute 阶段受锁定 **`execution_steps`** 与执行契约约束。各阶段计划在 `_per_stage/*_plan.json` 落盘便于对照与复跑。
 
 | 阶段 | 内容 |
 |------|------|
@@ -36,20 +36,10 @@
 2. 🌳 **LSP 拓扑展开**：通过 `lsp_get_call_graph`（多层递归调用树，包含变量到引用的智能降级）、`lsp_get_definition`（跨文件跳转）、`lsp_get_references` 构建精确的 AST 调用拓扑图。
 3. 🛠️ **分层降级兜底**：当 LSP 失败时，系统**首选 Tree-sitter AST 解析**（C/C++/Rust/Go/Zig），再退到语言感知正则、通用 Grep；仅在汇编或前述路径都失败时才使用 ASM 词法兜底。系统具备“智能分层切换”：LSP -> Tree-sitter -> Language-aware Static -> Grep -> ASM(最终兜底)。
 
-**v4.0 新增：阶段级 PER 闭环**
+**v4.0 新增：阶段级 Plan-Execute 闭环**
 
 1. 🧭 **Plan**：每章生成结构化 `PlanSpec`（`seed_paths`、`must_cover`、`entry_symbols` 等），并锁定 **`execution_steps`**（4～8 条短句）；Execute **须按该顺序**调工具与收束正文（见 `render_plan_context` + `STAGE_EXECUTION_CONTRACT`）。
-2. 🧠 **Execute**：ReAct Agent 做证据搜集与章节 Markdown；可抽取 `evidence_index` / `claim_map` 供侧车参考。
-3. 🧪 **Review（Describe）**：**仅**单次 **`llm.invoke` JSON 审阅**（`run_llm_review`），**不做**规则机预检、也**不与**规则机结果合并；提示词含草稿、`must_cover`、`review_checklist`。解析失败则记 `llm_review_failed`。
-4. **人工改稿**：`_per_stage/{stage_id}_review.json` 与 `{stage_id}_review_human.md` 落盘结构化审阅与 `review_suggestions` 等字段；由人改 prompt/章节后重跑。
-
-**Describe：`os_agent_d_describe` 中 ③ Verify 的实现说明（详见代码）**
-
-| 阶段 | 实现要点 |
-|------|----------|
-| **③ Verify** | `run_llm_review`：`llm.invoke` 单次 JSON；提示词含草稿、`must_cover`、`review_checklist`；**不含**证据索引摘要，**不与**规则机预检合并。解析失败则 `failed_rules=llm_review_failed`。 |
-| **侧车落盘** | `_per_stage/{stage_id}_review.json`（结构化）与 `{stage_id}_review_human.md`（人类可读摘要）。 |
-| **控制台** | 解析成功时**只打一份**结构化长预览。 |
+2. 🧠 **Execute**：ReAct Agent 做证据搜集与章节 Markdown；可抽取 `evidence_index` / `claim_map` 供内存侧逻辑参考；章节正文写入 `sections/*.md`，计划写入 `_per_stage/{stage_id}_plan.json`。
 
 **v4.0 受限外部背景补充**
 
@@ -99,7 +89,7 @@
   - **框架感知权重**：自动识别两个项目是否基于同一框架（ArceOS/rCore/xv6 等），同框架时将框架贡献维度（D1/D2/D7）权重减半，自研核心维度（D3~D8）权重上调 ×1.4，防止因共享框架导致虚高相似度。
   - **阶段缓存与断点续跑**：粗筛的指纹构建已支持分阶段落盘。`features`、`struct_features`、`embeddings` 会保存在 `output/<repo>/_coarse_stage/` 下，重跑时自动检查本地阶段缓存并跳过已完成阶段，避免因单次超时或中断整轮白跑。现在**最终 `fingerprint.json` 也依赖阶段缓存完整性**：只要某个阶段缓存缺失，即使 `fingerprint.json` 仍在，也会自动判定为需要重组最终指纹，而不是直接命中旧总缓存。
 
-- **精比模块 (`os_agent_c_fine.py`)**：**阶段级 Plan → Execute**（无审阅侧车）。对粗筛出的 Top-K 候选逐阶段生成对比草稿，在源码级深度比对的基础上，增加“代码相似 vs 设计相似”区分。并保留两大量化相似度维度：
+- **精比模块 (`os_agent_c_fine.py`)**：**阶段级 Plan → Execute**（与 Describe 同为两阶段管线）。对粗筛出的 Top-K 候选逐阶段生成对比草稿，在源码级深度比对的基础上，增加“代码相似 vs 设计相似”区分。并保留两大量化相似度维度：
   - **Token Jaccard 相似度**（`compare_function_tokens`）：对同名函数体 token 化后计算 Jaccard 指数，去除语言关键字后输出独有符号摘要，提供函数实现层面的客观数字证据。
   - **Call Graph Jaccard 相似度**（`compare_call_graphs`）：对比两项目调用图的节点集合，输出节点 Jaccard = |交集| / |并集|，量化调用拓扑结构的相似程度。
   - **综合评分锚定**：Agent 被强制要求对 5 个核心函数分别获取 Token Jaccard 与 CG Jaccard，以 `综合相似度 = Token Jaccard 均值 × 0.5 + CG Jaccard 均值 × 0.5` 为锚，结合 4 档评级区间（高度相似 / 改进版 / 受启发 / 独立）输出 0-100 最终评分，确保结论有量化依据可追溯。
@@ -334,11 +324,9 @@ output/
     │   ├── 01_项目概览与技术栈.md
     │   ├── 02_启动流程与架构初始化.md
     │   └── ...
-    ├── _per_stage/             # 审阅侧车（章节先写入 sections/ 后再生成）
+    ├── _per_stage/             # 阶段侧车（repo_profile + 各章 plan.json）
     │   ├── repo_profile.json
     │   ├── 03_mem_mgmt_plan.json
-    │   ├── 03_mem_mgmt_review.json
-    │   ├── 03_mem_mgmt_review_human.md
     │   └── ...
     ├── _coarse_stage/          # 粗筛阶段缓存（按项目）
     │   ├── fingerprint_features.json
@@ -500,12 +488,11 @@ evaluation/
 - **`lsp_set_target_arch` 竞争修复**：补加 `async with _lsp_global_lock`，确保 LSP 重启操作等待所有飞行中请求完成后才执行，消除并发调用时的竞态窗口。
 - **`compare_function_tokens` 类型安全**：`syscall_count_real` 和 `trapframe_bytes` 的精确加分逻辑增加 `int()` 类型规范化，防止 LLM 以字符串输出数字时导致的 `TypeError`。
 
-#### 🆕 **v4.0 阶段级 PER、LLM 审阅与执行契约**（2026-03-27；后续迭代）
+#### 🆕 **v4.0 阶段级 Plan-Execute 与执行契约**（2026-03-27；后续迭代）
 - **阶段级 Plan-Execute**：`os_agent_d_describe.py` 与 `os_agent_c_fine.py` 使用 `StageState` / `PlanSpec`；Describe 在 Plan 中锁定 **`execution_steps`**，Execute 提示词注入 **`STAGE_EXECUTION_CONTRACT`**（证据路径、文风与粒度等）。
-- **动态上下文**：`repo_profile`、`evidence_cache`、`external_background` 等经 `render_plan_context` 注入；③ Verify（Describe）为 **单次 LLM JSON 审阅**，**不做**规则预检合并（规则审阅仅在不传 `llm` 的路径使用，如精比侧）。
-- **证据账本 (`evidence_index`)**：可从工具轨迹抽取供侧车参考；Verify 的 LLM 提示默认**不含**证据索引摘要。
-- **审阅落盘**：`*_review.json`、`*_review_human.md`；不改写仓库正文，仅输出侧车供人工处理。
-- **粗筛链路保持轻量**：`os_agent_c_coarse.py` 没有硬套完整 PER，而是新增 `coarse_preplan` 与 `validate_coarse_output()`，继续保持“预侦察 + 指纹构建 + 向量检索”的确定性流水线。
+- **动态上下文**：`repo_profile`、`evidence_cache`、`external_background` 等经 `render_plan_context` 注入 Execute。
+- **证据账本 (`evidence_index`)**：可从工具轨迹抽取，供 Execute 与内存侧逻辑参考；**不**写入 `_per_stage`。
+- **粗筛链路保持轻量**：`os_agent_c_coarse.py` 没有硬套完整 PE，而是新增 `coarse_preplan` 与 `validate_coarse_output()`，继续保持“预侦察 + 指纹构建 + 向量检索”的确定性流水线。
 - **受限 `web_search`**：新增 `tools/web_search.py`，默认关闭，只允许用于“全国大学生操作系统比赛”背景、赛道定位、目标要求和技术概览；禁止作为源码实现证据或查重依据。
 - **细粒度并发保护而非降并发**：保留多 tool call / 多阶段并行能力，只对共享状态热点加最小粒度保护。当前已覆盖同仓库 LSP polyfill/目标架构切换、同项目 RAG 向量索引落盘、同仓库 clone，以及同目标文件写入/导出 PDF，避免把正常的只读检索也串行化。
 - **中断后不留“锁死”状态**：并发保护统一采用进程内锁，不落磁盘锁文件；`LSP` 的 `run_coroutine_threadsafe(...).result(timeout=...)` 在超时、异常或手动中断时会主动取消后台 future，避免同一进程里下一次运行被残留协程继续占锁。
@@ -560,7 +547,7 @@ OS-Agent/
 ├── os_agent_d_describe.py          # Agent D：OS 源码深度描述（13 个分析阶段 + 仓库准备/RAG 预索引）
 ├── os_agent_d_evaluate.py          # Agent D：报告自动评估
 ├── os_agent_c_coarse.py            # Agent C：粗筛（pre-plan + 向量相似度检索）
-├── os_agent_c_fine.py              # Agent C：精比（阶段级 Plan→Execute，无审阅）
+├── os_agent_c_fine.py              # Agent C：精比（阶段级 Plan→Execute）
 ├── check_env.py                    # 环境检查脚本（含依赖预检与 LSP 自动安装）
 ├── test_api.py                     # LLM API 连通性快速测试
 ├── force_download_jina.py          # Jina 嵌入模型强制下载脚本
@@ -570,16 +557,16 @@ OS-Agent/
 ├── .env                            # 环境变量配置（需自行创建）
 ├── .env.example                    # 环境变量配置模板
 ├── core/
-│   ├── agent_builder.py            # Agent 构建器（executor/reviewer/sub-agent builder）
+│   ├── agent_builder.py            # Agent 构建器（planner/executor/sub-agent）
 │   ├── code_rag.py                 # 代码 RAG 引擎（AST 解析 + 向量索引）
 │   ├── vectorizer.py               # 本地 Embedding 向量化（Jina 模型）+ 结构化精确特征提取
 │   ├── vector_store.py             # 向量数据库存取（含框架感知权重 + 精确字段加分）
 │   ├── utils.py                    # 公共工具函数（格式化、仓库名解析）
 │   ├── error_handling.py           # 错误处理模块（分类、重试、追踪）
-│   ├── per_types.py                # v4.0：PER 核心数据结构
+│   ├── per_types.py                # v4.0：StageState / PlanSpec 等核心数据结构
 │   ├── per_planner.py              # v4.0：plan 阶段、repo_profile、dynamic_context
 │   ├── per_executor.py             # v4.0：草稿与 evidence_index 抽取
-│   ├── per_reviewer.py             # v4.0：Describe=LLM 审阅；无 llm 时规则审阅
+│   ├── per_llm_stages.py           # v4.0：LLM 规划 Agent（Plan JSON 解析与合并）
 │   └── hf_env.py                   # Hugging Face 默认镜像、嵌入模型加载
 ├── tools/
 │   ├── lsp_ops.py                  # LSP 封装（callHierarchy、定义、引用、大纲）
@@ -593,7 +580,7 @@ OS-Agent/
 ├── output/                         # 描述模块输出（按项目名划分）
 │   └── <os-name>/
 │       ├── sections/               # 各章节分段报告
-│       ├── _per_stage/             # v4.0：PER 中间产物（plan/evidence/review 等）
+│       ├── _per_stage/             # v4.0：侧车（repo_profile、各阶段 *_plan.json）
 │       ├── OS技术分析报告_<os-name>.md
 │       └── describe_error_report.json  # 错误报告（如有）
 └── evaluation/                     # 评估模块输出（按项目名划分）
@@ -625,16 +612,14 @@ OS-Agent/
 - `prompt`: 分析提示词
 - `skip_in_report`: 是否跳过写入最终报告
 
-### v4.0：侧车审阅产物
+### v4.0：侧车计划产物
 
-`describe` 在章节写入 `sections/` 后，对同一草稿做 **LLM 单次 JSON 审阅**（**不与**规则机预检合并），并落盘：
+`describe` 在每章 **Plan** 合并后、**Execute** 写完章节时，将结构化计划落盘，便于对照提示词与执行契约、排查断点续跑问题：
 
 - `repo_profile.json`：仓库级先验（框架猜测、架构、关键目录、语言混合）
-- `*_plan.json`：阶段 `PlanSpec`（含 **`execution_steps`**、`must_cover` 等，便于对照 Execute 与审阅）
-- `*_review.json`：LLM 审阅结果（`ReviewResult`）
-- `*_review_human.md`：人类可读的审阅摘要
+- `*_plan.json`：阶段 `PlanSpec`（含 **`execution_steps`**、`must_cover`、`seed_paths` 等）
 
-`evidence_index` 仅在内存中用于 Execute / 工具侧逻辑，**不**写入 `_per_stage`。`fine compare` 仅在 `vs_<候选>_per/` 下保留 `*_plan.json`（无 `review.json`）。
+`evidence_index` 仅在内存中用于 Execute / 工具侧逻辑，**不**写入 `_per_stage`。`fine compare` 仅在 `vs_<候选>_per/` 下保留 `*_plan.json`。
 
 ### 支持的 CPU 架构
 
@@ -691,9 +676,9 @@ OS-Agent/
 - 单阶段失败不影响后续阶段执行
 - 运行结束时输出错误摘要，并生成 `output/<os-name>/describe_error_report.json`
 
-**v4.0** 可结合 `_per_stage/*_review.json` 与 `*_review_human.md` 定位审阅意见；章节正文以 `sections/*.md` 为准。
+**v4.0** 可结合 `_per_stage/*_plan.json` 与 `repo_profile.json` 对照各章锁定步骤与 must_cover；章节正文以 `sections/*.md` 为准。
 
-优先检查 `output/<os-name>/_per_stage/` 下的 `*_review.json` 与 `*_review_human.md`。
+若某章质量不符预期，优先检查 `output/<os-name>/_per_stage/` 下对应 `*_plan.json` 与 `os_agent_d_describe.py` 中该阶段 `prompt` / 执行契约。
 
 并发保护相关的运行时保证：
 - 当前锁都是**进程内锁**，不会在磁盘上遗留 `.lock` 一类文件，因此程序被终止后，下次启动不会因为旧锁残留而无法运行。

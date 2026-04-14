@@ -455,23 +455,6 @@ def infer_entry_symbols(stage_id: str, repo_profile: Dict[str, Any]) -> List[str
     return _dedupe_keep_order(list(hints.get("entry_symbols", [])) + repo_profile.get("entry_candidates", []))[:10]
 
 
-def build_review_checklist(stage_type: str, must_cover: List[str]) -> List[str]:
-    checklist = [
-        "关键问题是否回答",
-        "重要结论是否给出源码路径",
-        "是否避免将 README 当成实现证据",
-        "是否标出未实现/桩函数",
-    ]
-    if stage_type == "fine_compare":
-        checklist.extend([
-            "是否区分代码相似与设计相似",
-            "是否给出量化或结构化对比证据",
-        ])
-    if must_cover:
-        checklist.append(f"must_cover_count={len(must_cover)}")
-    return checklist
-
-
 def estimate_context_budget(stage_id: str) -> Dict[str, int]:
     base = {
         "max_prev_section_chars": 6000,
@@ -503,7 +486,6 @@ def plan_stage(state: StageState, repo_profile: Dict[str, Any], global_memory: D
         repo_hotspots=repo_profile.get("core_paths", [])[:10],
         preferred_tools=["rag_search_code", "lsp_get_call_graph", "lsp_get_definition", "read_code_segment"],
         avoid_tools=["blind_read_large_files", "full_repo_scan_with_read_code_segment"],
-        review_checklist=build_review_checklist(state.stage_type, must_cover),
         context_budget=estimate_context_budget(state.stage_id),
     )
 
