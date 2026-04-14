@@ -1,0 +1,360 @@
+{
+  "schema_version": "v1",
+  "stage_id": "09_smp_multicore",
+  "stage_title": "多核支持与并行机制",
+  "terminology_profile": "stallings_en_zh",
+  "answers": [
+    {
+      "question_id": "Q09_001",
+      "question_type": "single_choice",
+      "stem": "该 OS 的多核形态更接近哪种？",
+      "value": "A",
+      "evidence": [
+        {
+          "path": "kernel/main.c:68-69",
+          "symbol_kind": "function_call",
+          "symbol_name": "sbi_send_ipi",
+          "excerpt": "BSP (hart 0) 通过 sbi_send_ipi(mask, 0) 唤醒 AP (hart 1)"
+        },
+        {
+          "path": "kernel/main.c:80-97",
+          "symbol_kind": "function",
+          "symbol_name": "main",
+          "excerpt": "hart 1 自旋等待 started 标志后执行 kvminithart→trapinithart→scheduler"
+        },
+        {
+          "path": "include/param.h:5",
+          "symbol_kind": "macro",
+          "symbol_name": "NCPU",
+          "excerpt": "#define NCPU 2"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_002",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 Secondary CPU / AP 启动链（BSP 唤醒 AP，上线后进入 idle/调度）？",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/main.c:66-71",
+          "symbol_kind": "function",
+          "symbol_name": "main",
+          "excerpt": "hart 0 循环 i=1 到 NCPU-1，调用 sbi_send_ipi(mask, 0) 唤醒其他 hart"
+        },
+        {
+          "path": "kernel/main.c:76-85",
+          "symbol_kind": "function",
+          "symbol_name": "main",
+          "excerpt": "hart 1: while(started==0); floatinithart(); kvminithart(); trapinithart(); scheduler()"
+        },
+        {
+          "path": "kernel/main.c:72",
+          "symbol_kind": "variable",
+          "symbol_name": "started",
+          "excerpt": "volatile static int started = 0; hart 0 设置 started=1 作为 AP 启动信号"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_003",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 IPI（核间中断）发送与处理？",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "include/sbi.h:98-103",
+          "symbol_kind": "function",
+          "symbol_name": "sbi_send_ipi",
+          "excerpt": "static inline struct sbiret sbi_send_ipi(unsigned long hart_mask, unsigned long hart_mask_base)"
+        },
+        {
+          "path": "kernel/main.c:69",
+          "symbol_kind": "function_call",
+          "symbol_name": "sbi_send_ipi",
+          "excerpt": "sbi_send_ipi(mask, 0) 用于唤醒 AP"
+        },
+        {
+          "path": "kernel/trap/trap.c:309-315",
+          "symbol_kind": "function",
+          "symbol_name": "handle_intr",
+          "excerpt": "INTR_SOFTWARE 软件中断处理，调用 sbi_clear_ipi() 清除 pending 位"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_004",
+      "question_type": "short_answer",
+      "stem": "若存在 IPI：发送与处理路径分别在哪些函数/文件？",
+      "value": "IPI 发送路径：kernel/main.c:69 调用 sbi_send_ipi(mask, 0)，其中 mask=1<<i (i 为 hart 编号)；IPI 处理路径：kernel/trap/trap.c:309-315 在 handle_intr() 中处理 INTR_SOFTWARE 软件中断，调用 sbi_clear_ipi() 清除 pending 位。wakeup() 函数 (kernel/sched/proc.c:401) 也使用 sbi_send_ipi(1<<id, 0) 唤醒另一核进行调度。",
+      "evidence": [
+        {
+          "path": "kernel/main.c:69",
+          "symbol_kind": "function_call",
+          "symbol_name": "sbi_send_ipi",
+          "excerpt": "sbi_send_ipi(mask, 0) 其中 mask = 1 << i"
+        },
+        {
+          "path": "kernel/trap/trap.c:309-315",
+          "symbol_kind": "function",
+          "symbol_name": "handle_intr",
+          "excerpt": "else if (INTR_SOFTWARE == scause) { sbi_clear_ipi(); return 0; }"
+        },
+        {
+          "path": "kernel/sched/proc.c:401",
+          "symbol_kind": "function_call",
+          "symbol_name": "sbi_send_ipi",
+          "excerpt": "wakeup() 中：sbi_send_ipi(1 << id, 0) 唤醒另一核"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_005",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 per-CPU 变量/结构（PerCpu、CPU-local storage 等）？",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "include/sched/proc.h:158-163",
+          "symbol_kind": "struct",
+          "symbol_name": "cpu",
+          "excerpt": "struct cpu { struct proc *proc; struct context context; int noff; int intena; }"
+        },
+        {
+          "path": "include/sched/proc.h:169",
+          "symbol_kind": "function",
+          "symbol_name": "mycpu",
+          "excerpt": "struct cpu *mycpu(void); 返回当前 CPU 的 struct cpu 指针"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_006",
+      "question_type": "short_answer",
+      "stem": "per-CPU 的实现方式是什么？",
+      "value": "通过 tp 寄存器 (thread pointer) 存储 hartid 实现 per-CPU 索引。cpuid() 函数 (include/sched/proc.h:165-167) 使用 r_tp() 读取 tp 寄存器获取当前 hart 编号 (0 或 1)，然后 mycpu() 返回 &cpus[cpuid()]。启动时 inithartid() (kernel/main.c:28-30) 将 hartid 写入 tp 寄存器：asm volatile(\"mv tp, %0\" : : \"r\" (hartid & 0x1))。",
+      "evidence": [
+        {
+          "path": "include/sched/proc.h:165-167",
+          "symbol_kind": "function",
+          "symbol_name": "cpuid",
+          "excerpt": "static inline int cpuid(void) { return r_tp(); }"
+        },
+        {
+          "path": "kernel/main.c:28-30",
+          "symbol_kind": "function",
+          "symbol_name": "inithartid",
+          "excerpt": "static inline void inithartid(unsigned long hartid) { asm volatile(\"mv tp, %0\" : : \"r\" (hartid & 0x1)); }"
+        },
+        {
+          "path": "include/hal/riscv.h:350-353",
+          "symbol_kind": "function",
+          "symbol_name": "r_tp",
+          "excerpt": "static inline uint64 r_tp() { uint64 x; asm volatile(\"mv %0, tp\" : \"=r\" (x)); return x; }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_007",
+      "question_type": "tri_state_impl",
+      "stem": "调度是否存在跨核负载均衡/迁移/亲和性？",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/sched/proc.c:245-247",
+          "symbol_kind": "variable",
+          "symbol_name": "proc_runnable",
+          "excerpt": "struct proc *proc_runnable[PRIORITY_NUMBER]; 全局数组，非 per-CPU 运行队列"
+        },
+        {
+          "path": "kernel/sched/proc.c:671-710",
+          "symbol_kind": "function",
+          "symbol_name": "scheduler",
+          "excerpt": "scheduler() 从全局 proc_runnable 数组获取进程，无跨核迁移逻辑"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_008",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 TLB shootdown（跨核页表一致性刷新）？",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/mm/vm.c:124-129",
+          "symbol_kind": "function",
+          "symbol_name": "kvminithart",
+          "excerpt": "w_satp(stap); asm volatile(\"sfence.vma\"); 仅刷新当前核 TLB"
+        },
+        {
+          "path": "kernel/mm/vm.c:997-1029",
+          "symbol_kind": "function_call",
+          "symbol_name": "sfence_vma",
+          "excerpt": "页表修改后调用 sfence_vma() 但无 IPI 跨核刷新机制"
+        },
+        {
+          "path": "kernel/trap/trap.c:303-310",
+          "symbol_kind": "comment",
+          "symbol_name": "handle_intr",
+          "excerpt": "注释掉的代码：// for (int i = 0; i < NCPU; i ++) { if (cpuid() != i) { sbi_send_ipi(1 << i, 0); } }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_009",
+      "question_type": "short_answer",
+      "stem": "与 03/04/05/08 章的交叉一致性",
+      "value": "03 TLB: 多核页表修改后仅调用 sfence_vma() 刷新当前核 TLB，无跨核 TLB shootdown 机制 (kernel/mm/vm.c:997,1013,1029)。\n04 调度: 使用全局 proc_runnable[PRIORITY_NUMBER] 数组 (kernel/sched/proc.c:245)，无 per-CPU 运行队列，无负载均衡/IPI resched 机制。\n05 Trap: per-CPU trap 初始化在 AP 上线时执行 trapinithart() (kernel/main.c:83, kernel/trap/trap.c:59-67)，BSP 和 AP 分别调用，顺序正确。\n08 锁: SpinLock 的 acquire() 调用 push_off() 关中断 (kernel/sync/spinlock.c:24)，在多核下可防止同核中断干扰，但跨核竞争仍靠自旋锁原子操作保证，设计安全。",
+      "evidence": [
+        {
+          "path": "kernel/mm/vm.c:997",
+          "symbol_kind": "function_call",
+          "symbol_name": "sfence_vma",
+          "excerpt": "页表修改后调用 sfence_vma() 但仅刷新当前核"
+        },
+        {
+          "path": "kernel/sched/proc.c:245",
+          "symbol_kind": "variable",
+          "symbol_name": "proc_runnable",
+          "excerpt": "全局调度队列数组"
+        },
+        {
+          "path": "kernel/main.c:83",
+          "symbol_kind": "function_call",
+          "symbol_name": "trapinithart",
+          "excerpt": "AP 上线时调用 trapinithart()"
+        },
+        {
+          "path": "kernel/sync/spinlock.c:24",
+          "symbol_kind": "function_call",
+          "symbol_name": "push_off",
+          "excerpt": "acquire() 中调用 push_off() 关中断"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_010",
+      "question_type": "single_choice",
+      "stem": "SpinLock 在获取锁时是否禁用中断（关中断保护临界区）？",
+      "value": "A",
+      "evidence": [
+        {
+          "path": "kernel/sync/spinlock.c:24",
+          "symbol_kind": "function_call",
+          "symbol_name": "push_off",
+          "excerpt": "acquire() 第一行：push_off(); // disable interrupts to avoid deadlock"
+        },
+        {
+          "path": "kernel/intr.c:12-21",
+          "symbol_kind": "function",
+          "symbol_name": "push_off",
+          "excerpt": "intr_off(); c->noff += 1; 关中断并增加嵌套计数"
+        },
+        {
+          "path": "kernel/sync/spinlock.c:73",
+          "symbol_kind": "function_call",
+          "symbol_name": "pop_off",
+          "excerpt": "release() 最后调用 pop_off() 恢复中断状态"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_011",
+      "question_type": "short_answer",
+      "stem": "NCPU/MAXCPU（或等价宏）与链接脚本中的每 hart 栈/入口布局是否对应？",
+      "value": "对应。include/param.h:5 定义 NCPU=2，bootloader/SBI/rustsbi-k210/link-k210.ld:7 定义 _max_hart_id=1 (即 hart 编号 0 和 1，共 2 核)。链接脚本中 _hart_stack_size=16K (link-k210.ld:12)，每个 hart 独立栈空间。kernel/main.c:91-94 中 boot stack 按 hartid 偏移：kstack = boot_stack + hartid * 4 * PGSIZE。",
+      "evidence": [
+        {
+          "path": "include/param.h:5",
+          "symbol_kind": "macro",
+          "symbol_name": "NCPU",
+          "excerpt": "#define NCPU 2"
+        },
+        {
+          "path": "bootloader/SBI/rustsbi-k210/link-k210.ld:7",
+          "symbol_kind": "symbol",
+          "symbol_name": "_max_hart_id",
+          "excerpt": "_max_hart_id = 1;"
+        },
+        {
+          "path": "bootloader/SBI/rustsbi-k210/link-k210.ld:12",
+          "symbol_kind": "symbol",
+          "symbol_name": "_hart_stack_size",
+          "excerpt": "PROVIDE(_hart_stack_size = 16K);"
+        },
+        {
+          "path": "kernel/main.c:91-94",
+          "symbol_kind": "function",
+          "symbol_name": "main",
+          "excerpt": "uint64 kstack = (uint64)boot_stack + hartid * 4 * PGSIZE;"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_012",
+      "question_type": "tri_state_impl",
+      "stem": "是否使用 AtomicUsize/原子变量分配 PID/TID（全局唯一 ID 池）？",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/sched/proc.c:38",
+          "symbol_kind": "variable",
+          "symbol_name": "__pid",
+          "excerpt": "int __pid; 普通整型变量"
+        },
+        {
+          "path": "kernel/sched/proc.c:230",
+          "symbol_kind": "statement",
+          "symbol_name": "allocproc",
+          "excerpt": "p->pid = __pid ++; 非原子自增，仅靠 hash_lock 保护"
+        },
+        {
+          "path": "kernel/sched/proc.c:39-45",
+          "symbol_kind": "variable",
+          "symbol_name": "hash_lock",
+          "excerpt": "struct spinlock hash_lock; PID 分配在 __enter_hash_cs / __leave_hash_cs 临界区内"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_013",
+      "question_type": "tri_state_impl",
+      "stem": "是否支持实时调度 (Real-Time Scheduling, Stallings Ch10)？",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/sched/proc.c:240-247",
+          "symbol_kind": "variable",
+          "symbol_name": "PRIORITY_NUMBER",
+          "excerpt": "仅 3 个优先级：PRIORITY_TIMEOUT=0, PRIORITY_IRQ=1, PRIORITY_NORMAL=2，无 SCHED_FIFO/SCHED_RR/RT priority"
+        },
+        {
+          "path": "include/sched/proc.h",
+          "symbol_kind": "file",
+          "symbol_name": "proc.h",
+          "excerpt": "未发现 realtime/RT/deadline 相关定义"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_014",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 NUMA (Non-Uniform Memory Access) 感知的内存分配或调度策略？",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/mm/pm.c",
+          "symbol_kind": "file",
+          "symbol_name": "pm.c",
+          "excerpt": "物理内存分配器无 numa/node_id 相关代码"
+        },
+        {
+          "path": "kernel/sched/proc.c",
+          "symbol_kind": "file",
+          "symbol_name": "proc.c",
+          "excerpt": "调度器无 NUMA 感知策略。K210 为单 SoC 嵌入式架构，共享统一物理内存，无 NUMA 拓扑"
+        }
+      ]
+    }
+  ]
+}

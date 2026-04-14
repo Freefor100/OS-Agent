@@ -1,56 +1,62 @@
 {
   "stage_id": "06_fs_vfs",
-  "goal": "分析 xv6-k210 的 VFS 抽象层、具体文件系统(FAT32)实现、fd 表结构、pipe/mmap/socket 支持状态，验证伪文件系统(devfs/procfs)实现。",
+  "goal": "分析 xv6-k210 文件系统：VFS 抽象层（C 结构体 op 表）、FAT32 具体实现、fd table 形态、块缓存 LRU 驱逐、路径解析、伪文件系统等核心机制，收集代码证据回答 20 个题单问题。",
   "must_cover": [
-    "VFS 抽象层：struct inode/file/dentry/superblock 定义及 file_op/inode_op/dentry_op 操作集",
-    "具体文件系统：FAT32 自研实现(kernel/fs/fat32/)，无 Ext4 实现",
-    "伪文件系统：devfs/procfs 在 rootfs.c 中初始化并挂载",
-    "fd 表：Per-Process 的 struct fdtable 链表结构(支持动态扩展)",
-    "pipe 支持：✅ 已实现(kernel/fs/pipe.c, sys_pipe)",
-    "mmap 支持：✅ 已实现(kernel/mm/mmap.c, sys_mmap/sys_munmap)，需验证 MAP_SHARED 处理",
-    "socket 支持：❌ 未实现(仅 errno 定义，无 sys_socket)",
-    "自研边界：纯 C 实现，无 Rust crate 依赖",
-    "自研 vs 直接依赖 crate 的**边界文件**；`feature` 切换导致的 FS 组合差异；同一功能多目录重复实现时**以谁为准**（证据）。",
-    "VFS 抽象层：File/Inode/Dentry Traits 定义。",
-    "**具体文件系统（必须代码验证）**：",
-    "FAT32/Ext4：是否自己实现了？还是用的 crate？（check Cargo.toml）。**注意：对于组件化的 OS（如 ArceOS），具体的文件系统实现可能独立于 VFS 存在于诸如 `arceos/modules/axfs-ng/src/fs/fat/` 或 `ext4/` 目录中，务必使用搜索功能仔细查找，绝对不要仅仅因为特定目录下没有就断言未实现！**",
-    "**具体 FS 的抽象层结构**：搜索 `FatFilesystemInner|Ext4Filesystem|FatFileNode|FatDirNode` 等，分析各层如何实现 VFS trait。这是文件系统架构的核心。",
-    "RamFS/TmpFS：是否有内存文件系统？",
-    "**伪文件系统**：使用 grep_in_repo 搜索 `devfs|procfs|sysfs` 检查是否实现了伪文件系统。若有，分析其实现方式。",
-    "文件描述符表：Global 还是 Per-Process？`fd_table` 结构在哪？",
-    "**功能细节**（必须分类为 `✅ 已实现`、`🔸 桩函数`、`❌ 未实现`）：",
-    "是否支持 `pipe` 套接字？",
-    "是否支持网络 `socket`？",
-    "是否支持 `mmap`？**注意**：必须检查 `sys_mmap` 实现。如果是 **零拷贝**，必须看到 `VmArea` 结构体中有 `shared` 字段或 `MAP_SHARED` 处理逻辑。如果是 `sys_mmap` 仅返回 Ok(0) 没有处理标志位，标注为'桩函数'。"
+    "[Q06_001] VFS 接口形态：C 语言 struct fs_op/inode_op/file_op 函数指针表（include/fs/fs.h）",
+    "[Q06_002] 具体 FS 后端：自研 FAT32 实现（kernel/fs/fat32/），非第三方 crate",
+    "[Q06_003] FAT32 来源：自研（无 Cargo.toml 依赖，纯 C 实现）",
+    "[Q06_004] 文件打开路径：sys_openat → nameifrom → lookup_path → dirlookup → fat_lookup_dir",
+    "[Q06_005] FD Table 形态：固定数组 struct file *arr[NOFILE]（NOFILE=16），Per-Process 归属",
+    "[Q06_006] 块缓存：已实现 bcache（kernel/fs/bio.c），BNUM=2500",
+    "[Q06_007] 驱逐策略：LRU（lru_head 双向链表，bget 从尾部驱逐）",
+    "[Q06_008] 页缓存：未发现独立 Page Cache，仅 bcache",
+    "[Q06_009] mmap 映射：已实现 do_mmap/do_munmap（kernel/mm/mmap.c），支持文件/匿名映射",
+    "[Q06_010] poll/select：已实现 poll（kernel/fs/poll.c），支持 SYS_pselect6/SYS_ppoll",
+    "[Q06_011] 路径解析：已实现 namei/nameiparent/lookup_path，支持绝对/相对路径与 . ..",
+    "[Q06_012] 符号链接：仅 stub（SYS_readlinkat 存在但需验证实现）",
+    "[Q06_013] 管道：已实现 pipe/pipe2（kernel/fs/pipe.c），FD_PIPE 类型",
+    "[Q06_014] Socket：未实现（仅 S_IFSOCK 宏定义，无 socket 系统调用）",
+    "[Q06_015] 伪文件系统：已实现 devfs/procfs（kernel/fs/rootfs.c），sysfs 仅声明",
+    "[Q06_016] FD Table 归属：Per-Process（struct proc 内含 struct fdtable fds）",
+    "[Q06_001] VFS 抽象层 (Virtual File System, VFS)接口是什么形态？（Rust trait / C op 表；必须给接口定义证据）",
+    "[Q06_002] 具体文件系统后端 (Concrete File System Backend) 更接近哪种？",
+    "[Q06_003] 若支持 FAT32/Ext4：它是自研还是第三方库/crate？（必须引用 Cargo.toml/Cargo.lock 或 Makefile 引入证据）",
+    "[Q06_004] 文件打开路径：文件打开入口（sys_open 或等价）→ VFS 层 → 具体 FS open。列出 3-6 个关键节点并给证据。",
+    "[Q06_005] 文件描述符表 (File Descriptor Table, FD Table) 的实现形态是什么？（固定数组/Vec/BTreeMap 等；必须给结构体定义证据）",
+    "[Q06_006] 是否实现块缓存/缓冲缓存 (Block Cache / Buffer Cache, bcache)？（必须三态）"
   ],
   "evidence_targets": [
-    "VFS 设计：include/fs/fs.h(105-140 行 inode/superblock 定义), include/fs/file.h",
-    "FAT32 实现：kernel/fs/fat32/fat32.c(操作集定义), kernel/fs/fat32/fat32.h",
-    "fd table：include/fs/file.h(32-38 行), include/sched/proc.h(89 行)",
-    "pipe 实现：kernel/fs/pipe.c(pipealloc), include/fs/pipe.h",
-    "mmap 实现：kernel/mm/mmap.c(do_mmap), kernel/syscall/sysmem.c(sys_mmap 70-115 行)",
-    "伪文件系统：kernel/fs/rootfs.c(244-290 行 devfs/procfs 初始化)",
-    "mount 机制：kernel/fs/mount.c, kernel/fs/fs.c(create/namei)",
+    "VFS op 表定义（include/fs/fs.h:44-75）",
+    "FAT32 自研实现（kernel/fs/fat32/fat32.c:1-100）",
+    "fdtable 结构体（include/fs/file.h:32-38）",
+    "bcache LRU 驱逐（kernel/fs/bio.c:146-160）",
+    "sys_openat 调用链（kernel/syscall/sysfile.c:195-260）",
+    "devfs/procfs 初始化（kernel/fs/rootfs.c:244-275）",
+    "path_walk 实现（kernel/fs/fs.c:410-470）",
+    "pipe 实现（kernel/fs/pipe.c）",
+    "poll 实现（kernel/fs/poll.c）",
+    "mmap 文件映射（kernel/mm/mmap.c）",
     "VFS 设计",
     "具体文件系统",
     "fd table",
-    "pipe/mmap"
+    "pipe/mmap",
+    "整盘挂载与根目录测例脚本交界"
   ],
   "seed_paths": [
     "include/fs/fs.h",
     "include/fs/file.h",
-    "kernel/fs/fat32",
+    "include/fs/buf.h",
+    "kernel/fs/fs.c",
+    "kernel/fs/file.c",
+    "kernel/fs/bio.c",
+    "kernel/fs/fat32/",
     "kernel/fs/rootfs.c",
     "kernel/fs/pipe.c",
-    "kernel/fs/mount.c",
+    "kernel/fs/poll.c",
+    "kernel/syscall/sysfile.c",
     "kernel/mm/mmap.c",
-    "kernel/syscall/sysmem.c",
-    "include/sched/proc.h",
     "fs",
-    "vfs",
-    "file",
-    "inode",
-    "kernel/fs"
+    "vfs"
   ],
   "framework_guess": [
     "xv6"
@@ -59,18 +65,18 @@
     "riscv64"
   ],
   "entry_symbols": [
-    "sys_open",
-    "sys_mmap",
-    "sys_pipe",
-    "filealloc",
+    "sys_openat",
+    "namei",
+    "lookup_path",
+    "dirlookup",
+    "bget",
     "fdalloc",
-    "pipealloc",
+    "filealloc",
     "fat32_init",
     "rootfs_init",
-    "create",
-    "namei",
-    "vfs_open",
-    "openat"
+    "do_mmap",
+    "sys_open",
+    "vfs_open"
   ],
   "repo_hotspots": [
     "Cargo.toml",
@@ -86,21 +92,14 @@
   ],
   "preferred_tools": [
     "read_code_segment",
+    "lsp_get_call_graph",
     "lsp_get_definition",
     "lsp_get_references",
-    "lsp_get_call_graph",
     "grep_in_repo"
   ],
   "avoid_tools": [
     "blind_read_large_files",
     "full_repo_scan_with_read_code_segment"
-  ],
-  "review_checklist": [
-    "关键问题是否回答",
-    "重要结论是否给出源码路径",
-    "是否避免将 README 当成实现证据",
-    "是否标出未实现/桩函数",
-    "must_cover_count=12"
   ],
   "context_budget": {
     "max_prev_section_chars": 6000,
@@ -109,13 +108,13 @@
     "max_memory_items": 8
   },
   "execution_steps": [
-    "精读 include/fs/fs.h(105-140 行) 确认 struct inode/superblock 字段及 VFS 操作集定义",
-    "分析 kernel/fs/fat32/fat32.c(1-80 行) 验证 FAT32 如何实现 fat32_inode_op/fat32_file_op",
-    "读取 kernel/fs/rootfs.c(244-290 行) 取证 devfs/procfs 的初始化与挂载流程",
-    "检查 include/fs/file.h(32-38 行) 和 include/sched/proc.h(89 行) 确认 fd 表为 Per-Process 链表结构",
-    "精读 kernel/syscall/sysmem.c(70-115 行) sys_mmap 实现，验证 MAP_SHARED/MAP_PRIVATE 标志位处理逻辑",
-    "读取 kernel/fs/pipe.c(40-100 行) pipealloc 实现，确认 pipe 套接字完整支持",
-    "grep 搜索 sys_socket/socket_create 确认网络 socket 未实现(仅 errno 定义)",
-    "对照 must_cover 分类标记：pipe✅/mmap✅(需确认共享)/socket❌/devfs✅/procfs✅/Ext4❌"
+    "使用 lsp_get_call_graph 分析 sys_openat 的 outgoing 调用链（max_depth=3），验证 open 路径关键节点",
+    "读取 kernel/fs/pipe.c 前 100 行，确认 pipe 实现形态及与 VFS 的集成方式",
+    "读取 kernel/fs/fat32/dirent.c 前 80 行，验证 FAT32 目录查找与 VFS lookup 接口对接",
+    "使用 grep_in_repo 搜索 socket 系统调用（sys_socket/sys_connect 等），确认网络支持状态",
+    "读取 kernel/mm/mmap.c 前 100 行，确认 mmap 文件映射与匿名映射实现细节",
+    "使用 lsp_get_references 追踪 namei 符号，验证路径解析在所有文件操作中的调用点",
+    "读取 kernel/fs/fat32/cluster.c 前 80 行，确认 FAT32 簇分配与空闲空间管理策略",
+    "对照 must_cover 清单，整理所有证据的 路径：行号 引用，准备题单作答"
   ]
 }

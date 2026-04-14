@@ -22,6 +22,7 @@ import langchain
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage, SystemMessage
 
 from core.agent_builder import (
+    build_chat_model,
     build_executor_agent,
     build_planner_agent,
     SYSTEM_PROMPT,
@@ -43,6 +44,7 @@ from core.describe_stage_qa import load_stage_qa, list_question_ids
 from core.describe_json_qa import (
     SCHEMA_VERSION as JSON_QA_SCHEMA_VERSION,
     build_bailian_response_format_json_schema,
+    coerce_answers_payload_by_stage_qa,
     coerce_answers_payload_defaults,
     parse_answers_json,
     render_answers_to_markdown,
@@ -329,6 +331,8 @@ def _build_json_qa_prompt(stage_id: str, stage_title: str) -> tuple[str, list[st
     lines.append("JSON 顶层字段必须包含：`schema_version`、`stage_id`、`stage_title`、`terminology_profile`、`answers`。")
     lines.append("其中 `answers` 是数组，每个元素必须包含：`question_id`、`question_type`、`stem`、`value`、`evidence`。")
     lines.append("`tri_state_impl` 的 `value` 只允许：`implemented` / `stub` / `not_found`。")
+    lines.append("`single_choice` 的 `value` 必须是该题 `choices` 列表中的**完整选项文本**，禁止用 `A/B/C/D` 这类字母代号。")
+    lines.append("`multi_choice` 的 `value` 必须是数组，数组每个元素必须是该题 `choices` 列表中的**完整选项文本**，禁止用字母代号。")
     lines.append("每条证据 `evidence[]` 必须包含：`path`（仓库相对路径）、`symbol_kind`、`symbol_name`、可选 `excerpt`。")
     lines.append("")
     lines.append("你必须使用本仓库代码证据作答。若未发现实现，按三态要求输出 `not_found`，且不得编造路径/符号。")
@@ -914,9 +918,14 @@ def main():
         print(f"   模型: {os.getenv('MODEL_NAME')} ")
         sys.stdout.flush()  # 强制刷新输出缓冲区
 
-        # 若本阶段为题库 JSON-QA，则请求后端强制 json_schema 输出（百炼 OpenAI 兼容支持 response_format.json_schema）
-        model_kwargs = build_bailian_response_format_json_schema(name=f"os_agent_{stage_id}") if expected_question_ids else None
-        agent = build_executor_agent(stage_id=stage_id, model_kwargs=model_kwargs)
+        # 若本阶段为题库 JSON-QA：
+        # 不要在 ReAct 执行阶段启用 response_format/json_schema。
+        # 原因：启用结构化输出会让 LangChain 进入“自动解析工具调用”的模式，
+        # 要求所有 function tools 都是 strict；而本项目工具（如 get_repo_local_path）并非 strict，
+        # 会直接报：`<tool>` is not strict. Only strict function tools can be auto-parsed。
+        #
+        # JSON-QA 的结构化约束交给后处理（extract/validate）完成。
+        agent = build_executor_agent(stage_id=stage_id, model_kwargs=None)
         
         final_state = None
         stage_step_count = 0  # 阶段内步骤计数
@@ -1111,8 +1120,10 @@ def main():
                 pass
 
             try:
+                stage_qa = load_stage_qa(stage_id)
                 payload = parse_answers_json(stage_text)
                 payload = coerce_answers_payload_defaults(payload)
+                payload = coerce_answers_payload_by_stage_qa(payload, stage_qa=stage_qa)
                 issues = validate_answers_payload(
                     payload,
                     stage_id=stage_id,
@@ -1128,10 +1139,80 @@ def main():
                     _save_json(json_path, payload)
                     stage_text = render_answers_to_markdown(payload).strip()
             except Exception as e:
+                # JSON 解析/校验失败：将“输出 JSON 前的全部对话 + 原输出”重发给模型，要求仅返回合法 JSON 进行修复重生成。
+                # 注意：这一步必须禁止工具调用，否则会变成“继续探索”而不是“修复 JSON”。
+                stage_qa = load_stage_qa(stage_id)
+
+                repair_error = f"{type(e).__name__}: {e}"
                 _save_json(
                     os.path.join(sidecar_dir, f"{stage_id}_answers_parse_error.json"),
-                    {"error": f"{type(e).__name__}: {e}"},
+                    {"error": repair_error},
                 )
+
+                try:
+                    # 尽量保留上下文：使用执行阶段的完整 messages（包含工具证据），但避免把“未解析 tool_calls 的 AIMessage”带入。
+                    safe_msgs = (execution_messages or []).copy()
+                    while safe_msgs and isinstance(safe_msgs[-1], AIMessage) and getattr(safe_msgs[-1], "tool_calls", None):
+                        safe_msgs.pop()
+
+                    qa_prompt, _expected_ids = _build_json_qa_prompt(stage_id=stage_id, stage_title=title)
+                    # 最多重试 3 次修复重生成
+                    repair_llm = build_chat_model(temperature=0, max_retries=0)
+                    last_repair_exc: Exception | None = None
+                    for attempt in range(1, 4):
+                        try:
+                            repair_instructions = (
+                                "上一次你生成的 JSON 无法被解析或无法通过校验。\n"
+                                f"错误：{repair_error}\n"
+                                f"修复重试次数：{attempt}/3\n\n"
+                                "请你基于上文所有对话与工具证据，重新输出**唯一一个 JSON 对象**（允许 ```json 围栏），不要输出任何额外解释。\n"
+                                "严格遵守题库的 question_id / question_type / stem。\n"
+                                "- single_choice 的 value 必须是 choices 中的完整选项文本（禁止 A/B/C/D）。\n"
+                                "- multi_choice 的 value 必须是数组，元素为 choices 中完整选项文本（禁止字母代号）。\n\n"
+                                "这是题库与输出契约（必须按此修复）：\n\n"
+                                + qa_prompt
+                                + "\n\n"
+                                "这是你上一次的原始输出（供你修复，可能包含多余文字/围栏/不完整 JSON）：\n\n"
+                                "```text\n"
+                                + (stage_text or "")
+                                + "\n```\n"
+                            )
+
+                            repaired = repair_llm.invoke(safe_msgs + [HumanMessage(content=repair_instructions)])
+                            repaired_text = (getattr(repaired, "content", "") or "").strip()
+
+                            with open(raw_path, "a", encoding="utf-8") as f:
+                                f.write(f"\n\n---\n# repair_attempt {attempt}/3\n")
+                                f.write(repaired_text + "\n")
+
+                            payload = parse_answers_json(repaired_text)
+                            payload = coerce_answers_payload_defaults(payload)
+                            payload = coerce_answers_payload_by_stage_qa(payload, stage_qa=stage_qa)
+                            issues = validate_answers_payload(
+                                payload,
+                                stage_id=stage_id,
+                                stage_title=title,
+                                expected_question_ids=expected_question_ids,
+                            )
+                            if not issues:
+                                _save_json(json_path, payload)
+                                stage_text = render_answers_to_markdown(payload).strip()
+                                last_repair_exc = None
+                                break
+                            _save_json(
+                                os.path.join(sidecar_dir, f"{stage_id}_answers_validate_issues.json"),
+                                {"issues": [{"path": x.path, "reason": x.reason} for x in issues]},
+                            )
+                        except Exception as e_attempt:
+                            last_repair_exc = e_attempt
+
+                    if last_repair_exc is not None:
+                        raise last_repair_exc
+                except Exception as e2:
+                    _save_json(
+                        os.path.join(sidecar_dir, f"{stage_id}_answers_repair_error.json"),
+                        {"error": f"{type(e2).__name__}: {e2}"},
+                    )
 
         artifacts = extract_stage_artifacts(stage_text, execution_messages)
         stage_state.draft_markdown = artifacts["draft_markdown"] or stage_text

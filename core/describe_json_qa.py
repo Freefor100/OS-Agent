@@ -61,12 +61,14 @@ def build_bailian_response_format_json_schema(*, name: str = "os_agent_describe_
     {"type":"json_schema","json_schema":{"name":..., "schema":..., "strict":true}}
     """
     return {
-        "type": "json_schema",
-        "json_schema": {
-            "name": name[:64],
-            "schema": JSON_SCHEMA_V1,
-            "strict": True,
-        },
+        "response_format": {
+            "type": "json_schema",
+            "json_schema": {
+                "name": name[:64],
+                "schema": JSON_SCHEMA_V1,
+                "strict": True,
+            },
+        }
     }
 
 
@@ -75,6 +77,138 @@ class JSONQASchemaError(ValueError):
 
 
 _JSON_FENCE_RE = re.compile(r"```json\s*([\s\S]*?)\s*```", re.IGNORECASE)
+
+
+def _is_str(x: Any) -> bool:
+    return isinstance(x, str) and bool(x.strip())
+
+
+def _normalize_choice_text(x: str) -> str:
+    # Keep it conservative: strip only; do not normalize punctuation to avoid false matches.
+    return (x or "").strip()
+
+
+def _try_decode_letter_choice(value: str) -> Optional[int]:
+    v = (value or "").strip()
+    if len(v) != 1:
+        return None
+    ch = v.upper()
+    if "A" <= ch <= "Z":
+        return ord(ch) - ord("A")
+    return None
+
+
+def _try_decode_numeric_choice(value: str) -> Optional[int]:
+    v = (value or "").strip()
+    if v.isdigit():
+        n = int(v)
+        if n >= 1:
+            return n - 1
+    return None
+
+
+def _coerce_single_choice_value(value: Any, choices: List[str]) -> Any:
+    if not choices:
+        return value
+    if isinstance(value, str):
+        v = _normalize_choice_text(value)
+        # Already a full choice text
+        if v in choices:
+            return v
+        # A/B/C/D style
+        idx = _try_decode_letter_choice(v)
+        if idx is not None and 0 <= idx < len(choices):
+            return choices[idx]
+        # 1/2/3 style
+        idx = _try_decode_numeric_choice(v)
+        if idx is not None and 0 <= idx < len(choices):
+            return choices[idx]
+    return value
+
+
+def _coerce_multi_choice_value(value: Any, choices: List[str]) -> Any:
+    if not choices:
+        return value
+
+    # If already list of full texts, keep as-is (after strip) when possible.
+    if isinstance(value, list):
+        out: List[Any] = []
+        for it in value:
+            if isinstance(it, str):
+                out.append(_coerce_single_choice_value(it, choices))
+            else:
+                out.append(it)
+        # best-effort: if after coercion it's all strings and all in choices, keep them
+        return out
+
+    if isinstance(value, str):
+        v = value.strip()
+        # Common patterns: "A,C", "A C", "A;C", "A|C"
+        parts = [p for p in re.split(r"[,\s;|/]+", v) if p]
+        if parts:
+            out = []
+            for p in parts:
+                out.append(_coerce_single_choice_value(p, choices))
+            return out
+    return value
+
+
+def coerce_answers_payload_by_stage_qa(payload: Dict[str, Any], *, stage_qa: Dict[str, Any]) -> Dict[str, Any]:
+    """Best-effort fixups using the stage QA bank.
+
+    - Backfill `stem` to exactly match the QA bank (prevents constraint drift).
+    - Map single_choice/multi_choice value from A/B/C/D or 1/2/3 to actual choice texts.
+    """
+    if not isinstance(payload, dict):
+        return payload
+    questions = stage_qa.get("questions", []) if isinstance(stage_qa, dict) else []
+    if not isinstance(questions, list) or not questions:
+        return payload
+
+    qmap: Dict[str, Dict[str, Any]] = {}
+    for q in questions:
+        if not isinstance(q, dict):
+            continue
+        qid = str(q.get("question_id", "")).strip()
+        if qid:
+            qmap[qid] = q
+
+    answers = payload.get("answers")
+    if not isinstance(answers, list):
+        return payload
+
+    out = dict(payload)
+    new_answers: List[Any] = []
+    for a in answers:
+        if not isinstance(a, dict):
+            new_answers.append(a)
+            continue
+        qid = str(a.get("question_id", "")).strip()
+        q = qmap.get(qid)
+        if not q:
+            new_answers.append(a)
+            continue
+
+        qtype = str(q.get("question_type", "")).strip()
+        stem = str(q.get("stem", "")).strip()
+        choices_raw = q.get("choices")
+        choices = [str(x).strip() for x in choices_raw] if isinstance(choices_raw, list) else []
+
+        aa = dict(a)
+        # Backfill the canonical stem (exact match to bank).
+        if stem:
+            aa["stem"] = stem
+
+        # Coerce choice values
+        if qtype == "single_choice":
+            aa["value"] = _coerce_single_choice_value(aa.get("value"), choices)
+        elif qtype == "multi_choice":
+            aa["value"] = _coerce_multi_choice_value(aa.get("value"), choices)
+
+        new_answers.append(aa)
+
+    out["answers"] = new_answers
+    return out
 
 
 def _find_balanced_json_object(text: str) -> Optional[str]:
@@ -143,10 +277,6 @@ def parse_answers_json(raw_text: str) -> Dict[str, Any]:
     if not isinstance(payload, dict):
         raise JSONQASchemaError("payload_not_object")
     return payload
-
-
-def _is_str(x: Any) -> bool:
-    return isinstance(x, str) and bool(x.strip())
 
 
 def _as_list(x: Any) -> List[Any]:
