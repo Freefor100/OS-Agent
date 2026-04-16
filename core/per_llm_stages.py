@@ -13,7 +13,7 @@ from core.per_types import PlanSpec, StageState
 
 logger = logging.getLogger(__name__)
 
-PLANNER_RECURSION_LIMIT = 64
+PLANNER_RECURSION_LIMIT = 80
 
 PLANNER_SYSTEM = """你是操作系统代码分析任务的「规划员」，只做两件事：
 1) 使用工具摸清本仓库与当前阶段相关的目录/模块/符号/调用关系（不要写正式分析报告）。

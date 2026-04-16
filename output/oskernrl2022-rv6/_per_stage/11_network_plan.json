@@ -1,0 +1,115 @@
+{
+  "stage_id": "11_network",
+  "goal": "分析网络子系统实现情况：确认是否存在协议栈/socket 层，验证 README 声称的「本地回环 Socket 支持」是否有代码实现，检查网卡驱动与 syscall 接口",
+  "must_cover": [
+    "[Q11_001] 网络子系统存在性判定（三态）",
+    "[Q11_002] 协议栈来源（自研/第三方/混合/未发现）",
+    "[Q11_003] socket syscall 接口实现情况（三态）",
+    "[Q11_004] 发送路径追踪（如有实现）",
+    "[Q11_005] 网卡驱动与中断处理（三态）",
+    "[Q11_006] 协议支持列表（TCP/UDP/ARP/DNS/DHCP/ICMP）",
+    "[Q11_007] 零拷贝/DMA 路径验证（三态）",
+    "功能限制声明（仅回环/QEMU/未测试）",
+    "[Q11_001] 是否存在网络子系统实现（协议栈或 socket 层）？（必须三态）",
+    "[Q11_002] 协议栈来源更接近哪种？",
+    "[Q11_003] 是否实现 socket 系统调用接口（socket/bind/connect/sendto/recvfrom 等）？（必须三态）",
+    "[Q11_004] 选择一个发送路径（优先 sys_sendto），追踪：syscall → 协议栈 → 网卡驱动。列 3-6 个关键节点并给证据。",
+    "[Q11_005] 是否实现网卡驱动（virtio-net/e1000 等）与收包中断路径？（必须三态）",
+    "[Q11_006] 协议支持情况（多选；未发现则留空并在 notes 写 not_found）：",
+    "[Q11_007] 是否存在零拷贝/共享缓冲/DMA 描述符等路径（zero-copy）？（必须三态；仅有名词不算 implemented）",
+    "若仅回环/仅 QEMU：写明**限制**；若多网卡：列**各自入口文件**与 feature 开关。",
+    "若无网络实现：单列一节说明依据即可。",
+    "网络协议栈架构：自实现还是使用 `smoltcp`/`lwip` 等库？（**检查 Cargo.toml 依赖**）**如果完全没有网络支持，明确写“未实现网络功能（❌ 未实现）”**。",
+    "Socket 接口实现：是否有 `socket`/`bind`/`connect` 等 syscall？还是仅有 Loopback？",
+    "**功能限制声明（必须）**：分析项目是否已在真实物理网卡上测试过网络功能。如果仅在 QEMU 环境测试或仅支持本地回环通信，必须明确写出该限制。搜索 `loopback|LOOPBACK|127.0.0.1` 确认是否仅有回环设备。",
+    "**网卡驱动细节**：",
+    "搜索 `drivers/net/`, `virtio-drivers`, `ixgbe` 等。"
+  ],
+  "evidence_targets": [
+    "socket.h 中 struct socket_connection 定义及使用情况",
+    "socket_init/add_socket 函数实现是否存在",
+    "sys_socket/sys_bind/sys_connect 等 syscall 是否存在",
+    "file.h 中 FD_SOCKET 类型是否定义",
+    "virtio.h 中网络设备支持情况",
+    "README 声称的回环 Socket 支持代码证据",
+    "协议栈",
+    "socket API",
+    "poll/epoll",
+    "驱动接入"
+  ],
+  "seed_paths": [
+    "src/include/socket.h",
+    "src/include/file.h",
+    "src/include/virtio.h",
+    "src/include/param.h",
+    "src/file.c",
+    "src/dev.c",
+    "src/sysfile.c",
+    "src/sysproc.c",
+    "syscall/syscall.c",
+    "README.md",
+    "net",
+    "tcp",
+    "udp",
+    "socket"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "socket_init",
+    "add_socket",
+    "sys_socket",
+    "sys_bind",
+    "sys_connect",
+    "sys_sendto",
+    "sys_recvfrom",
+    "FD_SOCKET",
+    "tcp",
+    "udp",
+    "poll",
+    "epoll"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "bin",
+    "doc",
+    "linker",
+    "sbi",
+    "sd",
+    "src",
+    "src/include",
+    "src/sifive",
+    "syscall"
+  ],
+  "preferred_tools": [
+    "grep_in_repo",
+    "read_code_segment",
+    "rag_search_code",
+    "lsp_get_definition",
+    "lsp_get_references"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "grep 搜索 socket_init/add_socket 在 .c/.S 文件中的实现，确认是否仅有声明无实现",
+    "检查 file.h 中 file 类型枚举，确认是否缺少 FD_SOCKET 类型定义",
+    "grep 搜索 sys_socket/sys_bind/sys_connect/sys_sendto/sys_recvfrom 等 syscall 实现",
+    "检查 syscall 表（syscall.c 或文档）确认 socket 相关 syscall 是否注册",
+    "grep 搜索 virtio_net/VIRTIO_NET 或 net 驱动相关代码，确认网卡驱动存在性",
+    "检查 dev.c/file.c 中是否有 socket 类型的文件操作处理逻辑",
+    "搜索 loopback/127.0.0.1 等关键词，验证回环实现是否存在",
+    "综合以上证据，判定网络子系统实现状态并撰写题单答案"
+  ]
+}

@@ -12,7 +12,7 @@
 
 > **仓库地址**: https://gitlab.eduxiji.net/Cty/oskernrl2022-rv6
 
-> **分析日期**: 2026年03月19日
+> **分析日期**: 2026年04月16日
 
 > **分析工具**: OS-Agent-D
 
@@ -33,6 +33,97 @@
 11. 网络子系统与协议栈
 12. 调试机制与错误处理
 13. 开发历史与里程碑
+
+---
+
+## Call Graph 概览
+
+> 先以 Tree-sitter 扫描全库，再对 C/C++ 用 **Clang AST**（与仓库根 `compile_flags.txt` / `compile_commands.json` 一致）剔除**条件编译未进入翻译单元**的函数节点，得到参与 PageRank 的 **2562** 个函数、**1820** 条调用边。
+> 语义解析 54/54 个文件。
+>
+> 用 **PageRank** 选出架构枢纽 **Top-30** 个函数（参数 **k=30**；若全库可排名节点不足 k，则实际个数可能小于 k）。
+> 按 **domain（列）× layer（行）** 二维网格布局（**domain/layer 由 LLM 根据函数名与代码片段分类**），
+> 同格多节点限制在格内排布；连线体现调用关系。
+> **可变网格**：在 **k=30** 配置下，**未出现**的 domain 列、layer 行会**压缩**宽高，把画布让给有节点的列/行。
+> **layer 为何常落在 kernel**：PageRank 枢纽多为调度/内存/VFS 等**内核通用逻辑**，且 `kernel` 表示「既非 syscall 入口、也非直接 MMIO」的广义内核代码，模型容易默认成 kernel；已对 **`sys_*` 命名**做确定性修正为 `syscall_boundary`。缓存随 **compile 配置 / git / 管线版本** 自动失效；需强制全量重算时可调用 `generate_callgraph_section(..., force_regenerate=True)`。
+
+### 函数级 Call Graph（PageRank Top-30，图示 30 个函数）
+
+![函数级 Call Graph](callgraph_overview.svg)
+
+*（图：`callgraph_overview.svg`，与报告同目录）*
+
+**图例**：列 = domain 分类，行 = layer 层次（**userspace** → **syscall_boundary** → **kernel** → **hardware**）
+节点颜色：`arch_platform`=#f4d03f / `trap_syscall`=#e74c3c / `process_sched`=#3498db / `memory_vm`=#2ecc71 / `fs_storage`=#9b59b6
+节点**第一行**仅为**符号名**；**第二行**：**函数定义**只写相对源路径；**宏**、**类型别名（typedef）**、**仅引用（调用侧）**等在第二行用**中文**标明类别并附路径或调用方文件（来自静态解析或调用边）。
+列宽按该 domain 列下最长节点标签**动态**估算（有上下限），避免固定死宽度。
+
+### 文件级调用关系
+
+<table style="border-collapse:collapse;width:auto;max-width:100%;table-layout:auto">
+<thead><tr>
+<th style="text-align:left;padding:6px 10px;border:1px solid #ddd;background:#f6f8fa">源文件</th>
+<th style="text-align:left;padding:6px 10px;border:1px solid #ddd;background:#f6f8fa">domain</th>
+<th style="text-align:left;padding:6px 10px;border:1px solid #ddd;background:#f6f8fa">调用的文件（权重）</th>
+</tr></thead>
+<tbody>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>src/cpu.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">process_sched</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">riscv.h×7, intr.c×2, printf.c×1</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>src/intr.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">trap_syscall</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">riscv.h×8, cpu.c×4, printf.c×1</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>src/kmalloc.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">memory_vm</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">riscv.h×5, spinlock.c×4, printf.c×2, pm.c×2, cpu.c×2</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>src/pm.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">memory_vm</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">riscv.h×9, spinlock.c×6, cpu.c×4, intr.c×4, printf.c×3</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>src/printf.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">runtime_common</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">riscv.h×5, spinlock.c×3, cpu.c×2, intr.c×2, sbi.h×2</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>src/sd.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">arch_platform</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">spi.c×3</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>src/sleeplock.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">sync_ipc</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">proc.c×5, riscv.h×5, spinlock.c×3, cpu.c×3, printf.c×2</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>src/spinlock.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">sync_ipc</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">riscv.h×9, cpu.c×6, intr.c×2, printf.c×2</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>src/uarg.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">trap_syscall</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">riscv.h×11, cpu.c×9, intr.c×6, printf.c×3</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>src/vm.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">memory_vm</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">riscv.h×2, pm.c×1, string.c×1, printf.c×1</td></tr>
+</tbody></table>
+
+### PageRank Top-30 枢纽函数（k=30）
+
+<table style="border-collapse:collapse;width:auto;max-width:100%;table-layout:auto">
+<thead><tr>
+<th style="text-align:left;padding:6px 10px;border:1px solid #ddd;background:#f6f8fa">符号</th>
+<th style="text-align:left;padding:6px 10px;border:1px solid #ddd;background:#f6f8fa">类型</th>
+<th style="text-align:left;padding:6px 10px;border:1px solid #ddd;background:#f6f8fa">domain</th>
+<th style="text-align:left;padding:6px 10px;border:1px solid #ddd;background:#f6f8fa">layer</th>
+<th style="text-align:left;padding:6px 10px;border:1px solid #ddd;background:#f6f8fa">定义路径 / 引用位置</th>
+<th style="text-align:left;padding:6px 10px;border:1px solid #ddd;background:#f6f8fa">PR</th>
+<th style="text-align:left;padding:6px 10px;border:1px solid #ddd;background:#f6f8fa">in°</th>
+<th style="text-align:left;padding:6px 10px;border:1px solid #ddd;background:#f6f8fa">out°</th>
+</tr></thead>
+<tbody>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>mycpu</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">函数定义</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">process_sched</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">kernel</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>src/cpu.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#1</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">46</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">2</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>cpuid</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">函数定义</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">arch_platform</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">hardware</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>src/cpu.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#2</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">46</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">1</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>r_tp</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">函数定义</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">arch_platform</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">hardware</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>src/include/riscv.h</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#3</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">38</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">0</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>myproc</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">函数定义</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">process_sched</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">kernel</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>src/cpu.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#4</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">69</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">10</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>release</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">函数定义</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">sync_ipc</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">kernel</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>src/spinlock.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#5</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">54</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">9</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>acquire</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">函数定义</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">sync_ipc</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">kernel</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>src/spinlock.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#6</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">51</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">9</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>pop_off</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">函数定义</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">trap_syscall</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">kernel</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>src/intr.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#7</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">51</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">7</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>holding</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">函数定义</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">sync_ipc</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">kernel</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>src/spinlock.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#8</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">28</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">3</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>push_off</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">函数定义</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">trap_syscall</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">kernel</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>src/intr.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#9</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">51</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">6</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>r_sstatus</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">函数定义</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">arch_platform</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">hardware</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>src/include/riscv.h</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#10</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">7</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">0</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>memset</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">函数定义</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">runtime_common</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">kernel</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>src/string.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#11</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">25</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">0</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>walk</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">函数定义</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">memory_vm</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">kernel</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>src/vm.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#12</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">30</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">5</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>intr_get</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">函数定义</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">arch_platform</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">hardware</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>src/include/riscv.h</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#13</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">54</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">1</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>argraw</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">函数定义</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">trap_syscall</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">syscall_boundary</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>src/uarg.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#14</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">29</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">11</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>memmove</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">函数定义</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">runtime_common</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">kernel</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>src/string.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#15</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">30</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">0</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>spi_txrx</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">函数定义</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">arch_platform</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">hardware</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>src/spi.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#16</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">4</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">2</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>allocpage</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">函数定义</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">memory_vm</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">kernel</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>src/pm.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#17</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">35</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">13</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>initlock</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">函数定义</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">sync_ipc</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">kernel</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>src/spinlock.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#18</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">17</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">0</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>printf</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">函数定义</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">runtime_common</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">kernel</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>src/printf.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#19</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">62</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">21</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>sbi_call</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">函数定义</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">arch_platform</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">hardware</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>src/include/sbi.h</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#20</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">15</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">0</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>kfree</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">函数定义</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">memory_vm</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">kernel</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>src/kmalloc.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#21</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">19</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">20</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>intr_on</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">函数定义</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">arch_platform</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">hardware</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>src/include/riscv.h</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#22</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">80</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">2</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>argint</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">函数定义</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">trap_syscall</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">syscall_boundary</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>src/uarg.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#23</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">32</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">10</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>w_sstatus</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">函数定义</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">arch_platform</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">hardware</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>src/include/riscv.h</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#24</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">56</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">0</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>argaddr</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">函数定义</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">trap_syscall</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">syscall_boundary</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>src/uarg.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#25</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">34</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">10</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>ccache_barrier_0</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">函数定义</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">arch_platform</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">hardware</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>src/sifive/devices/ccache.h</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#26</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">14</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">0</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>intr_off</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">函数定义</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">arch_platform</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">hardware</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>src/include/riscv.h</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#27</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">79</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">2</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>sd_dummy</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">函数定义</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">arch_platform</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">hardware</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>src/sd.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#28</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">11</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">3</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>freepage</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">函数定义</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">memory_vm</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">kernel</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>src/pm.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#29</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">21</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">15</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>acquiresleep</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">函数定义</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">sync_ipc</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">kernel</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>src/sleeplock.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#30</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">3</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">23</td></tr>
+</tbody></table>
 
 ---
 
@@ -137,5227 +228,2145 @@
 
 # 启动流程与架构初始化
 
-## 第 2 章：启动流程与架构初始化
-
-### 启动入口与链接脚本分析
-
-#### 链接脚本配置
-
-内核的链接脚本位于 `linker/kernel.ld`，定义了内核的内存布局和入口点：
-
-```ld
-OUTPUT_ARCH(riscv)
-ENTRY(_entry)
-
-BASE_ADDRESS = 0x80200000;
-
-SECTIONS
-{
-    . = BASE_ADDRESS;
-    kernel_start = .;
-    
-    .text : {
-        *(.text .text.*)
-        _trampoline = .;
-        *(trampsec)
-        _sig_trampoline = .;
-        *(sigtrampsec)
-    }
-    
-    .rodata : { *(.rodata .rodata.*) }
-    .data : { *(.data .data.*) }
-    .bss : {
-        *(.bss.stack)
-        *(.sbss .bss .bss.*)
-    }
-}
-```
-
-**关键配置**：
-- **入口符号**: `ENTRY(_entry)` 指定 `_entry` 为程序入口点
-- **基地址**: `0x80200000` 是 RISC-V 机器模式下 SBI 跳转至内核的标准地址
-- **段对齐**: 所有段按 4KB 对齐，符合页表映射要求
-
-#### 汇编入口点 `_entry`
-
-真正的启动入口位于 `src/entry.S`：
-
-```assembly
-.section .text
-.extern __first_boot_magic
-.extern __get_boot_hartid
-.globl _entry
-
-_entry:
-    /* check first boot here */
-    la t0, __first_boot_magic
-    ld t1, (t0)
-    li t2, 0x5a5a
-    bne t1, t2, _secondary_boot
-    
-    la sp, boot_stack_top  # temporary use stack top
-    call __get_boot_hartid # return hartid to a0
-
-_secondary_boot:
-    mv t0, x0
-    add t0, a0, 1
-    slli t0, t0, 15
-    la sp, boot_stack
-    add sp, sp, t0
-    call main
-
-loop:
-    j loop
-```
-
-**启动流程分析**：
-
-1. **首核检测**：通过检查 `__first_boot_magic` 魔数（`0x5a5a`）判断是否为第一个启动的 CPU 核心
-2. **栈初始化**：
-   - 首核使用临时栈顶 `boot_stack_top`
-   - 调用 `__get_boot_hartid()` 获取当前 hartid
-3. **多核栈分配**：每个 hart 分配 4KB 栈空间（`slli t0, t0, 15` 即 `hartid * 32768`）
-4. **跳转至 C 入口**：调用 `main()` 函数进入内核主逻辑
-
-**栈空间定义**：
-```assembly
-.section .bss.stack
-.align 12
-.globl boot_stack
-boot_stack:
-    .space 4096 * 5 * 8  /* 5 harts, 每核 4KB 栈 */
-.globl boot_stack_top
-boot_stack_top:
-```
-
-### 架构初始化流程（模式切换/FPU/MMU）
-
-#### CPU 模式切换验证
-
-本内核运行于 **RISC-V Supervisor Mode (S-Mode)**，通过 SBI（Supervisor Binary Interface）从 Machine Mode 切换而来。
-
-**模式切换证据**：
-
-1. **SBI 调用接口**（`src/include/sbi.h`）：
-```c
-static inline void start_hart(uint64 hartid, uint64 start_addr, uint64 a1) {
-    a_sbi_ecall(0x48534D, 0, hartid, start_addr, a1, 0, 0, 0);
-}
-```
-- 使用 `ecall` 指令调用 SBI，这是 M-Mode 到 S-Mode 的标准切换机制
-- SBI 固件（`sbi/fw_jump.elf`）负责将 hart 从 M-Mode 切换至 S-Mode 并跳转至内核
-
-2. **sstatus 寄存器操作**（`src/include/riscv.h`）：
-```c
-#define SSTATUS_SPP (1L << 8)  // Previous mode, 1=Supervisor, 0=User
-```
-- 内核通过 `SSTATUS_SPP` 位保存/恢复先前模式
-- 在 `usertrapret()` 中清除 `SPP` 位以切换至 User Mode
-
-**⚠️ 关键发现**：内核代码中**未发现显式的 M-Mode 初始化代码**（如 `mstatus.mpp` 设置、`medeleg/mideleg` 配置）。所有 M-Mode 初始化由 SBI 固件（OpenSBI/RustSBI）完成，内核直接运行于 S-Mode。
-
-#### MMU 初始化与页表启用
-
-**页表初始化流程**（`src/vm.c`）：
-
-```c
-void kvminit() {
-    kernel_pagetable = (pagetable_t) allocpage();
-    memset(kernel_pagetable, 0, PGSIZE);
-    
-    // 映射关键设备区域
-    #ifdef RAM
-    kvmmap(RAMDISK, RAMDISK, 0x5000000, PTE_R | PTE_W);
-    #endif
-    #ifdef SD
-    kvmmap(SPI2_CTRL_ADDR, SPI2_CTRL_ADDR_P, SPI2_CTRL_SIZE, PTE_R | PTE_W);
-    #endif
-    
-    // 映射内核代码段
-    kvmmap(KERNBASE, KERNBASE, (uint64)etext - KERNBASE, PTE_R|PTE_X);
-    // 映射内核数据段和物理 RAM
-    kvmmap((uint64)etext, (uint64)etext, PHYSTOP - (uint64)etext, PTE_R | PTE_W);
-    // 映射 trampoline 页面
-    kvmmap(TRAMPOLINE, (uint64)trampoline, PGSIZE, PTE_R | PTE_X);
-    kvmmap(SIG_TRAMPOLINE, (uint64)sig_trampoline, PGSIZE, PTE_R | PTE_X);
-}
-
-void kvminithart() {
-    w_satp(MAKE_SATP(kernel_pagetable));
-    sfence_vma();
-}
-```
-
-**页表配置细节**：
-- **页表格式**: Sv39（三级页表），由 `SATP_SV39 (8L << 60)` 定义
-- **satp 写入**: `w_satp()` 使用内联汇编写入 `csrw satp` 寄存器
-- **TLB 刷新**: `sfence_vma()` 执行 `sfence.vma` 指令刷新 TLB
-
-**内存映射布局**（`src/include/memlayout.h`）：
-```c
-#define KERNBASE 0x80200000ULL          // 内核基地址
-#define PHYSTOP (KERNBASE + 128MB)      // 物理内存上限
-#define UART0 0x10000000L               // UART 物理地址
-#define UART0_V (UART0 + VIRT_OFFSET)   // UART 虚拟地址
-#define PLIC 0x0c000000L                // 平台级中断控制器
-#define TRAMPOLINE (USER_TOP - PGSIZE)  // trampoline 页面
-```
-
-#### FPU 初始化状态
-
-**❌ 未实现**
-
-通过以下搜索验证：
-- 搜索 `sstatus.fs`、`FS_INITIAL`、`fcsr`、`FRM`、`fence.i` 等 FPU 相关关键词
-- 仅在 `src/sifive/encoding.h` 中发现 FPU CSR 寄存器定义（`CSR_FRM`、`CSR_FCSR`），但**无任何实际初始化代码**
-- 内核未启用浮点单元，所有浮点操作将触发非法指令异常
-
-**影响**：用户程序无法使用浮点指令，内核也不支持浮点上下文保存/恢复。
-
-#### 中断向量表初始化
-
-**中断初始化流程**（`src/trap.c`）：
-
-```c
-void trapinithart(void) {
-    w_stvec((uint64)kernelvec);  // 设置内核中断向量基址
-    w_sstatus(r_sstatus() | SSTATUS_SIE);  // 启用 Supervisor 中断
-    w_sie(r_sie() | SIE_SEIE | SIE_SSIE | SIE_STIE);  // 启用外部/软件/定时器中断
-    set_next_timeout();  // 设置首次定时器中断
-}
-```
-
-**中断向量定义**（`src/kernelvec.S`）：
-- `kernelvec`：内核模式中断/异常入口，保存所有寄存器并调用 `kerneltrap()`
-- `uservec`/`userret`：用户模式中断入口/返回（位于 `trampoline.S`）
-
-### 到达内核主函数的路径（完整调用链）
-
-#### 启动调用链
-
-```mermaid
-graph TD
-    A["_entry
- src/entry.S:5"] --> B["__get_boot_hartid
- src/main.c:99"]
-    A --> C["main
- src/main.c:45"]
-    C --> D["cpuinit
- src/cpu.c:15"]
-    C --> E["printfinit
- src/printf.c"]
-    C --> F["kvminit
- src/vm.c:20"]
-    C --> G["kvminithart
- src/vm.c:54"]
-    C --> H["trapinithart
- src/trap.c:50"]
-    C --> I["procinit
- src/proc.c:52"]
-    C --> J["userinit
- src/proc.c:375"]
-    C --> K["scheduler
- src/proc.c"]
-    F --> L["kvmmap
- src/vm.c:64"]
-    G --> M["w_satp
- src/include/riscv.h:183"]
-```
-
-**调用链详解**：
-
-1. **`_entry` → `main`**（`src/entry.S:5` → `src/main.c:45`）
-   - 汇编入口直接调用 C 函数 `main(hartid, dtb_pa)`
-
-2. **`main` 中的初始化序列**（`src/main.c:49-95`）：
-   ```c
-   if (__first_boot_magic == 0x5a5a) {
-       __first_boot_magic = 0;
-       cpuinit();           // CPU 结构体清零
-       printfinit();        // 初始化 printf 锁
-       kpminit();           // 物理内存管理初始化
-       kmallocinit();       // 内核堆分配器初始化
-       kvminit();           // 创建内核页表
-       kvminithart();       // 启用 MMU
-       timerinit();         // 定时器锁初始化
-       trapinithart();      // 安装中断向量
-       procinit();          // 进程队列初始化
-       binit();             // 缓冲区缓存初始化
-       disk_init();         // 磁盘驱动初始化
-       fs_init();           // 文件系统初始化
-       devinit();           // 设备初始化
-       fileinit();          // 文件子系统初始化
-       userinit();          // 创建 init 进程
-       
-       // 启动其他 CPU 核心
-       for(int i = 1; i < NCPU; i++) {
-           if(hartid != i && booted[i] == 0) {
-               start_hart(i, (uint64)_entry, 0);
-           }
-       }
-   }
-   scheduler();  // 进入调度器
-   ```
-
-3. **次级核心启动**：
-   - 主核通过 SBI HSM 扩展调用 `start_hart(i, _entry, 0)`
-   - 次级核心从 `_entry` 开始执行，但 `__first_boot_magic` 已清零，跳过初始化直接进入 `scheduler()`
-
-### 多平台启动流程（StarFive/LoongArch 等）
-
-#### 支持的平台
-
-通过 `Makefile` 分析，本内核支持以下平台：
-
-```makefile
-M = sifive_u  # 默认平台
-QEMUOPTS = -machine $(M) -bios $(SBI) -kernel $K/kernel
-```
-
-**平台配置**：
-- **QEMU sifive_u**：QEMU 模拟的 SiFive Unleashed 开发板（FU540）
-- **SIFIVE_U**：实际 SiFive Unleashed 硬件
-- **QEMU**：通用 QEMU 虚拟机（通过 `MAC=QEMU` 切换）
-
-**❌ 未发现 StarFive VisionFive2 支持**：
-- 搜索 `visionfive`、`jh7110`、`starfive` 关键词无结果
-- 代码中无 VisionFive2 特有的设备树或驱动配置
-
-**❌ 未发现 LoongArch 支持**：
-- 搜索 `loongarch`、`loongson` 关键词无结果
-- 所有代码均为 RISC-V 架构（`riscv64` 工具链）
-
-#### 固件级启动链（RISC-V）
-
-**完整启动链**：
-
-```
-ROM/BootROM → OpenSBI/RustSBI (M-Mode) → U-Boot (可选) → 内核 (S-Mode)
-```
-
-**本项目的启动链**：
-
-1. **SBI 固件**：`sbi/fw_jump.elf`（RustSBI 或 OpenSBI）
-   - 运行于 M-Mode，初始化所有硬件
-   - 通过 `mret` 指令切换至 S-Mode 并跳转至内核
-
-2. **内核加载**：
-   - QEMU 通过 `-bios sbi/fw_jump.elf -kernel src/kernel` 加载
-   - SBI 解析 ELF 格式的内核，跳转至 `ENTRY(_entry)`
-
-3. **SBI 服务调用**（`src/include/sbi.h`）：
-   ```c
-   // 控制台输出
-   sbi_console_putchar(c);
-   // 定时器设置
-   set_timer(stime);
-   // 多核启动（HSM 扩展）
-   start_hart(hartid, start_addr, a1);
-   ```
-
-**⚠️ 未发现 U-Boot 集成**：
-- 代码中无 U-Boot 相关配置或设备树解析代码
-- 直接由 SBI 跳转至内核，跳过 U-Boot 阶段
-
-### 平台配置与构建机制
-
-#### Makefile 配置分析
-
-**关键构建选项**（`Makefile`）：
-
-```makefile
-# 文件系统选项
-FS ?= FAT  # 或 RAM
-
-# 平台选项
-MAC ?= SIFIVE_U  # 或 QEMU
-
-# 编译工具链
-TOOLPREFIX = riscv64-linux-gnu-
-CC = $(TOOLPREFIX)gcc
-CFLAGS = -mcmodel=medany -ffreestanding -nostdlib -mno-relax
-
-# 链接选项
-LDFLAGS = -z max-page-size=4096
-```
-
-**平台差异化配置**：
-
-```makefile
-ifeq ($(MAC),SIFIVE_U)
-    DISK := $K/link_null.o  # 空设备
-endif
-
-ifeq ($(MAC),QEMU)
-    DISK := $K/link_disk.o  # 磁盘镜像
-endif
-```
-
-**编译目标**：
-- `src/kernel`：ELF 格式内核
-- `src/kernel.asm`：反汇编文件（用于调试）
-- `src/kernel.sym`：符号表
-
-#### 架构特定代码
-
-**RISC-V 架构代码位置**：
-- `src/include/riscv.h`：RISC-V 寄存器定义和 CSR 操作
-- `src/sifive/`：SiFive 平台特定驱动（UART、PLIC、CLINT 等）
-- `src/entry.S`、`src/kernelvec.S`、`src/trampoline.S`：RISC-V 汇编代码
-
-**条件编译**：
-```c
-#ifdef QEMU
-    ramdisk = fs_img_start;
-#endif
-#ifdef SIFIVE_U
-    ramdisk = (char*)RAMDISK;
-#endif
-```
-
-### 关键代码片段分析
-
-#### MMU 启用前后的串口地址切换
-
-**物理地址定义**（`src/include/memlayout.h`）：
-```c
-#define UART0 0x10000000L              // 物理地址（256 MB）
-#define UART0_V (UART0 + VIRT_OFFSET)  // 虚拟地址
-#define VIRT_OFFSET 0x3F00000000L      // 虚拟地址偏移
-```
-
-**⚠️ 关键发现**：代码中**未发现显式的 `phys_to_virt` 或 `virt_to_phys` 转换函数**。
-
-**实际实现方式**：
-- MMU 启用前：通过 SBI 控制台进行输出（`sbi_console_putchar`），不直接访问 UART 寄存器
-- MMU 启用后：通过 `UART0_V` 虚拟地址访问 UART，但该映射在 `kvminit()` 中**未显式创建**
-
-**证据**：
-```c
-// src/vm.c:kvminit() 中无 UART 映射
-kvmmap(KERNBASE, KERNBASE, ...);  // 仅映射内核区域
-kvmmap(TRAMPOLINE, ...);          // 映射 trampoline
-// 缺少：kvmmap(UART0_V, UART0, PGSIZE, PTE_R | PTE_W);
-```
-
-**文档提及但代码缺失**（`doc/内核实现--内存管理.md`）：
-```markdown
-// uart registers
-kvmmap(UART0_V, UART0, PGSIZE, PTE_R | PTE_W);
-```
-该映射在文档中存在，但实际代码中**未实现**。
-
-**结论**：内核完全依赖 SBI 进行串口输出，未实现独立的 UART 驱动映射。
-
-#### 多核启动机制
-
-**主核启动次级核心**（`src/main.c:77-82`）：
-```c
-for(int i = 1; i < NCPU; i++) {
-    if(hartid != i && booted[i] == 0) {
-        start_hart(i, (uint64)_entry, 0);
-    }
-}
-```
-
-**SBI HSM 调用**（`src/include/sbi.h`）：
-```c
-static inline void start_hart(uint64 hartid, uint64 start_addr, uint64 a1) {
-    a_sbi_ecall(0x48534D, 0, hartid, start_addr, a1, 0, 0, 0);
-}
-
-static inline int sbi_hsm_hart_status(unsigned long hart) {
-    struct sbiret ret;
-    ret = a_sbi_ecall(0x48534D, 2, hart, 0, 0, 0, 0, 0);
-    return (ret.error != 0 ? (int)ret.error : (int)ret.value);
-}
-```
-
-**次级核心启动流程**：
-1. 主核调用 `start_hart(i, _entry, 0)` 通过 SBI HSM 扩展启动目标 hart
-2. 目标 hart 从 `_entry` 开始执行
-3. 检测到 `__first_boot_magic != 0x5a5a`，跳转至 `_secondary_boot`
-4. 分配独立栈空间，调用 `main()`
-5. 等待 `started` 标志后置位，执行 `kvminithart()` 和 `trapinithart()`
-6. 进入 `scheduler()` 等待任务
-
-#### 早期初始化细节
-
-**BSS 清零**：
-- **❌ 未发现显式 BSS 清零代码**
-- 可能由 SBI 固件或链接器脚本隐式处理
-
-**早期串口打印**：
-- 通过 `printfinit()` 初始化锁
-- 使用 `sbi_console_putchar()` 进行输出（M-Mode/S-Mode 通用）
-
-**设备树解析**：
-- **❌ 未发现设备树解析代码**
-- `main()` 函数接收 `dtb_pa` 参数但**未使用**
-- 硬件配置通过硬编码地址（`memlayout.h`）实现
-
----
-
-**本章总结**：
-
-| 特性 | 状态 | 证据 |
-|------|------|------|
-| 启动入口 | ✅ 已实现 | `src/entry.S:_entry` |
-| 链接脚本 | ✅ 已实现 | `linker/kernel.ld` |
-| M-Mode → S-Mode 切换 | ✅ 已实现（通过 SBI） | `src/include/sbi.h:start_hart()` |
-| MMU 初始化（Sv39） | ✅ 已实现 | `src/vm.c:kvminit()` |
-| 中断向量表 | ✅ 已实现 | `src/trap.c:trapinithart()` |
-| FPU 初始化 | ❌ 未实现 | 无 `sstatus.fs` 操作代码 |
-| StarFive VisionFive2 支持 | ❌ 未实现 | 无相关代码 |
-| LoongArch 支持 | ❌ 未实现 | 无相关代码 |
-| U-Boot 集成 | ❌ 未实现 | 直接 SBI → 内核 |
-| UART 虚拟地址映射 | 🔸 桩函数（文档提及但代码缺失） | `doc/` 提及但 `vm.c` 无实现 |
-| 设备树解析 | ❌ 未实现 | `dtb_pa` 参数未使用 |
-| BSS 显式清零 | ❌ 未实现 | 无相关代码 |
+## 题单作答（JSON-QA 渲染）
+
+- stage_id: `02_boot_arch`
+- terminology_profile: `stallings_en_zh`
+
+## 第 02_boot_arch 阶段：启动流程与架构初始化
+
+### Q02_001（short_answer）
+
+- 题干：启动入口在哪里？（例如 linker.ld 的 ENTRY、`_start`/`start`/`head`/`entry` 标签；必须给文件路径+符号证据）
+- 答案："启动入口定义在 `linker/kernel.ld` 的 `ENTRY(_entry)`，实际汇编代码位于 `src/entry.S` 的 `_entry` 标签。链接脚本设置基地址 `BASE_ADDRESS = 0x80200000`，`_entry` 标签检查 `__first_boot_magic` 区分首核/次核启动，设置 `boot_stack` 栈后调用 `main()`。"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `linker/kernel.ld` | `linker_directive ENTRY(_entry)` | OUTPUT_ARCH(riscv)<br>ENTRY(_entry)<br>BASE_ADDRESS = 0x80200000; |
+| `src/entry.S` | `assembly_label _entry` | .globl _entry<br>_entry:<br>    la t0, __first_boot_magic<br>    ld t1, (t0)<br>    li t2, 0x5a5a<br>    bne t1, t2, _secondary_boot<br>    la sp, boot_stack_top<br>    call __get_boot_hartid |
+
+### Q02_002（single_choice）
+
+- 题干：启动链更接近哪种交接方式？
+- 答案："A. 固件/引导加载器 → 内核入口（如 SBI/OpenSBI/U-Boot/BIOS/UEFI）"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `Makefile` | `makefile_variable QEMUOPTS` | QEMUOPTS = -machine $(M) -bios $(SBI) -kernel $K/kernel -smp $(CPUS) -nographic<br>SBI=sbi/fw_jump.elf |
+| `src/include/sbi.h` | `function sbi_call` | static int inline sbi_call(uint64 which, uint64 arg0, uint64 arg1, uint64 arg2) {<br>    register uint64 a7 asm("a7") = which;<br>    asm volatile("ecall" ...);<br>} |
+
+### Q02_003（tri_state_impl）
+
+- 题干：是否能在代码中证实发生了 CPU 特权级/模式切换？（RISC-V M→S、x86 实→保→长等；必须三态）
+- 答案："implemented"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/trap.c` | `function usertrapret` | unsigned long x = r_sstatus();<br>x &= ~SSTATUS_SPP; // clear SPP to 0 for user mode<br>x |= SSTATUS_SPIE; // enable interrupts in user mode<br>w_sstatus(x);<br>w_sepc(p->trapframe->epc);<br>((void (*)(uint64,uint64))fn)(TRAPFRAME, satp); |
+| `src/trampoline.S` | `assembly_instruction sret` | userret:<br>    csrw satp, a1<br>    sfence.vma<br>    csrrw a0, sscratch, a0<br>    sret |
+
+### Q02_004（short_answer）
+
+- 题干：模式切换涉及的关键寄存器/位是什么？（例如 RISC-V mstatus/sstatus、x86 cr0/cr4/eflags；必须给证据摘录）
+- 答案："RISC-V 模式切换涉及的关键寄存器：\n1. `sstatus` 寄存器的 `SSTATUS_SPP` 位（第 8 位）：Previous mode，1=Supervisor，0=User\n2. `sstatus` 寄存器的 `SSTATUS_SPIE` 位（第 5 位）：Supervisor Previous Interrupt Enable\n3. `stvec` 寄存器：Supervisor Trap-Vector Base Address\n4. `satp` 寄存器：Supervisor Address Translation and Protection（设置页表并启用 MMU）\n5. `sepc` 寄存器：Supervisor Exception Program Counter\n6. `sret` 指令：从 Supervisor 返回 User mode"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/include/riscv.h` | `macro SSTATUS_SPP` | #define SSTATUS_SPP (1L << 8)  // Previous mode, 1=Supervisor, 0=User<br>#define SSTATUS_SPIE (1L << 5) // Supervisor Previous Interrupt Enable |
+| `src/trap.c` | `function usertrapret` | x &= ~SSTATUS_SPP; // clear SPP to 0 for user mode<br>x |= SSTATUS_SPIE; // enable interrupts in user mode<br>w_sstatus(x);<br>w_sepc(p->trapframe->epc); |
+
+### Q02_005（tri_state_impl）
+
+- 题干：是否启用/初始化了 MMU（设置 SATP/CR3 等并建立页表）？（必须三态）
+- 答案："implemented"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/vm.c` | `function kvminit` | void kvminit() {<br>  kernel_pagetable = (pagetable_t) allocpage();<br>  memset(kernel_pagetable, 0, PGSIZE);<br>  kvmmap(KERNBASE, KERNBASE, (uint64)etext - KERNBASE, PTE_R|PTE_X);<br>  kvmmap((uint64)etext, (uint64)etext, PHYSTOP - (uint64)etext, PTE_R | PTE_W);<br>  kvmmap(TRAMPOLINE, (uint64)trampoline, PGSIZE, PTE_R | PTE_X);<br>} |
+| `src/vm.c` | `function kvminithart` | void kvminithart() {<br>  w_satp(MAKE_SATP(kernel_pagetable));<br>  sfence_vma();<br>} |
+| `src/include/riscv.h` | `macro MAKE_SATP` | #define SATP_SV39 (8L << 60)<br>#define MAKE_SATP(pagetable) (SATP_SV39 | (((uint64)pagetable) >> 12)) |
+
+### Q02_006（short_answer）
+
+- 题干：从入口汇编/固件交接到 C/Rust 主入口函数的跳转链是什么？（列出 3-6 个关键节点并给证据）
+- 答案："启动跳转链：\n1. `linker/kernel.ld:ENTRY(_entry)` - 链接器设置入口点\n2. `src/entry.S:_entry` - 汇编入口，检查 `__first_boot_magic`，设置 `boot_stack`，调用 `__get_boot_hartid`\n3. `src/entry.S:main` (call) - 跳转到 C 语言 `main()` 函数\n4. `src/main.c:main()` - 首核执行 `cpuinit/printfinit/kpminit/kmallocinit/kvminit/kvminithart/trapinithart/procinit` 等初始化\n5. `src/vm.c:kvminit()` → `kvminithart()` - 创建内核页表并启用 MMU（写 `satp` 寄存器）\n6. `src/trap.c:trapinithart()` - 设置 trap 向量（写 `stvec` 寄存器）\n7. `src/proc.c:scheduler()` - 进入调度器"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/entry.S` | `assembly_label _entry` | _entry:<br>    la t0, __first_boot_magic<br>    ld t1, (t0)<br>    li t2, 0x5a5a<br>    bne t1, t2, _secondary_boot<br>    la sp, boot_stack_top<br>    call __get_boot_hartid<br>_secondary_boot:<br>    mv t0, x0<br>    add t0, a0, 1<br>    slli t0, t0, 15<br>    la sp, boot_stack<br>    add sp, sp, t0<br>    call main |
+| `src/main.c` | `function main` | void main(unsigned long hartid, unsigned long dtb_pa) {<br>  inithartid(hartid);<br>  if (__first_boot_magic == 0x5a5a) {<br>    __first_boot_magic = 0;<br>    cpuinit();<br>    printfinit();<br>    kvminit();<br>    kvminithart();<br>    trapinithart();<br>    procinit();<br>    ...<br>    started=1;<br>  }<br>  scheduler();<br>} |
+
+### Q02_007（fill_in）
+
+- 题干：早期初始化 (Early Initialization) 各项状态（每项必须 implemented / stub / not_found + 证据路径，格式：`项目: 状态 [路径]`）：
+- BSS 清零 (BSS Clearing): ___
+- 早期串口输出 (Early Serial/UART Output): ___
+- 设备树解析 (Device Tree Blob parsing, DTB): ___
+- 页表初始化时机 (Page Table Init): ___（在 MMU 启用前/后？）
+- 答案："BSS 清零 (BSS Clearing): not_found [linker/kernel.ld 定义了 sbss_clear/ebss_clear 符号但 entry.S 和 main.c 中无显式清零代码]\n早期串口输出 (Early Serial/UART Output): implemented [src/printf.c:consputc() 调用 sbi_console_putchar() 通过 SBI 实现早期输出]\n设备树解析 (Device Tree Blob parsing, DTB): not_found [main() 接收 dtb_pa 参数但代码中未见解析逻辑]\n页表初始化时机 (Page Table Init): implemented [src/vm.c:kvminit() 在 MMU 启用前初始化页表，kvminithart() 写 satp 启用 MMU]"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `linker/kernel.ld` | `linker_symbol sbss_clear` | .bss : {<br>    *(.bss.stack)<br>    sbss_clear = .;<br>    *(.sbss .bss .bss.*)<br>    ebss_clear = .;<br>} |
+| `src/printf.c` | `function consputc` | void consputc(int c) {<br>  if(c == BACKSPACE){<br>    sbi_console_putchar('\b');<br>    sbi_console_putchar(' ');<br>    sbi_console_putchar('\b');<br>  } else {<br>    sbi_console_putchar(c);<br>  }<br>} |
+| `src/main.c` | `function main` | void main(unsigned long hartid, unsigned long dtb_pa) {<br>  inithartid(hartid);<br>  booted[hartid]=1;<br>  if (__first_boot_magic == 0x5a5a) {<br>    cpuinit();<br>    printfinit();<br>    kvminit();<br>    kvminithart();<br>    ... |
+
+### Q02_008（tri_state_impl）
+
+- 题干：是否初始化/启用了 FPU（如 sstatus.fs / cpacr_el1 / cr4）？（必须三态）
+- 答案："not_found"
+
+- 证据：无（`not_found`/`stub` 时允许为空；否则需补齐）
+
+### Q02_009（tri_state_impl）
+
+- 题干：是否设置 trap/中断向量（如 stvec/idt 等）并能指出设置点？（必须三态）
+- 答案："implemented"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/trap.c` | `function trapinithart` | void trapinithart(void) {<br>  w_stvec((uint64)kernelvec);<br>  w_sstatus(r_sstatus() | SSTATUS_SIE);<br>  w_sie(r_sie() | SIE_SEIE | SIE_SSIE | SIE_STIE);<br>  set_next_timeout();<br>} |
+| `src/kernelvec.S` | `assembly_label kernelvec` | .globl kernelvec<br>.align 4<br>kernelvec:<br>    addi sp, sp, -256<br>    sd ra, 0(sp)<br>    ...<br>    call kerneltrap<br>    ...<br>    sret |
+
+### Q02_010（short_answer）
+
+- 题干：构建系统如何选择目标平台/架构与入口文件？（Cargo features/Kconfig/Makefile 条件；必须引用配置证据）
+- 答案："通过 Makefile 变量控制：\n1. `MAC?=SIFIVE_U` - 平台选择（SIFIVE_U 或 QEMU），影响 DISK 链接对象（link_null.o vs link_disk.o）\n2. `FS?=FAT` - 文件系统选择（FAT 或 RAM）\n3. `M = sifive_u` - QEMU 机器类型（可通过 `make qemu M=virt` 覆盖）\n4. `CPUS := 5` - CPU 核心数\n5. 编译标志 `CFLAGS` 包含 `-D$(FS) -D$(MAC)` 进行条件编译\n6. 架构固定为 RISC-V 64：`TOOLPREFIX=riscv64-linux-gnu-`，`CFLAGS += -mcmodel=medany -march=rv64g`"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `Makefile` | `makefile_variable MAC` | FS?=FAT<br>MAC?=SIFIVE_U<br>ifeq ($(MAC),SIFIVE_U)<br>DISK:=$K/link_null.o<br>endif<br>ifeq ($(MAC),QEMU)<br>DISK:=$K/link_disk.o<br>endif<br>CFLAGS = -Wall -Werror -O -fno-omit-frame-pointer -ggdb -DDEBUG -DWARNING -DERROR -D$(FS) -D$(MAC) |
+| `Makefile` | `makefile_variable QEMUOPTS` | ifndef M<br>M = sifive_u<br>endif<br>QEMUOPTS = -machine $(M) -bios $(SBI) -kernel $K/kernel -smp $(CPUS) -nographic |
+
+### Q02_011（tri_state_impl）
+
+- 题干：对 RISC-V 平台：是否能证实 SBI/OpenSBI/U-Boot 固件链（固件将控制权移交内核）？（必须三态；搜索 sbi|opensbi|u-boot；非 RISC-V 平台写 not_found 并说明架构）
+- 答案："implemented"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `Makefile` | `makefile_variable SBI` | SBI=sbi/fw_jump.elf<br>QEMUOPTS = -machine $(M) -bios $(SBI) -kernel $K/kernel -smp $(CPUS) -nographic |
+| `src/include/sbi.h` | `function sbi_call` | static int inline sbi_call(uint64 which, uint64 arg0, uint64 arg1, uint64 arg2) {<br>    register uint64 a7 asm("a7") = which;<br>    asm volatile("ecall" ...);<br>} |
+| `src/main.c` | `function start_hart` | for(int i = 1; i < NCPU; i++) {<br>    if(hartid!=i&&booted[i]==0){<br>      start_hart(i, (uint64)_entry, 0);<br>    }<br>} |
+
+### Q02_012（tri_state_impl）
+
+- 题干：MMU 启用前后是否存在串口/UART 地址切换逻辑（物理地址→虚拟地址）？（必须三态；搜索 phys_to_virt|virt_to_phys 及 UART 基址常量）
+- 答案："not_found"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/include/memlayout.h` | `macro UART0` | #define UART0 0x10000000L   // 256 MB<br>#define UART0_V (UART0 + VIRT_OFFSET) |
+| `src/vm.c` | `function kvminit` | // 注意：kvminit() 中未映射 UART0，仅映射 RAMDISK/SPI/KERNBASE/TRAMPOLINE |
+
+### Q02_013（tri_state_impl）
+
+- 题干：是否存在从内核返回用户态的路径（usertrapret/trap_return/trampoline/eret 等）并设置 stvec/VBAR/IDT？（必须三态）
+- 答案："implemented"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/trap.c` | `function usertrapret` | void usertrapret() {<br>  intr_off();<br>  w_stvec(TRAMPOLINE + (uservec - trampoline));<br>  p->trapframe->kernel_satp = r_satp();<br>  p->trapframe->kernel_sp = p->kstack + PGSIZE;<br>  p->trapframe->kernel_trap = (uint64)usertrap;<br>  unsigned long x = r_sstatus();<br>  x &= ~SSTATUS_SPP; // clear SPP to 0 for user mode<br>  x |= SSTATUS_SPIE; // enable interrupts in user mode<br>  w_sstatus(x);<br>  w_sepc(p->trapframe->epc);<br>  uint64 satp = MAKE_SATP(p->pagetable);<br>  uint64 fn = TRAMPOLINE + (userret - trampoline);<br>  ((void (*)(uint64,uint64))fn)(TRAPFRAME, satp);<br>} |
+| `src/trampoline.S` | `assembly_label userret` | userret:<br>    csrw satp, a1<br>    sfence.vma<br>    csrrw a0, sscratch, a0<br>    sret |
+
+### Q02_014（short_answer）
+
+- 题干：是否支持多平台启动（StarFive VisionFive2/LoongArch/多板型）？（搜索 visionfive|jh7110|loongarch；有则描述差异入口与互斥关系；无则写未发现）
+- 答案："未发现对 StarFive VisionFive2、JH7110 或 LoongArch 的支持。代码仅支持 QEMU sifive_u 机器和 SiFive FU740 板（通过 Makefile 的 MAC=SIFIVE_U/QEMU 切换）。README 提及\"xv6 移植到 qemu 的 sifive_u 以及 fu740 的板子上\"，未提及其他平台。"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `README.md` | `documentation platform_support` | xv6 移植到 qemu 的 sifive_u 以及 fu740 的板子上<br>在 qemu 上调试: make all platform=qemu<br>在 fu740 上调试: make all platform=sifive_u |
+| `Makefile` | `makefile_variable MAC` | MAC?=SIFIVE_U<br>ifeq ($(MAC),SIFIVE_U)<br>DISK:=$K/link_null.o<br>endif<br>ifeq ($(MAC),QEMU)<br>DISK:=$K/link_disk.o<br>endif |
 
 ---
 
 
 # 内存管理物理虚拟分配器
 
-## 第 3 章：内存管理（物理/虚拟/分配器）
-
-### 物理内存管理实现
-
-本操作系统采用**空闲链表（Free List）**机制管理物理内存，而非 Buddy System 或 Bitmap 算法。
-
-#### 物理页分配器（Frame Allocator）
-
-物理页分配器的核心实现位于 `src/pm.c`，通过一个全局的空闲链表 `kmem.freelist` 管理所有可用物理页：
-
-```c
-// src/pm.c:56-80
-struct run {
-  struct run *next;
-};
-
-struct {
-  struct spinlock lock;
-  struct run *freelist;
-  uint64 npage;
-} kmem;
-
-void freepage(void *pa) {
-  struct run *r;
-  if(((uint64)pa % PGSIZE) != 0 || (char*)pa < kernel_end || (uint64)pa >= PHYSTOP)
-    panic("freepage");
-  memset(pa, 1, PGSIZE);  // Fill with junk to catch dangling refs
-  r = (struct run*)pa;
-  acquire(&kmem.lock);
-  r->next = kmem.freelist;
-  kmem.freelist = r;
-  kmem.npage++;
-  release(&kmem.lock);
-}
-
-void *allocpage(void) {
-  struct run *r;
-  acquire(&kmem.lock);
-  r = kmem.freelist;
-  if (r) {
-    kmem.freelist = r->next;
-    kmem.npage--;
-  }
-  release(&kmem.lock);
-  return (void*)r;
-}
-```
-
-**关键特性**：
-- **分配粒度**：4096 字节（`PGSIZE`）
-- **管理范围**：`kernel_end` 到 `PHYSTOP`（128MB 物理内存上限，定义于 `src/include/memlayout.h:38`）
-- **线程安全**：通过自旋锁 `kmem.lock` 保护
-- **调试支持**：释放时填充 `0x01`，分配时填充 `0x05`（DEBUG 模式）
-
-#### 内核堆分配器（Slab-like Allocator）
-
-在物理页分配器之上，内核实现了更细粒度的堆分配器 `kmalloc()`，位于 `src/kmalloc.c`。这是一个**类 Slab 分配器**，支持 32 字节到 4048 字节的小对象分配：
-
-```c
-// src/kmalloc.c:17-40
-#define KMEM_OBJ_MIN_SIZE   ((uint64)32)
-#define KMEM_OBJ_MAX_SIZE   ((uint64)4048)
-#define KMEM_OBJ_MAX_COUNT  (PGSIZE / KMEM_OBJ_MIN_SIZE)
-
-struct kmem_node {
-  struct kmem_node *next;
-  struct {
-    uint64 obj_size;      // 每个对象的大小
-    uint64 obj_addr;      // 第一个可用对象的起始地址
-  } config;
-  uint8 avail;            // 当前可用对象索引
-  uint8 cnt;              // 已分配对象数量
-  uint8 table[KMEM_OBJ_MAX_COUNT];  // 空闲链表
-};
-
-struct kmem_allocator {
-  struct spinlock lock;
-  uint obj_size;
-  uint16 npages;
-  uint16 nobjs;
-  struct kmem_node *list;
-  struct kmem_allocator *next;
-};
-```
-
-**工作原理**：
-1. **哈希表索引**：通过 `_hash(roundup_size)` 将分配请求映射到 17 个桶之一（`KMEM_TABLE_SIZE = 17`）
-2. **按需创建分配器**：每个桶维护一个 `kmem_allocator` 链表，按需创建不同大小的分配器
-3. **节点管理**：每个 `kmem_node` 占用一个物理页，通过 `table[]` 数组实现空闲对象链表
-4. **16 字节对齐**：所有分配大小通过 `ROUNDUP16()` 对齐到 16 字节
-
-**接口**（`src/include/kalloc.h`）：
-```c
-void kmallocinit(void);
-void* kmalloc(uint size);
-void kfree(void *addr);
-```
-
----
-
-### 虚拟内存与页表操作
-
-#### 页表结构（Sv39）
-
-系统采用 RISC-V **Sv39 三级页表**架构，定义于 `src/include/riscv.h:320-370`：
-
-```c
-// src/include/riscv.h:320-370
-#define PGSIZE 4096
-#define PGSHIFT 12
-#define PXMASK 0x1FF  // 9 bits
-#define PXSHIFT(level) (PGSHIFT+(9*(level)))
-#define PX(level, va) ((((uint64)(va)) >> PXSHIFT(level)) & PXMASK)
-
-#define PTE_V (1L << 0)  // Valid
-#define PTE_R (1L << 1)  // Readable
-#define PTE_W (1L << 2)  // Writable
-#define PTE_X (1L << 3)  // Executable
-#define PTE_U (1L << 4)  // User accessible
-#define PTE_A (1L << 6)  // Accessed
-#define PTE_D (1L << 7)  // Dirty
-
-typedef uint64 pte_t;
-typedef uint64 *pagetable_t;  // 512 PTEs
-```
-
-**虚拟地址格式**（39 位）：
-- `L2[8:0]`：第一级页表索引（9 位）
-- `L1[8:0]`：第二级页表索引（9 位）
-- `L0[8:0]`：第三级页表索引（9 位）
-- `Offset[11:0]`：页内偏移（12 位）
-
-#### 页表操作函数
-
-核心页表操作位于 `src/vm.c`：
-
-**1. 页表遍历（walk）**
-```c
-// src/vm.c:137-156
-pte_t *walk(pagetable_t pagetable, uint64 va, int alloc) {
-  if(va >= MAXVA) panic("walk");
-  for(int level = 2; level > 0; level--) {
-    pte_t *pte = &pagetable[PX(level, va)];
-    if(*pte & PTE_V) {
-      pagetable = (pagetable_t)PTE2PA(*pte);
-    } else {
-      if(!alloc || (pagetable = (pde_t*)allocpage()) == NULL)
-        return NULL;
-      memset(pagetable, 0, PGSIZE);
-      *pte = PA2PTE(pagetable) | PTE_V;
-    }
-  }
-  return &pagetable[PX(0, va)];
-}
-```
-
-**2. 页表映射（mappages）**
-```c
-// src/vm.c:83-107
-int mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm) {
-  uint64 a, last;
-  pte_t *pte;
-  a = PGROUNDDOWN(va);
-  last = PGROUNDDOWN(va + size - 1);
-  for(;;) {
-    if((pte = walk(pagetable, a, 1)) == NULL) return -1;
-    if(*pte & PTE_V) {
-      *pte = PA2PTE(pa) | perm | PTE_V | PTE_A | PTE_D;
-      return 0;
-    }
-    *pte = PA2PTE(pa) | perm | PTE_V | PTE_A | PTE_D;
-    if(a == last) break;
-    a += PGSIZE;
-    pa += PGSIZE;
-  }
-  return 0;
-}
-```
-
-**3. 页表解除映射（vmunmap）**
-```c
-// src/vm.c:112-132
-void vmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free) {
-  uint64 a;
-  pte_t *pte;
-  for(a = va; a < va + npages*PGSIZE; a += PGSIZE) {
-    if((pte = walk(pagetable, a, 0)) == 0) panic("vmunmap: walk");
-    if((*pte & PTE_V) == 0) panic("vmunmap: not mapped");
-    if(do_free) {
-      uint64 pa = PTE2PA(*pte);
-      kfree((void*)pa);
-    }
-    *pte = 0;
-  }
-}
-```
-
----
-
-### 地址空间布局（内核 vs 用户）
-
-#### 内核地址空间
-
-内核页表初始化于 `src/vm.c:kvminit()`，映射布局如下（`src/include/memlayout.h`）：
-
-| 虚拟地址范围 | 物理地址 | 权限 | 用途 |
-|-------------|---------|------|------|
-| `0x80200000` ~ `etext` | 恒等映射 | R+X | 内核代码段 |
-| `etext` ~ `PHYSTOP` | 恒等映射 | R+W | 内核数据段 + 物理 RAM |
-| `UART0_V` | `UART0` | R+W | UART 寄存器 |
-| `CLINT_V` | `CLINT` | R+W | 本地中断控制器 |
-| `PLIC_V` | `PLIC` | R+W | 平台级中断控制器 |
-| `TRAMPOLINE` | `trampoline` | R+X | 陷阱入口/出口代码 |
-| `SIG_TRAMPOLINE` | `sig_trampoline` | R+X | 信号处理跳板 |
-
-```c
-// src/vm.c:27-50
-void kvminit() {
-  kernel_pagetable = (pagetable_t) allocpage();
-  memset(kernel_pagetable, 0, PGSIZE);
-  kvmmap(UART0_V, UART0, PGSIZE, PTE_R | PTE_W);
-  kvmmap(CLINT_V, CLINT, 0x10000, PTE_R | PTE_W);
-  kvmmap(PLIC_V, PLIC, 0x400000, PTE_R | PTE_W);
-  kvmmap(KERNBASE, KERNBASE, (uint64)etext - KERNBASE, PTE_R|PTE_X);
-  kvmmap((uint64)etext, (uint64)etext, PHYSTOP - (uint64)etext, PTE_R | PTE_W);
-  kvmmap(TRAMPOLINE, (uint64)trampoline, PGSIZE, PTE_R | PTE_X);
-  kvmmap(SIG_TRAMPOLINE, (uint64)sig_trampoline, PGSIZE, PTE_R | PTE_X);
-}
-```
-
-#### 用户地址空间
-
-用户地址空间布局定义于 `src/include/memlayout.h:78-88`：
-
-```c
-#define MAXVA (1L << (9 + 9 + 9 + 12 - 1))  // 256 GB
-#define USER_TOP (MAXVA)
-#define TRAMPOLINE (USER_TOP - PGSIZE)          // 最高地址：陷阱跳板
-#define SIG_TRAMPOLINE (TRAMPOLINE - PGSIZE)    // 信号跳板
-#define TRAPFRAME (MAXUVA - PGSIZE)             // 陷阱帧
-#define USER_STACK_BOTTOM (MAXUVA - (2*PGSIZE)) // 栈底
-#define USER_MMAP_START (USER_STACK_BOTTOM - 0x10000000)  // mmap 区域起始
-#define USER_STACK_TOP (USER_MMAP_START + PGSIZE)
-#define USER_TEXT_START 0x1000                  // 代码段起始
-```
-
-**用户页表创建**：
-- 通过 `kvmcreate()` 复制内核页表项，继承内核映射
-- 用户页面通过 `uvmalloc()` 分配并映射，设置 `PTE_U` 标志
-
----
-
-### 堆分配器解析
-
-#### 用户堆管理（brk/sbrk）
-
-系统调用 `sys_brk()` 位于 `src/sysproc.c:163-169`：
-
-```c
-uint64 sys_brk(void) {
-  int n;
-  if(argint(0, &n) < 0) return -1;
-  return growproc(n);
-}
-```
-
-**堆增长实现**（`src/vma.c:530-544`）：
-```c
-uint64 growproc(int n) {
-  struct proc *p = myproc();
-  struct vma* vma = alloc_addr_heap_vma(p, n, PTE_R|PTE_W|PTE_U);
-  if(vma == NULL) {
-    __debug_warn("[growproc]alloc heap not found\n");
-    return 0;
-  }
-  return vma->end;
-}
-```
-
-**❌ 惰性分配（Lazy Allocation）未实现**：
-- 搜索 `lazy|populate` 关键词，**未找到相关实现**
-- `uvmalloc()` 在调用时**立即分配物理页**（`allocpage()`），而非仅调整边界
-- 缺页异常处理中**未发现**按需分配逻辑
-
-#### VMA（Virtual Memory Area）管理
-
-系统使用双向链表管理进程的虚拟内存区域，定义于 `src/include/vma.h`：
-
-```c
-struct vma {
-  enum segtype type;      // NONE, LOAD, TEXT, DATA, BSS, HEAP, MMAP, STACK, TRAP
-  int perm;
-  uint64 addr;
-  uint64 sz;
-  uint64 end;
-  int flags;
-  int fd;
-  uint64 f_off;
-  struct vma *prev;
-  struct vma *next;
-};
-```
-
-**VMA 操作函数**（`src/vma.c`）：
-- `vma_list_init()`：初始化进程 VMA 链表（包含 TRAP、STACK、MMAP 区域）
-- `alloc_vma()`：分配新 VMA 并映射页表
-- `addr_locate_vma()`：按地址查找 VMA
-- `free_vma_list()`：释放整个 VMA 链表及对应物理页
-
----
-
-### 用户指针安全验证
-
-系统调用通过 `copyin`/`copyout` 系列函数验证用户空间指针合法性，位于 `src/copy.c`：
-
-```c
-// src/copy.c:14-32
-int copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len) {
-  uint64 n, va0, pa0;
-  while(len > 0) {
-    va0 = PGROUNDDOWN(dstva);
-    pa0 = walkaddr(pagetable, va0);
-    if(pa0 == NULL) return -1;  // 验证失败
-    n = PGSIZE - (dstva - va0);
-    if(n > len) n = len;
-    memmove((void *)(pa0 + (dstva - va0)), src, n);
-    len -= n;
-    src += n;
-    dstva = va0 + PGSIZE;
-  }
-  return 0;
-}
-```
-
-**验证机制**：
-1. `walkaddr()` 检查虚拟地址是否已映射且为用户可访问（`PTE_U`）
-2. `copyinstr()` 额外检查字符串 null 终止符
-3. `copyin2()`/`copyout2()` 通过 `sz` 字段检查边界（不查页表）
-
-**❌ 未发现 `UserInPtr`/`UserOutPtr` 类型**：
-- 搜索 `UserInPtr|UserOutPtr|verify_area|check_region`，**仅找到 `copyin`/`copyout` 系列函数**
-- 无 Rust 风格的类型安全封装
-
----
-
-### 缺页异常处理
-
-#### 缺页异常检测
-
-`src/trap.c:36-38` 定义了缺页异常类型：
-```c
-#define EXCP_LOAD_PAGE  0xd  // 13: Load Page Fault
-#define EXCP_STORE_PAGE 0xf  // 15: Store Page Fault
-```
-
-#### ❌ 缺页异常处理程序未实现
-
-**关键发现**：
-1. `src/include/vm.h:42-43` 声明了 `handle_page_fault()` 和 `kernel_handle_page_fault()`，但**在 `.c` 文件中未找到实现**
-2. `src/trap.c:102` 中 `handle_excp(cause)` 被注释掉：
-   ```c
-   /* 
-   else if(handle_excp(cause) == 0) {
-   }
-   */
-   ```
-3. `usertrap()` 对未知异常的处理是直接标记进程为 `SIGTERM` 并退出：
-   ```c
-   else {
-     printf("\nusertrap(): unexpected scause %p pid=%d %s\n", r_scause(), p->pid, p->name);
-     p->killed = SIGTERM;
-   }
-   ```
-
-**结论**：❌ **缺页异常处理未实现**。当前内核不支持按需分页，所有用户页面必须在访问前通过 `uvmalloc()` 预先分配。
-
----
-
-### 高级内存特性清单
-
-| 特性 | 状态 | 证据/说明 |
-|------|------|----------|
-| **写时复制（CoW）** | ❌ 未实现 | 搜索 `cow|copy_on_write` 无结果；`uvmcopy()` 直接复制物理页（深拷贝） |
-| **懒分配（Lazy Allocation）** | ❌ 未实现 | 搜索 `lazy|populate` 无结果；`uvmalloc()` 立即分配物理页 |
-| **共享内存（shmget/shmdt）** | ❌ 未实现 | 搜索 `sys_shm|shmget|shmdt|SharedMemory` 无结果 |
-| **反向映射表（rmap）** | ❌ 未实现 | 搜索 `rmap|reverse_map|page_to_vma` 无结果 |
-| **交换区/页面置换（Swap）** | ❌ 未实现 | 搜索 `swap_out|swap_in` 仅找到无关代码；无 swap 数据结构 |
-| **大页支持（Huge Page）** | ❌ 未实现 | 搜索 `HugePage|MapSize.*2M|MapSize.*1G` 无结果；页表操作仅处理 4KB 页 |
-| **mmap 系统调用** | ✅ 已实现 | `sys_mmap()` 调用 `do_mmap()`，支持 `MAP_FIXED`/`MAP_ANONYMOUS` 标志 |
-| **零拷贝（sendfile）** | ✅ 已实现 | `sys_sendfile()` 调用 `filesend()`，但实现为内核缓冲拷贝（非 DMA 零拷贝） |
-
-#### mmap 实现分析
-
-`src/mmap.c:do_mmap()` 实现了完整的 mmap 功能：
-
-```c
-// src/mmap.c:38-95
-uint64 do_mmap(uint64 start, uint64 len, int prot, int flags, int fd, off_t offset) {
-  // 1. 验证参数
-  if(flags & MAP_ANONYMOUS) fd = -1;
-  if(offset < 0 || start % PGSIZE != 0) return -1;
-  
-  // 2. 计算权限
-  int perm = PTE_U;
-  if(prot & PROT_READ)  perm |= (PTE_R | PTE_A);
-  if(prot & PROT_WRITE) perm |= (PTE_W | PTE_D);
-  if(prot & PROT_EXEC)  perm |= (PTE_X | PTE_A);
-  
-  // 3. 处理 MAP_FIXED
-  if((flags & MAP_FIXED) && start != 0) {
-    do_mmap_fix(start, len, flags, fd, offset);
-    goto skip_vma;
-  }
-  
-  // 4. 分配 VMA
-  struct vma *vma = alloc_mmap_vma(p, flags, start, len, perm, fd, offset);
-  
-  // 5. 读取文件内容到内存
-  if(fd != -1) {
-    uint64 mmap_sz = f->ep->file_size - offset;
-    if(len < mmap_sz) mmap_sz = len;
-    for(int i = 0; i < page_n; ++i) {
-      uint64 pa = experm(p->pagetable, va, perm);
-      fileread(f, va, PGSIZE);
-      va += PGSIZE;
-    }
-  }
-  return start;
-}
-```
-
-**✅ 已实现功能**：
-- `MAP_ANONYMOUS`：匿名映射（`fd = -1`）
-- `MAP_FIXED`：固定地址映射（通过 `do_mmap_fix()` 记录）
-- `MAP_SHARED`/`MAP_PRIVATE`：标志存储于 VMA，但 `MAP_PRIVATE` 的写时复制**未实现**
-- 文件内容预读：映射时立即读取文件到内存
-
-**❌ 未实现功能**：
-- `MAP_PRIVATE` 的写时复制（CoW）
-- 按需分页（页面故障时再分配）
-- `munmap` 的写回优化（仅检查 `PTE_D` 位）
-
----
-
-### 关键代码片段与调用链分析
-
-#### 物理页分配调用链
-
-```mermaid
-graph TD
-  A["allocpage
- src/pm.c:80"] --> B["kmem.freelist
- 空闲链表头"]
-  C["kmalloc
- src/kmalloc.c:143"] --> D["get_allocator
- src/kmalloc.c:107"]
-  D --> E["allocpage
- src/pm.c:80"]
-  E --> F["kmem.lock
- 自旋锁保护"]
-```
-
-#### 用户内存增长流程
-
-```mermaid
-graph TD
-  A["sys_brk
- src/sysproc.c:163"] --> B["growproc
- src/vma.c:530"]
-  B --> C["alloc_addr_heap_vma
- src/vma.c:329"]
-  C --> D["uvmalloc
- src/vm.c:243"]
-  D --> E["allocpage
- src/pm.c:80"]
-  D --> F["mappages
- src/vm.c:83"]
-```
-
-#### mmap 系统调用流程
-
-```mermaid
-graph TD
-  A["sys_mmap
- src/sysfile.c:895"] --> B["do_mmap
- src/mmap.c:38"]
-  B --> C["alloc_mmap_vma
- src/vma.c:209"]
-  C --> D["alloc_vma
- src/vma.c:71"]
-  D --> E["uvmalloc
- src/vm.c:243"]
-  B --> F["fileread
- src/file.c"]
-```
-
----
-
-### 总结
-
-本操作系统的内存管理子系统实现了以下核心功能：
-
-1. **物理内存管理**：基于空闲链路的页分配器（`allocpage`/`freepage`）
-2. **内核堆分配**：类 Slab 分配器（`kmalloc`/`kfree`），支持 32-4048 字节对象
-3. **虚拟内存**：Sv39 三级页表，完整的 `walk`/`map`/`unmap` 操作
-4. **地址空间**：独立的内核/用户页表，通过 `kvmcreate()` 共享内核映射
-5. **VMA 管理**：双向链表管理进程虚拟内存区域
-6. **mmap 系统调用**：支持文件映射和匿名映射
-
-**缺失的高级特性**：
-- ❌ 缺页异常处理（无按需分页）
-- ❌ 写时复制（CoW）
-- ❌ 懒分配（Lazy Allocation）
-- ❌ 交换区/页面置换
-- ❌ 大页支持
-- ❌ 共享内存 IPC
+## 题单作答（JSON-QA 渲染）
+
+- stage_id: `03_mem_mgmt`
+- terminology_profile: `stallings_en_zh`
+
+## 第 03_mem_mgmt 阶段：内存管理（物理/虚拟/分配器）
+
+### Q03_001（single_choice）
+
+- 题干：该 OS 的内存管理实现语言/形态更接近哪类？（只选最贴近的一项）
+- 答案："B. C/Makefile 风格内核（xv6 类）"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/pm.c` | `file pm.c` | C 语言实现，类 xv6 风格的物理页分配器 |
+| `src/vm.c` | `file vm.c` | C 语言实现页表操作 walk/mappages/vmunmap |
+| `Makefile` | `file Makefile` | 使用 Makefile 构建系统 |
+
+### Q03_002（tri_state_impl）
+
+- 题干：是否存在“物理页帧分配器 (Physical Frame Allocator)”的真实实现？（必须三态）
+- 答案："implemented"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/pm.c` | `function allocpage` | void *allocpage(void) - 分配 4096 字节物理页 |
+| `src/pm.c` | `function freepage` | void freepage(void *pa) - 释放物理页 |
+| `src/pm.c` | `function kpminit` | void kpminit() - 初始化分配器 |
+
+### Q03_003（single_choice）
+
+- 题干：物理内存分配算法更接近哪种？
+- 答案："D. 空闲链表 run list（xv6 风格）"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/pm.c` | `struct run` | struct run { struct run *next; }; 单链表结构 |
+| `src/pm.c` | `struct kmem` | static struct { struct spinlock lock; struct run *freelist; uint64 npage; } kmem; |
+
+### Q03_004（short_answer）
+
+- 题干：物理页帧分配器的核心数据结构是什么？（例如 bitmap 数组、buddy free list、slab cache 表、`struct run` 单链表等；必须引用结构体/字段证据）
+- 答案："struct run 单链表 + 全局 kmem 结构体。核心结构：struct run { struct run *next; } 作为空闲链表节点；static struct { struct spinlock lock; struct run *freelist; uint64 npage; } kmem 管理全局空闲链表和页计数"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/pm.c` | `struct run` | struct run { struct run *next; }; |
+| `src/pm.c` | `struct kmem` | static struct { struct spinlock lock; struct run *freelist; uint64 npage; } kmem; |
+
+### Q03_005（short_answer）
+
+- 题干：物理分配器的并发控制锁粒度是什么？（全局大锁 / per-CPU / 分桶 / 无锁+关中断 / 其他；必须给锁对象类型与持锁范围证据）
+- 答案："全局自旋锁 (global spinlock)。使用 struct spinlock kmem.lock 保护整个空闲链表，持锁范围覆盖 allocpage 和 freepage 的整个临界区"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/pm.c` | `function allocpage` | acquire(&kmem.lock); r = kmem.freelist; ... release(&kmem.lock); |
+| `src/pm.c` | `function freepage` | acquire(&kmem.lock); r->next = kmem.freelist; kmem.freelist = r; ... release(&kmem.lock); |
+| `src/include/spinlock.h` | `struct spinlock` | struct spinlock { uint locked; char *name; struct cpu *cpu; }; |
+
+### Q03_006（tri_state_impl）
+
+- 题干：是否存在“页表 (page table) 结构体 + walk/map/unmap”的真实实现？（必须三态）
+- 答案："implemented"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/vm.c` | `function walk` | pte_t *walk(pagetable_t pagetable, uint64 va, int alloc) - 三级页表遍历 |
+| `src/vm.c` | `function mappages` | int mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm) |
+| `src/vm.c` | `function vmunmap` | void vmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free) |
+
+### Q03_007（short_answer）
+
+- 题干：页表操作 API（walk/map/unmap 或等价）对应的函数名/模块是什么？列出 1-3 个关键入口并给证据。
+- 答案："核心 API：walk() 遍历页表返回 PTE 指针；mappages() 建立虚拟地址到物理地址的映射；vmunmap() 解除映射并可选释放物理页。辅助 API：uvmalloc() 分配用户内存并建立映射；uvmdealloc() 释放用户内存"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/vm.c` | `function walk` | pte_t *walk(pagetable_t pagetable, uint64 va, int alloc) |
+| `src/vm.c` | `function mappages` | int mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm) |
+| `src/vm.c` | `function vmunmap` | void vmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free) |
+
+### Q03_008（short_answer）
+
+- 题干：页表修改路径的并发控制是什么？（锁粒度、是否需要关中断、是否使用每进程地址空间锁等；必须引用锁/临界区证据）
+- 答案："页表修改路径本身无专用锁，依赖物理页分配时的 kmem.lock 全局锁保护。mappages/walk 在分配新页表页时调用 allocpage() 持有 kmem.lock。无 per-CPU 锁或地址空间锁，无显式关中断保护"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/vm.c` | `function walk` | if(!alloc || (pagetable = (pde_t*)allocpage()) == NULL) return NULL; - 调用 allocpage 间接持有 kmem.lock |
+| `src/pm.c` | `function allocpage` | acquire(&kmem.lock); ... release(&kmem.lock); |
+
+### Q03_009（single_choice）
+
+- 题干：内核与用户地址空间关系更接近哪种？
+- 答案："B. 共享同一页表（内核映射常驻，高半核等）"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/vm.c` | `function kvmcreate` | pagetable_t kvmcreate() { ... memmove(pagetable, kernel_pagetable, PGSIZE); ... } - 用户页表复制内核页表 |
+| `src/vm.c` | `function kvminit` | 内核页表映射 KERNBASE 到 PHYSTOP，用户进程共享这些映射 |
+
+### Q03_010（tri_state_impl）
+
+- 题干：是否存在缺页异常 (Page Fault) 处理逻辑并与内存分配/映射联动？（必须三态）
+- 答案："not_found"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/trap.c` | `macro EXCP_LOAD_PAGE` | #define EXCP_LOAD_PAGE 0xd // 13 - 定义但未在 usertrap 中处理 |
+| `src/trap.c` | `function usertrap` | usertrap 中仅处理 EXCP_ENV_CALL 和 devintr，EXCP_LOAD_PAGE/EXCP_STORE_PAGE 分支被注释掉 |
+| `src/include/vm.h` | `function handle_page_fault` | int handle_page_fault(int kind, uint stval); - 仅声明，未发现实现 |
+
+### Q03_011（short_answer）
+
+- 题干：追踪一条缺页链路：trap/异常入口 → 缺页处理函数（handle_page_fault 或等价）→ 分配页帧 → 建立映射。用 3-5 个关键节点描述并给每节点证据。
+- 答案："缺页链路未实现。trap.c:usertrap 中 EXCP_LOAD_PAGE/EXCP_STORE_PAGE 处理分支被注释掉，handle_page_fault 仅在 vm.h 中声明但无实现。候选链路（未闭合）：usertrap [trap.c:94] → handle_excp [trap.c:未实现] → handle_page_fault [vm.h:42 仅声明] → allocpage [pm.c:79]"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/trap.c` | `function usertrap` | /* else if(handle_excp(cause) == 0) { } */ - 缺页处理被注释 |
+| `src/include/vm.h` | `function handle_page_fault` | int handle_page_fault(int kind, uint stval); - 仅声明 |
+
+### Q03_012（tri_state_impl）
+
+- 题干：是否实现写时复制 (Copy-on-Write, CoW)？（必须三态；若 implemented 需说明触发点在 fault 中还是 fork 中）
+- 答案："not_found"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/vm.c` | `function uvmcopy` | uvmcopy 实现深拷贝或浅拷贝，但未发现 PTE 写保护位设置或 CoW 标志 |
+| `src/trap.c` | `function usertrap` | 缺页处理未实现，无法触发 CoW |
+
+### Q03_013（tri_state_impl）
+
+- 题干：是否实现惰性分配 (Lazy Allocation)？（必须三态；若 implemented 需说明是在 brk/mmap 还是 fault 中分配）
+- 答案："stub"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/vma.c` | `function alloc_vma` | alloc_vma 中 alloc==1 时立即调用 uvmalloc 分配物理页，非惰性 |
+| `src/vma.c` | `function alloc_mmap_vma` | alloc_mmap_vma 调用 alloc_vma(p, MMAP, addr, sz, perm, 1, NULL) - 立即分配 |
+
+### Q03_014（tri_state_impl）
+
+- 题干：是否实现 swap（swap_in/swap_out 或等价页面置换）？（必须三态）
+- 答案："not_found"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/include/sysinfo.h` | `struct sysinfo` | unsigned long totalswap; unsigned long freeswap; - 仅结构体定义，无实现 |
+
+### Q03_015（tri_state_impl）
+
+- 题干：是否实现 mmap（文件映射/匿名映射）且处理标志位（MAP_FIXED/MAP_ANON/MAP_SHARED 等）？（必须三态；stub 需说明形态如 ENOSYS/return 0）
+- 答案："implemented"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/mmap.c` | `function do_mmap` | 处理 MAP_ANONYMOUS、MAP_FIXED、MAP_SHARED、MAP_PRIVATE 标志位 |
+| `src/mmap.c` | `function do_munmap` | 实现 munmap 并处理脏页回写（PTE_D 位检查） |
+| `src/sysfile.c` | `function sys_mmap` | 系统调用入口 sys_mmap 调用 do_mmap |
+
+### Q03_016（tri_state_impl）
+
+- 题干：是否存在 Page Cache（页缓存/文件页缓存）管理？（必须三态）
+- 答案："not_found"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/bio.c` | `file bio.c` | 块 I/O 缓冲，但非页缓存机制 |
+
+### Q03_017（tri_state_impl）
+
+- 题干：是否存在脏页回写 (dirty page writeback) 机制？（必须三态；若 implemented 需指出同步/异步与触发条件）
+- 答案："implemented"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/mmap.c` | `function do_munmap` | if(*pte & PTE_D){ pa = PTE2PA(*pte); filewrite(f, va, size); } - munmap 时同步回写脏页 |
+
+### Q03_018（tri_state_impl）
+
+- 题干：是否存在 TLB 射击 (TLB Shootdown / Remote TLB Flush)机制以支持多核页表一致性？（必须三态；若 implemented 需指向 IPI/跨核调用证据）
+- 答案："not_found"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/include/sbi.h` | `macro SBI_REMOTE_SFENCE_VMA` | #define SBI_REMOTE_SFENCE_VMA 6 - 仅定义，未发现调用 |
+| `src/include/sbi.h` | `macro SBI_REMOTE_SFENCE_VMA_ASID` | #define SBI_REMOTE_SFENCE_VMA_ASID 7 - 仅定义，未发现调用 |
+
+### Q03_019（short_answer）
+
+- 题干：TLB 刷新指令/函数点是什么？（RISC-V sfence.vma / AArch64 tlbi / x86 invlpg 等，或仓库中等价的 TLB 刷新封装；必须给证据）
+- 答案："RISC-V sfence.vma 指令。封装函数：sfence_vma() 定义在 riscv.h:329，使用 asm volatile(\"sfence.vma\") 实现。调用点：vm.c:57 kvminithart 中调用 sfence_vma()"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/include/riscv.h` | `function sfence_vma` | static inline void sfence_vma() { asm volatile("sfence.vma"); } |
+| `src/vm.c` | `function kvminithart` | w_satp(MAKE_SATP(kernel_pagetable)); sfence_vma(); |
+
+### Q03_020（short_answer）
+
+- 题干：用户指针安全检查机制是什么？（access_ok/verify_area/UserInPtr 等；列出入口点与校验逻辑证据）
+- 答案："walkaddr() 函数进行用户指针检查。检查逻辑：1) va >= MAXVA 返回 NULL；2) walk(pagetable, va, 0) 检查 PTE 存在；3) (*pte & PTE_V) == 0 检查有效位；4) (*pte & PTE_U) == 0 检查用户可访问位。copyin/copyout 调用 walkaddr 进行校验"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/vm.c` | `function walkaddr` | if(va >= MAXVA) return NULL; pte = walk(...); if((*pte & PTE_V) == 0) return NULL; if((*pte & PTE_U) == 0) return NULL; |
+| `src/copy.c` | `function copyin` | pa0 = walkaddr(pagetable, va0); if(pa0 == NULL) return -1; |
+| `src/copy.c` | `function copyout` | pa0 = walkaddr(pagetable, va0); if(pa0 == NULL) return -1; |
+
+### Q03_021（single_choice）
+
+- 题干：若实现了页面置换 (Page Replacement)，使用的算法最接近哪种？（Stallings Ch8：OPT 理想算法 / LRU 最近最少使用 / Clock 近似 LRU / FIFO / 未实现）
+- 答案："F. 未实现页面置换（无 swap）"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src` | `file 全局搜索` | 未发现 swap_in/swap_out 或页面置换算法实现 |
+
+### Q03_022（tri_state_impl）
+
+- 题干：是否存在工作集模型 (Working Set Model, WSM) 或抖动检测/防止 (Thrashing Prevention) 机制？（必须三态；Stallings Ch8 核心概念；若 not_found 需列出已搜关键字 working_set|thrash|resident_set）
+- 答案："not_found"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src` | `file 全局搜索` | 搜索关键字：working_set|thrash|resident_set|kswapd|oom - 未找到匹配 |
+
+### Q03_023（fill_in）
+
+- 题干：物理内存总量（Physical Memory Size）：____ KB/MB；页大小（Page Size）：____ bytes；最大进程虚拟地址空间（Virtual Address Space）：____ bits。（必须从代码常量/链接脚本/配置中给出证据；无法确定则写 unknown 并说明已搜路径）
+- 答案："物理内存总量：128 MB；页大小：4096 bytes；最大进程虚拟地址空间：39 bits（Sv39）"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/include/memlayout.h` | `macro PHYSTOP` | #define PHYSTOP (0x80000000ULL + (unsigned long long)(1ULL * 128 * 1024 * 1024)) // 128MB |
+| `src/include/riscv.h` | `macro PGSIZE` | #define PGSIZE 4096 // bytes per page |
+| `src/include/riscv.h` | `macro MAXVA` | #define MAXVA (1L << (9 + 9 + 9 + 12 - 1)) // 256 GB, Sv39 39-bit virtual address |
+| `src/include/riscv.h` | `macro SATP_SV39` | #define SATP_SV39 (8L << 60) // use riscv's sv39 page table scheme |
+
+### Q03_024（single_choice）
+
+- 题干：内存保护机制 (Memory Protection) 的实现形式更接近哪种？（Stallings Ch7.1）
+- 答案："C. 硬件页表 + 软件指针检查双重保护"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/include/riscv.h` | `macro PTE_U` | #define PTE_U (1L << 4) // 1 -> user can access - 硬件页表权限位 |
+| `src/copy.c` | `function copyin` | walkaddr 检查 PTE_U 位，软件校验用户指针 |
+| `src/vm.c` | `function walkaddr` | if((*pte & PTE_U) == 0) return NULL; - 软件检查用户可访问性 |
+
+### Q03_025（short_answer）
+
+- 题干：逻辑内存组织 (Logical Memory Organization, Stallings Ch7.1)：进程地址空间中 text/data/heap/stack/mmap 各区域（或等价区间）是否由统一的映射管理结构（VMA/区间表/链表/BTreeMap 等）维护？（如存在请给结构体证据；不存在则写未发现等价结构）
+- 答案："是，使用 VMA（Virtual Memory Area）双向链表统一管理。结构体 struct vma 定义在 vma.h:15，包含 type（LOAD/HEAP/STACK/MMAP/TRAP 等）、addr、sz、end、perm、fd、f_off 字段。进程 struct proc 包含 vma 头指针"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/include/vma.h` | `struct vma` | struct vma { enum segtype type; int perm; uint64 addr; uint64 sz; uint64 end; int flags; int fd; uint64 f_off; struct vma *prev; struct vma *next; }; |
+| `src/include/proc.h` | `struct proc` | struct proc { ... struct vma *vma; ... }; |
+| `src/vma.c` | `function vma_list_init` | 初始化 LOAD/HEAP/STACK/MMAP/TRAP 各区域 VMA |
+
+### Q03_026（single_choice）
+
+- 题干：是否存在显式的硬件分段机制 (Hardware Segmentation, Stallings Ch7.4)？
+- 答案："C. 纯分页无分段（RISC-V/AArch64 常见）"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/include/riscv.h` | `macro SATP_SV39` | RISC-V Sv39 纯分页机制，无硬件分段 |
+
+### Q03_027（single_choice）
+
+- 题干：取页策略 (Fetch Policy, Stallings Ch8.2) 更接近哪种？
+- 答案："D. 预分配 (Pre-allocation)：进程创建时立即分配全部物理页"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/vma.c` | `function alloc_vma` | alloc==1 时立即调用 uvmalloc 分配物理页并建立映射 |
+| `src/vma.c` | `function alloc_mmap_vma` | 调用 alloc_vma(p, MMAP, addr, sz, perm, 1, NULL) - 立即分配 |
+
+### Q03_028（short_answer）
+
+- 题干：放置策略 (Placement Policy, Stallings Ch8.2)：新的匿名映射或堆区域增长时，系统如何选择虚拟地址区间？（固定起始地址 / mmap_base 向下生长 / 首次适配 / 最佳适配 等；必须给实现证据或写未发现等价策略）
+- 答案："VMA 双向链表首次适配（first-fit）。alloc_vma 遍历链表查找空闲区间：while(nvma != vma_head) { if(end <= nvma->addr) break; ... }。MMAP 区域从 USER_MMAP_START 向下生长（alloc_mmap_vma 中 addr = PGROUNDDOWN(mvma->addr - sz)）"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/vma.c` | `function alloc_vma` | 遍历 VMA 链表查找空闲区间：while(nvma != vma_head) { if(end <= nvma->addr) break; } |
+| `src/vma.c` | `function alloc_mmap_vma` | addr = PGROUNDDOWN(mvma->addr - sz); - MMAP 向下生长 |
+| `src/include/memlayout.h` | `macro USER_MMAP_START` | #define USER_MMAP_START (USER_STACK_BOTTOM - 0x10000000) |
+
+### Q03_029（tri_state_impl）
+
+- 题干：是否存在驻留集管理/内存负载控制 (Resident Set Management / Load Control, Stallings Ch8.2)？（包括工作集动态调整、内存回收守护线程、OOM killer、驻留页数限制等；若 not_found 需列出已搜关键字）
+- 答案："not_found"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src` | `file 全局搜索` | 搜索关键字：working_set|thrash|resident_set|kswapd|oom|load_control - 未找到匹配 |
+
+### Q03_030（short_answer）
+
+- 题干：内存主链路（必须给出，尽量以 Mermaid graph TD 表达）：从确认的最强内存入口（缺页处理入口/mmap 入口/brk 入口/等价入口）出发，追踪到页表操作核心点或物理页分配核心点，写出 3-6 个关键节点。节点格式：FuncName [path:line]。若链路未被源码证据完全闭合，标注候选主链路而非确认的主链路。只画一条主链，不要并列展开多条支线。
+- 答案："graph TD\n    sys_mmap[sys_mmap [src/sysfile.c:894]] --> do_mmap[do_mmap [src/mmap.c:30]]\n    do_mmap --> alloc_mmap_vma[alloc_mmap_vma [src/vma.c:195]]\n    alloc_mmap_vma --> alloc_vma[alloc_vma [src/vma.c:64]]\n    alloc_vma --> uvmalloc[uvmalloc [src/vm.c:224]]\n    uvmalloc --> mappages[mappages [src/vm.c:85]]\n    mappages --> walk[walk [src/vm.c:140]]\n    walk --> allocpage[allocpage [src/pm.c:79]]"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/sysfile.c` | `function sys_mmap` | 系统调用入口 |
+| `src/mmap.c` | `function do_mmap` | mmap 核心实现 |
+| `src/vma.c` | `function alloc_mmap_vma` | 分配 MMAP VMA |
+| `src/vma.c` | `function alloc_vma` | 通用 VMA 分配 |
+| `src/vm.c` | `function uvmalloc` | 用户内存分配 |
+| `src/vm.c` | `function mappages` | 页表映射 |
+| `src/pm.c` | `function allocpage` | 物理页分配 |
+
+### Q03_031（single_choice）
+
+- 题干：该系统更容易出现哪种内存碎片 (Memory Fragmentation, Stallings Ch7.2)？
+- 答案："B. 外部碎片 (External Fragmentation)：空闲块分散无法满足大连续请求"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/pm.c` | `function allocpage` | 简单空闲链表分配器，无碎片整理机制 |
+| `src/pm.c` | `function freepage` | 释放页插入链表头部，可能导致碎片化 |
+
+### Q03_032（single_choice）
+
+- 题干：地址重定位 (Address Relocation, Stallings Ch7.1) 的绑定时机更接近哪种？
+- 答案："C. 运行时动态绑定 (Run-time / Dynamic Relocation)：通过 MMU 基址 + 界限或页表在每次访问时转换"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/include/riscv.h` | `macro SATP_SV39` | RISC-V Sv39 页表机制，运行时通过 satp 寄存器切换页表 |
+| `src/vm.c` | `function kvminithart` | w_satp(MAKE_SATP(kernel_pagetable)); sfence_vma(); - 运行时切换页表 |
+
+### Q03_033（single_choice）
+
+- 题干：页面置换的作用域策略 (Replacement Scope, Stallings Ch8.2) 更接近哪种？
+- 答案："C. 未实现置换（无 swap）"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src` | `file 全局搜索` | 未发现 swap 或页面置换实现 |
+
+### Q03_034（tri_state_impl）
+
+- 题干：是否存在清理策略 (Cleaning Policy, Stallings Ch8.2)？（即脏页预先后台写回，而非仅在置换时才写回；搜索 background writeback / kswapd / cleaner_thread 或等价；必须三态；若 not_found 需列出已搜关键字）
+- 答案："not_found"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src` | `file 全局搜索` | 搜索关键字：background_writeback|writeback|cleaner|flush_dirty|kswapd - 仅找到 VIRTIO_BLK_F_CONFIG_WCE 定义，无后台写回实现 |
+| `src/mmap.c` | `function do_munmap` | 仅在 munmap 时同步回写脏页，无后台清理线程 |
 
 ---
 
 
 # 进程线程与调度机制
 
-## 第 4 章：进程/线程与调度机制
-
-### 任务模型与核心数据结构
-
-本 OS 采用统一的 `struct proc` 结构体来表示执行实体（进程/线程），未严格区分 PCB 与 TCB。核心定义位于 `src/include/proc.h:115-171`。
-
-#### `struct proc` 关键字段
-
-```c
-struct proc {
-  int magic;
-  struct spinlock lock;
-  enum procstate state;        // 进程状态
-  struct proc *parent;         // 父进程
-  void *chan;                  // 睡眠通道
-  int killed;                  // 被杀死标志
-  int xstate;                  // 退出状态
-  int pid;                     // 进程 ID
-  int uid, gid;                // 用户/组 ID
-
-  uint64 kstack;               // 内核栈虚拟地址
-  uint64 sz;                   // 进程内存大小
-  pagetable_t pagetable;       // 用户页表
-  struct trapframe *trapframe; // 陷阱帧（用户寄存器保存）
-  struct context context;      // 上下文（内核寄存器）
-  
-  struct file **ofile;         // 打开文件表
-  struct dirent *cwd;          // 当前目录
-  char name[16];               // 进程名
-  
-  struct vma *vma;             // 虚拟内存区域链表
-  map_fix *mf;                 // 内存映射修复结构
-  
-  // 信号机制
-  ksigaction_t *sig_act;       // 信号处理动作
-  __sigset_t sig_set;          // 阻塞信号掩码
-  __sigset_t sig_pending;      // 待处理信号
-  struct sig_frame *sig_frame; // 信号栈帧链表
-  
-  // 线程支持
-  uint64 set_child_tid;        // 子线程 TID 设置地址
-  uint64 clear_child_tid;      // 清除子线程 TID 地址
-  struct robust_list_head *robust_list; // 健壮互斥列表
-};
-```
-
-#### `struct context`（上下文切换寄存器）
-
-定义于 `src/include/cpu.h:9-24`，保存callee-saved寄存器：
-```c
-struct context {
-  uint64 ra, sp;          // 返回地址、栈指针
-  uint64 s0-s11;          // 被调用者保存寄存器
-};
-```
-
-#### `struct trapframe`（用户态寄存器保存）
-
-定义于 `src/include/trap.h:18-54`，包含所有用户寄存器（ra, sp, gp, tp, t0-t6, s0-s11, a0-a7），在系统调用/中断时保存用户态上下文。
-
----
-
-### 调度算法与策略（代码证据）
-
-#### 调度器实现
-
-调度器位于 `src/proc.c:119-152`，采用**简单的 FIFO 轮转调度**（无优先级、无时间片轮转）。
-
-```c
-void scheduler(){
-  struct cpu *c = mycpu();
-  c->proc = 0;
-  while(1){
-    struct proc* p = readyq_pop();  // 从就绪队列取出
-    if(p){
-      acquire(&p->lock);
-      if(p->state == RUNNABLE) {
-        p->state = RUNNING;
-        c->proc = p;
-        w_satp(MAKE_SATP(p->pagetable));
-        sfence_vma();
-        swtch(&c->context, &p->context);  // 上下文切换
-        w_satp(MAKE_SATP(kernel_pagetable));
-        sfence_vma();
-        c->proc = 0;
-      }
-      release(&p->lock);
-    }else{
-      intr_on();
-      asm volatile("wfi");  // 无进程可运行时进入低功耗
-    }
-  }
-}
-```
-
-#### 就绪队列实现
-
-就绪队列为全局单队列 `readyq`（`src/proc.c:29`），使用 `queue_push`/`queue_pop` 操作（`src/include/queue.h:36-52`），本质是**FIFO 链表**。
-
-**关键证据**：`scheduler()` 直接调用 `readyq_pop()` 获取下一个进程，未进行任何优先级比较或时间片计算。
-
-#### 调度器调用链
-
-```mermaid
-graph TD
-  A["main
- src/main.c:45"] --> B["scheduler
- src/proc.c:119"]
-  B --> C["readyq_pop
- src/proc.c:105"]
-  C --> D["queue_pop
- src/include/queue.h:43"]
-  B --> E["swtch
- src/proc.c:24"]
-```
+## 题单作答（JSON-QA 渲染）
 
-**调度触发点**：
-1. `main()` 启动后进入 `scheduler()` 死循环
-2. `yield()`（`src/proc.c:618`）主动让出 CPU
-3. `sched()`（`src/proc.c:521`）被动调度（如 `sleep()`、`exit()`）
-4. 定时器中断触发 `yield()`（`src/trap.c:133`）
-
-**❌ 未实现优先级调度**：代码中未发现 `priority`、`stride`、`CFS` 等相关字段或算法。
+- stage_id: `04_process_sched`
+- terminology_profile: `stallings_en_zh`
 
----
-
-### 任务状态机
-
-#### 进程状态定义
-
-定义于 `src/include/proc.h:89`：
-```c
-enum procstate { UNUSED, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
-```
-
-#### 状态流转
-
-| 状态 | 转换条件 | 代码位置 |
-|------|----------|----------|
-| **UNUSED → RUNNABLE** | `allocproc()` 分配后设置 `state = RUNNABLE` | `src/proc.c:213-294` |
-| **RUNNABLE → RUNNING** | `scheduler()` 选中进程 | `src/proc.c:132` |
-| **RUNNING → RUNNABLE** | `yield()` 主动让出 | `src/proc.c:618` |
-| **RUNNING → SLEEPING** | `sleep()` 等待事件 | `src/proc.c:553` |
-| **SLEEPING → RUNNABLE** | `wakeup()` 唤醒 | `src/proc.c:581` |
-| **RUNNING → ZOMBIE** | `exit()` 退出 | `src/proc.c:720` |
-| **ZOMBIE → UNUSED** | `wait4pid()` 回收后 `freeproc()` | `src/proc.c:678` |
-
-#### 状态流转图
-
-```mermaid
-graph LR
-  A[UNUSED] -->|allocproc| B[RUNNABLE]
-  B -->|scheduler| C[RUNNING]
-  C -->|yield/timer| B
-  C -->|sleep| D[SLEEPING]
-  D -->|wakeup| B
-  C -->|exit| E[ZOMBIE]
-  E -->|wait/freeproc| A
-```
+## 第 04_process_sched 阶段：进程/线程与调度机制
 
----
+### Q04_001（short_answer）
 
-### 上下文切换实现（汇编分析）
+- 题干：执行实体 (Execution Entity) 抽象是什么？
+请按以下格式作答（每项必须有代码证据）：
+- 顶层类型名: ___（如 Process / Task / Thread / TaskControlBlock）
+- 结构体路径: ___
+- 关键字段（至少列 3 个）: Context=___, State=___, PID=___, TrapFrame=___
+- 是否区分 PCB 与 TCB: ___（是 / 否 / 待核实）
+- 答案："顶层类型名: struct proc\n结构体路径: src/include/proc.h:128-170\n关键字段: Context=context (struct context), State=state (enum procstate), PID=pid (int), TrapFrame=trapframe (struct trapframe*)\n是否区分 PCB 与 TCB: 否 (统一使用 struct proc，通过 CLONE_VM|CLONE_THREAD 标志区分进程/线程)"
 
-#### `swtch.S` 汇编代码
-
-位于 `src/swtch.S:1-42`，保存/恢复 callee-saved 寄存器：
-
-```assembly
-.globl swtch
-swtch:
-        # 保存旧上下文到 old (a0)
-        sd ra, 0(a0)
-        sd sp, 8(a0)
-        sd s0, 16(a0)
-        # ... 保存 s1-s11 (省略)
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/include/proc.h` | `struct proc` | struct proc { int magic; struct spinlock lock; enum procstate state; struct proc *parent; int pid; struct context context; struct trapframe *trapframe; pagetable_t pagetable; ... } |
 
-        # 从 new (a1) 恢复新上下文
-        ld ra, 0(a1)
-        ld sp, 8(a1)
-        ld s0, 16(a1)
-        # ... 恢复 s1-s11 (省略)
+### Q04_002（short_answer）
 
-        ret
-```
+- 题干：任务/进程的生命周期状态机有哪些状态与流转点？（Ready/Running/Blocked/Exited 等；需状态枚举/字段证据）
+- 答案："五态模型：UNUSED (未使用), SLEEPING (睡眠/阻塞), RUNNABLE (就绪), RUNNING (运行), ZOMBIE (僵尸)\n流转点:\n- UNUSED→RUNNABLE: allocproc() 初始化后 readyq_push()\n- RUNNABLE→RUNNING: scheduler() 选中并 w_satp 切换页表\n- RUNNING→SLEEPING: sleep() 调用 sched()\n- SLEEPING→RUNNABLE: wakeup() 调用 readyq_push()\n- RUNNING→ZOMBIE: exit() 设置 state=ZOMBIE\n- ZOMBIE→UNUSED: wait4pid() 调用 freeproc()"
 
-#### 保存的寄存器列表
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/include/proc.h` | `enum procstate` | enum procstate { UNUSED, SLEEPING, RUNNABLE, RUNNING, ZOMBIE }; |
+| `src/proc.c` | `function scheduler` | p->state = RUNNING; w_satp(MAKE_SATP(p->pagetable)); swtch(&c->context, &p->context); |
+| `src/proc.c` | `function exit` | p->state = ZOMBIE; sched(); |
 
-| 寄存器 | 偏移量 | 用途 |
-|--------|--------|------|
-| ra | 0 | 返回地址 |
-| sp | 8 | 栈指针 |
-| s0-s11 | 16-104 | 被调用者保存寄存器 |
+### Q04_003（tri_state_impl）
 
-**注意**：`swtch()` **不保存** caller-saved 寄存器（t0-t6, a0-a7），因为这些寄存器在调用 `swtch()` 前已由编译器保存到栈上。
+- 题干：是否存在上下文切换 (Context Switch) 实现（switch.S/__switch/swtch/context_switch）？（必须三态）
+- 答案："implemented"
 
-#### 上下文切换流程
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/swtch.S` | `assembly swtch` | swtch: sd ra, 0(a0); sd sp, 8(a0); sd s0-s11, 16-104(a0); ld ra, 0(a1); ld sp, 8(a1); ld s0-s11, 16-104(a1); ret |
 
-1. `scheduler()` 调用 `swtch(&c->context, &p->context)`
-2. 保存当前 CPU 的 `context` 到 `c->context`
-3. 恢复目标进程的 `context` 到 CPU 寄存器
-4. `ret` 跳转到目标进程的 `context.ra`（通常是 `forkret` 或 `sched` 的返回点）
+### Q04_004（short_answer）
 
----
+- 题干：上下文切换保存/恢复了哪些寄存器集合？（例如 RISC-V s0-s11；必须引用汇编/结构体证据）
+- 答案："保存/恢复 14 个寄存器：ra (返回地址), sp (栈指针), s0-s11 (被调用者保存寄存器)\n证据：src/swtch.S 中 sd/ld 指令序列，偏移 0-104 字节共 12*8=96 字节 + ra+sp 共 112 字节"
 
-### 进程间通信与同步（Signal/Futex）
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/swtch.S` | `assembly swtch` | sd ra, 0(a0); sd sp, 8(a0); sd s0, 16(a0); ... sd s11, 104(a0); ld ra, 0(a1); ... ld s11, 104(a1) |
+| `src/include/cpu.h` | `struct context` | struct context { uint64 ra; uint64 sp; uint64 s0-s11; }; |
 
-#### 信号机制（Signal）
+### Q04_005（short_answer）
 
-**✅ 已实现**（部分实现）
-
-##### 核心数据结构
-
-定义于 `src/include/signal.h:35-51`：
-```c
-struct sigaction {
-  union {
-    __sighandler_t sa_handler;  // 信号处理函数
-  } __sigaction_handler;
-  __sigset_t sa_mask;           // 阻塞掩码
-  int sa_flags;
-};
-
-typedef struct __ksigaction_t {
-  struct __ksigaction_t *next;
-  struct sigaction sigact;
-  int signum;
-} ksigaction_t;
-
-struct sig_frame {
-  __sigset_t mask;
-  struct trapframe *tf;
-  struct sig_frame *next;
-};
-```
-
-##### 信号处理流程
-
-1. **注册信号处理函数**：`sys_rt_sigaction()`（`src/syssig.c:54-85`）调用 `set_sigaction()`（`src/signal.c:53-82`）
-2. **发送信号**：`sys_kill()`（`src/syssig.c:87-93`）调用 `kill()`（`src/proc.c:752-770`）设置 `p->sig_pending` 和 `p->killed`
-3. **信号分发**：`usertrap()` 检查 `p->killed` 后调用 `sighandle()`（`src/signal.c:118-170`）
-4. **信号返回**：`sys_rt_sigreturn()` 调用 `sigreturn()` 恢复 `trapframe`
-
-##### 支持的信号
-
-定义于 `src/include/signal.h:10-20`：
-- `SIGTERM(15)`, `SIGKILL(9)`, `SIGABRT(6)`, `SIGHUP(1)`, `SIGINT(2)`, `SIGQUIT(3)`, `SIGILL(4)`, `SIGTRAP(5)`, `SIGCHLD(17)`
-- `SIGRTMIN(34)` 到 `SIGRTMAX(64)`
-
-**🔸 桩函数/限制**：
-- `SIGSET_LEN` 定义为 1（`src/include/signal.h:32`），仅支持 64 个信号中的前 64 位（实际只用了低 34 位）
-- `sa_mask` 未完全实现（`signal.c:143-153` 注释掉）
-- `siginfo_t` 未实现（仅支持简单 `sa_handler`）
-
-#### Futex 机制
-
-**🔸 桩函数**（接口存在，实现不完整）
-
-##### 接口定义
-
-定义于 `src/include/proc.h:18-50`：
-```c
-#define FUTEX_WAIT  0
-#define FUTEX_WAKE  1
-#define FUTEX_REQUEUE  3
-// ... 共 15 种操作
-```
-
-函数声明：`src/include/proc.h:199`
-```c
-int do_futex(int* uaddr, int futex_op, int val, ktime_t *timeout, int *addr2, int val2, int val3);
-```
-
-##### 实现状态
-
-**❌ 未找到 `do_futex()` 的具体实现**。仅在文档 `doc/内核实现--Futex.md` 中描述了设计思路，但源代码中未找到对应的实现函数。
-
-**文档提及但未见代码**：
-- `futex_wait()`, `futex_wake()`, `futex_requeue()` 等辅助函数未在代码中找到
-- `sys_futex` 系统调用未在 `syscall/syscall.c` 的系统调用表中找到
-
-**结论**：Futex 机制**仅有接口定义和文档规划**，**未实际实现**。
-
----
-
-### 关键流程追踪（Fork/Exec/Schedule/Exit）
-
-#### `fork()` 实现分析
-
-**❌ 未找到 `sys_fork` 系统调用**。代码中仅发现 `clone()` 系统调用（`SYS_clone = 220`），`fork()` 通过 `clone(0, 0, 0, 0, 0)` 实现。
-
-##### `clone()` 调用链
-
-```mermaid
-graph TD
-  A["sys_clone
- src/sysproc.c:109"] --> B["clone
- src/proc.c:408"]
-  B --> C["allocproc
- src/proc.c:213"]
-  C --> D["proc_pagetable
- src/proc.c:298"]
-  D --> E["vma_copy
- src/include/vma.h:37"]
-  D --> F["vma_deep_mapping
- src/include/vma.h:44"]
-  B --> G["copyout
- src/include/vm.h:28"]
-  B --> H["filedup
- src/include/file.h:51"]
-  B --> I["edup
- src/include/fat32.h:138"]
-```
-
-##### `clone()` 关键逻辑（`src/proc.c:408-492`）
-
-1. **进程/线程判断**：
-   ```c
-   if((flag & CLONE_THREAD) && (flag & CLONE_VM)) {
-     // 线程创建：共享地址空间（浅拷贝 VMA）
-     np = allocproc(p, 1);  // thread_create=1
-   } else {
-     // 进程创建：独立地址空间（深拷贝 VMA）
-     np = allocproc(p, 0);  // thread_create=0
-   }
-   ```
-
-2. **地址空间复制**（`proc_pagetable()` → `vma_copy()` + `vma_deep_mapping()`）：
-   - **深拷贝**：为子进程分配新物理页，复制父进程内容（`vma_deep_mapping()`）
-   - **浅拷贝**：共享父进程物理页，设置写时复制（`vma_shallow_mapping()`）— **但代码中未实现 CoW**
-
-3. **文件表复制**：
-   ```c
-   for(i = 0; i < NOFILE; i++)
-     if(p->ofile[i])
-       np->ofile[i] = filedup(p->ofile[i]);  // 引用计数 +1
-   np->cwd = edup(p->cwd);
-   ```
-
-4. **Trapframe 复制**：
-   ```c
-   *(np->trapframe) = *(p->trapframe);
-   np->trapframe->a0 = 0;  // 子进程返回 0
-   ```
-
-**✅ 已实现**：地址空间复制（深拷贝）、文件表复制、Trapframe 复制
-
-**❌ 未实现**：写时复制（CoW）机制（`vma_shallow_mapping()` 未设置 CoW 标志）
-
-#### `exec()` 实现分析
-
-**✅ 已实现**（`src/exec.c:1-378`）
-
-##### 调用链
-
-```mermaid
-graph TD
-  A["sys_execve
- src/sysproc.c:4"] --> B["exec
- src/exec.c:176"]
-  B --> C["proc_pagetable
- src/proc.c:298"]
-  B --> D["loadelf
- src/exec.c:72"]
-  D --> E["alloc_load_vma
- src/include/vma.h:33"]
-  D --> F["loadseg
- src/exec.c:29"]
-  B --> G["ustackpushstr
- src/exec.c:162"]
-  B --> H["loadaux
- src/exec.c:141"]
-```
-
-##### 关键步骤
-
-1. **创建新页表**：`proc_pagetable(np, 0, 0)` 分配空页表
-2. **加载 ELF**：`loadelf()` 解析 ELF 头，遍历 Program Header
-3. **分配 VMA**：`alloc_load_vma()` 为每个 LOAD 段分配虚拟内存区域
-4. **加载段内容**：`loadseg()` 从文件读取数据到物理页
-5. **构建用户栈**：
-   - 压入 argv 字符串
-   - 压入 env 字符串
-   - 压入 auxv（`AT_PAGESZ`, `AT_PHDR`, `AT_RANDOM` 等）
-   - 设置 `sp`, `a0(argc)`, `a1(argv)`
-6. **切换页表**：交换 `p->pagetable` 和 `np->pagetable`
-
-**✅ 已实现**：ELF 加载、地址空间重建、栈初始化、auxv 传递
-
-#### `schedule()` 调用分析
-
-**谁调用 `schedule()`？**
-
-通过 `lsp_get_call_graph` 分析（`direction="both"`）：
-
-**入向调用**：
-- `main()`（`src/main.c:45`）— 初始调度器启动
-
-**出向调用**：
-- `readyq_pop()` — 从就绪队列取进程
-- `swtch()` — 执行上下文切换
-- `w_satp()`, `sfence_vma()` — 切换页表
-
-**实际调度触发**：
-1. `yield()` → `sched()` → `swtch()`
-2. `sleep()` → `sched()` → `swtch()`
-3. `exit()` → `sched()` → `swtch()`
-
-**❌ 未实现优先级调度**：`readyq_pop()` 直接返回队列头，未进行优先级比较。
-
-#### `exit()` 资源回收流程
-
-**✅ 已实现**（`src/proc.c:720-749`）
-
-##### 调用链
+- 题干：调度算法 (Scheduling Algorithm) 属于哪类？
+请按格式作答：
+- 算法名称: ___（必须是以下之一：FCFS / Round-Robin (RR) / Stride/Proportional-Share / MLFQ / CFS / Priority / 其他）
+- 代码证据（关键字段/函数）: ___
+  - RR: timeslice/slice 字段位置=___
+  - Stride: stride 字段与比较逻辑位置=___
+  - MLFQ: 多级队列 VecDeque/数组层级证据=___
+  - Priority: priority 字段参与 pick_next 排序证据=___
+- 答案："算法名称: FCFS (First-Come First-Served) / FIFO\n代码证据:\n- readyq 为单队列 (src/proc.c:28 queue readyq)\n- queue_push/queue_pop 使用 list_add_before/list_next 实现 FIFO (src/include/queue.h:36-48)\n- 无 timeslice/slice 字段 (grep 搜索无结果)\n- 无 priority/stride 字段参与调度 (grep 搜索无相关调度逻辑)\n- scheduler() 直接 readyq_pop() 无优先级比较 (src/proc.c:124)"
 
-```mermaid
-graph TD
-  A["exit
- src/proc.c:720"] --> B["fileclose
- src/include/file.h:50"]
-  A --> C["eput
- src/include/fat32.h:142"]
-  A --> D["wakeup
- src/proc.c:581"]
-  A --> E["reparent
- src/proc.c:634"]
-  A --> F["sched
- src/proc.c:521"]
-```
-
-##### 回收步骤
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/proc.c` | `variable readyq` | queue readyq; |
+| `src/include/queue.h` | `function queue_pop` | struct proc* queue_pop(queue* q){ if(!queue_empty(q)){ qlock(q); struct list* l = list_next(&q->head); list_del(l); p = dlist_entry(l, struct proc, dlist); ... } } |
+| `src/proc.c` | `function scheduler` | struct proc* p = readyq_pop(); if(p){ p->state = RUNNING; swtch(&c->context, &p->context); } |
 
-1. **关闭文件**：遍历 `ofile[]`，调用 `fileclose()`
-2. **释放当前目录**：`eput(p->cwd)`
-3. **唤醒父进程**：`wakeup(getparent(p))`
-4. **重绑定子进程**：`reparent(p)` 将子进程的父进程设为 `initproc`
-5. **设置退出状态**：`p->xstate = n`
-6. **状态设为 ZOMBIE**：`p->state = ZOMBIE`
-7. **调度**：`sched()` 永不返回
-
-**父进程回收**：`wait4pid()`（`src/proc.c:651-678`）调用 `freeproc()` 释放资源。
-
----
-
-### 进程/线程管理模块扩展
-
-#### 进程组与会话管理
-
-**❌ 未实现**
-
-搜索 `pgid|session_id|set_sid|setpgid|getsid|getpgid` 未找到任何相关代码。
-
-**结论**：该 OS **未实现** POSIX 进程组（Process Group）和会话（Session）机制。
-
-#### 层次结构 ID 规则
-
-**❌ 未实现**
-
-- 无 PGID（进程组 ID）概念
-- 无 SID（会话 ID）概念
-- 仅支持单一 PID 分配（`allocpid()` 全局自增）
-
-#### POSIX 资源限制（rlimit）
-
-**🔸 桩函数**（仅定义结构，未实现系统调用）
-
-##### 定义
-
-`src/include/proc.h:91-111` 定义了完整的 POSIX 资源限制：
-```c
-#define RLIMIT_CPU     0
-#define RLIMIT_FSIZE   1
-#define RLIMIT_DATA    2
-#define RLIMIT_STACK   3
-#define RLIMIT_CORE    4
-#define RLIMIT_RSS     5
-#define RLIMIT_NPROC   6
-#define RLIMIT_NOFILE  7
-#define RLIMIT_MEMLOCK 8
-#define RLIMIT_AS      9
-#define RLIMIT_LOCKS   10
-#define RLIMIT_SIGPENDING 11
-#define RLIMIT_MSGQUEUE 12
-#define RLIMIT_NICE    13
-#define RLIMIT_RTPRIO  14
-#define RLIMIT_RTTIME  15
-#define RLIMIT_NLIMITS 16
-
-struct rlimit {
-  rlim_t rlim_cur;
-  rlim_t rlim_max;
-};
-```
-
-##### 实现状态
-
-**❌ 未找到 `getrlimit()`、`setrlimit()`、`sys_prlimit64()` 的实现**。
-
-仅在文档 `doc/内核实现--信号相关.md:160` 中提到 `SYS_prlimit64`，但代码中未找到对应的系统调用处理函数。
-
-**结论**：资源限制机制**仅有结构体定义**，**未实现任何系统调用**。
-
-#### 线程支持
-
-**✅ 已实现**（通过 `clone()` 系统调用）
-
-##### 线程与进程的区别
-
-代码中**未区分 TCB 和 PCB**，统一使用 `struct proc`：
-- **进程**：`clone(0, 0, 0, 0, 0)` — 独立地址空间（`CLONE_VM` 未设置）
-- **线程**：`clone(CLONE_THREAD|CLONE_VM, stack, ptid, tls, ctid)` — 共享地址空间
-
-##### 线程特性
-
-1. **共享资源**（当 `CLONE_VM` 设置时）：
-   - 页表（`pagetable`）
-   - VMA 链表（`vma`）
-   - 文件表（通过 `filedup()` 共享）
-
-2. **独立资源**：
-   - 内核栈（`kstack`）
-   - Trapframe（`trapframe`）
-   - Context（`context`）
-   - PID（`pid`）— 线程 ID 即 PID
-
-3. **线程清理**：
-   - `clear_child_tid`：线程退出时唤醒等待的线程（`futex()` 调用 — **但 futex 未实现**）
-   - `set_child_tid`：设置子线程 TID
-
----
-
-### 本章总结
-
-| 特性 | 实现状态 | 证据 |
-|------|----------|------|
-| **进程/线程模型** | ✅ 已实现 | `struct proc` 统一表示，`clone()` 支持线程 |
-| **调度算法** | ✅ FIFO 轮转 | `scheduler()` 直接 `readyq_pop()`，无优先级 |
-| **上下文切换** | ✅ 已实现 | `swtch.S` 保存/恢复 14 个寄存器 |
-| **进程状态机** | ✅ 已实现 | 5 状态（UNUSED/RUNNABLE/RUNNING/SLEEPING/ZOMBIE） |
-| **信号机制** | ✅ 部分实现 | 支持 9 种基本信号，`sigaction`/`kill` 已实现 |
-| **Futex** | ❌ 未实现 | 仅接口定义，无 `do_futex()` 实现 |
-| **fork()** | ✅ 通过 `clone()` 实现 | 地址空间深拷贝，文件表复制 |
-| **exec()** | ✅ 已实现 | ELF 加载、地址空间重建、栈初始化 |
-| **exit()/wait()** | ✅ 已实现 | 资源回收、ZOMBIE 状态、父进程通知 |
-| **进程组/会话** | ❌ 未实现 | 无 PGID/SID 相关代码 |
-| **资源限制 (rlimit)** | 🔸 桩函数 | 仅结构体定义，无系统调用 |
-| **写时复制 (CoW)** | ❌ 未实现 | `vma_shallow_mapping()` 未设置 CoW |
+### Q04_006（short_answer）
+
+- 题干：调度器 (Scheduler)核心入口/关键函数有哪些？（schedule/pick_next 等；给 1-3 个入口与证据）
+- 答案："1. scheduler() (src/proc.c:119): 主调度循环，每核启动时调用 (src/main.c:95)，无限循环从 readyq 取进程\n2. sched() (src/proc.c:520): 主动让出 CPU，调用 swtch 切换到 cpu->context\n3. yield() (src/proc.c:655): 将当前进程放回 readyq 并调用 sched()"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/proc.c` | `function scheduler` | void scheduler(){ struct cpu *c = mycpu(); while(1){ struct proc* p = readyq_pop(); ... swtch(&c->context, &p->context); } } |
+| `src/proc.c` | `function sched` | void sched(void){ struct proc *p = myproc(); swtch(&p->context, &mycpu()->context); } |
+| `src/main.c` | `function main` | printf("hart %d scheduler!\n", hartid); scheduler(); |
+
+### Q04_007（tri_state_impl）
+
+- 题干：是否实现 fork/clone（创建新执行实体）？（必须三态）
+- 答案："implemented"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/proc.c` | `function clone` | int clone(uint64 flag, uint64 stack, uint64 ptid, uint64 tls, uint64 ctid) { struct proc *np; if((flag & CLONE_THREAD) && (flag & CLONE_VM)) { np = allocproc(p, 1); ... } else { np = allocproc(p, 0); ... } } |
+| `src/sysproc.c` | `function sys_clone` | uint64 sys_clone(void) { uint64 flag, stack, ptid, ctid, tls; argaddr(0, &flag); ... return clone(flag, stack, ptid, tls, ctid); } |
+
+### Q04_008（short_answer）
+
+- 题干：fork/clone 是否复制地址空间与文件表？（必须给复制路径证据；若 stub 需说明形态）
+- 答案："是，根据 CLONE_VM/CLONE_FILES 标志区分:\n- 地址空间：proc_pagetable() 中 thread_create=1 时调用 vma_shallow_mapping (共享)，thread_create=0 时调用 vma_deep_mapping (复制) (src/proc.c:330-360)\n- 文件表：clone() 中循环调用 filedup() 复制 ofile 数组，edup() 复制 cwd (src/proc.c:458-460)\n- CLONE_VM|CLONE_THREAD 时共享地址空间 (浅拷贝)，否则深拷贝"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/proc.c` | `function clone` | for(i = 0; i < NOFILE; i++) if(p->ofile[i]) np->ofile[i] = filedup(p->ofile[i]); np->cwd = edup(p->cwd); |
+| `src/proc.c` | `function proc_pagetable` | if(thread_create) { while(nvma != p->vma) { if(nvma->type != TRAP && vma_shallow_mapping(...) < 0) ... } } else { while(nvma != p->vma) { if(nvma->type != TRAP && vma_deep_mapping(...) < 0) ... } } |
+
+### Q04_009（tri_state_impl）
+
+- 题干：是否实现 exec（装载 ELF/重建地址空间）？（必须三态）
+- 答案："implemented"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/exec.c` | `function exec` | int exec(char *path, char **argv, char **env) { struct proc* np = kmalloc(sizeof(struct proc)); proc_pagetable(np, 0, 0); loadelf(np, ep, &elf, &phdr, 0); ... } |
+| `src/sysproc.c` | `function sys_execve` | uint64 sys_execve() { char *path, *argv[MAXARG], *env[MAXARG]; argstr(0, &path); ... int ret = exec(path, argv, env); } |
+
+### Q04_010（tri_state_impl）
+
+- 题干：是否实现 wait/waitpid（父子回收同步）？（必须三态）
+- 答案："implemented"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/proc.c` | `function wait4pid` | int wait4pid(int pid, uint64 addr) { struct proc *p = myproc(); while(1){ child = findchild(p, zombiecond, pid, &chan); if(child != NULL){ freeproc(child); return kidpid; } sleep(p, &p->lock); } } |
+| `src/sysproc.c` | `function sys_wait4` | uint64 sys_wait4() { int pid; uint64 addr; argint(0, &pid); argaddr(1, &addr); return wait4pid(pid, addr); } |
+
+### Q04_011（single_choice）
+
+- 题干：waitpid / wait4 的阻塞实现 (Blocking Implementation) 更接近哪种？
+- 答案："A. 真正阻塞：移出就绪队列 + WaitQueue/条件变量唤醒 (Wait Queue or Condition Variable)"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/proc.c` | `function wait4pid` | if(pid == -1) sleep(p, &p->lock); else sleep(chan, &p->lock); |
+| `src/proc.c` | `function sleep` | queue* q = findwaitq(chan); waitq_push(q, p); p->state = SLEEPING; sched(); |
+| `src/proc.c` | `function wakeup` | queue* q = findwaitq(chan); while((p = waitq_pop(q))!=NULL){ p->state = RUNNABLE; readyq_push(p); } |
+
+### Q04_012（short_answer）
+
+- 题干：PID 分配器实现是什么？（自增/bitmap/空闲栈复用/只分配不回收；必须给证据）
+- 答案："单调自增，不回收 (只分配不回收)\n实现：nextpid 全局变量，allocpid() 中 nextpid = nextpid + 1\n无 bitmap/空闲栈复用机制，PID 泄漏风险"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/proc.c` | `function allocpid` | int allocpid() { acquire(&pid_lock); pid = nextpid; nextpid = nextpid + 1; release(&pid_lock); return pid; } |
+| `src/proc.c` | `variable nextpid` | int nextpid = 1; |
+
+### Q04_013（short_answer）
+
+- 题干：父子进程树如何存储？（children Vec/链表/parent+sibling 指针；必须给结构体字段证据）
+- 答案："parent 指针 + 全局遍历\n- struct proc 含 parent 指针 (src/include/proc.h:133)\n- 无 children 链表/数组\n- findchild() 通过遍历全局 proc 数组并检查 np->parent == p 查找子进程 (src/proc.c:611-625)\n- reparent() 遍历全局数组修改 orphan 子进程的 parent 为 initproc (src/proc.c:634-650)\n时间复杂度 O(NPROC)"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/include/proc.h` | `struct proc` | struct proc *parent; |
+| `src/proc.c` | `function findchild` | for(struct proc* np = proc; np < &proc[NPROC]; np++){ if(np->parent == p && cond(np, pid)){ ... } } |
+
+### Q04_014（tri_state_impl）
+
+- 题干：是否实现信号 (signal) 或 futex？（若二者都无则 not_found；若只实现其一需说明并给证据）
+- 答案："stub"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/include/proc.h` | `struct proc` | ksigaction_t *sig_act; __sigset_t sig_set; __sigset_t sig_pending; struct sig_frame *sig_frame; |
+| `src/include/proc.h` | `function do_futex` | int do_futex(int* uaddr, int futex_op, int val, ktime_t *timeout, int *addr2, int val2, int val3); |
+| `src/proc.c` | `grep do_futex` | 仅在 src/include/proc.h:199 声明，无函数体实现 (grep 仅找到声明) |
+
+### Q04_015（short_answer）
+
+- 题干：与 09 多核的交叉一致性：是否存在每核队列/任务迁移/IPI resched？（需与第 9 章互指证据或写不适用）
+- 答案："不适用 (单队列全局共享)\n- 仅一个全局 readyq (src/proc.c:28)\n- struct cpu 无 per-CPU readyq 字段 (src/include/cpu.h:28-34)\n- 无任务迁移/负载均衡代码\n- IPI 仅用于启动 (sbi_send_ipi)，无 IPI resched 机制\n与第 9 章交叉验证：若 09 判定为 SMP 启动但无调度迁移，此处一致"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/proc.c` | `variable readyq` | queue readyq; |
+| `src/include/cpu.h` | `struct cpu` | struct cpu { struct proc *proc; struct context context; int noff; int intena; }; |
+
+### Q04_016（short_answer）
+
+- 题干：exit() 资源回收路径：调用链是什么？是否真正回收地址空间/文件表/通知父进程？（必须给调用链证据；桩则说明）
+- 答案："调用链:\n1. exit(n) (src/proc.c:720)\n2. 关闭文件：fileclose() 循环关闭 ofile (src/proc.c:727-733)\n3. 释放 cwd：eput(p->cwd) (src/proc.c:735)\n4. 唤醒父进程：wakeup(getparent(p)) (src/proc.c:738)\n5. 重继子进程：reparent(p) (src/proc.c:739)\n6. 设置僵尸态：p->state = ZOMBIE (src/proc.c:742)\n7. 调度：sched() (永不返回) (src/proc.c:745)\n8. wait4pid() 中 freeproc() 回收页表/栈/信号 (src/proc.c:169-206)"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/proc.c` | `function exit` | for(int fd = 0; fd < NOFILE; fd++){ fileclose(f); } eput(p->cwd); wakeup(getparent(p)); reparent(p); p->state = ZOMBIE; sched(); |
+| `src/proc.c` | `function freeproc` | if(p->pagetable) proc_freepagetable(p); sigaction_free(p->sig_act); sigframefree(p->sig_frame); p->state = UNUSED; |
+
+### Q04_017（tri_state_impl）
+
+- 题干：是否实现进程组/会话（Process Group / Session，pgid/session/set_sid/setpgid）？（必须三态；有则区分真实检查链 vs 仅占位字段）
+- 答案："not_found"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/include/proc.h` | `grep pgid` | grep 'setpgid|set_sid|getpgid|getsid' 无匹配 (仅 ff.h 中有 session 字样但与进程组无关) |
+| `src/proc.c` | `grep session` | 无进程组/会话相关实现代码 |
+
+### Q04_018（tri_state_impl）
+
+- 题干：是否实现 POSIX 资源限制（rlimit/RLIMIT/getrlimit/setrlimit）？（必须三态；若 implemented 需说明支持的资源类型数量及软/硬限制机制）
+- 答案："not_found"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/include/proc.h` | `struct rlimit` | struct rlimit { rlim_t rlim_cur; rlim_t rlim_max; }; 但仅定义结构体，无 getrlimit/setrlimit 函数 |
+| `src/proc.c` | `grep getrlimit` | grep 'getrlimit|setrlimit' 无匹配 (0 结果) |
+
+### Q04_019（single_choice）
+
+- 题干：该 OS 是否区分了 TCB（线程控制块）与 PCB（进程控制块）？
+- 答案："B. 仅有统一 Task 结构（无区分）"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/include/proc.h` | `struct proc` | 仅 struct proc 一种结构体，通过 clone() 的 CLONE_VM|CLONE_THREAD 标志区分进程/线程语义 |
+
+### Q04_020（tri_state_impl）
+
+- 题干：调度切换路径上是否存在页表切换（w_satp/sfence.vma/写 CR3/TTBR 等）？（必须三态；给调用点 路径 证据）
+- 答案："implemented"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/proc.c` | `function scheduler` | w_satp(MAKE_SATP(p->pagetable)); sfence_vma(); swtch(&c->context, &p->context); w_satp(MAKE_SATP(kernel_pagetable)); sfence_vma(); |
+
+### Q04_021（single_choice）
+
+- 题干：用户线程与内核线程的映射模型 (User-Level Thread to Kernel-Level Thread Mapping) 更接近哪种？（Stallings Ch4）
+- 答案："A. 1:1（每个用户线程对应一个内核线程，如 Linux pthread）"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/proc.c` | `function clone` | clone() 创建新 struct proc 实例，用户态线程库可通过 clone(CLONE_VM|CLONE_THREAD) 创建内核级线程 |
+| `usrinit/user.h` | `function clone` | extern int clone(uint64 flag, uint64 stack, uint64 ptid, uint64 tls, uint64 ctid); 用户态可调用 |
+
+### Q04_022（tri_state_impl）
+
+- 题干：是否实现线程局部存储 (Thread-Local Storage, TLS)？（必须三态；搜索 thread_local|TLS|__thread|#[thread_local]；若 implemented 需说明 TLS 的访问方式：tp 寄存器/段寄存器/其他）
+- 答案："stub"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/include/proc.h` | `macro CLONE_SETTLS` | #define CLONE_SETTLS 0x00080000 /* create a new TLS for the child */ |
+| `src/proc.c` | `function clone` | np->trapframe->tp = tls; 仅将 tls 参数存入 tp 寄存器，无实际 TLS 分配/管理机制 |
+| `src/proc.c` | `grep CLONE_SETTLS` | clone() 函数中未检查 CLONE_SETTLS 标志，无 TLS 描述符处理逻辑 |
+
+### Q04_023（multi_choice）
+
+- 题干：调度器是否追踪/优化以下哪些性能指标 (Scheduling Criteria, Stallings Ch9)？（多选；未发现则留空并在 notes 写 not_found）
+- 答案：["F. 未发现调度性能统计"]
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/proc.c` | `grep CPU utilization` | 无 CPU 利用率/吞吐量/周转时间等统计代码 |
+| `src/proc.c` | `struct tms` | struct tms proc_tms 存在但仅用于 times() 系统调用，非调度优化 |
+
+### Q04_024（tri_state_impl）
+
+- 题干：优先级调度是否实现老化 (Aging, Stallings Ch9) 以防止低优先级进程饥饿 (Starvation)？（必须三态；搜索 age/aging/boost_priority 或等价；若 not_found 需说明是否存在饥饿风险）
+- 答案："not_found"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/proc.c` | `grep aging` | grep 'aging|boost_priority|priority.*age' 无匹配 |
+| `src/include/proc.h` | `struct proc` | struct proc 无 priority 字段，FCFS 调度无饥饿风险概念 |
+
+### Q04_025（tri_state_impl）
+
+- 题干：是否实现公平份额调度 (Fair-Share Scheduling, Stallings Ch9) 或 CPU 配额 (CPU Quota/cgroup)？（必须三态；搜索 fair_share/cgroup/cpu_quota/weight 等）
+- 答案："not_found"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/proc.c` | `grep fair_share` | grep 'fair_share|cgroup|cpu_quota|weight' 仅找到 CLONE_NEWCGROUP 宏定义，无实现 |
+| `src/include/proc.h` | `macro CLONE_NEWCGROUP` | #define CLONE_NEWCGROUP 0x02000000 /* New cgroup namespace */ 仅宏定义，无 cgroup 实现 |
+
+### Q04_026（single_choice）
+
+- 题干：调度器的抢占模式 (Preemption Mode, Stallings Ch9) 更接近哪种？
+- 答案："A. 完全抢占 (Fully Preemptive)：时钟中断可随时抢占运行进程"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/trap.c` | `function usertrap` | 时钟中断 (scause 0x8000000000000005L) 调用 timer_tick()，可触发调度 |
+| `src/proc.c` | `function yield` | yield() 可在任何时刻调用，将当前进程放回 readyq 并 sched() |
+| `src/trap.c` | `grep proc_tick` | proc_tick() 被注释 (src/trap.c:256)，但 timer_tick() 仍存在，时钟中断可抢占 |
+
+### Q04_027（tri_state_impl）
+
+- 题干：是否实现最短作业优先调度 (Shortest Job First / SJF 或 SRTF, Stallings Ch9)？（必须三态；或等价的基于预测 burst 时间的调度）
+- 答案："not_found"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/proc.c` | `grep SJF` | grep 'SJF|shortest.*job|burst' 无匹配 |
+| `src/proc.c` | `function scheduler` | scheduler() 直接 readyq_pop() 无 burst 时间预测或排序逻辑 |
 
 ---
 
 
 # 中断异常与系统调用
 
-## 第 5 章：中断、异常与系统调用
-
-### Trap 处理流程（用户态 <-> 内核态）
-
-本操作系统的 Trap 处理机制采用 RISC-V 标准的 `sret`/`sepc` 机制实现用户态与内核态之间的切换。Trap 入口分为两种场景：
-
-1. **用户态 Trap**：通过 `trampoline.S` 中的 `uservec` 入口处理
-2. **内核态 Trap**：通过 `kernelvec.S` 中的 `kernelvec` 入口处理
-
-#### 用户态 Trap 入口流程
-
-用户态程序触发 Trap（系统调用 `ecall`、异常或中断）时，硬件自动保存 `sepc` 和 `sstatus`，然后跳转到 `stvec` 寄存器指向的地址。在用户态执行时，`stvec` 指向 `TRAMPOLINE + (uservec - trampoline)`。
-
-**`uservec` 汇编代码**（`src/trampoline.S:17-85`）执行以下关键操作：
-
-```assembly
-uservec:    
-    # swap a0 and sscratch, so that a0 is TRAPFRAME
-    csrrw a0, sscratch, a0
-    
-    # save all user registers to TRAPFRAME (ra, sp, gp, tp, t0-t6, s0-s11, a0-a7)
-    sd ra, 40(a0)
-    sd sp, 48(a0)
-    # ... 保存所有寄存器 ...
-    
-    # restore kernel stack pointer from p->trapframe->kernel_sp
-    ld sp, 8(a0)
-    
-    # load the address of usertrap()
-    ld t0, 16(a0)
-    
-    # restore kernel page table
-    ld t1, 0(a0)
-    csrw satp, t1
-    sfence.vma
-    
-    # jump to usertrap()
-    jr t0
-```
-
-**`usertrap()` 函数**（`src/trap.c:72-145`）是用户态 Trap 的 C 语言处理入口：
-
-```c
-void usertrap(void) {
-  int which_dev = 0;
-  
-  if((r_sstatus() & SSTATUS_SPP) != 0)
-    panic("usertrap: not from user mode");
-  
-  // 切换到内核态 Trap 向量
-  w_stvec((uint64)kernelvec);
-  
-  struct proc *p = myproc();
-  p->trapframe->epc = r_sepc();  // 保存断点
-  
-  uint64 cause = r_scause();
-  
-  if(cause == EXCP_ENV_CALL){  // 系统调用 (ecall)
-    p->trapframe->epc += 4;    // 跳过 ecall 指令
-    intr_on();
-    syscall();
-  } 
-  else if((which_dev = devintr()) != 0){
-    // 设备中断处理
-  }
-  else if(cause == 3){  // ebreak
-    printf("ebreak\n");
-    trapframedump(p->trapframe);
-    p->trapframe->epc += 2;
-  }
-  else {
-    // 未预期的异常
-    p->killed = SIGTERM;
-  }
-  
-  // 信号处理
-  if (p->killed) {
-    if (SIGTERM == p->killed)
-      exit(-1);
-    sighandle();
-  }
-  
-  // 时钟中断触发调度
-  if(which_dev == 2)
-    yield();
-    
-  usertrapret();
-}
-```
-
-#### 中断与异常的区分
-
-在 `src/trap.c:20-39` 中定义了中断和异常的区分逻辑：
-
-```c
-// Interrupt flag: set 1 in the Xlen - 1 bit
-#define INTERRUPT_FLAG    0x8000000000000000L
-
-// Supervisor interrupt number
-#define INTR_SOFTWARE    (0x1 | INTERRUPT_FLAG)
-#define INTR_TIMER       (0x5 | INTERRUPT_FLAG)
-#define INTR_EXTERNAL    (0x9 | INTERRUPT_FLAG)
-
-// Supervisor exception number
-#define EXCP_LOAD_ACCESS  0x5
-#define EXCP_STORE_ACCESS 0x7
-#define EXCP_ENV_CALL     0x8      // 系统调用
-#define EXCP_LOAD_PAGE    0xd      // 取页异常
-#define EXCP_STORE_PAGE   0xf      // 存页异常
-```
-
-**区分机制**：
-- **中断**：`scause` 最高位为 1（`0x8000000000000000L`），低 11 位表示中断类型
-- **异常**：`scause` 最高位为 0，低 12 位表示异常类型
-
-`devintr()` 函数（`src/trap.c:188-229`）负责设备中断的分发：
-
-```c
-int devintr(void) {
-  uint64 scause = r_scause();
-  
-  // 外部中断 (scause = 0x8000000000000009)
-  if ((0x8000000000000000L & scause) && 9 == (scause & 0xff)) {
-    // PLIC 中断处理（当前代码中 irq 始终为 0，未完全实现）
-    return 1;
-  }
-  // 定时器中断 (scause = 0x8000000000000005)
-  else if (0x8000000000000005L == scause) {
-    timer_tick();
-    return 2;  // 返回 2 表示时钟中断
-  }
-  else { return 0; }  // 非设备中断
-}
-```
-
-### 异常向量表与入口
-
-#### TrapFrame 结构体定义
-
-**`struct trapframe`**（`src/include/trap.h:17-56`）用于保存用户态上下文，共包含 **28 个寄存器字段**，总大小为 **28 × 8 = 224 字节**：
-
-```c
-struct trapframe {
-  /*   0 */ uint64 kernel_satp;   // 内核页表基址
-  /*   8 */ uint64 kernel_sp;     // 内核栈顶
-  /*  16 */ uint64 kernel_trap;   // usertrap() 函数地址
-  /*  24 */ uint64 epc;           // 用户态程序计数器
-  /*  32 */ uint64 kernel_hartid; // CPU 核心 ID
-  /*  40 */ uint64 ra;
-  /*  48 */ uint64 sp;
-  /*  56 */ uint64 gp;
-  /*  64 */ uint64 tp;
-  /*  72 */ uint64 t0;
-  /*  80 */ uint64 t1;
-  /*  88 */ uint64 t2;
-  /*  96 */ uint64 s0;
-  /* 104 */ uint64 s1;
-  /* 112 */ uint64 a0;  // 系统调用返回值
-  /* 120 */ uint64 a1;
-  /* 128 */ uint64 a2;
-  /* 136 */ uint64 a3;
-  /* 144 */ uint64 a4;
-  /* 152 */ uint64 a5;
-  /* 160 */ uint64 a6;
-  /* 168 */ uint64 a7;  // 系统调用号
-  /* 176 */ uint64 s2;
-  /* 184 */ uint64 s3;
-  /* 192 */ uint64 s4;
-  /* 200 */ uint64 s5;
-  /* 208 */ uint64 s6;
-  /* 216 */ uint64 s7;
-  /* 224 */ uint64 s8;
-  /* 232 */ uint64 s9;
-  /* 240 */ uint64 s10;
-  /* 248 */ uint64 s11;
-  /* 256 */ uint64 t3;
-  /* 264 */ uint64 t4;
-  /* 272 */ uint64 t5;
-  /* 280 */ uint64 t6;
-};
-```
-
-**寄存器统计**：
-- **通用寄存器**：`ra`, `sp`, `gp`, `tp`, `t0-t6`, `s0-s11`, `a0-a7` 共 23 个
-- **控制寄存器**：`kernel_satp`, `kernel_sp`, `kernel_trap`, `epc`, `kernel_hartid` 共 5 个
-- **总计**：28 个 `uint64` 字段，224 字节
-
-#### 上下文保存与恢复
-
-**保存流程**（`trampoline.S:uservec`）：
-1. 通过 `sscratch` 寄存器交换获取 `TRAPFRAME` 地址
-2. 依次保存所有用户寄存器到 `trapframe`
-3. 从 `trapframe` 恢复内核栈指针和页表
-4. 跳转到 `usertrap()`
-
-**恢复流程**（`trampoline.S:userret`）：
-```assembly
-userret:
-    # 切换到用户页表
-    csrw satp, a1
-    sfence.vma
-    
-    # 恢复所有用户寄存器
-    ld ra, 40(a0)
-    ld sp, 48(a0)
-    # ... 恢复所有寄存器 ...
-    
-    # 恢复用户 a0，保存 TRAPFRAME 到 sscratch
-    csrrw a0, sscratch, a0
-    
-    # 返回用户态
-    sret
-```
-
-### 系统调用分发机制（追踪 sys_write）
-
-#### 系统调用入口
-
-用户态通过 `ecall` 指令触发系统调用，参数传递遵循 RISC-V 调用约定：
-- **系统调用号**：`a7` 寄存器
-- **参数**：`a0-a5` 寄存器
-- **返回值**：`a0` 寄存器
-
-#### 系统调用分发表
-
-**`syscall()` 函数**（`syscall/syscall.c:1-20`）负责系统调度的分发：
-
-```c
-void syscall(void) {
-  int num;
-  struct proc *p = myproc();
-
-  num = p->trapframe->a7;  // 获取系统调用号
-  if(num > 0 && num < NELEM(syscalls) && syscalls[num]) {
-    p->trapframe->a0 = syscalls[num]();  // 调用对应处理函数
-    // trace
-    if ((p->tmask & (1 << num)) != 0) {
-      printf("pid %d: %s -> %d\n", p->pid, sysnames[num], p->trapframe->a0);
-    }
-  } else {
-    printf("pid %d %s: unknown sys call %d\n", p->pid, p->name, num);
-    p->trapframe->a0 = -1;
-  }
-}
-```
-
-**系统调用表**（根据 `doc/内核实现--系统调用.md:374-395` 文档）：
-```c
-static uint64 (*syscalls[])(void) = {
-  [SYS_fork]    sys_fork,
-  [SYS_exit]    sys_exit,
-  [SYS_wait]    sys_wait,
-  [SYS_pipe]    sys_pipe,
-  [SYS_read]    sys_read,
-  [SYS_kill]    sys_kill,
-  [SYS_exec]    sys_exec,
-  [SYS_fstat]   sys_fstat,
-  [SYS_chdir]   sys_chdir,
-  [SYS_dup]     sys_dup,
-  [SYS_getpid]  sys_getpid,
-  [SYS_sbrk]    sys_sbrk,
-  [SYS_sleep]   sys_sleep,
-  [SYS_uptime]  sys_uptime,
-  [SYS_open]    sys_open,
-  [SYS_write]   sys_write,
-  [SYS_mknod]   sys_mknod,
-  [SYS_unlink]  sys_unlink,
-  [SYS_link]    sys_link,
-  [SYS_mkdir]   sys_mkdir,
-  [SYS_close]   sys_close,
-};
-```
-
-#### sys_write 调用链追踪
-
-**`sys_write()` 实现**（`src/sysfile.c:233-244`）：
-
-```c
-uint64 sys_write(void) {
-  int fd;
-  struct file *f;
-  int n;
-  uint64 p;
-  if(argfd(0, &fd, &f) < 0 || argint(2, &n) < 0 || argaddr(1, &p) < 0){
-    return -1;
-  }
-  return filewrite(f, p, n);
-}
-```
-
-**完整调用链**：
-```mermaid
-graph TD
-  A["ecall 指令\n用户态"] --> B["usertrap\nsrc/trap.c:72"]
-  B --> C["syscall\nsyscall/syscall.c:1"]
-  C --> D["sys_write\nsrc/sysfile.c:233"]
-  D --> E["filewrite\nsrc/file.c"]
-```
-
-**参数获取函数**：
-- `argfd()`: 获取文件描述符和 `struct file` 指针
-- `argint()`: 获取整数参数
-- `argaddr()`: 获取用户态地址
-
-### 核心 Syscall 实现列表
-
-根据代码分析，本系统已实现的系统调用如下：
-
-#### ✅ 已实现的系统调用
-
-| 类别 | 系统调用 | 实现文件 | 状态 |
-|------|---------|---------|------|
-| **进程管理** | `sys_fork` | `src/proc.c` | ✅ 已实现（通过 `clone()` 间接实现） |
-| | `sys_exit` | `src/sysproc.c:173` | ✅ 已实现 |
-| | `sys_wait4` | `src/sysproc.c:133` | ✅ 已实现 |
-| | `sys_clone` | `src/sysproc.c:93` | ✅ 已实现 |
-| | `sys_getpid` | `src/sysproc.c:36` | ✅ 已实现 |
-| | `sys_getppid` | `src/sysproc.c:41` | ✅ 已实现 |
-| | `sys_gettid` | `src/sysproc.c:148` | ✅ 已实现 |
-| | `sys_set_tid_address` | `src/sysproc.c:140` | ✅ 已实现 |
-| **文件 I/O** | `sys_read` | `src/sysfile.c:218` | ✅ 已实现 |
-| | `sys_write` | `src/sysfile.c:233` | ✅ 已实现 |
-| | `sys_readv` | `src/sysfile.c:248` | ✅ 已实现 |
-| | `sys_writev` | `src/sysfile.c:279` | ✅ 已实现 |
-| | `sys_close` | `src/sysfile.c:313` | ✅ 已实现 |
-| | `sys_openat` | `src/sysfile.c:38` | ✅ 已实现 |
-| **信号** | `sys_rt_sigaction` | `src/syssig.c:47` | ✅ 已实现 |
-| | `sys_rt_sigprocmask` | `src/syssig.c:28` | ✅ 已实现 |
-| | `sys_rt_sigreturn` | `src/syssig.c:22` | ✅ 已实现 |
-| | `sys_kill` | `src/syssig.c:94` | ✅ 已实现 |
-| | `sys_tgkill` | `src/syssig.c:102` | ✅ 已实现 |
-| | `sys_exit_group` | `src/syssig.c:9` | 🔸 桩函数（返回 0 无逻辑） |
-| **内存管理** | `sys_brk` | `src/sysproc.c:165` | ✅ 已实现 |
-| **其他** | `sys_execve` | `src/sysproc.c:11` | ✅ 已实现 |
-| | `sys_uname` | `src/sysproc.c:84` | ✅ 已实现 |
-| | `sys_nanosleep` | `src/sysproc.c:182` | ✅ 已实现 |
-| | `sys_getuid/geteuid` | `src/sysproc.c:46-59` | ✅ 已实现 |
-| | `sys_getgid/getegid` | `src/sysproc.c:62-75` | ✅ 已实现 |
-| | `sys_setuid/setgid` | `src/sysproc.c:78-91` | ✅ 已实现 |
-
-#### 🔸 桩函数检测
-
-以下系统调用被识别为**桩函数**（Stub）：
-
-1. **`sys_exit_group()`**（`src/syssig.c:9-11`）：
-   ```c
-   uint64 sys_exit_group(void){
-     return 0;  // 仅返回 0，无实际逻辑
-   }
-   ```
-
-#### ❌ 未实现的系统调用
-
-根据文档提及但**未在代码中找到实现**的系统调用：
-- `sys_mmap` / `sys_munmap`：文档提及内存映射，但未找到对应 syscall 实现
-- `sys_fstat` / `sys_stat`：文档提及但代码中未找到完整实现
-- `sys_pipe`：系统调用表中有声明，但未找到实现文件
-- `sys_dup` / `sys_dup2`：系统调用表中有声明，但未找到实现
-- `sys_sleep` / `sys_uptime`：系统调用表中有声明，但未找到独立实现
-- `sys_mknod` / `sys_unlink` / `sys_link` / `sys_mkdir`：系统调用表中有声明，但未找到实现
-
-### 中断处理与信号关联
-
-#### 时钟中断处理流程
-
-**定时器初始化**（`src/timer.c:14-22`）：
-```c
-void timerinit() {
-    initlock(&tickslock, "time");
-    ticks = 0;
-}
-
-void set_next_timeout() {
-    set_timer(r_time() + INTERVAL);
-}
-
-void timer_tick() {
-    acquire(&tickslock);
-    ticks++;
-    wakeup(&ticks);
-    release(&tickslock);
-    set_next_timeout();
-}
-```
-
-**时钟中断触发调度**：
-```c
-// src/trap.c:140-142
-if(which_dev == 2)  // devintr() 返回 2 表示时钟中断
-  yield();
-```
-
-#### 信号处理机制
-
-**信号定义**（`src/include/signal.h:10-19`）：
-```c
-#define SIGTERM   15
-#define SIGKILL   9
-#define SIGABRT   6
-#define SIGHUP    1
-#define SIGINT    2
-#define SIGQUIT   3
-#define SIGILL    4
-#define SIGTRAP   5
-#define SIGCHLD   17
-#define SIGRTMIN  34
-#define SIGRTMAX  64
-```
-
-**信号处理流程**（`src/signal.c:123-180`）：
-
-```c
-void sighandle(void) {
-  struct proc *p = myproc();
-  int signum = 0;
-  
-  if (p->killed) {
-    signum = p->killed;
-    // 清除 pending 位
-    p->sig_pending.__val[i] &= ~(1ul << bit);
-    p->killed = 0;
-  }
-  else {
-    return;  // 无信号处理
-  }
-  
-  // 分配信号处理帧
-  struct sig_frame *frame = allocpage();
-  struct trapframe *tf = allocpage();
-  
-  // 保存原 trapframe
-  frame->tf = p->trapframe;
-  
-  // 设置信号处理跳板
-  tf->epc = (uint64)(SIG_TRAMPOLINE + ((uint64)sig_handler - (uint64)sig_trampoline));
-  tf->a0 = signum;
-  
-  // 插入 sig_frame 链表
-  frame->next = p->sig_frame;
-  p->sig_frame = frame;
-  p->trapframe = tf;
-}
-```
-
-**信号发送实现**：
-
-1. **`sys_kill()`**（`src/syssig.c:94-99`）- 进程级信号：
-   ```c
-   uint64 sys_kill(){
-     int sig, pid;
-     argint(0,&pid);
-     argint(1,&sig);
-     return kill(pid,sig);
-   }
-   ```
-
-2. **`sys_tgkill()`**（`src/syssig.c:102-108`）- 线程组信号：
-   ```c
-   uint64 sys_tgkill(){
-     int sig, tid, pid;
-     argint(0,&pid);
-     argint(1,&tid);
-     argint(2,&sig);
-     return tgkill(pid,tid,sig);
-   }
-   ```
-
-3. **`kill()` 函数**（`src/proc.c:754-773`）：
-   ```c
-   int kill(int pid,int sig){
-     struct proc* p;
-     for(p = proc; p < &proc[NPROC]; p++){
-       if(p->pid == pid){
-         acquire(&p->lock);
-         if(p->state == SLEEPING){
-           queue_del(p);
-           readyq_push(p);
-           p->state = RUNNABLE;
-         }
-         p->sig_pending.__val[0] |= 1ul << sig;
-         if (0 == p->killed || sig < p->killed) {
-           p->killed = sig;
-         }
-         release(&p->lock);
-         return 0;
-       }
-     }
-     return 0;
-   }
-   ```
-
-**信号处理粒度**：
-- ✅ **进程级**：`sys_kill(pid, sig)` - 向指定进程发送信号
-- ✅ **线程级**：`sys_tgkill(pid, tid, sig)` - 向指定线程发送信号（通过 `tgkill()` 验证父子关系）
-- ❌ **进程组级**：未找到 `sys_tgkill` 或 `sys_killpg` 实现
-
-**信号返回机制**（`src/signal.c:244-259`）：
-```c
-void sigreturn(void) {
-  struct proc *p = myproc();
-  
-  if (NULL == p->sig_frame) {
-    exit(-1);
-  }
-  
-  struct sig_frame *frame = p->sig_frame;
-  freepage(p->trapframe);
-  p->trapframe = frame->tf;  // 恢复原 trapframe
-  
-  p->sig_frame = frame->next;
-  freepage(frame);
-}
-```
-
-**跳板代码**：
-- `src/sig_trampoline.S` 包含信号处理的跳板代码
-- `SIG_TRAMPOLINE` 映射在 `TRAMPOLINE - PGSIZE`（`src/include/memlayout.h:60`）
-
-#### 缺页异常与内存特性
-
-**缺页异常定义**（`src/trap.c:38-39`）：
-```c
-#define EXCP_LOAD_PAGE    0xd  // 13 - 取页异常
-#define EXCP_STORE_PAGE   0xf  // 15 - 存页异常
-```
-
-**处理函数声明**（`src/include/vm.h:42-43`）：
-```c
-int handle_page_fault(int kind, uint stval);
-int kernel_handle_page_fault(int kind, uint stval);
-```
-
-**⚠️ 未实现检测**：
-- 在 `src/trap.c:102` 中，缺页异常处理被注释掉：
-  ```c
-  else if(handle_excp(cause) == 0) {
-    // 空处理
-  }
-  ```
-- 未找到 `handle_page_fault()` 的实际实现
-- 未找到 **CoW（写时复制）** 相关实现代码
-- 未找到 **Lazy Allocation（懒分配）** 相关实现代码
-
-**结论**：缺页异常处理机制**🔸 仅为桩函数**，CoW 和 Lazy Allocation 特性**❌ 未实现**。
-
-### 关键代码片段
-
-#### Trap 入口汇编（`src/trampoline.S`）
-```assembly
-# 用户态 Trap 入口
-uservec:    
-    csrrw a0, sscratch, a0      # 获取 TRAPFRAME
-    sd ra, 40(a0)               # 保存所有寄存器
-    sd sp, 48(a0)
-    # ... 保存 ra, sp, gp, tp, t0-t6, s0-s11, a0-a7 ...
-    ld sp, 8(a0)                # 恢复内核栈
-    ld t0, 16(a0)               # 加载 usertrap 地址
-    ld t1, 0(a0)                # 加载内核页表
-    csrw satp, t1
-    sfence.vma
-    jr t0                       # 跳转到 usertrap()
-```
-
-#### 系统调用分发（`syscall/syscall.c`）
-```c
-void syscall(void) {
-  int num = p->trapframe->a7;
-  if(num > 0 && num < NELEM(syscalls) && syscalls[num]) {
-    p->trapframe->a0 = syscalls[num]();
-    // trace
-    if ((p->tmask & (1 << num)) != 0) {
-      printf("pid %d: %s -> %d\n", p->pid, sysnames[num], p->trapframe->a0);
-    }
-  } else {
-    p->trapframe->a0 = -1;
-  }
-}
-```
-
-#### 信号处理（`src/signal.c`）
-```c
-void sighandle(void) {
-  struct proc *p = myproc();
-  int signum = p->killed;
-  
-  // 清除 pending 位
-  p->sig_pending.__val[0] &= ~(1ul << signum);
-  p->killed = 0;
-  
-  // 分配信号处理帧
-  struct sig_frame *frame = allocpage();
-  struct trapframe *tf = allocpage();
-  
-  frame->tf = p->trapframe;
-  tf->epc = SIG_TRAMPOLINE + (sig_handler - sig_trampoline);
-  tf->a0 = signum;
-  
-  p->trapframe = tf;
-  frame->next = p->sig_frame;
-  p->sig_frame = frame;
-}
-```
-
-#### 定时器中断（`src/timer.c`）
-```c
-void timer_tick() {
-    acquire(&tickslock);
-    ticks++;
-    wakeup(&ticks);
-    release(&tickslock);
-    set_next_timeout();
-}
-```
-
----
-
-**本章总结**：
-
-1. **Trap 处理**：完整实现了用户态/内核态 Trap 切换机制，通过 `trampoline.S` 和 `usertrap()` 处理所有异常和中断
-2. **系统调用**：实现了约 25 个核心系统调用，包括进程管理、文件 I/O、信号处理等，但部分 syscall（如 `sys_exit_group`）仅为桩函数
-3. **信号机制**：实现了完整的信号处理框架，支持进程级和线程级信号发送，包含信号跳板机制
-4. **中断处理**：时钟中断完整实现并触发调度，但外部中断（PLIC）处理未完全实现
-5. **缺页异常**：仅声明接口但未实现具体处理逻辑，CoW 和 Lazy Allocation 特性未实现
+## 题单作答（JSON-QA 渲染）
+
+- stage_id: `05_trap_syscall`
+- terminology_profile: `stallings_en_zh`
+
+## 第 05_trap_syscall 阶段：中断、异常与系统调用
+
+### Q05_001（short_answer）
+
+- 题干：trap/异常向量入口在哪里？（trap_handler/trap_vector/__alltraps 等；必须给证据）
+- 答案："陷阱入口位于 `src/trampoline.S` 的 `uservec` 标签（用户态陷阱入口）和 `src/trap.c` 的 `usertrap()` 函数（C 语言处理入口）。内核态陷阱入口为 `src/kernelvec.S` 的 `kernelvec`，由 `kerneltrap()` 处理。初始化时通过 `trapinithart()` 设置 `stvec` 寄存器指向 `kernelvec`。"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/trampoline.S` | `label uservec` | uservec: 保存用户寄存器到 TRAPFRAME，然后跳转到 usertrap() |
+| `src/trap.c` | `function usertrap` | void usertrap(void) - 处理用户态陷阱，区分系统调用 (EXCP_ENV_CALL) 和设备中断 |
+| `src/trap.c` | `function trapinithart` | w_stvec((uint64)kernelvec) - 设置陷阱向量基地址 |
+| `src/trap.c` | `function kerneltrap` | void kerneltrap() - 内核态陷阱处理入口 |
+
+### Q05_002（single_choice）
+
+- 题干：trap 上下文 (TrapFrame/TrapContext) 更可能存放在哪里？
+- 答案："A. 内核栈上"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/include/proc.h` | `struct_field trapframe` | struct proc { struct trapframe *trapframe; } - 每个进程控制块包含 trapframe 指针 |
+| `src/proc.c` | `function allocproc` | p->trapframe = allocpage() - trapframe 分配独立页面，但由内核管理 |
+| `src/trap.c` | `function usertrapret` | p->trapframe->kernel_sp = p->kstack + PGSIZE - 内核栈指针保存在 trapframe 中 |
+
+### Q05_003（short_answer）
+
+- 题干：TrapFrame/寄存器保存结构体定义在哪里？寄存器数量与字节数是多少？（必须引用结构体定义证据）
+- 答案："TrapFrame 结构体定义在 `src/include/trap.h`。包含 31 个 64 位寄存器字段：kernel_satp(8B)、kernel_sp(8B)、kernel_trap(8B)、epc(8B)、kernel_hartid(8B)、ra(8B)、sp(8B)、gp(8B)、tp(8B)、t0-t6(7×8B)、s0-s11(12×8B)、a0-a7(8×8B)。总计 31 个字段 × 8 字节 = 288 字节（0x120）。"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/include/trap.h` | `struct trapframe` | struct trapframe { uint64 kernel_satp; ... uint64 t6; } - 从行 16 到行 52，共 31 个 uint64 字段 |
+
+### Q05_004（tri_state_impl）
+
+- 题干：是否存在系统调用分发表（syscall table / match 分发）？（必须三态）
+- 答案："implemented"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `syscall/syscall.c` | `function syscall` | if(num > 0 && num < NELEM(syscalls) && syscalls[num]) { p->trapframe->a0 = syscalls[num](); } - 通过函数指针数组 syscalls[] 分发 |
+| `doc/内核实现--系统调用.md` | `code_example syscalls_table` | static uint64 (*syscalls[])(void) = { [SYS_fork] sys_fork, [SYS_exec] sys_exec, ... } - 文档中展示了完整的分发表结构 |
+
+### Q05_005（tri_state_impl）
+
+- 题干：系统调用号是否做边界检查？（越界默认分支/返回错误/panic；必须三态）
+- 答案："implemented"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `syscall/syscall.c` | `function syscall` | if(num > 0 && num < NELEM(syscalls) && syscalls[num]) { ... } else { printf("unknown sys call %d\n", num); p->trapframe->a0 = -1; } - 边界检查后返回 -1 |
+
+### Q05_006（short_answer）
+
+- 题干：选择一个具体 syscall（优先 sys_write），追踪：用户指令 → trap → 分发 → 实现体。列出 3-6 个关键节点并给证据。
+- 答案："sys_write 调用链：\n1. 用户态：`ecall` 指令触发陷阱（RISC-V 系统调用约定，a7=SYS_write）\n2. 陷阱入口：`src/trampoline.S:uservec` 保存寄存器到 trapframe\n3. 内核处理：`src/trap.c:usertrap()` 检测到 EXCP_ENV_CALL，调用 `syscall()`\n4. 分发：`syscall/syscall.c:syscall()` 通过 `syscalls[SYS_write]` 查找函数指针\n5. 实现：`src/sysfile.c:sys_write()` 调用 `filewrite()` 完成写操作\n6. 返回：`usertrapret()` 恢复寄存器，`sret` 返回用户态"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/trap.c` | `function usertrap` | if(cause == EXCP_ENV_CALL) { syscall(); } - 系统调用识别 |
+| `syscall/syscall.c` | `function syscall` | num = p->trapframe->a7; syscalls[num]() - 通过 a7 寄存器获取 syscall 号并分发 |
+| `src/sysfile.c` | `function sys_write` | uint64 sys_write(void) { argfd(0,&fd,&f); argaddr(1,&p); argint(2,&n); return filewrite(f,p,n); } - 参数提取并调用 filewrite |
+
+### Q05_007（short_answer）
+
+- 题干：列出 5-10 个“高价值 syscall”（fork/exec/mmap/open/write 等）的实现三态（implemented/stub/not_found），并为每个至少给一条证据。
+- 答案："高价值 syscall 实现状态：\n1. sys_write: ✅ implemented - `src/sysfile.c:234` 完整实现\n2. sys_openat: ✅ implemented - `src/sysfile.c:39` 完整实现\n3. sys_execve: ✅ implemented - `src/sysproc.c:11` 完整实现\n4. sys_clone: ✅ implemented - `src/sysproc.c:109` 调用 clone()\n5. sys_mmap: ✅ implemented - `src/sysfile.c:895` 调用 do_mmap()\n6. sys_kill: ✅ implemented - `src/syssig.c:94` 调用 kill()\n7. sys_wait4: ✅ implemented - `src/sysproc.c:126` 调用 wait4pid()\n8. sys_exit: ✅ implemented - `src/sysproc.c:177` 调用 exit()\n9. sys_fork: 🔸 stub - 仅在文档 `doc/内核实现--系统调用.md:375` 提及，代码中通过 clone() 模拟\n10. sys_read: ✅ implemented - `src/sysfile.c:218` 完整实现"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/sysfile.c` | `function sys_write` | 行 234-242: 完整实现文件写操作 |
+| `src/sysproc.c` | `function sys_execve` | 行 11-33: 完整实现 execve 系统调用 |
+| `src/sysfile.c` | `function sys_mmap` | 行 895-920: 调用 do_mmap() 实现内存映射 |
+| `src/syssig.c` | `function sys_kill` | 行 94-100: 调用 kill(pid,sig) |
+| `doc/内核实现--系统调用.md` | `documentation syscalls_table` | 行 375: [SYS_fork] sys_fork - 仅文档提及，代码中未见独立 sys_fork 实现 |
+
+### Q05_008（tri_state_impl）
+
+- 题干：是否存在用户指针访问安全检查（copyin/copyout/access_ok/UserInPtr 等）？（必须三态）
+- 答案："implemented"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/copy.c` | `function copyin` | int copyin(pagetable_t pagetable, char *dst, uint64 srcva, uint64 len) - 通过页表转换验证用户地址 |
+| `src/copy.c` | `function copyout` | int copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len) - 安全写入用户空间 |
+| `src/copy.c` | `function either_copyin` | int either_copyin(int user_src, void *dst, uint64 src, uint64 len) - 统一接口处理用户/内核地址 |
+| `src/include/copy.h` | `header copy_functions` | 声明 copyin/copyout/copyinstr/either_copyin/either_copyout 等安全拷贝函数 |
+
+### Q05_009（tri_state_impl）
+
+- 题干：时钟中断是否触发抢占调度（timer tick 中调用 yield/schedule/resched）？（必须三态）
+- 答案："implemented"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/trap.c` | `function usertrap` | if(which_dev == 2) yield(); - 用户态陷阱返回前检查定时器并让出 CPU |
+| `src/trap.c` | `function kerneltrap` | if(which_dev == 2 && myproc() != 0 && myproc()->state == RUNNING) { yield(); } - 内核态也支持抢占 |
+| `src/trap.c` | `function devintr` | else if (0x8000000000000005L == scause) { timer_tick(); return 2; } - 识别定时器中断并返回 2 |
+| `src/proc.c` | `function yield` | void yield() { readyq_push(p); p->state = RUNNABLE; sched(); } - 让出 CPU 并调度 |
+
+### Q05_010（tri_state_impl）
+
+- 题干：是否存在信号处理链路（trap 返回前处理 pending signal、sigreturn/trampoline）？（必须三态）
+- 答案："implemented"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/trap.c` | `function usertrap` | if (p->killed) { if (SIGTERM == p->killed) exit(-1); sighandle(); } - trap 返回前处理信号 |
+| `src/signal.c` | `function sighandle` | void sighandle(void) - 分配 sig_frame，设置信号处理函数入口，修改 trapframe |
+| `src/signal.c` | `function sigreturn` | void sigreturn(void) - 从信号处理返回，恢复原 trapframe |
+| `src/sig_trampoline.S` | `assembly sig_trampoline` | 信号跳板代码，用于从内核态跳转到用户态信号处理函数 |
+
+### Q05_011（short_answer）
+
+- 题干：缺页异常与内存特性（CoW/lazy）是否在 trap 中联动？（若存在，说明入口点与调用到内存模块的证据）
+- 答案："未发现缺页异常与 CoW/Lazy 的联动实现。代码中定义了 EXCP_LOAD_PAGE(0xd) 和 EXCP_STORE_PAGE(0xf) 异常号（`src/trap.c:38-39`），vm.h 声明了 handle_page_fault() 函数（`src/include/vm.h:42-43`），但在 trap.c 的 usertrap() 中未调用该函数。搜索 'cow|CoW|lazy' 无结果。README 声称\"完成了缺页中断的处理\"，但代码中未见完整实现。"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/trap.c` | `macro EXCP_LOAD_PAGE` | #define EXCP_LOAD_PAGE 0xd - 定义缺页异常号但未处理 |
+| `src/include/vm.h` | `function_declaration handle_page_fault` | int handle_page_fault(int kind, uint stval); - 仅声明未见实现调用 |
+| `README.md` | `documentation features` | "完成了缺页中断的处理" - README 声称但代码证据不足 |
+
+### Q05_012（short_answer）
+
+- 题干：与 09 多核交叉一致性：per-CPU trap 栈/时钟初始化顺序与 AP 上线是否一致？（互指证据或写单核不适用）
+- 答案："单核实现。trapinithart() 在每个 hart 上调用设置 stvec，但未发现显式的 per-CPU 陷阱栈机制。时钟初始化通过 timerinit() 完成，但未找到与 AP 启动顺序的明确关联代码。代码基于 xv6 改编，支持多核但本仓库以单核 QEMU 为主要测试平台。"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/trap.c` | `function trapinithart` | void trapinithart(void) - 每 hart 调用设置 stvec，但未使用 per-CPU 栈 |
+| `src/timer.c` | `function timerinit` | void timerinit() - 初始化 tickslock 和 ticks=0 |
+| `README.md` | `documentation platform` | "xv6 移植到 qemu 的 sifive_u 以及 fu740 的板子上" - 支持多核平台但以单核测试为主 |
+
+### Q05_013（fill_in）
+
+- 题干：Syscall 实现全量统计 (Syscall Coverage Analysis)，请按格式填写：
+- 分发表路径: ___
+- 完整实现 ✅ (implemented): ___ 个
+- 桩/ENOSYS/return 0 🔸 (stub): ___ 个，代表性例子: ___
+- 未注册 ❌ (not_found): ___ 个
+- 统计依据（grep 或 outline 方式）: ___
+（若无法精确计数，给出区间估计并说明理由）
+- 答案："分发表路径：syscall/syscall.c\n完整实现 ✅ (implemented): 约 35-40 个（基于 grep 统计 sys_ 开头函数）\n桩/ENOSYS/return 0 🔸 (stub): 约 2-3 个，代表性例子：sys_exit_group (返回 0), sys_fork (通过 clone 模拟)\n未注册 ❌ (not_found): 无法精确统计，分发表 syscalls[] 数组未在代码中显式定义，仅在文档中展示\n统计依据：grep_in_repo 搜索 'uint64 sys_|sys_\\w+(void)' 找到 44 个 syscall 函数定义；通过 read_code_segment 检查实现深度"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `syscall/syscall.c` | `function syscall` | 使用 syscalls[] 函数指针数组分发，但数组定义未在代码中找到 |
+| `src/syssig.c` | `function sys_exit_group` | uint64 sys_exit_group(void){ return 0; } - 桩函数 |
+
+### Q05_014（short_answer）
+
+- 题干：README 与 syscall 声称对照：README 中声称兼容/实现了哪些 syscall 或标准？与代码分发表实际是否一致？（无 README 则写「无 README，仅以代码为准」）
+- 答案："README 声称：\n- \"完善了用户内存管理和内核内存管理\"\n- \"完善了 mmap 的机制\"\n- \"完成了缺页中断的处理\"\n- \"完成了信号相关的操作\"\n- \"完成了轮询相关的操作\"\n- \"完成了对本地回环地址的 Socket 支持\"\n\n代码验证：\n- mmap: ✅ 已实现 (src/sysfile.c:sys_mmap)\n- 信号：✅ 已实现 (src/signal.c, src/syssig.c)\n- 缺页中断：❌ 仅声明未见完整处理链\n- 轮询：✅ 已实现 (src/poll.c, syspoll.c)\n- Socket: ⚠️ 部分实现（仅本地回环）\n\n总体：README 声称与代码基本一致，但缺页中断处理证据不足。"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `README.md` | `documentation features` | 列出了 12 项完成的工作，包括缺页中断、信号、mmap 等 |
+| `src/sysfile.c` | `function sys_mmap` | 行 895-920: mmap 完整实现 |
+
+### Q05_015（short_answer）
+
+- 题干：`_impl` 命名模式搜索结论：grep `_impl\b|sys_[a-z0-9_]*_impl`，结果是命中了哪些函数（列出），还是「未见该命名模式」？（必须给搜索结论）
+- 答案："未见该命名模式。使用 grep_in_repo 搜索 '_impl\\b' 和 'sys_[a-z0-9_]*_impl' 均返回\"未找到匹配\"。本仓库采用直接实现模式，syscall 函数直接命名为 sys_xxx，无 _impl 后缀分层。"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `N/A` | `grep_result _impl_pattern` | grep_in_repo 返回：未找到匹配 '_impl\b' 的内容 (已搜索 145 个文件) |
+
+### Q05_016（tri_state_impl）
+
+- 题干：是否存在外部中断（PLIC/APIC 等）的分发处理逻辑？（必须三态；与时钟中断分开作答）
+- 答案："stub"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/trap.c` | `function devintr` | 处理外部中断的代码存在但 irq 始终为 0：int irq = 0; // plic_claim(); printf("irq:%d\n",irq); - plic_claim() 被注释 |
+| `src/include/plic.h` | `header plic_functions` | 声明了 plic_claim() 和 plic_complete() 但实际未调用 |
+| `src/trap.c` | `function devintr` | if (UART0_IRQ == irq) - 由于 irq=0 且 UART0_IRQ=4(QEMU)，条件永不满足 |
+
+### Q05_017（tri_state_impl）
+
+- 题干：非法内存访问时是否向进程发送 SIGSEGV 信号？（必须三态；搜索 SIGSEGV|sig_segv）
+- 答案："not_found"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `N/A` | `grep_result SIGSEGV_search` | grep_in_repo 返回：未找到匹配 'SIGSEGV|sig_segv' 的内容 (已搜索 145 个文件) |
+| `src/include/signal.h` | `header signal_definitions` | 定义了 SIGTERM(15)、SIGKILL(9)、SIGILL(4) 等，但未定义 SIGSEGV |
+
+### Q05_018（short_answer）
+
+- 题干：信号发送支持哪些粒度？（搜索 sys_kill/sys_tkill/sys_tgkill；分别是进程级/线程级/进程组级；列出已实现的与其证据）
+- 答案："已实现的信号发送粒度：\n1. 进程级：sys_kill() - `src/syssig.c:94` 调用 kill(pid, sig)\n2. 线程组级：sys_tgkill() - `src/syssig.c:102` 调用 tgkill(pid, tid, sig)\n\n未实现：\n- sys_tkill：未找到独立实现\n\n证据：\n- sys_kill: `src/syssig.c:94-100` 接收 pid 和 sig 参数\n- sys_tgkill: `src/syssig.c:102-109` 接收 pid、tid、sig 三参数\n- kill() 和 tgkill() 函数声明在 `src/include/proc.h:177-178`"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/syssig.c` | `function sys_kill` | uint64 sys_kill(){ argint(0,&pid); argint(1,&sig); return kill(pid,sig); } |
+| `src/syssig.c` | `function sys_tgkill` | uint64 sys_tgkill(){ argint(0,&pid); argint(1,&tid); argint(2,&sig); return tgkill(pid,tid,sig); } |
+| `src/include/proc.h` | `function_declaration kill` | int kill(int pid,int sig); int tgkill(int pid,int tid,int sig); |
+
+### Q05_019（single_choice）
+
+- 题干：中断 (Interrupt)、异常 (Exception/Fault/Trap) 的区分机制更接近哪种？（Stallings Ch5；即 trap handler 如何区分「外部中断」与「同步异常」）
+- 答案："A. 通过 scause/mcause/VBAR 中断原因寄存器区分（硬件编码原因号）"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/trap.c` | `function devintr` | uint64 scause = r_scause(); if ((0x8000000000000000L & scause) && 9 == (scause & 0xff)) - 通过 scause 最高位判断中断，低 8 位判断原因 |
+| `src/trap.c` | `function usertrap` | uint64 cause = r_scause(); if(cause == EXCP_ENV_CALL) - 通过 scause 值区分系统调用 (0x8) 和其他异常 |
+| `src/trap.c` | `macro interrupt_exception_defines` | #define EXCP_ENV_CALL 0x8, #define INTR_TIMER (0x5 | INTERRUPT_FLAG) - 使用硬件编码的原因号 |
+
+### Q05_020（tri_state_impl）
+
+- 题干：是否支持中断嵌套 (Nested Interrupt / Interrupt Nesting, Stallings Ch5)？（必须三态；搜索 enable_irq_in_handler / nested_irq / 中断处理时是否重开中断；若 not_found 需说明是否关中断运行整个 handler）
+- 答案："not_found"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/trap.c` | `function kerneltrap` | if(intr_get() != 0) panic("kerneltrap: interrupts enabled"); - 内核陷阱处理时要求中断必须关闭 |
+| `src/trap.c` | `function usertrap` | intr_on(); syscall(); - 仅在系统调用处理期间开启中断，但非嵌套处理 |
+| `N/A` | `grep_result nested_search` | grep_in_repo 搜索 'nested|enable_irq_in_handler|interrupt.*nest' 返回：未找到匹配内容 |
 
 ---
 
 
 # 文件系统VFS  具体 FS
 
-## 第 6 章：文件系统（VFS + 具体 FS）
-
-### VFS 架构与接口设计
-
-本操作系统采用**轻量级 VFS 抽象**，未实现标准 Linux 式的 File/Inode/Dentry 分离架构，而是将文件元数据与目录项合并为统一的 `struct dirent` 结构。
-
-#### 核心数据结构
-
-**1. 文件抽象层（`struct file`）**
-
-文件描述符表项定义于 `src/include/file.h:14-30`：
-
-```c
-struct file {
-  enum { FD_NONE, FD_PIPE, FD_ENTRY, FD_DEVICE } type;
-  int ref;                // reference count
-  char readable;
-  char writable;
-  struct pipe *pipe;      // FD_PIPE
-  struct dirent *ep;      // FD_ENTRY
-  uint64 off;             // FD_ENTRY offset
-  short major;            // FD_DEVICE
-  // ... time fields
-};
-```
-
-- **`type`**：区分四种文件类型（无/管道/目录项/设备）
-- **`ref`**：引用计数，支持多进程共享文件描述符
-- **`ep`**：指向 `struct dirent`，承载实际文件元数据
-
-**2. 目录项/索引节点融合层（`struct dirent`）**
-
-定义于 `src/include/fat32.h:36-67`，兼具 Linux Dentry 和 Inode 功能：
-
-```c
-struct dirent {
-    char  filename[FAT32_MAX_FILENAME + 1];
-    uint8   attribute;
-    uint32  first_clus;      // 首簇号（类似 inode number）
-    uint32  file_size;
-    uint32  cur_clus;        // 当前簇号（用于顺序读写优化）
-    uint    clus_cnt;
-    
-    /* for OS */
-    uint8   dev;             // 设备号
-    uint8   dirty;
-    short   valid;
-    int     ref;             // 引用计数
-    int     mnt;             // 挂载点标志
-    uint32  off;             // 在父目录中的偏移
-    struct dirent *parent;   // 父目录指针
-    struct dirent *next;     // 缓存链表
-    struct dirent *prev;
-    struct sleeplock lock;   // 条目级锁
-};
-```
-
-- **`first_clus`**：FAT32 文件首簇号，功能等价于 inode number
-- **`parent`**：显式维护父目录指针，加速路径解析
-- **`ref`**：支持多文件描述符共享同一路径条目
-- **`sleeplock`**：保证并发访问安全性
-
-**3. 文件系统超级块抽象（`struct fs`）**
-
-定义于 `src/include/fat32.h:101-111`：
-
-```c
-struct fs{
-    uint devno;
-    int  valid;
-    struct dirent* image;
-    struct Fat fat;              // BPB 参数块
-    struct entry_cache ecache;   // 目录项缓存池
-    struct dirent root;          // 根目录
-    void (*disk_init)(struct dirent*image);
-    void (*disk_read)(struct buf* b,struct dirent* image);
-    void (*disk_write)(struct buf* b,struct dirent* image);
-};
-```
-
-- **`Fat`**：存储 BIOS Parameter Block（BPB），包含每扇区字节数、每簇扇区数、FAT 表大小等
-- **`ecache`**：固定大小（50 项）的目录项缓存池，采用循环链表管理
-- **函数指针**：支持不同后端存储（Ramdisk/SD 卡/镜像文件）
-
-#### VFS 操作接口
-
-所有 VFS 操作通过 `struct dirent` 指针传递，关键函数声明于 `src/include/defs.h:57-75`：
-
-| 函数 | 功能 | 实现位置 |
-|------|------|----------|
-| `ename()` | 路径名解析，返回 `struct dirent*` | `fat32.c:1084` |
-| `ealloc()` | 在目录中分配新条目 | `fat32.c:609` |
-| `eread()` / `ewrite()` | 文件内容读写 | `fat32.c:355` / `fat32.c:388` |
-| `etrunc()` | 截断文件 | `fat32.c:725` |
-| `eput()` / `edup()` | 引用计数管理 | `fat32.c:659` / `fat32.c:649` |
-| `elock()` / `eunlock()` | 条目锁操作 | `fat32.c:759` / `fat32.c:770` |
-
----
-
-### 具体文件系统支持情况（FAT32/Ext4/RamFS）
-
-#### FAT32 文件系统（✅ 已实现）
-
-本系统**完整实现了 FAT32 文件系统**，代码位于 `src/fat32.c`（1181 行，37KB），是核心存储模块。
-
-**实现架构：**
-
-```
-用户层 (sys_open/sys_read/sys_write)
-    ↓
-VFS 层 (file.c: fileread/filewrite)
-    ↓
-FAT32 层 (fat32.c: eread/ewrite)
-    ↓
-簇管理 (rw_clus → reloc_clus → read_fat/write_fat)
-    ↓
-块设备层 (bio.c: bread/bwrite)
-    ↓
-物理层 (Ramdisk 或 SD 卡)
-```
-
-**关键实现细节：**
-
-1. **簇链管理**（`fat32.c:211-281`）
-   - `read_fat()`：读取 FAT 表项，获取下一簇号
-   - `write_fat()`：更新 FAT 表项
-   - `alloc_clus()`：分配空闲簇（线性扫描 FAT 表）
-   - `free_clus()`：释放簇（写 0 到 FAT 表项）
-
-2. **路径解析**（`fat32.c:950-1000`）
-   - `lookup_path()`：递归解析路径组件
-   - `dirlookup()`：在目录中查找条目（支持 `.` 和 `..`）
-   - `skipelem()`：提取路径中的单个组件
-
-3. **文件创建**（`fat32.c:1131-1181`）
-   ```c
-   struct dirent* create(struct dirent* env, char *path, short type, int mode)
-   {
-       // 1. 解析父目录
-       dp = enameparent(env, path, name, 0);
-       // 2. 若父目录不存在，递归创建
-       if (dp == NULL) {
-           dp = create(env, pname, T_DIR, O_RDWR);
-       }
-       // 3. 在父目录中分配新条目
-       ep = ealloc(dp, name, mode);
-       // 4. 验证类型一致性
-       if ((type == T_DIR && !(ep->attribute & ATTR_DIRECTORY)) || ...)
-           return NULL;
-       return ep;
-   }
-   ```
-
-4. **长文件名支持**（`fat32.c:557-599`）
-   - 采用 VFAT 长文件名扩展（LFN）
-   - 每个长文件名条目存储 13 个字符
-   - 通过 `order` 字段链接多个 LFN 条目
-
-5. **挂载机制**（`fat32.c:1095-1108`）
-   ```c
-   int emount(struct fs* fatfs, char* mnt) {
-       struct dirent* mntpoint = ename(NULL, mnt, 0);
-       mntpoint->mnt = 1;           // 标记为挂载点
-       mntpoint->dev = fatfs->devno; // 重定向设备号
-       fatfs->root.parent = mntpoint;
-       return 0;
-   }
-   ```
-
-**文件打开流程追踪**（从 `sys_openat` 到 `fdalloc`）：
-
-```mermaid
-graph TD
-    A["sys_openat
- sysfile.c:41"] --> B["ename
- fat32.c:1084"]
-    B --> C["lookup_path
- fat32.c:950"]
-    C --> D["dirlookup
- fat32.c:886"]
-    B --> E["create
- fat32.c:1131"]
-    E --> F["ealloc
- fat32.c:609"]
-    F --> G["emake
- fat32.c:532"]
-    A --> H["filealloc
- file.c:43"]
-    A --> I["fdalloc
- sysfile.c:28"]
-    H --> J["ftable.file 全局文件表"]
-    I --> K["p->ofile Per-Process FD 表"]
-```
-
-> **说明**：`sys_openat` 首先调用 `ename()` 解析路径，若文件不存在且指定 `O_CREATE` 则调用 `create()` 创建。获得 `struct dirent*` 后，分配 `struct file` 并注册到进程文件描述符表。
-
-#### Ext4 文件系统（❌ 未实现）
-
-**搜索验证**：
-- `grep_in_repo` 搜索 `ext4|Ext4|EXT4`：**0 匹配**
-- `list_repo_structure` 未发现 `ext4/` 或 `fs/ext4/` 目录
-- 文档 `doc/内核实现--文件系统.md` 仅提及 FAT32
-
-**结论**：Ext4 文件系统**未实现**。
-
-#### RamFS/TmpFS（❌ 未实现）
-
-**搜索验证**：
-- `grep_in_repo` 搜索 `ramfs|RamFS|tmpfs|TmpFS`：**0 匹配**
-- 虽然存在 `src/ramdisk.c`，但这是**块设备层**的内存模拟（用内存模拟磁盘扇区），**不是文件系统层的内存文件系统**
-
-**结论**：RamFS/TmpFS **未实现**。系统仅支持 FAT32 一种文件系统格式。
-
----
-
-### 文件描述符与进程关联
-
-#### Per-Process 文件描述符表
-
-文件描述符表采用**Per-Process 设计**，每个进程独立维护自己的 FD 表。
-
-**数据结构**（`src/include/proc.h:145-147`）：
-
-```c
-struct proc {
-    // ...
-    int64 filelimit;
-    struct file **ofile;        // Open files (Per-Process FD 表)
-    int *exec_close;            // exec 时关闭标志
-    struct dirent *cwd;         // Current directory
-    // ...
-};
-```
-
-- **`ofile`**：指向 `struct file*` 数组，大小为 `NOFILE`（默认 32）
-- **`filelimit`**：进程级文件描述符数量限制
-- **`NOFILEMAX(p)`** 宏（`proc.h:174`）：返回 `min(p->filelimit, NOFILE)`
-
-#### 全局文件结构池
-
-虽然 FD 表是 Per-Process 的，但 `struct file` 对象本身来自**全局池**（`src/file.c:20-23`）：
-
-```c
-struct {
-  struct spinlock lock;
-  struct file file[NFILE];  // 全局文件结构池
-} ftable;
-```
-
-- **`NFILE`**：系统级最大打开文件数（默认 100）
-- **`filealloc()`**：从全局池分配空闲 `struct file`
-- **`fileclose()`**：回收时递减 `ref`，归零时释放回池
-
-#### FD 分配流程
-
-```c
-// sysfile.c:16-28
-static int fdalloc(struct file *f) {
-  struct proc *p = myproc();
-  for(int fd = 0; fd < NOFILEMAX(p); fd++) {
-    if(p->ofile[fd] == 0) {
-      p->ofile[fd] = f;  // 建立映射
-      return fd;
-    }
-  }
-  return -EMFILE;  // 文件描述符耗尽
-}
-```
-
-**设计特点**：
-- **最小可用 FD 分配**：从 0 开始线性扫描，复用已关闭的 FD
-- **继承机制**：`fork()` 时深拷贝 `ofile` 数组（`proc.c` 未展示但文档提及 `CLONE_FILES`）
-- **exec 清理**：`exec_close` 数组标记哪些 FD 应在 `exec` 时关闭
-
----
-
-### 管道 (Pipe) 与套接字 (Socket) 支持情况
-
-#### 管道（Pipe）（✅ 已实现）
-
-**完整实现**于 `src/pipe.c`（120 行）和 `src/include/pipe.h`。
-
-**数据结构**（`pipe.h:10-17`）：
-
-```c
-#define PIPESIZE 512
-
-struct pipe {
-  struct spinlock lock;
-  char data[PIPESIZE];
-  uint nread;     // 读指针
-  uint nwrite;    // 写指针
-  int readopen;   // 读端是否打开
-  int writeopen;  // 写端是否打开
-};
-```
-
-**核心函数**：
-
-1. **`pipealloc()`**（`pipe.c:15-47`）：
-   - 分配一个 `struct pipe` 和两个 `struct file`
-   - 设置 `f0` 为读端（`readable=1, writable=0`）
-   - 设置 `f1` 为写端（`readable=0, writable=1`）
-   - 两端共享同一 `pipe` 对象
-
-2. **`pipewrite()`**（`pipe.c:72-100`）：
-   - 循环写入，缓冲区满时 `sleep(&pi->nwrite)`
-   - 读端关闭或进程被杀死时返回 -1
-   - 支持 `user` 参数区分用户/内核地址空间
-
-3. **`piperead()`**（`pipe.c:102-120`）：
-   - 循环读取，缓冲区空时 `sleep(&pi->nread)`
-   - 写端关闭时退出循环（EOF）
-
-**系统调用**（`sysfile.c:830-868`）：
-
-```c
-uint64 sys_pipe2(void) {
-  uint64 fdarray;
-  struct file *rf, *wf;
-  int fd0, fd1;
-  
-  if(pipealloc(&rf, &wf) < 0) return -1;
-  fd0 = fdalloc(rf);
-  fd1 = fdalloc(wf);
-  
-  // 拷贝 FD 到用户空间
-  either_copyout(1, fdarray, &fd0, sizeof(fd0));
-  either_copyout(1, fdarray+sizeof(fd0), &fd1, sizeof(fd1));
-  return 0;
-}
-```
-
-**实现状态**：✅ **完整实现**，支持阻塞式读写、引用计数、EOF 处理。
-
-#### 套接字（Socket）（❌ 未实现）
-
-**搜索验证**：
-- `src/include/socket.h` 仅 15 行，定义了空壳结构：
-  ```c
-  struct socket_connection{
-      int IP;
-      int sock_opt;
-      uint64 sock_addr;
-      int passive_socket;
-      char temp[MAX_LENGTH_OF_SOCKET];
-  };
-  void socket_init(void);
-  int add_socket(int IP,int op);
-  ```
-- **无实现文件**：不存在 `socket.c` 或 `sys_socket.c`
-- `grep_in_repo` 搜索 `sys_socket|sys_bind|sys_listen|sys_accept|sys_connect`：**0 匹配**
-- `file.c` 中 `struct file` 的 `type` 枚举**无 `FD_SOCKET`** 变体
-
-**结论**：Socket 接口**❌ 未实现**，仅有占位头文件。
-
----
-
-### 缓存机制（Block/Page Cache）
-
-#### 块缓存（Buffer Cache）
-
-系统实现了**块级缓存**（`src/bio.c`），用于缓存磁盘扇区。
-
-**数据结构**（`src/include/buf.h`，未展示但 `bio.c` 中使用）：
-
-```c
-struct buf {
-  int valid;       // 数据是否有效
-  int disk;        // 是否由磁盘"拥有"
-  uint dev;        // 设备号
-  uint sectorno;   // 扇区号
-  struct sleeplock lock;
-  uint refcnt;     // 引用计数
-  struct buf *prev, *next;  // LRU 链表
-  uchar data[BSIZE];        // 512 字节数据
-};
-```
-
-**关键函数**：
-- `bread(dev, sectorno)`：读取扇区到缓存（若已缓存则直接返回）
-- `bwrite(dev, bp)`：写回脏页到磁盘
-- `brelse(bp)`：释放缓存引用
-
-**实现位置**：`src/bio.c`（165 行）
-
-#### 目录项缓存（Entry Cache）
-
-FAT32 层实现了**目录项缓存池**（`src/include/fat32.h:58-62`）：
-
-```c
-struct entry_cache {
-    struct spinlock lock;
-    struct dirent entries[ENTRY_CACHE_NUM];  // 固定 50 项
-};
-```
-
-- **循环链表管理**：`entries` 数组通过 `next/prev` 链接成环
-- **缓存命中**：`dirlookup()` 先检查 `ecache`，命中则直接返回
-- **淘汰策略**：未实现 LRU，采用固定大小循环缓冲
-
-**限制**：
-- **无 Page Cache**：文件内容不缓存，每次读写都访问块设备
-- **无 Write-Back**：`ewrite()` 直接写磁盘，未实现延迟写回
-
----
-
-### 零拷贝映射验证（mmap 实现分析）
-
-#### mmap 系统调用（✅ 已实现，但无零拷贝）
-
-**系统调用接口**（`sysfile.c:895-925`）：
-
-```c
-uint64 sys_mmap(void) {
-  uint64 start, len;
-  int prot, flags, fd, off;
-  // 参数解析...
-  uint64 ret = do_mmap(start, len, prot, flags, fd, off);
-  return ret;
-}
-```
-
-**实现分析**（`src/mmap.c:33-138`）：
-
-1. **匿名映射**（`MAP_ANONYMOUS`）：
-   ```c
-   if(flags & MAP_ANONYMOUS) {
-       fd = -1;
-       goto ignore_fd;
-   }
-   ```
-
-2. **权限转换**：
-   ```c
-   int perm = PTE_U;
-   if(prot & PROT_READ)  perm |= (PTE_R | PTE_A);
-   if(prot & PROT_WRITE) perm |= (PTE_W | PTE_D);
-   if(prot & PROT_EXEC)  perm |= (PTE_X | PTE_A);
-   ```
-
-3. **VMA 创建**：
-   ```c
-   struct vma *vma = alloc_mmap_vma(p, flags, start, len, perm, fd, offset);
-   ```
-
-4. **文件内容拷贝**（**非零拷贝**）：
-   ```c
-   for(int i = 0; i < page_n; ++i) {
-       uint64 pa = experm(p->pagetable, va, perm);
-       if(i != page_n - 1) {
-           fileread(f, va, PGSIZE);  // 逐页读取文件到内存
-       } else {
-           fileread(f, va, end_pagespace);
-           memset((void *)(pa + end_pagespace), 0, PGSIZE - end_pagespace);
-       }
-       va += PGSIZE;
-   }
-   ```
-
-#### 零拷贝支持验证（❌ 未实现）
-
-**关键检查点**：
-
-1. **`struct vma` 无 `shared` 字段**（`src/include/vma.h:13-24`）：
-   ```c
-   struct vma {
-       enum segtype type;
-       int perm;
-       uint64 addr, sz, end;
-       int flags;          // 存储 MAP_SHARED/MAP_PRIVATE
-       int fd;
-       uint64 f_off;
-       // ... 无 shared 字段
-   };
-   ```
-
-2. **`do_mmap()` 未区分 `MAP_SHARED` 处理**：
-   - 代码中仅检查 `MAP_PRIVATE` 用于 `munmap` 时的写回判断（`mmap.c:168`）
-   - **无 `MAP_SHARED` 的特殊逻辑**（如共享页面映射、写时复制优化）
-
-3. **文件映射采用 eager copy**：
-   - `mmap()` 时立即调用 `fileread()` 将文件内容**完整拷贝**到物理页
-   - **非按需分页**（Demand Paging），无页故障处理
-   - **非零拷贝**，数据从文件 → 内核缓冲 → 用户页，经历两次拷贝
-
-**结论**：
-- `sys_mmap`：✅ **已实现**（支持文件映射和匿名映射）
-- **零拷贝优化**：❌ **未实现**（无 `MAP_SHARED` 优化、无 Demand Paging）
-- **实现质量**：🔸 **基础版本**（Eager Copy，性能较低）
-
----
-
-### 高级 I/O 功能验证
-
-#### poll/select/epoll（❌ 未实现）
-
-**搜索验证**：
-- `grep_in_repo` 搜索 `sys_poll|sys_select|sys_epoll`：**0 匹配**
-- `src/syspoll.c` 仅实现 `sys_ppoll()`，且**直接返回 0**：
-  ```c
-  uint64 sys_ppoll(){
-    return 0;  // 桩函数
-  }
-  ```
-- `src/include/poll.h` 定义了 `struct pollfd`，但**无实现逻辑**
-
-**结论**：
-- `sys_poll`：❌ **未实现**
-- `sys_select`：❌ **未实现**
-- `sys_epoll_create/epoll_ctl/epoll_wait`：❌ **未实现**
-- `sys_ppoll`：🔸 **桩函数**（返回 0，无实际功能）
-
----
-
-### 伪文件系统支持（devfs/procfs/sysfs）
-
-**搜索验证**：
-- `grep_in_repo` 搜索 `devfs|procfs|sysfs|pseudo.*fs`：**0 匹配**
-- `src/dev.c` 手动创建设备文件（`create(NULL, "/dev", T_DIR, 0)`），但**非动态伪文件系统**
-- 无 `/proc` 或 `/sys` 目录的自动创建逻辑
-
-**结论**：
-- **devfs**：❌ **未实现**（设备文件静态创建）
-- **procfs**：❌ **未实现**（无 `/proc/[pid]` 等动态信息）
-- **sysfs**：❌ **未实现**
-
----
-
-### 关键代码验证总结
-
-| 功能 | 状态 | 证据文件 | 备注 |
-|------|------|----------|------|
-| **VFS 抽象** | ✅ 已实现 | `src/include/file.h`, `src/include/fat32.h` | `struct file` + `struct dirent` |
-| **FAT32** | ✅ 已实现 | `src/fat32.c`（1181 行） | 完整支持 LFN、挂载、簇链管理 |
-| **Ext4** | ❌ 未实现 | - | 无代码 |
-| **RamFS/TmpFS** | ❌ 未实现 | - | 仅有 Ramdisk（块设备层） |
-| **Pipe** | ✅ 已实现 | `src/pipe.c` | 阻塞式读写、引用计数 |
-| **Socket** | ❌ 未实现 | `src/include/socket.h` | 仅头文件 |
-| **mmap** | ✅ 已实现 | `src/mmap.c` | 无零拷贝、Eager Copy |
-| **poll/select/epoll** | ❌ 未实现 | `src/syspoll.c` | `sys_ppoll` 返回 0 |
-| **devfs/procfs/sysfs** | ❌ 未实现 | - | 静态设备文件 |
-| **文件描述符** | ✅ Per-Process | `src/include/proc.h:145` | `struct file **ofile` |
-| **块缓存** | ✅ 已实现 | `src/bio.c` | Buffer Cache |
-| **Page Cache** | ❌ 未实现 | - | 无文件内容缓存 |
-
----
-
-### 文件系统架构评价
-
-**优势**：
-1. **FAT32 实现完整**：支持长文件名、多文件系统挂载、完整的簇链管理
-2. **简洁的 VFS 设计**：`struct dirent` 融合 Dentry+Inode，减少间接层
-3. **并发安全**：`sleeplock` + `spinlock` 双层锁机制
-
-**局限**：
-1. **单一文件系统**：仅支持 FAT32，无 Ext4、无内存文件系统
-2. **无网络支持**：Socket 完全未实现
-3. **高级 I/O 缺失**：poll/select/epoll 均未实现
-4. **mmap 性能低**：Eager Copy 策略，无 Demand Paging 和零拷贝优化
-5. **无伪文件系统**：调试和系统信息获取受限
-
-**适用场景**：适合教学演示和简单嵌入式应用，不适合需要高性能 I/O 或网络功能的场景。
+## 题单作答（JSON-QA 渲染）
+
+- stage_id: `06_fs_vfs`
+- terminology_profile: `stallings_en_zh`
+
+## 第 06_fs_vfs 阶段：文件系统（VFS + 具体 FS）
+
+### Q06_001（short_answer）
+
+- 题干：VFS 抽象层 (Virtual File System, VFS)接口是什么形态？（Rust trait / C op 表；必须给接口定义证据）
+- 答案："C 语言风格的文件对象抽象，通过 struct file 的 type 字段区分 FD_ENTRY（文件）/FD_PIPE（管道）/FD_DEVICE（设备），无 Rust trait 风格。文件操作通过函数指针间接调用（如 eread/ewrite 用于 FD_ENTRY，piperead/pipewrite 用于 FD_PIPE，devsw[].read/write 用于 FD_DEVICE）。"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/include/file.h` | `struct file` | struct file { enum { FD_NONE, FD_PIPE, FD_ENTRY, FD_DEVICE } type; ... struct pipe *pipe; struct dirent *ep; short major; }; |
+| `src/file.c` | `function fileread` | switch (f->type) { case FD_PIPE: r = piperead(...); case FD_DEVICE: r = (devsw + f->major)->read(...); case FD_ENTRY: r = eread(f->ep, ...); } |
+
+### Q06_002（single_choice）
+
+- 题干：具体文件系统后端 (Concrete File System Backend) 更接近哪种？
+- 答案："A. 真实磁盘文件系统（FAT32/Ext4/其他，持久化存储）"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/fat32.c` | `function fat32_init` | FAT32 文件系统实现，基于 ChaN FatFs 库，支持持久化存储 |
+| `src/include/fat32.h` | `struct fs` | struct fs { uint devno; int valid; struct dirent* image; struct Fat fat; ... void (*disk_read)(...); void (*disk_write)(...); }; |
+
+### Q06_003（short_answer）
+
+- 题干：若支持 FAT32/Ext4：它是自研还是第三方库/crate？（必须引用 Cargo.toml/Cargo.lock 或 Makefile 引入证据）
+- 答案："第三方库：ChaN FatFs R0.14b。证据：`src/include/ff.h` 头部明确标注 'FatFs - Generic FAT Filesystem module R0.14b' 及 'Copyright (C) 2021, ChaN, all right reserved.'，本项目为 C 语言项目（非 Rust），通过直接包含 ff.h/ffconf.h 使用第三方 FatFs 库。"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/include/ff.h` | `file_header FF_DEFINED` | FatFs - Generic FAT Filesystem module R0.14b / Copyright (C) 2021, ChaN, all right reserved. |
+
+### Q06_004（short_answer）
+
+- 题干：文件打开路径：文件打开入口（sys_open 或等价）→ VFS 层 → 具体 FS open。列出 3-6 个关键节点并给证据。
+- 答案："文件打开路径：sys_openat (src/sysfile.c:41) → fdalloc (src/sysfile.c:17) → ename (src/fat32.c:1055) → create/edirlookup (src/fat32.c:867) → filealloc (src/file.c:42) → 返回 fd。关键节点：1) sys_openat 解析路径并调用 ename；2) ename 调用 lookup_path 进行路径遍历；3) dirlookup 在目录中查找条目；4) filealloc 分配全局 file 结构；5) fdalloc 将 file 绑定到进程 ofile 数组。"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/sysfile.c` | `function sys_openat` | uint64 sys_openat() { ... ep = ename(dp,path,&devno); ... f = filealloc(); fd = fdalloc(f); ... } |
+| `src/file.c` | `function filealloc` | struct file* filealloc(void) { ... for(f = ftable.file; f < ftable.file + NFILE; f++) if(f->ref == 0) { f->ref = 1; return f; } } |
+| `src/fat32.c` | `function ename` | struct dirent *ename(struct dirent* env,char *path,int* devno) { return lookup_path(env,path, 0, name, devno); } |
+
+### Q06_005（short_answer）
+
+- 题干：文件描述符表 (File Descriptor Table, FD Table) 的实现形态是什么？（固定数组/Vec/BTreeMap 等；必须给结构体定义证据）
+- 答案："Per-process 固定数组：`struct file **ofile`，大小为 NOFILE（101）。每个进程独立拥有 ofile 数组，通过 kmalloc 动态分配。"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/include/proc.h` | `struct_field proc::ofile` | struct proc { ... struct file **ofile; ... }; |
+| `src/proc.c` | `code_block procinit` | p->ofile = kmalloc(NOFILE*sizeof(struct file*)); |
+| `src/include/param.h` | `macro NOFILE` | #define NOFILE 101  // open files per process |
+
+### Q06_006（tri_state_impl）
+
+- 题干：是否实现块缓存/缓冲缓存 (Block Cache / Buffer Cache, bcache)？（必须三态）
+- 答案："implemented"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/bio.c` | `struct cache` | struct cache { struct spinlock lock; struct buf buf[NBUF]; struct buf head; } bcache; |
+| `src/bio.c` | `function bread` | struct buf* bread(uint dev, uint sectorno) { b = bget(dev, sectorno); if (!b->valid) { FatFs[dev].disk_read(...); b->valid = 1; } return b; } |
+
+### Q06_007（short_answer）
+
+- 题干：若存在缓存：驱逐策略是什么（LRU/Clock/FIFO/无驱逐）？必须指出判断依据（字段/算法分支）证据。
+- 答案："LRU（Least Recently Used）驱逐策略。判断依据：bget() 从 bcache.head.prev（最久未使用）开始扫描寻找 refcnt==0 的缓冲；brelse() 将释放的缓冲移回 bcache.head.next（最近使用），通过双向链表维护访问顺序。"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/bio.c` | `function bget` | for(b = bcache.head.prev; b != &bcache.head; b = b->prev) if(b->refcnt == 0) { ... return b; } |
+| `src/bio.c` | `function brelse` | b->next->prev = b->prev; b->prev->next = b->next; b->next = bcache.head.next; b->prev = &bcache.head; bcache.head.next->prev = b; bcache.head.next = b; |
+
+### Q06_008（tri_state_impl）
+
+- 题干：是否实现页缓存 (Page Cache)或与 mmap/文件映射共享缓存页？（必须三态）
+- 答案："stub"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/mmap.c` | `function do_mmap` | do_mmap 通过 fileread 直接读取文件内容到分配的物理页，无独立页缓存层，文件数据直接拷贝到用户页，未实现共享页缓存机制 |
+
+### Q06_009（tri_state_impl）
+
+- 题干：是否实现 mmap 的文件映射或匿名映射？（必须三态；若 stub 说明形态）
+- 答案："implemented"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/mmap.c` | `function do_mmap` | if(flags & MAP_ANONYMOUS) { fd = -1; goto ignore_fd; } ... struct vma *vma = alloc_mmap_vma(p, flags, start, len, perm, fd, offset); ... fileread(f, va, PGSIZE); |
+
+### Q06_010（tri_state_impl）
+
+- 题干：是否实现 poll/select/epoll（或等价事件机制）？（必须三态）
+- 答案："stub"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/syspoll.c` | `function sys_ppoll` | uint64 sys_ppoll() { return 0; } |
+
+### Q06_011（tri_state_impl）
+
+- 题干：路径解析 (namei/path_walk/lookup) 是否实现并支持绝对/相对路径与 . ..？（必须三态）
+- 答案："implemented"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/fat32.c` | `function lookup_path` | if (*path == '/') { entry = edup(&self_fs->root); } else if(env) { entry = edup(env); } else { entry = edup(myproc()->cwd); } |
+| `src/fat32.c` | `function dirlookup` | if (strncmp(filename, ".", FAT32_MAX_FILENAME) == 0) { return edup(dp); } else if (strncmp(filename, "..", FAT32_MAX_FILENAME) == 0) { return edup(dp->parent); } |
+
+### Q06_012（tri_state_impl）
+
+- 题干：是否支持符号链接 (symlink) 的解析/跟随？（必须三态）
+- 答案："not_found"
+
+- 证据：无（`not_found`/`stub` 时允许为空；否则需补齐）
+
+### Q06_013（tri_state_impl）
+
+- 题干：是否实现管道 (pipe/pipe2) 并在 VFS 层作为文件对象？（必须三态；与 08 章 pipe 实现互指）
+- 答案："implemented"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/pipe.c` | `function pipealloc` | (*f0)->type = FD_PIPE; (*f0)->readable = 1; (*f0)->writable = 0; (*f0)->pipe = pi; (*f1)->type = FD_PIPE; (*f1)->readable = 0; (*f1)->writable = 1; |
+| `src/file.c` | `function fileread` | case FD_PIPE: r = piperead(f->pipe, 1, addr, n); |
+
+### Q06_014（tri_state_impl）
+
+- 题干：是否实现网络 socket（作为 VFS 文件对象）？（必须三态）
+- 答案："not_found"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/include/socket.h` | `file socket.h` | 仅定义 struct socket_connection 结构，未发现 sys_socket 系统调用实现 |
+
+### Q06_015（tri_state_impl）
+
+- 题干：是否实现伪文件系统（devfs/procfs/sysfs）？（必须三态；若 implemented 需说明实现形态）
+- 答案："not_found"
+
+- 证据：无（`not_found`/`stub` 时允许为空；否则需补齐）
+
+### Q06_016（single_choice）
+
+- 题干：文件描述符表的归属是哪种？
+- 答案："A. Per-Process（每进程独立 fd 表，fork 时复制/共享）"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/include/proc.h` | `struct_field proc::ofile` | struct proc { ... struct file **ofile; ... }; |
+| `src/proc.c` | `code_block procinit` | p->ofile = kmalloc(NOFILE*sizeof(struct file*)); |
+
+### Q06_017（single_choice）
+
+- 题干：文件数据块分配方式 (File Allocation Method, Stallings Ch12) 更接近哪种？
+- 答案："E. 混合（如 Unix 直接 + 间接块）"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/fat32.c` | `function etrunc` | for (uint32 clus = entry->first_clus; clus >= 2 && clus < FAT32_EOC; ) { uint32 next = read_fat(self_fs, clus); free_clus(self_fs, clus); clus = next; } |
+
+### Q06_018（single_choice）
+
+- 题干：磁盘/存储空闲空间管理 (Free Space Management, Stallings Ch12) 更接近哪种？
+- 答案："E. FAT 表内嵌空闲链（FAT32 特有）"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/fat32.c` | `function read_fat` | FAT32 通过 FAT 表项值判断簇是否空闲（0 表示空闲），使用 read_fat/write_fat 操作 FAT 表管理空闲簇 |
+
+### Q06_019（single_choice）
+
+- 题干：目录结构 (Directory Structure, Stallings Ch12) 更接近哪种？
+- 答案："C. 树形层次目录 (Tree-Structured Hierarchy)（最常见）"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/fat32.c` | `function lookup_path` | 通过 skipelem 逐元素解析路径，支持多级目录嵌套遍历 |
+| `src/fat32.c` | `function dirlookup` | 在目录中查找子目录或文件，支持树形层次结构 |
+
+### Q06_020（single_choice）
+
+- 题干：文件内部记录组织 (File Record Organization, Stallings Ch12) 更接近哪种？
+- 答案："A. 字节流 (Byte Stream / Unstructured)：无固定记录结构"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/file.c` | `function fileread` | fileread 按字节数 n 读取，无记录边界概念 |
+| `src/fat32.c` | `function eread` | eread 按偏移 off 和长度 n 读取文件内容，视为连续字节流 |
 
 ---
 
 
 # 设备驱动与硬件抽象
 
-## 第 7 章：设备驱动与硬件抽象
-
-本章分析 `oskernrl2022-rv6` 操作系统的设备驱动架构、硬件抽象层实现以及目标平台适配机制。该内核基于 xv6-k210 改编，支持 QEMU sifive_u 虚拟机和 SiFive FU740 等硬件平台。
-
----
-
-### 驱动框架与设备发现
-
-#### 设备发现机制
-
-**❌ 未实现 Device Tree 解析**。内核未实现动态设备树（DTS/DTB）解析功能，设备地址和中断号均通过编译期宏定义硬编码。
-
-设备发现采用**静态内存映射表**方式，所有外设的物理地址在 `src/include/memlayout.h` 和 `src/sifive/platform.h` 中预定义：
-
-```c
-// src/include/memlayout.h
-#define UART0 0x10000000L       // QEMU UART0 物理地址
-#define VIRTIO0 0x10001000      // VirtIO 磁盘接口
-#define PLIC 0x0c000000L        // 平台级中断控制器
-#define CLINT 0x02000000L       // 本地中断控制器（含定时器）
+## 题单作答（JSON-QA 渲染）
 
-// src/sifive/platform.h (SiFive 硬件平台)
-#define UART0_CTRL_ADDR _AC(0x10010000,UL)
-#define SPI0_CTRL_ADDR  _AC(0x10040000,UL)
-#define GPIO_CTRL_ADDR  _AC(0x10060000,UL)
-```
+- stage_id: `07_device_drivers`
+- terminology_profile: `stallings_en_zh`
 
-#### 设备驱动框架
+## 第 07_device_drivers 阶段：设备驱动与硬件抽象
 
-**🔸 桩函数/简化实现**。内核未实现现代操作系统的 Driver Trait 或设备驱动模型（如 Linux 的 `struct device_driver`）。设备管理采用**静态设备表**方式：
-
-```c
-// src/include/dev.h
-#define DEV_NAME_MAX 12
-#define NDEV 4  // 最多支持 4 种设备
-
-struct devsw {
-  char name[DEV_NAME_MAX+1];
-  struct spinlock lk;
-  int (*read)(int, uint64, int);   // 读函数指针
-  int (*write)(int, uint64, int);  // 写函数指针
-};
-
-extern struct devsw devsw[];
-```
-
-设备注册通过 `allocdev()` 函数在初始化时静态完成：
-
-```c
-// src/dev.c:42-45
-int devinit() {
-  // ... 创建 /dev 目录 ...
-  memset(devsw, 0, NDEV*sizeof(struct devsw));
-  allocdev("console", consoleread, consolewrite);  // 控制台
-  allocdev("null", nullread, nullwrite);           // 空设备
-  allocdev("zero", zeroread, zerowrite);           // 零设备
-  return 0;
-}
-```
-
-**设备查找**通过线性扫描设备表实现：
-
-```c
-// src/dev.c:72-78
-int devlookup(char *name) {
-  for(int i = 0; i < NDEV; i++) {
-    if(strncmp(name, devsw[i].name, DEV_NAME_MAX+1) == 0) {
-      return i;  // 返回设备索引
-    }
-  }
-  return -1;  // 未找到
-}
-```
-
-#### 驱动初始化流程
-
-驱动初始化在内核启动时按固定顺序执行，调用链如下：
-
-```mermaid
-graph TD
-  A["main
- src/main.c:51"] --> B["disk_init
- src/disk.c:16"]
-  A --> C["devinit
- src/dev.c:24"]
-  A --> D["trapinithart
- src/trap.c:52"]
-  B --> E["ramdisk_init
- src/ramdisk.c:18"]
-  B --> F["disk_initialize
- src/diskio.c:47"]
-  D --> G["plicinithart
- 中断初始化"]
-```
-
----
-
-### 组件化设计与配置机制
-
-#### 编译配置系统
-
-内核通过 **Makefile 宏定义** 实现组件化配置，支持在编译期选择不同的存储后端和目标平台。
-
-**存储后端配置**（`Makefile:4-9`）：
-
-```makefile
-FS?=FAT
-MAC?=SIFIVE_U
-
-ifeq ($(MAC),SIFIVE_U)
-DISK:=$K/link_null.o    # 空磁盘后端
-endif
-
-ifeq ($(MAC),QEMU)
-DISK:=$K/link_disk.o    # VirtIO 磁盘后端
-endif
-```
-
-**编译选项**（`Makefile:70`）：
-
-```makefile
-CFLAGS = -Wall -Werror -O -fno-omit-frame-pointer -ggdb -DDEBUG -DWARNING -DERROR -D$(FS) -D$(MAC)
-```
-
-支持的平台和存储模式：
-
-| 宏定义 | 含义 | 影响 |
-|--------|------|------|
-| `QEMU` | QEMU sifive_u 虚拟机 | 启用 VirtIO 磁盘、UART 地址 0x10000000 |
-| `SIFIVE_U` | SiFive FU740 硬件 | 启用 SPI/SD 卡驱动、UART 地址 0x10010000 |
-| `RAM` | RAM 磁盘模式 | 使用内存模拟磁盘，`ramdisk_rw()` |
-| `SD` | SD 卡模式 | 使用 SPI+SD 卡驱动，`disk_read/write()` |
-| `FAT` | FAT32 文件系统 | 启用 FatFs 文件系统支持 |
-
-#### 条件编译示例
-
-磁盘驱动根据 `RAM` 宏选择不同后端：
-
-```c
-// src/disk.c:16-35
-void disk_init(void) {
-    if(disk_init_flag) return;
-    else disk_init_flag = 1;
-    #ifdef RAM
-    ramdisk_init();      // RAM 磁盘初始化
-    #else
-    disk_initialize(0);  // SD 卡初始化
-    #endif
-}
-
-void vdisk_read(struct buf *b) {
-    #ifdef RAM    
-    ramdisk_rw(b, 0);    // 从 RAM 读取
-    #else 
-    disk_read(0, b->data, b->sectorno, 1);  // 从 SD 卡读取
-    #endif
-}
-```
-
----
-
-### 字符设备驱动（UART/Console）
-
-#### UART 驱动实现
-
-**✅ 已实现**。UART 驱动采用**SBI（Supervisor Binary Interface）调用**方式，而非直接操作 UART 硬件寄存器。
-
-```c
-// src/include/sbi.h:61-66
-static inline void sbi_console_putchar(int c) {
-    sbi_call(SBI_CONSOLE_PUTCHAR, c, 0, 0);
-}
-
-static inline int sbi_console_getchar() {
-    return sbi_call(SBI_CONSOLE_GETCHAR, 0, 0, 0);
-}
-```
-
-**SBI 调用封装**通过 RISC-V `ecall` 指令实现：
-
-```c
-// src/include/sbi.h:31-38
-static int inline sbi_call(uint64 which, uint64 arg0, uint64 arg1, uint64 arg2) {
-    register uint64 a0 asm("a0") = arg0;
-    register uint64 a1 asm("a1") = arg1;
-    register uint64 a2 asm("a2") = arg2;
-    register uint64 a7 asm("a7") = which;
-    asm volatile("ecall" : "=r"(a0) : "r"(a0), "r"(a1), "r"(a2), "r"(a7) : "memory");
-    return a0;
-}
-```
-
-**控制台读写**通过设备表接口暴露：
-
-```c
-// src/dev.c:113-130
-int consoleread(int user_dst, uint64 addr, int n) {
-  char readbuf[CONSOLE_BUF_LEN];
-  int ret = 0;
-  while(n) {
-    int len = MIN(n, CONSOLE_BUF_LEN);
-    for(int i=0; i<len; i++) {
-      char c = 0;
-      while((c = sbi_console_getchar()) == 255);  // 等待输入
-      c = c == 13 ? 10 : c;  // CR -> LF
-      readbuf[i] = c;
-      consputc(c);  // 回显
-    }
-    // ... 拷贝到用户空间 ...
-  }
-  return ret;
-}
-```
-
-#### MMU 前后地址切换
-
-**🔸 部分实现**。UART 驱动在 MMU 启用前后均使用 SBI 调用，**无需地址切换**。SBI 固件负责将虚拟地址转换为物理地址或直接操作硬件。
-
-```c
-// src/include/memlayout.h:57-58
-#define UART0 0x10000000L      // QEMU 物理地址
-#define UART0_V (UART0 + VIRT_OFFSET)  // 虚拟地址（未使用）
-```
-
-**注意**：虽然定义了 `UART0_V` 虚拟地址，但实际代码中未直接使用 UART 寄存器，而是通过 SBI 抽象层，因此不存在 MMU 前后的地址切换问题。
-
-#### 中断处理
-
-UART 中断通过 PLIC（Platform-Level Interrupt Controller）管理：
-
-```c
-// src/include/plic.h:88-91
-#ifdef QEMU
-#define UART0_IRQ 4 
-#define UART1_IRQ 5
-#else  // K210
-#define UART0_IRQ 4 
-#define UART1_IRQ 5
-#endif 
-```
-
-**❌ 未实现 PLIC 完整驱动**。`devintr()` 函数中 UART 中断处理被注释掉：
-
-```c
-// src/trap.c:220-235
-int devintr(void) {
-  if ((0x8000000000000000L & scause) && 9 == (scause & 0xff)) {
-    int irq = 0;  // ⚠️ 硬编码为 0，未从 PLIC 读取
-    // plic_claim();
-    if (UART0_IRQ == irq) {
-      int c = sbi_console_getchar();
-      if (-1 != c) {
-        // consoleintr(c);  // 被注释
-      }
-    }
-    // plic_complete(irq);
-    return 1;
-  }
-  // ...
-}
-```
-
----
-
-### 块设备驱动（VirtIO-Blk 等）
-
-#### 存储后端架构
-
-内核支持两种存储后端，通过 `RAM` 宏切换：
-
-| 后端 | 实现文件 | 原理 |
-|------|----------|------|
-| **RAM 磁盘** | `src/ramdisk.c` | 将内存区域模拟为磁盘，`ramdisk = fs_img_start` |
-| **SD 卡** | `src/diskio.c`, `src/sd.c` | 通过 SPI 协议读写 SD 卡，FatFs 文件系统 |
-
-#### RAM 磁盘实现
-
-**✅ 已实现**。RAM 磁盘将内核镜像后的内存区域作为磁盘使用：
-
-```c
-// src/ramdisk.c:18-29
-void ramdisk_init(void) {
-#ifdef QEMU
-  ramdisk = fs_img_start;  // 使用内核后的内存
-#endif
-#ifdef SIFIVE_U
-  ramdisk = (char*)RAMDISK;  // 固定地址
-#endif
-  initlock(&ramdisklock, "ramdisk lock");
-}
-
-void ramdisk_rw(struct buf *b, int write) {
-  acquire(&ramdisklock);
-  char *addr = ramdisk + b->sectorno * BSIZE;
-  if (write)
-    memmove(addr, b->data, BSIZE);
-  else
-    memmove(b->data, addr, BSIZE);
-  release(&ramdisklock);
-}
-```
-
-#### SD 卡驱动（SPI 协议）
-
-**✅ 已实现**。SD 卡驱动通过 SPI 控制器实现，支持初始化、读写块操作。
-
-**SPI 控制器定义**：
-
-```c
-// src/diskio.c:22-24
-static spi_ctrl* spictrl = (spi_ctrl*) SPI2_CTRL_ADDR;
-static unsigned int peripheral_input_khz = 500000;  // 500kHz 初始频率
-```
-
-**SD 卡初始化流程**：
-
-```c
-// src/sd.c:256-271
-int sd_init(spi_ctrl* spi, unsigned int input_clk_khz, int skip_sd_init_commands) {
-  if (!skip_sd_init_commands) {
-    sd_poweron(spi, input_clk_khz);      // 上电延时 1ms
-    if (sd_cmd0(spi)) return SD_INIT_ERROR_CMD0;   // GO_IDLE_STATE
-    if (sd_cmd8(spi)) return SD_INIT_ERROR_CMD8;   // SEND_IF_COND
-    if (sd_acmd41(spi)) return SD_INIT_ERROR_ACMD41; // ACMD41 (HCS)
-    if (sd_cmd58(spi)) return SD_INIT_ERROR_CMD58; // READ_OCR
-    if (sd_cmd16(spi)) return SD_INIT_ERROR_CMD16; // SET_BLOCKLEN (512B)
-  }
-  spi->sckdiv = spi_min_clk_divisor(input_clk_khz, SD_POST_INIT_CLK_KHZ); // 提升到 20MHz
-  return 0;
-}
-```
-
-**块读写操作**：
-
-```c
-// src/sd.c:293-328
-int sd_read_blocks(spi_ctrl* spi, void* dst, uint32_t src_lba, size_t size) {
-  // CMD18: READ_BLOCK_MULTIPLE
-  if (sd_cmd(spi, SD_CMD(SD_CMD_READ_BLOCK_MULTIPLE), src_lba, crc) != 0x00) {
-    sd_cmd_end(spi);
-    return SD_COPY_ERROR_CMD18;
-  }
-  do {
-    // 等待数据令牌
-    while (sd_dummy(spi) != SD_DATA_TOKEN);
-    // 读取 512 字节
-    n = 512;
-    do {
-      uint8_t x = sd_dummy(spi);
-      *p++ = x;
-      crc = crc16(crc, x);
-    } while (--n > 0);
-    // 验证 CRC
-    crc_exp = ((uint16_t)sd_dummy(spi) << 8) | sd_dummy(spi);
-    if (crc != crc_exp) {
-      rc = SD_COPY_ERROR_CMD18_CRC;
-      break;
-    }
-  } while (--i > 0);
-  // CMD12: STOP_TRANSMISSION
-  sd_cmd(spi, SD_CMD(SD_CMD_STOP_TRANSMISSION), 0, 0x01);
-  sd_cmd_end(spi);
-  return rc;
-}
-```
-
-#### VirtIO 支持
-
-**❌ 未实现**。虽然 `src/include/virtio.h` 定义了 VirtIO 描述符结构，但**无实际驱动代码**：
-
-```c
-// src/include/virtio.h:56-61
-struct VRingDesc {
-  uint64 addr;
-  uint32 len;
-  uint16 flags;
-  uint16 next;
-};
-
-// 声明但未实现
-void virtio_disk_init(void);
-void virtio_disk_rw(struct buf *b, int write);
-void virtio_disk_intr(void);
-```
-
-`src/disk.c` 中仅调用 `disk_read/write()`，未使用 VirtIO 接口。
-
----
-
-### 网络设备驱动
-
-**❌ 未实现**。内核未实现任何网络设备驱动或网络协议栈。
-
-- 无网卡驱动（VirtIO-Net、MAC 控制器等）
-- 无 TCP/IP 协议栈（如 smoltcp、lwIP）
-- `src/include/socket.h` 仅定义结构体，无实现
-
----
-
-### 中断控制器驱动
-
-#### PLIC（Platform-Level Interrupt Controller）
-
-**🔸 桩函数**。`src/include/plic.h` 声明了 PLIC 操作函数，但**未实现完整功能**：
-
-```c
-// src/include/plic.h:95-98
-void plicinit(void);
-void plicinithart(void);
-int plic_claim(void);
-void plic_complete(int irq);
-```
-
-**中断使能和优先级设置**通过内存映射寄存器实现：
-
-```c
-// src/include/memlayout.h:70-77
-#define PLIC_PRIORITY (PLIC_V + 0x0)
-#define PLIC_PENDING (PLIC_V + 0x1000)
-#define PLIC_MENABLE(hart) (PLIC_V + 0x1f80 + (hart)*0x100)
-#define PLIC_MCLAIM(hart) (PLIC_V + 0x1ff004 + (hart)*0x2000)
-#define PLIC_SCLAIM(hart) (PLIC_V + 0x200004 + (hart)*0x2000)
-```
-
-**❌ 未实现中断路由**。`devintr()` 函数中 `irq` 硬编码为 0，未从 `PLIC_MCLAIM` 读取实际中断号。
-
-#### CLINT（Core Local Interruptor）
-
-**✅ 已实现**。CLINT 驱动通过 SBI 调用实现定时器中断：
-
-```c
-// src/timer.c:30-34
-void set_next_timeout() {
-  set_timer(r_time() + INTERVAL);  // SBI_SET_TIMER
-}
-
-void timer_tick() {
-  acquire(&tickslock);
-  ticks++;
-  wakeup(&ticks);
-  release(&tickslock);
-  set_next_timeout();
-}
-```
-
-**定时器中断处理**在 `devintr()` 中识别：
-
-```c
-// src/trap.c:244-248
-else if (0x8000000000000005L == scause) {  // Supervisor Timer Interrupt
-  timer_tick();
-  return 2;
-}
-```
-
----
-
-### 目标平台适配情况
-
-#### 支持的平台
-
-| 平台 | 宏定义 | UART 地址 | 存储后端 |
-|------|--------|-----------|----------|
-| **QEMU sifive_u** | `QEMU` | 0x10000000 | VirtIO / RAM 磁盘 |
-| **SiFive FU740** | `SIFIVE_U` | 0x10010000 | SPI+SD 卡 |
-| **Kendryte K210** | `K210`（已注释） | 0x38000000 | SPI+SD 卡 |
-
-#### 平台适配机制
-
-通过 `Makefile` 的 `MAC` 变量切换平台：
-
-```makefile
-# Makefile:5
-MAC?=SIFIVE_U
-
-# 编译命令
-make MAC=QEMU    # QEMU 虚拟机
-make MAC=SIFIVE_U  # SiFive 硬件
-```
-
-**内存布局差异**在 `src/include/memlayout.h` 中通过条件编译区分：
-
-```c
-// src/include/memlayout.h:1-2
-// #define K210  // 已注释，支持 K210 时启用
-
-#ifdef QEMU
-#define UART0 0x10000000L
-#define UART0_IRQ 4
-#else  // SIFIVE_U / K210
-#define UART0_CTRL_ADDR 0x10010000  // 来自 platform.h
-#define UART0_IRQ 5
-#endif
-```
-
-#### 板级特有驱动
-
-**SiFive 平台**包含完整的外设定义（`src/sifive/platform.h`）：
-
-```c
-#define CLINT_CTRL_ADDR   _AC(0x2000000,UL)
-#define PLIC_CTRL_ADDR    _AC(0xc000000,UL)
-#define UART0_CTRL_ADDR   _AC(0x10010000,UL)
-#define SPI0_CTRL_ADDR    _AC(0x10040000,UL)
-#define GPIO_CTRL_ADDR    _AC(0x10060000,UL)
-#define I2C_CTRL_ADDR     _AC(0x10030000,UL)
-```
-
-**K210 平台**（已废弃）使用不同的地址映射（见 `memlayout.h` 注释）：
-
-```c
-// (0x0200_0000, 0x1000),      /* CLINT     */
-// (0x0C20_0000, 0x1000),      /* PLIC      */
-// (0x3800_0000, 0x1000),      /* UARTHS    */
-// (0x5020_0000, 0x1000),      /* SPI0      */
-```
-
----
-
-### 其他外设支持
-
-#### SPI 控制器驱动
-
-**✅ 已实现**。SPI 驱动用于 SD 卡通信，提供基础的 TX/RX 操作：
-
-```c
-// src/spi.c:14-37
-void spi_tx(spi_ctrl* spictrl, uint8_t in) {
-  while ((int32_t) spictrl->txdata.raw_bits < 0);
-  spictrl->txdata.data = in;
-}
-
-uint8_t spi_rx(spi_ctrl* spictrl) {
-  int32_t out;
-  while ((out = (int32_t) spictrl->rxdata.raw_bits) < 0);
-  return (uint8_t) out;
-}
-
-uint8_t spi_txrx(spi_ctrl* spictrl, uint8_t in) {
-  spi_tx(spictrl, in);
-  return spi_rx(spictrl);
-}
-```
-
-#### GPIO/I2C 驱动
-
-**❌ 未实现**。虽然 `src/sifive/devices/gpio.h` 和 `i2c.h` 定义了寄存器结构，但**无驱动实现代码**。
-
-#### 文件系统支持
-
-**✅ 已实现**。内核集成 FatFs（FAT32）文件系统，通过 `src/fat32.c` 实现：
-
-- 文件读写：`file_read()`, `file_write()`
-- 目录操作：`create()`, `dirlookup()`
-- 块设备抽象：`bread()`, `bwrite()` 通过 buffer cache
-
----
-
-### 总结
-
-| 子系统 | 实现状态 | 备注 |
-|--------|----------|------|
-| **设备发现** | ❌ 未实现 | 硬编码地址，无 DTB 解析 |
-| **驱动框架** | 🔸 简化实现 | 静态设备表，无动态注册 |
-| **UART/Console** | ✅ 已实现 | 通过 SBI 调用抽象 |
-| **RAM 磁盘** | ✅ 已实现 | 内存模拟磁盘 |
-| **SD 卡驱动** | ✅ 已实现 | SPI 协议，FatFs 集成 |
-| **VirtIO-Blk** | ❌ 未实现 | 仅头文件定义 |
-| **网络驱动** | ❌ 未实现 | 无网卡/协议栈 |
-| **PLIC 中断** | 🔸 桩函数 | 未实现中断路由 |
-| **CLINT 定时器** | ✅ 已实现 | SBI 调用 |
-| **平台适配** | ✅ 已实现 | QEMU / SiFive_U 双支持 |
-
-**架构特点**：
-1. **SBI 抽象层**：通过 SBI 调用简化硬件操作，但限制了裸机部署能力
-2. **静态配置**：所有设备地址和中断号编译期确定，无运行时发现
-3. **组件化编译**：通过 Makefile 宏切换存储后端和目标平台
-4. **简化驱动模型**：无设备树、无动态驱动加载，适合教学和资源受限场景
+### Q07_001（single_choice）
+
+- 题干：设备发现/枚举机制更接近哪种？
+- 答案："C. 硬编码设备表/固定 MMIO 地址"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/include/memlayout.h` | `macro UART0` | #define UART0 0x10000000L   // 256 MB |
+| `src/include/memlayout.h` | `macro CLINT` | #define CLINT 0x02000000L |
+| `src/include/memlayout.h` | `macro PLIC` | #define PLIC 0x0c000000L       // 192 MB |
+| `src/include/memlayout.h` | `macro VIRTIO0` | #define VIRTIO0 0x10001000 |
+
+### Q07_002（tri_state_impl）
+
+- 题干：是否能在代码中证实解析了 `.dtb`/DeviceTree？（必须三态；若 implemented 必须指出解析入口）
+- 答案："not_found"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/main.c` | `function main` | void main(unsigned long hartid, unsigned long dtb_pa) - 虽然接收 dtb_pa 参数但未见解析代码 |
+
+### Q07_003（short_answer）
+
+- 题干：驱动框架接口是什么？（Rust Driver trait / C driver ops / 注册表；必须引用接口定义证据）
+- 答案："C 语言风格的设备操作表（device switch table），通过 struct devsw 数组注册设备驱动。每个设备包含 name、read/write 函数指针。"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/include/dev.h` | `struct devsw` | struct devsw { char name[DEV_NAME_MAX+1]; struct spinlock lk; int (*read)(int, uint64, int); int (*write)(int, uint64, int); }; |
+| `src/dev.c` | `function allocdev` | int allocdev(char* name,int (*devread)(int, uint64, int),int (*devwrite)(int, uint64, int)) |
+| `src/dev.c` | `function devinit` | allocdev("console",consoleread,consolewrite); allocdev("null",nullread,nullwrite); allocdev("zero",zeroread,zerowrite); |
+
+### Q07_004（short_answer）
+
+- 题干：驱动注册与初始化顺序是什么？（init_drivers/probe/driver_manager 等；列出 3-6 个关键节点并给证据）
+- 答案："1. main() 调用 disk_init() → 2. disk_init() 根据 RAM/SD 宏调用 ramdisk_init() 或 disk_initialize() → 3. fs_init() 初始化文件系统 → 4. devinit() 注册字符设备（console/null/zero）→ 5. trapinithart() 设置中断向量"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/main.c` | `function main` | disk_init(); fs_init(); devinit(); |
+| `src/disk.c` | `function disk_init` | #ifdef RAM ramdisk_init(); #else disk_initialize(0); #endif |
+| `src/dev.c` | `function devinit` | allocdev("console",consoleread,consolewrite); allocdev("null",nullread,nullwrite); allocdev("zero",zeroread,zerowrite); |
+| `src/ramdisk.c` | `function ramdisk_init` | void ramdisk_init(void) { initlock(&ramdisklock, "ramdisk lock"); } |
+
+### Q07_005（tri_state_impl）
+
+- 题干：是否实现 UART/Console 驱动用于早期输出？（必须三态）
+- 答案："implemented"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/dev.c` | `function consoleread` | int consoleread(int user_dst,uint64 addr,int n){ while((c=sbi_console_getchar())==255); } |
+| `src/dev.c` | `function consolewrite` | int consolewrite(int user_dst,uint64 addr,int n){ for(int i=0;i<len;i++){ consputc(writebuf[i]); } } |
+| `src/include/sbi.h` | `function sbi_console_putchar` | static inline void sbi_console_putchar(int c) { sbi_call(SBI_CONSOLE_PUTCHAR, c, 0, 0); } |
+| `src/include/sbi.h` | `function sbi_console_getchar` | static inline int sbi_console_getchar() { return sbi_call(SBI_CONSOLE_GETCHAR, 0, 0, 0); } |
+
+### Q07_006（tri_state_impl）
+
+- 题干：是否实现块设备驱动（virtio-blk/ramdisk/其他）？（必须三态）
+- 答案："implemented"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/ramdisk.c` | `function ramdisk_init` | void ramdisk_init(void) { ramdisk = fs_img_start; initlock(&ramdisklock, "ramdisk lock"); } |
+| `src/ramdisk.c` | `function ramdisk_rw` | void ramdisk_rw(struct buf *b, int write) { memmove(b->data, (void*)addr, BSIZE); } |
+| `src/disk.c` | `function vdisk_read` | void vdisk_read(struct buf *b) { #ifdef RAM ramdisk_rw(b, 0); #else disk_read(0,b->data, b->sectorno,1); #endif } |
+| `src/sd.c` | `function sd_read_blocks` | int sd_read_blocks(spi_ctrl* spi, void* dst, uint32_t src_lba, size_t size) |
+
+### Q07_007（tri_state_impl）
+
+- 题干：是否实现网络设备驱动（virtio-net/e1000/rtl8139 等）？（必须三态）
+- 答案："not_found"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/include/virtio.h` | `macro VIRTIO_MMIO_DEVICE_ID` | #define VIRTIO_MMIO_DEVICE_ID 0x008 // device type; 1 is net, 2 is disk - 仅注释提及 net，无实现 |
+
+### Q07_008（tri_state_impl）
+
+- 题干：是否实现中断控制器驱动（PLIC/CLINT/APIC 等）？（必须三态；需指出中断源到 handler 的分发证据）
+- 答案："stub"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/trap.c` | `function devintr` | int devintr(void) { int irq =0; // plic_claim(); printf("irq:%d\n",irq); if (UART0_IRQ == irq) { int c = sbi_console_getchar(); } } |
+| `src/include/plic.h` | `function plic_claim` | int plic_claim(void); - 声明但未在 devintr 中实际调用 |
+| `src/include/plic.h` | `function plic_complete` | void plic_complete(int irq); - 声明但未使用 |
+| `src/trap.c` | `function trapinithart` | w_sie(r_sie() | SIE_SEIE | SIE_SSIE | SIE_STIE); - 启用中断但 irq 硬编码为 0 |
+
+### Q07_009（short_answer）
+
+- 题干：MMIO 地址来源是什么？（DTB 提供 / 常量硬编码 / 物理→虚拟转换；必须给证据）
+- 答案："常量硬编码。所有外设地址在 src/include/memlayout.h 中定义为宏常量，如 UART0=0x10000000L、CLINT=0x02000000L、PLIC=0x0c000000L。同时定义了 VIRT_OFFSET 用于物理到虚拟地址转换。"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/include/memlayout.h` | `macro UART0` | #define UART0 0x10000000L   // 256 MB |
+| `src/include/memlayout.h` | `macro UART0_V` | #define UART0_V (UART0 + VIRT_OFFSET) |
+| `src/include/memlayout.h` | `macro VIRT_OFFSET` | #define VIRT_OFFSET 0x3F00000000L |
+
+### Q07_010（short_answer）
+
+- 题干：多平台适配是如何通过构建/条件编译选择驱动的？（features/Kconfig/Makefile 规则；必须给证据）
+- 答案："通过 Makefile 的 MAC 变量和 C 预处理器宏实现。MAC 可设为 QEMU 或 SIFIVE_U，编译时传递 -D$(MAC) 标志。源码中使用 #ifdef QEMU / #ifdef SIFIVE_U / #ifdef K210 进行条件编译。"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `Makefile` | `makefile_variable MAC` | MAC?=SIFIVE_U ... CFLAGS += -D$(FS) -D$(MAC) |
+| `src/include/plic.h` | `macro UART0_IRQ` | #ifdef QEMU #define UART0_IRQ 4 #else #define UART0_IRQ 4 #endif |
+| `src/ramdisk.c` | `macro RAMDISK` | #ifdef QEMU ramdisk = fs_img_start; #endif #ifdef SIFIVE_U ramdisk = (char*)RAMDISK; #endif |
+
+### Q07_011（tri_state_impl）
+
+- 题干：是否存在 MMU 启用前后串口地址切换（phys/virt 切换）逻辑？（必须三态）
+- 答案："not_found"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/include/sbi.h` | `function sbi_console_putchar` | 通过 SBI 调用而非直接 MMIO 访问，无需地址切换 |
+| `src/include/memlayout.h` | `macro UART0_V` | #define UART0_V (UART0 + VIRT_OFFSET) - 定义了虚拟地址但未在串口驱动中使用 |
+
+### Q07_012（single_choice）
+
+- 题干：I/O 缓冲模式 (I/O Buffering) 最接近哪种？（Stallings Ch11：单缓冲 Single Buffer / 双缓冲 Double Buffer / 循环缓冲 Circular Buffer / 缓冲池 Buffer Pool / 无缓冲 No Buffer）
+- 答案："D. 缓冲池 (Buffer Pool)"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/bio.c` | `struct cache` | struct cache{ struct spinlock lock; struct buf buf[NBUF]; struct buf head; } bcache; |
+| `src/bio.c` | `function bget` | Look through buffer cache for block on device dev. If not found, allocate a buffer. LRU recycling. |
+| `src/include/buf.h` | `struct buf` | struct buf { int valid; uint dev; uint sectorno; struct sleeplock lock; uint refcnt; uchar data[BSIZE]; }; |
+
+### Q07_013（single_choice）
+
+- 题干：块设备（磁盘/eMMC/NVMe）I/O 请求调度算法 (Scheduling Algorithm) (Disk Scheduling Algorithm) 更接近哪种？（Stallings Ch11；若无显式调度则选「FCFS 顺序提交」）
+- 答案："A. FCFS（先来先服务 First-Come First-Served）"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/bio.c` | `function bread` | struct buf* bread(uint dev, uint sectorno) { b = bget(dev, sectorno); if (!b->valid) { FatFs[dev].disk_read(b,FatFs[dev].image); } } |
+| `src/disk.c` | `function vdisk_read` | void vdisk_read(struct buf *b) { disk_read(0,b->data, b->sectorno,1); } - 直接提交请求，无调度逻辑 |
+
+### Q07_014（single_choice）
+
+- 题干：I/O 控制技术 (I/O Control Techniques, Stallings Ch11) 更接近哪种？
+- 答案："A. 程序控制 I/O (Programmed I/O / Polling)：CPU 主动轮询设备状态"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/sd.c` | `function sd_read_blocks` | while (sd_dummy(spi) != SD_DATA_TOKEN); - 轮询等待数据 |
+| `src/sd.c` | `function sd_write_blocks` | while(sd_dummy(spi) == SD_RESPONSE_BUSY); - 轮询等待设备就绪 |
+| `src/trap.c` | `function devintr` | int irq =0; // plic_claim(); - 中断处理中 irq 硬编码为 0，实际未实现中断驱动 |
+
+### Q07_015（tri_state_impl）
+
+- 题干：是否实现 DMA (Direct Memory Access, Stallings Ch11) 传输路径？（必须三态；搜索 dma_alloc / dma_map / dma_buf / virtio 描述符环等；virtio 的描述符环也算 DMA 等价机制）
+- 答案："not_found"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/disk.c` | `function disk_intr` | #ifdef SD // dmac_intr(DMAC_CHANNEL0); #endif - 仅注释提及 DMA |
+| `src/include/virtio.h` | `struct VRingDesc` | struct VRingDesc { uint64 addr; uint32 len; uint16 flags; uint16 next; }; - 定义了 virtio 描述符但未见实际使用 |
 
 ---
 
 
 # 同步互斥与进程间通信
 
-## 第 8 章：同步互斥与进程间通信
-
-### 同步与互斥原语（锁与原子操作）
-
-本操作系统实现了两种核心锁机制：**SpinLock（自旋锁）** 和 **SleepLock（睡眠锁）**，分别适用于短临界区和长临界区的互斥保护。
-
-#### SpinLock 实现
-
-**文件位置**: `src/spinlock.c` (85 行), `src/include/spinlock.h` (30 行)
-
-**结构体定义** (`src/include/spinlock.h:7-13`):
-```c
-struct spinlock {
-  uint locked;       // Is the lock held?
-  char *name;        // Name of lock.
-  struct cpu *cpu;   // The cpu holding the lock.
-};
-```
-
-**加锁机制** (`src/spinlock.c:24-46`):
-```c
-void acquire(struct spinlock *lk)
-{
-  push_off(); // disable interrupts to avoid deadlock.
-  if(holding(lk))
-    panic("acquire");
-
-  // On RISC-V, sync_lock_test_and_set turns into an atomic swap:
-  //   amoswap.w.aq a5, a5, (s1)
-  while(__sync_lock_test_and_set(&lk->locked, 1) != 0)
-    ;
-
-  __sync_synchronize(); // memory fence
-  lk->cpu = mycpu();
-}
-```
-
-**原子操作实现**:
-- 使用 GCC 内置函数 `__sync_lock_test_and_set()` 实现原子交换
-- 在 RISC-V 架构下编译为 `amoswap.w.aq` 指令（原子内存交换）
-- 通过 `while` 循环自旋等待直到锁可用
-- 使用 `__sync_synchronize()` 发出 `fence` 指令确保内存顺序
-
-**解锁机制** (`src/spinlock.c:49-75`):
-```c
-void release(struct spinlock *lk)
-{
-  if(!holding(lk))
-    panic("release");
-
-  lk->cpu = 0;
-  __sync_synchronize(); // memory fence
-  __sync_lock_release(&lk->locked); // amoswap.w zero, zero, (s1)
-  pop_off();
-}
-```
-
-**状态分类**: **✅ 已实现** - 包含完整的原子操作和内存屏障逻辑
-
-#### SleepLock 实现
-
-**文件位置**: `src/sleeplock.c` (56 行), `src/include/sleeplock.h` (24 行)
-
-**结构体定义** (`src/include/sleeplock.h:10-17`):
-```c
-struct sleeplock {
-  uint locked;       // Is the lock held?
-  struct spinlock lk; // spinlock protecting this sleep lock
-  char *name;        // Name of lock.
-  int pid;           // Process holding lock
-};
-```
-
-**实现原理**:
-- SleepLock 内部嵌套一个 SpinLock 保护其状态
-- 当锁不可用时，调用 `sleep()` 将进程挂起到等待队列，而非自旋
-- 适用于持有时间较长的临界区（如文件系统操作）
-
-**加锁流程** (`src/sleeplock.c:24-34`):
-```c
-void acquiresleep(struct sleeplock *lk)
-{
-  acquire(&lk->lk);
-  while (lk->locked) {
-    sleep(lk, &lk->lk);  // 挂起进程
-  }
-  lk->locked = 1;
-  release(&lk->lk);
-}
-```
-
-**状态分类**: **✅ 已实现** - 完整实现睡眠/唤醒语义
-
-### 等待队列实现机制
-
-**文件位置**: `src/proc.c` (等待队列管理), `src/include/queue.h` (队列数据结构)
-
-#### 等待队列池
-
-系统维护一个全局等待队列池 (`src/proc.c:28-30`):
-```c
-#define WAITQ_NUM 100
-struct spinlock waitq_pool_lk;
-queue waitq_pool[WAITQ_NUM];
-int waitq_valid[WAITQ_NUM];
-```
-
-**队列结构** (`src/include/queue.h:9-14`):
-```c
-typedef struct{
-  void* chan;           // 睡眠通道标识
-  struct spinlock lk;   // 队列锁
-  struct list head;     // 双向链表头
-}queue;
-```
-
-#### 核心 API
-
-**分配等待队列** (`src/proc.c:76-89`):
-```c
-queue* allocwaitq(void* chan){
-  acquire(&waitq_pool_lk);
-  for(int i=0;i<WAITQ_NUM ;i++){
-    if(!waitq_valid[i]){
-      waitq_valid[i] = 1;
-      queue_init(waitq_pool+i,chan);
-      release(&waitq_pool_lk);
-      return waitq_pool+i;
-    }
-  }
-  release(&waitq_pool_lk);
-  return NULL;
-}
-```
-
-**睡眠机制** (`src/proc.c:542-576`):
-```c
-void sleep(void *chan, struct spinlock *lk)
-{
-  struct proc *p = myproc();
-  
-  if(lk != &p->lock){
-    acquire(&p->lock);
-    release(lk);
-  }
-
-  queue* q = findwaitq(chan);
-  if(!q) q = allocwaitq(chan);
-  waitq_push(q, p);
-  p->state = SLEEPING;
-  sched();  // 触发调度
-
-  if(lk != &p->lock){
-    release(&p->lock);
-    acquire(lk);
-  }
-}
-```
-
-**唤醒机制** (`src/proc.c:580-592`):
-```c
-void wakeup(void *chan)
-{
-   queue* q = findwaitq(chan);
-   if(q){
-     struct proc* p;
-     while((p = waitq_pop(q))!=NULL){
-       p->state = RUNNABLE;
-       readyq_push(p);
-     }
-     delwaitq(q);
-   }
-}
-```
-
-**状态分类**: **✅ 已实现** - 完整的等待队列管理和进程挂起/唤醒逻辑
-
-### 进程间通信（Pipe/MsgQueue/Sem）
-
-#### 管道（Pipe）
-
-**文件位置**: `src/pipe.c` (120 行), `src/include/pipe.h` (24 行)
-
-**结构体定义** (`src/include/pipe.h:10-17`):
-```c
-#define PIPESIZE 512
-
-struct pipe {
-  struct spinlock lock;
-  char data[PIPESIZE];      // 环形缓冲区
-  uint nread;               // 读指针
-  uint nwrite;              // 写指针
-  int readopen;             // 读端是否打开
-  int writeopen;            // 写端是否打开
-};
-```
-
-**实现特点**:
-- 使用 **512 字节环形缓冲区** 实现
-- 通过 `nread` 和 `nwrite` 索引实现循环访问
-- 读写操作均持有 `spinlock` 保证原子性
-- 缓冲区满/空时通过 `sleep/wakeup` 机制阻塞
-
-**写操作** (`src/pipe.c:69-93`):
-```c
-int pipewrite(struct pipe *pi, int user, uint64 addr, int n)
-{
-  for(i = 0; i < n; i++){
-    while(pi->nwrite == pi->nread + PIPESIZE){  // 缓冲区满
-      if(pi->readopen == 0 || pr->killed){
-        release(&pi->lock);
-        return -1;
-      }
-      wakeup(&pi->nread);
-      sleep(&pi->nwrite, &pi->lock);
-    }
-    pi->data[pi->nwrite++ % PIPESIZE] = ch;
-  }
-  wakeup(&pi->nread);
-  return i;
-}
-```
-
-**读操作** (`src/pipe.c:95-120`):
-```c
-int piperead(struct pipe *pi, int user, uint64 addr, int n)
-{
-  while(pi->nread == pi->nwrite && pi->writeopen){  // 缓冲区空
-    if(pr->killed){
-      release(&pi->lock);
-      return -1;
-    }
-    sleep(&pi->nread, &pi->lock);
-  }
-  for(i = 0; i < n; i++){
-    if(pi->nread == pi->nwrite)
-      break;
-    ch = pi->data[pi->nread++ % PIPESIZE];
-  }
-  wakeup(&pi->nwrite);
-  return i;
-}
-```
-
-**状态分类**: **✅ 已实现** - 完整的环形缓冲区实现和阻塞式读写
-
-#### 消息队列（Message Queue）
-
-**搜索结果**: 在整个代码库中搜索 `sys_msgget|msgget|msgsnd|msgrcv` 未找到任何匹配。
-
-**状态分类**: **❌ 未实现** - 代码库中不存在消息队列相关系统调用或数据结构
-
-#### 信号量（Semaphore）
-
-**搜索结果**: 搜索 `sys_semget|semget|semop` 未找到任何匹配。
-
-**状态分类**: **❌ 未实现** - 代码库中不存在 System V 信号量相关系统调用
-
-#### 共享内存（Shared Memory）
-
-**搜索结果**: 搜索 `shmat|shmdt|shmget` 仅找到 `src/include/sysinfo.h:14` 中 `sharedram` 字段引用，无实际实现。
-
-**状态分类**: **❌ 未实现** - 无 System V 共享内存系统调用
-
-#### Futex
-
-**文档描述** (`doc/内核实现--Futex.md`):
-- 定义了 `FUTEX_WAIT`, `FUTEX_WAKE`, `FUTEX_REQUEUE` 操作
-- 函数原型声明在 `src/include/proc.h:199`: `int do_futex(int* uaddr,int futex_op,int val,ktime_t *timeout,int *addr2,int val2,int val3);`
-
-**代码验证**:
-- 搜索 `do_futex` 仅在头文件中找到声明，**未找到实现体**
-- 搜索 `sys_futex|futex(` 仅在文档中找到引用
-- `src/sysproc.c` 中无 `sys_futex` 系统调用实现
-
-**状态分类**: **🔸 桩函数** - 仅有接口声明和文档描述，无实际实现代码
-
-#### 信号（Signal）作为 IPC
-
-**文件位置**: `src/signal.c` (272 行), `src/syssig.c` (110 行), `src/proc.c:754-792`
-
-**信号发送** (`src/proc.c:754-777`):
-```c
-int kill(int pid,int sig){
-  struct proc* p;
-  for(p = proc; p < &proc[NPROC]; p++){
-    if(p->pid == pid){
-      acquire(&p->lock);
-      if(p->state == SLEEPING){
-        queue_del(p);
-        readyq_push(p);
-        p->state = RUNNABLE;
-      }
-      p->sig_pending.__val[0] |= 1ul << sig;
-      if (0 == p->killed || sig < p->killed) {
-        p->killed = sig;
-      }
-      release(&p->lock);
-      return 0;
-    }
-  }
-  return 0;
-}
-```
-
-**系统调用** (`src/syssig.c:94-109`):
-```c
-uint64 sys_kill(){
-  int sig, pid;
-  argint(0,&pid);
-  argint(1,&sig);
-  return kill(pid,sig);
-}
-
-uint64 sys_tgkill(){
-  int sig, tid, pid;
-  argint(0,&pid);
-  argint(1,&tid);
-  argint(2,&sig);
-  return tgkill(pid,tid,sig);
-}
-```
-
-**信号处理时机** (`src/trap.c:118-122`):
-```c
-if (p->killed) {
-  if (SIGTERM == p->killed)
-    exit(-1);
-  sighandle();  // 在 Trap 返回用户态前处理信号
-}
-```
-
-**信号处理流程** (`src/signal.c:119-190`):
-```c
-void sighandle(void) {
-  struct proc *p = myproc();
-  int signum = 0;
-  
-  if (p->killed) {
-    signum = p->killed;
-    // 清除 pending 位
-    p->sig_pending.__val[0] &= ~(1ul << signum);
-    p->killed = 0;
-  }
-  else return;  // 无信号处理
-  
-  // 分配信号帧
-  frame = allocpage();
-  tf = allocpage();
-  
-  // 设置 trapframe 跳转到信号处理函数
-  tf->epc = (uint64)(SIG_TRAMPOLINE + ((uint64)sig_handler - (uint64)sig_trampoline));
-  tf->a0 = signum;
-  
-  // 保存原 trapframe
-  frame->tf = p->trapframe;
-  p->trapframe = tf;
-}
-```
-
-**状态分类**: **✅ 已实现** - 完整的信号发送、pending 标记、Trap 返回前处理机制
-
-### 关键代码片段
-
-#### 原子操作实现（RISC-V）
-
-```c
-// src/spinlock.c:34-36
-// RISC-V 原子交换指令: amoswap.w.aq
-while(__sync_lock_test_and_set(&lk->locked, 1) != 0)
-  ;
-
-// src/spinlock.c:71-72
-// 解锁: amoswap.w zero, zero, (s1)
-__sync_lock_release(&lk->locked);
-```
-
-#### Pipe 环形缓冲区索引计算
-
-```c
-// src/pipe.c:86
-pi->data[pi->nwrite++ % PIPESIZE] = ch;
-
-// src/pipe.c:113
-ch = pi->data[pi->nread++ % PIPESIZE];
-```
-
-#### 信号处理流程调用链
-
-```mermaid
-graph TD
-  A["usertrap\n trap.c:74"] --> B["syscall\n trap.c:90"]
-  B --> C["sys_kill\n syssig.c:94"]
-  C --> D["kill\n proc.c:754"]
-  D --> E["sighandle\n trap.c:121"]
-  E --> F["sigreturn\n syssig.c:24"]
-```
-
-### 未实现/桩函数功能列表
-
-| 功能 | 状态 | 说明 |
-|------|------|------|
-| **SpinLock** | ✅ 已实现 | 基于 RISC-V `amoswap` 原子指令 |
-| **SleepLock** | ✅ 已实现 | 基于 SpinLock + WaitQueue |
-| **WaitQueue** | ✅ 已实现 | 100 个队列的池化管理 |
-| **Pipe** | ✅ 已实现 | 512 字节环形缓冲区 |
-| **Signal (kill)** | ✅ 已实现 | 支持 `sys_kill`, `sys_tgkill` |
-| **Signal Handler** | ✅ 已实现 | Trap 返回前调用 `sighandle()` |
-| **Futex** | 🔸 桩函数 | 仅有 `do_futex` 声明，无实现 |
-| **Message Queue** | ❌ 未实现 | 无 `msgget/msgsnd/msgrcv` |
-| **Semaphore** | ❌ 未实现 | 无 `semget/semop` |
-| **Shared Memory** | ❌ 未实现 | 无 `shmget/shmat/shmdt` |
-
-**总结**: 本操作系统在同步互斥方面实现了基础的 SpinLock 和 SleepLock，配合 WaitQueue 机制支持进程阻塞/唤醒。IPC 方面仅实现了 Pipe 和 Signal 两种基础机制，System V IPC（消息队列、信号量、共享内存）和 Futex 均未实现（仅有文档规划或接口声明）。
+## 题单作答（JSON-QA 渲染）
+
+- stage_id: `08_sync_ipc`
+- terminology_profile: `stallings_en_zh`
+
+## 第 08_sync_ipc 阶段：同步互斥与进程间通信
+
+### Q08_001（short_answer）
+
+- 题干：该内核提供了哪些同步原语？（SpinLock/Mutex/RwLock/Semaphore/Condvar/WaitQueue 等；列出类型定义证据）
+- 答案："已实现的同步原语：\n1. **SpinLock（自旋锁）**：`src/include/spinlock.h:7-12` 定义 `struct spinlock`，包含 `locked` 字段和 `cpu` 指针；`src/spinlock.c:25-78` 实现 `acquire()`/`release()`，使用 RISC-V `amoswap` 原子指令进行忙等待（Busy-Waiting）。\n2. **SleepLock（睡眠锁）**：`src/include/sleeplock.h:9-15` 定义 `struct sleeplock`，内部封装 `struct spinlock lk`；`src/sleeplock.c:25-44` 实现 `acquiresleep()`/`releasesleep()`，通过 `sleep()`/`wakeup()` 实现阻塞等待。\n3. **WaitQueue（等待队列）**：`src/proc.c:30-32` 定义 `waitq_pool[WAITQ_NUM]`（WAITQ_NUM=100）数组和 `waitq_pool_lk` 保护锁；`src/proc.c:64-94` 实现 `findwaitq()`/`allocwaitq()`/`delwaitq()`；`src/proc.c:110-117` 实现 `waitq_push()`/`waitq_pop()`。\n\n未发现的同步原语：\n- **Mutex**：未找到独立 Mutex 类型定义（grep 'Mutex|mutex' 无结构体定义）\n- **RwLock**：未找到（grep 'RwLock|rwlock|read_write_lock' 无结果）\n- **Semaphore**：未找到（grep 'Semaphore|semaphore' 仅 ff.h 文件引用，无内核实现）\n- **Condvar/Condition Variable**：未找到（grep 'Condvar|condition_variable|monitor' 无结果）"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/include/spinlock.h` | `struct spinlock` | struct spinlock { uint locked; char *name; struct cpu *cpu; }; |
+| `src/spinlock.c` | `function acquire` | while(__sync_lock_test_and_set(&lk->locked, 1) != 0) ; |
+| `src/include/sleeplock.h` | `struct sleeplock` | struct sleeplock { uint locked; struct spinlock lk; char *name; int pid; }; |
+| `src/proc.c` | `variable waitq_pool` | queue waitq_pool[WAITQ_NUM]; struct spinlock waitq_pool_lk; |
+
+### Q08_002（single_choice）
+
+- 题干：Mutex 更接近哪种实现？
+- 答案："D. 未发现/待核实"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/include/spinlock.h` | `struct spinlock` | 仅发现 SpinLock 和 SleepLock，无独立 Mutex 类型定义 |
+
+### Q08_003（tri_state_impl）
+
+- 题干：是否存在等待队列 (Wait Queue, WaitQueue) 与 sleep/wakeup（或等价阻塞/唤醒）实现？（必须三态）
+- 答案："implemented"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/proc.c` | `variable waitq_pool` | queue waitq_pool[WAITQ_NUM]; // WAITQ_NUM=100 |
+| `src/proc.c` | `function findwaitq` | queue* findwaitq(void* chan) { acquire(&waitq_pool_lk); for(int i=0;i<WAITQ_NUM;i++){ if(waitq_valid[i]&&waitq_pool[i].chan == chan){ ... } } } |
+| `src/proc.c` | `function sleep` | void sleep(void *chan, struct spinlock *lk) { ... queue* q = findwaitq(chan); if(!q)q = allocwaitq(chan); waitq_push(q,p); p->state = SLEEPING; sched(); } |
+| `src/proc.c` | `function wakeup` | void wakeup(void *chan) { queue* q = findwaitq(chan); if(q){ struct proc* p; while((p = waitq_pop(q))!=NULL){ p->state = RUNNABLE; readyq_push(p); } delwaitq(q); } } |
+
+### Q08_004（fill_in）
+
+- 题干：sleep / wakeup 不变量 (Sleep-Wakeup Invariant) 分析，按格式填写：
+- sleep 入口函数: ___（路径）
+- 入睡前持有的锁: ___（无则写 none）
+- 防丢 wakeup (Lost Wakeup Prevention) 机制: ___（如：持队列锁检查条件 / 无防护）
+- wakeup 函数: ___（路径）
+- 唤醒与锁释放顺序: ___（先唤醒后释放 / 先释放后唤醒 / 其他）
+- 答案：{"sleep_entry": "src/proc.c:542 (sleep 函数)", "lock_held_before_sleep": "p->lock (通过 if(lk != &p->lock){ acquire(&p->lock); release(lk); } 切换持有)", "lost_wakeup_prevention": "持 p->lock 后检查条件并调用 sched()，wakeup 也需获取 p->lock 才能修改 p->state，防止丢失唤醒", "wakeup_function": "src/proc.c:577 (wakeup 函数)", "wakeup_lock_order": "wakeup 不持有 p->lock 调用（注释说明'Must be called without any p->lock'），先唤醒（p->state = RUNNABLE; readyq_push(p)）后删除等待队列（delwaitq(q)）"}
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/proc.c` | `function sleep` | void sleep(void *chan, struct spinlock *lk) { struct proc *p = myproc(); if(lk != &p->lock){ acquire(&p->lock); release(lk); } ... p->state = SLEEPING; sched(); ... if(lk != &p->lock){ release(&p->lock); acquire(lk); } } |
+| `src/proc.c` | `function wakeup` | void wakeup(void *chan) { queue* q = findwaitq(chan); if(q){ struct proc* p; while((p = waitq_pop(q))!=NULL){ p->state = RUNNABLE; readyq_push(p); } delwaitq(q); } } |
+
+### Q08_005（tri_state_impl）
+
+- 题干：是否实现管道 (Pipe)？（必须三态）
+- 答案："implemented"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/include/pipe.h` | `macro PIPESIZE` | #define PIPESIZE 512 |
+| `src/include/pipe.h` | `struct pipe` | struct pipe { struct spinlock lock; char data[PIPESIZE]; uint nread; uint nwrite; int readopen; int writeopen; }; |
+| `src/pipe.c` | `function pipealloc` | int pipealloc(struct file **f0, struct file **f1) { ... pi = kmalloc(sizeof(struct pipe)); ... } |
+| `src/sysfile.c` | `function sys_pipe2` | uint64 sys_pipe2(void) { ... if(pipealloc(&rf, &wf) < 0) return -1; ... } |
+
+### Q08_006（single_choice）
+
+- 题干：pipe 缓冲形态更接近哪种？
+- 答案："A. 字节环形缓冲区 (ring buffer)"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/include/pipe.h` | `struct pipe` | struct pipe { char data[PIPESIZE]; uint nread; uint nwrite; ... }; |
+| `src/pipe.c` | `function pipewrite` | pi->data[pi->nwrite++ % PIPESIZE] = ch; |
+| `src/pipe.c` | `function piperead` | ch = pi->data[pi->nread++ % PIPESIZE]; |
+
+### Q08_007（single_choice）
+
+- 题干：pipe 的阻塞语义更接近哪种？
+- 答案："A. 阻塞：挂起当前线程/任务进入等待队列"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/pipe.c` | `function pipewrite` | while(pi->nwrite == pi->nread + PIPESIZE){ if(pi->readopen == 0 || pr->killed){ release(&pi->lock); return -1; } wakeup(&pi->nread); sleep(&pi->nwrite, &pi->lock); } |
+| `src/pipe.c` | `function piperead` | while(pi->nread == pi->nwrite && pi->writeopen){ if(pr->killed){ release(&pi->lock); return -1; } sleep(&pi->nread, &pi->lock); } |
+
+### Q08_008（tri_state_impl）
+
+- 题干：是否实现消息队列/信号量/共享内存等 SysV IPC (Message Queue / Semaphore / Shared Memory, msg/sem/shm)？（必须三态；若仅实现其一需说明）
+- 答案："not_found"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/` | `search msgget|semget|shmget` | grep 'msgget|semget|shmget' 在 145 个文件中未找到匹配 |
+
+### Q08_009（tri_state_impl）
+
+- 题干：是否实现 futex？（必须三态）
+- 答案："stub"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/include/proc.h` | `macro FUTEX_WAIT` | #define FUTEX_WAIT 0 ... #define FUTEX_WAKE 1 ... (共 13 个 FUTEX_* 宏定义，行 18-50) |
+| `src/include/proc.h` | `function do_futex` | int do_futex(int* uaddr,int futex_op,int val,ktime_t *timeout,int *addr2,int val2,int val3); // 仅声明，行 199 |
+| `src/` | `search sys_futex` | grep 'sys_futex' 仅在 doc/内核实现--线程相关.md 中找到 SYS_futex 宏定义，无系统调用实现 |
+| `src/` | `search do_futex` | grep 'do_futex(' 仅在 src/include/proc.h:199 找到声明，无函数体实现 |
+
+### Q08_010（tri_state_impl）
+
+- 题干：是否实现信号机制（sigaction/kill/sigreturn/trampoline）？（必须三态）
+- 答案："implemented"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/syssig.c` | `function sys_rt_sigaction` | uint64 sys_rt_sigaction(void) { ... set_sigaction(signum, uptr_act ? &act : NULL, uptr_oldact ? &oldact : NULL); ... } |
+| `src/syssig.c` | `function sys_kill` | uint64 sys_kill(){ int sig; int pid; argint(0,&pid); argint(1,&sig); return kill(pid,sig); } |
+| `src/syssig.c` | `function sys_rt_sigreturn` | uint64 sys_rt_sigreturn(void){ sigreturn(); return 0; } |
+| `src/sig_trampoline.S` | `label sig_trampoline` | .globl sig_trampoline; sig_trampoline: ... .globl sig_handler; sig_handler: jalr a1; li a7, SYS_rt_sigreturn; ecall |
+
+### Q08_011（short_answer）
+
+- 题干：若实现 signal handler：用户态 handler 上下文如何构建？是否存在 sigreturn 恢复原 trap frame？（必须给证据）
+- 答案："用户态 handler 上下文构建流程：\n1. **分配信号帧**：`src/signal.c:174` 中 `frame = allocpage()` 分配信号帧，`tf = allocpage()` 分配新 trapframe。\n2. **保存原 trapframe**：`src/signal.c:183` 中 `frame->tf = p->trapframe` 保存原陷阱帧。\n3. **设置 handler 入口**：`src/signal.c:186` 中 `tf->epc = (uint64)(SIG_TRAMPOLINE + ((uint64)sig_handler - (uint64)sig_trampoline))` 设置返回地址到 sig_trampoline 中的 sig_handler。\n4. **传递参数**：`src/signal.c:188-195` 设置 `tf->a0 = signum`（信号编号），`tf->a1` 指向 handler 函数地址或 default_sigaction。\n5. **切换 trapframe**：`src/signal.c:197` 中 `p->trapframe = tf` 切换到新陷阱帧。\n6. **sigreturn 恢复**：`src/signal.c:224-235` 实现 `sigreturn()`，从 `p->sig_frame` 链表取出帧，`p->trapframe = frame->tf` 恢复原陷阱帧，`freepage(frame)` 释放信号帧。\n\nsigreturn 确实恢复原 trap frame，证据：`src/signal.c:231` 中 `p->trapframe = frame->tf`。"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/signal.c` | `function sighandle` | frame = allocpage(); tf = allocpage(); frame->tf = p->trapframe; tf->epc = (uint64)(SIG_TRAMPOLINE + ((uint64)sig_handler - (uint64)sig_trampoline)); p->trapframe = tf; |
+| `src/signal.c` | `function sigreturn` | void sigreturn(void) { ... struct sig_frame *frame = p->sig_frame; freepage(p->trapframe); p->trapframe = frame->tf; p->sig_frame = frame->next; freepage(frame); } |
+| `src/sig_trampoline.S` | `label sig_handler` | sig_handler: jalr a1; li a7, SYS_rt_sigreturn; ecall |
+
+### Q08_012（single_choice）
+
+- 题干：RwLock（读写锁 Reader-Writer Lock）的实现形态更接近哪种？
+- 答案："C. 未发现/不支持"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/` | `search RwLock|rwlock|read_write_lock` | grep 'RwLock|rwlock|read_write_lock' 在 145 个文件中未找到匹配 |
+
+### Q08_013（single_choice）
+
+- 题干：底层原子操作来源更接近哪种？
+- 答案："B. 自定义汇编（ldxr/stxr、lock xchg 等）"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/spinlock.c` | `function acquire` | while(__sync_lock_test_and_set(&lk->locked, 1) != 0) ; // 注释说明：On RISC-V, sync_lock_test_and_set turns into an atomic swap: amoswap.w.aq |
+| `src/spinlock.c` | `function release` | __sync_lock_release(&lk->locked); // 注释说明：On RISC-V, sync_lock_release turns into an atomic swap: amoswap.w zero, zero, (s1) |
+| `src/sifive/encoding.h` | `macro MATCH_AMOSWAP_W` | #define MATCH_AMOSWAP_W 0x800202f ... DECLARE_INSN(amoswap_w, MATCH_AMOSWAP_W, MASK_AMOSWAP_W) |
+
+### Q08_014（short_answer）
+
+- 题干：死锁四必要条件（Coffman Conditions）在该内核中是否均成立？
+请逐条作答（互斥 Mutual Exclusion / 持有并等待 Hold-and-Wait / 不可剥夺 No Preemption / 循环等待 Circular Wait），并结合 SpinLock/Mutex 的实现给出证据或写「不适用」。
+- 答案："1. **互斥 (Mutual Exclusion)**：**成立**。SpinLock 通过原子 `amoswap` 指令确保同一时刻只有一个 CPU 能获取锁（`src/spinlock.c:37` 中 `while(__sync_lock_test_and_set(&lk->locked, 1) != 0)` 忙等待直到锁可用）。\n\n2. **持有并等待 (Hold-and-Wait)**：**成立**。内核中存在嵌套锁场景，例如 `acquiresleep()`（`src/sleeplock.c:25-32`）先 `acquire(&lk->lk)` 获取内部 SpinLock，然后在循环中调用 `sleep()` 可能释放锁并进入等待；`pipewrite()`（`src/pipe.c:70-85`）持有 `pi->lock` 时调用 `sleep()`。\n\n3. **不可剥夺 (No Preemption)**：**成立**。SpinLock 持有者不会被强制剥夺锁（除非持有者主动 `release()` 或进程被 kill）；SleepLock 持有者进入 SLEEPING 状态后由 scheduler 切换，但锁状态 `lk->locked` 保持不变，直到 `releasesleep()` 显式释放。\n\n4. **循环等待 (Circular Wait)**：**可能成立**。内核未实现全局锁顺序规范（见 Q08_016），存在嵌套锁场景（如 `acquiresleep` 持 spinlock 调用 `sleep`，`sleep` 又获取 `p->lock`），理论上可能形成 ABBA 死锁模式，但代码中未发现显式的锁顺序约束注释。"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/spinlock.c` | `function acquire` | while(__sync_lock_test_and_set(&lk->locked, 1) != 0) ; // 互斥等待 |
+| `src/sleeplock.c` | `function acquiresleep` | acquire(&lk->lk); while (lk->locked) { sleep(lk, &lk->lk); } // 持有锁时进入等待 |
+| `src/pipe.c` | `function pipewrite` | acquire(&pi->lock); ... sleep(&pi->nwrite, &pi->lock); // 持有 pipe 锁时调用 sleep |
+
+### Q08_015（single_choice）
+
+- 题干：内核对死锁 (Deadlock) 的处理策略更接近哪种？
+- 答案："D. 忽略 (Ostrich Algorithm)：不处理，依赖外部重启"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/` | `search lock.*order|lock.*ordering|ABBA|deadlock.*detect` | grep 'lock.*order|lock.*ordering|ABBA|deadlock.*detect' 仅在 src/proc.c:547 找到注释'Must acquire p->lock in order to'，无死锁检测/避免/预防机制 |
+| `src/spinlock.c` | `function acquire` | if(holding(lk)) panic("acquire"); // 仅检测同一 CPU 重复获取同一锁，非死锁检测 |
+
+### Q08_016（tri_state_impl）
+
+- 题干：是否存在全局锁顺序（Lock Ordering）规范或注释，以预防嵌套锁导致的循环等待死锁 (Circular Wait Deadlock)？（必须三态；若 implemented 需给出锁排序规则或 ABBA 锁检测代码证据）
+- 答案："not_found"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/` | `search lock.*order|lock.*ordering|ABBA|nested.*lock` | grep 'lock.*order|lock.*ordering|ABBA|nested.*lock' 仅在 src/proc.c:547 找到注释'Must acquire p->lock in order to change p->state and then call sched'，此为 sleep 函数内部锁切换说明，非全局锁顺序规范 |
+
+### Q08_017（tri_state_impl）
+
+- 题干：是否实现管程/条件变量 (Monitor / Condition Variable, Stallings Ch5)？（必须三态；搜索 Condvar / condition_variable / monitor / wait/notify/signal 等；若 implemented 需区分 Hoare 语义（等待者立即恢复）vs Mesa 语义（等待者重新竞争锁））
+- 答案："not_found"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/` | `search Condvar|condition_variable|monitor` | grep 'Condvar|condition_variable|monitor' 在 145 个文件中未找到匹配 |
+
+### Q08_018（short_answer）
+
+- 题干：经典同步问题验证 (Classic Synchronization Problems, Stallings Ch5)：
+以下三个经典问题在该内核中是否有对应实现或测试？
+- 生产者-消费者 (Producer-Consumer / Bounded Buffer)：___（implemented/not_found + 证据）
+- 读者-写者 (Readers-Writers)：___（实现了读者优先/写者优先/公平？ + 证据）
+- 哲学家就餐 (Dining Philosophers)：___（implemented/not_found）
+- 答案："1. **生产者 - 消费者 (Producer-Consumer / Bounded Buffer)**：**not_found**。grep 'producer.*consumer|bounded.*buffer' 无结果。虽然 Pipe 实现（`src/pipe.c`）本质上是生产者 - 消费者模式（pipewrite 生产，piperead 消费），但这是内核 IPC 机制，非专门的教学示例或测试用例。\n\n2. **读者 - 写者 (Readers-Writers)**：**not_found**。grep 'reader.*writer' 无结果，且未发现 RwLock 实现（见 Q08_012），无读者优先/写者优先/公平的实现证据。\n\n3. **哲学家就餐 (Dining Philosophers)**：**not_found**。grep 'dining.*philosoph' 无结果，无相关实现或测试。"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/` | `search producer.*consumer|bounded.*buffer` | grep 'producer.*consumer|bounded.*buffer' 未找到匹配 |
+| `src/` | `search reader.*writer` | grep 'reader.*writer' 未找到匹配 |
+| `src/` | `search dining.*philosoph` | grep 'dining.*philosoph' 未找到匹配 |
+
+### Q08_019（tri_state_impl）
+
+- 题干：是否实现消息传递 (Message Passing, Stallings Ch5) 作为 IPC 机制？（必须三态；区分直接消息传递 Direct / 间接通过邮箱 Mailbox / POSIX mq_open 等；与 SysV msgq 的区别是是否通过内核邮箱路由）
+- 答案："not_found"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/` | `search message.*pass|mailbox|mq_open` | grep 'message.*pass|mailbox|mq_open' 在 145 个文件中未找到匹配 |
+
+### Q08_020（tri_state_impl）
+
+- 题干：是否实现屏障同步 (Barrier Synchronization, Stallings Ch5)？（必须三态；搜索 barrier / sync_barrier / pthread_barrier 或等价；用于多线程/多核同步到同一检查点）
+- 答案："stub"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/sifive/barrier.h` | `struct Barrier` | typedef struct Barrier { _Atomic volatile int entered[2]; _Atomic volatile int wait[2]; _Atomic volatile int gen; } Barrier; |
+| `src/sifive/barrier.h` | `function Barrier_Wait` | static inline void Barrier_Wait(Barrier *bar, int numProcs) { ... } // 用于多核启动同步 |
+| `src/sifive/devices/ccache.h` | `function ccache_barrier_0` | static inline void ccache_barrier_0(void) { asm volatile("fence rw, io" : : : "memory"); } // 硬件缓存屏障，非用户态同步原语 |
 
 ---
 
 
 # 多核支持与并行机制
 
-## 第 9 章：多核支持与并行机制
-
-本章分析 `oskernrl2022-rv6` 操作系统的多核（SMP）支持实现。通过深入源码分析，该内核**实现了基础的多核启动机制**，但多核并行调度与同步机制相对简单。以下从架构设计、Secondary CPU 启动、IPI 通信、Per-CPU 变量、调度策略及锁机制六个维度展开分析。
-
----
-
-## 多核架构设计（SMP/AMP）
-
-**架构类型：✅ 已实现 SMP（对称多处理）架构**
-
-该内核采用经典的 SMP 架构设计，支持最多 5 个 CPU 核心（`NCPU = 5`）。所有核心共享同一内核地址空间、页表和全局数据结构，每个核心独立执行调度器循环。
-
-**关键证据：**
-
-1. **最大核心数定义**（`src/include/param.h:4`）：
-   ```c
-   #define NCPU          5  // maximum number of CPUs
-   ```
-
-2. **Per-CPU 数组声明**（`src/cpu.c:13`、`src/include/cpu.h:37`）：
-   ```c
-   struct cpu cpus[NCPU];  // 全局 CPU 数组，每核一份
-   ```
-
-3. **核心标识机制**：通过 `tp` 寄存器存储 hartid（核心号），`cpuid()` 函数直接读取：
-   ```c
-   // src/cpu.c:22-27
-   int cpuid() {
-     int id = r_tp();  // 从 tp 寄存器读取 hartid
-     return id;
-   }
-   ```
-
-4. **共享全局数据结构**：所有核心共享 `readyq`（就绪队列）、`pid_lock`（PID 分配锁）、`waitq_pool`（等待队列池）等全局资源，通过自旋锁保护。
-
-**架构特点：**
-- **对称性**：所有核心执行相同的 `scheduler()` 循环，从全局就绪队列竞争获取进程
-- **共享内存模型**：通过 `kvminit()` 创建统一内核页表，所有核心使用相同的虚拟地址映射
-- **无 NUMA 感知**：未实现内存节点亲和性或核心拓扑感知
-
----
-
-## Secondary CPU 启动流程
-
-**实现状态：✅ 已实现**
-
-内核通过 RISC-V SBI（Supervisor Binary Interface）的 HSM（Hart State Management）扩展唤醒 Secondary CPU。启动链清晰完整，主核（BSP）完成初始化后通过 `start_hart()` SBI 调用唤醒其他核心。
-
-### 详细启动链（Mermaid Call Graph）
-
-```mermaid
-graph TD
-  A["main\n src/main.c:45"] --> B["start_hart\n src/include/sbi.h:78"]
-  B --> C["a_sbi_ecall\n SBI HSM START"]
-  A --> D["inithartid\n src/main.c:20"]
-  D --> E["mv tp, a0\n 设置 tp 寄存器为 hartid"]
-  A --> F["scheduler\n src/proc.c:119"]
-  F --> G["readyq_pop\n src/proc.c:105"]
-  F --> H["swtch\n 上下文切换"]
-```
-
-### 启动流程详解
-
-**阶段 1：BSP 初始化（`src/main.c:44-110`）**
-
-主核（hartid=0 或首个启动的核心）执行完整初始化：
-```c
-void main(unsigned long hartid, unsigned long dtb_pa) {
-  inithartid(hartid);  // 将 hartid 存入 tp 寄存器
-  booted[hartid] = 1;  // 标记本核已启动
-  
-  if (__first_boot_magic == 0x5a5a) { /* 仅 BSP 执行 */
-    __first_boot_magic = 0;
-    cpuinit();        // 初始化 cpus[] 数组
-    printfinit();
-    kvminit();        // 创建内核页表
-    kvminithart();    // 启用分页（每核）
-    trapinithart();   // 安装中断向量
-    procinit();       // 初始化进程子系统
-    // ... 其他初始化
-    
-    userinit();       // 创建第一个用户进程
-    
-    // 唤醒其他核心
-    for(int i = 1; i < NCPU; i++) {
-      if(hartid != i && booted[i] == 0) {
-        start_hart(i, (uint64)_entry, 0);  // SBI 调用唤醒
-      }
-    }
-    started = 1;  // 释放等待的 Secondary CPU
-  }
-  // ...
-  scheduler();  // 进入调度循环
-}
-```
-
-**阶段 2：Secondary CPU 等待与启动**
-
-Secondary CPU 通过忙等待同步：
-```c
-// src/main.c:80-89
-else {  // Secondary CPU 路径
-  while (started == 0)  // 等待 BSP 完成初始化
-    ;
-  printf("hart %d enter main()...\n", hartid);
-  kvminithart();        // 启用本核分页
-  trapinithart();       // 安装中断向量
-  __sync_synchronize();
-}
-```
-
-**阶段 3：SBI HSM 调用（`src/include/sbi.h:78-83`）**
-
-```c
-static inline void start_hart(uint64 hartid, uint64 start_addr, uint64 a1) {
-    a_sbi_ecall(0x48534D, 0, hartid, start_addr, a1, 0, 0, 0);
-    // SBI Extension ID: 0x48534D = 'HSM' (ASCII)
-    // Function ID: 0 = START
-}
-
-static inline int sbi_hsm_hart_status(unsigned long hart) {
-    struct sbiret ret;
-    ret = a_sbi_ecall(0x48534D, 2, hart, 0, 0, 0, 0, 0);
-    // Function ID: 2 = GET_STATUS
-    return (ret.error != 0 ? (int)ret.error : (int)ret.value);
-}
-```
-
-**关键同步机制：**
-- `booted[]` 数组：标记每核启动状态（`src/main.c:28`）
-- `started` 标志：Secondary CPU 忙等待直到 BSP 完成初始化
-- `__sync_synchronize()`：内存屏障确保可见性
-
----
-
-## 核间通信与 IPI 机制
-
-**实现状态：🔸 桩函数（仅有接口，未见实际使用）**
-
-内核提供了 IPI（Inter-Processor Interrupt）发送接口，但**在源码中未找到任何实际调用 `send_ipi()` 的位置**。IPI 机制仅停留在接口层面，未用于调度、TLB 刷新或核间同步。
-
-### IPI 接口定义（`src/include/sbi.h:86-88`）
-
-```c
-static inline void send_ipi(uint64 mask) {
-    a_sbi_ecall(0x735049, 0, mask, 0, 0, 0, 0, 0);
-    // SBI Extension ID: 0x735049 = 'IPI' (ASCII)
-}
-```
-
-### 外部中断处理（`src/trap.c:216-260`）
-
-中断处理中未涉及 IPI 接收逻辑：
-```c
-int devintr(void) {
-  uint64 scause = r_scause();
-  
-  // 外部中断处理（scause bit 9）
-  if ((0x8000000000000000L & scause) && 9 == (scause & 0xff)) {
-    // 仅处理 UART0_IRQ，未处理 IPI
-    // ...
-    #ifndef QEMU 
-    w_sip(r_sip() & ~2);    // clear pending bit (清除软件中断)
-    sbi_set_mie();
-    #endif 
-    return 1;
-  }
-  // ...
-}
-```
-
-**IPI 缺失场景：**
-- ❌ **调度器间通信**：未实现跨核调度（如进程迁移）
-- ❌ **TLB 刷新**：页表更新后未发送 IPI 刷新其他核心 TLB
-- ❌ **RCU 回调**：未实现 RCU 机制
-- ❌ **核间同步**：无 `smp_call_function()` 类接口
-
-**结论**：IPI 接口已定义但**未被使用**，多核间无主动通信机制，仅通过共享内存 + 锁进行隐式同步。
-
----
-
-## Per-CPU 变量与数据结构
-
-**实现状态：✅ 已实现基础 Per-CPU 结构**
-
-内核通过 `struct cpu` 数组实现 Per-CPU 变量，每个核心通过 `mycpu()` 访问自己的 CPU 结构。
-
-### Per-CPU 结构定义（`src/include/cpu.h:30-35`）
-
-```c
-struct cpu {
-  struct proc *proc;          // 当前运行的进程（或 null）
-  struct context context;     // swtch() 切换到 scheduler() 的上下文
-  int noff;                   // push_off() 嵌套深度（中断禁用计数）
-  int intena;                 // push_off() 前的中断使能状态
-};
-```
-
-### 访问方式（`src/cpu.c:32-48`）
-
-```c
-// 获取当前 CPU 结构
-struct cpu* mycpu(void) {
-  int id = cpuid();      // 从 tp 寄存器读取 hartid
-  struct cpu *c = &cpus[id];
-  return c;
-}
-
-// 获取当前进程
-struct proc* myproc(void) {
-  push_off();            // 禁用中断（防止进程被迁移）
-  struct cpu *c = mycpu();
-  struct proc *p = c->proc;
-  pop_off();
-  return p;
-}
-```
-
-### Per-CPU 字段用途
-
-| 字段 | 用途 | 多线程安全 |
-|------|------|-----------|
-| `proc` | 指向当前运行的进程 | ✅ 通过 `push_off()` 保护 |
-| `context` | 调度器上下文（`ra`, `sp`, `s0-s11`） | ✅ 每核独立 |
-| `noff` | 中断禁用嵌套计数 | ✅ 每核独立 |
-| `intena` | 保存中断使能状态 | ✅ 每核独立 |
-
-**缺失的 Per-CPU 优化：**
-- ❌ **Per-CPU 就绪队列**：所有核心共享全局 `readyq`，存在锁竞争
-- ❌ **Per-CPU 分配器**：`kmalloc` 使用全局锁（`kmem_table_lock`）
-- ❌ **Per-CPU 统计信息**：无每核调度次数、中断计数等统计
-
----
-
-## 多核调度策略
-
-**实现状态：❌ 未实现多核调度优化（全局单队列）**
-
-内核采用**全局单就绪队列**设计，所有核心从同一队列竞争获取进程，无负载均衡、无 CPU 亲和性、无调度器隔离。
-
-### 调度器实现（`src/proc.c:119-152`）
-
-```c
-void scheduler() {
-  struct cpu *c = mycpu();
-  c->proc = 0;
-  while(1) {
-    struct proc* p = readyq_pop();  // 从全局队列获取进程
-    if(p) {
-      acquire(&p->lock);
-      if(p->state == RUNNABLE) {
-        p->state = RUNNING;
-        c->proc = p;
-        w_satp(MAKE_SATP(p->pagetable));  // 切换页表
-        sfence_vma();
-        swtch(&c->context, &p->context);  // 上下文切换
-        w_satp(MAKE_SATP(kernel_pagetable));
-        sfence_vma();
-        c->proc = 0;
-      }
-      release(&p->lock);
-    } else {
-      intr_on();       // 启用中断
-      asm volatile("wfi");  // 等待中断（无进程时空转）
-    }
-  }
-}
-```
-
-### 调度策略分析
-
-| 特性 | 实现状态 | 说明 |
-|------|---------|------|
-| **调度队列** | 全局单队列 | 所有核心共享 `readyq` |
-| **调度算法** | FIFO（先进先出） | `queue_pop()` 从队首取进程 |
-| **负载均衡** | ❌ 未实现 | 无跨核迁移逻辑 |
-| **CPU 亲和性** | ❌ 未实现 | 进程无 `cpumask` 绑定 |
-| **调度器锁** | 无锁（队列操作原子性依赖底层） | `readyq_pop()` 未显式加锁 |
-| **空闲核心处理** | `wfi` 指令休眠 | 无进程时进入低功耗模式 |
-
-### PID 分配机制（`src/proc.c:155-160`）
-
-PID 分配使用全局自旋锁保护，**非原子操作**：
-```c
-int allocpid() {
-  int pid;
-  acquire(&pid_lock);  // 全局锁
-  pid = nextpid;
-  nextpid = nextpid + 1;  // 非原子自增
-  release(&pid_lock);
-  return pid;
-}
-```
-
-**问题**：
-- `nextpid` 为普通 `int` 类型，未使用 `atomic_t` 或 `volatile`
-- 依赖 `pid_lock` 保证原子性，但锁开销较大
-- 无 PID 回收机制（循环分配）
-
-### 与前面章节的交叉引用
-
-1. **进程调度中的全局唯一 ID 池**（第 4 章）：
-   - `nextpid` 为全局变量，通过 `pid_lock` 保护
-   - 未使用 `AtomicUsize` 或原子操作，依赖锁保证原子性
-
-2. **双级注册机制**（第 4 章）：
-   - 线程注册到 Process + 全局管理器：未实现线程级调度，仅进程级
-   - 所有进程注册到全局 `readyq`，无 per-process 线程队列
-
-3. **Futex 实现**（第 6 章）：
-   - 文档提及 Futex 但**未找到系统调用实现**
-   - `waitq_pool` 用于进程等待队列，但非 Futex 用户态快速路径
-
----
-
-## 锁机制与多核安全
-
-### 自旋锁实现（`src/spinlock.c:15-85`）
-
-**实现状态：✅ 已实现（禁用中断的自旋锁）**
-
-```c
-void acquire(struct spinlock *lk) {
-  push_off();  // 禁用中断（防止死锁）
-  if(holding(lk))
-    panic("acquire");
-
-  // RISC-V 原子交换（amoswap.w.aq）
-  while(__sync_lock_test_and_set(&lk->locked, 1) != 0)
-    ;
-
-  __sync_synchronize();  // 内存屏障
-  lk->cpu = mycpu();     // 记录持有者
-}
-
-void release(struct spinlock *lk) {
-  if(!holding(lk))
-    panic("release");
-
-  lk->cpu = 0;
-  __sync_synchronize();  // 内存屏障
-  __sync_lock_release(&lk->locked);  // 原子释放
-
-  pop_off();  // 恢复中断状态
-}
-```
-
-**关键特性：**
-- ✅ **禁用中断**：`push_off()` 防止同一核心在持有锁时被中断处理程序再次尝试获取锁（死锁预防）
-- ✅ **原子操作**：`__sync_lock_test_and_set()` 编译为 RISC-V `amoswap.w.aq` 指令
-- ✅ **内存屏障**：`__sync_synchronize()` 确保临界区内存操作顺序
-- ✅ **持有者追踪**：`lk->cpu` 用于调试和 `holding()` 检查
-
-**缺失特性：**
-- ❌ **优先级继承**：未实现优先级继承协议（Priority Inheritance）
-- ❌ **自适应自旋**：无自适应退避策略
-- ❌ **读写锁**：未实现读写锁（RWLock）
-
-### 中断嵌套保护（`src/intr.c:11-40`）
-
-```c
-void push_off(void) {
-  int old = intr_get();
-  intr_off();  // 禁用中断
-  if(mycpu()->noff == 0)
-    mycpu()->intena = old;  // 保存初始中断状态
-  mycpu()->noff += 1;       // 嵌套计数 +1
-}
-
-void pop_off(void) {
-  struct cpu *c = mycpu();
-  if(intr_get())
-    panic("pop_off - interruptible");
-  if(c->noff < 1)
-    panic("pop_off");
-  c->noff -= 1;
-  if(c->noff == 0 && c->intena)
-    intr_on();  // 恢复中断
-}
-```
-
-### 全局锁列表
-
-| 锁名称 | 类型 | 保护资源 | 文件位置 |
-|--------|------|---------|---------|
-| `pid_lock` | SpinLock | PID 分配（`nextpid`） | `src/proc.c:37` |
-| `waitq_pool_lk` | SpinLock | 等待队列池 | `src/proc.c:30` |
-| `kmem_table_lock` | SpinLock | 内核内存分配器 | `src/kmalloc.c:54` |
-| `ramdisklock` | SpinLock | 虚拟磁盘访问 | `src/ramdisk.c:13` |
-| `file.lock` | SpinLock | 文件结构 | `src/file.c:22` |
-| `printf.lock` | SpinLock | 控制台输出 | `src/printf.c:23` |
-
-### 原子操作使用情况
-
-**检查结果**：未使用 C11/C++11 标准原子类型（`atomic_t`、`AtomicUsize`），所有"原子"操作依赖：
-1. 自旋锁保护（如 `nextpid`）
-2. GCC 内置函数（`__sync_lock_test_and_set()`）
-3. RISC-V 原子指令（`amoswap`）
-
-**内存序保证**：
-- `__sync_synchronize()` 提供全内存屏障（Full Memory Barrier）
-- 未使用细粒度内存序（如 `memory_order_acquire`、`memory_order_release`）
-
----
-
-## 关键代码片段
-
-### 1. Secondary CPU 启动（`src/main.c:77-89`）
-
-```c
-// BSP 唤醒其他核心
-for(int i = 1; i < NCPU; i++) {
-    if(hartid != i && booted[i] == 0) {
-      start_hart(i, (uint64)_entry, 0);
-    }
-}
-started = 1;  // 释放 Secondary CPU
-
-// Secondary CPU 等待 BSP
-else {
-    while (started == 0)
-      ;
-    printf("hart %d enter main()...\n", hartid);
-    kvminithart();
-    trapinithart();
-    __sync_synchronize();
-}
-```
-
-### 2. 自旋锁获取与释放（`src/spinlock.c:25-70`）
-
-```c
-void acquire(struct spinlock *lk) {
-  push_off();  // 禁用中断
-  if(holding(lk))
-    panic("acquire");
-
-  while(__sync_lock_test_and_set(&lk->locked, 1) != 0)
-    ;
-
-  __sync_synchronize();
-  lk->cpu = mycpu();
-}
-
-void release(struct spinlock *lk) {
-  if(!holding(lk))
-    panic("release");
-
-  lk->cpu = 0;
-  __sync_synchronize();
-  __sync_lock_release(&lk->locked);
-  pop_off();  // 恢复中断
-}
-```
-
-### 3. 全局调度器（`src/proc.c:119-152`）
-
-```c
-void scheduler() {
-  struct cpu *c = mycpu();
-  c->proc = 0;
-  while(1) {
-    struct proc* p = readyq_pop();  // 全局队列
-    if(p) {
-      acquire(&p->lock);
-      if(p->state == RUNNABLE) {
-        p->state = RUNNING;
-        c->proc = p;
-        w_satp(MAKE_SATP(p->pagetable));
-        sfence_vma();
-        swtch(&c->context, &p->context);
-        w_satp(MAKE_SATP(kernel_pagetable));
-        sfence_vma();
-        c->proc = 0;
-      }
-      release(&p->lock);
-    } else {
-      intr_on();
-      asm volatile("wfi");  // 等待中断
-    }
-  }
-}
-```
-
-### 4. Per-CPU 访问（`src/cpu.c:32-48`）
-
-```c
-struct cpu* mycpu(void) {
-  int id = cpuid();  // r_tp()
-  struct cpu *c = &cpus[id];
-  return c;
-}
-
-struct proc* myproc(void) {
-  push_off();
-  struct cpu *c = mycpu();
-  struct proc *p = c->proc;
-  pop_off();
-  return p;
-}
-```
-
----
-
-## 本章总结
-
-| 特性 | 实现状态 | 备注 |
-|------|---------|------|
-| **SMP 架构** | ✅ 已实现 | 支持最多 5 核，共享地址空间 |
-| **Secondary CPU 启动** | ✅ 已实现 | 通过 SBI HSM 扩展唤醒 |
-| **IPI 通信** | 🔸 桩函数 | 接口存在但未使用 |
-| **Per-CPU 变量** | ✅ 已实现 | `struct cpu` 数组 + `mycpu()` 访问 |
-| **多核调度** | ❌ 未优化 | 全局单队列，无负载均衡 |
-| **自旋锁** | ✅ 已实现 | 禁用中断 + 原子操作 |
-| **优先级继承** | ❌ 未实现 | 无优先级继承协议 |
-| **原子操作** | 🔸 部分实现 | 依赖 GCC 内置函数，无标准原子类型 |
-
-**核心结论**：
-1. **多核启动机制完整**：BSP 通过 SBI HSM 成功唤醒 Secondary CPU，同步机制可靠
-2. **IPI 机制缺失**：未实现核间主动通信，多核间仅通过共享内存 + 锁隐式同步
-3. **调度器为单队列设计**：所有核心竞争全局 `readyq`，存在锁竞争瓶颈
-4. **锁机制基础但有效**：自旋锁禁用中断防止死锁，但缺乏高级特性（优先级继承、自适应自旋）
-5. **原子操作依赖编译器内置函数**：未使用 C11/C++11 标准原子类型，内存序控制粗糙
-
-**改进建议**：
-- 实现 Per-CPU 就绪队列，减少锁竞争
-- 添加 IPI 用于 TLB 刷新和跨核调度
-- 引入优先级继承协议防止优先级反转
-- 使用标准原子类型（`atomic_t`）替代锁保护的计数器
+## 题单作答（JSON-QA 渲染）
+
+- stage_id: `09_smp_multicore`
+- terminology_profile: `stallings_en_zh`
+
+## 第 09_smp_multicore 阶段：多核支持与并行机制
+
+### Q09_001（single_choice）
+
+- 题干：该 OS 的多核形态更接近哪种？
+- 答案："A. SMP（对称多处理）"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/main.c:78-82` | `function_body main` | for(int i = 1; i < NCPU; i++) { if(hartid!=i&&booted[i]==0){ start_hart(i, (uint64)_entry, 0); } } |
+| `src/entry.S:20-24` | `assembly _entry` | 所有 hart 从同一入口 _entry 启动，通过 tp 寄存器区分核号 |
+
+### Q09_002（tri_state_impl）
+
+- 题干：是否存在 Secondary CPU / AP 启动链（BSP 唤醒 AP，上线后进入 idle/调度）？（必须三态）
+- 答案："implemented"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/main.c:78-82` | `function_call start_hart` | for(int i = 1; i < NCPU; i++) { if(hartid!=i&&booted[i]==0){ start_hart(i, (uint64)_entry, 0); } } |
+| `src/main.c:85-91` | `function_body main` | Secondary CPU 等待 started 标志后执行 kvminithart()、trapinithart()，然后进入 scheduler() |
+| `src/include/sbi.h:78-80` | `function_definition start_hart` | static inline void start_hart(uint64 hartid,uint64 start_addr, uint64 a1) { a_sbi_ecall(0x48534D, 0, hartid, start_addr, a1, 0, 0, 0); } |
+
+### Q09_003（tri_state_impl）
+
+- 题干：是否实现 IPI（核间中断）发送与处理？（必须三态）
+- 答案："stub"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/include/sbi.h:86-88` | `function_definition send_ipi` | static inline void send_ipi(uint64 mask) { a_sbi_ecall(0x735049, 0, mask,0,0,0,0,0); } |
+| `src/trap.c:216-260` | `function_definition devintr` | 仅处理外部中断和定时器中断，未发现软件中断（IPI）处理逻辑 |
+
+### Q09_004（short_answer）
+
+- 题干：若存在 IPI：发送与处理路径分别在哪些函数/文件？（给关键入口与证据）
+- 答案："IPI 发送路径：`src/include/sbi.h:86-88` 的 `send_ipi()` 通过 SBI ecall (ext=0x735049) 实现。IPI 处理路径：未发现专门的 IPI 处理函数。`src/trap.c:216-260` 的 `devintr()` 仅处理外部中断 (scause=9) 和定时器中断 (scause=0x8000000000000005L)，未处理软件中断 (scause=1 或 3)。IPI 功能仅有发送接口，未见完整处理链路。"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/include/sbi.h:86-88` | `function_definition send_ipi` | static inline void send_ipi(uint64 mask) { a_sbi_ecall(0x735049, 0, mask,0,0,0,0,0); } |
+| `src/trap.c:216-260` | `function_definition devintr` | 仅处理外部中断和定时器中断，无软件中断处理分支 |
+
+### Q09_005（tri_state_impl）
+
+- 题干：是否存在 per-CPU 变量/结构（PerCpu、CPU-local storage 等）？（必须三态）
+- 答案："implemented"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/include/cpu.h:30-35` | `struct_definition cpu` | struct cpu { struct proc *proc; struct context context; int noff; int intena; } |
+| `src/cpu.c:12` | `variable_definition cpus` | struct cpu cpus[NCPU]; |
+| `src/cpu.c:32-38` | `function_definition mycpu` | struct cpu* mycpu(void) { int id = cpuid(); struct cpu *c = &cpus[id]; return c; } |
+
+### Q09_006（short_answer）
+
+- 题干：per-CPU 的实现方式是什么？（例如 TLS/tp 寄存器/gsbase/数组索引 hartid；需证据）
+- 答案："使用 tp 寄存器存储 hartid + 数组索引方式。`src/cpu.c:23-27` 的 `cpuid()` 通过 `r_tp()` 读取 tp 寄存器获取当前核 ID。`src/main.c:45` 的 `inithartid(hartid)` 在启动时将 hartid 写入 tp 寄存器。`src/cpu.c:12` 定义全局数组 `cpus[NCPU]`，通过 `cpus[id]` 访问 per-CPU 数据。"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/cpu.c:23-27` | `function_definition cpuid` | int cpuid() { int id = r_tp(); return id; } |
+| `src/include/riscv.h:348-354` | `function_definition r_tp` | static inline uint64 r_tp() { uint64 x; asm volatile("mv %0, tp" : "=r" (x) ); return x; } |
+| `src/main.c:45` | `function_call inithartid` | inithartid(hartid); // 将 hartid 写入 tp 寄存器 |
+
+### Q09_007（tri_state_impl）
+
+- 题干：调度是否存在跨核负载均衡/迁移/亲和性？（必须三态）
+- 答案："not_found"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/proc.c:119-152` | `function_definition scheduler` | 所有 CPU 共享单一全局 readyq 队列，无 per-CPU 运行队列 |
+| `src/proc.c:28-30` | `variable_definition readyq` | queue readyq; // 全局单一就绪队列 |
+
+### Q09_008（tri_state_impl）
+
+- 题干：是否实现 TLB shootdown（跨核页表一致性刷新）？（必须三态；需与 03 互指）
+- 答案："not_found"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/include/riscv.h:328-334` | `function_definition sfence_vma` | static inline void sfence_vma() { asm volatile("sfence.vma"); } // 仅本地刷新 |
+| `src/include/sbi.h:9-10` | `macro_definition SBI_REMOTE_SFENCE_VMA` | #define SBI_REMOTE_SFENCE_VMA 6 // 定义但未使用 |
+| `src/vm.c:1-336` | `file vm.c` | 页表操作文件中使用 sfence_vma() 仅刷新本地 TLB，无远程刷新调用 |
+
+### Q09_009（short_answer）
+
+- 题干：与 03/04/05/08 章的交叉一致性 (Cross-Chapter Consistency)，按以下四项分别作答（每项须给证据路径或写「单核不适用」）：
+- 03 TLB: 多核页表修改后 TLB 刷新策略=___
+- 04 调度: 每核运行队列/负载均衡/IPI resched=___
+- 05 Trap: per-CPU trap 栈/时钟中断初始化与 AP 上线顺序=___
+- 08 锁: SpinLock 关中断行为在多核下是否安全=___
+- 答案："03 TLB: 多核页表修改后 TLB 刷新策略=仅本地刷新。`src/vm.c:56` 的 `kvminithart()` 和 `src/proc.c:137` 的 `scheduler()` 在切换页表后调用 `sfence_vma()`，但仅刷新当前核 TLB，无远程刷新机制。\n\n04 调度: 每核运行队列/负载均衡/IPI resched=全局单一队列，无负载均衡。`src/proc.c:28` 定义全局 `readyq`，所有 CPU 共享。无 per-CPU 队列，无迁移逻辑，无 IPI resched。\n\n05 Trap: per-CPU trap 栈/时钟中断初始化与 AP 上线顺序=Secondary CPU 在 `src/main.c:88-90` 执行 `trapinithart()` 设置 trap 向量，`timerinit()` 在 BSP 初始化时调用一次（`src/main.c:63`），但未见 per-CPU timer 初始化。\n\n08 锁: SpinLock 关中断行为在多核下是否安全=安全。`src/spinlock.c:33` 的 `acquire()` 调用 `push_off()` 关中断，`src/intr.c:11-21` 实现中断禁用，防止同核中断重入。但跨核竞争仍依赖原子操作 `__sync_lock_test_and_set`。"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/vm.c:56` | `function_call sfence_vma` | sfence_vma(); // 仅本地 TLB 刷新 |
+| `src/proc.c:28` | `variable_definition readyq` | queue readyq; // 全局单一队列 |
+| `src/spinlock.c:33` | `function_call push_off` | push_off(); // acquire 时关中断 |
+
+### Q09_010（single_choice）
+
+- 题干：SpinLock 在获取锁时是否禁用中断（关中断保护临界区）？
+- 答案："A. 是，获取时关中断、释放时恢复"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/spinlock.c:33` | `function_call push_off` | void acquire(struct spinlock *lk) { push_off(); // disable interrupts to avoid deadlock. ... } |
+| `src/spinlock.c:58` | `function_call pop_off` | void release(struct spinlock *lk) { ... pop_off(); } |
+| `src/intr.c:11-21` | `function_definition push_off` | void push_off(void) { int old = intr_get(); intr_off(); ... } |
+
+### Q09_011（short_answer）
+
+- 题干：NCPU/MAXCPU（或等价宏）与链接脚本中的每 hart 栈/入口布局是否对应？（搜索 _max_hart_id 等；给宏定义与链接脚本对应证据，或写未发现）
+- 答案："NCPU 定义为 5（`src/include/param.h:4`）。`src/entry.S:32-34` 中 boot_stack 分配 `4096 * 5 * 8` 字节（5 harts，每 hart 8 页=32KB）。链接脚本 `linker/kernel.ld` 未显式定义 hart 栈布局，栈空间在 `.bss.stack` 段中分配。NCPU 与 entry.S 中的硬编码 5 对应，但未使用宏，存在不一致风险。"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/include/param.h:4` | `macro_definition NCPU` | #define NCPU 5 // maximum number of CPUs |
+| `src/entry.S:32-34` | `assembly_data boot_stack` | .space 4096 * 5 * 8 /* 5 harts */ |
+| `linker/kernel.ld:48-52` | `linker_script .bss.stack` | .bss : { *(.bss.stack) ... } |
+
+### Q09_012（tri_state_impl）
+
+- 题干：是否使用 AtomicUsize/原子变量分配 PID/TID（全局唯一 ID 池）？（必须三态；给实现证据）
+- 答案："stub"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/proc.c:33-35` | `variable_definition nextpid` | int nextpid = 1; |
+| `src/proc.c:155-162` | `function_definition allocpid` | int allocpid() { int pid; acquire(&pid_lock); pid = nextpid; nextpid = nextpid + 1; release(&pid_lock); return pid; } |
+
+### Q09_013（tri_state_impl）
+
+- 题干：是否支持实时调度 (Real-Time Scheduling, Stallings Ch10)？（必须三态；搜索 SCHED_FIFO / SCHED_RR / realtime / RT priority / deadline 等）
+- 答案："not_found"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/proc.c:1-793` | `file proc.c` | 调度器仅实现简单 FIFO 队列，无优先级、无实时调度策略 |
+| `src/include/proc.h:1-201` | `file proc.h` | proc 结构体无优先级字段，无调度策略枚举 |
+
+### Q09_014（tri_state_impl）
+
+- 题干：是否存在 NUMA (Non-Uniform Memory Access) 感知的内存分配或调度策略？（必须三态；搜索 numa / node_id / local_memory 等；嵌入式单 SoC 可写 not_found 并说明架构）
+- 答案："not_found"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/kmalloc.c:1-280` | `file kmalloc.c` | 内存分配器无 NUMA 感知逻辑 |
+| `src/include/memlayout.h:1-94` | `file memlayout.h` | 内存布局定义无 node_id 或本地内存概念 |
 
 ---
 
 
 # 安全机制与权限模型
 
-## 第 10 章：安全机制与权限模型
+## 题单作答（JSON-QA 渲染）
 
-本章分析 `oskernrl2022-rv6` 操作系统的安全隔离与权限控制机制。该内核采用 C 语言编写，针对 RISC-V 64 位架构（`riscv64`），是一个教学/实验性质的操作系统内核。
+- stage_id: `10_security`
+- terminology_profile: `stallings_en_zh`
 
----
+## 第 10_security 阶段：安全机制与权限模型
 
-### 特权级与隔离机制
+### Q10_001（single_choice）
 
-**用户态/内核态隔离**：
+- 题干：特权级隔离形态更接近哪种？
+- 答案："A. 有用户态/内核态隔离（user mode/kernel mode）"
 
-该内核实现了基本的 RISC-V 特权级隔离机制，通过 `sstatus` 寄存器的 `SPP` 位区分用户态（U 模式）和内核态（S 模式）。
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/trap.c:155-158` | `function_body usertrapret` | x &= ~SSTATUS_SPP; // clear SPP to 0 for user mode |
+| `src/include/riscv.h:345-354` | `macro PTE_U` | #define PTE_U (1L << 4) // 1 -> user can access |
+| `src/vm.c:165-180` | `function walkaddr` | if((*pte & PTE_U) == 0) return NULL; |
 
-**关键实现**：
-- **页表隔离**：内核使用独立的内核页表 `kernel_pagetable`（`src/vm.c:17`），用户进程使用各自的页表（`src/proc.c` 中 `struct proc` 的 `pagetable` 字段）。
-- **特权级切换**：在 `usertrapret()` 函数中，通过清除 `SSTATUS_SPP` 位切换到用户模式：
+### Q10_002（tri_state_impl）
 
-```c
-// src/trap.c:155-158
-unsigned long x = r_sstatus();
-x &= ~SSTATUS_SPP; // clear SPP to 0 for user mode
-x |= SSTATUS_SPIE; // enable interrupts in user mode
-w_sstatus(x);
-```
+- 题干：是否存在凭证/权限数据结构（UID/GID/Credential/Capability/ACL 等）？（必须三态）
+- 答案："implemented"
 
-- **页表权限位**：使用 `PTE_U` 位标记用户可访问的页面（`src/include/riscv.h:349`）：
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/include/proc.h:128-150` | `struct proc` | int uid; int gid; |
+| `src/proc.c:236-237` | `function_body allocproc` | p->uid = 0; p->gid = 0; |
 
-```c
-#define PTE_U (1L << 4) // 1 -> user can access
-```
+### Q10_003（tri_state_impl）
 
-**SMEP/SMAP/KPTI 状态**：
-- ❌ **未实现 SMEP/SMAP**：RISC-V 架构中对应的保护机制是通过 `PTE_U` 位实现的，内核在 `walkaddr()` 中检查用户指针时验证 `PTE_U` 位（`src/vm.c:178`），但**未发现**显式的 SMEP/SMAP 模拟实现。
-- ❌ **未实现 KPTI（内核页表隔离）**：内核在用户态执行时使用用户页表，但**未发现**完整的 KPTI 实现（如动态切换内核/用户页表映射）。
+- 题干：是否能证实在 syscall 路径上真实执行了权限检查（open/exec/write 等）？（必须三态；仅有字段不算 implemented）
+- 答案："not_found"
 
-**多架构覆盖**：
-- 该项目仅支持 **RISC-V 64 位架构**（`riscv64`），代码中所有特权级相关操作均基于 RISC-V CSR 寄存器（如 `sstatus`、`sepc`、`satp`）。
-- **未发现** aarch64、x86_64、loongarch64 等其他架构的支持代码。
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/sysfile.c:39-120` | `function sys_openat` | No uid/gid check in open path |
+| `src/file.c:299-330` | `function filewrite` | No permission check against uid/gid |
+| `src/sysfile.c:493-568` | `function sys_faccessat` | Only checks mode bits, no uid/gid comparison |
 
----
+### Q10_004（short_answer）
 
-### 权限检查与访问控制
-
-**用户/组（UID/GID）实现状态**：
+- 题干：若存在权限检查：入口点与核心检查函数链路是什么？（列 2-5 个节点并给证据）
+- 答案："sys_faccessat → ename → mode 检查（仅检查文件是否存在及 mode 位，无 UID/GID 验证链）"
 
-内核在 `struct proc` 结构体中定义了 `uid` 和 `gid` 字段（`src/include/proc.h:141-142`）：
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/sysfile.c:494-568` | `function sys_faccessat` | ep = ename(dp, path, &devno); if((emode & mode) != mode) return -1; |
+| `src/include/file.h:43-46` | `macro R_OK/W_OK/X_OK` | #define R_OK 4, W_OK 2, X_OK 1 |
 
-```c
-struct proc {
-  // ...
-  int uid;                      
-  int gid;
-  // ...
-};
-```
+### Q10_005（tri_state_impl）
 
-**系统调用接口**：
-- `sys_getuid()` / `sys_geteuid()`：返回当前进程的 `uid`（`src/sysproc.c:48-58`）
-- `sys_getgid()` / `sys_getegid()`：返回当前进程的 `gid`（`src/sysproc.c:60-70`）
-- `sys_setuid()` / `sys_setgid()`：设置当前进程的 `uid`/`gid`（`src/sysproc.c:72-94`）
+- 题干：是否实现用户指针验证（access_ok/verify_area/UserInPtr/copyin/copyout 等）？（必须三态）
+- 答案："implemented"
 
-**🔸 桩函数检测**：
-- **权限检查缺失**：`sys_setuid()` 和 `sys_setgid()` **直接赋值**，**未进行任何权限验证**（如检查调用者是否为 root）：
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/copy.c:14-45` | `function copyout` | Uses walkaddr to validate PTE_U before copying |
+| `src/copy.c:50-70` | `function copyin` | Uses walkaddr to validate PTE_U before copying |
+| `src/vm.c:165-180` | `function walkaddr` | if((*pte & PTE_U) == 0) return NULL; |
+| `src/sysfile.c:271-303` | `function_body sys_readv/sys_writev` | copyin(p->pagetable,(char*)&v,vec,sizeof(v)); |
 
-```c
-// src/sysproc.c:72-82
-uint64 
-sys_setuid(void)
-{
-  int uid;
-  if(argint(0, &uid) < 0)
-  {
-    return -1;
-  }
-  myproc()->uid = uid;  // 直接赋值，无权限检查
-  return 0;
-}
-```
+### Q10_006（tri_state_impl）
 
-- **文件系统权限检查缺失**：在 `sys_openat()`（`src/sysfile.c:36-145`）中，**未发现**基于 `uid`/`gid` 的文件权限检查逻辑。文件打开仅检查 `O_RDWR`、`O_TRUNC` 等标志位，**未验证**进程 UID 与文件所有权的匹配关系。
+- 题干：是否实现 seccomp/prctl/sandbox 等系统调用过滤/沙箱？（必须三态；stub 需说明形态：ENOSYS/return 0）
+- 答案："not_found"
 
-**结论**：
-- ✅ **UID/GID 字段已定义**
-- 🔸 **权限检查为桩函数**：`setuid`/`setgid` 可被任意调用，**未强制执行**权限验证
-- ❌ **文件访问控制未实现**：`open`/`read`/`write` 等系统调用**未使用** UID/GID 进行权限检查
+- 证据：无（`not_found`/`stub` 时允许为空；否则需补齐）
 
----
+### Q10_007（tri_state_impl）
 
-### 用户/组/权限模型
+- 题干：是否存在栈保护/溢出防护（stack canary/guard page）或等价机制？（必须三态）
+- 答案："not_found"
 
-**Capability/ACL 机制**：
-- ❌ **未实现 Capability 机制**：搜索 `capability`、`acl` 关键词**未找到**任何相关代码。
-- ❌ **未实现 ACL（访问控制列表）**：文件系统（`src/fat32.c`）基于 FAT32，**不支持** Unix 风格的权限位或 ACL。
+- 证据：无（`not_found`/`stub` 时允许为空；否则需补齐）
 
-**命名空间（Namespace）**：
-- `src/include/proc.h:72-85` 中定义了 Linux 风格的克隆标志：
+### Q10_008（tri_state_impl）
 
-```c
-#define CLONE_NEWNS     0x00020000  /* New mount namespace group */
-#define CLONE_NEWUSER   0x10000000  /* New user namespace */
-#define CLONE_NEWPID    0x20000000  /* New pid namespace */
-#define CLONE_NEWNET    0x40000000  /* New network namespace */
-```
+- 题干：是否存在审计/安全启动（audit/secure boot/signature）相关逻辑？（必须三态）
+- 答案："not_found"
 
-- ❌ **未实现命名空间隔离**：`sys_clone()`（`src/sysproc.c:108-123`）仅调用 `clone()` 函数，**未发现**对 `CLONE_NEW*` 标志的实际处理逻辑。这些标志**仅作为常量定义**，无对应实现。
+- 证据：无（`not_found`/`stub` 时允许为空；否则需补齐）
 
----
+### Q10_009（short_answer）
 
-### 进程间隔离与资源限制
+- 题干：本项目支持哪些架构（riscv64/aarch64/x86_64/loongarch64 等）？每种架构的安全相关初始化（特权级配置、PMP/MPU/SMEP 等）是否有代码证据？（必须逐架构作答，无证据写「未发现」）
+- 答案："仅支持 riscv64 架构。证据：linker/kernel.ld 声明 OUTPUT_ARCH(riscv)，所有源码包含 src/include/riscv.h。特权级配置通过 sstatus.SPP 位实现 U/S 态切换（src/trap.c:155-158）。未发现 PMP/MPU 配置代码。"
 
-**资源限制（RLIMIT）**：
-- `src/include/proc.h:90-104` 定义了 `RLIMIT_*` 常量（如 `RLIMIT_CPU`、`RLIMIT_FSIZE`、`RLIMIT_STACK`）和 `struct rlimit` 结构体。
-- ❌ **未实现资源限制检查**：搜索 `rlimit`、`check_rlimit` 等关键词**未找到**实际的限制执行代码。`struct proc` 中**未包含** `rlimit` 字段。
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `linker/kernel.ld:1` | `directive OUTPUT_ARCH` | OUTPUT_ARCH(riscv) |
+| `src/trap.c:155-158` | `function_body usertrapret` | x &= ~SSTATUS_SPP; // clear SPP to 0 for user mode |
+| `src/include/riscv.h` | `header riscv.h` | RISC-V specific definitions |
 
-**文件描述符限制**：
-- `struct proc` 包含 `filelimit` 字段（`src/include/proc.h:148`），并通过 `NOFILEMAX(p)` 宏进行限制（`src/include/proc.h:163`）：
+### Q10_010（tri_state_impl）
 
-```c
-#define NOFILEMAX(p) (p->filelimit<NOFILE?p->filelimit:NOFILE)
-```
+- 题干：若项目使用 Rust，是否存在 RAII/所有权/生命周期相关的内核安全机制（如不可 unsafe 直接访问用户内存、锁的 RAII 自动释放等）？（必须三态；给具体模式证据）
+- 答案："not_found"
 
-- ✅ **部分实现**：`fdallocfrom()`（`src/sysfile.c:13-26`）在分配文件描述符时检查 `NOFILEMAX(p)` 限制。
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/` | `directory src` | Pure C implementation, no Rust code |
 
-**内存隔离**：
-- ✅ **已实现**：每个进程拥有独立的页表（`struct proc::pagetable`），通过 `PTE_U` 位隔离用户/内核空间。
-- `walkaddr()` 函数（`src/vm.c:164-182`）在访问用户指针时验证：
-  1. 虚拟地址不超过 `MAXVA`
-  2. 页表项存在（`PTE_V`）
-  3. 用户可访问（`PTE_U`）
+### Q10_011（tri_state_impl）
 
-```c
-// src/vm.c:164-182
-uint64 walkaddr(pagetable_t pagetable, uint64 va)
-{
-  // ...
-  if(va >= MAXVA) return NULL;
-  pte = walk(pagetable, va, 0);
-  if(pte == 0) return NULL;
-  if((*pte & PTE_V) == 0) return NULL;
-  if((*pte & PTE_U) == 0) return NULL;  // 用户指针验证
-  return PTE2PA(*pte);
-}
-```
-
----
-
-### 安全沙箱与过滤机制
-
-**Seccomp/Prctl**：
-- ❌ **未实现 Seccomp**：搜索 `seccomp`、`sandbox`、`filter` **未找到**任何相关代码。
-- ❌ **未实现 Prctl**：搜索 `prctl`、`sys_prctl` **未找到**任何实现。
-
-**结论**：
-- ❌ **安全沙箱机制未实现**
-
----
-
-### 审计与安全启动机制
-
-**审计日志（Audit）**：
-- ❌ **未实现审计机制**：搜索 `audit`、`audit_log` **未找到**任何相关代码。
-
-**安全启动（Secure Boot）**：
-- ❌ **未实现安全启动**：搜索 `secure_boot`、`signature`、`verify_sig` **未找到**任何签名验证或安全启动相关代码。
-- `exec()` 函数（`src/exec.c`）加载 ELF 文件时**仅检查** ELF 魔数（`elf->magic != ELF_MAGIC`），**未验证**二进制文件签名。
-
----
-
-### 内存安全与系统调用检查
-
-**用户指针验证**：
-- ✅ **已实现基本验证**：所有系统调用通过 `copyin()`/`copyout()` 访问用户空间（`src/copy.c`），这些函数内部调用 `walkaddr()` 验证指针合法性。
-- `fetchaddr()`（`src/uarg.c:6-14`）和 `argstruct()`（`src/uarg.c:100-108`）在读取用户参数时调用 `copyin()` 进行验证。
-
-```c
-// src/uarg.c:6-14
-int fetchaddr(uint64 addr, uint64 *ip)
-{
-  if(either_copyin(1, (char*)ip, addr, sizeof(*ip)))
-    return -1;
-  return 0;
-}
-```
-
-- ❌ **未发现 `access_ok`/`verify_area` 等显式验证函数**：验证逻辑内嵌在 `copyin`/`copyout` 中。
-
-**缓冲区溢出保护**：
-- ❌ **未实现 Stack Canary**：搜索 `stack canary`、`__stack_chk`、`STACK_GUARD` **未找到**任何相关代码。
-- `Makefile` 中**显式禁用**了栈保护（`-fno-stack-protector`）：
-
-```makefile
-# Makefile:73
-CFLAGS += $(shell $(CC) -fno-stack-protector -E -x c /dev/null >/dev/null 2>&1 && echo -fno-stack-protector)
-```
-
-**结论**：
-- ✅ **用户指针验证已实现**（通过 `walkaddr`）
-- ❌ **Stack Canary 未实现**（显式禁用）
-
----
-
-### Rust 语言级安全性机制
-
-**不适用**：该项目使用 **C 语言**编写（非 Rust），因此**不涉及** RAII、所有权分析、基于生命周期的锁等 Rust 语言特性。
-
----
-
-### 关键代码片段
-
-**1. UID/GID 设置（无权限检查）**：
-```c
-// src/sysproc.c:72-94
-uint64 sys_setuid(void)
-{
-  int uid;
-  if(argint(0, &uid) < 0) return -1;
-  myproc()->uid = uid;  // 直接赋值，无权限检查
-  return 0;
-}
-
-uint64 sys_setgid(void)
-{
-  int gid;
-  if(argint(0, &gid) < 0) return -1;
-  myproc()->gid = gid;  // 直接赋值，无权限检查
-  return 0;
-}
-```
-
-**2. 用户指针验证**：
-```c
-// src/vm.c:164-182
-uint64 walkaddr(pagetable_t pagetable, uint64 va)
-{
-  pte_t *pte;
-  uint64 pa;
-
-  if(va >= MAXVA) return NULL;
-  pte = walk(pagetable, va, 0);
-  if(pte == 0) return NULL;
-  if((*pte & PTE_V) == 0) return NULL;
-  if((*pte & PTE_U) == 0) return NULL;  // 验证用户可访问
-  pa = PTE2PA(*pte);
-  return pa;
-}
-```
-
-**3. 特权级切换**：
-```c
-// src/trap.c:155-158
-unsigned long x = r_sstatus();
-x &= ~SSTATUS_SPP;  // 清除 SPP，切换到用户模式
-x |= SSTATUS_SPIE;  // 启用用户模式中断
-w_sstatus(x);
-```
-
----
-
-### 本章总结
-
-| 安全机制 | 实现状态 | 说明 |
-|---------|---------|------|
-| UID/GID 字段 | ✅ 已定义 | `struct proc` 包含 `uid`/`gid` |
-| UID/GID 权限检查 | 🔸 桩函数 | `setuid`/`setgid` 无权限验证 |
-| 文件权限检查 | ❌ 未实现 | `open`/`read`/`write` 未检查 UID/GID |
-| Capability/ACL | ❌ 未实现 | 搜索无结果 |
-| 命名空间（Namespace） | ❌ 未实现 | 仅定义常量，无实际逻辑 |
-| 资源限制（RLIMIT） | ❌ 未实现 | 仅定义常量，无执行逻辑 |
-| 文件描述符限制 | ✅ 部分实现 | `NOFILEMAX` 宏检查 |
-| 用户指针验证 | ✅ 已实现 | `walkaddr` 验证 `PTE_U` |
-| Stack Canary | ❌ 未实现 | 显式禁用（`-fno-stack-protector`） |
-| Seccomp/Prctl | ❌ 未实现 | 搜索无结果 |
-| 审计（Audit） | ❌ 未实现 | 搜索无结果 |
-| 安全启动 | ❌ 未实现 | 无签名验证 |
-| KPTI/SMEP/SMAP | ❌ 未实现 | 仅基本 `PTE_U` 隔离 |
-
-**总体评价**：`oskernrl2022-rv6` 是一个教学性质的 RISC-V 操作系统内核，实现了基本的用户/内核态隔离和用户指针验证机制，但**缺乏完整的安全权限模型**。UID/GID 仅作为字段存在，**未在系统调用中强制执行权限检查**；高级安全特性（Capability、Seccomp、Audit、安全启动）均**未实现**。
+- 题干：是否实现了内核/用户页表隔离 (Kernel/User Page Table Isolation, KPTI 或等价机制)？
+（x86: CR3 KPTI / SMEP / SMAP；RISC-V: PMP / S-mode 分离；AArch64: TTBR0/TTBR1 隔离；
+必须三态；无则写未发现并列出已搜关键字）
+- 答案："not_found"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/vm.c:165-180` | `function walkaddr` | User pages marked with PTE_U, but no separate kernel/user page table switching evidence |
+
+### Q10_012（short_answer）
+
+- 题干：UID/GID 字段是否在 syscall 路径上真实执行权限检查？（搜索 check_perm/inode_permission；若只有字段无检查链须标注「仅有定义但未强制执行 🔸」；给检查链证据或写「字段存在但无检查链」）
+- 答案："字段存在但无检查链。struct proc 含 uid/gid 字段（src/include/proc.h:142-143），sys_getuid/sys_setuid 仅读写字段（src/sysproc.c:49-92），但 sys_openat/sys_write 未使用 uid/gid 进行权限验证。🔸 仅有定义但未强制执行"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/include/proc.h:128-150` | `struct proc` | int uid; int gid; |
+| `src/sysproc.c:49-92` | `function sys_getuid/sys_setuid` | return myproc()->uid; myproc()->uid = uid; |
+| `src/sysfile.c:39-120` | `function sys_openat` | No uid/gid check |
+
+### Q10_013（single_choice）
+
+- 题干：访问控制模型 (Access Control Model, Stallings Ch15) 更接近哪种？
+- 答案："A. 自主访问控制 DAC (Discretionary Access Control)：所有者自主设置权限（Unix 权限位）"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/include/file.h:43-46` | `macro R_OK/W_OK/X_OK` | Unix-style permission bits |
+| `src/sysfile.c:493-568` | `function sys_faccessat` | Checks mode bits against R_OK|W_OK|X_OK |
+
+### Q10_014（tri_state_impl）
+
+- 题干：是否实现完整性策略 (Integrity Policy, Stallings Ch15)？（如 Biba 模型、只读内核段、代码签名验证、W^X 内存保护等；必须三态）
+- 答案："not_found"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/exec.c:94` | `function_body alloc_load_vma` | PTE_R|PTE_W|PTE_X|PTE_U - W^X not enforced |
 
 ---
 
 
 # 网络子系统与协议栈
 
-## 第 11 章：网络子系统与协议栈
+## 题单作答（JSON-QA 渲染）
 
-### 网络子系统架构（自研 vs 第三方库）
+- stage_id: `11_network`
+- terminology_profile: `stallings_en_zh`
 
-**❌ 未实现网络功能**。
+## 第 11_network 阶段：网络子系统与协议栈
 
-经过对代码库的全面搜索与分析，本仓库**未发现任何实际的网络协议栈实现**。具体情况如下：
+### Q11_001（tri_state_impl）
 
-1. **无第三方网络库依赖**：
-   - 搜索 `smoltcp`、`lwip`、`netstack` 等关键词，**未找到任何匹配**
-   - 项目为纯 C 语言实现（非 Rust），不存在使用 Rust 生态网络库的可能
-   - 无 `Cargo.toml` 或其他包管理配置文件
+- 题干：是否存在网络子系统实现（协议栈或 socket 层）？（必须三态）
+- 答案："not_found"
+- 说明：仅在头文件中找到 socket 相关声明，在 .c/.S 文件中未找到 socket_init/add_socket 的实现。file.h 中 file 类型枚举无 FD_SOCKET 分支。
 
-2. **仅有 Socket 结构体定义（桩代码）**：
-   - 头文件 `src/include/socket.h` 中定义了简单的结构体：
-   ```c
-   struct socket_connection{
-       int IP;
-       int sock_opt;
-       uint64 sock_addr;
-       int passive_socket;
-       char temp[MAX_LENGTH_OF_SOCKET];
-   };
-   
-   void socket_init(void);
-   int add_socket(int IP,int op);
-   ```
-   - **但是**：在整个代码库中搜索 `socket_init` 和 `add_socket` 的**实现代码（.c 文件）**，结果为空
-   - 这两个函数**仅有声明，无实现**，属于**桩函数（🔸 桩函数）**
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/include/socket.h` | `header_file socket.h` | 定义了 struct socket_connection 和 socket_init()/add_socket() 声明，但无实现 |
+| `src/include/file.h` | `enum_definition file.type` | enum { FD_NONE, FD_PIPE, FD_ENTRY, FD_DEVICE } — 缺少 FD_SOCKET |
 
-3. **README 文档声明与实际代码不符**：
-   - README.md 第 89 行声称："完成了对本地回环地址的 Socket 支持"
-   - **反向证据原则**：经全面搜索，未发现任何 loopback、127.0.0.1、eth0、netif 相关代码
-   - 此功能**文档提及但未见代码**，应视为**❌ 未实现**
+### Q11_002（single_choice）
 
-### Socket 接口与系统调用
+- 题干：协议栈来源更接近哪种？
+- 答案："D. 未发现"
+- 说明：搜索 smoltcp/lwip/tcpip/network 等关键词，仅找到错误码和宏定义，未发现第三方库依赖或自研协议栈代码。
 
-**❌ 未实现 Socket 系统调用**。
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/include/errno.h` | `macro_definition ENONET` | #define ENONET 64 /* Machine is not on the network */ — 仅错误码定义 |
+| `src/include/proc.h` | `macro_definition CLONE_NEWNET` | #define CLONE_NEWNET 0x40000000 /* New network namespace */ — 仅宏定义 |
 
-1. **系统调用表中无 Socket 相关调用**：
-   - 搜索 `SYS_socket`、`SYS_bind`、`SYS_connect`、`SYS_sendto`、`SYS_recvfrom`、`SYS_listen`、`SYS_accept`，**全部未找到**
-   - `src/sysproc.c`（进程相关系统调用）和 `src/sysfile.c`（文件相关系统调用）中**无任何 socket 相关 syscall 实现**
+### Q11_003（tri_state_impl）
 
-2. **错误码定义存在但无实际使用**：
-   - `src/include/errno.h` 中定义了网络相关错误码：
-   ```c
-   #define ENOTSOCK        88  /* Socket operation on non-socket */
-   #define EPROTOTYPE      91  /* Protocol wrong type for socket */
-   #define ESOCKTNOSUPPORT 94  /* Socket type not supported */
-   ```
-   - 这些错误码**仅存在于头文件**，在代码中**未被任何函数使用**
+- 题干：是否实现 socket 系统调用接口（socket/bind/connect/sendto/recvfrom 等）？（必须三态）
+- 答案："not_found"
+- 说明：grep 搜索 sys_socket/sys_bind/sys_connect/sys_sendto/sys_recvfrom 均未找到实现。syscall 表中无 socket 相关条目。
 
-3. **文件类型支持中的 Socket 占位符**：
-   - `src/include/fat32.h` 中定义了 `S_IFSOCK`：
-   ```c
-   #define S_IFSOCK    0140000  // socket
-   ```
-   - 但这只是文件类型宏定义，**不代表实际支持 socket 文件**
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/sysfile.c` | `source_file sysfile.c` | 包含 sys_openat/sys_read/sys_write/sys_close 等文件操作 syscall，但无 socket 相关 syscall |
+| `src/sysproc.c` | `source_file sysproc.c` | 包含 sys_execve/sys_getpid/sys_clone 等进程 syscall，但无 socket 相关 syscall |
 
-4. **Pipe 机制已实现（与 Socket 无关）**：
-   - 项目实现了 Pipe 机制（`src/pipe.c`、`src/include/pipe.h`），支持 `sys_pipe2` 系统调用
-   - Pipe 是进程间通信机制，**不是网络 Socket**
+### Q11_004（short_answer）
 
-### 协议栈支持详情（TCP/UDP/IP/Ethernet）
+- 题干：选择一个发送路径（优先 sys_sendto），追踪：syscall → 协议栈 → 网卡驱动。列 3-6 个关键节点并给证据。
+- 答案："无法追踪：未发现 sys_sendto 或任何网络发送路径实现。\n\n证据：\n1. sys_sendto 不存在：grep 搜索 'sys_sendto' 在 .c/.S 文件中无匹配\n2. 无协议栈：搜索 'smoltcp|lwip|tcp_send|udp_send' 无结果\n3. 无网卡驱动：virtio.h 仅注释提到 'device type; 1 is net'，但只有 virtio_disk_init/virtio_disk_rw 等磁盘驱动实现，无 virtio_net 相关代码\n4. file.c 中文件操作 switch 语句仅处理 FD_PIPE/FD_ENTRY/FD_DEVICE，无 FD_SOCKET 分支\n\n结论：该 OS 未实现网络发送路径。"
+- 说明：not_found — 无发送路径实现
 
-**❌ 不支持任何网络协议**。
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/include/virtio.h:21` | `macro_definition VIRTIO_MMIO_DEVICE_ID` | #define VIRTIO_MMIO_DEVICE_ID 0x008 // device type; 1 is net, 2 is disk — 仅注释提及网络，无实现 |
+| `src/disk.c` | `source_file disk.c` | 仅实现 vdisk_read/vdisk_write 用于磁盘/RAMDISK，无网络驱动 |
 
-| 协议 | 实现状态 | 证据 |
-|------|---------|------|
-| Ethernet | ❌ 未实现 | 无以太网帧处理代码 |
-| IP (IPv4/IPv6) | ❌ 未实现 | 无 IP 包头解析/构建代码 |
-| ARP | ❌ 未实现 | 无 ARP 请求/响应代码 |
-| ICMP | ❌ 未实现 | 无 ping/ICMP 处理代码 |
-| TCP | ❌ 未实现 | 无 TCP 三次握手、拥塞控制代码 |
-| UDP | ❌ 未实现 | 无 UDP 数据报处理代码 |
-| DHCP | ❌ 未实现 | 无 DHCP 客户端代码 |
-| DNS | ❌ 未实现 | 无 DNS 解析代码 |
+### Q11_005（tri_state_impl）
 
-**搜索方法**：
-- 使用 `rag_search_code` 搜索 "TCP UDP IP Ethernet protocol stack"
-- 使用 `grep_in_repo` 搜索 "tcp_send|tcp_recv|udp_send|ip_header|ethernet_frame"
-- 搜索结果：**无任何匹配**
+- 题干：是否实现网卡驱动（virtio-net/e1000 等）与收包中断路径？（必须三态）
+- 答案："not_found"
+- 说明：virtio.h 注释提到 VIRTIO device type 1 是 net，但代码中仅实现了 type 2 (disk) 的驱动。未找到 virtio-net 驱动或任何收包中断处理逻辑。
 
-### 数据包收发流程追踪
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/include/virtio.h` | `header_file virtio.h` | 声明 virtio_disk_init/virtio_disk_rw/virtio_disk_intr，但无 virtio_net 相关函数 |
+| `src/disk.c` | `source_file disk.c` | 实现 disk_init/vdisk_read/vdisk_write/disk_intr，仅用于磁盘/RAMDISK |
+| `src/include/plic.h` | `header_file plic.h` | 定义 DMA 中断向量 IRQN_DMA0_INTERRUPT 等，但无网络中断处理代码 |
 
-**❌ 无数据包收发流程**。
+### Q11_006（multi_choice）
 
-1. **VirtIO 驱动仅支持磁盘（Block Device）**：
-   - `src/include/virtio.h` 中定义了 VirtIO MMIO 寄存器接口：
-   ```c
-   #define VIRTIO_MMIO_DEVICE_ID  0x008  // device type; 1 is net, 2 is disk
-   ```
-   - 注释提到 "1 is net, 2 is disk"，但**仅实现了磁盘驱动**
-   - 搜索 `virtio_disk_init`、`virtio_disk_rw` 等函数，**未找到实现代码**
-   - **无 VirtIO-Net 驱动代码**
+- 题干：协议支持情况（多选；未发现则留空并在 notes 写 not_found）：
+- 答案：[]
+- 说明：not_found — 搜索 TCP/UDP/ARP/ICMP/DHCP/DNS/Ethernet/IPv4/IPv6 相关代码均未找到实现。仅在 errno.h 中找到 ENONET 错误码定义，proc.h 中找到 CLONE_NEWNET 宏定义，但无实际协议代码。
 
-2. **无网卡驱动**：
-   - 搜索 `virtio_net`、`VIRTIO_ID_NET`、`ixgbe`、`rtl8139`、`e1000` 等网卡驱动关键词，**未找到**
-   - `src/dev.c` 中仅实现了 console、null、zero 三种设备：
-   ```c
-   allocdev("console", consoleread, consolewrite);
-   allocdev("null", nullread, nullwrite);
-   allocdev("zero", zeroread, zerowrite);
-   ```
-   - **无网络设备注册**
+- 证据：无（`not_found`/`stub` 时允许为空；否则需补齐）
 
-3. **无中断处理网络数据包**：
-   - `src/trap.c` 中处理时钟中断、设备中断，但**无网络中断处理**
-   - 无 `net_interrupt`、`packet_rx`、`packet_tx` 等函数
+### Q11_007（tri_state_impl）
 
-### 高级特性支持验证（零拷贝等）
+- 题干：是否存在零拷贝/共享缓冲/DMA 描述符等路径（zero-copy）？（必须三态；仅有名词不算 implemented）
+- 答案："not_found"
+- 说明：virtio.h 中的 VRingDesc descriptor 仅用于磁盘 I/O。未找到网络相关的 DMA 描述符操作、共享缓冲区或 mbuf 引用传递机制。file.c 中的文件读写使用传统 copyin/copyout 进行用户态 - 内核态数据拷贝。
 
-**❌ 不支持任何网络高级特性**。
-
-| 特性 | 实现状态 | 验证方法 |
-|------|---------|---------|
-| 零拷贝（Zero Copy） | ❌ 不支持 | 搜索 `DMA`、`shared buffer`、`mbuf`，未找到 |
-| 多队列（Multi-queue/RSS） | ❌ 不支持 | 无多队列网卡驱动代码 |
-| 发送/接收缓冲区 | ❌ 不支持 | 无 socket buffer 实现 |
-
-### 功能限制声明
-
-**本项目网络功能状态总结**：
-
-1. **文档声明**：README.md 声称"完成了对本地回环地址的 Socket 支持"
-2. **代码现实**：
-   - ✅ `src/include/socket.h` 头文件存在（仅定义结构体和函数声明）
-   - ❌ `socket_init()` 和 `add_socket()` **无实现代码**
-   - ❌ **无 Socket 系统调用**（`sys_socket`、`sys_bind`、`sys_connect` 等）
-   - ❌ **无网络协议栈**（TCP/UDP/IP 均未实现）
-   - ❌ **无网卡驱动**（VirtIO-Net 未实现）
-   - ❌ **无 loopback 设备代码**（搜索 `loopback|127.0.0.1` 无结果）
-
-3. **结论**：
-   - 本项目的网络功能**仅停留在头文件定义阶段**
-   - 所有网络相关功能均为**🔸 桩函数**或**❌ 未实现**
-   - README 中的声明**未在代码中得到验证**，属于"规划功能"而非"已实现功能"
-   - 项目**无法进行任何网络通信**（包括本地回环）
-
-### 本章总结
-
-| 子系统/功能 | 实现状态 | 备注 |
-|------------|---------|------|
-| Socket 接口定义 | 🔸 桩函数 | 仅头文件声明，无实现 |
-| Socket 系统调用 | ❌ 未实现 | 无 sys_socket 等 syscall |
-| TCP/IP 协议栈 | ❌ 未实现 | 无第三方库，无自研代码 |
-| 网卡驱动 | ❌ 未实现 | VirtIO-Net 未实现 |
-| Loopback 支持 | ❌ 未实现 | 文档提及但无代码 |
-| 零拷贝/多队列 | ❌ 不支持 | 无网络功能故不支持 |
-
-**最终结论**：本项目（oskernrl2022-rv6）**未实现网络子系统**。所有网络相关代码仅为头文件中的结构体定义和函数声明，无任何实际实现。项目无法进行网络通信。
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/include/virtio.h` | `struct_definition VRingDesc` | 定义 virtio descriptor 结构体，但仅用于磁盘操作 (VIRTIO_BLK_T_IN/VIRTIO_BLK_T_OUT) |
+| `src/file.c` | `source_file file.c` | filewrite/fileread 使用内存拷贝 (copyin/copyout)，无零拷贝优化 |
 
 ---
 
 
 # 调试机制与错误处理
 
-## 第 12 章：调试机制与错误处理
-
-本章分析 oskernrl2022-rv6 操作系统的调试支持、日志系统、错误处理机制以及调试接口。该内核基于 RISC-V 架构，采用 C 语言实现，调试机制相对基础但功能完整。
-
----
-
-## 日志与打印系统
-
-### 核心打印函数 `printf`
-
-内核的打印系统围绕 `printf` 函数构建，位于 [`src/printf.c`](repos\oskernrl2022-rv6\src\printf.c:81-137)。该函数支持标准格式化输出，包括 `%c`、`%d`、`%x`、`%p`、`%s` 等格式说明符。
-
-```c
-// src/printf.c:81-137
-void printf(char *fmt, ...) {
-  va_list ap;
-  int i, c;
-  int locking;
-  char *s;
-  locking = pr.locking;
-  if(locking)
-    acquire(&pr.lock);
-  
-  if (fmt == 0)
-    panic("null fmt");
-
-  va_start(ap, fmt);
-  for(i = 0; (c = fmt[i] & 0xff) != 0; i++){
-    if(c != '%'){
-      consputc(c);
-      continue;
-    }
-    c = fmt[++i] & 0xff;
-    // ... 格式化处理
-  }
-  if(locking)
-    release(&pr.lock);
-}
-```
-
-**实现特点**：
-- **线程安全**：通过 `pr.lock` 自旋锁保护并发访问
-- **格式化支持**：支持字符、整数、十六进制、指针、字符串等格式
-- **底层输出**：通过 `consputc()` 将字符输出到控制台（UART）
-
-### 日志级别设计
-
-内核实现了三级日志系统，通过条件编译控制：
-
-| 级别 | 函数 | 宏控制 | 文件位置 |
-|------|------|--------|----------|
-| INFO | `__debug_info()` | `DEBUG` | [`src/printf.c:163-219`](repos\oskernrl2022-rv6\src\printf.c:163-219) |
-| WARN | `__debug_warn()` | `WARNING` | [`src/printf.c:221-277`](repos\oskernrl2022-rv6\src\printf.c:221-277) |
-| ERROR | `__debug_error()` | `ERROR` | [`src/printf.c`](repos\oskernrl2022-rv6\src\printf.c) |
-
-```c
-// src/printf.c:163-180
-void __debug_info(char *fmt, ...){
-#ifdef DEBUG
-  va_list ap;
-  // ... 获取锁
-  if (fmt == 0)
-    panic("null fmt");
-  printstring("[DEBUG]");  // 添加前缀
-  va_start(ap, fmt);
-  // ... 格式化输出
-#endif    
-}
-```
-
-**实现状态**：✅ 已实现
-
-日志级别通过编译时宏控制，开发者可在编译时定义 `DEBUG`、`WARNING`、`ERROR` 来启用相应级别的日志输出。
-
-### 系统日志缓冲区
-
-内核实现了简单的系统日志缓冲区机制，位于 [`src/syslog.c`](repos\oskernrl2022-rv6\src\syslog.c:12-50)：
-
-```c
-// src/syslog.c:12-22
-char syslogbuf[1024];
-int logbuflen = 0;
-
-void logbufinit(){
-  logbuflen = 0;
-  strncpy(syslogbuf, "[log]init done\n", 1024);
-  logbuflen += strlen(syslogbuf);
-}
-```
-
-通过 `sys_syslog()` 系统调用（`SYSLOG_ACTION_READ_ALL`）可读取缓冲区内容，但实现较为简单，仅支持读取固定大小的缓冲区。
-
----
-
-## Panic 处理与栈回溯
-
-### Panic 处理流程
-
-当内核遇到致命错误时，调用 `panic()` 函数处理。其实现位于 [`src/printf.c:139-149`](repos\oskernrl2022-rv6\src\printf.c:139-149)：
-
-```c
-void panic(char *s) {
-  printf("panic: ");
-  printf(s);
-  printf("\n");
-  backtrace();
-  panicked = 1;  // freeze uart output from other CPUs
-  for(;;)
-    ;
-}
-```
-
-**处理流程**：
-1. 打印 panic 消息
-2. 调用 `backtrace()` 打印调用栈
-3. 设置全局标志 `panicked = 1` 冻结 UART 输出
-4. 进入无限循环停机
-
-### 栈回溯 (Backtrace) 实现
-
-内核支持基于 **Frame Pointer (FP)** 的栈回溯，位于 [`src/printf.c:151-161`](repos\oskernrl2022-rv6\src\printf.c:151-161)：
-
-```c
-void backtrace() {
-  uint64 *fp = (uint64 *)r_fp();
-  uint64 *bottom = (uint64 *)PGROUNDUP((uint64)fp);
-  printf("backtrace:\n");
-  while (fp < bottom) {
-    uint64 ra = *(fp - 1);
-    printf("%p\n", ra - 4);
-    fp = (uint64 *)*(fp - 2);
-  }
-}
-```
-
-**实现原理**：
-- 通过 `r_fp()` 读取当前帧指针（`fp` 寄存器）
-- 利用 RISC-V 调用约定：`fp-8` 存储返回地址（`ra`），`fp-16` 存储上一帧的 `fp`
-- 遍历栈帧直到达到页边界（`PGROUNDUP`）
-- 打印每个返回地址（减 4 以指向 call 指令）
-
-**实现状态**：✅ 已实现（基于 FramePointer）
-
-**限制**：
-- ❌ **不支持 DWARF 解析**：未搜索到 DWARF 相关代码
-- ❌ **不支持 libunwind**：无 unwind 库集成
-- 仅支持内核态栈回溯，不支持用户态回溯
-
-### Panic 调用链分析
-
-通过 `lsp_get_call_graph` 分析 `panic` 的入向调用：
-
-```mermaid
-graph TD
-  A["main
- src/main.c:45"] --> B["userinit
- src/proc.c:376"]
-  B --> C["clone
- src/proc.c:408"]
-  C --> D["allocproc
- src/proc.c:213"]
-  D --> E["panic
- src/printf.c:140"]
-  
-  F["exit
- src/proc.c:720"] --> E
-  G["sched
- src/proc.c:521"] --> F
-  H["kerneltrap
- src/trap.c:176"] --> E
-  I["printf
- src/printf.c:82"] --> E
-```
-
-**触发 panic 的主要场景**：
-1. **内核陷阱处理**：`kerneltrap()` 遇到未处理异常时（[`src/trap.c:176-209`](repos\oskernrl2022-rv6\src\trap.c:176-209)）
-2. **进程分配失败**：`allocproc()` 资源不足时
-3. **进程退出**：`exit()` 遇到致命错误
-4. **格式化错误**：`printf()` 收到空格式字符串
-
-### 陷阱帧转储 (Trapframe Dump)
-
-内核提供 `trapframedump()` 函数用于打印陷阱帧内容，位于 [`src/trap.c:263-297`](repos\oskernrl2022-rv6\src\trap.c:263-297)：
-
-```c
-void trapframedump(struct trapframe *tf) {
-  printf("a0: %p\t", tf->a0);
-  printf("a1: %p\t", tf->a1);
-  // ... 打印所有寄存器
-  printf("epc: %p\n", tf->epc);
-}
-```
-
-该函数在 `kerneltrap()` 中被调用，用于调试异常发生时的寄存器状态。
-
-**实现状态**：✅ 已实现
-
----
-
-## 错误码与 Result 设计
-
-### 错误码定义
-
-内核采用类 Unix 的错误码设计，定义在 [`src/include/errno.h`](repos\oskernrl2022-rv6\src\include\errno.h:1-107) 中：
-
-```c
-// src/include/errno.h:1-40
-#define EPERM     1   /* Operation not permitted */
-#define ENOENT    2   /* No such file or directory */
-#define ESRCH     3   /* No such process */
-#define EINTR     4   /* Interrupted system call */
-#define EIO       5   /* I/O error */
-#define ENOMEM    12  /* Out of memory */
-#define EACCES    13  /* Permission denied */
-#define EFAULT    14  /* Bad address */
-#define EINVAL    22  /* Invalid argument */
-#define ENOSYS    38  /* Invalid system call number */
-// ... 共 98+ 个错误码
-```
-
-**错误码分类**：
-- **权限相关**：`EPERM`、`EACCES`
-- **资源相关**：`ENOMEM`、`ENOSPC`、`EMFILE`
-- **文件操作**：`ENOENT`、`EISDIR`、`ENOTDIR`
-- **系统调用**：`ENOSYS`、`EINVAL`
-
-### 返回值约定
-
-内核函数采用 **C 语言传统错误处理模式**：
-- **成功**：返回 `0` 或有效值
-- **失败**：返回 `-1` 并设置全局 `errno`，或直接返回负的错误码
-
-```c
-// src/copy.c:12-15
-// Return 0 on success, -1 on error.
-
-// src/diskio.c:57-58
-result = sd_init(spictrl, peripheral_input_khz, 0);
-return result == 0 ? RES_OK : RES_ERROR;
-```
-
-**实现状态**：✅ 已实现
-
-**注意**：该内核未使用 Rust 风格的 `Result<T, E>` 类型，而是采用传统 C 语言的错误处理方式。
-
----
-
-## 调试接口与交互式 Shell
-
-### 交互式 Shell 支持
-
-**❌ 未实现内核级交互式 Shell/Monitor**
-
-通过搜索 `monitor|shell|command` 发现：
-- 文档中提及用户态 shell（busybox），但**内核未实现调试 Monitor**
-- 无内核命令解析器（如 `ps`、`ls`、`help` 等命令）
-- 用户程序通过系统调用与内核交互，无运行时调试接口
-
-### 系统调用追踪
-
-内核支持简单的系统调用追踪机制，位于 [`syscall/syscall.c:1-20`](repos\oskernrl2022-rv6\syscall\syscall.c:1-20)：
-
-```c
-void syscall(void) {
-  int num;
-  struct proc *p = myproc();
-  
-  num = p->trapframe->a7;
-  if(num > 0 && num < NELEM(syscalls) && syscalls[num]) {
-    p->trapframe->a0 = syscalls[num]();
-    // trace
-    if ((p->tmask & (1 << num)) != 0) {
-      printf("pid %d: %s -> %d\n", p->pid, sysnames[num], p->trapframe->a0);
-    }
-  } else {
-    printf("pid %d %s: unknown sys call %d\n", p->pid, p->name, num);
-    p->trapframe->a0 = -1;
-  }
-}
-```
-
-**实现特点**：
-- 通过进程结构体中的 `tmask` 字段控制追踪掩码（[`src/include/proc.h:153`](repos\oskernrl2022-rv6\src\include\proc.h:153)）
-- 当 `tmask` 对应位被设置时，打印系统调用名称和返回值
-- 类似 `strace` 功能，但功能较为基础
-
-**实现状态**：✅ 已实现（基础追踪）
-
-### 调试控制台
-
-内核通过 UART 提供基础的控制台输出：
-- `printf()` 系列函数输出到串口
-- `consputc()` 为底层字符输出函数
-- 无交互式命令输入支持
-
----
-
-## GDB Stub 支持情况
-
-### GDB 远程调试配置
-
-仓库包含 `.gdbinit` 配置文件，用于配合 QEMU 进行远程调试：
-
-```
-# .gdbinit
-set confirm off
-set architecture riscv:rv64
-target remote 127.0.0.1:26000
-symbol-file src/kernel
-set disassemble-next-line auto
-set riscv use-compressed-breakpoints yes
-```
-
-**实现状态**：🔸 仅配置文件
-
-### GDB Stub 代码检查
-
-**❌ 未实现内核级 GDB Stub**
-
-通过搜索 `gdb|gdbstub|handle_gdb_packet`：
-- **未找到任何 GDB 数据包处理代码**
-- **未找到 GDB Stub 实现**（如 `handle_gdb_packet`、`gdb_enter` 等）
-- 调试依赖 QEMU 内置的 GDB Server，而非内核实现
-
-**结论**：该内核不支持运行时 GDB 远程调试协议，仅能通过 QEMU 的外部 GDB Server 进行调试。
-
----
-
-## 断言与运行时检查
-
-### 链接器断言
-
-内核在链接脚本中使用 `ASSERT` 进行编译时检查，位于 [`linker/kernel.ld`](repos\oskernrl2022-rv6\linker\kernel.ld:23-27)：
-
-```ld
-/* linker/kernel.ld */
-ASSERT(. - _trampoline == 0x1000, "error: trampoline larger than one page")
-ASSERT(. - _sig_trampoline == 0x1000, "error: sig_trampoline larger than one page")
-```
-
-**检查内容**：
-- 确保 `trampoline` 代码大小不超过一页（4KB）
-- 确保信号跳板代码大小不超过一页
-
-### 静态断言
-
-内核在头文件中使用 `_Static_assert` 进行类型大小检查，位于 [`src/include/spi.h`](repos\oskernrl2022-rv6\src\include\spi.h:13-179)：
-
-```c
-// src/include/spi.h:13
-#define _ASSERT_SIZEOF(type, size) _Static_assert(sizeof(type) == (size), #type " must be " #size " bytes wide")
-
-// src/include/spi.h:25-179
-_ASSERT_SIZEOF(spi_reg_sckmode, 4);
-_ASSERT_SIZEOF(spi_reg_csmode, 4);
-// ... 多个 SPI 寄存器结构检查
-```
-
-**实现状态**：✅ 已实现
-
-### 运行时断言
-
-**❌ 未发现运行时 `assert()` 宏实现**
-
-- 未找到 `assert.h` 或 `KERNEL_ASSERT` 的运行时实现
-- 代码中注释提及 `//#include <utils/assert.h>`，但实际未启用
-- 错误处理主要依赖返回值检查和 `panic()`
-
-### 调试宏使用示例
-
-内核代码中广泛使用条件编译的调试宏：
-
-```c
-// src/bio.c:60
-#ifdef DEBUG
-  // 调试输出
-#endif
-
-// src/cpu.c:12
-// #define DEBUG1
-```
-
-**实现状态**：🔸 部分实现（依赖编译选项）
-
----
-
-## 关键代码片段
-
-### Panic 与 Backtrace 完整实现
-
-```c
-// src/printf.c:139-161
-void panic(char *s) {
-  printf("panic: ");
-  printf(s);
-  printf("\n");
-  backtrace();
-  panicked = 1;  // freeze uart output from other CPUs
-  for(;;)
-    ;
-}
-
-void backtrace() {
-  uint64 *fp = (uint64 *)r_fp();
-  uint64 *bottom = (uint64 *)PGROUNDUP((uint64)fp);
-  printf("backtrace:\n");
-  while (fp < bottom) {
-    uint64 ra = *(fp - 1);
-    printf("%p\n", ra - 4);
-    fp = (uint64 *)*(fp - 2);
-  }
-}
-```
-
-### 内核陷阱处理中的 Panic
-
-```c
-// src/trap.c:176-200
-void kerneltrap() {
-  int which_dev = 0;
-  uint64 sepc = r_sepc();
-  uint64 sstatus = r_sstatus();
-  uint64 scause = r_scause();
-
-  if((sstatus & SSTATUS_SPP) == 0)
-    panic("kerneltrap: not from supervisor mode");
-  if(intr_get() != 0)
-    panic("kerneltrap: interrupts enabled");
-
-  if((which_dev = devintr()) == 0){
-    printf("\nscause %p\n", scause);
-    printf("sepc=%p stval=%p hart=%d\n", r_sepc(), r_stval(), r_tp());
-    struct proc *p = myproc();
-    if (p != 0) {
-      printf("pid: %d, name: %s\n", p->pid, p->name);
-    }
-    panic("kerneltrap");
-  }
-  // ... 处理设备中断
-}
-```
-
-### 系统日志实现
-
-```c
-// src/syslog.c:12-50
-char syslogbuf[1024];
-int logbuflen = 0;
-
-uint64 sys_syslog() {
-  int type;
-  uint64 bufp;
-  int len;
-  if(argint(0,&type)<0) return -1;
-  if(argaddr(1,&bufp)<0) return -1;
-  if(argint(2,&len)<0) return -1;
-  
-  switch(type){
-    case SYSLOG_ACTION_READ_ALL:
-      if(either_copyout(1,bufp,syslogbuf,logbuflen)<0)
-        return -1;
-      return logbuflen;
-    case SYSLOG_ACTION_SIZE_BUFFER: 
-      return sizeof(syslogbuf);
-  }
-  return 0;
-}
-```
-
----
-
-## 总结
-
-| 功能模块 | 实现状态 | 说明 |
-|----------|----------|------|
-| 日志系统 | ✅ 已实现 | 支持 `printf` 和三级日志（DEBUG/WARNING/ERROR） |
-| Panic 处理 | ✅ 已实现 | 打印消息 + 栈回溯 + 停机 |
-| 栈回溯 (Backtrace) | ✅ 已实现 | 基于 FramePointer，不支持 DWARF |
-| 错误码设计 | ✅ 已实现 | 类 Unix 错误码（98+ 个） |
-| 交互式 Shell | ❌ 未实现 | 无内核 Monitor |
-| GDB Stub | ❌ 未实现 | 仅 QEMU 外部调试 |
-| 系统调用追踪 | ✅ 已实现 | 基于 `tmask` 的基础追踪 |
-| 断言检查 | 🔸 部分实现 | 仅链接器和静态断言 |
-| Perf/ftrace | ❌ 未实现 | 无性能分析工具 |
-
-该内核的调试机制以满足基础调试需求为主，缺乏高级调试功能（如 GDB Stub、交互式 Monitor、性能分析工具）。栈回溯功能完整但较为基础，错误处理机制遵循传统 C 语言风格。
+## 题单作答（JSON-QA 渲染）
+
+- stage_id: `12_debug_error`
+- terminology_profile: `stallings_en_zh`
+
+## 第 12_debug_error 阶段：调试机制与错误处理
+
+### Q12_001（tri_state_impl）
+
+- 题干：是否存在日志系统（log/printk/println 宏）与日志级别控制？（必须三态）
+- 答案："implemented"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/printf.c` | `function __debug_info` | void __debug_info(char *fmt, ...){ #ifdef DEBUG ... } |
+| `src/printf.c` | `function __debug_warn` | void __debug_warn(char *fmt, ...){ #ifdef WARNING ... } |
+| `src/printf.c` | `function __debug_error` | void __debug_error(char *fmt, ...){ #ifdef ERROR ... } |
+| `src/include/printf.h` | `function_decl __debug_info` | void __debug_info(char *fmt, ...); void __debug_warn(char *fmt, ...); void __debug_error(char *fmt, ...); |
+
+### Q12_002（tri_state_impl）
+
+- 题干：是否存在 panic/崩溃处理路径（panic_handler/oom/abort 等）？（必须三态）
+- 答案："implemented"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/printf.c` | `function panic` | panic(char *s) { printf("panic: "); printf(s); printf("\n"); backtrace(); panicked = 1; for(;;) ; } |
+| `src/include/printf.h` | `function_decl panic` | void panic(char *s) __attribute__((noreturn)); |
+
+### Q12_003（short_answer）
+
+- 题干：panic 路径会输出哪些诊断？（寄存器 dump/栈回溯/停机；必须引用实现证据）
+- 答案："panic 路径输出 panic 消息字符串，调用 backtrace() 打印返回地址 (ra) 链，然后进入死循环停机。不包含寄存器 dump（trapframedump 仅在用户态异常时调用，非 panic 路径）。"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/printf.c:140-148` | `function panic` | panic(char *s) { printf("panic: "); printf(s); printf("\n"); backtrace(); panicked = 1; for(;;) ; } |
+| `src/printf.c:151-159` | `function backtrace` | void backtrace() { uint64 *fp = (uint64 *)r_fp(); ... printf("backtrace:\n"); while (fp < bottom) { uint64 ra = *(fp - 1); printf("%p\n", ra - 4); fp = (uint64 *)*(fp - 2); } } |
+| `src/trap.c:109-115` | `function usertrap` | trapframedump 仅在 usertrap 中用户态异常时调用，panic 路径不调用 trapframedump |
+
+### Q12_004（tri_state_impl）
+
+- 题干：是否实现栈回溯 (backtrace/unwind/stack_trace)？（必须三态；仅打印 ra 不算）
+- 答案："implemented"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/printf.c:151-159` | `function backtrace` | void backtrace() { uint64 *fp = (uint64 *)r_fp(); uint64 *bottom = (uint64 *)PGROUNDUP((uint64)fp); printf("backtrace:\n"); while (fp < bottom) { uint64 ra = *(fp - 1); printf("%p\n", ra - 4); fp = (uint64 *)*(fp - 2); } } |
+| `src/include/printf.h` | `function_decl backtrace` | void backtrace(); |
+
+### Q12_005（tri_state_impl）
+
+- 题干：是否存在交互式内核 monitor/shell？（必须三态；若 implemented 列出 3-10 个命令入口证据）
+- 答案："not_found"
+
+- 证据：无（`not_found`/`stub` 时允许为空；否则需补齐）
+
+### Q12_006（tri_state_impl）
+
+- 题干：是否实现 GDB stub（需数据包解析循环，如 handle_gdb_packet）？（必须三态）
+- 答案："not_found"
+
+- 证据：无（`not_found`/`stub` 时允许为空；否则需补齐）
+
+### Q12_007（short_answer）
+
+- 题干：错误码/错误类型体系是什么？（errno/Result/Error enum；给类型定义与传播点证据）
+- 答案："采用标准 POSIX errno.h 定义（EPERM=1 至 ERANGE=34 等共 98+ 个错误码）。函数通过返回 -1 或 RES_ERROR 表示错误，成功返回 RES_OK 或 0。"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/include/errno.h` | `header errno.h` | #define EPERM 1 /* Operation not permitted */ ... #define ERANGE 34 /* Math result not representable */ |
+| `src/diskio.c:58` | `function disk_initialize` | return result == 0 ? RES_OK : RES_ERROR; |
+| `src/copy.c:22` | `function copyout` | return -1; |
+
+### Q12_008（tri_state_impl）
+
+- 题干：是否存在 trace/perf/ftrace 等跟踪机制或 tracepoints？（必须三态）
+- 答案："stub"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `syscall/syscall.c:11-13` | `function syscall` | // trace<br>    if ((p->tmask & (1 << num)) != 0) {<br>      printf("pid %d: %s -> %d\n", p->pid, sysnames[num], p->trapframe->a0);<br>    } |
+| `src/include/proc.h:153` | `struct_field tmask` | int tmask; // trace mask |
 
 ---
 
@@ -5596,5 +2605,5 @@ uint64 sys_syslog() {
 ---
 
 *本报告由 OS-Agent-D 自动生成*  
-*生成时间: 2026-03-19 22:54:01*  
-*分析耗时: 1.3 分钟*
+*生成时间: 2026-04-16 21:53:21*  
+*分析耗时: 64.9 分钟*

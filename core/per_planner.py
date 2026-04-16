@@ -531,7 +531,7 @@ def apply_llm_plan_overlay(base: PlanSpec, overlay: Dict[str, Any]) -> PlanSpec:
     pt_llm = _coerce_str_list(overlay.get("preferred_tools"), 8)
     preferred_tools = pt_llm if pt_llm else base.preferred_tools
 
-    steps_llm = _coerce_str_list(overlay.get("execution_steps"), 12)
+    steps_llm = _coerce_str_list(overlay.get("execution_steps"), 32)
     execution_steps = steps_llm if steps_llm else base.execution_steps
 
     return replace(
@@ -559,7 +559,7 @@ def ensure_execution_steps(plan: PlanSpec) -> PlanSpec:
         qn = _norm(q)[:120]
         if qn:
             steps.append(f"覆盖要点：{qn}")
-    return replace(plan, execution_steps=steps[:12])
+    return replace(plan, execution_steps=steps[:32])
 
 
 def _shorten(text: str, limit: int = 400) -> str:
@@ -619,7 +619,7 @@ def render_plan_context(state: StageState) -> str:
     if plan.execution_steps:
         lines.append("")
         lines.append("## 须按序完成的执行步骤（Execute 阶段必须遵守；未列事项勿擅自长篇展开）")
-        for i, st in enumerate(plan.execution_steps[:14], 1):
+        for i, st in enumerate(plan.execution_steps[:32], 1):
             lines.append(f"{i}. {st}")
     lines.extend(
         [

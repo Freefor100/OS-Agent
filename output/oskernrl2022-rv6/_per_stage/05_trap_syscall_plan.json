@@ -1,0 +1,109 @@
+{
+  "stage_id": "05_trap_syscall",
+  "goal": "## 题单（评委用，小题作答）",
+  "must_cover": [
+    "[Q05_001] trap/异常向量入口在哪里？（trap_handler/trap_vector/__alltraps 等；必须给证据）",
+    "[Q05_002] trap 上下文 (TrapFrame/TrapContext) 更可能存放在哪里？",
+    "[Q05_003] TrapFrame/寄存器保存结构体定义在哪里？寄存器数量与字节数是多少？（必须引用结构体定义证据）",
+    "[Q05_004] 是否存在系统调用分发表（syscall table / match 分发）？（必须三态）",
+    "[Q05_005] 系统调用号是否做边界检查？（越界默认分支/返回错误/panic；必须三态）",
+    "[Q05_006] 选择一个具体 syscall（优先 sys_write），追踪：用户指令 → trap → 分发 → 实现体。列出 3-6 个关键节点并给证据。",
+    "[Q05_007] 列出 5-10 个“高价值 syscall”（fork/exec/mmap/open/write 等）的实现三态（implemented/stub/not_found），并为每个至少给一条证据。",
+    "[Q05_008] 是否存在用户指针访问安全检查（copyin/copyout/access_ok/UserInPtr 等）？（必须三态）",
+    "[Q05_009] 时钟中断是否触发抢占调度（timer tick 中调用 yield/schedule/resched）？（必须三态）",
+    "[Q05_010] 是否存在信号处理链路（trap 返回前处理 pending signal、sigreturn/trampoline）？（必须三态）",
+    "[Q05_011] 缺页异常与内存特性（CoW/lazy）是否在 trap 中联动？（若存在，说明入口点与调用到内存模块的证据）",
+    "[Q05_012] 与 09 多核交叉一致性：per-CPU trap 栈/时钟初始化顺序与 AP 上线是否一致？（互指证据或写单核不适用）",
+    "[Q05_013] Syscall 实现全量统计 (Syscall Coverage Analysis)，请按格式填写：",
+    "分发表路径: ___",
+    "完整实现 ✅ (implemented): ___ 个",
+    "桩/ENOSYS/return 0 🔸 (stub): ___ 个，代表性例子: ___",
+    "未注册 ❌ (not_found): ___ 个",
+    "统计依据（grep 或 outline 方式）: ___",
+    "[Q05_014] README 与 syscall 声称对照：README 中声称兼容/实现了哪些 syscall 或标准？与代码分发表实际是否一致？（无 README 则写「无 README，仅以代码为准」）",
+    "[Q05_015] `_impl` 命名模式搜索结论：grep `_impl\\b|sys_[a-z0-9_]*_impl`，结果是命中了哪些函数（列出），还是「未见该命名模式」？（必须给搜索结论）",
+    "[Q05_016] 是否存在外部中断（PLIC/APIC 等）的分发处理逻辑？（必须三态；与时钟中断分开作答）",
+    "[Q05_017] 非法内存访问时是否向进程发送 SIGSEGV 信号？（必须三态；搜索 SIGSEGV|sig_segv）",
+    "[Q05_018] 信号发送支持哪些粒度？（搜索 sys_kill/sys_tkill/sys_tgkill；分别是进程级/线程级/进程组级；列出已实现的与其证据）",
+    "[Q05_019] 中断 (Interrupt)、异常 (Exception/Fault/Trap) 的区分机制更接近哪种？（Stallings Ch5；即 trap handler 如何区分「外部中断」与「同步异常」）",
+    "[Q05_020] 是否支持中断嵌套 (Nested Interrupt / Interrupt Nesting, Stallings Ch5)？（必须三态；搜索 enable_irq_in_handler / nested_irq / 中断处理时是否重开中断；若 not_found 需说明是否关中断运行整个 handler）",
+    "对「高价值 syscall」列表：**实现深度分级**（真逻辑 / 仅 ENOSYS / 返回 0 / todo），并说明与 README 声称是否冲突。",
+    "Trap/信号/缺页三条链的**交汇点**（文件+符号），写清本仓实际存在的衔接代码或缺失。",
+    "**章节交叉引用（与 09 多核）**：若存在 **每 CPU 陷阱栈**、`tp`/`gsbase` 存 per-cpu、`cpuid()`/`hartid` 分支的 trap 入口，须与 **第 9 章** 的 AP 启动、`percpu`/次级核初始化**对照**（谁先初始化 per-cpu 再设 `stvec` 等）；单核实现则一句写明「与 09 单核结论一致即可」。",
+    "Trap 入口：trap_handler / trap_vector 在哪里？如何区分中断（Interrupt）和异常（Exception）？",
+    "**特权级切换与陷阱上下文存放位置**：搜索 `trap_handler|__alltraps|alltraps|trap_entry`；判定 **TrapContext/TrapFrame** 保存在**内核栈**、**每 CPU 陷阱栈**、还是**用户地址空间预留页**（如 `TRAMPOLINE`/`trap_context` 页）；须 `路径:行号` 说明切换栈的指令路径。"
+  ],
+  "evidence_targets": [
+    "trap 入口",
+    "syscall 分发",
+    "TrapFrame",
+    "用户指针校验",
+    "README syscall 表与代码对照",
+    "errno/桩与深度测例敏感点"
+  ],
+  "seed_paths": [
+    "trap",
+    "syscall",
+    "interrupt",
+    "exception",
+    "kernel/trap",
+    "README.md",
+    "Makefile",
+    "linker/kernel.ld",
+    "src/entry.S",
+    "src/include/sbi.h",
+    "src/trap.c",
+    "src/trampoline.S"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "trap_handler",
+    "syscall",
+    "syscall_dispatch",
+    "TrapFrame",
+    "main"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "bin",
+    "doc",
+    "linker",
+    "sbi",
+    "sd",
+    "src",
+    "src/include",
+    "src/sifive",
+    "syscall"
+  ],
+  "preferred_tools": [
+    "rag_search_code",
+    "lsp_get_call_graph",
+    "lsp_get_definition",
+    "read_code_segment"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "对照 seed_paths、entry_symbols，用 rag_search_code / list_repo_structure / LSP 锁定与本阶段相关的关键文件与符号。",
+    "对核心入口使用 lsp_get_document_outline → lsp_get_call_graph（单入口、浅深度）→ 必要时 read_code_segment 精读。",
+    "按 must_cover 逐项输出结论，每条附反引号源码路径；无实现则显式写「未发现/桩函数」等，勿臆测。",
+    "覆盖要点：[Q05_001] trap/异常向量入口在哪里？（trap_handler/trap_vector/__alltraps 等；必须给证据）",
+    "覆盖要点：[Q05_002] trap 上下文 (TrapFrame/TrapContext) 更可能存放在哪里？",
+    "覆盖要点：[Q05_003] TrapFrame/寄存器保存结构体定义在哪里？寄存器数量与字节数是多少？（必须引用结构体定义证据）",
+    "覆盖要点：[Q05_004] 是否存在系统调用分发表（syscall table / match 分发）？（必须三态）",
+    "覆盖要点：[Q05_005] 系统调用号是否做边界检查？（越界默认分支/返回错误/panic；必须三态）"
+  ]
+}

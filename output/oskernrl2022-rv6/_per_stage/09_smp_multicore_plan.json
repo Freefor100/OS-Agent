@@ -1,0 +1,107 @@
+{
+  "stage_id": "09_smp_multicore",
+  "goal": "## 题单（评委用，小题作答）",
+  "must_cover": [
+    "[Q09_001] 该 OS 的多核形态更接近哪种？",
+    "[Q09_002] 是否存在 Secondary CPU / AP 启动链（BSP 唤醒 AP，上线后进入 idle/调度）？（必须三态）",
+    "[Q09_003] 是否实现 IPI（核间中断）发送与处理？（必须三态）",
+    "[Q09_004] 若存在 IPI：发送与处理路径分别在哪些函数/文件？（给关键入口与证据）",
+    "[Q09_005] 是否存在 per-CPU 变量/结构（PerCpu、CPU-local storage 等）？（必须三态）",
+    "[Q09_006] per-CPU 的实现方式是什么？（例如 TLS/tp 寄存器/gsbase/数组索引 hartid；需证据）",
+    "[Q09_007] 调度是否存在跨核负载均衡/迁移/亲和性？（必须三态）",
+    "[Q09_008] 是否实现 TLB shootdown（跨核页表一致性刷新）？（必须三态；需与 03 互指）",
+    "[Q09_009] 与 03/04/05/08 章的交叉一致性 (Cross-Chapter Consistency)，按以下四项分别作答（每项须给证据路径或写「单核不适用」）：",
+    "03 TLB: 多核页表修改后 TLB 刷新策略=___",
+    "04 调度: 每核运行队列/负载均衡/IPI resched=___",
+    "05 Trap: per-CPU trap 栈/时钟中断初始化与 AP 上线顺序=___",
+    "08 锁: SpinLock 关中断行为在多核下是否安全=___",
+    "[Q09_010] SpinLock 在获取锁时是否禁用中断（关中断保护临界区）？",
+    "[Q09_011] NCPU/MAXCPU（或等价宏）与链接脚本中的每 hart 栈/入口布局是否对应？（搜索 _max_hart_id 等；给宏定义与链接脚本对应证据，或写未发现）",
+    "[Q09_012] 是否使用 AtomicUsize/原子变量分配 PID/TID（全局唯一 ID 池）？（必须三态；给实现证据）",
+    "[Q09_013] 是否支持实时调度 (Real-Time Scheduling, Stallings Ch10)？（必须三态；搜索 SCHED_FIFO / SCHED_RR / realtime / RT priority / deadline 等）",
+    "[Q09_014] 是否存在 NUMA (Non-Uniform Memory Access) 感知的内存分配或调度策略？（必须三态；搜索 numa / node_id / local_memory 等；嵌入式单 SoC 可写 not_found 并说明架构）",
+    "**SMP 真伪**：要么给出 AP 在线全链证据（谁唤醒、何处进 idle）；要么明确单核结论，并说明「未找到 AP 启动链」或有关 API 未编译/未调用等依据——勿仅凭宏断言多核。",
+    "**核心任务：一定要极其仔细地在源码中寻找有没有真正实现多核！** 架构设计是 SMP 还是 AMP？**绝不能仅凭看到一两个宏定义就断言支持多核，必须找到唤醒其他核的切实验证。如果不支持多核，务必明确写“仅支持单核（❌ 未实现）”**。",
+    "Secondary CPU 启动等主要功能机制：**必须清晰、详尽地描述其详细的底层工作机制**。具体描述 BSP（主核）是如何通过 IPI 或中断控制器发送信号唤醒 AP（从核）的链条，精确到对应文件的代码逻辑。搜索 `smp_boot`, `__cpu_up`。如果找不到启动其他核的代码，那就是单核。",
+    "核间中断 (IPI)：搜索 `send_ipi`, `ipi_handler`。",
+    "**锁的实现**：SpinLock 是否禁用了中断？Mutex 是否支持优先级继承？",
+    "Per-CPU 变量设计与访问方式。搜索 `axns` 模块，分析 PerCPU 命名空间实现。",
+    "多核调度策略：负载均衡、CPU 亲和性（affinity）。",
+    "自旋锁/RCU 在多核下的实现差异。",
+    "**`NCPU` / `MAXCPU` 与链接脚本**：将 `NCPU`（或本仓等价宏）与 `link-k210.ld`/`kernel.ld` 等中的 `_max_hart_id`、每 hart 栈/入口布局**对照引用**（须 `路径:行号`），避免仅口述宏而未对照链接脚本。",
+    "**交叉引用前面章节（必须）**：本章与前面章节有大量交叉，必须引用并深化（各条均须落到**具体路径:行号**或明确「前文未涉及故本章首次给出」）：",
+    "**03 内存管理**：Buddy/Slab/帧分配与 **页表 map/unmap** 上的**锁粒度**；**TLB shootdown** 或与 `sfence`/`tlbi`/`invlpg`、**IPI** 联动的远程刷新路径。若本章发现多核下 TLB 刷新而 03 未写清，须在本章**显式补齐**并说明与 03 的关系（补充证据而非口头否定前文）。",
+    "**04 进程/调度**：全局/每核运行队列、迁移（migration）、在 IPI 或 **resched** 路径上与调度的耦合。"
+  ],
+  "evidence_targets": [
+    "多核启动",
+    "CPU 本地状态",
+    "IPI",
+    "并发保护"
+  ],
+  "seed_paths": [
+    "smp",
+    "cpu",
+    "hart",
+    "scheduler",
+    "interrupt",
+    "linker/kernel.ld",
+    "src/entry.S",
+    "src/include/sbi.h",
+    "src/trap.c",
+    "src/trampoline.S",
+    "src/include/riscv.h",
+    "src/vm.c"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "start_secondary",
+    "boot_secondary",
+    "cpu_init",
+    "ipi",
+    "main"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "bin",
+    "doc",
+    "linker",
+    "sbi",
+    "sd",
+    "src",
+    "src/include",
+    "src/sifive",
+    "syscall"
+  ],
+  "preferred_tools": [
+    "rag_search_code",
+    "lsp_get_call_graph",
+    "lsp_get_definition",
+    "read_code_segment"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "对照 seed_paths、entry_symbols，用 rag_search_code / list_repo_structure / LSP 锁定与本阶段相关的关键文件与符号。",
+    "对核心入口使用 lsp_get_document_outline → lsp_get_call_graph（单入口、浅深度）→ 必要时 read_code_segment 精读。",
+    "按 must_cover 逐项输出结论，每条附反引号源码路径；无实现则显式写「未发现/桩函数」等，勿臆测。",
+    "覆盖要点：[Q09_001] 该 OS 的多核形态更接近哪种？",
+    "覆盖要点：[Q09_002] 是否存在 Secondary CPU / AP 启动链（BSP 唤醒 AP，上线后进入 idle/调度）？（必须三态）",
+    "覆盖要点：[Q09_003] 是否实现 IPI（核间中断）发送与处理？（必须三态）",
+    "覆盖要点：[Q09_004] 若存在 IPI：发送与处理路径分别在哪些函数/文件？（给关键入口与证据）",
+    "覆盖要点：[Q09_005] 是否存在 per-CPU 变量/结构（PerCpu、CPU-local storage 等）？（必须三态）"
+  ]
+}

@@ -1,563 +1,195 @@
-## 第 6 章：文件系统（VFS + 具体 FS）
-
-### VFS 架构与接口设计
-
-本操作系统采用**轻量级 VFS 抽象**，未实现标准 Linux 式的 File/Inode/Dentry 分离架构，而是将文件元数据与目录项合并为统一的 `struct dirent` 结构。
-
-#### 核心数据结构
-
-**1. 文件抽象层（`struct file`）**
-
-文件描述符表项定义于 `src/include/file.h:14-30`：
-
-```c
-struct file {
-  enum { FD_NONE, FD_PIPE, FD_ENTRY, FD_DEVICE } type;
-  int ref;                // reference count
-  char readable;
-  char writable;
-  struct pipe *pipe;      // FD_PIPE
-  struct dirent *ep;      // FD_ENTRY
-  uint64 off;             // FD_ENTRY offset
-  short major;            // FD_DEVICE
-  // ... time fields
-};
-```
-
-- **`type`**：区分四种文件类型（无/管道/目录项/设备）
-- **`ref`**：引用计数，支持多进程共享文件描述符
-- **`ep`**：指向 `struct dirent`，承载实际文件元数据
-
-**2. 目录项/索引节点融合层（`struct dirent`）**
-
-定义于 `src/include/fat32.h:36-67`，兼具 Linux Dentry 和 Inode 功能：
-
-```c
-struct dirent {
-    char  filename[FAT32_MAX_FILENAME + 1];
-    uint8   attribute;
-    uint32  first_clus;      // 首簇号（类似 inode number）
-    uint32  file_size;
-    uint32  cur_clus;        // 当前簇号（用于顺序读写优化）
-    uint    clus_cnt;
-    
-    /* for OS */
-    uint8   dev;             // 设备号
-    uint8   dirty;
-    short   valid;
-    int     ref;             // 引用计数
-    int     mnt;             // 挂载点标志
-    uint32  off;             // 在父目录中的偏移
-    struct dirent *parent;   // 父目录指针
-    struct dirent *next;     // 缓存链表
-    struct dirent *prev;
-    struct sleeplock lock;   // 条目级锁
-};
-```
-
-- **`first_clus`**：FAT32 文件首簇号，功能等价于 inode number
-- **`parent`**：显式维护父目录指针，加速路径解析
-- **`ref`**：支持多文件描述符共享同一路径条目
-- **`sleeplock`**：保证并发访问安全性
-
-**3. 文件系统超级块抽象（`struct fs`）**
-
-定义于 `src/include/fat32.h:101-111`：
-
-```c
-struct fs{
-    uint devno;
-    int  valid;
-    struct dirent* image;
-    struct Fat fat;              // BPB 参数块
-    struct entry_cache ecache;   // 目录项缓存池
-    struct dirent root;          // 根目录
-    void (*disk_init)(struct dirent*image);
-    void (*disk_read)(struct buf* b,struct dirent* image);
-    void (*disk_write)(struct buf* b,struct dirent* image);
-};
-```
-
-- **`Fat`**：存储 BIOS Parameter Block（BPB），包含每扇区字节数、每簇扇区数、FAT 表大小等
-- **`ecache`**：固定大小（50 项）的目录项缓存池，采用循环链表管理
-- **函数指针**：支持不同后端存储（Ramdisk/SD 卡/镜像文件）
-
-#### VFS 操作接口
-
-所有 VFS 操作通过 `struct dirent` 指针传递，关键函数声明于 `src/include/defs.h:57-75`：
-
-| 函数 | 功能 | 实现位置 |
-|------|------|----------|
-| `ename()` | 路径名解析，返回 `struct dirent*` | `fat32.c:1084` |
-| `ealloc()` | 在目录中分配新条目 | `fat32.c:609` |
-| `eread()` / `ewrite()` | 文件内容读写 | `fat32.c:355` / `fat32.c:388` |
-| `etrunc()` | 截断文件 | `fat32.c:725` |
-| `eput()` / `edup()` | 引用计数管理 | `fat32.c:659` / `fat32.c:649` |
-| `elock()` / `eunlock()` | 条目锁操作 | `fat32.c:759` / `fat32.c:770` |
-
----
-
-### 具体文件系统支持情况（FAT32/Ext4/RamFS）
-
-#### FAT32 文件系统（✅ 已实现）
-
-本系统**完整实现了 FAT32 文件系统**，代码位于 `src/fat32.c`（1181 行，37KB），是核心存储模块。
-
-**实现架构：**
-
-```
-用户层 (sys_open/sys_read/sys_write)
-    ↓
-VFS 层 (file.c: fileread/filewrite)
-    ↓
-FAT32 层 (fat32.c: eread/ewrite)
-    ↓
-簇管理 (rw_clus → reloc_clus → read_fat/write_fat)
-    ↓
-块设备层 (bio.c: bread/bwrite)
-    ↓
-物理层 (Ramdisk 或 SD 卡)
-```
-
-**关键实现细节：**
-
-1. **簇链管理**（`fat32.c:211-281`）
-   - `read_fat()`：读取 FAT 表项，获取下一簇号
-   - `write_fat()`：更新 FAT 表项
-   - `alloc_clus()`：分配空闲簇（线性扫描 FAT 表）
-   - `free_clus()`：释放簇（写 0 到 FAT 表项）
-
-2. **路径解析**（`fat32.c:950-1000`）
-   - `lookup_path()`：递归解析路径组件
-   - `dirlookup()`：在目录中查找条目（支持 `.` 和 `..`）
-   - `skipelem()`：提取路径中的单个组件
-
-3. **文件创建**（`fat32.c:1131-1181`）
-   ```c
-   struct dirent* create(struct dirent* env, char *path, short type, int mode)
-   {
-       // 1. 解析父目录
-       dp = enameparent(env, path, name, 0);
-       // 2. 若父目录不存在，递归创建
-       if (dp == NULL) {
-           dp = create(env, pname, T_DIR, O_RDWR);
-       }
-       // 3. 在父目录中分配新条目
-       ep = ealloc(dp, name, mode);
-       // 4. 验证类型一致性
-       if ((type == T_DIR && !(ep->attribute & ATTR_DIRECTORY)) || ...)
-           return NULL;
-       return ep;
-   }
-   ```
-
-4. **长文件名支持**（`fat32.c:557-599`）
-   - 采用 VFAT 长文件名扩展（LFN）
-   - 每个长文件名条目存储 13 个字符
-   - 通过 `order` 字段链接多个 LFN 条目
-
-5. **挂载机制**（`fat32.c:1095-1108`）
-   ```c
-   int emount(struct fs* fatfs, char* mnt) {
-       struct dirent* mntpoint = ename(NULL, mnt, 0);
-       mntpoint->mnt = 1;           // 标记为挂载点
-       mntpoint->dev = fatfs->devno; // 重定向设备号
-       fatfs->root.parent = mntpoint;
-       return 0;
-   }
-   ```
-
-**文件打开流程追踪**（从 `sys_openat` 到 `fdalloc`）：
-
-```mermaid
-graph TD
-    A["sys_openat
- sysfile.c:41"] --> B["ename
- fat32.c:1084"]
-    B --> C["lookup_path
- fat32.c:950"]
-    C --> D["dirlookup
- fat32.c:886"]
-    B --> E["create
- fat32.c:1131"]
-    E --> F["ealloc
- fat32.c:609"]
-    F --> G["emake
- fat32.c:532"]
-    A --> H["filealloc
- file.c:43"]
-    A --> I["fdalloc
- sysfile.c:28"]
-    H --> J["ftable.file 全局文件表"]
-    I --> K["p->ofile Per-Process FD 表"]
-```
-
-> **说明**：`sys_openat` 首先调用 `ename()` 解析路径，若文件不存在且指定 `O_CREATE` 则调用 `create()` 创建。获得 `struct dirent*` 后，分配 `struct file` 并注册到进程文件描述符表。
-
-#### Ext4 文件系统（❌ 未实现）
-
-**搜索验证**：
-- `grep_in_repo` 搜索 `ext4|Ext4|EXT4`：**0 匹配**
-- `list_repo_structure` 未发现 `ext4/` 或 `fs/ext4/` 目录
-- 文档 `doc/内核实现--文件系统.md` 仅提及 FAT32
-
-**结论**：Ext4 文件系统**未实现**。
-
-#### RamFS/TmpFS（❌ 未实现）
-
-**搜索验证**：
-- `grep_in_repo` 搜索 `ramfs|RamFS|tmpfs|TmpFS`：**0 匹配**
-- 虽然存在 `src/ramdisk.c`，但这是**块设备层**的内存模拟（用内存模拟磁盘扇区），**不是文件系统层的内存文件系统**
-
-**结论**：RamFS/TmpFS **未实现**。系统仅支持 FAT32 一种文件系统格式。
-
----
-
-### 文件描述符与进程关联
-
-#### Per-Process 文件描述符表
-
-文件描述符表采用**Per-Process 设计**，每个进程独立维护自己的 FD 表。
-
-**数据结构**（`src/include/proc.h:145-147`）：
-
-```c
-struct proc {
-    // ...
-    int64 filelimit;
-    struct file **ofile;        // Open files (Per-Process FD 表)
-    int *exec_close;            // exec 时关闭标志
-    struct dirent *cwd;         // Current directory
-    // ...
-};
-```
-
-- **`ofile`**：指向 `struct file*` 数组，大小为 `NOFILE`（默认 32）
-- **`filelimit`**：进程级文件描述符数量限制
-- **`NOFILEMAX(p)`** 宏（`proc.h:174`）：返回 `min(p->filelimit, NOFILE)`
-
-#### 全局文件结构池
-
-虽然 FD 表是 Per-Process 的，但 `struct file` 对象本身来自**全局池**（`src/file.c:20-23`）：
-
-```c
-struct {
-  struct spinlock lock;
-  struct file file[NFILE];  // 全局文件结构池
-} ftable;
-```
-
-- **`NFILE`**：系统级最大打开文件数（默认 100）
-- **`filealloc()`**：从全局池分配空闲 `struct file`
-- **`fileclose()`**：回收时递减 `ref`，归零时释放回池
-
-#### FD 分配流程
-
-```c
-// sysfile.c:16-28
-static int fdalloc(struct file *f) {
-  struct proc *p = myproc();
-  for(int fd = 0; fd < NOFILEMAX(p); fd++) {
-    if(p->ofile[fd] == 0) {
-      p->ofile[fd] = f;  // 建立映射
-      return fd;
-    }
-  }
-  return -EMFILE;  // 文件描述符耗尽
-}
-```
-
-**设计特点**：
-- **最小可用 FD 分配**：从 0 开始线性扫描，复用已关闭的 FD
-- **继承机制**：`fork()` 时深拷贝 `ofile` 数组（`proc.c` 未展示但文档提及 `CLONE_FILES`）
-- **exec 清理**：`exec_close` 数组标记哪些 FD 应在 `exec` 时关闭
-
----
-
-### 管道 (Pipe) 与套接字 (Socket) 支持情况
-
-#### 管道（Pipe）（✅ 已实现）
-
-**完整实现**于 `src/pipe.c`（120 行）和 `src/include/pipe.h`。
-
-**数据结构**（`pipe.h:10-17`）：
-
-```c
-#define PIPESIZE 512
-
-struct pipe {
-  struct spinlock lock;
-  char data[PIPESIZE];
-  uint nread;     // 读指针
-  uint nwrite;    // 写指针
-  int readopen;   // 读端是否打开
-  int writeopen;  // 写端是否打开
-};
-```
-
-**核心函数**：
-
-1. **`pipealloc()`**（`pipe.c:15-47`）：
-   - 分配一个 `struct pipe` 和两个 `struct file`
-   - 设置 `f0` 为读端（`readable=1, writable=0`）
-   - 设置 `f1` 为写端（`readable=0, writable=1`）
-   - 两端共享同一 `pipe` 对象
-
-2. **`pipewrite()`**（`pipe.c:72-100`）：
-   - 循环写入，缓冲区满时 `sleep(&pi->nwrite)`
-   - 读端关闭或进程被杀死时返回 -1
-   - 支持 `user` 参数区分用户/内核地址空间
-
-3. **`piperead()`**（`pipe.c:102-120`）：
-   - 循环读取，缓冲区空时 `sleep(&pi->nread)`
-   - 写端关闭时退出循环（EOF）
-
-**系统调用**（`sysfile.c:830-868`）：
-
-```c
-uint64 sys_pipe2(void) {
-  uint64 fdarray;
-  struct file *rf, *wf;
-  int fd0, fd1;
-  
-  if(pipealloc(&rf, &wf) < 0) return -1;
-  fd0 = fdalloc(rf);
-  fd1 = fdalloc(wf);
-  
-  // 拷贝 FD 到用户空间
-  either_copyout(1, fdarray, &fd0, sizeof(fd0));
-  either_copyout(1, fdarray+sizeof(fd0), &fd1, sizeof(fd1));
-  return 0;
-}
-```
-
-**实现状态**：✅ **完整实现**，支持阻塞式读写、引用计数、EOF 处理。
-
-#### 套接字（Socket）（❌ 未实现）
-
-**搜索验证**：
-- `src/include/socket.h` 仅 15 行，定义了空壳结构：
-  ```c
-  struct socket_connection{
-      int IP;
-      int sock_opt;
-      uint64 sock_addr;
-      int passive_socket;
-      char temp[MAX_LENGTH_OF_SOCKET];
-  };
-  void socket_init(void);
-  int add_socket(int IP,int op);
-  ```
-- **无实现文件**：不存在 `socket.c` 或 `sys_socket.c`
-- `grep_in_repo` 搜索 `sys_socket|sys_bind|sys_listen|sys_accept|sys_connect`：**0 匹配**
-- `file.c` 中 `struct file` 的 `type` 枚举**无 `FD_SOCKET`** 变体
-
-**结论**：Socket 接口**❌ 未实现**，仅有占位头文件。
-
----
-
-### 缓存机制（Block/Page Cache）
-
-#### 块缓存（Buffer Cache）
-
-系统实现了**块级缓存**（`src/bio.c`），用于缓存磁盘扇区。
-
-**数据结构**（`src/include/buf.h`，未展示但 `bio.c` 中使用）：
-
-```c
-struct buf {
-  int valid;       // 数据是否有效
-  int disk;        // 是否由磁盘"拥有"
-  uint dev;        // 设备号
-  uint sectorno;   // 扇区号
-  struct sleeplock lock;
-  uint refcnt;     // 引用计数
-  struct buf *prev, *next;  // LRU 链表
-  uchar data[BSIZE];        // 512 字节数据
-};
-```
-
-**关键函数**：
-- `bread(dev, sectorno)`：读取扇区到缓存（若已缓存则直接返回）
-- `bwrite(dev, bp)`：写回脏页到磁盘
-- `brelse(bp)`：释放缓存引用
-
-**实现位置**：`src/bio.c`（165 行）
-
-#### 目录项缓存（Entry Cache）
-
-FAT32 层实现了**目录项缓存池**（`src/include/fat32.h:58-62`）：
-
-```c
-struct entry_cache {
-    struct spinlock lock;
-    struct dirent entries[ENTRY_CACHE_NUM];  // 固定 50 项
-};
-```
-
-- **循环链表管理**：`entries` 数组通过 `next/prev` 链接成环
-- **缓存命中**：`dirlookup()` 先检查 `ecache`，命中则直接返回
-- **淘汰策略**：未实现 LRU，采用固定大小循环缓冲
-
-**限制**：
-- **无 Page Cache**：文件内容不缓存，每次读写都访问块设备
-- **无 Write-Back**：`ewrite()` 直接写磁盘，未实现延迟写回
-
----
-
-### 零拷贝映射验证（mmap 实现分析）
-
-#### mmap 系统调用（✅ 已实现，但无零拷贝）
-
-**系统调用接口**（`sysfile.c:895-925`）：
-
-```c
-uint64 sys_mmap(void) {
-  uint64 start, len;
-  int prot, flags, fd, off;
-  // 参数解析...
-  uint64 ret = do_mmap(start, len, prot, flags, fd, off);
-  return ret;
-}
-```
-
-**实现分析**（`src/mmap.c:33-138`）：
-
-1. **匿名映射**（`MAP_ANONYMOUS`）：
-   ```c
-   if(flags & MAP_ANONYMOUS) {
-       fd = -1;
-       goto ignore_fd;
-   }
-   ```
-
-2. **权限转换**：
-   ```c
-   int perm = PTE_U;
-   if(prot & PROT_READ)  perm |= (PTE_R | PTE_A);
-   if(prot & PROT_WRITE) perm |= (PTE_W | PTE_D);
-   if(prot & PROT_EXEC)  perm |= (PTE_X | PTE_A);
-   ```
-
-3. **VMA 创建**：
-   ```c
-   struct vma *vma = alloc_mmap_vma(p, flags, start, len, perm, fd, offset);
-   ```
-
-4. **文件内容拷贝**（**非零拷贝**）：
-   ```c
-   for(int i = 0; i < page_n; ++i) {
-       uint64 pa = experm(p->pagetable, va, perm);
-       if(i != page_n - 1) {
-           fileread(f, va, PGSIZE);  // 逐页读取文件到内存
-       } else {
-           fileread(f, va, end_pagespace);
-           memset((void *)(pa + end_pagespace), 0, PGSIZE - end_pagespace);
-       }
-       va += PGSIZE;
-   }
-   ```
-
-#### 零拷贝支持验证（❌ 未实现）
-
-**关键检查点**：
-
-1. **`struct vma` 无 `shared` 字段**（`src/include/vma.h:13-24`）：
-   ```c
-   struct vma {
-       enum segtype type;
-       int perm;
-       uint64 addr, sz, end;
-       int flags;          // 存储 MAP_SHARED/MAP_PRIVATE
-       int fd;
-       uint64 f_off;
-       // ... 无 shared 字段
-   };
-   ```
-
-2. **`do_mmap()` 未区分 `MAP_SHARED` 处理**：
-   - 代码中仅检查 `MAP_PRIVATE` 用于 `munmap` 时的写回判断（`mmap.c:168`）
-   - **无 `MAP_SHARED` 的特殊逻辑**（如共享页面映射、写时复制优化）
-
-3. **文件映射采用 eager copy**：
-   - `mmap()` 时立即调用 `fileread()` 将文件内容**完整拷贝**到物理页
-   - **非按需分页**（Demand Paging），无页故障处理
-   - **非零拷贝**，数据从文件 → 内核缓冲 → 用户页，经历两次拷贝
-
-**结论**：
-- `sys_mmap`：✅ **已实现**（支持文件映射和匿名映射）
-- **零拷贝优化**：❌ **未实现**（无 `MAP_SHARED` 优化、无 Demand Paging）
-- **实现质量**：🔸 **基础版本**（Eager Copy，性能较低）
-
----
-
-### 高级 I/O 功能验证
-
-#### poll/select/epoll（❌ 未实现）
-
-**搜索验证**：
-- `grep_in_repo` 搜索 `sys_poll|sys_select|sys_epoll`：**0 匹配**
-- `src/syspoll.c` 仅实现 `sys_ppoll()`，且**直接返回 0**：
-  ```c
-  uint64 sys_ppoll(){
-    return 0;  // 桩函数
-  }
-  ```
-- `src/include/poll.h` 定义了 `struct pollfd`，但**无实现逻辑**
-
-**结论**：
-- `sys_poll`：❌ **未实现**
-- `sys_select`：❌ **未实现**
-- `sys_epoll_create/epoll_ctl/epoll_wait`：❌ **未实现**
-- `sys_ppoll`：🔸 **桩函数**（返回 0，无实际功能）
-
----
-
-### 伪文件系统支持（devfs/procfs/sysfs）
-
-**搜索验证**：
-- `grep_in_repo` 搜索 `devfs|procfs|sysfs|pseudo.*fs`：**0 匹配**
-- `src/dev.c` 手动创建设备文件（`create(NULL, "/dev", T_DIR, 0)`），但**非动态伪文件系统**
-- 无 `/proc` 或 `/sys` 目录的自动创建逻辑
-
-**结论**：
-- **devfs**：❌ **未实现**（设备文件静态创建）
-- **procfs**：❌ **未实现**（无 `/proc/[pid]` 等动态信息）
-- **sysfs**：❌ **未实现**
-
----
-
-### 关键代码验证总结
-
-| 功能 | 状态 | 证据文件 | 备注 |
-|------|------|----------|------|
-| **VFS 抽象** | ✅ 已实现 | `src/include/file.h`, `src/include/fat32.h` | `struct file` + `struct dirent` |
-| **FAT32** | ✅ 已实现 | `src/fat32.c`（1181 行） | 完整支持 LFN、挂载、簇链管理 |
-| **Ext4** | ❌ 未实现 | - | 无代码 |
-| **RamFS/TmpFS** | ❌ 未实现 | - | 仅有 Ramdisk（块设备层） |
-| **Pipe** | ✅ 已实现 | `src/pipe.c` | 阻塞式读写、引用计数 |
-| **Socket** | ❌ 未实现 | `src/include/socket.h` | 仅头文件 |
-| **mmap** | ✅ 已实现 | `src/mmap.c` | 无零拷贝、Eager Copy |
-| **poll/select/epoll** | ❌ 未实现 | `src/syspoll.c` | `sys_ppoll` 返回 0 |
-| **devfs/procfs/sysfs** | ❌ 未实现 | - | 静态设备文件 |
-| **文件描述符** | ✅ Per-Process | `src/include/proc.h:145` | `struct file **ofile` |
-| **块缓存** | ✅ 已实现 | `src/bio.c` | Buffer Cache |
-| **Page Cache** | ❌ 未实现 | - | 无文件内容缓存 |
-
----
-
-### 文件系统架构评价
-
-**优势**：
-1. **FAT32 实现完整**：支持长文件名、多文件系统挂载、完整的簇链管理
-2. **简洁的 VFS 设计**：`struct dirent` 融合 Dentry+Inode，减少间接层
-3. **并发安全**：`sleeplock` + `spinlock` 双层锁机制
-
-**局限**：
-1. **单一文件系统**：仅支持 FAT32，无 Ext4、无内存文件系统
-2. **无网络支持**：Socket 完全未实现
-3. **高级 I/O 缺失**：poll/select/epoll 均未实现
-4. **mmap 性能低**：Eager Copy 策略，无 Demand Paging 和零拷贝优化
-5. **无伪文件系统**：调试和系统信息获取受限
-
-**适用场景**：适合教学演示和简单嵌入式应用，不适合需要高性能 I/O 或网络功能的场景。
+## 题单作答（JSON-QA 渲染）
+
+- stage_id: `06_fs_vfs`
+- terminology_profile: `stallings_en_zh`
+
+## 第 06_fs_vfs 阶段：文件系统（VFS + 具体 FS）
+
+### Q06_001（short_answer）
+
+- 题干：VFS 抽象层 (Virtual File System, VFS)接口是什么形态？（Rust trait / C op 表；必须给接口定义证据）
+- 答案："C 语言风格的文件对象抽象，通过 struct file 的 type 字段区分 FD_ENTRY（文件）/FD_PIPE（管道）/FD_DEVICE（设备），无 Rust trait 风格。文件操作通过函数指针间接调用（如 eread/ewrite 用于 FD_ENTRY，piperead/pipewrite 用于 FD_PIPE，devsw[].read/write 用于 FD_DEVICE）。"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/include/file.h` | `struct file` | struct file { enum { FD_NONE, FD_PIPE, FD_ENTRY, FD_DEVICE } type; ... struct pipe *pipe; struct dirent *ep; short major; }; |
+| `src/file.c` | `function fileread` | switch (f->type) { case FD_PIPE: r = piperead(...); case FD_DEVICE: r = (devsw + f->major)->read(...); case FD_ENTRY: r = eread(f->ep, ...); } |
+
+### Q06_002（single_choice）
+
+- 题干：具体文件系统后端 (Concrete File System Backend) 更接近哪种？
+- 答案："A. 真实磁盘文件系统（FAT32/Ext4/其他，持久化存储）"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/fat32.c` | `function fat32_init` | FAT32 文件系统实现，基于 ChaN FatFs 库，支持持久化存储 |
+| `src/include/fat32.h` | `struct fs` | struct fs { uint devno; int valid; struct dirent* image; struct Fat fat; ... void (*disk_read)(...); void (*disk_write)(...); }; |
+
+### Q06_003（short_answer）
+
+- 题干：若支持 FAT32/Ext4：它是自研还是第三方库/crate？（必须引用 Cargo.toml/Cargo.lock 或 Makefile 引入证据）
+- 答案："第三方库：ChaN FatFs R0.14b。证据：`src/include/ff.h` 头部明确标注 'FatFs - Generic FAT Filesystem module R0.14b' 及 'Copyright (C) 2021, ChaN, all right reserved.'，本项目为 C 语言项目（非 Rust），通过直接包含 ff.h/ffconf.h 使用第三方 FatFs 库。"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/include/ff.h` | `file_header FF_DEFINED` | FatFs - Generic FAT Filesystem module R0.14b / Copyright (C) 2021, ChaN, all right reserved. |
+
+### Q06_004（short_answer）
+
+- 题干：文件打开路径：文件打开入口（sys_open 或等价）→ VFS 层 → 具体 FS open。列出 3-6 个关键节点并给证据。
+- 答案："文件打开路径：sys_openat (src/sysfile.c:41) → fdalloc (src/sysfile.c:17) → ename (src/fat32.c:1055) → create/edirlookup (src/fat32.c:867) → filealloc (src/file.c:42) → 返回 fd。关键节点：1) sys_openat 解析路径并调用 ename；2) ename 调用 lookup_path 进行路径遍历；3) dirlookup 在目录中查找条目；4) filealloc 分配全局 file 结构；5) fdalloc 将 file 绑定到进程 ofile 数组。"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/sysfile.c` | `function sys_openat` | uint64 sys_openat() { ... ep = ename(dp,path,&devno); ... f = filealloc(); fd = fdalloc(f); ... } |
+| `src/file.c` | `function filealloc` | struct file* filealloc(void) { ... for(f = ftable.file; f < ftable.file + NFILE; f++) if(f->ref == 0) { f->ref = 1; return f; } } |
+| `src/fat32.c` | `function ename` | struct dirent *ename(struct dirent* env,char *path,int* devno) { return lookup_path(env,path, 0, name, devno); } |
+
+### Q06_005（short_answer）
+
+- 题干：文件描述符表 (File Descriptor Table, FD Table) 的实现形态是什么？（固定数组/Vec/BTreeMap 等；必须给结构体定义证据）
+- 答案："Per-process 固定数组：`struct file **ofile`，大小为 NOFILE（101）。每个进程独立拥有 ofile 数组，通过 kmalloc 动态分配。"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/include/proc.h` | `struct_field proc::ofile` | struct proc { ... struct file **ofile; ... }; |
+| `src/proc.c` | `code_block procinit` | p->ofile = kmalloc(NOFILE*sizeof(struct file*)); |
+| `src/include/param.h` | `macro NOFILE` | #define NOFILE 101  // open files per process |
+
+### Q06_006（tri_state_impl）
+
+- 题干：是否实现块缓存/缓冲缓存 (Block Cache / Buffer Cache, bcache)？（必须三态）
+- 答案："implemented"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/bio.c` | `struct cache` | struct cache { struct spinlock lock; struct buf buf[NBUF]; struct buf head; } bcache; |
+| `src/bio.c` | `function bread` | struct buf* bread(uint dev, uint sectorno) { b = bget(dev, sectorno); if (!b->valid) { FatFs[dev].disk_read(...); b->valid = 1; } return b; } |
+
+### Q06_007（short_answer）
+
+- 题干：若存在缓存：驱逐策略是什么（LRU/Clock/FIFO/无驱逐）？必须指出判断依据（字段/算法分支）证据。
+- 答案："LRU（Least Recently Used）驱逐策略。判断依据：bget() 从 bcache.head.prev（最久未使用）开始扫描寻找 refcnt==0 的缓冲；brelse() 将释放的缓冲移回 bcache.head.next（最近使用），通过双向链表维护访问顺序。"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/bio.c` | `function bget` | for(b = bcache.head.prev; b != &bcache.head; b = b->prev) if(b->refcnt == 0) { ... return b; } |
+| `src/bio.c` | `function brelse` | b->next->prev = b->prev; b->prev->next = b->next; b->next = bcache.head.next; b->prev = &bcache.head; bcache.head.next->prev = b; bcache.head.next = b; |
+
+### Q06_008（tri_state_impl）
+
+- 题干：是否实现页缓存 (Page Cache)或与 mmap/文件映射共享缓存页？（必须三态）
+- 答案："stub"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/mmap.c` | `function do_mmap` | do_mmap 通过 fileread 直接读取文件内容到分配的物理页，无独立页缓存层，文件数据直接拷贝到用户页，未实现共享页缓存机制 |
+
+### Q06_009（tri_state_impl）
+
+- 题干：是否实现 mmap 的文件映射或匿名映射？（必须三态；若 stub 说明形态）
+- 答案："implemented"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/mmap.c` | `function do_mmap` | if(flags & MAP_ANONYMOUS) { fd = -1; goto ignore_fd; } ... struct vma *vma = alloc_mmap_vma(p, flags, start, len, perm, fd, offset); ... fileread(f, va, PGSIZE); |
+
+### Q06_010（tri_state_impl）
+
+- 题干：是否实现 poll/select/epoll（或等价事件机制）？（必须三态）
+- 答案："stub"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/syspoll.c` | `function sys_ppoll` | uint64 sys_ppoll() { return 0; } |
+
+### Q06_011（tri_state_impl）
+
+- 题干：路径解析 (namei/path_walk/lookup) 是否实现并支持绝对/相对路径与 . ..？（必须三态）
+- 答案："implemented"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/fat32.c` | `function lookup_path` | if (*path == '/') { entry = edup(&self_fs->root); } else if(env) { entry = edup(env); } else { entry = edup(myproc()->cwd); } |
+| `src/fat32.c` | `function dirlookup` | if (strncmp(filename, ".", FAT32_MAX_FILENAME) == 0) { return edup(dp); } else if (strncmp(filename, "..", FAT32_MAX_FILENAME) == 0) { return edup(dp->parent); } |
+
+### Q06_012（tri_state_impl）
+
+- 题干：是否支持符号链接 (symlink) 的解析/跟随？（必须三态）
+- 答案："not_found"
+
+- 证据：无（`not_found`/`stub` 时允许为空；否则需补齐）
+
+### Q06_013（tri_state_impl）
+
+- 题干：是否实现管道 (pipe/pipe2) 并在 VFS 层作为文件对象？（必须三态；与 08 章 pipe 实现互指）
+- 答案："implemented"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/pipe.c` | `function pipealloc` | (*f0)->type = FD_PIPE; (*f0)->readable = 1; (*f0)->writable = 0; (*f0)->pipe = pi; (*f1)->type = FD_PIPE; (*f1)->readable = 0; (*f1)->writable = 1; |
+| `src/file.c` | `function fileread` | case FD_PIPE: r = piperead(f->pipe, 1, addr, n); |
+
+### Q06_014（tri_state_impl）
+
+- 题干：是否实现网络 socket（作为 VFS 文件对象）？（必须三态）
+- 答案："not_found"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/include/socket.h` | `file socket.h` | 仅定义 struct socket_connection 结构，未发现 sys_socket 系统调用实现 |
+
+### Q06_015（tri_state_impl）
+
+- 题干：是否实现伪文件系统（devfs/procfs/sysfs）？（必须三态；若 implemented 需说明实现形态）
+- 答案："not_found"
+
+- 证据：无（`not_found`/`stub` 时允许为空；否则需补齐）
+
+### Q06_016（single_choice）
+
+- 题干：文件描述符表的归属是哪种？
+- 答案："A. Per-Process（每进程独立 fd 表，fork 时复制/共享）"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/include/proc.h` | `struct_field proc::ofile` | struct proc { ... struct file **ofile; ... }; |
+| `src/proc.c` | `code_block procinit` | p->ofile = kmalloc(NOFILE*sizeof(struct file*)); |
+
+### Q06_017（single_choice）
+
+- 题干：文件数据块分配方式 (File Allocation Method, Stallings Ch12) 更接近哪种？
+- 答案："E. 混合（如 Unix 直接 + 间接块）"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/fat32.c` | `function etrunc` | for (uint32 clus = entry->first_clus; clus >= 2 && clus < FAT32_EOC; ) { uint32 next = read_fat(self_fs, clus); free_clus(self_fs, clus); clus = next; } |
+
+### Q06_018（single_choice）
+
+- 题干：磁盘/存储空闲空间管理 (Free Space Management, Stallings Ch12) 更接近哪种？
+- 答案："E. FAT 表内嵌空闲链（FAT32 特有）"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/fat32.c` | `function read_fat` | FAT32 通过 FAT 表项值判断簇是否空闲（0 表示空闲），使用 read_fat/write_fat 操作 FAT 表管理空闲簇 |
+
+### Q06_019（single_choice）
+
+- 题干：目录结构 (Directory Structure, Stallings Ch12) 更接近哪种？
+- 答案："C. 树形层次目录 (Tree-Structured Hierarchy)（最常见）"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/fat32.c` | `function lookup_path` | 通过 skipelem 逐元素解析路径，支持多级目录嵌套遍历 |
+| `src/fat32.c` | `function dirlookup` | 在目录中查找子目录或文件，支持树形层次结构 |
+
+### Q06_020（single_choice）
+
+- 题干：文件内部记录组织 (File Record Organization, Stallings Ch12) 更接近哪种？
+- 答案："A. 字节流 (Byte Stream / Unstructured)：无固定记录结构"
+
+| 证据路径 | 符号 | 摘录 |
+|---|---|---|
+| `src/file.c` | `function fileread` | fileread 按字节数 n 读取，无记录边界概念 |
+| `src/fat32.c` | `function eread` | eread 按偏移 off 和长度 n 读取文件内容，视为连续字节流 |

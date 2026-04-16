@@ -1,0 +1,267 @@
+{
+  "schema_version": "v1",
+  "stage_id": "10_security",
+  "stage_title": "安全机制与权限模型",
+  "terminology_profile": "stallings_en_zh",
+  "answers": [
+    {
+      "question_id": "Q10_001",
+      "question_type": "single_choice",
+      "stem": "特权级隔离形态更接近哪种？",
+      "value": "A. 有用户态/内核态隔离（user mode/kernel mode）",
+      "evidence": [
+        {
+          "path": "src/trap.c:155-158",
+          "symbol_kind": "function_body",
+          "symbol_name": "usertrapret",
+          "excerpt": "x &= ~SSTATUS_SPP; // clear SPP to 0 for user mode"
+        },
+        {
+          "path": "src/include/riscv.h:345-354",
+          "symbol_kind": "macro",
+          "symbol_name": "PTE_U",
+          "excerpt": "#define PTE_U (1L << 4) // 1 -> user can access"
+        },
+        {
+          "path": "src/vm.c:165-180",
+          "symbol_kind": "function",
+          "symbol_name": "walkaddr",
+          "excerpt": "if((*pte & PTE_U) == 0) return NULL;"
+        }
+      ]
+    },
+    {
+      "question_id": "Q10_002",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在凭证/权限数据结构（UID/GID/Credential/Capability/ACL 等）？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "src/include/proc.h:128-150",
+          "symbol_kind": "struct",
+          "symbol_name": "proc",
+          "excerpt": "int uid; int gid;"
+        },
+        {
+          "path": "src/proc.c:236-237",
+          "symbol_kind": "function_body",
+          "symbol_name": "allocproc",
+          "excerpt": "p->uid = 0; p->gid = 0;"
+        }
+      ]
+    },
+    {
+      "question_id": "Q10_003",
+      "question_type": "tri_state_impl",
+      "stem": "是否能证实在 syscall 路径上真实执行了权限检查（open/exec/write 等）？（必须三态；仅有字段不算 implemented）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "src/sysfile.c:39-120",
+          "symbol_kind": "function",
+          "symbol_name": "sys_openat",
+          "excerpt": "No uid/gid check in open path"
+        },
+        {
+          "path": "src/file.c:299-330",
+          "symbol_kind": "function",
+          "symbol_name": "filewrite",
+          "excerpt": "No permission check against uid/gid"
+        },
+        {
+          "path": "src/sysfile.c:493-568",
+          "symbol_kind": "function",
+          "symbol_name": "sys_faccessat",
+          "excerpt": "Only checks mode bits, no uid/gid comparison"
+        }
+      ]
+    },
+    {
+      "question_id": "Q10_004",
+      "question_type": "short_answer",
+      "stem": "若存在权限检查：入口点与核心检查函数链路是什么？（列 2-5 个节点并给证据）",
+      "value": "sys_faccessat → ename → mode 检查（仅检查文件是否存在及 mode 位，无 UID/GID 验证链）",
+      "evidence": [
+        {
+          "path": "src/sysfile.c:494-568",
+          "symbol_kind": "function",
+          "symbol_name": "sys_faccessat",
+          "excerpt": "ep = ename(dp, path, &devno); if((emode & mode) != mode) return -1;"
+        },
+        {
+          "path": "src/include/file.h:43-46",
+          "symbol_kind": "macro",
+          "symbol_name": "R_OK/W_OK/X_OK",
+          "excerpt": "#define R_OK 4, W_OK 2, X_OK 1"
+        }
+      ]
+    },
+    {
+      "question_id": "Q10_005",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现用户指针验证（access_ok/verify_area/UserInPtr/copyin/copyout 等）？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "src/copy.c:14-45",
+          "symbol_kind": "function",
+          "symbol_name": "copyout",
+          "excerpt": "Uses walkaddr to validate PTE_U before copying"
+        },
+        {
+          "path": "src/copy.c:50-70",
+          "symbol_kind": "function",
+          "symbol_name": "copyin",
+          "excerpt": "Uses walkaddr to validate PTE_U before copying"
+        },
+        {
+          "path": "src/vm.c:165-180",
+          "symbol_kind": "function",
+          "symbol_name": "walkaddr",
+          "excerpt": "if((*pte & PTE_U) == 0) return NULL;"
+        },
+        {
+          "path": "src/sysfile.c:271-303",
+          "symbol_kind": "function_body",
+          "symbol_name": "sys_readv/sys_writev",
+          "excerpt": "copyin(p->pagetable,(char*)&v,vec,sizeof(v));"
+        }
+      ]
+    },
+    {
+      "question_id": "Q10_006",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 seccomp/prctl/sandbox 等系统调用过滤/沙箱？（必须三态；stub 需说明形态：ENOSYS/return 0）",
+      "value": "not_found",
+      "evidence": []
+    },
+    {
+      "question_id": "Q10_007",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在栈保护/溢出防护（stack canary/guard page）或等价机制？（必须三态）",
+      "value": "not_found",
+      "evidence": []
+    },
+    {
+      "question_id": "Q10_008",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在审计/安全启动（audit/secure boot/signature）相关逻辑？（必须三态）",
+      "value": "not_found",
+      "evidence": []
+    },
+    {
+      "question_id": "Q10_009",
+      "question_type": "short_answer",
+      "stem": "本项目支持哪些架构（riscv64/aarch64/x86_64/loongarch64 等）？每种架构的安全相关初始化（特权级配置、PMP/MPU/SMEP 等）是否有代码证据？（必须逐架构作答，无证据写「未发现」）",
+      "value": "仅支持 riscv64 架构。证据：linker/kernel.ld 声明 OUTPUT_ARCH(riscv)，所有源码包含 src/include/riscv.h。特权级配置通过 sstatus.SPP 位实现 U/S 态切换（src/trap.c:155-158）。未发现 PMP/MPU 配置代码。",
+      "evidence": [
+        {
+          "path": "linker/kernel.ld:1",
+          "symbol_kind": "directive",
+          "symbol_name": "OUTPUT_ARCH",
+          "excerpt": "OUTPUT_ARCH(riscv)"
+        },
+        {
+          "path": "src/trap.c:155-158",
+          "symbol_kind": "function_body",
+          "symbol_name": "usertrapret",
+          "excerpt": "x &= ~SSTATUS_SPP; // clear SPP to 0 for user mode"
+        },
+        {
+          "path": "src/include/riscv.h",
+          "symbol_kind": "header",
+          "symbol_name": "riscv.h",
+          "excerpt": "RISC-V specific definitions"
+        }
+      ]
+    },
+    {
+      "question_id": "Q10_010",
+      "question_type": "tri_state_impl",
+      "stem": "若项目使用 Rust，是否存在 RAII/所有权/生命周期相关的内核安全机制（如不可 unsafe 直接访问用户内存、锁的 RAII 自动释放等）？（必须三态；给具体模式证据）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "src/",
+          "symbol_kind": "directory",
+          "symbol_name": "src",
+          "excerpt": "Pure C implementation, no Rust code"
+        }
+      ]
+    },
+    {
+      "question_id": "Q10_011",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现了内核/用户页表隔离 (Kernel/User Page Table Isolation, KPTI 或等价机制)？\n（x86: CR3 KPTI / SMEP / SMAP；RISC-V: PMP / S-mode 分离；AArch64: TTBR0/TTBR1 隔离；\n必须三态；无则写未发现并列出已搜关键字）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "src/vm.c:165-180",
+          "symbol_kind": "function",
+          "symbol_name": "walkaddr",
+          "excerpt": "User pages marked with PTE_U, but no separate kernel/user page table switching evidence"
+        }
+      ]
+    },
+    {
+      "question_id": "Q10_012",
+      "question_type": "short_answer",
+      "stem": "UID/GID 字段是否在 syscall 路径上真实执行权限检查？（搜索 check_perm/inode_permission；若只有字段无检查链须标注「仅有定义但未强制执行 🔸」；给检查链证据或写「字段存在但无检查链」）",
+      "value": "字段存在但无检查链。struct proc 含 uid/gid 字段（src/include/proc.h:142-143），sys_getuid/sys_setuid 仅读写字段（src/sysproc.c:49-92），但 sys_openat/sys_write 未使用 uid/gid 进行权限验证。🔸 仅有定义但未强制执行",
+      "evidence": [
+        {
+          "path": "src/include/proc.h:128-150",
+          "symbol_kind": "struct",
+          "symbol_name": "proc",
+          "excerpt": "int uid; int gid;"
+        },
+        {
+          "path": "src/sysproc.c:49-92",
+          "symbol_kind": "function",
+          "symbol_name": "sys_getuid/sys_setuid",
+          "excerpt": "return myproc()->uid; myproc()->uid = uid;"
+        },
+        {
+          "path": "src/sysfile.c:39-120",
+          "symbol_kind": "function",
+          "symbol_name": "sys_openat",
+          "excerpt": "No uid/gid check"
+        }
+      ]
+    },
+    {
+      "question_id": "Q10_013",
+      "question_type": "single_choice",
+      "stem": "访问控制模型 (Access Control Model, Stallings Ch15) 更接近哪种？",
+      "value": "A. 自主访问控制 DAC (Discretionary Access Control)：所有者自主设置权限（Unix 权限位）",
+      "evidence": [
+        {
+          "path": "src/include/file.h:43-46",
+          "symbol_kind": "macro",
+          "symbol_name": "R_OK/W_OK/X_OK",
+          "excerpt": "Unix-style permission bits"
+        },
+        {
+          "path": "src/sysfile.c:493-568",
+          "symbol_kind": "function",
+          "symbol_name": "sys_faccessat",
+          "excerpt": "Checks mode bits against R_OK|W_OK|X_OK"
+        }
+      ]
+    },
+    {
+      "question_id": "Q10_014",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现完整性策略 (Integrity Policy, Stallings Ch15)？（如 Biba 模型、只读内核段、代码签名验证、W^X 内存保护等；必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "src/exec.c:94",
+          "symbol_kind": "function_body",
+          "symbol_name": "alloc_load_vma",
+          "excerpt": "PTE_R|PTE_W|PTE_X|PTE_U - W^X not enforced"
+        }
+      ]
+    }
+  ]
+}
