@@ -1,0 +1,114 @@
+{
+  "stage_id": "09_debug_error",
+  "goal": "分析 xv6-k210 的调试机制与错误处理：日志系统、panic 处理、栈回溯、交互式 shell、GDB stub、错误码体系、trace 机制。",
+  "must_cover": [
+    "[Q09_001] 日志系统：printf 宏实现，无级别控制（仅 DEBUG 宏开关）",
+    "[Q09_002] panic 处理：panic_handler（RustSBI）+ __panic（内核），存在崩溃路径",
+    "[Q09_003] panic 诊断：输出文件/行号、调用 backtrace()、停机循环（intr_off + for(;;)）",
+    "[Q09_004] 栈回溯：基于 FramePointer 的 backtrace() 实现（非 dwarf），打印 ra 地址",
+    "[Q09_005] 交互式 shell：xv6-user/sh.c 存在，支持 export/cd/exec 等命令",
+    "[Q09_006] GDB stub：未发现 handle_gdb_packet 或数据包解析循环",
+    "[Q09_007] 错误码：errno.h 定义 POSIX 风格错误码（EPERM/ENOENT 等），无 Result/Error enum",
+    "[Q09_008] trace 机制：sys_trace 系统调用 + strace 用户工具，无 ftrace/perf/tracepoints",
+    "[Q09_001] 是否存在日志系统（log/printk/println 宏）与日志级别控制？（必须三态）",
+    "[Q09_002] 是否存在 panic/崩溃处理路径（panic_handler/oom/abort 等）？（必须三态）",
+    "[Q09_003] panic 路径会输出哪些诊断？（寄存器 dump/栈回溯/停机；必须引用实现证据）",
+    "[Q09_004] 是否实现栈回溯 (backtrace/unwind/stack_trace)？（必须三态；仅打印 ra 不算）",
+    "[Q09_005] 是否存在交互式内核 monitor/shell？（必须三态；若 implemented 列出 3-10 个命令入口证据）",
+    "[Q09_006] 是否实现 GDB stub（需数据包解析循环，如 handle_gdb_packet）？（必须三态）",
+    "[Q09_007] 错误码/错误类型体系是什么？（errno/Result/Error enum；给类型定义与传播点证据）",
+    "[Q09_008] 是否存在 trace/perf/ftrace 等跟踪机制或 tracepoints？（必须三态）",
+    "若存在 monitor/shell：**命令实现文件**列表；若无：明确「未发现」。",
+    "日志系统：print/log 宏如何实现？日志级别设计？",
+    "Panic 处理：panic! 触发后的流程（栈回溯、寄存器 dump、停机）。**须一句话结论**：是否包含寄存器 dump、是否调用回溯辅助函数，并附 `路径:行号`。",
+    "**栈回溯 (Backtrace)**：是否支持 `dwarf` 解析或基于 FramePointer 的回溯？**必须** `grep_in_repo` 搜索 `backtrace|unwind|stack_trace|StackTrace`，在正文**摘录关键命中行或明确写零命中**。**注意**：不要被 panic 时仅打印若干寄存器/`ra` 误导为完整回溯；`doc/*.md` 不得单独作为「已实现回溯」的证据，须 C/Rust 源码 `路径:行号`。",
+    "异常处理：未处理异常的默认行为。",
+    "调试接口："
+  ],
+  "evidence_targets": [
+    "panic 实现路径（include/printf.h:12-16, kernel/printf.c:115-133）",
+    "backtrace 实现（kernel/printf.c:135-145）",
+    "日志宏（include/utils/debug.h）",
+    "shell 命令入口（xv6-user/sh.c）",
+    "错误码定义（include/errno.h）",
+    "trace 系统调用（kernel/syscall/sysproc.c:255-265, xv6-user/strace.c）",
+    "GDB stub 缺失证据（grep 零命中）",
+    "panic/debug",
+    "日志系统",
+    "回溯",
+    "错误处理"
+  ],
+  "seed_paths": [
+    "include/printf.h",
+    "kernel/printf.c",
+    "include/utils/debug.h",
+    "include/errno.h",
+    "xv6-user/sh.c",
+    "xv6-user/strace.c",
+    "kernel/syscall/sysproc.c",
+    "bootloader/SBI/rustsbi-k210/src/main.rs",
+    "debug",
+    "log",
+    "panic",
+    "assert",
+    "backtrace",
+    "include/fs"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "panic",
+    "__panic",
+    "backtrace",
+    "printf",
+    "sys_trace",
+    "trace",
+    "parsecmd",
+    "main",
+    "panic_handler",
+    "log",
+    "assert",
+    "_start"
+  ],
+  "repo_hotspots": [
+    "Cargo.toml",
+    "Makefile",
+    "bootloader",
+    "bootloader/SBI",
+    "debug",
+    "debug/kendryte_openocd",
+    "debug/openocd_cfg",
+    "doc",
+    "doc/img",
+    "include"
+  ],
+  "preferred_tools": [
+    "read_code_segment",
+    "grep_in_repo",
+    "lsp_get_call_graph"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "1. 确认 panic 路径：读取 kernel/printf.c 的 __panic 函数，验证是否调用 backtrace() 并停机",
+    "2. 验证 backtrace 实现：读取 kernel/printf.c:135-145，确认基于 FramePointer 的回溯逻辑（非 dwarf）",
+    "3. 检查日志系统：读取 include/utils/debug.h，确认 DEBUG 宏控制 __debug_assert/__debug_msg，无运行时级别",
+    "4. 分析 shell：读取 xv6-user/sh.c 前 200 行，列出 3-5 个命令入口（如 export/cd/parsecmd）",
+    "5. 验证 GDB stub 缺失：确认 grep 'handle_gdb_packet|gdb_stub' 零命中，记录结论",
+    "6. 整理错误码：读取 include/errno.h，记录错误码体系为 POSIX errno 风格，无 Rust Result/Error",
+    "7. 分析 trace 机制：读取 kernel/syscall/sysproc.c:255-265 和 xv6-user/strace.c，确认 sys_trace 实现",
+    "8. 汇总证据：将各文件路径:行号整理为 Q09_001~Q09_008 的作答依据"
+  ]
+}

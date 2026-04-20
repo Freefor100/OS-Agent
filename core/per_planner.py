@@ -48,65 +48,11 @@ STAGE_HINTS: Dict[str, Dict[str, List[str]]] = {
             "评测/交付产物信号(kernel-rv等)",
         ],
     },
-    "02_boot_arch": {
+    "02_boot_trap": {
         "seed_paths": [
             "arch",
             "boot",
             "platform",
-            "README.md",
-            "Makefile",
-            "entry.S",
-            "start.S",
-            "linker.ld",
-        ],
-        "entry_symbols": ["_start", "start", "rust_main", "kernel_main", "trap_handler"],
-        "evidence_targets": [
-            "启动入口",
-            "模式切换",
-            "页表/MMU",
-            "trap 向量",
-            "QEMU/README 机模与板型差异",
-            "RTC/virtio 早期初始化线索",
-        ],
-    },
-    "02": {
-        "seed_paths": [
-            "arch",
-            "boot",
-            "platform",
-            "README.md",
-            "Makefile",
-            "entry.S",
-            "start.S",
-            "linker.ld",
-        ],
-        "entry_symbols": ["_start", "start", "rust_main", "kernel_main", "trap_handler"],
-        "evidence_targets": [
-            "启动入口",
-            "模式切换",
-            "页表/MMU",
-            "trap 向量",
-            "QEMU/README 机模与板型差异",
-            "RTC/virtio 早期初始化线索",
-        ],
-    },
-    "03_mem_mgmt": {
-        "seed_paths": ["mm", "memory", "vm", "kernel/mm", "os/src/mm"],
-        "entry_symbols": ["handle_page_fault", "alloc_frame", "map_page", "PageTable", "FrameAllocator"],
-        "evidence_targets": ["物理页分配", "页表映射", "页故障处理", "堆分配器"],
-    },
-    "03": {
-        "seed_paths": ["mm", "memory", "vm", "kernel/mm", "os/src/mm"],
-        "entry_symbols": ["handle_page_fault", "alloc_frame", "map_page", "PageTable", "FrameAllocator"],
-        "evidence_targets": ["物理页分配", "页表映射", "页故障处理", "堆分配器"],
-    },
-    "04": {
-        "seed_paths": ["task", "proc", "process", "sched", "kernel/task", "kernel/proc"],
-        "entry_symbols": ["schedule", "sys_fork", "spawn", "switch_to", "Task"],
-        "evidence_targets": ["任务模型", "调度器", "上下文切换", "信号/Futex"],
-    },
-    "05": {
-        "seed_paths": [
             "trap",
             "syscall",
             "interrupt",
@@ -114,39 +60,75 @@ STAGE_HINTS: Dict[str, Dict[str, List[str]]] = {
             "kernel/trap",
             "README.md",
             "Makefile",
+            "entry.S",
+            "start.S",
+            "linker.ld",
         ],
-        "entry_symbols": ["trap_handler", "syscall", "syscall_dispatch", "TrapFrame"],
+        "entry_symbols": [
+            "_start",
+            "start",
+            "rust_main",
+            "kernel_main",
+            "trap_handler",
+            "syscall",
+            "syscall_dispatch",
+            "TrapFrame",
+        ],
         "evidence_targets": [
+            "启动入口",
+            "模式切换",
+            "页表/MMU",
+            "trap 向量",
             "trap 入口",
             "syscall 分发",
             "TrapFrame",
             "用户指针校验",
-            "README syscall 表与代码对照",
-            "errno/桩与深度测例敏感点",
+            "QEMU/README 机模与板型差异",
+            "RTC/virtio 早期初始化线索",
         ],
     },
-    "06": {
+    "04_process_smp": {
+        "seed_paths": [
+            "task",
+            "proc",
+            "process",
+            "sched",
+            "kernel/task",
+            "kernel/proc",
+            "smp",
+            "cpu",
+            "hart",
+            "interrupt",
+        ],
+        "entry_symbols": [
+            "schedule",
+            "sys_fork",
+            "spawn",
+            "switch_to",
+            "Task",
+            "start_secondary",
+            "boot_secondary",
+            "cpu_init",
+            "ipi",
+        ],
+        "evidence_targets": [
+            "任务模型",
+            "调度器",
+            "上下文切换",
+            "信号/Futex",
+            "多核启动",
+            "CPU 本地状态",
+            "IPI",
+            "并发保护",
+        ],
+    },
+    "05_fs_drivers": {
         "seed_paths": [
             "fs",
             "vfs",
             "file",
             "inode",
             "kernel/fs",
-            "README.md",
-            "Makefile",
-            "scripts",
-        ],
-        "entry_symbols": ["sys_open", "vfs_open", "openat", "File", "Inode"],
-        "evidence_targets": [
-            "VFS 设计",
-            "具体文件系统",
-            "fd table",
-            "pipe/mmap",
-            "整盘挂载与根目录测例脚本交界",
-        ],
-    },
-    "07": {
-        "seed_paths": [
             "driver",
             "device",
             "net",
@@ -155,42 +137,53 @@ STAGE_HINTS: Dict[str, Dict[str, List[str]]] = {
             "uart",
             "README.md",
             "Makefile",
+            "scripts",
         ],
-        "entry_symbols": ["probe", "init_driver", "uart_init", "virtio", "interrupt"],
+        "entry_symbols": [
+            "sys_open",
+            "vfs_open",
+            "openat",
+            "File",
+            "Inode",
+            "probe",
+            "init_driver",
+            "uart_init",
+            "virtio",
+            "interrupt",
+        ],
         "evidence_targets": [
+            "VFS 设计",
+            "具体文件系统",
+            "fd table",
+            "pipe/mmap",
             "驱动框架",
             "中断注册",
             "块设备/网卡",
             "平台适配",
-            "多 virtio-blk / virtio-net 实例证据",
+            "整盘挂载与根目录测例脚本交界",
         ],
     },
-    "08": {
+    "06_sync_ipc": {
         "seed_paths": ["sync", "lock", "ipc", "futex", "pipe", "signal"],
         "entry_symbols": ["Mutex", "SpinLock", "futex_wait", "pipe_write", "signal"],
         "evidence_targets": ["锁与同步原语", "IPC", "Futex", "管道/信号"],
     },
-    "09": {
-        "seed_paths": ["smp", "cpu", "hart", "scheduler", "interrupt"],
-        "entry_symbols": ["start_secondary", "boot_secondary", "cpu_init", "ipi"],
-        "evidence_targets": ["多核启动", "CPU 本地状态", "IPI", "并发保护"],
-    },
-    "10": {
+    "07_security": {
         "seed_paths": ["security", "capability", "uid", "perm", "auth"],
         "entry_symbols": ["sys_getuid", "cap", "permission", "check_perm"],
         "evidence_targets": ["权限模型", "用户身份", "隔离边界", "安全机制"],
     },
-    "11": {
+    "08_network": {
         "seed_paths": ["net", "tcp", "udp", "socket", "lwip", "smoltcp"],
         "entry_symbols": ["sys_socket", "tcp", "udp", "poll", "epoll"],
         "evidence_targets": ["协议栈", "socket API", "poll/epoll", "驱动接入"],
     },
-    "12": {
+    "09_debug_error": {
         "seed_paths": ["debug", "log", "panic", "assert", "backtrace"],
         "entry_symbols": ["panic_handler", "backtrace", "log", "assert"],
         "evidence_targets": ["panic/debug", "日志系统", "回溯", "错误处理"],
     },
-    "13_history": {
+    "10_history": {
         "seed_paths": ["git", "history", "README.md", "Makefile", "scripts", ".github"],
         "entry_symbols": ["git"],
         "evidence_targets": [
@@ -200,6 +193,79 @@ STAGE_HINTS: Dict[str, Dict[str, List[str]]] = {
             "当前缺口",
             "CI/产物名/自测相关演进(有工具证据时)",
         ],
+    },
+    "03_mem_mgmt": {
+        "seed_paths": ["mm", "memory", "vm", "kernel/mm", "os/src/mm"],
+        "entry_symbols": ["handle_page_fault", "alloc_frame", "map_page", "PageTable", "FrameAllocator"],
+        "evidence_targets": ["物理页分配", "页表映射", "页故障处理", "堆分配器"],
+    },
+    "02": {
+        "seed_paths": [
+            "arch",
+            "boot",
+            "platform",
+            "trap",
+            "syscall",
+            "kernel/trap",
+            "README.md",
+            "Makefile",
+            "entry.S",
+            "start.S",
+            "linker.ld",
+        ],
+        "entry_symbols": ["_start", "trap_handler", "syscall", "TrapFrame", "rust_main", "kernel_main"],
+        "evidence_targets": [
+            "启动入口",
+            "模式切换",
+            "trap/syscall",
+            "TrapFrame",
+            "页表/MMU 早期",
+        ],
+    },
+    "03": {
+        "seed_paths": ["mm", "memory", "vm", "kernel/mm", "os/src/mm"],
+        "entry_symbols": ["handle_page_fault", "alloc_frame", "map_page", "PageTable", "FrameAllocator"],
+        "evidence_targets": ["物理页分配", "页表映射", "页故障处理", "堆分配器"],
+    },
+    "04": {
+        "seed_paths": ["task", "proc", "process", "sched", "smp", "hart", "cpu", "kernel/task", "kernel/proc"],
+        "entry_symbols": ["schedule", "sys_fork", "switch_to", "Task", "ipi", "start_secondary"],
+        "evidence_targets": ["任务模型", "调度器", "上下文切换", "多核启动", "IPI"],
+    },
+    "05": {
+        "seed_paths": [
+            "fs",
+            "vfs",
+            "driver",
+            "device",
+            "virtio",
+            "uart",
+            "kernel/fs",
+            "README.md",
+            "Makefile",
+        ],
+        "entry_symbols": ["sys_open", "vfs_open", "Inode", "probe", "virtio", "interrupt"],
+        "evidence_targets": ["VFS/具体 FS", "驱动框架", "块/网设备", "fd/mmap 交界"],
+    },
+    "06": {
+        "seed_paths": ["sync", "lock", "ipc", "futex", "pipe", "signal"],
+        "entry_symbols": ["Mutex", "SpinLock", "futex_wait", "pipe_write", "signal"],
+        "evidence_targets": ["锁与同步原语", "IPC", "Futex", "管道/信号"],
+    },
+    "07": {
+        "seed_paths": ["security", "capability", "uid", "perm", "auth"],
+        "entry_symbols": ["sys_getuid", "cap", "permission", "check_perm"],
+        "evidence_targets": ["权限模型", "用户身份", "隔离边界", "安全机制"],
+    },
+    "08": {
+        "seed_paths": ["net", "tcp", "udp", "socket", "lwip", "smoltcp"],
+        "entry_symbols": ["sys_socket", "tcp", "udp", "poll", "epoll"],
+        "evidence_targets": ["协议栈", "socket API", "poll/epoll", "驱动接入"],
+    },
+    "09": {
+        "seed_paths": ["debug", "log", "panic", "assert", "backtrace"],
+        "entry_symbols": ["panic_handler", "backtrace", "log", "assert"],
+        "evidence_targets": ["panic/debug", "日志系统", "回溯", "错误处理"],
     },
 }
 
@@ -466,7 +532,7 @@ def estimate_context_budget(stage_id: str) -> Dict[str, int]:
     if "01_overview" in stage_id:
         base["max_prev_section_chars"] = 12000
         base["max_evidence_items"] = 18
-    if "13_history" in stage_id:
+    if "10_history" in stage_id:
         base["max_prev_section_chars"] = 4000
     return base
 

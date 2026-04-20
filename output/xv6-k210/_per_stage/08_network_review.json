@@ -1,0 +1,64 @@
+{
+  "schema_version": "describe_review_v1",
+  "stage_id": "08_network",
+  "stage_title": "网络子系统与协议栈",
+  "confidence": 0.85,
+  "question_reviews": [
+    {
+      "question_id": "Q08_001",
+      "confidence": 0.95,
+      "review": "结论为 not_found，证据链完整（系统调用号定义、kernel 目录结构、virtio 驱动文件），三者相互印证无网络实现，支撑充分。"
+    },
+    {
+      "question_id": "Q08_002",
+      "confidence": 0.95,
+      "review": "选择“未发现”符合事实，证据指出 Cargo.toml 无协议栈依赖且 errno 仅为占位，逻辑合理且证据直接支撑结论。"
+    },
+    {
+      "question_id": "Q08_003",
+      "confidence": 0.95,
+      "review": "结论为 not_found，证据引用 sysnum.h 与 syscall 实现文件，明确指出无 socket 相关系统调用，证据与结论高度一致。"
+    },
+    {
+      "question_id": "Q08_004",
+      "confidence": 0.6,
+      "review": "结论合理（未实现），但 evidence 数组为空。虽然 value 文本中引用了文件路径作为理由，但缺乏结构化证据节点支撑，不符合证据支撑结论的硬性要求。"
+    },
+    {
+      "question_id": "Q08_005",
+      "confidence": 0.95,
+      "review": "结论为 not_found，证据详细区分了 virtio 磁盘驱动与网卡驱动的差异，并检查了 HAL 目录结构，支撑有力。"
+    },
+    {
+      "question_id": "Q08_006",
+      "confidence": 0.7,
+      "review": "结论为空选，notes 字段说明了 grep 未发现，但 evidence 数组为空。对于否定性结论，缺乏搜索日志或关键文件检查记录作为结构化证据，支撑度稍弱。"
+    },
+    {
+      "question_id": "Q08_007",
+      "confidence": 0.95,
+      "review": "结论为 not_found，证据准确指出 DMA 描述符仅用于磁盘 I/O 而非网络零拷贝，区分清晰，支撑充分。"
+    }
+  ],
+  "dimensions": {
+    "evidence_supports_answers": 0.8,
+    "question_answer_consistency": 1.0,
+    "requirements_fit": 0.9
+  },
+  "findings": [
+    {
+      "severity": "warn",
+      "topic": "结构化证据缺失",
+      "detail": "Q08_004 与 Q08_006 的 evidence 数组为空，仅依赖 value 文本或 notes 说明，不符合证据支撑结论的标准格式。"
+    },
+    {
+      "severity": "info",
+      "topic": "结论一致性",
+      "detail": "所有题目结论一致指向系统无网络子系统实现，逻辑自洽，无矛盾点。"
+    }
+  ],
+  "summary_zh": "模型准确识别出目标系统不存在网络子系统实现。Q08_001/002/003/005/007 证据充分且逻辑清晰，置信度高。主要风险在于 Q08_004（简答）与 Q08_006（多选）缺失结构化证据数组，仅靠文本描述或备注支撑否定性结论，略减整体置信度。整体结论可靠，建议补充搜索日志或文件检查记录作为证据。",
+  "_meta": {
+    "review_model": "qwen3.5-plus"
+  }
+}

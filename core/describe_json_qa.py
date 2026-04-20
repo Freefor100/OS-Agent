@@ -434,7 +434,9 @@ def render_answers_to_markdown(payload: Dict[str, Any]) -> str:
 
         evidence = a.get("evidence", [])
         if not evidence:
-            lines.append("- 证据：无（`not_found`/`stub` 时允许为空；否则需补齐）")
+            lines.append(
+                "- 证据：无（`not_found`/`stub` 时允许为空；**建议**用 `excerpt` 记录检索过程以便复核；其它题型须补齐）"
+            )
             lines.append("")
             continue
 

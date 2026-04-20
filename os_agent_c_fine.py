@@ -235,7 +235,7 @@ COMPARE_STAGES = [
 7. **缺页异常处理差异**：是否与 CoW / Lazy Allocation 关联
 8. **用户指针安全**：UserInPtr / UserOutPtr 类型安全包装对比
 
-加载两个项目的 05_ section 报告，使用 `compare_feature_summary` 对比 D5_trap_syscall 维度。
+加载两个项目的 02_ section 报告，使用 `compare_feature_summary` 对比 D5_trap_syscall 维度。
 
 输出格式：## Trap 差异 → ## syscall 分发差异 → ## Call Graph 差异 → ## 覆盖度对比""",
     },
@@ -256,7 +256,7 @@ COMPARE_STAGES = [
 6. **poll/select/epoll 支持状态差异**
 7. **使用 `compare_call_graphs` 对比 sys_open 或 vfs_open 调用链**
 
-加载两个项目的 06_ section 报告，使用 `compare_feature_summary` 对比 D6_filesystem 维度。
+加载两个项目的 05_ section 报告，使用 `compare_feature_summary` 对比 D6_filesystem 维度。
 
 **创新点发现**：如果 {target} 实现了 {candidate} 没有的伪文件系统（如 ProcFS），标注为创新点。
 
@@ -283,7 +283,7 @@ COMPARE_STAGES = [
 4. **等待队列差异**：WaitQueue 实现方式
 5. **【必须】使用 `compare_call_graphs` 对比 `sys_futex` 或 `futex_wait` 调用链**
 
-加载两个项目的 07_ 和 08_ section 报告，使用 `compare_feature_summary` 分别对比 D7_device_driver 和 D8_sync_ipc 维度。
+加载两个项目的 05_ 和 06_ section 报告，使用 `compare_feature_summary` 分别对比 D7_device_driver 和 D8_sync_ipc 维度。
 
 **桩代码检测**：如果 sys_msgget/sys_semget 函数体为空或仅返回 Ok(0)，标注为'桩函数'。
 
@@ -318,7 +318,7 @@ COMPARE_STAGES = [
 5. **【必须】使用 `compare_call_graphs` 对比 `sys_sendto` 或 `socket_write` 调用链**
    - 如果两个项目都不支持网络，此步跳过并在报告中注明
 
-加载两个项目的 09_/10_/11_ section 报告，使用 `compare_feature_summary` 对比 D9_smp_security 和 D10_net_debug 维度。
+加载两个项目的 04_/07_/08_/09_ section 报告，使用 `compare_feature_summary` 对比 D9_smp_security 与 D10_net_debug 维度（D9 侧重 04/07 章证据，D10 侧重 08/09 章证据）。
 
 **Call Graph 退避策略**：如果 compare_call_graphs 返回'未找到函数'或'Call Graph 获取失败'，改用 `grep_in_repo` 搜索对应函数名进行文本级对比，并在报告中标注'降级分析'。
 
@@ -335,7 +335,7 @@ COMPARE_STAGES = [
 3. **调试接口差异**：交互式 Shell / GDB Stub / Monitor
 4. **错误码设计差异**：Result/Error 类型定义
 
-加载两个项目的 12_ section 报告进行对比。
+加载两个项目的 09_ section 报告进行对比。
 
 输出格式：## 调试机制差异 → ## 错误处理机制差异 → ## 日志系统对比""",
     },

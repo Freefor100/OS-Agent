@@ -1,0 +1,204 @@
+{
+  "schema_version": "describe_review_v1",
+  "stage_id": "05_fs_drivers",
+  "stage_title": "文件系统与设备 I/O",
+  "confidence": 0.92,
+  "question_reviews": [
+    {
+      "question_id": "Q05_001",
+      "confidence": 0.95,
+      "review": "作答切题，明确指出 C 语言 op 表形态。evidence 提供了 fs.h 中结构体定义，包含函数指针，充分支撑结论。"
+    },
+    {
+      "question_id": "Q05_002",
+      "confidence": 0.95,
+      "review": "选择合理，evidence 展示 FAT32 初始化代码，证实存在真实磁盘文件系统后端。"
+    },
+    {
+      "question_id": "Q05_003",
+      "confidence": 0.95,
+      "review": "结论为自研，evidence 引用源码路径及 Makefile 编译规则，无外部依赖，支撑有力。"
+    },
+    {
+      "question_id": "Q05_004",
+      "confidence": 0.9,
+      "review": "调用链清晰，evidence 列出关键函数及文件位置，逻辑连贯，支撑文件打开路径描述。"
+    },
+    {
+      "question_id": "Q05_005",
+      "confidence": 0.95,
+      "review": "结构体定义证据确凿，明确展示固定数组 + 链表扩展形态，完全符合题意。"
+    },
+    {
+      "question_id": "Q05_006",
+      "confidence": 0.95,
+      "review": "三态选择 implemented，evidence 展示 bcache 初始化与获取函数，支撑充分。"
+    },
+    {
+      "question_id": "Q05_007",
+      "confidence": 0.95,
+      "review": "明确指出 LRU 策略，evidence 展示链表操作代码（头插尾取），逻辑闭环。"
+    },
+    {
+      "question_id": "Q05_008",
+      "confidence": 0.85,
+      "review": "结论为 implemented，evidence 展示 mmap 相关结构及 inode mapping，虽偏向内存映射，但可视为页缓存相关实现，基本支撑。"
+    },
+    {
+      "question_id": "Q05_009",
+      "confidence": 0.95,
+      "review": "syscall 及实现函数证据齐全，支撑 mmap 已实现的结论。"
+    },
+    {
+      "question_id": "Q05_010",
+      "confidence": 0.95,
+      "review": "poll/select 相关 syscall 及函数证据充分，支撑 implemented 结论。"
+    },
+    {
+      "question_id": "Q05_011",
+      "confidence": 0.95,
+      "review": "evidence 展示路径解析代码及对 . .. 的处理，充分支撑路径解析已实现。"
+    },
+    {
+      "question_id": "Q05_012",
+      "confidence": 0.8,
+      "review": "结论 not_found，evidence 提及 readlinkat 存在但无跟随逻辑。证据略显矛盾（有 syscall 但无功能），但解释了原因，基本可信。"
+    },
+    {
+      "question_id": "Q05_013",
+      "confidence": 0.95,
+      "review": "pipe 分配及 syscall 证据充分，支撑 implemented 结论。"
+    },
+    {
+      "question_id": "Q05_014",
+      "confidence": 0.6,
+      "review": "结论 not_found，但 evidence 为空。缺乏负面证据（如搜索记录或目录结构说明），置信度降低。"
+    },
+    {
+      "question_id": "Q05_015",
+      "confidence": 0.9,
+      "review": "evidence 展示 devfs/procfs 超级块初始化，支撑伪文件系统已实现。"
+    },
+    {
+      "question_id": "Q05_016",
+      "confidence": 0.95,
+      "review": "evidence 展示 fdtable 与进程关联及复制函数，支撑 Per-Process 结论。"
+    },
+    {
+      "question_id": "Q05_017",
+      "confidence": 0.95,
+      "review": "FAT32 特性描述准确，evidence 展示 FAT 表管理，支撑分配方式结论。"
+    },
+    {
+      "question_id": "Q05_018",
+      "confidence": 0.95,
+      "review": "空闲空间管理与 FAT 表一致，evidence 展示 free_count 读取，支撑结论。"
+    },
+    {
+      "question_id": "Q05_019",
+      "confidence": 0.95,
+      "review": "evidence 展示多级路径解析及 dentry 树形结构，支撑树形目录结论。"
+    },
+    {
+      "question_id": "Q05_020",
+      "confidence": 0.95,
+      "review": "按字节读取证据充分，支撑字节流组织形式。"
+    },
+    {
+      "question_id": "Q05_021",
+      "confidence": 0.9,
+      "review": "evidence 展示硬编码地址与 DTB 解析并存，支撑混合机制结论。"
+    },
+    {
+      "question_id": "Q05_022",
+      "confidence": 0.95,
+      "review": "evidence 展示 DTB 解析代码，支撑 implemented 结论。"
+    },
+    {
+      "question_id": "Q05_023",
+      "confidence": 0.9,
+      "review": "明确指出无统一框架，evidence 展示 main.c 顺序初始化，支撑结论。"
+    },
+    {
+      "question_id": "Q05_024",
+      "confidence": 0.95,
+      "review": "初始化顺序列表与 evidence 中 main 函数内容一致，支撑充分。"
+    },
+    {
+      "question_id": "Q05_025",
+      "confidence": 0.95,
+      "review": "console 初始化及 putchar 证据充分，支撑 UART 驱动已实现。"
+    },
+    {
+      "question_id": "Q05_026",
+      "confidence": 0.95,
+      "review": "virtio 及 sdcard 初始化函数证据充分，支撑块设备驱动已实现。"
+    },
+    {
+      "question_id": "Q05_027",
+      "confidence": 0.6,
+      "review": "结论 not_found，但 evidence 为空。缺乏负面证据，置信度降低，建议补充搜索范围说明。"
+    },
+    {
+      "question_id": "Q05_028",
+      "confidence": 0.95,
+      "review": "PLIC 初始化及中断分发证据充分，支撑中断控制器驱动已实现。"
+    },
+    {
+      "question_id": "Q05_029",
+      "confidence": 0.95,
+      "review": "memlayout.h 宏定义证据确凿，支撑硬编码地址结论。"
+    },
+    {
+      "question_id": "Q05_030",
+      "confidence": 0.95,
+      "review": "Makefile 及条件编译证据充分，支撑多平台适配机制。"
+    },
+    {
+      "question_id": "Q05_031",
+      "confidence": 0.95,
+      "review": "虚拟地址映射及宏定义证据充分，支撑 MMU 切换逻辑。"
+    },
+    {
+      "question_id": "Q05_032",
+      "confidence": 0.95,
+      "review": "buffer 池数组及初始化证据充分，支撑缓冲池模式。"
+    },
+    {
+      "question_id": "Q05_033",
+      "confidence": 0.9,
+      "review": "virtio 环及提交顺序证据支撑无显式调度结论，符合题意。"
+    },
+    {
+      "question_id": "Q05_034",
+      "confidence": 0.9,
+      "review": "DMA 及中断证据并存，支撑混合控制模式结论。"
+    },
+    {
+      "question_id": "Q05_035",
+      "confidence": 0.95,
+      "review": "DMA 函数及 virtio 描述符证据充分，支撑 DMA 传输路径已实现。"
+    }
+  ],
+  "dimensions": {
+    "evidence_supports_answers": 0.9,
+    "question_answer_consistency": 0.95,
+    "requirements_fit": 0.95
+  },
+  "findings": [
+    {
+      "severity": "warn",
+      "topic": "负面证据缺失",
+      "detail": "Q05_014 与 Q05_027 结论为 not_found 但 evidence 数组为空，缺乏搜索过程或目录结构佐证，建议补充。"
+    },
+    {
+      "severity": "info",
+      "topic": "页缓存定义模糊",
+      "detail": "Q05_008 证据偏向 mmap 映射结构，虽可关联页缓存，但若能提供文件页缓存具体结构更佳。"
+    }
+  ],
+  "summary_zh": "整体作答质量高，绝大多数题目证据充分且逻辑自洽。VFS、FAT32、驱动初始化等核心模块描述准确。主要风险在于部分“未实现”类题目（如 socket、网卡驱动）缺乏负面证据支撑，仅凭空数组断言不存在，存在漏检风险。建议补充搜索范围或文件列表以增强可信度。",
+  "_meta": {
+    "review_model": "qwen3.5-plus"
+  }
+}

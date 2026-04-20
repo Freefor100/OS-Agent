@@ -43,6 +43,7 @@ from core.utils import repo_name_from_url, parse_env_repo_list
 from core.vectorizer import (
     build_fingerprint,
     get_fingerprint_stage_status,
+    is_fingerprint_disk_cache_ok,
     LocalEmbedder,
     get_dimension_weights,
     DIMENSION_MAP,
@@ -236,15 +237,15 @@ def run_coarse_screening(
         print(f"   ⚠️ 保存 coarse_preplan 失败: {e}")
 
     target_fp_path = os.path.join(os.path.dirname(target_sections), "fingerprint.json")
-    target_action = "BUILD"
+    target_disk_ok = (not rebuild) and is_fingerprint_disk_cache_ok(target_sections)
+    target_action = "LOAD" if target_disk_ok else "BUILD"
     target_reason = None
-    if not rebuild and os.path.exists(target_fp_path):
-        target_action = "LOAD"
-    else:
-        if rebuild:
-            target_reason = "--rebuild"
-        elif not os.path.exists(target_fp_path):
-            target_reason = "fingerprint_missing"
+    if rebuild:
+        target_reason = "--rebuild"
+    elif not os.path.exists(target_fp_path):
+        target_reason = "fingerprint_missing"
+    elif not target_disk_ok:
+        target_reason = "fingerprint_stale_or_incomplete"
 
     target_fp = build_fingerprint(
         repo_name=target_name,
@@ -283,7 +284,8 @@ def run_coarse_screening(
         try:
             action = "BUILD"
             reason = None
-            if not rebuild and os.path.exists(proj_fp_path):
+            proj_disk_ok = (not rebuild) and is_fingerprint_disk_cache_ok(proj_sections)
+            if proj_disk_ok and os.path.exists(proj_fp_path):
                 action = "LOAD"
                 fp = Fingerprint.load(proj_fp_path)
                 n_load += 1
@@ -292,6 +294,8 @@ def run_coarse_screening(
                     reason = "--rebuild"
                 elif not os.path.exists(proj_fp_path):
                     reason = "fingerprint_missing"
+                elif not proj_disk_ok:
+                    reason = "fingerprint_stale_or_incomplete"
                 fp = build_fingerprint(
                     repo_name=proj_name,
                     sections_dir=proj_sections,

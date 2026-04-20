@@ -20,6 +20,8 @@ from core.error_handling import ErrorType, RetryConfig, classify_error, calculat
 load_dotenv()
 logger = logging.getLogger("vectorizer")
 STRUCT_FEATURE_SCHEMA_VERSION = 3
+# 与 describe 生成的章节 md 前缀及本文件 DIMENSION_MAP["sections"] 对齐；合并/重排 STAGES 时递增，以作废旧 fingerprint。
+FINGERPRINT_SECTIONS_LAYOUT_VERSION = 2
 
 # ---------------------------------------------------------------------------
 # 7 维度特征提取 Prompt
@@ -102,7 +104,7 @@ DIMENSION_MAP = {
         "weight": 0.15,
     },
     "D5_trap_syscall": {
-        "sections": ["05_"],
+        "sections": ["02_"],
         "prompt": (
             "从以下中断与系统调用报告中提取特征摘要（120-180 字）。\n\n"
             "【必须涵盖】：\n"
@@ -122,7 +124,7 @@ DIMENSION_MAP = {
         "weight": 0.10,
     },
     "D6_filesystem": {
-        "sections": ["06_"],
+        "sections": ["05_"],
         "prompt": (
             "从以下文件系统报告中提取特征摘要（120-200 字）。\n\n"
             "【必须涵盖】：\n"
@@ -146,7 +148,7 @@ DIMENSION_MAP = {
         "weight": 0.12,
     },
     "D7_device_driver": {
-        "sections": ["07_"],
+        "sections": ["05_"],
         "prompt": (
             "从以下设备驱动与硬件抽象报告中提取特征摘要（100-150 字）。\n\n"
             "【必须涵盖】：\n"
@@ -166,7 +168,7 @@ DIMENSION_MAP = {
         "weight": 0.06,
     },
     "D8_sync_ipc": {
-        "sections": ["08_"],
+        "sections": ["06_"],
         "prompt": (
             "从以下同步互斥与 IPC 报告中提取特征摘要（100-150 字）。\n\n"
             "【必须涵盖】：\n"
@@ -190,7 +192,7 @@ DIMENSION_MAP = {
         "weight": 0.08,
     },
     "D9_smp_security": {
-        "sections": ["09_", "10_"],
+        "sections": ["04_", "07_"],
         "prompt": (
             "从以下多核支持与安全机制报告中提取特征摘要（120-180 字）。\n\n"
             "【多核部分必须涵盖】：\n"
@@ -213,7 +215,7 @@ DIMENSION_MAP = {
         "weight": 0.08,
     },
     "D10_net_debug": {
-        "sections": ["11_", "12_"],
+        "sections": ["08_", "09_"],
         "prompt": (
             "从以下网络与调试报告中综合提取特征摘要（120-180 字）。\n\n"
             "【网络部分】：\n"
@@ -326,6 +328,8 @@ def _is_struct_stage_cache_current(payload: Optional[dict]) -> bool:
 def _is_fingerprint_cache_current(payload: Optional[dict]) -> bool:
     if not payload:
         return False
+    if payload.get("sections_layout_version") != FINGERPRINT_SECTIONS_LAYOUT_VERSION:
+        return False
     version = payload.get("struct_features_schema_version", 1)
     return version == STRUCT_FEATURE_SCHEMA_VERSION
 
@@ -437,6 +441,27 @@ def get_fingerprint_stage_status(sections_dir: str, force: bool = False) -> Dict
         "cache_hits": cache_hits,
         "rerun_stages": rerun_stages,
     }
+
+
+def is_fingerprint_disk_cache_ok(sections_dir: str) -> bool:
+    """
+    磁盘上的 fingerprint.json 与 _coarse_stage 三阶段缓存是否可被
+    build_fingerprint(force=False) 整包复用（layout/schema 与阶段完整性均满足）。
+    """
+    paths = _get_fingerprint_stage_paths(sections_dir)
+    if not os.path.exists(paths["fingerprint"]):
+        return False
+    fingerprint_payload = _load_json(paths["fingerprint"])
+    feature_payload = _load_json(paths["feature_stage"])
+    struct_payload = _load_json(paths["struct_stage"])
+    embedding_payload = _load_json(paths["embedding_stage"])
+    dim_ids = sorted(DIMENSION_MAP.keys())
+    return _is_fingerprint_cache_current(fingerprint_payload) and _are_fingerprint_stage_caches_complete(
+        feature_payload,
+        struct_payload,
+        embedding_payload,
+        dim_ids,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -888,15 +913,21 @@ class Fingerprint:
     项目特征指纹：结构化特征文本 + 10 维向量 + 精确结构化字段。
     """
 
-    def __init__(self, name: str, features: Dict[str, str],
-                 embeddings: Dict[str, List[float]],
-                 struct_features: Optional[dict] = None,
-                 struct_features_schema_version: int = STRUCT_FEATURE_SCHEMA_VERSION):
+    def __init__(
+        self,
+        name: str,
+        features: Dict[str, str],
+        embeddings: Dict[str, List[float]],
+        struct_features: Optional[dict] = None,
+        struct_features_schema_version: int = STRUCT_FEATURE_SCHEMA_VERSION,
+        sections_layout_version: int = FINGERPRINT_SECTIONS_LAYOUT_VERSION,
+    ):
         self.name = name
         self.features = features                        # {dim_id: feature_text}
         self.embeddings = embeddings                    # {dim_id: [float, ...]}
         self.struct_features = struct_features or {}    # 精确 JSON 特征
         self.struct_features_schema_version = struct_features_schema_version
+        self.sections_layout_version = sections_layout_version
 
     def to_dict(self) -> dict:
         return {
@@ -905,6 +936,7 @@ class Fingerprint:
             "embeddings": {k: v for k, v in self.embeddings.items()},
             "struct_features": self.struct_features,
             "struct_features_schema_version": self.struct_features_schema_version,
+            "sections_layout_version": self.sections_layout_version,
         }
 
     @classmethod
@@ -915,6 +947,7 @@ class Fingerprint:
             embeddings=d["embeddings"],
             struct_features=d.get("struct_features", {}),  # 向后兼容
             struct_features_schema_version=d.get("struct_features_schema_version", 1),
+            sections_layout_version=d.get("sections_layout_version", 0),
         )
 
     def save(self, path: str):
@@ -964,20 +997,18 @@ def build_fingerprint(
     embedding_stage_path = os.path.join(stage_dir, "fingerprint_embeddings.json")
     dim_ids = sorted(DIMENSION_MAP.keys())
 
+    cache_ok = (not force) and is_fingerprint_disk_cache_ok(sections_dir)
+
     if not force and os.path.exists(fp_path):
         fingerprint_payload = _load_json(fp_path)
-        feature_payload = _load_json(feature_stage_path)
-        struct_payload = _load_json(struct_stage_path)
-        embedding_payload = _load_json(embedding_stage_path)
-        if _is_fingerprint_cache_current(fingerprint_payload) and _are_fingerprint_stage_caches_complete(
-            feature_payload,
-            struct_payload,
-            embedding_payload,
-            dim_ids,
-        ):
+        if cache_ok:
             logger.info(f"加载已有指纹: {fp_path}")
             return Fingerprint.from_dict(fingerprint_payload)
-        if not _is_fingerprint_cache_current(fingerprint_payload):
+        if fingerprint_payload.get("sections_layout_version") != FINGERPRINT_SECTIONS_LAYOUT_VERSION:
+            logger.info(
+                f"fingerprint 章节布局版本与当前工具不一致（sections_layout_version），将重建: {fp_path}"
+            )
+        elif not _is_fingerprint_cache_current(fingerprint_payload):
             logger.info(
                 f"fingerprint 结构化特征 schema 版本过旧，将重建: {fp_path}"
             )
@@ -986,12 +1017,15 @@ def build_fingerprint(
                 f"fingerprint 阶段缓存不完整，将重组最终指纹: {fp_path}"
             )
 
+    # 章节合并后旧「维度摘要/向量」阶段缓存仍可能命中错误前缀，须强制重跑 LLM 摘要与 struct
+    effective_force = bool(force or not cache_ok)
+
     # Step 1: LLM 提取文本摘要特征
     print(f"📝 正在提取 {repo_name} 的结构化特征...")
     features, feature_usage = extract_features_from_report(
         sections_dir,
         checkpoint_path=feature_stage_path,
-        force=force,
+        force=effective_force,
     )
 
     # Step 1.5: LLM 提取精确结构化特征（JSON）
@@ -999,16 +1033,16 @@ def build_fingerprint(
     struct_features, struct_usage = extract_struct_features(
         sections_dir,
         checkpoint_path=struct_stage_path,
-        force=force,
+        force=effective_force,
     )
 
     # Step 2: 本地 Embedding
     if embedder is None:
         embedder = LocalEmbedder()
 
-    embedding_payload = {} if force else _load_json(embedding_stage_path)
+    embedding_payload = {} if effective_force else _load_json(embedding_stage_path)
     embeddings = embedding_payload.get("embeddings", {}) or {}
-    if embeddings and all(dim_id in embeddings for dim_id in dim_ids):
+    if embeddings and all(dim_id in embeddings for dim_id in dim_ids) and not effective_force:
         print(f"🧠 LLM 特征提取完成，开始本地向量化...")
         print(f"⏭️  命中本地阶段缓存：embedding 向量")
     else:
@@ -1032,9 +1066,14 @@ def build_fingerprint(
         print(f"💾 已保存 embedding 阶段缓存: {embedding_stage_path}")
 
     # Step 3: 保存
-    fp = Fingerprint(name=repo_name, features=features,
-                     embeddings=embeddings, struct_features=struct_features,
-                     struct_features_schema_version=STRUCT_FEATURE_SCHEMA_VERSION)
+    fp = Fingerprint(
+        name=repo_name,
+        features=features,
+        embeddings=embeddings,
+        struct_features=struct_features,
+        struct_features_schema_version=STRUCT_FEATURE_SCHEMA_VERSION,
+        sections_layout_version=FINGERPRINT_SECTIONS_LAYOUT_VERSION,
+    )
     fp.save(fp_path)
     llm_usage_total = _merge_token_usage(feature_usage, struct_usage)
     if llm_usage_total["total_tokens"] > 0:

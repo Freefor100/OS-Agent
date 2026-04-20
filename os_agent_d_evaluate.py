@@ -8,7 +8,7 @@ OS-Agent D 评估模块（增强版：重试机制 + 错误追溯 + 鲁棒性）
 3. 每个章节启动独立 Agent（无共享记忆），对比人类文档与生成报告
 4. 冲突时以 OS 源码为权威，使用工具验证
 5. 输出至 evaluation/<os_name>/：sections/*.json、summary.json、evaluation_report.md
-6. 13(开发历史与里程碑) 不参与验证，评估仅覆盖 01-12 章
+6. 10(开发历史与里程碑) 不参与验证，评估覆盖 01–09 技术章及 01 概览（按文件名前缀扫描）
 
 增强功能：
 - 智能重试机制（指数退避、错误分类）
@@ -923,8 +923,8 @@ def run_evaluation(
     for idx, sec_path in enumerate(sections, 1):
         sec_name = os.path.basename(sec_path)
 
-        # 跳过不需要验证的章节
-        if sec_name.startswith("14_") or sec_name.startswith("15_"):
+        # 跳过不需要验证的章节（历史章、预留前缀）
+        if sec_name.startswith("10_") or sec_name.startswith("14_") or sec_name.startswith("15_"):
             print(f"\n⏭️  [{idx}/{len(sections)}] 跳过（不验证）: {sec_name}")
             logging.info(f"Skipping section: {sec_name}")
             skip_count += 1

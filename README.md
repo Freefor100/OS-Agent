@@ -10,25 +10,22 @@
 
 ### 1. OS-Agent D：自动源码描述 (`os_agent_d_describe.py`) ✨ **增强版**
 
-对 OS 仓库进行 **13 阶段**的深度技术分析，现已升级为**阶段级 Plan-Execute (PE)** 架构，内置本地 RAG 语义搜索、LSP 调用图分析、智能重试；Execute 阶段受锁定 **`execution_steps`** 与执行契约约束。各阶段计划在 `_per_stage/*_plan.json` 落盘便于对照与复跑。
+对 OS 仓库进行 **阶段化**深度技术分析（`STAGES`：**02→09 技术章 → `10_history` → `01_overview` 置底**；另含 **00** 仓库准备、**0.5** RAG 预索引），现已升级为**阶段级 Plan-Execute (PE)** 架构，内置本地 RAG 语义搜索、LSP 调用图分析、智能重试；Execute 阶段受锁定 **`execution_steps`** 与执行契约约束。各阶段计划在 `_per_stage/*_plan.json` 落盘便于对照与复跑。
 
 | 阶段 | 内容 |
 |------|------|
 | 00 | 仓库准备（本地直连克隆，无 LLM 开销） |
 | 0.5 | RAG 预索引（代码向量化，支持后续语义搜索，已有索引自动跳过） |
-| 01 | 项目概览与技术栈 |
-| 02 | 启动流程与架构初始化 |
+| 02 | 启动/架构与 Trap/系统调用 |
 | 03 | 内存管理（物理/虚拟/分配器） |
-| 04 | 进程/线程与调度机制 |
-| 05 | 中断、异常与系统调用 |
-| 06 | 文件系统（VFS + 具体 FS） |
-| 07 | 设备驱动与硬件抽象 |
-| 08 | 同步互斥与进程间通信 |
-| 09 | 多核支持与并行机制 |
-| 10 | 安全机制与权限模型 |
-| 11 | 网络子系统与协议栈 |
-| 12 | 调试机制与错误处理 |
-| 13 | 开发历史与里程碑（Git 语义化分析） |
+| 04 | 进程/线程/调度与多核 |
+| 05 | 文件系统与设备 I/O |
+| 06 | 同步互斥与进程间通信 |
+| 07 | 安全机制与权限模型 |
+| 08 | 网络子系统与协议栈 |
+| 09 | 调试机制与错误处理 |
+| 10 | 开发历史与里程碑（Git 语义化分析） |
+| 01 | 项目概览与技术栈（**最后执行**，依赖 02–10 各章） |
 
 **核心分析机制（三级联动）：**
 
@@ -47,7 +44,7 @@
 - 该工具只允许查询“全国大学生操作系统比赛”背景、赛道定位、目标要求、功能要求和公开技术背景。
 - `web_search` 结果只能用于**技术概览 / 概述总结**，**绝不能**作为仓库实现事实、查重判断或源码证据。
 
-**报告拼装（13阶段结束后）：Call Graph 概览块** (`tools/callgraph_overview.py`) ✨ **新增**
+**报告拼装（各阶段结束后）：Call Graph 概览块** (`tools/callgraph_overview.py`) ✨ **新增**
 
 所有分析阶段完成后，在报告 TOC 之后、各章节正文之前，自动插入 **Call Graph 概览块**，让评委一眼看懂 OS 的架构枢纽与调用关系。
 
@@ -421,7 +418,7 @@ evaluation/
    output_dir: C:\...\output\my-os
    评估输出: C:\...\evaluation\my-os
    模型: deepseek/deepseek-v3.2
-   章节总数: 13
+   章节总数: 11
    日志文件: C:\...\evaluation\my-os\evaluation.log
    重试配置: 最大3次, 退避2-60秒
 ============================================================
@@ -461,7 +458,7 @@ evaluation/
 ============================================================
 ✅ 评估任务完成
    📊 统计:
-      - 总章节数: 13
+      - 总章节数: 11
       - 成功: 12
       - 失败: 1
       - 跳过: 2
@@ -499,7 +496,7 @@ evaluation/
 - **粗筛最终缓存语义收紧**：`fingerprint.json` 不再单独视为充分缓存命中条件；只有当 `features`、`struct_features`、`embeddings` 三个阶段缓存也完整且 schema 版本匹配时才会直接加载。只要任一阶段缓存缺失，即使最终指纹仍在，也会自动进入重组流程。
 
 #### 🆕 **v3.2 终局合成与抗幻觉架构重构**（2026-03-19）
-- **报告生成逆向思维法**：颠覆了流程式生成的刻板印象，将 `01_overview` 移至分析大循环的最后一环执行。Agent 现在会携带前置 12 章的几万字上下文全集，以前所未有的上帝视角凝练出最终的项目概览与完成度评价，并通过首字母编排算法自动归位至报告首发位置。
+- **报告生成逆向思维法**：颠覆了流程式生成的刻板印象，将 `01_overview` 移至分析大循环的最后一环执行。Agent 现在会携带前置技术章与历史章（02–10）的全量上下文，以前所未有的上帝视角凝练出最终的项目概览与完成度评价，并通过首字母编排算法自动归位至报告首发位置。
 - **封杀数字虚构幻觉**：删除冗余旧阶段，并以硬性“防打分负向 Prompt”取代，有效抑制了大模型在评价完成度时随意虚构 `7.5/10` 一类不严谨的数字评分体系。
 - **自动选手画像注入**：集成纯 Python (`openpyxl`) 的解析桥梁，智能从 `collected-data.xlsx` 回读开发者的学校、年份、赛事及队伍画像，直接雕刻于最终报告顶部。
 
@@ -544,7 +541,7 @@ evaluation/
 
 ```
 OS-Agent/
-├── os_agent_d_describe.py          # Agent D：OS 源码深度描述（13 个分析阶段 + 仓库准备/RAG 预索引）
+├── os_agent_d_describe.py          # Agent D：OS 源码深度描述（10 个 LLM 阶段 + 仓库准备/RAG 预索引）
 ├── os_agent_d_evaluate.py          # Agent D：报告自动评估
 ├── os_agent_c_coarse.py            # Agent C：粗筛（pre-plan + 向量相似度检索）
 ├── os_agent_c_fine.py              # Agent C：精比（阶段级 Plan→Execute）
@@ -677,6 +674,8 @@ OS-Agent/
 - 运行结束时输出错误摘要，并生成 `output/<os-name>/describe_error_report.json`
 
 **v4.0** 可结合 `_per_stage/*_plan.json` 与 `repo_profile.json` 对照各章锁定步骤与 must_cover；章节正文以 `sections/*.md` 为准。
+
+**Describe 无工具 Review（可选）**：`DESCRIBE_STAGE_REVIEW=1` 时，仅对 **JSON-QA 且校验成功** 的阶段在落盘前送审：材料为 **`core/describe_stage_qa` 题单** + **`coerce_answers_payload_by_stage_qa` 覆写题面前的答案 JSON**（证据以答案 JSON 内 `evidence` 为准，**不含**工具回传摘录）。`01_overview`、`10_history` 不审。结果 `_per_stage/<stage_id>_review.json`：含逐题 **`question_reviews[]`**（`question_id`、`confidence`、`review` 文字）、全阶段 **`confidence`** 与 **`summary_zh`** 总评等；默认关闭。可选 `DESCRIBE_REVIEW_MODEL`。
 
 若某章质量不符预期，优先检查 `output/<os-name>/_per_stage/` 下对应 `*_plan.json` 与 `os_agent_d_describe.py` 中该阶段 `prompt` / 执行契约。
 

@@ -1,0 +1,254 @@
+{
+  "stage_id": "05_fs_drivers",
+  "stage_title": "文件系统与设备 I/O",
+  "questions": [
+    {
+      "question_id": "Q05_001",
+      "question_type": "short_answer",
+      "stem": "VFS 抽象层 (Virtual File System, VFS)接口是什么形态？（Rust trait / C op 表；必须给接口定义证据）"
+    },
+    {
+      "question_id": "Q05_002",
+      "question_type": "single_choice",
+      "stem": "具体文件系统后端 (Concrete File System Backend) 更接近哪种？",
+      "choices": [
+        "真实磁盘文件系统（FAT32/Ext4/其他，持久化存储）",
+        "仅内存文件系统（RamFS / TmpFS，重启丢失）",
+        "混合挂载（磁盘 FS + 内存 FS 均支持）",
+        "仅 VFS 接口定义，无具体后端（骨架/桩）",
+        "未发现"
+      ]
+    },
+    {
+      "question_id": "Q05_003",
+      "question_type": "short_answer",
+      "stem": "若支持 FAT32/Ext4：它是自研还是第三方库/crate？（必须引用 Cargo.toml/Cargo.lock 或 Makefile 引入证据）"
+    },
+    {
+      "question_id": "Q05_004",
+      "question_type": "short_answer",
+      "stem": "文件打开路径：文件打开入口（sys_open 或等价）→ VFS 层 → 具体 FS open。列出 3-6 个关键节点并给证据。"
+    },
+    {
+      "question_id": "Q05_005",
+      "question_type": "short_answer",
+      "stem": "文件描述符表 (File Descriptor Table, FD Table) 的实现形态是什么？（固定数组/Vec/BTreeMap 等；必须给结构体定义证据）"
+    },
+    {
+      "question_id": "Q05_006",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现块缓存/缓冲缓存 (Block Cache / Buffer Cache, bcache)？（必须三态）"
+    },
+    {
+      "question_id": "Q05_007",
+      "question_type": "short_answer",
+      "stem": "若存在缓存：驱逐策略是什么（LRU/Clock/FIFO/无驱逐）？必须指出判断依据（字段/算法分支）证据。"
+    },
+    {
+      "question_id": "Q05_008",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现页缓存 (Page Cache)或与 mmap/文件映射共享缓存页？（必须三态）"
+    },
+    {
+      "question_id": "Q05_009",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 mmap 的文件映射或匿名映射？（必须三态；若 stub 说明形态）"
+    },
+    {
+      "question_id": "Q05_010",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 poll/select/epoll（或等价事件机制）？（必须三态）"
+    },
+    {
+      "question_id": "Q05_011",
+      "question_type": "tri_state_impl",
+      "stem": "路径解析 (namei/path_walk/lookup) 是否实现并支持绝对/相对路径与 . ..？（必须三态）"
+    },
+    {
+      "question_id": "Q05_012",
+      "question_type": "tri_state_impl",
+      "stem": "是否支持符号链接 (symlink) 的解析/跟随？（必须三态）"
+    },
+    {
+      "question_id": "Q05_013",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现管道 (pipe/pipe2) 并在 VFS 层作为文件对象？（必须三态；与 08 章 pipe 实现互指）"
+    },
+    {
+      "question_id": "Q05_014",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现网络 socket（作为 VFS 文件对象）？（必须三态）"
+    },
+    {
+      "question_id": "Q05_015",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现伪文件系统（devfs/procfs/sysfs）？（必须三态；若 implemented 需说明实现形态）"
+    },
+    {
+      "question_id": "Q05_016",
+      "question_type": "single_choice",
+      "stem": "文件描述符表的归属是哪种？",
+      "choices": [
+        "Per-Process（每进程独立 fd 表，fork 时复制/共享）",
+        "Global（全局共享 fd 表）",
+        "未发现/待核实"
+      ]
+    },
+    {
+      "question_id": "Q05_017",
+      "question_type": "single_choice",
+      "stem": "文件数据块分配方式 (File Allocation Method, Stallings Ch12) 更接近哪种？",
+      "choices": [
+        "连续分配 (Contiguous Allocation)：文件占连续磁盘块",
+        "链式分配 (Chained/Linked Allocation)：块通过指针链接",
+        "索引分配 (Indexed Allocation)：inode 索引块列表",
+        "extent 分配 (Extent-based)：连续块区间的索引",
+        "混合（如 Unix 直接+间接块）",
+        "未发现/不适用（内存FS无磁盘分配）"
+      ]
+    },
+    {
+      "question_id": "Q05_018",
+      "question_type": "single_choice",
+      "stem": "磁盘/存储空闲空间管理 (Free Space Management, Stallings Ch12) 更接近哪种？",
+      "choices": [
+        "位向量/位图 (Bit Vector / Bitmap)",
+        "空闲块链表 (Linked Free List)",
+        "成组链接 (Grouping)：空闲块指向下一组",
+        "计数法 (Counting)：记录连续空闲块起始+数量",
+        "FAT 表内嵌空闲链（FAT32 特有）",
+        "未发现/不适用（内存FS）"
+      ]
+    },
+    {
+      "question_id": "Q05_019",
+      "question_type": "single_choice",
+      "stem": "目录结构 (Directory Structure, Stallings Ch12) 更接近哪种？",
+      "choices": [
+        "单级目录 (Single-Level Directory)",
+        "两级目录 (Two-Level Directory)",
+        "树形层次目录 (Tree-Structured Hierarchy)（最常见）",
+        "无环图目录 (Acyclic-Graph Directory)（支持硬链接/软链接）",
+        "通用图目录 (General Graph)（允许目录环路）",
+        "未发现"
+      ]
+    },
+    {
+      "question_id": "Q05_020",
+      "question_type": "single_choice",
+      "stem": "文件内部记录组织 (File Record Organization, Stallings Ch12) 更接近哪种？",
+      "choices": [
+        "字节流 (Byte Stream / Unstructured)：无固定记录结构",
+        "固定长度记录 (Fixed-Length Records)",
+        "可变长度记录 (Variable-Length Records)",
+        "未发现（不涉及记录层）"
+      ]
+    },
+    {
+      "question_id": "Q05_021",
+      "question_type": "single_choice",
+      "stem": "设备发现/枚举机制更接近哪种？",
+      "choices": [
+        "Device Tree (DTB/DTS) 解析",
+        "PCI/总线扫描",
+        "硬编码设备表/固定 MMIO 地址",
+        "混合（多种并存）",
+        "未发现/待核实"
+      ]
+    },
+    {
+      "question_id": "Q05_022",
+      "question_type": "tri_state_impl",
+      "stem": "是否能在代码中证实解析了 `.dtb`/DeviceTree？（必须三态；若 implemented 必须指出解析入口）"
+    },
+    {
+      "question_id": "Q05_023",
+      "question_type": "short_answer",
+      "stem": "驱动框架接口是什么？（Rust Driver trait / C driver ops / 注册表；必须引用接口定义证据）"
+    },
+    {
+      "question_id": "Q05_024",
+      "question_type": "short_answer",
+      "stem": "驱动注册与初始化顺序是什么？（init_drivers/probe/driver_manager 等；列出 3-6 个关键节点并给证据）"
+    },
+    {
+      "question_id": "Q05_025",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 UART/Console 驱动用于早期输出？（必须三态）"
+    },
+    {
+      "question_id": "Q05_026",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现块设备驱动（virtio-blk/ramdisk/其他）？（必须三态）"
+    },
+    {
+      "question_id": "Q05_027",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现网络设备驱动（virtio-net/e1000/rtl8139 等）？（必须三态）"
+    },
+    {
+      "question_id": "Q05_028",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现中断控制器驱动（PLIC/CLINT/APIC 等）？（必须三态；需指出中断源到 handler 的分发证据）"
+    },
+    {
+      "question_id": "Q05_029",
+      "question_type": "short_answer",
+      "stem": "MMIO 地址来源是什么？（DTB 提供 / 常量硬编码 / 物理→虚拟转换；必须给证据）"
+    },
+    {
+      "question_id": "Q05_030",
+      "question_type": "short_answer",
+      "stem": "多平台适配是如何通过构建/条件编译选择驱动的？（features/Kconfig/Makefile 规则；必须给证据）"
+    },
+    {
+      "question_id": "Q05_031",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 MMU 启用前后串口地址切换（phys/virt 切换）逻辑？（必须三态）"
+    },
+    {
+      "question_id": "Q05_032",
+      "question_type": "single_choice",
+      "stem": "I/O 缓冲模式 (I/O Buffering) 最接近哪种？（Stallings Ch11：单缓冲 Single Buffer / 双缓冲 Double Buffer / 循环缓冲 Circular Buffer / 缓冲池 Buffer Pool / 无缓冲 No Buffer）",
+      "choices": [
+        "单缓冲 (Single Buffer)",
+        "双缓冲 (Double Buffer / Ping-Pong Buffer)",
+        "循环缓冲 (Circular Buffer / Ring Buffer)",
+        "缓冲池 (Buffer Pool)",
+        "无缓冲（直接 I/O / Unbuffered）",
+        "未发现缓冲机制"
+      ]
+    },
+    {
+      "question_id": "Q05_033",
+      "question_type": "single_choice",
+      "stem": "块设备（磁盘/eMMC/NVMe）I/O 请求调度算法 (Scheduling Algorithm) (Disk Scheduling Algorithm) 更接近哪种？（Stallings Ch11；若无显式调度则选「FCFS 顺序提交」）",
+      "choices": [
+        "FCFS（先来先服务 First-Come First-Served）",
+        "SSTF（最短寻道时间优先 Shortest Seek Time First）",
+        "SCAN / Elevator（电梯算法）",
+        "C-SCAN（循环扫描 Circular SCAN）",
+        "基于 virtio 环（queue 顺序提交，无显式磁盘调度）",
+        "未发现"
+      ]
+    },
+    {
+      "question_id": "Q05_034",
+      "question_type": "single_choice",
+      "stem": "I/O 控制技术 (I/O Control Techniques, Stallings Ch11) 更接近哪种？",
+      "choices": [
+        "程序控制 I/O (Programmed I/O / Polling)：CPU 主动轮询设备状态",
+        "中断驱动 I/O (Interrupt-Driven I/O)：设备完成后发中断通知 CPU",
+        "DMA (Direct Memory Access)：DMA 控制器直接在内存与设备间传输",
+        "混合（小传输用中断，大传输用 DMA）",
+        "未发现"
+      ]
+    },
+    {
+      "question_id": "Q05_035",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 DMA (Direct Memory Access, Stallings Ch11) 传输路径？（必须三态；搜索 dma_alloc / dma_map / dma_buf / virtio 描述符环等；virtio 的描述符环也算 DMA 等价机制）"
+    }
+  ],
+  "stage_constraints_md": "### 原 06 文件系统\n\n**本阶段须额外覆盖**：\n- 自研 vs 直接依赖 crate 的**边界文件**；`feature` 切换导致的 FS 组合差异；同一功能多目录重复实现时**以谁为准**（证据）。\n\n必须回答：\n- VFS 抽象层 (Virtual File System, VFS)：若为 Rust 则写 File/Inode/Dentry **Traits**；若为 **纯 C**，则写 **VFS op 表/函数指针结构**（如 `struct file_operations`/`inode_operations` 等）及挂载点，**勿强行套用 Trait 叙事**。\n- **VFS 与真实后端（防“内存 mock”）**：`grep_in_repo` 搜索 `inode|File trait|disk_inode|fat32|ext4|lwext` 等；**强制**回答：底层是**真实磁盘 FS**（FAT32/Ext4 等）、**仅 RamFS/TmpFS 内存文件系统**、还是**无后端桩**；结论须能指向具体 `路径:行号` 或 `Cargo.toml` 依赖证据。\n- **具体文件系统（必须代码验证）**：\n  - FAT32/Ext4：是否自己实现了？还是用的 crate？（**Rust**：`Cargo.toml`/`Cargo.lock`；**C/Makefile 项目**：同步检查 `Makefile`/`*.mk` 是否引入外部子目录或第三方 FS 源码路径）。**注意：对于组件化的 OS（如 ArceOS），具体的文件系统实现可能独立于 VFS 存在于诸如 `arceos/modules/axfs-ng/src/fs/fat/` 或 `ext4/` 目录中，务必使用搜索功能仔细查找，绝对不要仅仅因为特定目录下没有就断言未实现！**\n  - **具体 FS 的抽象层结构**：搜索 `FatFilesystemInner|Ext4Filesystem|FatFileNode|FatDirNode` 等，分析各层如何实现 VFS trait。这是文件系统架构的核心。\n  - RamFS/TmpFS：是否有内存文件系统？\n- **伪文件系统**：使用 grep_in_repo 搜索 `devfs|procfs|sysfs` 检查是否实现了伪文件系统。若有，分析其实现方式。\n- 文件描述符表：Global 还是 Per-Process？`fd_table` 结构在哪？**须进一步判定实现形态**：例如固定长度数组 `[Option<Arc<dyn File>>; N]`、`Vec<Option<...>>`、`BTreeMap<u32, ...>` 等；引用结构体定义 `路径:行号`，勿泛泛说“有 fd 表”。\n- **页缓存 / 块缓存（Buffer Cache）**：搜索 `block_cache|get_block_cache|bread|bwrite|BufBlock|PageCache`；若存在：**驱逐策略**（LRU、Clock、简单 FIFO、无驱逐）须在代码层指出判断依据 `路径:行号`；若不存在写「未发现块/页缓存」并列出已搜符号。\n- **路径解析（Path Resolution）**：搜索 `namei|path_walk|lookup|resolve_path`（或等价）；检查是否支持**绝对路径**（`/` 开头）与**相对路径**；是否正确处理 `.` / `..`；若声称支持**符号链接（symlink）**，须在 `readlink`/`open` 路径上给出跟随逻辑或写「未发现 symlink 处理」。\n- **功能细节**（必须分类为 `✅ 已实现`、`🔸 桩函数`、`❌ 未实现`）：\n  - 是否支持 `pipe` 套接字？\n  - 是否支持网络 `socket`？\n  - 是否支持 `mmap`？**注意**：必须检查 `sys_mmap` 实现。如果是 **零拷贝**，必须看到 `VmArea` 结构体中有 `shared` 字段或 `MAP_SHARED` 处理逻辑。如果是 `sys_mmap` 仅返回 Ok(0) 没有处理标志位，标注为'桩函数'。\n  - **高级特性**：`poll`/`select`/`epoll` 是否实现？搜索 `sys_poll` / `sys_select` / `sys_epoll`，检查是一律返回 Ready 还是真的检查了文件状态？\n  - **如果上述功能未找到代码，明确写“未实现（❌ 未实现）”**。\n\n- **文件打开流程**：追踪从 `sys_open` 到最终获得文件描述符的完整调用链，说明超级块、Inode、Dentry、File 四大核心数据结构如何协同。\n\n要求：\n- **语义发现（🥇 首选）**：使用 `rag_search_code` 搜索 \"VFS trait\", \"FAT32 implementation\", \"file descriptor table\", \"mount logic\", \"block cache\", \"namei\", \"path resolution\" 锁定文件系统核心实现。\n- 使用 `lsp_get_definition` 定位 `File` trait、`Inode` trait、`SuperBlock` 等 VFS 核心抽象的精确定义。\n- 使用 `lsp_get_references` 追踪 `sys_open` → `vfs_open` → 具体 FS `open` 的完整调用链。\n- **【必须】使用 `lsp_get_call_graph` 追踪文件打开完整路径**：\n  - `lsp_get_call_graph(repo_path, file_of_sys_open, \"sys_open\", direction=\"outgoing\", max_depth=4)` — 从 syscall 到 VFS 再到具体 FS 的完整下行链\n  - `lsp_get_call_graph(repo_path, file_of_vfs_open, \"vfs_open\", direction=\"both\", max_depth=3)` — VFS 中枢节点双向（谁调它，它调谁）\n  - 如返回 `[⚠️ DEGRADED MODE]`，标注\"DEGRADED — 静态 Grep 分析\"并继续使用，重点关注 outgoing 中 FS trait impl 的调用。\n- 使用 `lsp_get_document_outline` 快速摸清 VFS 和具体 FS 实现文件的内部结构。\n- 使用 grep_in_repo 搜索 \"FdTable|FileDescriptor|fd_table\" 确认文件描述符表实际命名。\n- **路径精确性（关键）**：注意区分相似目录（如 `core/file/` vs `core/fs/`，`src/fs/imp/` vs `api/src/core/fs/imp/`）。引用每个文件前必须用 `lsp_get_definition` 确认函数的真实定义位置。如果同一模块在多个目录中有实现（如 TmpFS 在 `src/` 和 `api/src/` 中都有），必须全部列出。\n- **多目录重复实现**：若检出多处 VFS/FS 实现，须用构建规则或条件编译行号说明**哪一路径参与当前 profile 链接**，避免仅列目录而无取舍依据。\n\n**【评测与交付适配 — 本阶段启发式】**（须 grep/README 与源码交叉验证；无则写未发现）：\n- **整盘挂载/无分区表 EXT4**、根目录**扫测试脚本**（如 `*testcode*`、固定横幅字符串）往往落在 **VFS/mount/init 用户态**交界：有命中则单列「Harness 与文件系统交界」并列出文件；无命中不写赛题名。\n- **双盘或多 virtio-blk** 挂载点：仅在代码或 README 中出现第二块盘、`disk.img` 等证据时描述。\n\n### 原 07 设备驱动\n\n**本阶段须额外覆盖**：\n- 每个外设子系统：**本仓支持的硬件列表 + 对应驱动文件**；未支持则写「未接入」而非默认假设 QEMU。\n\n必须回答：\n- 设备发现：Device Tree (DTS) 解析或 PCI/Bus 扫描？**必须验证**是否真的解析了 `.dtb` 文件，还是硬编码了地址？\n- 驱动框架：Driver Trait，如何注册/初始化驱动？\n- **组件化与配置**：搜索构建配置文件（Cargo.toml 的 features、Kconfig、条件编译宏），分析如何通过编译选项选择不同的驱动/模块实现。\n- **平台适配**：搜索 `platform/` 或 `boards/` 目录，列出所有支持的目标平台/开发板及其特有驱动，分析项目如何适配不同硬件。\n- 常见设备：\n    - UART/Serial（控制台输出）\n    - Block Device（磁盘读写，VirtIO-Blk）\n    - Net Device（网卡，VirtIO-Net）及网络协议栈（TCP/IP, smoltcp 等实现）\n    - GPU/Input（如有）\n- 中断控制器：PLIC/CLINT/APIC 驱动。\n- **MMU 前后串口地址切换**：分析 UART 驱动在 MMU 启用前（使用物理地址）和 MMU 启用后（使用虚拟地址）的地址切换机制。搜索串口基址常量的不同定义。\n\n要求：\n- **语义发现（🥇 首选）**：使用 `rag_search_code` 搜索 \"device driver trait\", \"virtio-blk driver\", \"UART initialization\", \"PCI bus scanning\" 快速锁定驱动程序。\n- 使用 `lsp_get_definition` 定位 Driver trait 定义和各设备驱动的 trait impl。\n- 使用 `lsp_get_references` 追踪 `init_drivers` / `probe` 的调用链，理解驱动注册与初始化顺序。\n- 使用 `lsp_get_document_outline` 浏览驱动文件结构，快速发现所有设备相关的 struct 和 impl。\n- 辅以 grep_in_repo 搜索 `axdriver` 或 `driver::` 和构建配置中的 feature flags。\n\n**【评测与交付适配 — 本阶段启发式】**（须源码证据；无则略）：\n- 若 README/Makefile 出现**多 virtio-blk/virtio-net 实例**，须与驱动代码对应 `路径:行号` 给出「能否同时挂载」结论。\n- 仅在有 `grep` 命中驱动相关符号或 README 明确描述时写评测相关内容；禁止臆测赛题。"
+}

@@ -3,9 +3,15 @@
 # 每阶段 Cursor 式管线（固定）:
 #   ① Plan     — 阶段提示词 + 启发式 plan + LLM 自主探索 → 锁定计划与 execution_steps（须按序执行）
 #   ② Execute  — System + 单条 Human（计划+任务合并）后 ReAct 写章节
+#   ③ Review（可选）— DESCRIBE_STAGE_REVIEW=1 且本阶段为 JSON-QA 并成功校验时：仅将
+#      「describe_stage_qa 题单」+「coerce_answers_payload_by_stage_qa 覆写前的 JSON」
+#      送审；不含工具摘录。01_overview / 10_history 不审。
+#      侧车：_per_stage/<stage_id>_review.json（失败见 *_review_error.json）。
 #
 # API Key / MODEL_NAME 等仍从仓库根目录 .env 读取（load_dotenv）。
 #
+import copy
+import json
 import os
 import re
 import sys
@@ -41,6 +47,12 @@ from core.per_planner import (
 )
 from core.per_executor import extract_stage_artifacts
 from core.describe_stage_qa import load_stage_qa, list_question_ids
+from core.describe_stage_review import (
+    build_stage_qa_question_sheet,
+    describe_stage_review_applies,
+    describe_stage_review_enabled,
+    run_describe_stage_review,
+)
 from core.describe_json_qa import (
     SCHEMA_VERSION as JSON_QA_SCHEMA_VERSION,
     build_bailian_response_format_json_schema,
@@ -343,9 +355,42 @@ def _build_json_qa_prompt(stage_id: str, stage_title: str) -> tuple[str, list[st
     lines.append("- `value` 必须是数组（JSON array）。数组中**每个元素**都必须是该题 `choices[]` 中的**完整原文**，要求逐字匹配。")
     lines.append("- **禁止**输出 `A/C`、`A,C`、`[\"A\",\"C\"]` 这类字母代号；禁止输出带 `A.` 前缀的文本；禁止改写选项。")
     lines.append("- 若题目允许“未发现/无统计”等选项，且你未找到任何证据支持其他项，优先把该“未发现/无统计”选项作为数组唯一元素。")
-    lines.append("每条证据 `evidence[]` 必须包含：`path`（仓库相对路径）、`symbol_kind`、`symbol_name`、可选 `excerpt`。")
+    lines.append(
+        "每条证据 `evidence[]` 必须包含：`path`（仓库相对路径）、`symbol_kind`、`symbol_name`、"
+        "`excerpt`（**否定/未找到结论时见上节须为非空**，其它题型仍建议填写摘录）。"
+    )
     lines.append("")
-    lines.append("你必须使用本仓库代码证据作答。若未发现实现，按三态要求输出 `not_found`，且不得编造路径/符号。")
+    lines.append(
+        "你必须使用本仓库代码证据作答。若未发现实现，按三态要求输出 `not_found`。"
+        "**不得编造**不存在的文件路径或符号；但**鼓励**在 `evidence` 中给出**可复核的查找过程**（见下节），避免 `evidence` 为空导致评审无法判断你是否真的搜过。"
+    )
+    lines.append("")
+    lines.append("### `not_found` / 否定结论时的证据（强烈建议非空）")
+    lines.append("")
+    lines.append(
+        "当结论为 `not_found` 或选择题/简答表达「未发现」时，`evidence` **优先使用 1～3 条**记录检索过程（仍须真实、可对照）："
+    )
+    lines.append("- `path`：你实际打开或作为检索范围的**真实**仓库相对路径（可为具体文件，或代表性目录如 `kernel/syscall`；禁止虚构路径）。")
+    lines.append("- `symbol_kind`：可用 `search`、`scan`、`doc` 等自说明类别（字符串即可）。")
+    lines.append("- `symbol_name`：简短标签，如 `grep_pattern`、`syscall_table_scan`、`dir_list`。")
+    lines.append(
+        "- `excerpt`：**必填（此场景下）**，写清检索手段、关键字/模式、范围、结果（例如「于 sysnum.h 与 syscall.c 检索 socket/bind/listen 标识符，0 命中」或「已阅读 README 相关段落，未声称网络协议栈」）。"
+    )
+    lines.append("")
+    lines.append("### Mermaid / 多行文本与 JSON 合法性（极其重要）")
+    lines.append("")
+    lines.append(
+        "最终输出必须是 **`json.loads` 一次即可解析** 的合法 JSON。字符串值内的 **物理换行必须写成 `\\n`**，"
+        "字符串内的 **双引号必须写成 `\\\"`**，反斜杠写成 `\\\\`。"
+    )
+    lines.append(
+        "**严禁**在 `value` 的 JSON 字符串中直接嵌入「含真实换行」的 ```mermaid … ``` 围栏块——这是已引发 **Unterminated string / JSON 解析失败** 的高频原因。"
+    )
+    lines.append("若题干要求 Mermaid，任选其一（由易到难）：")
+    lines.append("1. 将整图放在**单行字符串**内，仅用 `\\n` 表示图中换行（整条 `value` 对外仍是合法 JSON）；或")
+    lines.append("2. 使用**无三反引号**的缩略 `graph TD` 文本（节点写 `Func[path:line]`），避免反引号围栏；或")
+    lines.append("3. 用**有序步骤 + 路径:行号**列表代替图，并在 `notes`（若输出该字段）说明「为避免破坏 JSON 未嵌完整 Mermaid」。")
+    lines.append("**禁止**输出「看起来像 JSON、实际不能解析」的内容；宁可简化图，不可输出非法 JSON。")
     lines.append("")
     lines.append("你必须按题单顺序输出 answers，且 question_id 必须与题单完全一致（不多不少）。")
     lines.append("")
@@ -363,7 +408,16 @@ def _build_json_qa_prompt(stage_id: str, stage_title: str) -> tuple[str, list[st
     lines.append("      \"question_type\": \"tri_state_impl\",")
     lines.append("      \"stem\": \"...\",")
     lines.append("      \"value\": \"not_found\",")
-    lines.append("      \"evidence\": []")
+    lines.append("      \"evidence\": [")
+    lines.append("        {")
+    lines.append("          \"path\": \"kernel/syscall/sysnum.h\",")
+    lines.append("          \"symbol_kind\": \"search\",")
+    lines.append("          \"symbol_name\": \"grep_keyword_scan\",")
+    lines.append(
+        "          \"excerpt\": \"在 sysnum.h 与 syscall.c 检索关键字 xxx，0 命中；并列出已打开文件范围\""
+    )
+    lines.append("        }")
+    lines.append("      ]")
     lines.append("    }")
     lines.append("  ]")
     lines.append("}")
@@ -376,9 +430,9 @@ def _build_json_qa_prompt(stage_id: str, stage_title: str) -> tuple[str, list[st
 STAGES = [
 
     {
-        "id": "02_boot_arch",
-        "title": "启动流程与架构初始化",
-        "prompt": "",  # legacy prompt archived under legacy_stage_prompts/
+        "id": "02_boot_trap",
+        "title": "启动/架构与 Trap/系统调用",
+        "prompt": "",  # JSON-QA: core/describe_stage_qa/02_boot_trap.json
     },
     {
         "id": "03_mem_mgmt",
@@ -386,79 +440,67 @@ STAGES = [
         "prompt": "",
     },
     {
-        "id": "04_process_sched",
-        "title": "进程/线程与调度机制",
-        "prompt": "",  # legacy prompt archived under legacy_stage_prompts/
+        "id": "04_process_smp",
+        "title": "进程/线程/调度与多核",
+        "prompt": "",
     },
     {
-        "id": "05_trap_syscall",
-        "title": "中断、异常与系统调用",
-        "prompt": "",  # legacy prompt archived under legacy_stage_prompts/
+        "id": "05_fs_drivers",
+        "title": "文件系统与设备 I/O",
+        "prompt": "",
     },
     {
-        "id": "06_fs_vfs",
-        "title": "文件系统（VFS + 具体 FS）",
-        "prompt": "",  # legacy prompt archived under legacy_stage_prompts/
-    },
-    {
-        "id": "07_device_drivers",
-        "title": "设备驱动与硬件抽象",
-        "prompt": "",  # legacy prompt archived under legacy_stage_prompts/
-    },
-    {
-        "id": "08_sync_ipc",
+        "id": "06_sync_ipc",
         "title": "同步互斥与进程间通信",
-        "prompt": "",  # legacy prompt archived under legacy_stage_prompts/
+        "prompt": "",
     },
     {
-        "id": "09_smp_multicore",
-        "title": "多核支持与并行机制",
-        "prompt": "",  # legacy prompt archived under legacy_stage_prompts/
-    },
-    {
-        "id": "10_security",
+        "id": "07_security",
         "title": "安全机制与权限模型",
-        "prompt": "",  # legacy prompt archived under legacy_stage_prompts/
+        "prompt": "",
     },
     {
-        "id": "11_network",
+        "id": "08_network",
         "title": "网络子系统与协议栈",
-        "prompt": "",  # legacy prompt archived under legacy_stage_prompts/
+        "prompt": "",
     },
     {
-        "id": "12_debug_error",
+        "id": "09_debug_error",
         "title": "调试机制与错误处理",
-        "prompt": "",  # legacy prompt archived under legacy_stage_prompts/
+        "prompt": "",
     },
-
-
     {
-        "id": "13_history",
+        "id": "10_history",
         "title": "开发历史与里程碑",
-        "prompt": "",  # legacy prompt archived under legacy_stage_prompts/
+        "prompt": """目标：撰写「开发历史与里程碑」一章，以 **Git 与仓库内可复核证据** 为主，做技术向演进归纳（避免无依据的提交流水账）。
+
+**建议覆盖（有证据才写，无则明确写「未发现」）**
+- 若存在 `.git`：用本阶段已启用的 Git 工具概括主分支/标签/作者贡献方向；**禁止**编造未出现在工具输出中的 commit hash 或统计口径。
+- **模块演进**：可结合前文各章已出现的路径，用 `trace_file_evolution` 等追踪关键文件/目录的引入或大改，只写工具输出可支撑的判断。
+- **文档里程碑**：README、CHANGELOG、CI 配置等中与版本或阶段目标相关的陈述，区分「文档声称」与「代码可验证结论」。
+- **缺口**：若历史信息显示某能力被移除、长期标注实验/待办，如实记录。
+
+**输出形式**：Markdown 本章正文（小节自洽）；**不要**以题库 JSON 对象作为终稿。""",
     },
     {
         "id": "01_overview",
         "title": "项目概览与技术栈",
         "needs_previous_sections": True,
-        "prompt": """目标：在「项目概览」一章中，**以各前置章节（02-13）已生成的报告为主要依据**，系统整理**每个功能模块所采用的技术、算法、关键数据结构、外部依赖与工具使用**；并补充仓库级技术栈与构建信息。要求**逐模块覆盖、不得遗漏**（与下文「[前面阶段的分析内容]」中的章节一一对应）。
+        "prompt": """目标：在「项目概览」一章中，**以各前置章节（02–10）已生成的报告为主要依据**，系统整理**每个功能模块所采用的技术、算法、关键数据结构、外部依赖与工具使用**；并补充仓库级技术栈与构建信息。要求**逐模块覆盖、不得遗漏**（与下文「[前面阶段的分析内容]」中的章节一一对应）。
 
         **定位**：区分仓库对外名称与 README 中可能提及的上游框架名；若声称基于某框架，**一两句**交代关系即可，正文不展开框架教程。
-        本阶段**最后执行**，上下文已含 **02–13** 全文；归纳以各章报告为主，仅在核对入口、架构列表、语言版本时**轻量**调工具。
+        本阶段**最后执行**，上下文已含 **02–10** 全文；归纳以各章报告为主，仅在核对入口、架构列表、语言版本时**轻量**调工具。
 
         **模块—章节对应关系（归纳时必须逐条覆盖；若某章在上下文中缺失或过短，须单独说明「该章无可用内容」并写「待结合仓库核实」）**：
-        - 02 启动与架构初始化 → 启动链、模式切换、MMU/FPU、平台适配、构建与链接
+        - 02 启动/架构与 Trap/系统调用 → 启动链、模式切换、MMU/FPU、Trap 向量、系统调用分发、TrapFrame、用户指针校验等
         - 03 内存管理 → 物理/虚拟内存、页表、分配器、CoW/Lazy/Swap 等高级特性
-        - 04 进程/线程与调度 → 任务模型、调度算法、上下文切换、信号/Futex 等
-        - 05 中断与系统调用 → Trap、系统调用分发、TrapFrame、用户指针校验等
-        - 06 文件系统与 VFS → VFS、具体 FS、fd/mmap 等
-        - 07 设备驱动 → 驱动框架、中断、块/网设备等
-        - 08 同步与 IPC → 锁、管道、IPC、Futex 等
-        - 09 多核与 SMP → 多核启动、IPI、每 CPU 数据等
-        - 10 安全机制 → 权限、Capability、隔离等
-        - 11 网络协议栈 → socket、协议栈实现形态等
-        - 12 调试与错误处理 → panic、日志、回溯等
-        - 13 演进与历史 → 模块演进、重大提交方向（技术层面归纳即可）
+        - 04 进程/线程/调度与多核 → 任务模型、调度算法、上下文切换、信号/Futex、多核启动、IPI、每 CPU 数据等
+        - 05 文件系统与设备 I/O → VFS、具体 FS、fd/mmap、驱动框架、块/网设备等
+        - 06 同步与 IPC → 锁、管道、IPC、Futex 等
+        - 07 安全机制 → 权限、Capability、隔离等
+        - 08 网络协议栈 → socket、协议栈实现形态等
+        - 09 调试与错误处理 → panic、日志、回溯等
+        - 10 演进与历史 → 模块演进、重大提交方向（技术层面归纳即可）
 
         请按顺序完成（repo_path 为仓库根）：
         1) **通读前置报告**：完整阅读上下文中的各章 Markdown，为下面「各模块技术全景」打草稿；摘录每章出现的**具体技术名词、算法名、crate 名、关键路径/符号**（须能在该章正文中找到依据，勿臆造）。
@@ -473,30 +515,30 @@ STAGES = [
         - ## 快速总览
           **报告第一个内容块**。含：
           **一句话定位**（≤60字）："[OS名称] 基于 [框架/自研] 的 [架构] [内核类型]，主要语言 [x]，[1 个最突出技术点]。"
-          **子系统完成度矩阵**（固定 10 行，不得删行；「关键实现」优先引用前置章节已给出的结论/路径）：
+          **子系统完成度矩阵**（固定 10 行，不得删行；「关键实现」优先引用前置章节已给出的结论/路径；与 02–09 章对应时注明章节号）：
           | 子系统 | 完成度 | 关键实现 |
           |--------|--------|---------|
-          | 启动与初始化 | ✅完整 / 🔸部分 / ❌缺失 | 一句话 |
-          | 内存管理 | ... | ... |
-          | 进程/线程调度 | ... | ... |
-          | 中断与系统调用 | ... | ... |
-          | 文件系统 | ... | ... |
-          | 设备驱动 | ... | ... |
-          | 同步与IPC | ... | ... |
-          | 多核支持 | ... | ... |
-          | 网络协议栈 | ... | ... |
-          | 安全机制 | ... | ... |
+          | 启动与 Trap/系统调用（第 02 章） | ✅完整 / 🔸部分 / ❌缺失 | 一句话 |
+          | 内存管理（第 03 章） | ... | ... |
+          | 进程/调度与多核（第 04 章） | ... | ... |
+          | 中断与系统调用（与第 02 章同源时可互引） | ... | ... |
+          | 文件系统与设备 I/O（第 05 章） | ... | ... |
+          | 同步与IPC（第 06 章） | ... | ... |
+          | 多核支持（与第 04 章同源时可互引） | ... | ... |
+          | 网络协议栈（第 08 章） | ... | ... |
+          | 安全机制（第 07 章） | ... | ... |
+          | 调试与错误处理（第 09 章） | ... | ... |
 
         - ## 评测与交付适配（启发式归纳）
-          **固定小节、紧接在「快速总览」矩阵之后**。不臆测任何一届具体赛题或保密测例；仅综合 **02–12 前置章** 与 **本步对 README/`grep` 的轻量结果**，用短段落归纳下列四类（无证据则写「未发现」或「不适用」）：
+          **固定小节、紧接在「快速总览」矩阵之后**。不臆测任何一届具体赛题或保密测例；仅综合 **02–09 技术前置章** 与 **本步对 README/`grep` 的轻量结果**，用短段落归纳下列四类（无证据则写「未发现」或「不适用」）：
           - **Delivery**：`Makefile`/`build.rs`/CI 中是否出现固定产物名（如 `kernel-rv`、`kernel-la`、`disk.img`）、`make all` 等；列路径，不写仓外断言。
           - **Harness**：是否存在自测主控、固定输出标记、扫盘跑脚本、关机等**输出契约**相关代码或 README 描述；须能指向前置章节或源码 `路径:行号`，否则标待核实。
-          - **PlatformProfile**：README/QEMU 命令与代码中 **QEMU `virt` vs 物理板**、多 virtio、SMP 等是否一致；与 02/07/09 结论对照。
-          - **SubsystemDepth**：若 README 声称可跑 libc/LTP/压测等，用 05/06/11 等章的桩态结论概括**风险缺口**（仍禁止数值打分）。
+          - **PlatformProfile**：README/QEMU 命令与代码中 **QEMU `virt` vs 物理板**、多 virtio、SMP 等是否一致；与 **02/05/04** 等章结论对照。
+          - **SubsystemDepth**：若 README 声称可跑 libc/LTP/压测等，用 **02/05/08** 等章的桩态结论概括**风险缺口**（仍禁止数值打分）。
           禁止编造未在当次工具输出中出现的 commit hash。
 
-        - ## 各模块技术全景（基于 02-13 章报告提取）
-          **本章核心**：按上表「模块—章节对应」顺序，**每一模块一个小节**（建议 `### 02 …` 至 `### 13 …` 与章节 id 对齐）。每节须包含：
+        - ## 各模块技术全景（基于 02–10 章报告提取）
+          **本章核心**：按上表「模块—章节对应」顺序，**每一模块一个小节**（建议 `### 02 …` 至 `### 10 …` 与章节号对齐）。每节须包含：
           - **技术清单**：条列该技术模块中明确采用的技术/机制（含算法、同步原语、子系统接口风格等）；
           - **关键实现、证据与细粒度锚点**：路径/符号/字段/cfg 等摘自前置章，须能在该章正文找到依据，勿臆造；
           - **依赖与工具**：该模块涉及的 crate、驱动/协议栈、或分析中使用的典型工具结论（若有）；
@@ -508,7 +550,7 @@ STAGES = [
         - ## 总结评价（完成度评估）
           200-300 字：结合**各模块技术全景**与完成度矩阵，概括闭环情况；**禁止数值打分**（不要出现 x/10 等）。
 
-        **收尾**：**「各模块技术全景」**须脱离 02–13 原文仍可读懂各模块技术选型。
+        **收尾**：**「各模块技术全景」**须脱离 02–10 原文仍可读懂各模块技术选型。
         """,
     },
 ]
@@ -541,7 +583,7 @@ def _strip_llm_preamble(text: str) -> str:
     return text
 
 
-def print_step(step_num: int, node_name: str, state: dict, stage_step_num: int = 0, max_steps: int = 1500, stage_limit: int = 500) -> int:
+def print_step(step_num: int, node_name: str, state: dict, stage_step_num: int = 0, max_steps: int = 1500, stage_limit: int = 600) -> int:
     """打印每一步的执行信息（简洁的 agent 风格）
     
     Args:
@@ -620,6 +662,57 @@ def _save_json(path: str, payload: dict):
             json.dump(payload, f, ensure_ascii=False, indent=2)
     except Exception as e:
         print(f"  ⚠️  无法写入 JSON 文件 {path}: {e}")
+
+
+def _invoke_describe_stage_review(
+    repo_output_dir: str,
+    stage_id: str,
+    title: str,
+    expected_question_ids: list,
+    payload_before_stage_qa: dict,
+    skip_in_report: bool,
+) -> None:
+    """JSON-QA 校验成功且非 01/10 时，送审题单 + 题库覆写前的答案 JSON。"""
+    if skip_in_report or not describe_stage_review_enabled():
+        return
+    if not describe_stage_review_applies(stage_id, expected_question_ids=expected_question_ids):
+        return
+    sidecar_dir = os.path.join(repo_output_dir, "_per_stage")
+    os.makedirs(sidecar_dir, exist_ok=True)
+    question_sheet = build_stage_qa_question_sheet(stage_id, title)
+    model_json = json.dumps(payload_before_stage_qa, ensure_ascii=False, indent=2)
+    try:
+        parsed_review, review_raw_llm, review_err = run_describe_stage_review(
+            stage_id=stage_id,
+            stage_title=title,
+            question_sheet=question_sheet,
+            model_json_before_stage_qa_coerce=model_json,
+            expected_question_ids=list(expected_question_ids),
+        )
+        review_out = os.path.join(sidecar_dir, f"{stage_id}_review.json")
+        review_err_out = os.path.join(sidecar_dir, f"{stage_id}_review_error.json")
+        if parsed_review is not None:
+            parsed_review["_meta"] = {
+                "review_model": os.environ.get("DESCRIBE_REVIEW_MODEL") or os.getenv("MODEL_NAME", ""),
+            }
+            _save_json(review_out, parsed_review)
+            conf = parsed_review.get("confidence")
+            print(f"\n   📋 Describe Review：confidence={conf} → {review_out}")
+        else:
+            _save_json(
+                review_err_out,
+                {
+                    "error": review_err or "unknown",
+                    "raw_model_output_excerpt": (review_raw_llm or "")[:8000],
+                },
+            )
+            print(f"\n   ⚠️ Describe Review 解析失败（已写入 {review_err_out}）")
+    except Exception as _re:
+        _save_json(
+            os.path.join(sidecar_dir, f"{stage_id}_review_error.json"),
+            {"error": f"{type(_re).__name__}: {_re}"},
+        )
+        print(f"\n   ⚠️ Describe Review 调用失败: {_re}")
 
 
 def _clear_stage_sidecar_artifacts(repo_output_dir: str, stage_id: str) -> None:
@@ -732,14 +825,15 @@ def main():
         title = stage["title"]
         prompt = stage["prompt"]
         expected_question_ids: list[str] = []
-        # JSON-QA 阶段：如果该 stage_id 存在题库文件，则运行时组装 prompt
-        try:
-            qa_prompt, expected_question_ids = _build_json_qa_prompt(stage_id=stage_id, stage_title=title)
-            # 若题库非空，则覆盖 prompt（让 planner must_cover 也从题单抽取）
-            if expected_question_ids:
-                prompt = qa_prompt
-        except Exception:
-            expected_question_ids = []
+        # JSON-QA：仅当 STAGES 未写内联 prompt（prompt 为空）时，才从 describe_stage_qa 组装题单并可能覆盖 prompt。
+        # 内联阶段（如 01_overview、10_history）不读题库、不要求 JSON 答案后处理。
+        if not (prompt or "").strip():
+            try:
+                qa_prompt, expected_question_ids = _build_json_qa_prompt(stage_id=stage_id, stage_title=title)
+                if expected_question_ids:
+                    prompt = qa_prompt
+            except Exception:
+                expected_question_ids = []
         stage_state = StageState(
             stage_id=stage_id,
             stage_title=title,
@@ -753,7 +847,7 @@ def main():
         
         # 只有非skip阶段才计入章节号
         if not skip_in_report:
-            # 优先从 stage_id 提取章节号 (例如 "02_boot_arch" -> "02")
+            # 优先从 stage_id 提取章节号 (例如 "02_boot_trap" -> "02")
             chapter_prefix = stage_id.split('_')[0]
             if not chapter_prefix.isdigit():
                 chapter_counter += 1
@@ -939,7 +1033,7 @@ def main():
         
         final_state = None
         stage_step_count = 0  # 阶段内步骤计数
-        recursion_limit = 500
+        recursion_limit = 600
         
         stage_tokens = 0  # 阶段内 token 计数
         retry_count = 0
@@ -1133,6 +1227,7 @@ def main():
                 stage_qa = load_stage_qa(stage_id)
                 payload = parse_answers_json(stage_text)
                 payload = coerce_answers_payload_defaults(payload)
+                payload_before_stage_qa = copy.deepcopy(payload)
                 payload = coerce_answers_payload_by_stage_qa(payload, stage_qa=stage_qa)
                 issues = validate_answers_payload(
                     payload,
@@ -1148,6 +1243,14 @@ def main():
                 else:
                     _save_json(json_path, payload)
                     stage_text = render_answers_to_markdown(payload).strip()
+                    _invoke_describe_stage_review(
+                        repo_output_dir,
+                        stage_id,
+                        title,
+                        expected_question_ids,
+                        payload_before_stage_qa,
+                        skip_in_report,
+                    )
             except Exception as e:
                 # JSON 解析/校验失败：将“输出 JSON 前的全部对话 + 原输出”重发给模型，要求仅返回合法 JSON 进行修复重生成。
                 # 注意：这一步必须禁止工具调用，否则会变成“继续探索”而不是“修复 JSON”。
@@ -1197,6 +1300,7 @@ def main():
 
                             payload = parse_answers_json(repaired_text)
                             payload = coerce_answers_payload_defaults(payload)
+                            payload_before_stage_qa = copy.deepcopy(payload)
                             payload = coerce_answers_payload_by_stage_qa(payload, stage_qa=stage_qa)
                             issues = validate_answers_payload(
                                 payload,
@@ -1207,6 +1311,14 @@ def main():
                             if not issues:
                                 _save_json(json_path, payload)
                                 stage_text = render_answers_to_markdown(payload).strip()
+                                _invoke_describe_stage_review(
+                                    repo_output_dir,
+                                    stage_id,
+                                    title,
+                                    expected_question_ids,
+                                    payload_before_stage_qa,
+                                    skip_in_report,
+                                )
                                 last_repair_exc = None
                                 break
                             _save_json(
