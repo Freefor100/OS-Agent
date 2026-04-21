@@ -838,6 +838,14 @@ def main():
         from tools.git_ops import clone_repository
         result = clone_repository.invoke({"repo_url": repo_url})
         print(result)
+
+    # 新跑开始前：删除仓库根带 OS-Agent 签名的遗留临时文件（compile_flags / 虚拟 Cargo 等）
+    try:
+        from tools.lsp_ops import cleanup_os_agent_repo_ephemeral
+
+        cleanup_os_agent_repo_ephemeral(repo_local_path)
+    except Exception as _e:
+        print(f"⚠️  清理历史 LSP 临时文件跳过: {_e}")
     
     # --- 增加：RAG 预索引 (加速后续分析阶段) ---
     print(f"\n🚀 阶段 0.5：RAG 预索引 (代码向量化)...")

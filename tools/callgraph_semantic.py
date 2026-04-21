@@ -160,30 +160,43 @@ def compute_input_fingerprint(
         "libclang_ok=" + ("1" if libclang_runtime_ok() else "0"),
         "git=" + _git_head(abs_repo),
     ]
-    cf = os.path.join(abs_repo, "compile_flags.txt")
-    if os.path.isfile(cf):
-        parts.append("compile_flags=" + _file_sha256(cf))
     cc = os.path.join(abs_repo, "compile_commands.json")
     if os.path.isfile(cc):
         parts.append("compile_commands=" + _file_sha256(cc))
+    else:
+        try:
+            from tools.compile_context import build_compile_flag_lines
+
+            gen = "\n".join(build_compile_flag_lines(abs_repo))
+            parts.append("compile_flags_gen=" + hashlib.sha256(gen.encode()).hexdigest())
+        except Exception:
+            cf = os.path.join(abs_repo, "compile_flags.txt")
+            if os.path.isfile(cf):
+                parts.append("compile_flags=" + _file_sha256(cf))
     raw = "|".join(parts)
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:48]
 
 
 def _read_compile_flags_lines(repo_path: str) -> List[str]:
-    path = os.path.join(_abspath(repo_path), "compile_flags.txt")
-    if not os.path.isfile(path):
-        return []
-    out: List[str] = []
+    """与 clangd polyfill 一致：无 compile_commands 时用算法生成（不依赖仓库根残留文件）。"""
     try:
-        with open(path, "r", encoding="utf-8", errors="ignore") as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith("#"):
-                    out.append(line)
-    except OSError:
-        pass
-    return out
+        from tools.compile_context import build_compile_flag_lines
+
+        return build_compile_flag_lines(repo_path)
+    except Exception:
+        path = os.path.join(_abspath(repo_path), "compile_flags.txt")
+        if not os.path.isfile(path):
+            return []
+        out: List[str] = []
+        try:
+            with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith("#"):
+                        out.append(line)
+        except OSError:
+            pass
+        return out
 
 
 def _load_compile_commands(repo_path: str) -> Optional[List[dict]]:
