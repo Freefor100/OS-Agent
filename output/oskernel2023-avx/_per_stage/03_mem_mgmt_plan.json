@@ -1,0 +1,116 @@
+{
+  "stage_id": "03_mem_mgmt",
+  "goal": "完成内存管理阶段(Q03_001~Q03_030)证据收集：物理页分配器、页表映射、缺页处理、VMA管理、mmap/brk、TLB刷新、并发控制等",
+  "must_cover": [
+    "物理页分配器实现形态(kalloc/kfree/free list)",
+    "页表walk/map/unmap函数及调用链",
+    "缺页异常处理链路(usertrap→handle_stack_page_fault→uvmalloc1)",
+    "VMA结构体与链表管理",
+    "mmap系统调用实现与标志位处理",
+    "页大小/物理内存总量/虚拟地址空间常量",
+    "TLB刷新(sfence.vma)与远程TLB刷新机制",
+    "用户指针安全检查(copyin/copyout)",
+    "并发控制锁(spinlock持锁范围)",
+    "CoW/Lazy/Swap/PageCache等工作机制存在性",
+    "[Q03_001] 该 OS 的内存管理实现语言/形态更接近哪类？（只选最贴近的一项）",
+    "[Q03_002] 是否存在“物理页帧分配器 (Physical Frame Allocator)”的真实实现？（必须三态）",
+    "[Q03_003] 物理内存分配算法更接近哪种？",
+    "[Q03_004] 物理页帧分配器的核心数据结构是什么？（例如 bitmap 数组、buddy free list、slab cache 表、`struct run` 单链表等；必须引用结构体/字段证据）",
+    "[Q03_005] 物理分配器的并发控制锁粒度是什么？（全局大锁 / per-CPU / 分桶 / 无锁+关中断 / 其他；必须给锁对象类型与持锁范围证据）",
+    "[Q03_006] 是否存在“页表 (page table) 结构体 + walk/map/unmap”的真实实现？（必须三态）",
+    "[Q03_007] 页表操作 API（walk/map/unmap 或等价）对应的函数名/模块是什么？列出 1-3 个关键入口并给证据。",
+    "[Q03_008] 页表修改路径的并发控制是什么？（锁粒度、是否需要关中断、是否使用每进程地址空间锁等；必须引用锁/临界区证据）",
+    "[Q03_009] 内核与用户地址空间关系更接近哪种？",
+    "[Q03_010] 是否存在缺页异常 (Page Fault) 处理逻辑并与内存分配/映射联动？（必须三态）",
+    "[Q03_011] 追踪一条缺页链路：trap/异常入口 → 缺页处理函数（handle_page_fault 或等价）→ 分配页帧 → 建立映射。用 3-5 个关键节点描述并给每节点证据。",
+    "[Q03_012] 是否实现写时复制 (Copy-on-Write, CoW)？（必须三态；若 implemented 需说明触发点在 fault 中还是 fork 中）"
+  ],
+  "evidence_targets": [
+    "物理页分配器数据结构(struct run free list)",
+    "页表操作API(walk/mappages/vmunmap)",
+    "缺页处理链路(usertrap scause 13/15)",
+    "VMA管理(vma_init/alloc_vma/free_vma_list)",
+    "mmap系统调用入口与标志位",
+    "TLB刷新点(sfence_vma调用位置)",
+    "用户指针校验(copyin/copyout实现)",
+    "内存总量常量(PHYSTOP/KERNBASE/PGSIZE)",
+    "物理页分配",
+    "页表映射",
+    "页故障处理",
+    "堆分配器"
+  ],
+  "seed_paths": [
+    "kernel/kalloc.c",
+    "kernel/vm.c",
+    "kernel/vma.c",
+    "kernel/trap.c",
+    "kernel/mmap.c",
+    "kernel/proc.c",
+    "kernel/include/vm.h",
+    "kernel/include/vma.h",
+    "kernel/include/memlayout.h",
+    "kernel/include/riscv.h",
+    "linker/qemu.ld",
+    "kernel/include/sbi.h",
+    "mm",
+    "memory"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "kalloc",
+    "kfree",
+    "walk",
+    "mappages",
+    "vmunmap",
+    "usertrap",
+    "handle_stack_page_fault",
+    "uvmalloc1",
+    "vma_init",
+    "sfence_vma",
+    "handle_page_fault",
+    "alloc_frame"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "linker",
+    "doc",
+    "doc/pic",
+    "xv6-user",
+    "kernel",
+    "kernel/include",
+    "kernel/lwip",
+    "tools"
+  ],
+  "preferred_tools": [
+    "lsp_get_call_graph",
+    "lsp_get_definition",
+    "lsp_get_references",
+    "read_code_segment",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "用lsp_get_call_graph追踪kalloc→kfree调用链，确认物理分配器并发控制(全局spinlock持锁范围)",
+    "用lsp_get_definition定位walk/mappages/vmunmap函数，读取实现确认页表三级遍历逻辑",
+    "用lsp_get_call_graph分析usertrap→handle_stack_page_fault→uvmalloc1缺页处理链路(方向both,max_depth=3)",
+    "读取vma.c中vma_init/alloc_vma/free_vma_list，确认VMA双向链表结构与字段含义",
+    "读取mmap.c中mmap函数，确认MAP_FIXED/MAP_ANON等标志位处理逻辑",
+    "用grep_in_repo搜索sfence_vma调用点，确认TLB刷新位置；检查sbi_remote_sfence_vma是否启用",
+    "读取vm.c中copyin/copyout实现，确认用户指针安全检查机制",
+    "从memlayout.h/riscv.h提取PGSIZE/PHYSTOP/MAXVA常量，计算物理内存总量与虚拟地址空间位数"
+  ]
+}

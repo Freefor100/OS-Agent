@@ -1,0 +1,115 @@
+{
+  "stage_id": "07_security",
+  "goal": "分析 oskernel2023-avx 的安全机制与权限模型，覆盖特权级隔离、UID/GID 权限检查链、用户指针验证、栈保护、多架构安全初始化等 14 个题单要点。",
+  "must_cover": [
+    "[Q07_001] 特权级隔离形态（RISC-V S/U 模式）",
+    "[Q07_002] UID/GID 字段存在性（proc 结构体）",
+    "[Q07_003] syscall 路径权限检查实证（open/exec/write）",
+    "[Q07_004] 权限检查入口点与核心函数链路",
+    "[Q07_005] 用户指针验证（copyin/copyout/either_copyin）",
+    "[Q07_006] seccomp/prctl 沙箱状态（三态）",
+    "[Q07_007] 栈保护/溢出防护（guard page）",
+    "[Q07_008] 审计/安全启动逻辑（三态）",
+    "[Q07_009] 多架构安全初始化（riscv64 唯一架构，PMP/SUM 配置）",
+    "[Q07_010] Rust RAII 机制（本项目为 C，不适用）",
+    "[Q07_011] KPTI 页表隔离状态",
+    "[Q07_012] UID/GID 检查链贯通验证",
+    "[Q07_013] 访问控制模型分类",
+    "[Q07_014] 完整性策略（W^X/只读段等）",
+    "[Q07_001] 特权级隔离形态更接近哪种？",
+    "[Q07_002] 是否存在凭证/权限数据结构（UID/GID/Credential/Capability/ACL 等）？（必须三态）",
+    "[Q07_003] 是否能证实在 syscall 路径上真实执行了权限检查（open/exec/write 等）？（必须三态；仅有字段不算 implemented）",
+    "[Q07_004] 若存在权限检查：入口点与核心检查函数链路是什么？（列 2-5 个节点并给证据）",
+    "[Q07_005] 是否实现用户指针验证（access_ok/verify_area/UserInPtr/copyin/copyout 等）？（必须三态）",
+    "[Q07_006] 是否实现 seccomp/prctl/sandbox 等系统调用过滤/沙箱？（必须三态；stub 需说明形态：ENOSYS/return 0）",
+    "[Q07_007] 是否存在栈保护/溢出防护（stack canary/guard page）或等价机制？（必须三态）",
+    "[Q07_008] 是否存在审计/安全启动（audit/secure boot/signature）相关逻辑？（必须三态）"
+  ],
+  "evidence_targets": [
+    "proc 结构体 uid/gid 字段定义 (kernel/include/proc.h)",
+    "sys_getuid/sys_setuid 实现 (kernel/sysproc.c)",
+    "sys_open/sys_exec 是否调用权限检查 (kernel/sysfile.c, kernel/exec.c)",
+    "copyin/copyout 用户指针验证实现 (kernel/vm.c)",
+    "guard page 分配逻辑 (kernel/proc.c, kernel/vm.c)",
+    "RISC-V sstatus/SUM 位配置 (kernel/trap.c, kernel/include/riscv.h)",
+    "satp 页表切换 (kernel/exec.c, kernel/trap.c)",
+    "权限模型",
+    "用户身份",
+    "隔离边界",
+    "安全机制"
+  ],
+  "seed_paths": [
+    "kernel/include/proc.h",
+    "kernel/sysproc.c",
+    "kernel/sysfile.c",
+    "kernel/vm.c",
+    "kernel/trap.c",
+    "kernel/exec.c",
+    "kernel/include/riscv.h",
+    "kernel/entry_qemu.S",
+    "kernel/entry_visionfive.S",
+    "kernel/proc.c",
+    "security",
+    "capability",
+    "uid",
+    "perm"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "sys_getuid",
+    "sys_setuid",
+    "sys_open",
+    "sys_exec",
+    "copyin",
+    "copyout",
+    "usertrap",
+    "trapanithart",
+    "cap",
+    "permission",
+    "check_perm",
+    "main"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "linker",
+    "doc",
+    "doc/pic",
+    "xv6-user",
+    "kernel",
+    "kernel/include",
+    "kernel/lwip",
+    "tools"
+  ],
+  "preferred_tools": [
+    "lsp_get_definition",
+    "lsp_get_call_graph",
+    "lsp_get_references",
+    "grep_in_repo",
+    "read_code_segment"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "使用 lsp_get_definition 定位 proc 结构体中 uid/gid 字段定义，确认字段存在性",
+    "使用 lsp_get_call_graph 追踪 sys_getuid/sys_setuid 调用链，验证 UID 是否被真实使用",
+    "使用 lsp_get_call_graph 分析 sys_open/sys_exec 是否调用任何 check_perm/inode_permission 类函数",
+    "使用 read_code_segment 精读 vm.c 中 copyin/copyout 实现，确认用户指针验证逻辑",
+    "使用 grep_in_repo 搜索 faccessat 实现，检查是否基于 UID/GID 做权限判断",
+    "使用 read_code_segment 读取 trap.c 中 usertrap 和 trapinithart，确认 sstatus/SUM 位配置",
+    "使用 grep_in_repo 搜索 PMP/TOR/NAPOT 关键词，确认 RISC-V 物理内存保护是否启用",
+    "综合以上证据，对 14 个题单要点逐一作答（三态判定+检查链证据）"
+  ]
+}

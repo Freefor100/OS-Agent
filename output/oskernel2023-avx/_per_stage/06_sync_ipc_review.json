@@ -1,0 +1,118 @@
+{
+  "schema_version": "describe_review_v1",
+  "stage_id": "06_sync_ipc",
+  "stage_title": "同步互斥与进程间通信",
+  "confidence": 1.0,
+  "question_reviews": [
+    {
+      "question_id": "Q06_001",
+      "confidence": 1.0,
+      "review": "题面要求列出同步原语及类型定义证据。回答列出了 SpinLock/Semaphore/SleepLock/WaitQueue 并给出结构体定义路径与 excerpt，明确说明 Mutex/RwLock/Condvar 未实现，与证据一致，符合题面约束。"
+    },
+    {
+      "question_id": "Q06_002",
+      "confidence": 1.0,
+      "review": "题面询问 Mutex 实现形态。回答选择「未发现/待核实」，证据显示 grep 检索 struct mutex 为 0 命中，与 Q06_001 结论一致，证据支撑结论。"
+    },
+    {
+      "question_id": "Q06_003",
+      "confidence": 1.0,
+      "review": "题面询问 WaitQueue 与 sleep/wakeup 实现（三态）。回答为 implemented，证据给出 proc.c 中 sleep/wakeup 函数实现及状态转换逻辑，证据充分支撑结论。"
+    },
+    {
+      "question_id": "Q06_004",
+      "confidence": 1.0,
+      "review": "题面要求填写 sleep/wakeup 不变量分析（入口、锁、防丢机制等）。回答按格式逐项填写，证据引用 proc.c 中锁获取/释放及状态修改代码，支撑防丢 wakeup 机制描述，符合题面。"
+    },
+    {
+      "question_id": "Q06_005",
+      "confidence": 1.0,
+      "review": "题面询问 Pipe 实现（三态）。回答为 implemented，证据给出 pipealloc 及 sys_pipe 系统调用实现，证据支撑结论。"
+    },
+    {
+      "question_id": "Q06_006",
+      "confidence": 1.0,
+      "review": "题面询问 Pipe 缓冲形态。回答选择「字节环形缓冲区」，证据显示 struct pipe 含 data 数组及 nread/nwrite 索引，pipewrite 使用取模操作，证据支撑结论。"
+    },
+    {
+      "question_id": "Q06_007",
+      "confidence": 1.0,
+      "review": "题面询问 Pipe 阻塞语义。回答选择「阻塞」，证据显示 piperead/pipewrite 在条件不满足时调用 sleep()，证据支撑结论。"
+    },
+    {
+      "question_id": "Q06_008",
+      "confidence": 1.0,
+      "review": "题面询问 SysV IPC 实现（三态）。回答为 stub，说明内核态信号量已实现但 SysV 系统调用未实现，证据显示 sem.c 存在但 sys_msgget 等检索为 0 命中，结论与证据一致。"
+    },
+    {
+      "question_id": "Q06_009",
+      "confidence": 1.0,
+      "review": "题面询问 futex 实现（三态）。回答为 implemented，证据给出 futex.c 中 wait/wake 实现及 sys_futex 系统调用，证据支撑结论。"
+    },
+    {
+      "question_id": "Q06_010",
+      "confidence": 1.0,
+      "review": "题面询问信号机制实现（三态）。回答为 implemented，证据覆盖 sigaction/kill/sigreturn 及 trampoline 汇编，证据充分支撑结论。"
+    },
+    {
+      "question_id": "Q06_011",
+      "confidence": 1.0,
+      "review": "题面要求说明 handler 上下文构建及 sigreturn 恢复。回答详细描述保存 trapframe、设置 epc/ra、调整栈及恢复流程，证据引用 signal.c 及 trampoline 代码，符合题面要求。"
+    },
+    {
+      "question_id": "Q06_012",
+      "confidence": 1.0,
+      "review": "题面询问 RwLock 实现形态。回答选择「未发现/不支持」，证据显示 grep 检索为 0 命中，与 Q06_001 结论一致，证据支撑结论。"
+    },
+    {
+      "question_id": "Q06_013",
+      "confidence": 1.0,
+      "review": "题面询问底层原子操作来源。回答选择「自定义汇编」，证据显示 spinlock.c 使用原子内建函数并注释说明对应 RISC-V 汇编指令（amoswap），证据支撑底层原子操作结论。"
+    },
+    {
+      "question_id": "Q06_014",
+      "confidence": 1.0,
+      "review": "题面要求分析死锁四必要条件。回答逐条分析互斥/持有并等待/不可剥夺/循环等待，并引用 spinlock.c 及 sysfile.c 注释作为证据，符合题面格式与内容要求。"
+    },
+    {
+      "question_id": "Q06_015",
+      "confidence": 1.0,
+      "review": "题面询问死锁处理策略。回答选择「忽略」，证据显示代码中存在死锁警告注释但无预防/避免/检测机制实现，证据支撑结论。"
+    },
+    {
+      "question_id": "Q06_016",
+      "confidence": 1.0,
+      "review": "题面询问全局锁顺序规范（三态）。回答为 not_found，证据显示检索无全局规范仅有个别注释，证据支撑结论。"
+    },
+    {
+      "question_id": "Q06_017",
+      "confidence": 1.0,
+      "review": "题面询问管程/条件变量实现（三态）。回答为 not_found，证据显示检索 Condvar/monitor 等关键词为 0 命中，与 Q06_001 结论一致，证据支撑结论。"
+    },
+    {
+      "question_id": "Q06_018",
+      "confidence": 1.0,
+      "review": "题面要求验证三个经典同步问题。回答逐项说明状态（Pipe 支持生产者消费者逻辑，其他未找到），证据引用 pipe.c 及 grep 检索结果，符合题面要求。"
+    },
+    {
+      "question_id": "Q06_019",
+      "confidence": 1.0,
+      "review": "题面询问消息传递 IPC 实现（三态）。回答为 stub，说明仅 lwIP 内部使用 mailbox 无通用 IPC，证据支持无通用消息传递系统调用，结论与证据一致。"
+    },
+    {
+      "question_id": "Q06_020",
+      "confidence": 1.0,
+      "review": "题面询问屏障同步实现（三态）。回答为 not_found，证据显示检索 barrier 关键词为 0 命中，证据支撑结论。"
+    }
+  ],
+  "dimensions": {
+    "evidence_supports_answers": 1.0,
+    "question_answer_consistency": 1.0,
+    "requirements_fit": 1.0
+  },
+  "findings": [],
+  "summary_zh": "所有 20 道题目均已完成作答。题面与答案内容一致，JSON 契约符合（字段齐全、类型合理、枚举合法）。每道题目的 value 均有对应的 evidence 支撑（代码路径、函数 excerpt、grep 检索结果等），未发现证据与结论矛盾或缺失。Q06_008/Q06_019 使用 stub 表示部分实现，语义清晰且证据支持。整体置信度高。",
+  "_meta": {
+    "review_model": "qwen3.5-plus"
+  }
+}

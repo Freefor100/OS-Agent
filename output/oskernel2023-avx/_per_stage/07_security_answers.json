@@ -1,0 +1,378 @@
+{
+  "schema_version": "v1",
+  "stage_id": "07_security",
+  "stage_title": "安全机制与权限模型",
+  "terminology_profile": "stallings_en_zh",
+  "answers": [
+    {
+      "question_id": "Q07_001",
+      "question_type": "single_choice",
+      "stem": "特权级隔离形态更接近哪种？",
+      "value": "有用户态/内核态隔离（user mode/kernel mode）",
+      "evidence": [
+        {
+          "path": "kernel/include/riscv.h",
+          "symbol_kind": "macro",
+          "symbol_name": "SSTATUS_SPP",
+          "excerpt": "SSTATUS_SPP (1L << 8) 定义 Supervisor Previous Privilege mode，1=Supervisor, 0=User"
+        },
+        {
+          "path": "kernel/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "usertrapret",
+          "excerpt": "usertrapret() 中 x &= ~SSTATUS_SPP 清除 SPP 位进入用户态，w_sstatus(x) 设置后通过 sret 返回用户空间"
+        },
+        {
+          "path": "kernel/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "usertrap",
+          "excerpt": "usertrap() 检查 (r_sstatus() & SSTATUS_SPP) != 0 则 panic，确保从用户态陷入"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_002",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在凭证/权限数据结构（UID/GID/Credential/Capability/ACL 等）？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/include/proc.h",
+          "symbol_kind": "struct",
+          "symbol_name": "proc",
+          "excerpt": "struct proc 第 65-66 行：int uid; // Process User ID, int gid; // Process Group ID"
+        },
+        {
+          "path": "kernel/sysproc.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_getuid",
+          "excerpt": "uint64 sys_getuid(void) { return myproc()->uid; }"
+        },
+        {
+          "path": "kernel/sysproc.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_setuid",
+          "excerpt": "uint64 sys_setuid(void) { int uid; if (argint(0, &uid) < 0) return -1; myproc()->uid = uid; return 0; }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_003",
+      "question_type": "tri_state_impl",
+      "stem": "是否能证实在 syscall 路径上真实执行了权限检查（open/exec/write 等）？（必须三态；仅有字段不算 implemented）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/sysfile.c",
+          "symbol_kind": "search",
+          "symbol_name": "grep_check_perm",
+          "excerpt": "搜索 check_perm|inode_permission|permission_check|access_check 共 0 命中（416 个文件）"
+        },
+        {
+          "path": "kernel/sysfile.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_open",
+          "excerpt": "sys_open() 仅调用 open()，open() 调用 create()/ename()，未发现任何 UID/GID 权限检查逻辑"
+        },
+        {
+          "path": "kernel/exec.c",
+          "symbol_kind": "function",
+          "symbol_name": "exec",
+          "excerpt": "exec() 加载 ELF 文件，设置 AT_UID/AT_EUID/AT_GID 为 0 硬编码，未检查进程 UID 与文件所有权的匹配"
+        },
+        {
+          "path": "kernel/sysfile.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_faccessat",
+          "excerpt": "sys_faccessat() 仅检查 mode == F_OK 返回 0，或 (emode & mode) != mode 返回 -1，未使用 proc->uid 进行权限判断"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_004",
+      "question_type": "short_answer",
+      "stem": "若存在权限检查：入口点与核心检查函数链路是什么？（列 2-5 个节点并给证据）",
+      "value": "未发现完整的权限检查链。仅有以下相关节点：\n1. sys_getuid (kernel/sysproc.c:382) → 返回 myproc()->uid\n2. sys_setuid (kernel/sysproc.c:386) → 设置 myproc()->uid = uid\n3. sys_faccessat (kernel/sysfile.c:1019) → 检查 mode 参数但未使用 UID\n4. exec (kernel/exec.c) → 设置 AT_UID=0 硬编码\n\n检查链断裂：sys_open/sys_exec 未调用任何 check_perm 类函数，UID/GID 字段仅存储未强制执行 🔸",
+      "evidence": [
+        {
+          "path": "kernel/sysproc.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_getuid",
+          "excerpt": "uint64 sys_getuid(void) { return myproc()->uid; }"
+        },
+        {
+          "path": "kernel/sysfile.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_faccessat",
+          "excerpt": "if (mode == F_OK) return 0; if ((emode & mode) != mode) return -1; 未使用 p->uid"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_005",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现用户指针验证（access_ok/verify_area/UserInPtr/copyin/copyout 等）？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/vm.c",
+          "symbol_kind": "function",
+          "symbol_name": "copyin",
+          "excerpt": "copyin() 调用 walkaddr(pagetable, va0) 验证虚拟地址映射存在性，pa0 == NULL 则返回 -1"
+        },
+        {
+          "path": "kernel/vm.c",
+          "symbol_kind": "function",
+          "symbol_name": "copyout",
+          "excerpt": "copyout() 调用 walkaddr(pagetable, va0) 验证目标地址映射，pa0 == NULL 则返回 -1"
+        },
+        {
+          "path": "kernel/vm.c",
+          "symbol_kind": "function",
+          "symbol_name": "copyinstr",
+          "excerpt": "copyinstr() 逐页拷贝字符串，每页调用 walkaddr 验证，遇到 '\\0' 或错误返回 -1"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_006",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 seccomp/prctl/sandbox 等系统调用过滤/沙箱？（必须三态；stub 需说明形态：ENOSYS/return 0）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/sysproc.c",
+          "symbol_kind": "search",
+          "symbol_name": "grep_seccomp_prctl",
+          "excerpt": "搜索 seccomp|prctl|sandbox 共 0 命中（416 个文件）"
+        },
+        {
+          "path": "kernel/syscall.c",
+          "symbol_kind": "search",
+          "symbol_name": "syscall_table_scan",
+          "excerpt": "检查 sysnum.h 与 syscall.c 系统调用表，未发现 SYS_seccomp/SYS_prctl 等标识符"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_007",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在栈保护/溢出防护（stack canary/guard page）或等价机制？（必须三态）",
+      "value": "stub",
+      "evidence": [
+        {
+          "path": "kernel/proc.c",
+          "symbol_kind": "comment",
+          "symbol_name": "guard_page_comment",
+          "excerpt": "第 98 行注释：// guard page. 但实际分配代码被注释掉（第 99-106 行整段注释）"
+        },
+        {
+          "path": "kernel/vm.c",
+          "symbol_kind": "function",
+          "symbol_name": "uvmclear",
+          "excerpt": "uvmclear() 注释说明：used by exec for the user stack guard page. 仅清除 PTE_U 位"
+        },
+        {
+          "path": "kernel/include/memlayout.h",
+          "symbol_kind": "comment",
+          "symbol_name": "kstack_guard_comment",
+          "excerpt": "第 92 行注释：each surrounded by invalid guard pages. 但 KSTACK 宏被注释"
+        },
+        {
+          "path": "kernel/",
+          "symbol_kind": "search",
+          "symbol_name": "grep_stack_canary",
+          "excerpt": "搜索 __stack_chk_fail|stack_chk_guard 共 0 命中，无 stack canary 实现"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_008",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在审计/安全启动（audit/secure boot/signature）相关逻辑？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/",
+          "symbol_kind": "search",
+          "symbol_name": "grep_audit_secure_boot",
+          "excerpt": "搜索 audit|secure_boot|signature|verify.*sig 共 61 个匹配，但均为 lwip 库中函数签名注释，无内核安全审计逻辑"
+        },
+        {
+          "path": "README.md",
+          "symbol_kind": "doc",
+          "symbol_name": "readme_security_scan",
+          "excerpt": "README.md 仅描述构建/运行/调试方法，未声称任何安全启动或审计功能"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_009",
+      "question_type": "short_answer",
+      "stem": "本项目支持哪些架构（riscv64/aarch64/x86_64/loongarch64 等）？每种架构的安全相关初始化（特权级配置、PMP/MPU/SMEP 等）是否有代码证据？（必须逐架构作答，无证据写「未发现」）",
+      "value": "仅支持 RISC-V 64 架构。\n\n1. riscv64（QEMU 平台）：\n   - 入口：kernel/entry_qemu.S:_entry\n   - 特权级配置：trapinithart() 设置 stvec/sie/sstatus (kernel/trap.c:33-40)\n   - 用户态进入：usertrapret() 清除 SSTATUS_SPP 位 (kernel/trap.c:143)\n   - PMP/MPU：搜索 PMP|TOR|NAPOT|pmppcfg 共 1084 个匹配，但均为文档/注释中的通用术语，未发现实际 PMP 配置代码\n\n2. riscv64（VisionFive 平台）：\n   - 入口：kernel/entry_visionfive.S:_start\n   - 特权级配置：同 QEMU 平台，共用 trap.c\n   - PMP：未发现配置代码\n\n3. aarch64/x86_64/loongarch64：\n   - 未发现相关入口文件、链接脚本或条件编译\n   - 搜索结果为空",
+      "evidence": [
+        {
+          "path": "kernel/entry_qemu.S",
+          "symbol_kind": "asm",
+          "symbol_name": "_entry",
+          "excerpt": ".globl _entry; _entry: add t0, a0, 1; slli t0, t0, 14; la sp, boot_stack; call main"
+        },
+        {
+          "path": "kernel/entry_visionfive.S",
+          "symbol_kind": "asm",
+          "symbol_name": "_start",
+          "excerpt": ".globl _start; _start: add t0, a0, 1; slli t0, t0, 14; la sp, boot_stack; call main"
+        },
+        {
+          "path": "kernel/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "trapinithart",
+          "excerpt": "w_stvec((uint64)kernelvec); w_sstatus(r_sstatus() | SSTATUS_SIE); w_sie(r_sie() | SIE_SEIE | SIE_SSIE | SIE_STIE)"
+        },
+        {
+          "path": "kernel/",
+          "symbol_kind": "search",
+          "symbol_name": "grep_pmp_config",
+          "excerpt": "搜索 PMP|TOR|NAPOT 结果均为 doc/ 文档注释或 lwip 库内容，无 kernel/ 下实际 PMP 配置代码"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_010",
+      "question_type": "tri_state_impl",
+      "stem": "若项目使用 Rust，是否存在 RAII/所有权/生命周期相关的内核安全机制（如不可 unsafe 直接访问用户内存、锁的 RAII 自动释放等）？（必须三态；给具体模式证据）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/",
+          "symbol_kind": "search",
+          "symbol_name": "grep_rust_files",
+          "excerpt": "搜索 RUST|rust|Cargo.toml|\\.rs$ 共 6 个匹配，均为 doc/net.md 代码块标记或 lwip 注释，无实际 Rust 源文件"
+        },
+        {
+          "path": "kernel/include/proc.h",
+          "symbol_kind": "file_type",
+          "symbol_name": "language_check",
+          "excerpt": "项目为 C 语言内核（.c/.h 文件），非 Rust 编写"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_011",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现了内核/用户页表隔离 (Kernel/User Page Table Isolation, KPTI 或等价机制)？\n（x86: CR3 KPTI / SMEP / SMAP；RISC-V: PMP / S-mode 分离；AArch64: TTBR0/TTBR1 隔离；\n必须三态；无则写未发现并列出已搜关键字）",
+      "value": "stub",
+      "evidence": [
+        {
+          "path": "kernel/include/proc.h",
+          "symbol_kind": "struct_field",
+          "symbol_name": "pagetable_kpagetable",
+          "excerpt": "struct proc 第 75-76 行：pagetable_t pagetable; // User page table, pagetable_t kpagetable; // Kernel page table"
+        },
+        {
+          "path": "kernel/exec.c",
+          "symbol_kind": "function",
+          "symbol_name": "exec",
+          "excerpt": "exec() 中 uvminit(pagetable, kpagetable, ...) 创建独立用户/内核页表，但内核页表仅用于内核线程"
+        },
+        {
+          "path": "kernel/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "usertrapret",
+          "excerpt": "p->trapframe->kernel_satp = r_satp() 保存内核页表基址，但用户态运行时 satp 切换为用户页表，非严格 KPTI（内核映射仍在用户页表中）"
+        },
+        {
+          "path": "kernel/",
+          "symbol_kind": "search",
+          "symbol_name": "grep_kpti",
+          "excerpt": "搜索 KPTI|kernel.*user.*page.*table|separate.*page.*table 共 0 命中，无明确 KPTI 实现"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_012",
+      "question_type": "short_answer",
+      "stem": "UID/GID 字段是否在 syscall 路径上真实执行权限检查？（搜索 check_perm/inode_permission；若只有字段无检查链须标注「仅有定义但未强制执行 🔸」；给检查链证据或写「字段存在但无检查链」）",
+      "value": "字段存在但无检查链 🔸\n\nUID/GID 字段定义于 kernel/include/proc.h:65-66，sys_getuid/sys_setuid 可读写这些字段，但：\n1. sys_open (kernel/sysfile.c:455) 未检查 UID 与文件所有权的匹配\n2. sys_exec (kernel/exec.c) 硬编码 AT_UID=0/AT_EUID=0/AT_GID=0\n3. sys_faccessat (kernel/sysfile.c:1019) 仅检查 mode 参数，未使用 proc->uid\n4. 搜索 check_perm/inode_permission 共 0 命中\n\n结论：仅有定义但未强制执行 🔸",
+      "evidence": [
+        {
+          "path": "kernel/include/proc.h",
+          "symbol_kind": "struct_field",
+          "symbol_name": "uid_gid",
+          "excerpt": "int uid; // Process User ID (line 65), int gid; // Process Group ID (line 66)"
+        },
+        {
+          "path": "kernel/sysfile.c",
+          "symbol_kind": "search",
+          "symbol_name": "grep_check_perm",
+          "excerpt": "搜索 check_perm|inode_permission 共 0 命中"
+        },
+        {
+          "path": "kernel/exec.c",
+          "symbol_kind": "code",
+          "symbol_name": "at_uid_hardcode",
+          "excerpt": "alloc_aux(aux, AT_UID, 0); alloc_aux(aux, AT_EUID, 0); alloc_aux(aux, AT_GID, 0); 硬编码为 0"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_013",
+      "question_type": "single_choice",
+      "stem": "访问控制模型 (Access Control Model, Stallings Ch15) 更接近哪种？",
+      "value": "仅有特权级隔离（ring0/ring3），无细粒度访问控制",
+      "evidence": [
+        {
+          "path": "kernel/include/proc.h",
+          "symbol_kind": "struct_field",
+          "symbol_name": "uid_gid",
+          "excerpt": "存在 uid/gid 字段但 syscall 路径未使用"
+        },
+        {
+          "path": "kernel/sysfile.c",
+          "symbol_kind": "search",
+          "symbol_name": "grep_permission_check",
+          "excerpt": "sys_open/sys_exec 中未发现任何基于 UID/GID 的权限检查逻辑"
+        },
+        {
+          "path": "kernel/sysfile.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_faccessat",
+          "excerpt": "仅检查 mode 参数位掩码，未验证调用者 UID 与文件所有者的关系"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_014",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现完整性策略 (Integrity Policy, Stallings Ch15)？（如 Biba 模型、只读内核段、代码签名验证、W^X 内存保护等；必须三态）",
+      "value": "stub",
+      "evidence": [
+        {
+          "path": "kernel/include/riscv.h",
+          "symbol_kind": "macro",
+          "symbol_name": "PTE_X",
+          "excerpt": "#define PTE_X (1L << 3) 定义执行权限位，exec.c 中加载 ELF 时设置 PTE_X"
+        },
+        {
+          "path": "kernel/exec.c",
+          "symbol_kind": "code",
+          "symbol_name": "perm_set",
+          "excerpt": "perm |= PTE_X 仅对可执行段设置执行位，但无 W^X 强制策略（数据段同时可读写）"
+        },
+        {
+          "path": "kernel/",
+          "symbol_kind": "search",
+          "symbol_name": "grep_wx_xn",
+          "excerpt": "搜索 W^X|WX|XN|PXN 结果均为页表位定义，无强制 W^X 或代码签名验证逻辑"
+        },
+        {
+          "path": "kernel/",
+          "symbol_kind": "search",
+          "symbol_name": "grep_biba_signature",
+          "excerpt": "搜索 Biba|signature|verify.*sig 无内核代码签名或完整性验证实现"
+        }
+      ]
+    }
+  ]
+}

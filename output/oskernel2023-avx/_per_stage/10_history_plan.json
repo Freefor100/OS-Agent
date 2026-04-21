@@ -1,0 +1,96 @@
+{
+  "stage_id": "10_history",
+  "goal": "基于 Git 历史与文档证据，撰写「开发历史与里程碑」章节，归纳内核从基础 xv6 到支持线程、网络、动态链接的演进轨迹，识别关键里程碑与当前缺口。",
+  "must_cover": [
+    "作者贡献分布与协作模式（5 位核心贡献者分工）",
+    "三大里程碑：线程模型引入、LwIP 协议栈移植、动态链接/信号机制完善",
+    "关键文件演进轨迹（proc.c/thread.c/socket_new.c）",
+    "文档声称与代码实现的对照（net.md/thread.md）",
+    "当前缺口：libctest 动态链接测试未完全通过、部分 socket 功能简化实现",
+    "若存在 `.git`：用本阶段已启用的 Git 工具概括主分支/标签/作者贡献方向；**禁止**编造未出现在工具输出中的 commit hash 或统计口径。",
+    "**模块演进**：可结合前文各章已出现的路径，用 `trace_file_evolution` 等追踪关键文件/目录的引入或大改，只写工具输出可支撑的判断。",
+    "**文档里程碑**：README、CHANGELOG、CI 配置等中与版本或阶段目标相关的陈述，区分「文档声称」与「代码可验证结论」。",
+    "**缺口**：若历史信息显示某能力被移除、长期标注实验/待办，如实记录。"
+  ],
+  "evidence_targets": [
+    "作者贡献统计（zxt/zbtrs/asterich/Comedymaker 等）",
+    "LwIP 移植里程碑（2023-08-14 首次引入）",
+    "线程模型关键提交（2023-07-26 thread_clone/sched 完成）",
+    "Socket 系统调用演进（2023-07-24 起逐步实现）",
+    "文档里程碑（doc/ 下 12 篇技术文档集中创建于 2023-08-01）",
+    "taskList.md 中未完成的动态链接测试项",
+    "作者贡献",
+    "重大提交",
+    "模块演进",
+    "当前缺口",
+    "CI/产物名/自测相关演进(有工具证据时)"
+  ],
+  "seed_paths": [
+    "kernel/proc.c",
+    "kernel/thread.c",
+    "kernel/socket_new.c",
+    "kernel/lwip",
+    "doc/net.md",
+    "doc/thread.md",
+    "taskList.md",
+    "Makefile",
+    "git",
+    "history",
+    "README.md",
+    "scripts",
+    ".github",
+    "kernel/vm.c"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "thread_clone",
+    "sched",
+    "sys_socket",
+    "lwip",
+    "forkret",
+    "git",
+    "main"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "linker",
+    "doc",
+    "doc/pic",
+    "xv6-user",
+    "kernel",
+    "kernel/include",
+    "kernel/lwip",
+    "tools"
+  ],
+  "preferred_tools": [
+    "get_git_history_summary",
+    "analyze_authors_contribution",
+    "trace_file_evolution",
+    "find_symbol_first_commit",
+    "read_code_segment"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 4000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "用 get_git_history_summary 输出 200 条提交摘要，识别 3-5 个重大里程碑 commit（如 LwIP 移植、线程模型完成）",
+    "用 analyze_authors_contribution 统计全量贡献，归纳 5 位核心作者的主力模块分工",
+    "对 proc.c/thread.c/socket_new.c 分别调用 trace_file_evolution，提取关键功能引入/重构的时间线",
+    "用 find_symbol_first_commit 定位 thread_clone/lwip/socket 等符号首次出现，验证里程碑时间点",
+    "精读 doc/net.md/thread.md 与 taskList.md，对照代码证据标注「文档声称」vs「实际完成度」",
+    "检查 taskList.md 中注释掉的 libctest 动态链接测试项，记录为当前缺口",
+    "汇总上述证据，按时间顺序撰写演进叙事，突出技术决策（如简化 socket 实现、线程调度设计）"
+  ]
+}

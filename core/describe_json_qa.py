@@ -398,60 +398,35 @@ def coerce_answers_payload_defaults(payload: Dict[str, Any]) -> Dict[str, Any]:
     return out
 
 
+def _format_answer_value_for_markdown(value: Any) -> str:
+    """渲染答案正文：字符串原样输出，其余类型 JSON（紧凑）。"""
+    if isinstance(value, str):
+        return (value or "").strip()
+    return json.dumps(value, ensure_ascii=False)
+
+
 def render_answers_to_markdown(payload: Dict[str, Any]) -> str:
-    """Deterministically render QA JSON to Markdown suitable for current reviewer."""
-    stage_id = str(payload.get("stage_id", "")).strip()
-    stage_title = str(payload.get("stage_title", "")).strip()
-    terminology_profile = str(payload.get("terminology_profile", TERMINOLOGY_PROFILE_DEFAULT)).strip()
+    """将题库 JSON 答案渲染为章节内 Markdown（无 meta 头、无证据表、无「题干/答案」列表项）。"""
     answers = payload.get("answers", [])
 
     lines: List[str] = []
-    lines.append(f"## 题单作答（JSON-QA 渲染）")
-    lines.append("")
-    lines.append(f"- stage_id: `{stage_id}`")
-    lines.append(f"- terminology_profile: `{terminology_profile}`")
-    lines.append("")
-    lines.append(f"## 第 {stage_id} 阶段：{stage_title}" if stage_id else f"## {stage_title}")
-    lines.append("")
-
     for a in answers if isinstance(answers, list) else []:
         if not isinstance(a, dict):
             continue
         qid = str(a.get("question_id", "")).strip()
-        qtype = str(a.get("question_type", "")).strip()
         stem = str(a.get("stem", "")).strip()
         value = a.get("value")
         notes = (a.get("notes") or "").strip() if isinstance(a.get("notes"), str) else ""
 
-        lines.append(f"### {qid}（{qtype}）")
-        lines.append("")
         if stem:
-            lines.append(f"- 题干：{stem}")
-        lines.append(f"- 答案：{json.dumps(value, ensure_ascii=False)}")
-        if notes:
-            lines.append(f"- 说明：{notes}")
+            lines.append(f"### {qid} {stem}")
+        else:
+            lines.append(f"### {qid}")
         lines.append("")
-
-        evidence = a.get("evidence", [])
-        if not evidence:
-            lines.append(
-                "- 证据：无（`not_found`/`stub` 时允许为空；**建议**用 `excerpt` 记录检索过程以便复核；其它题型须补齐）"
-            )
+        lines.append(_format_answer_value_for_markdown(value))
+        if notes:
             lines.append("")
-            continue
-
-        lines.append("| 证据路径 | 符号 | 摘录 |")
-        lines.append("|---|---|---|")
-        for ev in evidence if isinstance(evidence, list) else []:
-            if not isinstance(ev, dict):
-                continue
-            path = str(ev.get("path", "")).strip()
-            symbol_kind = str(ev.get("symbol_kind", "")).strip()
-            symbol_name = str(ev.get("symbol_name", "")).strip()
-            sym = f"`{symbol_kind} {symbol_name}`".strip() if (symbol_kind or symbol_name) else ""
-            excerpt = str(ev.get("excerpt", "")).strip()
-            excerpt = excerpt.replace("\n", "<br>") if excerpt else ""
-            lines.append(f"| `{path}` | {sym} | {excerpt} |")
+            lines.append(notes)
         lines.append("")
 
     return "\n".join(lines).strip() + "\n"

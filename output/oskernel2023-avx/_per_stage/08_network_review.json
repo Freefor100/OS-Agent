@@ -1,0 +1,53 @@
+{
+  "schema_version": "describe_review_v1",
+  "stage_id": "08_network",
+  "stage_title": "网络子系统与协议栈",
+  "confidence": 1.0,
+  "question_reviews": [
+    {
+      "question_id": "Q08_001",
+      "confidence": 1.0,
+      "review": "答案声明已实现网络子系统，证据引用了 sys_sendto、do_sendto 实现及 lwipopts.h 配置，题面要求三态已落实，证据充分支撑 value。"
+    },
+    {
+      "question_id": "Q08_002",
+      "confidence": 1.0,
+      "review": "答案选择第三方库（lwIP），证据展示了 kernel/lwip/ 目录结构、lwip_sendto 实现及头文件引用，题答一致，证据确凿。"
+    },
+    {
+      "question_id": "Q08_003",
+      "confidence": 1.0,
+      "review": "答案声明已实现 socket 系统调用，证据列举了 sys_socket/bind/connect/sendto/recvfrom 的具体实现位置，符合题面三态要求，证据支撑结论。"
+    },
+    {
+      "question_id": "Q08_004",
+      "confidence": 1.0,
+      "review": "答案追踪了 sys_sendto 至 ring_buffer 的发送路径并列出关键节点，证据引用了对应函数代码片段，路径描述与证据一致，且关于回环限制的说明与 Q08_005 证据吻合。"
+    },
+    {
+      "question_id": "Q08_005",
+      "confidence": 1.0,
+      "review": "答案声明未发现网卡驱动，证据引用了 virtio_disk.c 仅含磁盘驱动、搜索无网卡驱动命中及文档明确说明仅回环，题答一致，证据充分支撑 not_found 结论。"
+    },
+    {
+      "question_id": "Q08_006",
+      "confidence": 1.0,
+      "review": "答案选择了 IPv4/IPv6、UDP、TCP、DNS，证据引用 lwipopts.h 显示对应宏定义为 1（IPv6 为 0 但归类于 IP 层选项），未选 ICMP/DHCP 与配置为 0 一致，题答与证据相符。"
+    },
+    {
+      "question_id": "Q08_007",
+      "confidence": 1.0,
+      "review": "答案声明未发现零拷贝，证据展示了 do_sendto 及 ring_buffer 中的 copyin/MEMCPY 显式拷贝操作及搜索无 DMA/mbuf 机制，证据充分支撑 not_found 结论。"
+    }
+  ],
+  "dimensions": {
+    "evidence_supports_answers": 1.0,
+    "question_answer_consistency": 1.0,
+    "requirements_fit": 1.0
+  },
+  "findings": [],
+  "summary_zh": "所有 7 道题目均已作答，题面类型（三态/单选/多选/简答）与答案格式符合契约。各题 value 均有对应的代码片段、配置文件或文档证据支撑，证据链完整且逻辑自洽（如 Q08_004 路径追踪与 Q08_005 无网卡结论一致）。未发现题答不符、证据缺失或契约违反情况。",
+  "_meta": {
+    "review_model": "qwen3.5-plus"
+  }
+}

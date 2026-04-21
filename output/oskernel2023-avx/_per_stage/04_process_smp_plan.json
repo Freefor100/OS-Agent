@@ -1,0 +1,120 @@
+{
+  "stage_id": "04_process_smp",
+  "goal": "分析进程/线程/调度与多核实现，完成 Q04_001~Q04_020 题单作答，覆盖执行实体抽象、状态机、上下文切换、调度算法、fork/clone/exec/wait、PID 分配、信号/futex、多核一致性等要点",
+  "must_cover": [
+    "[Q04_001] 执行实体：struct proc (PCB) + struct thread (TCB)，双结构体分离",
+    "[Q04_002] 状态机：procstate (UNUSED/SLEEPING/RUNNABLE/RUNNING/ZOMBIE) + threadState (t_UNUSED/t_SLEEPING/t_RUNNABLE/t_RUNNING/t_ZOMBIE/t_TIMING)",
+    "[Q04_003] 上下文切换：swtch.S 实现，保存/恢复 ra,sp,s0-s11 共 14 个寄存器",
+    "[Q04_004] 上下文结构体：context.h 定义 ra,sp,s0-s11",
+    "[Q04_005] 调度算法：FCFS/轮询混合（遍历 proc 数组，无线程时间片字段）",
+    "[Q04_006] 调度器入口：scheduler() (proc.c:669), sched() (proc.c:762), yield() (proc.c:787)",
+    "[Q04_007] fork/clone：sys_fork (proc.c fork()), sys_clone (thread_clone/clone)",
+    "[Q04_008] fork 复制地址空间 (copyuvm) 与文件表 (filedup)",
+    "[Q04_009] exec：sys_exec (exec.c loadseg 装载 ELF)",
+    "[Q04_010] wait/waitpid：wait() (proc.c:615), wait4pid()",
+    "[Q04_011] wait 阻塞：sleep(p, &p->lock) 实现",
+    "[Q04_012] PID 分配：自增计数器 nextpid + pid_lock 保护",
+    "[Q04_013] 父子树：proc->parent 指针，reparent() 传递给 init",
+    "[Q04_014] 信号已实现 (sigaction/sig_pending)，futex 已实现 (futex.c)",
+    "[Q04_015] 多核：cpus[NCPU] 数组，每核 scheduler() 循环，未见 IPI resched 显式调用",
+    "[Q04_016] exit 回收：freeproc() 回收页表/文件/vma，wakeup1 通知父进程",
+    "[Q04_001] 执行实体 (Execution Entity) 抽象是什么？",
+    "顶层类型名: ___（如 Process / Task / Thread / TaskControlBlock）",
+    "结构体路径: ___",
+    "关键字段（至少列 3 个）: Context=___, State=___, PID=___, TrapFrame=___",
+    "是否区分 PCB 与 TCB: ___（是 / 否 / 待核实）",
+    "[Q04_002] 任务/进程的生命周期状态机有哪些状态与流转点？（Ready/Running/Blocked/Exited 等；需状态枚举/字段证据）"
+  ],
+  "evidence_targets": [
+    "任务模型 (proc.h/thread.h)",
+    "调度器 (scheduler/sched/yield)",
+    "上下文切换 (swtch.S/context.h)",
+    "信号/Futex (signal.c/futex.c)",
+    "多核启动 (cpus 数组/mycpu)",
+    "CPU 本地状态 (struct cpu)",
+    "fork/clone/exec/wait 系统调用",
+    "PID 分配器 (allocpid/nextpid)",
+    "任务模型",
+    "调度器",
+    "上下文切换",
+    "信号/Futex",
+    "多核启动",
+    "CPU 本地状态",
+    "IPI",
+    "并发保护"
+  ],
+  "seed_paths": [
+    "kernel/include/proc.h",
+    "kernel/include/thread.h",
+    "kernel/include/context.h",
+    "kernel/proc.c",
+    "kernel/swtch.S",
+    "kernel/sysproc.c",
+    "kernel/exec.c",
+    "kernel/futex.c",
+    "kernel/syssig.c",
+    "kernel/include/signal.h",
+    "kernel/include/futex.h",
+    "kernel/include/riscv.h",
+    "task",
+    "proc"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "scheduler",
+    "sched",
+    "yield",
+    "fork",
+    "clone",
+    "thread_clone",
+    "exec",
+    "wait",
+    "exit",
+    "swtch",
+    "schedule",
+    "sys_fork"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "linker",
+    "doc",
+    "doc/pic",
+    "xv6-user",
+    "kernel",
+    "kernel/include",
+    "kernel/lwip",
+    "tools"
+  ],
+  "preferred_tools": [
+    "read_code_segment",
+    "lsp_get_call_graph",
+    "lsp_get_references",
+    "grep_in_repo",
+    "rag_search_code"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "1. 精读 kernel/proc.c 的 scheduler() (669-750 行) 和 sched() (762-782 行)，确认调度循环逻辑和页表切换点",
+    "2. 使用 lsp_get_call_graph 分析 scheduler() 的 incoming 调用链 (max_depth=2)，确认多核入口",
+    "3. 精读 kernel/proc.c 的 fork() (约 400-520 行) 和 exit() (570-610 行)，取证地址空间/文件表复制与回收路径",
+    "4. 使用 lsp_get_call_graph 分析 exit() 的 outgoing 调用链 (max_depth=3)，确认 freeproc/reparent/wakeup1 调用顺序",
+    "5. 精读 kernel/sysproc.c 的 sys_clone (20-50 行) 和 sys_wait4 (70-90 行)，确认线程创建与 wait4 实现",
+    "6. 使用 grep_in_repo 搜索 w_satp/sfence_vma 在 proc.c 的所有调用点，确认页表切换位置",
+    "7. 精读 kernel/futex.c 和 kernel/syssig.c，确认 futex 和信号的核心实现逻辑",
+    "8. 使用 rag_search_code 搜索「IPI」或「inter-processor interrupt」，确认是否存在多核间调度唤醒机制"
+  ]
+}

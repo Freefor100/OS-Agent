@@ -1,0 +1,116 @@
+{
+  "stage_id": "06_sync_ipc",
+  "goal": "分析该内核的同步互斥原语（SpinLock/Semaphore/SleepLock）、IPC 机制（Pipe/Futex/Signal）、sleep/wakeup 不变量及死锁处理策略，完成 Q06 题单作答。",
+  "must_cover": [
+    "[Q06_001] 同步原语类型：SpinLock（已实现）、Semaphore（已实现）、SleepLock（已实现），无 Mutex/RwLock/Condvar",
+    "[Q06_002] Mutex 实现形态：未实现独立 Mutex，用 SpinLock+Semaphore 替代",
+    "[Q06_003] WaitQueue 与 sleep/wakeup：存在 sleep()/wakeup() 函数，基于 chan 字段和 SLEEPING/RUNNABLE 状态转换",
+    "[Q06_004] sleep/wakeup 不变量：sleep 入口 proc.c:818，入睡前持锁 lk 后释放，wakeup 在 proc.c:850，先 acquire(p->lock) 再修改状态后 release",
+    "[Q06_005] Pipe 实现：已实现（pipe.c），环形缓冲 PIPESIZE=512",
+    "[Q06_006] Pipe 缓冲形态：环形缓冲（ring buffer），data[PIPESIZE] + nread/nwrite 索引",
+    "[Q06_007] Pipe 阻塞语义：读写均阻塞（while 循环 sleep 等待条件）",
+    "[Q06_008] SysV IPC：未实现（无 msgget/semget/shmget 系统调用）",
+    "[Q06_009] Futex：已实现（futex.c，支持 FUTEX_WAIT/WAKE/REQUEUE）",
+    "[Q06_010] 信号机制：已实现（signal.c，含 sigaction/kill/rt_sigreturn/sighandle）",
+    "[Q06_011] Signal handler 上下文：sighandle() 保存 trapframe 到 sig_tf，设置 ra=SIGTRAMPOLINE，sigreturn 恢复",
+    "[Q06_012] RwLock：未实现",
+    "[Q06_013] 原子操作来源：GCC builtin (__sync_lock_test_and_set/__sync_synchronize/__sync_lock_release)",
+    "[Q06_014] 死锁四条件：需分析代码中是否均成立（互斥/占有等待/不可剥夺/循环等待）",
+    "[Q06_015] 死锁处理策略：无显式检测/避免，依赖程序员预防",
+    "[Q06_016] 全局锁顺序规范：未发现显式 lock ordering 注释或 ABBA 检测代码",
+    "[Q06_001] 该内核提供了哪些同步原语？（SpinLock/Mutex/RwLock/Semaphore/Condvar/WaitQueue 等；列出类型定义证据）",
+    "[Q06_002] Mutex 更接近哪种实现？",
+    "[Q06_003] 是否存在等待队列 (Wait Queue, WaitQueue) 与 sleep/wakeup（或等价阻塞/唤醒）实现？（必须三态）",
+    "[Q06_004] sleep / wakeup 不变量 (Sleep-Wakeup Invariant) 分析，按格式填写：",
+    "sleep 入口函数: ___（路径）",
+    "入睡前持有的锁: ___（无则写 none）"
+  ],
+  "evidence_targets": [
+    "SpinLock 定义 (kernel/include/spinlock.h:7)",
+    "Semaphore 定义与实现 (kernel/include/sem.h, kernel/sem.c)",
+    "SleepLock 定义 (kernel/include/sleeplock.h)",
+    "sleep/wakeup 实现 (kernel/proc.c:818/850)",
+    "Pipe 结构与读写 (kernel/include/pipe.h, kernel/pipe.c)",
+    "Futex 实现 (kernel/futex.c, kernel/include/futex.h)",
+    "Signal handler 机制 (kernel/signal.c, SignalTrampoline.S)",
+    "原子操作 (kernel/spinlock.c:41/48/67/76)",
+    "锁与同步原语",
+    "IPC",
+    "Futex",
+    "管道/信号"
+  ],
+  "seed_paths": [
+    "kernel/include/spinlock.h",
+    "kernel/include/sem.h",
+    "kernel/include/sleeplock.h",
+    "kernel/include/pipe.h",
+    "kernel/include/signal.h",
+    "kernel/include/futex.h",
+    "kernel/proc.c",
+    "kernel/spinlock.c",
+    "kernel/sem.c",
+    "kernel/pipe.c",
+    "kernel/signal.c",
+    "kernel/futex.c",
+    "sync",
+    "lock"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "sleep",
+    "wakeup",
+    "acquire",
+    "release",
+    "sem_wait",
+    "sem_post",
+    "piperead",
+    "pipewrite",
+    "futexWait",
+    "futexWake",
+    "Mutex",
+    "SpinLock"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "linker",
+    "doc",
+    "doc/pic",
+    "xv6-user",
+    "kernel",
+    "kernel/include",
+    "kernel/lwip",
+    "tools"
+  ],
+  "preferred_tools": [
+    "read_code_segment",
+    "lsp_get_definition",
+    "lsp_get_references",
+    "lsp_get_call_graph",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "1. 读取 kernel/proc.c:818-865 确认 sleep/wakeup 完整实现，记录锁持有/释放顺序及防丢 wakeup 机制",
+    "2. 读取 kernel/spinlock.c 确认 acquire/release 的原子操作实现（__sync_lock_test_and_set 等）",
+    "3. 读取 kernel/sem.c 确认 Semaphore 的 wait/post 实现，验证是否使用 sleep/wakeup",
+    "4. 读取 kernel/pipe.c 完整代码，确认环形缓冲结构、阻塞读写逻辑及 wakeup 调用位置",
+    "5. 读取 kernel/futex.c 和 sysproc.c:504-540 确认 futex 系统调用实现及队列管理机制",
+    "6. 读取 kernel/signal.c 和 SignalTrampoline.S 确认信号处理上下文保存/恢复流程",
+    "7. 使用 grep 搜索 lock ordering/deadlock/barrier/producer-consumer 等关键词确认缺失功能",
+    "8. 汇总所有证据，按 Q06_001~Q06_020 格式填写答案，标注文件路径和行号作为证据"
+  ]
+}

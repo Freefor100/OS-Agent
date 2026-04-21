@@ -401,6 +401,47 @@ def _find_repo_docs(repo_path: str) -> List[str]:
     return docs
 
 
+def _infer_board_guesses(blob: str) -> List[str]:
+    """README/构建文件头中常见赛用板与 QEMU 机模子串 → 去重标签（供 Plan 侧车 board_guess）。"""
+    low = (blob or "").lower()
+    # (子串, 标签)；子串越长/越特异的条目放前面，避免短串误伤
+    markers: tuple[tuple[str, str], ...] = (
+        ("-machine virt", "qemu-virt"),
+        ("riscv-virt", "qemu-virt"),
+        ("qemu-system", "qemu"),
+        ("qemu-virt", "qemu-virt"),
+        ("fu740-c000", "fu740"),
+        ("fu740", "fu740"),
+        ("u740", "fu740"),
+        ("2k1000la", "2k1000la"),
+        ("2k1000-la", "2k1000la"),
+        ("2k1000", "2k1000"),
+        ("2k0500", "2k0500"),
+        ("ls2k", "ls2k"),
+        ("ls7a", "ls7a"),
+        ("ls3a", "ls3a"),
+        ("loongson", "loongson"),
+        ("jh7110", "jh7110"),
+        ("visionfive", "visionfive"),
+        ("vf2", "visionfive2"),
+        ("starfive", "starfive"),
+        ("sifive", "sifive"),
+        ("sophgo", "sophgo"),
+        ("k230", "k230"),
+        ("k210", "k210"),
+        ("nezha", "nezha"),
+        ("milkv", "milkv"),
+        ("allwinner-d1", "allwinner-d1"),
+        ("lichee", "lichee"),
+        ("qemu", "qemu"),
+    )
+    out: List[str] = []
+    for needle, label in markers:
+        if needle in low:
+            out.append(label)
+    return _dedupe_keep_order(out)
+
+
 def build_repo_profile(repo_url: str, repo_path: str) -> Dict[str, Any]:
     root_entries = _list_root_entries(repo_path)
     readme_text = ""
@@ -415,12 +456,13 @@ def build_repo_profile(repo_url: str, repo_path: str) -> Dict[str, Any]:
         for name in ("Cargo.toml", "Makefile", "rust-toolchain.toml")
         if os.path.exists(os.path.join(repo_path, name))
     )
-    arch_guesses = _guess_architecture(readme_text + "\n" + config_text, root_entries)
-    framework_guesses = _guess_framework(readme_text + "\n" + config_text, root_entries)
+    scan_blob = readme_text + "\n" + config_text
+    arch_guesses = _guess_architecture(scan_blob, root_entries)
+    framework_guesses = _guess_framework(scan_blob, root_entries)
     core_paths = _walk_core_paths(repo_path, max_depth=2)
     entry_candidates = _dedupe_keep_order([
         symbol for symbol in ("_start", "start", "rust_main", "kernel_main", "main", "trap_handler")
-        if symbol in (readme_text + "\n" + config_text)
+        if symbol in scan_blob
     ])
 
     return {
@@ -428,12 +470,8 @@ def build_repo_profile(repo_url: str, repo_path: str) -> Dict[str, Any]:
         "repo_path": repo_path,
         "framework_guess": framework_guesses,
         "arch_guess": arch_guesses,
-        "board_guess": _dedupe_keep_order([
-            board
-            for board in ("k210", "visionfive", "jh7110", "qemu", "virt")
-            if board in (readme_text + "\n" + config_text).lower()
-        ]),
-        "language_mix": _guess_language_mix(readme_text + "\n" + config_text, root_entries),
+        "board_guess": _infer_board_guesses(scan_blob),
+        "language_mix": _guess_language_mix(scan_blob, root_entries),
         "core_paths": core_paths,
         "entry_candidates": entry_candidates,
         "doc_paths": _find_repo_docs(repo_path),

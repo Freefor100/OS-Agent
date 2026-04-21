@@ -1,0 +1,116 @@
+{
+  "stage_id": "02_boot_trap",
+  "goal": "## 题单（评委用，小题作答）",
+  "must_cover": [
+    "[Q02_001] 启动入口在哪里？（例如 linker.ld 的 ENTRY、`_start`/`start`/`head`/`entry` 标签；必须给文件路径+符号证据）",
+    "[Q02_002] 启动链更接近哪种交接方式？",
+    "[Q02_003] 是否能在代码中证实发生了 CPU 特权级/模式切换？（RISC-V M→S、x86 实→保→长等；必须三态）",
+    "[Q02_004] 模式切换涉及的关键寄存器/位是什么？（例如 RISC-V mstatus/sstatus、x86 cr0/cr4/eflags；必须给证据摘录）",
+    "[Q02_005] 是否启用/初始化了 MMU（设置 SATP/CR3 等并建立页表）？（必须三态）",
+    "[Q02_006] 从入口汇编/固件交接到 C/Rust 主入口函数的跳转链是什么？（列出 3-6 个关键节点并给证据）",
+    "[Q02_007] 早期初始化 (Early Initialization) 各项状态（每项必须 implemented / stub / not_found + 证据路径，格式：`项目: 状态 [路径]`）：",
+    "BSS 清零 (BSS Clearing): ___",
+    "早期串口输出 (Early Serial/UART Output): ___",
+    "设备树解析 (Device Tree Blob parsing, DTB): ___",
+    "页表初始化时机 (Page Table Init): ___（在 MMU 启用前/后？）",
+    "[Q02_008] 是否初始化/启用了 FPU（如 sstatus.fs / cpacr_el1 / cr4）？（必须三态）",
+    "[Q02_009] 是否设置 trap/中断向量（如 stvec/idt 等）并能指出设置点？（必须三态）",
+    "[Q02_010] 构建系统如何选择目标平台/架构与入口文件？（Cargo features/Kconfig/Makefile 条件；必须引用配置证据）",
+    "[Q02_011] 对 RISC-V 平台：是否能证实 SBI/OpenSBI/U-Boot 固件链（固件将控制权移交内核）？（必须三态；搜索 sbi|opensbi|u-boot；非 RISC-V 平台写 not_found 并说明架构）",
+    "[Q02_012] MMU 启用前后是否存在串口/UART 地址切换逻辑（物理地址→虚拟地址）？（必须三态；搜索 phys_to_virt|virt_to_phys 及 UART 基址常量）",
+    "[Q02_013] 是否存在从内核返回用户态的路径（usertrapret/trap_return/trampoline/eret 等）并设置 stvec/VBAR/IDT？（必须三态）",
+    "[Q02_014] 是否支持多平台启动（StarFive VisionFive2/LoongArch/多板型）？（搜索 visionfive|jh7110|loongarch；有则描述差异入口与互斥关系；无则写未发现）",
+    "[Q02_015] trap/异常向量入口在哪里？（trap_handler/trap_vector/__alltraps 等；必须给证据）",
+    "[Q02_016] trap 上下文 (TrapFrame/TrapContext) 更可能存放在哪里？",
+    "[Q02_017] TrapFrame/寄存器保存结构体定义在哪里？寄存器数量与字节数是多少？（必须引用结构体定义证据）",
+    "[Q02_018] 是否存在系统调用分发表（syscall table / match 分发）？（必须三态）",
+    "[Q02_019] 系统调用号是否做边界检查？（越界默认分支/返回错误/panic；必须三态）",
+    "[Q02_020] 选择一个具体 syscall（优先 sys_write），追踪：用户指令 → trap → 分发 → 实现体。列出 3-6 个关键节点并给证据。",
+    "[Q02_021] 列出 5-10 个“高价值 syscall”（fork/exec/mmap/open/write 等）的实现三态（implemented/stub/not_found），并为每个至少给一条证据。",
+    "[Q02_022] 是否存在用户指针访问安全检查（copyin/copyout/access_ok/UserInPtr 等）？（必须三态）",
+    "[Q02_023] 时钟中断是否触发抢占调度（timer tick 中调用 yield/schedule/resched）？（必须三态）",
+    "[Q02_024] 是否存在信号处理链路（trap 返回前处理 pending signal、sigreturn/trampoline）？（必须三态）",
+    "[Q02_025] 缺页异常与内存特性（CoW/lazy）是否在 trap 中联动？（若存在，说明入口点与调用到内存模块的证据）",
+    "[Q02_026] 与 09 多核交叉一致性：per-CPU trap 栈/时钟初始化顺序与 AP 上线是否一致？（互指证据或写单核不适用）"
+  ],
+  "evidence_targets": [
+    "启动入口",
+    "模式切换",
+    "页表/MMU",
+    "trap 向量",
+    "trap 入口",
+    "syscall 分发",
+    "TrapFrame",
+    "用户指针校验",
+    "QEMU/README 机模与板型差异",
+    "RTC/virtio 早期初始化线索"
+  ],
+  "seed_paths": [
+    "arch",
+    "boot",
+    "platform",
+    "trap",
+    "syscall",
+    "interrupt",
+    "exception",
+    "kernel/trap",
+    "README.md",
+    "Makefile",
+    "entry.S",
+    "start.S"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "_start",
+    "start",
+    "rust_main",
+    "kernel_main",
+    "trap_handler",
+    "syscall",
+    "syscall_dispatch",
+    "TrapFrame",
+    "main"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "linker",
+    "doc",
+    "doc/pic",
+    "xv6-user",
+    "kernel",
+    "kernel/include",
+    "kernel/lwip",
+    "tools"
+  ],
+  "preferred_tools": [
+    "rag_search_code",
+    "lsp_get_call_graph",
+    "lsp_get_definition",
+    "read_code_segment"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "对照 seed_paths、entry_symbols，用 rag_search_code / list_repo_structure / LSP 锁定与本阶段相关的关键文件与符号。",
+    "对核心入口使用 lsp_get_document_outline → lsp_get_call_graph（单入口、浅深度）→ 必要时 read_code_segment 精读。",
+    "按 must_cover 逐项输出结论，每条附反引号源码路径；无实现则显式写「未发现/桩函数」等，勿臆测。",
+    "覆盖要点：[Q02_001] 启动入口在哪里？（例如 linker.ld 的 ENTRY、`_start`/`start`/`head`/`entry` 标签；必须给文件路径+符号证据）",
+    "覆盖要点：[Q02_002] 启动链更接近哪种交接方式？",
+    "覆盖要点：[Q02_003] 是否能在代码中证实发生了 CPU 特权级/模式切换？（RISC-V M→S、x86 实→保→长等；必须三态）",
+    "覆盖要点：[Q02_004] 模式切换涉及的关键寄存器/位是什么？（例如 RISC-V mstatus/sstatus、x86 cr0/cr4/eflags；必须给证据摘录）",
+    "覆盖要点：[Q02_005] 是否启用/初始化了 MMU（设置 SATP/CR3 等并建立页表）？（必须三态）"
+  ]
+}

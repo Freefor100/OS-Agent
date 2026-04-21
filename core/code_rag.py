@@ -158,6 +158,8 @@ class ASTParser:
         return chunks
 
 class CodeRAGEngine:
+    # 按模型 ID 进程内共享一份 SentenceTransformer，避免每次工具调用 new CodeRAGEngine 都占满一份显存。
+    _shared_embedding_models: Dict[str, Any] = {}
     _model_lock = threading.Lock()
     _project_locks_guard = threading.Lock()
     _project_locks = {}
@@ -183,31 +185,36 @@ class CodeRAGEngine:
     def _load_model(self):
         if self.model is not None:
             return
-            
-        with CodeRAGEngine._model_lock:
-            if self.model is not None:
-                return
-                
-            if SentenceTransformer is not None:
-                # 强制使用针对代码优化的 Jina 模型，禁止回退到其他模型
-                model_name = os.environ.get("CODE_EMBEDDING_MODEL", "jinaai/jina-embeddings-v2-base-code")
-                try:
-                    import torch
-                    from core.hf_env import load_sentence_transformer_for_embedding
+        if SentenceTransformer is None:
+            return
 
-                    device = "cuda" if torch.cuda.is_available() else "cpu"
-                    logger.info(f"正在加载代码嵌入模型: {model_name} (Device: {device})...")
-                    model_kwargs = {"dtype": torch.float32, "low_cpu_mem_usage": False}
-                    self.model = load_sentence_transformer_for_embedding(
-                        model_name,
-                        trust_remote_code=True,
-                        device=device,
-                        model_kwargs=model_kwargs,
-                    )
-                except Exception as e:
-                    msg = f"❌ 无法加载核心代码模型 {model_name}: {e}。请检查网络环境、HF_ENDPOINT 镜像或模型缓存。"
-                    logger.error(msg)
-                    raise RuntimeError(msg)
+        model_name = os.environ.get("CODE_EMBEDDING_MODEL", "jinaai/jina-embeddings-v2-base-code")
+
+        with CodeRAGEngine._model_lock:
+            cached = CodeRAGEngine._shared_embedding_models.get(model_name)
+            if cached is not None:
+                self.model = cached
+                return
+
+            try:
+                import torch
+                from core.hf_env import load_sentence_transformer_for_embedding
+
+                device = "cuda" if torch.cuda.is_available() else "cpu"
+                logger.info(f"正在加载代码嵌入模型: {model_name} (Device: {device}, 进程内共享) ...")
+                model_kwargs = {"dtype": torch.float32, "low_cpu_mem_usage": False}
+                loaded = load_sentence_transformer_for_embedding(
+                    model_name,
+                    trust_remote_code=True,
+                    device=device,
+                    model_kwargs=model_kwargs,
+                )
+                CodeRAGEngine._shared_embedding_models[model_name] = loaded
+                self.model = loaded
+            except Exception as e:
+                msg = f"❌ 无法加载核心代码模型 {model_name}: {e}。请检查网络环境、HF_ENDPOINT 镜像或模型缓存。"
+                logger.error(msg)
+                raise RuntimeError(msg)
 
     def build_index(self, repo_path: str, force: bool = False):
         lock = CodeRAGEngine._get_project_lock(os.path.abspath(self.db_dir))

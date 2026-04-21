@@ -1,0 +1,114 @@
+{
+  "stage_id": "09_debug_error",
+  "goal": "完成调试机制与错误处理章节的题单作答，重点验证日志系统、panic处理、栈回溯、内核monitor、GDB stub、错误码体系、trace机制等8个核心问题。",
+  "must_cover": [
+    "[Q09_001] 日志系统：printf/debug_print/serious_print宏实现与级别控制",
+    "[Q09_002] panic处理路径：panic()函数实现与调用点",
+    "[Q09_003] panic诊断输出：寄存器dump、栈回溯、停机行为",
+    "[Q09_004] 栈回溯实现：backtrace()函数基于FramePointer的回溯机制",
+    "[Q09_005] 内核monitor：区分内核态监视器与用户态shell（xv6-user/sh.c）",
+    "[Q09_006] GDB stub：是否存在数据包解析循环",
+    "[Q09_007] 错误码体系：error.h中的ErrorCode enum与errno定义",
+    "[Q09_008] trace机制：sys_trace系统调用与tmask跟踪掩码",
+    "[Q09_001] 是否存在日志系统（log/printk/println 宏）与日志级别控制？（必须三态）",
+    "[Q09_002] 是否存在 panic/崩溃处理路径（panic_handler/oom/abort 等）？（必须三态）",
+    "[Q09_003] panic 路径会输出哪些诊断？（寄存器 dump/栈回溯/停机；必须引用实现证据）",
+    "[Q09_004] 是否实现栈回溯 (backtrace/unwind/stack_trace)？（必须三态；仅打印 ra 不算）",
+    "[Q09_005] 是否存在 **内核驻留的交互式监视器（kernel monitor）**？（对齐 Stallings《操作系统：精髓与设计原理》语境：**在内核态上下文**接受命令、用于探查/操控系统的监视器；**不包括**仅在用户态运行的常规 shell，如 `xv6-user/sh.c`、`user/` 下用户程序等——除非题面另有定义。必须三态；若 `implemented`：须给出 3–10 个 **用户可键入的 monitor 命令名** 及对应 **内核内** 解析/分发入口的 `路径:行号` 证据；仅以用户态 shell 充当内核 monitor 视为 **未切题** 应判 `stub` 或 `not_found` 并说明理由。）",
+    "[Q09_006] 是否实现 GDB stub（需数据包解析循环，如 handle_gdb_packet）？（必须三态）",
+    "[Q09_007] 错误码/错误类型体系是什么？（errno/Result/Error enum；给类型定义与传播点证据）",
+    "[Q09_008] 是否存在 trace/perf/ftrace 等跟踪机制或 tracepoints？（必须三态）",
+    "**Kernel monitor（Stallings 意义）**：仅统计 **`kernel/`**（或经引导后**仅内核可达**的调试循环）内的交互监视器；须与用户态 shell 区分。若存在：**命令名 + 内核处理入口**列表；若无：明确「未发现」。**禁止**把 `xv6-user/`、`user/` 等用户态 shell 单独当作内核 monitor 的充分证据。",
+    "日志系统：print/log 宏如何实现？日志级别设计？",
+    "Panic 处理：panic! 触发后的流程（栈回溯、寄存器 dump、停机）。**须一句话结论**：是否包含寄存器 dump、是否调用回溯辅助函数，并附 `路径:行号`。",
+    "**栈回溯 (Backtrace)**：是否支持 `dwarf` 解析或基于 FramePointer 的回溯？**必须** `grep_in_repo` 搜索 `backtrace|unwind|stack_trace|StackTrace`，在正文**摘录关键命中行或明确写零命中**。**注意**：不要被 panic 时仅打印若干寄存器/`ra` 误导为完整回溯；`doc/*.md` 不得单独作为「已实现回溯」的证据，须 C/Rust 源码 `路径:行号`。",
+    "异常处理：未处理异常的默认行为。",
+    "调试接口："
+  ],
+  "evidence_targets": [
+    "panic实现路径(kernel/printf.c:268-278)",
+    "backtrace实现(kernel/printf.c:280-290)",
+    "日志宏实现(kernel/printf.c debug_print/serious_print)",
+    "错误码定义(kernel/include/error.h)",
+    "trace系统调用(kernel/sysproc.c sys_trace)",
+    "console输入处理与procdump命令(kernel/console.c)",
+    "用户态strace工具(xv6-user/strace.c)",
+    "panic/debug",
+    "日志系统",
+    "回溯",
+    "错误处理"
+  ],
+  "seed_paths": [
+    "kernel/printf.c",
+    "kernel/include/printf.h",
+    "kernel/include/error.h",
+    "kernel/console.c",
+    "kernel/sysproc.c",
+    "kernel/syscall.c",
+    "kernel/trap.c",
+    "xv6-user/strace.c",
+    "xv6-user/sh.c",
+    "debug",
+    "log",
+    "panic",
+    "assert",
+    "backtrace"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "panic",
+    "backtrace",
+    "printf",
+    "debug_print",
+    "serious_print",
+    "sys_trace",
+    "procdump",
+    "consoleintr",
+    "panic_handler",
+    "log",
+    "assert",
+    "main"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "linker",
+    "doc",
+    "doc/pic",
+    "xv6-user",
+    "kernel",
+    "kernel/include",
+    "kernel/lwip",
+    "tools"
+  ],
+  "preferred_tools": [
+    "read_code_segment",
+    "grep_in_repo",
+    "lsp_get_definition",
+    "lsp_get_call_graph"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "使用read_code_segment精读kernel/printf.c中panic()和backtrace()完整实现，确认是否包含寄存器dump",
+    "使用grep_in_repo搜索debug_print/serious_print的调用点，验证日志系统使用模式",
+    "使用read_code_segment读取kernel/include/error.h，整理ErrorCode enum与errno宏定义",
+    "使用read_code_segment读取kernel/sysproc.c中sys_trace实现，理解tmask跟踪机制",
+    "使用read_code_segment读取kernel/console.c中consoleintr和procdump，确认Ctrl-P命令功能",
+    "使用grep_in_repo验证是否存在handle_gdb_packet或类似GDB数据包解析代码",
+    "对比xv6-user/sh.c与kernel/console.c，明确区分用户态shell与内核诊断命令",
+    "汇总证据，按must_cover列表逐项作答Q09_001至Q09_008"
+  ]
+}

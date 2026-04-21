@@ -1,0 +1,210 @@
+{
+  "schema_version": "v1",
+  "stage_id": "09_debug_error",
+  "stage_title": "调试机制与错误处理",
+  "terminology_profile": "stallings_en_zh",
+  "answers": [
+    {
+      "question_id": "Q09_001",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在日志系统（log/printk/println 宏）与日志级别控制？（必须三态）",
+      "value": "stub",
+      "evidence": [
+        {
+          "path": "kernel/printf.c",
+          "symbol_kind": "function",
+          "symbol_name": "debug_print",
+          "excerpt": "debug_print 实现于 kernel/printf.c:71-143，使用 #ifdef DEBUG 条件编译控制，无运行时日志级别控制机制"
+        },
+        {
+          "path": "kernel/printf.c",
+          "symbol_kind": "function",
+          "symbol_name": "serious_print",
+          "excerpt": "serious_print 实现于 kernel/printf.c:145-217，使用 #ifndef EXAM 条件编译控制，用于 panic 等严重错误输出"
+        },
+        {
+          "path": "kernel/include/printf.h",
+          "symbol_kind": "header",
+          "symbol_name": "printf.h",
+          "excerpt": "头文件声明 debug_print/serious_print/printf/panic/backtrace 等函数，无日志级别 enum 定义"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_002",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 panic/崩溃处理路径（panic_handler/oom/abort 等）？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/printf.c",
+          "symbol_kind": "function",
+          "symbol_name": "panic",
+          "excerpt": "panic 实现于 kernel/printf.c:265-277：输出错误信息→调用 backtrace()→设置 panicked=1→无限循环停机"
+        },
+        {
+          "path": "kernel/include/printf.h",
+          "symbol_kind": "header",
+          "symbol_name": "panic",
+          "excerpt": "void panic(char *s) __attribute__((noreturn)); 声明为不返回函数"
+        },
+        {
+          "path": "kernel/printf.c",
+          "symbol_kind": "variable",
+          "symbol_name": "panicked",
+          "excerpt": "volatile int panicked = 0; 全局标志，panic 后设为 1 以冻结其他 CPU 的 uart 输出"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_003",
+      "question_type": "short_answer",
+      "stem": "panic 路径会输出哪些诊断？（寄存器 dump/栈回溯/停机；必须引用实现证据）",
+      "value": "panic 路径输出：1) 错误字符串（serious_print 打印 s）；2) 调用 backtrace() 进行基于 FramePointer 的栈回溯（打印返回地址 RA）；3) 设置 panicked=1 后进入无限循环停机。未发现寄存器 dump（如打印 ra/sp/gp 等寄存器值），backtrace 仅遍历栈帧打印 RA。",
+      "evidence": [
+        {
+          "path": "kernel/printf.c",
+          "symbol_kind": "function",
+          "symbol_name": "panic",
+          "excerpt": "kernel/printf.c:265-277: serious_print(\"%p\\n\", s); serious_print(\"panic: \"); serious_print(s); serious_print(\"\\n\"); backtrace(); panicked = 1; for (;;) ;"
+        },
+        {
+          "path": "kernel/printf.c",
+          "symbol_kind": "function",
+          "symbol_name": "backtrace",
+          "excerpt": "kernel/printf.c:280-290: 基于 r_fp() 获取 FramePointer，遍历栈帧打印 ra-4 地址，无寄存器 dump"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_004",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现栈回溯 (backtrace/unwind/stack_trace)？（必须三态；仅打印 ra 不算）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/printf.c",
+          "symbol_kind": "function",
+          "symbol_name": "backtrace",
+          "excerpt": "kernel/printf.c:280-290: 基于 FramePointer 遍历栈帧，uint64 *fp = (uint64 *)r_fp(); while (fp < bottom) { uint64 ra = *(fp - 1); serious_print(\"%p\\n\", ra - 4); fp = (uint64 *)*(fp - 2); }"
+        },
+        {
+          "path": "kernel/include/riscv.h",
+          "symbol_kind": "function",
+          "symbol_name": "r_fp",
+          "excerpt": "kernel/include/riscv.h:320-325: static inline uint64 r_fp() { uint64 x; asm volatile(\"mv %0, s0\" : \"=r\" (x) ); return x; } 读取 s0 寄存器作为 FramePointer"
+        },
+        {
+          "path": "kernel/include/printf.h",
+          "symbol_kind": "header",
+          "symbol_name": "backtrace",
+          "excerpt": "void backtrace(); 函数声明"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_005",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 **内核驻留的交互式监视器（kernel monitor）**？（对齐 Stallings《操作系统：精髓与设计原理》语境：**在内核态上下文**接受命令、用于探查/操控系统的监视器；**不包括**仅在用户态运行的常规 shell，如 `xv6-user/sh.c`、`user/` 下用户程序等——除非题面另有定义。必须三态；若 `implemented`：须给出 3–10 个 **用户可键入的 monitor 命令名** 及对应 **内核内** 解析/分发入口的 `路径:行号` 证据；仅以用户态 shell 充当内核 monitor 视为 **未切题** 应判 `stub` 或 `not_found` 并说明理由。）",
+      "value": "stub",
+      "evidence": [
+        {
+          "path": "kernel/console.c",
+          "symbol_kind": "function",
+          "symbol_name": "consoleintr",
+          "excerpt": "kernel/console.c:148-154: case C('P'): procdump(); break; 仅支持 Ctrl-P 触发 procdump 打印进程列表，无命令解析循环"
+        },
+        {
+          "path": "kernel/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "procdump",
+          "excerpt": "kernel/proc.c:950-970: 打印 PID/STATE/NAME/MEM 表格，无交互式命令接口"
+        },
+        {
+          "path": "xv6-user/sh.c",
+          "symbol_kind": "file",
+          "symbol_name": "sh.c",
+          "excerpt": "用户态 shell 实现，非内核态 monitor；内核中未发现类似 monitor_cmdloop 或命令分发表"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_006",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 GDB stub（需数据包解析循环，如 handle_gdb_packet）？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/",
+          "symbol_kind": "search",
+          "symbol_name": "grep_gdbstub_scan",
+          "excerpt": "在 kernel/ 目录下搜索 handle_gdb_packet|gdbstub|gdb_stub，0 命中；未发现 GDB 数据包解析循环或 GDB stub 实现"
+        },
+        {
+          "path": "kernel/trap.c",
+          "symbol_kind": "scan",
+          "symbol_name": "trap_handler_scan",
+          "excerpt": "阅读 trap.c 未发现 GDB breakpoint/watchpoint 处理逻辑"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_007",
+      "question_type": "short_answer",
+      "stem": "错误码/错误类型体系是什么？（errno/Result/Error enum；给类型定义与传播点证据）",
+      "value": "错误码体系采用 C 语言风格：1) ErrorCode enum（kernel/include/error.h:4-12）定义 8 种内核错误（UNKNOWN_ERROR/BAD_PROCESS/INVALID_PARAM 等）；2) 标准 errno 宏定义（kernel/include/error.h:14-107）涵盖 EPERM/ENOENT/ENOMEM/EINVAL 等 POSIX 错误码，ENOSYS=38 表示无效系统调用；3) 系统调用通过返回负值传播错误（如 sysproc.c 中 argint 失败返回 -1）",
+      "evidence": [
+        {
+          "path": "kernel/include/error.h",
+          "symbol_kind": "enum",
+          "symbol_name": "ErrorCode",
+          "excerpt": "kernel/include/error.h:4-12: enum ErrorCode { UNKNOWN_ERROR = 1, BAD_PROCESS, INVALID_PARAM, NO_FREE_MEMORY, NO_FREE_PROCESS, NOT_ELF_FILE, INVALID_PROCESS_STATUS, INVALID_PERM };"
+        },
+        {
+          "path": "kernel/include/error.h",
+          "symbol_kind": "macro",
+          "symbol_name": "errno",
+          "excerpt": "kernel/include/error.h:14-107: #define EPERM 1, #define ENOENT 2, ..., #define ENOSYS 38, #define ENOTCONN 107, #define ECONNREFUSED 111"
+        },
+        {
+          "path": "kernel/sysproc.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_trace",
+          "excerpt": "kernel/sysproc.c:373-380: if (argint(0, &mask) < 0) return -1; 错误时返回 -1"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_008",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 trace/perf/ftrace 等跟踪机制或 tracepoints？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/sysproc.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_trace",
+          "excerpt": "kernel/sysproc.c:373-380: uint64 sys_trace(void) { int mask; if (argint(0, &mask) < 0) return -1; myproc()->tmask = mask; return 0; }"
+        },
+        {
+          "path": "kernel/syscall.c",
+          "symbol_kind": "function",
+          "symbol_name": "syscall",
+          "excerpt": "kernel/syscall.c:445-455: if ((p->tmask & (1 << num)) != 0) { printf(\"pid %d: %s -> %d\\n\", p->pid, sysnames[num], p->trapframe->a0); } 根据 tmask 位掩码输出系统调用跟踪"
+        },
+        {
+          "path": "kernel/include/proc.h",
+          "symbol_kind": "struct_field",
+          "symbol_name": "tmask",
+          "excerpt": "kernel/include/proc.h:85: int tmask; // trace mask 进程结构体中的跟踪掩码字段"
+        },
+        {
+          "path": "xv6-user/strace.c",
+          "symbol_kind": "file",
+          "symbol_name": "strace.c",
+          "excerpt": "用户态 strace 工具：trace(atoi(argv[1])) 设置掩码后 exec 目标程序"
+        }
+      ]
+    }
+  ]
+}

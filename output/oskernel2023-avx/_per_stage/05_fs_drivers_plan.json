@@ -1,0 +1,120 @@
+{
+  "stage_id": "05_fs_drivers",
+  "goal": "分析文件系统与设备I/O：VFS接口形态、FD表实现、块缓存策略、mmap/pipe支持、驱动框架与中断分发、平台适配机制",
+  "must_cover": [
+    "[Q05_001] VFS接口形态（C struct devsw + dirent操作函数，非Rust trait）",
+    "[Q05_002] 具体文件系统后端（自研FAT32，kernel/fat32.c）",
+    "[Q05_003] FAT32为自研实现（无Cargo.toml，纯C实现）",
+    "[Q05_004] 文件打开路径：sys_openat→open→ename/new_ename→filealloc/fdalloc",
+    "[Q05_005] FD表实现形态（proc->ofile固定数组，NOFILEMAX上限）",
+    "[Q05_006] 块缓存存在（bio.c中bcache双向链表）",
+    "[Q05_007] 驱逐策略为LRU（bget从prev端回收，brelse移回next端）",
+    "[Q05_008] 页缓存状态（通过vma+mmap实现文件映射，无独立page cache）",
+    "[Q05_009] mmap已实现（mmap.c，支持文件映射与匿名映射）",
+    "[Q05_010] poll/select/epoll状态（pselect.c存在，需验证完整性）",
+    "[Q05_011] 路径解析实现（ename/new_ename/new_lookup_path支持绝对/相对路径）",
+    "[Q05_012] symlink支持状态（readlinkat系统调用存在）",
+    "[Q05_013] pipe已实现（pipe.c，FD_PIPE类型，VFS文件对象）",
+    "[Q05_014] socket已实现（socket_new.c，FD_SOCK类型，lwip后端）",
+    "[Q05_015] 伪文件系统状态（/dev/null硬编码，/proc/*部分路径硬编码，无完整procfs/devfs）",
+    "[Q05_016] FD表归属（per-process，struct proc::ofile）",
+    "[Q05_001] VFS 抽象层 (Virtual File System, VFS)接口是什么形态？（Rust trait / C op 表；必须给接口定义证据）",
+    "[Q05_002] 具体文件系统后端 (Concrete File System Backend) 更接近哪种？",
+    "[Q05_003] 若支持 FAT32/Ext4：它是自研还是第三方库/crate？（必须引用 Cargo.toml/Cargo.lock 或 Makefile 引入证据）",
+    "[Q05_004] 文件打开路径：文件打开入口（sys_open 或等价）→ VFS 层 → 具体 FS open。列出 3-6 个关键节点并给证据。",
+    "[Q05_005] 文件描述符表 (File Descriptor Table, FD Table) 的实现形态是什么？（固定数组/Vec/BTreeMap 等；必须给结构体定义证据）",
+    "[Q05_006] 是否实现块缓存/缓冲缓存 (Block Cache / Buffer Cache, bcache)？（必须三态）"
+  ],
+  "evidence_targets": [
+    "VFS接口定义（file.h struct file/devsw）",
+    "FD表结构（proc.h ofile数组）",
+    "块缓存LRU（bio.c bget/brelse）",
+    "mmap实现（mmap.c+vma.h）",
+    "pipe实现（pipe.c FD_PIPE）",
+    "socket实现（socket_new.c FD_SOCK+lwip）",
+    "FAT32目录项（fat32.h struct dirent）",
+    "驱动注册（main.c init序列）",
+    "中断分发（plic.c plic_claim/complete）",
+    "平台适配（Makefile platform条件编译）",
+    "路径解析（fat32.c ename/new_ename）",
+    "open调用链（sysfile.c sys_openat→open）",
+    "VFS 设计",
+    "具体文件系统",
+    "fd table",
+    "pipe/mmap"
+  ],
+  "seed_paths": [
+    "kernel/file.h",
+    "kernel/proc.h",
+    "kernel/bio.c",
+    "kernel/fat32.c",
+    "kernel/mmap.c",
+    "kernel/pipe.c",
+    "kernel/socket_new.c",
+    "kernel/plic.c",
+    "kernel/main.c",
+    "kernel/disk.c",
+    "Makefile",
+    "kernel/include/fat32.h",
+    "fs",
+    "vfs"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "sys_openat",
+    "open",
+    "ename",
+    "fdalloc",
+    "filealloc",
+    "bget",
+    "brelse",
+    "mmap",
+    "pipealloc",
+    "plic_claim",
+    "sys_open",
+    "vfs_open"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "linker",
+    "doc",
+    "doc/pic",
+    "xv6-user",
+    "kernel",
+    "kernel/include",
+    "kernel/lwip",
+    "tools"
+  ],
+  "preferred_tools": [
+    "lsp_get_call_graph",
+    "lsp_get_definition",
+    "lsp_get_references",
+    "read_code_segment",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "使用lsp_get_call_graph分析sys_openat的outgoing调用链（depth=3），取证open→ename→filealloc/fdalloc路径",
+    "使用lsp_get_definition定位struct file和struct proc定义，读取file.h和proc.h中ofile数组定义以确认FD表形态",
+    "读取bio.c中bget和brelse完整实现，取证LRU驱逐策略（双向链表移动逻辑）",
+    "读取mmap.c和vma.h，确认mmap支持文件映射与匿名映射的实现细节",
+    "读取pipe.c中pipealloc和piperead/pipewrite，确认pipe作为VFS文件对象（FD_PIPE）的实现",
+    "读取socket_new.c和lwip集成点，确认socket作为FD_SOCK的实现形态",
+    "读取fat32.c中ename/new_ename/dirlookup函数，确认路径解析支持绝对/相对路径及. ..的处理",
+    "读取plic.c和trap.c，追踪中断从plic_claim到具体handler（如uartintr/diskintr）的分发路径"
+  ]
+}
