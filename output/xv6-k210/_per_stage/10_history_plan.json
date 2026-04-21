@@ -1,0 +1,99 @@
+{
+  "stage_id": "10_history",
+  "goal": "基于 Git 历史与仓库证据，撰写「开发历史与里程碑」章节，聚焦作者贡献、模块演进路径、关键里程碑提交及文档/CI 演进，避免无依据的流水账。",
+  "must_cover": [
+    "作者贡献图谱：retrhelo/hustccc/Lu Sitong 等核心贡献者及其主力模块",
+    "时间线里程碑：2021-05 启动 → 07 月 lazy-load/mmap → 08 月 signal/SD 卡优化",
+    "模块演进：kernel/mm 从基础分配器到 lazy-mmap 的重写轨迹",
+    "文档里程碑：README 与 doc/ 目录下原理/调试文档的迭代节点",
+    "缺口与实验性标记：TODO 指向 Issues，部分功能被移除或长期待办",
+    "若存在 `.git`：用本阶段已启用的 Git 工具概括主分支/标签/作者贡献方向；**禁止**编造未出现在工具输出中的 commit hash 或统计口径。",
+    "**模块演进**：可结合前文各章已出现的路径，用 `trace_file_evolution` 等追踪关键文件/目录的引入或大改，只写工具输出可支撑的判断。",
+    "**文档里程碑**：README、CHANGELOG、CI 配置等中与版本或阶段目标相关的陈述，区分「文档声称」与「代码可验证结论」。",
+    "**缺口**：若历史信息显示某能力被移除、长期标注实验/待办，如实记录。"
+  ],
+  "evidence_targets": [
+    "作者贡献统计（commits/增删行数/主力目录）",
+    "重大提交节点（lazy-mmap、signal、mmap、SD 卡驱动）",
+    "kernel/mm 与 kernel/fs 的文件演进轨迹",
+    "README.md 与 doc/ 文档的更新历史",
+    "Makefile 构建脚本的演进（toolchain/平台适配）",
+    "作者贡献",
+    "重大提交",
+    "模块演进",
+    "当前缺口",
+    "CI/产物名/自测相关演进(有工具证据时)"
+  ],
+  "seed_paths": [
+    "README.md",
+    "Makefile",
+    "kernel/mm",
+    "kernel/fs",
+    "kernel/sched/proc.c",
+    "doc/",
+    "xv6-user/usertests.c",
+    ".gitmodules",
+    "git",
+    "history",
+    "scripts",
+    ".github",
+    "include/fs",
+    "include/mm"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "_start",
+    "rust_main",
+    "mmap",
+    "munmap",
+    "sigaction",
+    "fat32_init",
+    "sdcard_init",
+    "git",
+    "start"
+  ],
+  "repo_hotspots": [
+    "Cargo.toml",
+    "Makefile",
+    "bootloader",
+    "bootloader/SBI",
+    "debug",
+    "debug/kendryte_openocd",
+    "debug/openocd_cfg",
+    "doc",
+    "doc/img",
+    "include"
+  ],
+  "preferred_tools": [
+    "get_git_history_summary",
+    "analyze_authors_contribution",
+    "trace_file_evolution",
+    "read_code_segment",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 4000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "用 get_git_history_summary 输出全量提交摘要，识别 5-8 个关键里程碑 commit（如 lazy-mmap、signal、mmap 合并）",
+    "用 analyze_authors_contribution 提取作者贡献图谱，记录 Top-3 贡献者及其主力目录",
+    "用 trace_file_evolution 追踪 kernel/mm 目录与 README.md 的演进节点，标注重大重构 commit",
+    "用 trace_file_evolution 追踪 Makefile 与 kernel/fs 的变更，记录 toolchain 切换与文件系统改进",
+    "用 read_code_segment 精读 README.md 的 Progress/TODO 节，提取官方声称的完成项与缺口",
+    "用 grep_in_repo 搜索 doc/ 目录下含日期或版本关键词的文档，辅助定位文档里程碑",
+    "对照 must_cover 收束证据，区分「文档声称」与「代码可验证结论」，标记实验性/移除功能",
+    "输出章节草稿：按时间线组织里程碑，附作者贡献统计与模块演进轨迹，注明证据来源 commit SHA"
+  ]
+}

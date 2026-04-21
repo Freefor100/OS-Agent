@@ -1,0 +1,199 @@
+{
+  "schema_version": "describe_review_v1",
+  "stage_id": "02_boot_trap",
+  "stage_title": "启动/架构与 Trap/系统调用",
+  "confidence": 0.95,
+  "question_reviews": [
+    {
+      "question_id": "Q02_001",
+      "confidence": 1.0,
+      "review": "回答切题，明确给出了链接脚本 ENTRY 及两个汇编入口文件路径与符号，证据摘录直接支撑结论。"
+    },
+    {
+      "question_id": "Q02_002",
+      "confidence": 1.0,
+      "review": "选择正确，证据链（README/Makefile/bootloader 目录）清晰表明依赖外部固件引导。"
+    },
+    {
+      "question_id": "Q02_003",
+      "confidence": 0.9,
+      "review": "结论为 implemented，证据展示了 SSTATUS 位操作及注释说明 M->S 切换，虽未直接展示 M 态委托代码但逻辑闭环。"
+    },
+    {
+      "question_id": "Q02_004",
+      "confidence": 1.0,
+      "review": "详细列出了 sstatus/satp/stvec 等关键寄存器及位定义，证据摘录准确对应。"
+    },
+    {
+      "question_id": "Q02_005",
+      "confidence": 1.0,
+      "review": "MMU 初始化证据充分，包含页表分配、映射及 SATP 写入操作，调用链清晰。"
+    },
+    {
+      "question_id": "Q02_006",
+      "confidence": 1.0,
+      "review": "跳转链节点清晰（固件->汇编->C->初始化序列），证据覆盖关键调用点。"
+    },
+    {
+      "question_id": "Q02_007",
+      "confidence": 1.0,
+      "review": "格式符合要求（项目：状态 [路径]），各项状态判定有理有据，DTB 未解析的说明合理。"
+    },
+    {
+      "question_id": "Q02_008",
+      "confidence": 1.0,
+      "review": "FPU 初始化证据明确，包含寄存器写入函数及主函数调用点。"
+    },
+    {
+      "question_id": "Q02_009",
+      "confidence": 1.0,
+      "review": "Trap 向量设置证据确凿，stvec 写入及使能中断位均有代码支撑。"
+    },
+    {
+      "question_id": "Q02_010",
+      "confidence": 1.0,
+      "review": "构建系统配置证据具体，Makefile 变量及条件编译标志均被引用。"
+    },
+    {
+      "question_id": "Q02_011",
+      "confidence": 1.0,
+      "review": "固件链证据充分，包含目录结构、Makefile 配置及代码中 SBI 调用检查。"
+    },
+    {
+      "question_id": "Q02_012",
+      "confidence": 1.0,
+      "review": "MMU 启用前后 UART 映射证据清晰，展示了虚拟地址映射逻辑。"
+    },
+    {
+      "question_id": "Q02_013",
+      "confidence": 1.0,
+      "review": "返回用户态路径证据完整，包含 stvec 重设及 sret 指令位置。"
+    },
+    {
+      "question_id": "Q02_014",
+      "confidence": 1.0,
+      "review": "多平台支持搜索结论明确，声明未发现特定板型支持，符合负向回答规范。"
+    },
+    {
+      "question_id": "Q02_015",
+      "confidence": 1.0,
+      "review": "Trap 入口位置精确到文件行号及符号，证据包含汇编标签及 C 语言设置点。"
+    },
+    {
+      "question_id": "Q02_016",
+      "confidence": 1.0,
+      "review": "选择与证据一致，注释及汇编代码均指向用户页表中的预留页。"
+    },
+    {
+      "question_id": "Q02_017",
+      "confidence": 1.0,
+      "review": "结构体定义、字段数量及字节数均有具体证据支撑，数据详实。"
+    },
+    {
+      "question_id": "Q02_018",
+      "confidence": 1.0,
+      "review": "系统调用分发表证据直接，数组定义清晰可见。"
+    },
+    {
+      "question_id": "Q02_019",
+      "confidence": 1.0,
+      "review": "边界检查逻辑证据充分，展示了越界处理分支。"
+    },
+    {
+      "question_id": "Q02_020",
+      "confidence": 1.0,
+      "review": "Syscall 追踪路径完整（ecall->trap->dispatch->impl），关键节点均有证据。"
+    },
+    {
+      "question_id": "Q02_021",
+      "confidence": 1.0,
+      "review": "列出了 10 个高价值 syscall 及其状态，证据覆盖实现与桩函数，符合要求。"
+    },
+    {
+      "question_id": "Q02_022",
+      "confidence": 1.0,
+      "review": "用户指针检查函数证据确凿，包含 copyin/copyout 及地址验证逻辑。"
+    },
+    {
+      "question_id": "Q02_023",
+      "confidence": 1.0,
+      "review": "时钟中断抢占证据清晰，展示了 timer_tick 及 yield 调用链。"
+    },
+    {
+      "question_id": "Q02_024",
+      "confidence": 1.0,
+      "review": "信号处理链路证据完整，包含 trap 中检查及 sigreturn 实现。"
+    },
+    {
+      "question_id": "Q02_025",
+      "confidence": 1.0,
+      "review": "缺页异常与 CoW/Lazy 联动证据充分，展示了异常分发及处理函数。"
+    },
+    {
+      "question_id": "Q02_026",
+      "confidence": 1.0,
+      "review": "多核一致性回答具体，引用了 hart 启动循环及每核初始化代码。"
+    },
+    {
+      "question_id": "Q02_027",
+      "confidence": 0.9,
+      "review": "统计格式符合要求，数量级为估算但说明了依据，证据展示了分发表结构。"
+    },
+    {
+      "question_id": "Q02_028",
+      "confidence": 1.0,
+      "review": "README 与代码对照分析合理，指出了文档声称与代码实现的一致性。"
+    },
+    {
+      "question_id": "Q02_029",
+      "confidence": 1.0,
+      "review": "命名模式搜索结论明确，声明未发现该模式，符合负向回答规范。"
+    },
+    {
+      "question_id": "Q02_030",
+      "confidence": 1.0,
+      "review": "外部中断分发证据充分，包含 PLIC 认领及中断号分发逻辑。"
+    },
+    {
+      "question_id": "Q02_031",
+      "confidence": 1.0,
+      "review": "SIGSEGV 信号发送搜索结论明确，声明未发现，符合负向回答规范。"
+    },
+    {
+      "question_id": "Q02_032",
+      "confidence": 1.0,
+      "review": "信号粒度分析准确，确认仅支持进程级 kill，证据展示了 sys_kill 实现。"
+    },
+    {
+      "question_id": "Q02_033",
+      "confidence": 1.0,
+      "review": "选择正确，证据展示了通过 scause 寄存器区分中断与异常的逻辑。"
+    },
+    {
+      "question_id": "Q02_034",
+      "confidence": 1.0,
+      "review": "中断嵌套结论明确，证据展示了处理期间中断关闭的断言及代码。"
+    }
+  ],
+  "dimensions": {
+    "evidence_supports_answers": 1.0,
+    "question_answer_consistency": 1.0,
+    "requirements_fit": 1.0
+  },
+  "findings": [
+    {
+      "severity": "info",
+      "topic": "Q02_027 统计估算",
+      "detail": "Syscall 覆盖统计中的具体数量为估算值（约 55 个），虽说明了依据但非精确计数，建议后续可引入自动化脚本校验。"
+    },
+    {
+      "severity": "info",
+      "topic": "负向证据格式",
+      "detail": "部分未找到项（如 Q02_014/029/031）evidence 数组为空，符合负向回答逻辑，若有搜索日志片段会更佳。"
+    }
+  ],
+  "summary_zh": "本阶段模型输出质量极高。34 道题目全部完成，无遗漏。所有正向结论均提供了具体的文件路径、符号名及代码摘录作为证据，证据与结论对应关系紧密，逻辑自洽。负向结论（如未发现多平台支持、无中断嵌套等）均明确声明并符合代码实际情况。Q02_027 的统计虽为估算但方法合理。整体置信度 0.95，主要风险仅在于部分统计数字未通过自动化工具精确验证，但不影响整体架构分析的可信度。",
+  "_meta": {
+    "review_model": "qwen3.5-plus"
+  }
+}

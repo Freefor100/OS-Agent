@@ -1,0 +1,30 @@
+{
+  "summary": "压缩 7 条 repair_actions 为 5 条，合并 7.1.1 的两条证据收集，合并 7.6.1/7.6.2 的构建配置验证与重写",
+  "actions": [
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "p001",
+      "hint": "读取 kern/driver/io.h 验证 IO_REGION_* 宏，grep 搜索 'device.?tree|\\.dtb|pci_' 验证无 DTS/PCI 代码"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "p002",
+      "hint": "list_repo_structure 验证无 platform/boards 目录"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "p003",
+      "hint": "读取 libs/sbi.h 和 kern/driver/console.c 验证 SBI 调用实现"
+    },
+    {
+      "action_type": "rewrite_paragraph",
+      "target_paragraph_id": "p004",
+      "hint": "读取 Makefile 验证无 Kconfig/Cargo features，移除'推断'标注并提供实际内容"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "p005",
+      "hint": "读取 kern/init/init.c 验证初始化顺序"
+    }
+  ]
+}

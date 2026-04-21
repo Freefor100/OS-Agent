@@ -1,0 +1,112 @@
+{
+  "stage_id": "13_history",
+  "goal": "基于 Git 历史数据，梳理 rwos 从 2021-05-07 初始提交到 2021-08-20 最终版本的开发时间线，识别关键里程碑、模块演进轨迹及作者贡献分布。",
+  "must_cover": [
+    "初始版本（2021-05-07）一次性搭建的子系统清单及代码规模",
+    "识别 2-3 个重大功能演进节点（如文件系统完善、进程管理增强、k210 移植）",
+    "作者贡献分布：rrrzh 主导开发，Sword-Horse 与阮志涵少量贡献",
+    "开发周期划分：密集开发期（5 月）与平稳/测试期（7-8 月）",
+    "关键符号（_start、sys_open）的引入时间点",
+    "**严禁**把 `get_git_history_summary` 放在循环里调用。你只需要调用**一次**，它会自动返回贯穿仓库生命周期的浓缩摘要。",
+    "**严禁**无脑遍历所有的历史节点。",
+    "当 `get_git_history_summary` 的结果显示某次重大 Commit 涉及了海量文件（如 `[arceos/modules/] 3500 files`）且你需要知道具体加了什么功能时，**必须且只能**使用 `analyze_git_history(repo_path, max_commits=1, skip=N, path_filter=\"arceos/modules\")` 对该重点目录进行定点下钻。",
+    "**绝不允许**在未设定 `path_filter` 的情况下对几千个文件的重大提交使用 `analyze_git_history`，这会导致上万行的输出撑爆监控。",
+    "`find_symbol_first_commit` 可以批量传入多个关键词，请严格合并为 1-2 次统一调用。",
+    "识别出提交密集期（快速开发阶段）和平稳期。",
+    "从 `get_git_history_summary` 的返回中找到最早的几个 commit，汇总其增加的代码行数。",
+    "观察这些最早 commit 涉及的模块，总结第一版已经搭起了哪几个子系统。",
+    "启动入口：`[\"_start\", \"rust_main\", \"kernel_main\"]`",
+    "内存管理：`[\"FrameAllocator\", \"PageTable\", \"MemorySet\"]`",
+    "进程/任务：`[\"TaskInner\", \"spawn_task\", \"ProcessInner\"]`",
+    "文件系统：`[\"VfsNode\", \"fat32\", \"ramfs\", \"sys_open\"]`"
+  ],
+  "evidence_targets": [
+    "初始提交涵盖的 15 个 kern 子目录及代码量",
+    "2021-05-22 管道（pipe）子系统新增",
+    "2021-07-17 k210 移植与时钟系统",
+    "2021-08-20 性能测试工具（lat_ctx、lat_pipe）集中提交",
+    "vfsfile.c 等核心文件的演进轨迹",
+    "作者贡献",
+    "重大提交",
+    "模块演进",
+    "当前缺口"
+  ],
+  "seed_paths": [
+    "kern/init/entry.S",
+    "kern/fs/vfs/vfsfile.c",
+    "kern/fs/pipe/",
+    "kern/process/proc.c",
+    "kern/mm/pmm.c",
+    "kern/syscall/syscall.c",
+    "Makefile",
+    "tools/mksfs.c",
+    "git",
+    "history",
+    "README.md",
+    "kern/driver",
+    "kern/fs",
+    "kern/mm"
+  ],
+  "framework_guess": [
+    "uCore"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "_start",
+    "sys_open",
+    "kern_init",
+    "pipe",
+    "dup",
+    "sfs_create",
+    "git"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "kern",
+    "kern/debug",
+    "kern/driver",
+    "kern/fs",
+    "kern/init",
+    "kern/libs",
+    "kern/mm",
+    "kern/process",
+    "kern/schedule"
+  ],
+  "preferred_tools": [
+    "get_git_history_summary",
+    "analyze_git_history",
+    "trace_file_evolution",
+    "get_commit_diff_summary",
+    "find_symbol_first_commit",
+    "analyze_authors_contribution"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "review_checklist": [
+    "关键问题是否回答",
+    "重要结论是否给出源码路径",
+    "是否避免将 README 当成实现证据",
+    "是否标出未实现/桩函数",
+    "must_cover_count=12"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 4000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "从 get_git_history_summary 提取初始提交（60eb8b7d）的代码规模统计，列出 15 个 kern 子目录的增行数",
+    "使用 analyze_git_history 下钻 2021-05-22 管道子系统新增（path_filter=\"kern/fs/pipe\"）",
+    "使用 analyze_git_history 下钻 2021-07-17 k210 移植提交（path_filter=\"kern/driver\"）",
+    "结合 trace_file_evolution 分析 vfsfile.c、proc.c 等核心文件的变更节点",
+    "从 analyze_authors_contribution 汇总三位作者的贡献比例与专注模块",
+    "识别开发密集期（5 月 7 日 -5 月 31 日）与平稳期（7 月 -8 月）的提交频率差异",
+    "将重大提交归类到对应模块（内存管理、进程、文件系统、驱动）形成演进时间线",
+    "对照 must_cover 检查是否覆盖初始框架、功能演进、作者分工、开发周期四维度"
+  ]
+}

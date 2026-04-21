@@ -1,0 +1,30 @@
+{
+  "summary": "压缩 7 条证据补充为 5 条，聚焦路径引用缺失与关键代码证据，合并同类验证项",
+  "actions": [
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "p005",
+      "hint": "读取 kern/trap/trap.h 中 struct trapframe/pushregs 定义，统计字段数与字节数，附代码片段"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "p013",
+      "hint": "使用 lsp_get_call_graph 追踪 trap() 函数调用链，提供实际工具输出替代伪代码"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "p031",
+      "hint": "读取 kern/syscall/syscall.c 中 syscalls[] 数组与 NUM_SYSCALLS 宏，验证系统调用总数"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "p032",
+      "hint": "验证 sys_getuid 等桩函数实现，附 lsp_get_definition 输出"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "p062",
+      "hint": "grep 搜索 'cow|signal|_impl' 关键词，提供 CoW/信号/接口分离未实现的证据"
+    }
+  ]
+}

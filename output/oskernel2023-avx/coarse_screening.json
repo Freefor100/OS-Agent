@@ -1,0 +1,186 @@
+{
+  "target": "oskernel2023-avx",
+  "library_dir": "G:\\OS-Agent\\output",
+  "timestamp": "2026-03-31T18:03:11.685185",
+  "top_k": 5,
+  "coarse_preplan_path": "./output\\oskernel2023-avx\\coarse_preplan.json",
+  "coarse_preplan": {
+    "target": "oskernel2023-avx",
+    "framework_guess": [
+      "ArceOS",
+      "rCore",
+      "xv6"
+    ],
+    "arch_guess": [
+      "riscv64"
+    ],
+    "critical_dims": [
+      "framework"
+    ],
+    "available_sections": [
+      "01_项目概览与技术栈.md",
+      "02_启动流程与架构初始化.md",
+      "03_内存管理物理虚拟分配器.md",
+      "04_进程线程与调度机制.md",
+      "05_中断异常与系统调用.md",
+      "06_文件系统VFS__具体_FS.md",
+      "07_设备驱动与硬件抽象.md",
+      "08_同步互斥与进程间通信.md",
+      "09_多核支持与并行机制.md",
+      "10_安全机制与权限模型.md",
+      "11_网络子系统与协议栈.md",
+      "12_调试机制与错误处理.md",
+      "13_开发历史与里程碑.md",
+      "14_执行摘要与总结评价.md"
+    ]
+  },
+  "dimension_weights": {
+    "D1_tech_stack": 0.08,
+    "D2_boot_arch": 0.06,
+    "D3_memory": 0.15,
+    "D4_process_sched": 0.15,
+    "D5_trap_syscall": 0.1,
+    "D6_filesystem": 0.12,
+    "D7_device_driver": 0.06,
+    "D8_sync_ipc": 0.08,
+    "D9_smp_security": 0.08,
+    "D10_net_debug": 0.12
+  },
+  "target_fingerprint_path": "./output\\oskernel2023-avx\\fingerprint.json",
+  "target_vectors": {
+    "D10_net_debug": {
+      "feature_text": "网络集成 lwIP 协议栈，实现完整 Socket 系统调用，支持 TCP/UDP/DNS。但仅支持 QEMU 回环模式，无真实网卡驱动，不支持 DHCP/ICMP 及跨机通信。调试含三级日志与 Panic 处理，支持基于帧指针的栈回溯及寄存器 dump。提供用户态 Shell 与系统调用追踪，未实现内核 Monitor、GDB Stub。无性能追踪，不具备真实网络通信能力。",
+      "vector_length": 768
+    },
+    "D1_tech_stack": {
+      "feature_text": "本项目基于 xv6-riscv 扩展，为 64 位 RISC-V 宏内核。编程语言为 C (C99 标准) 及汇编，采用 no_std 裸机环境。目标架构仅支持 RISC-V 64 (riscv64gc)。内核类型为宏内核。关键依赖包括集成 lwIP 网络栈与自研 FAT32 驱动。构建系统使用 Makefile 配合 riscv64-unknown-elf-gcc 工具链，主要命令为 make build。",
+      "vector_length": 768
+    },
+    "D2_boot_arch": {
+      "feature_text": "平台 QEMU/VF2，LoongArch 未实现。链 SBI→U-Boot→Kernel。入口 kernel/entry_qemu.S/entry_visionfive.S。固件切 M-Mode 至 S-Mode，内核无码。MMU 经 kvminit 建表、kvminithart 写 satp 启用。FPU 无。",
+      "vector_length": 768
+    },
+    "D3_memory": {
+      "feature_text": "物理内存用空闲链表。页表 Sv39 三级，`pagetable_t`，`walk`/`mappages`。用户堆隐式链表，内核仅页级分配。mmap(FIXED/ANON) 已实现；CoW、懒分配、Swap、大页、共享、rmap 未实现。缺页异常链：`usertrap`→`handle_stack_page_fault`→`uvmalloc1`。指针无显式验证，依赖 `walkaddr` 隐式检查。",
+      "vector_length": 768
+    },
+    "D4_process_sched": {
+      "feature_text": "采用 Process+Thread 分离模型，有 struct proc/thread。调度简单轮转，代码仅有 FIFO，无多调度器。swtch.S 切换，存 14 个寄存器，无浮点上下文。进程支持 PGID，无 Session/SID。信号支持 sigaction/kill/trampoline。Futex 实现，rlimit 桩函数，fork 用 uvmcopy 复制地址空间 (COW)。",
+      "vector_length": 768
+    },
+    "D5_trap_syscall": {
+      "feature_text": "Trap 入口为汇编 trap.S，TrapFrame 含 36 字段 288 字节。系统调用用指针表，注册 100 个，70 个完整，15 个桩函数。核心 sys_clone/exec/mmap 均完整，覆盖文件/进程/内存。接口层 sys_xxx 调内部函数，无 impl 层。信号在 Trap 返回前检查。缺页触发栈懒分配，无 CoW。用户指针无 UserInPtr，用 copyin。",
+      "vector_length": 768
+    },
+    "D6_filesystem": {
+      "feature_text": "VFS 无独立 Inode/Dentry Trait，struct file 与 dirent 直接耦合。FAT32 完全自研，ext4 未支持，TmpFS 仅桩函数，ProcFS/DevFS 未实现。文件描述符表为 Per-Process (proc->ofile) 加全局 ftable。Pipe 系 512 字节环形缓冲区。Socket 集成 LWIP。mmap 支持标志位但无零拷贝，munmap 为桩实现。poll/select/epoll 均未实现。打开流程由隐式 SuperBlock、dirent、file 与进程 fd 表协同。",
+      "vector_length": 768
+    },
+    "D7_device_driver": {
+      "feature_text": "驱动基于 Makefile 编译，无注册机制。设备地址硬编码，无 DT 解析。支持 QEMU（仅测试）与 VisionFive。字符 16550aUART（仅 QEMU）与 UART8250。块设备 VirtIO-Blk（仅 QEMU）、SD 卡、RAMDisk。网络 lwIP 回环。中断 PLIC，分 M/S 模式。",
+      "vector_length": 768
+    },
+    "D8_sync_ipc": {
+      "feature_text": "锁机制含 SpinLock（禁中断，GCC 原子指令）及 Mutex(SleepLock)，RwLock 未实现。等待队列基于 chan 数组扫描。原子操作源自 GCC 内置。IPC 方面 Pipe 已实现环形缓冲区；MessageQueue 与 SharedMem 未实现；Semaphore 仅内核态实现；Signal 已实现但 sys_kill 存在缺陷。Futex 完整实现 wait/wake 调用链。",
+      "vector_length": 768
+    },
+    "D9_smp_security": {
+      "feature_text": "本项目仅支持单核，从核仅轮询串口未进调度器。IPI 仅有接口未实现。Per-CPU 为全局数组，无 axns。调度无负载均衡与亲和性。页表 PTE_U 位隔离用户/内核态，未实现 KPTI/SMEP/SMAP。UID/GID 仅有定义未强制检查，文件硬编码 root。无 Seccomp/prctl 沙箱。用户指针经 copyin 验证。纯 C 无 Rust。无 Capability。",
+      "vector_length": 768
+    }
+  },
+  "results": [
+    {
+      "name": "oskernrl2022-rv6",
+      "total_score": 0.8839,
+      "similarity_percent": 88.39,
+      "cosine_score": 0.8562,
+      "struct_score": 0.2928,
+      "struct_score_normalized": 0.976,
+      "raw_total_score": 1.149,
+      "same_framework": true,
+      "dim_scores": {
+        "D10_net_debug": 0.8326,
+        "D1_tech_stack": 0.7507,
+        "D2_boot_arch": 0.6461,
+        "D3_memory": 0.9003,
+        "D4_process_sched": 0.7867,
+        "D5_trap_syscall": 0.9443,
+        "D6_filesystem": 0.8635,
+        "D7_device_driver": 0.8236,
+        "D8_sync_ipc": 0.9144,
+        "D9_smp_security": 0.8515
+      }
+    },
+    {
+      "name": "oskernel2021-x",
+      "total_score": 0.8767,
+      "similarity_percent": 87.67,
+      "cosine_score": 0.8398,
+      "struct_score": 0.3,
+      "struct_score_normalized": 1.0,
+      "raw_total_score": 1.1398,
+      "same_framework": true,
+      "dim_scores": {
+        "D10_net_debug": 0.7639,
+        "D1_tech_stack": 0.7557,
+        "D2_boot_arch": 0.6795,
+        "D3_memory": 0.8368,
+        "D4_process_sched": 0.8189,
+        "D5_trap_syscall": 0.9327,
+        "D6_filesystem": 0.8841,
+        "D7_device_driver": 0.8688,
+        "D8_sync_ipc": 0.896,
+        "D9_smp_security": 0.7727
+      }
+    },
+    {
+      "name": "xv6-k210",
+      "total_score": 0.8321,
+      "similarity_percent": 83.21,
+      "cosine_score": 0.8587,
+      "struct_score": 0.223,
+      "struct_score_normalized": 0.7433,
+      "raw_total_score": 1.0817,
+      "same_framework": true,
+      "dim_scores": {
+        "D10_net_debug": 0.8073,
+        "D1_tech_stack": 0.7376,
+        "D2_boot_arch": 0.6479,
+        "D3_memory": 0.8311,
+        "D4_process_sched": 0.8547,
+        "D5_trap_syscall": 0.9542,
+        "D6_filesystem": 0.9039,
+        "D7_device_driver": 0.8126,
+        "D8_sync_ipc": 0.9021,
+        "D9_smp_security": 0.8525
+      }
+    },
+    {
+      "name": "rwos",
+      "total_score": 0.8119,
+      "similarity_percent": 81.19,
+      "cosine_score": 0.7893,
+      "struct_score": 0.2662,
+      "struct_score_normalized": 0.8873,
+      "raw_total_score": 1.0555,
+      "same_framework": true,
+      "dim_scores": {
+        "D10_net_debug": 0.8256,
+        "D1_tech_stack": 0.6723,
+        "D2_boot_arch": 0.5959,
+        "D3_memory": 0.7527,
+        "D4_process_sched": 0.8308,
+        "D5_trap_syscall": 0.9635,
+        "D6_filesystem": 0.6144,
+        "D7_device_driver": 0.7815,
+        "D8_sync_ipc": 0.818,
+        "D9_smp_security": 0.8785
+      }
+    }
+  ],
+  "validation": {
+    "passed": true,
+    "issues": []
+  }
+}

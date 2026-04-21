@@ -1,0 +1,121 @@
+{
+  "stage_id": "04_process_smp",
+  "goal": "分析 xv6-k210 的进程/线程模型、调度器实现、上下文切换机制、多核 SMP 支持及相关系统调用",
+  "must_cover": [
+    "[Q04_001] 执行实体抽象：struct proc (PCB)，含 context/trapframe/state/pid 等字段",
+    "[Q04_002] 状态机：RUNNABLE/RUNNING/SLEEPING/ZOMBIE 四态，流转点在 scheduler/yield/sleep/exit",
+    "[Q04_003] 上下文切换：swtch.S 实现，保存/恢复 ra/sp/s0-s11 共 14 个寄存器",
+    "[Q04_004] 调度算法：多级优先级队列 (PRIORITY_TIMEOUT/IRQ/NORMAL)，带 timer 超时机制",
+    "[Q04_005] 调度器入口：scheduler() 主循环、__get_runnable_no_lock() 选进程、sched() 触发切换",
+    "[Q04_006] fork/clone：clone() 实现，复制地址空间/文件表/信号处理，返回子进程 PID",
+    "[Q04_007] exec：sys_exec/sys_execve 调用 execve() 重建地址空间",
+    "[Q04_008] wait/wait4：wait4() 阻塞等待 ZOMBIE 子进程，支持 -1/指定 PID",
+    "[Q04_009] PID 分配：全局自增 __pid，无回收机制 (简单递增)",
+    "[Q04_010] 父子树：child/sibling_next/sibling_pprev 链表存储",
+    "[Q04_011] 信号：实现 sigaction/sigprocmask/signal 处理，无 futex",
+    "[Q04_012] 多核 SMP：hart0 初始化后 IPI 唤醒其他 hart，每核 cpu 结构体独立",
+    "[Q04_013] exit 回收：释放地址空间/文件表，子进程重父为 init，状态变 ZOMBIE",
+    "[Q04_014] 进程组/会话：未实现 (grep 无 setpgid/setsid)",
+    "[Q04_015] rlimit：仅 stub sys_prlimit64 返回 0，未真实实现",
+    "[Q04_016] PCB/TCB：未区分，仅 struct proc 统一表示",
+    "[Q04_001] 执行实体 (Execution Entity) 抽象是什么？",
+    "顶层类型名: ___（如 Process / Task / Thread / TaskControlBlock）",
+    "结构体路径: ___",
+    "关键字段（至少列 3 个）: Context=___, State=___, PID=___, TrapFrame=___",
+    "是否区分 PCB 与 TCB: ___（是 / 否 / 待核实）",
+    "[Q04_002] 任务/进程的生命周期状态机有哪些状态与流转点？（Ready/Running/Blocked/Exited 等；需状态枚举/字段证据）"
+  ],
+  "evidence_targets": [
+    "任务模型 (struct proc)",
+    "调度器 (scheduler/__get_runnable_no_lock)",
+    "上下文切换 (swtch.S)",
+    "信号机制 (signal.c)",
+    "多核启动 (main.c hart 循环)",
+    "CPU 本地状态 (struct cpu)",
+    "IPI 唤醒 (sbi_send_ipi)",
+    "并发保护 (proc_lock/spinlock)",
+    "任务模型",
+    "调度器",
+    "上下文切换",
+    "信号/Futex",
+    "多核启动",
+    "CPU 本地状态",
+    "IPI",
+    "并发保护"
+  ],
+  "seed_paths": [
+    "kernel/sched/proc.c",
+    "kernel/sched/swtch.S",
+    "include/sched/proc.h",
+    "kernel/sched/signal.c",
+    "include/sched/signal.h",
+    "kernel/syscall/sysproc.c",
+    "kernel/main.c",
+    "kernel/exec.c",
+    "task",
+    "proc",
+    "process",
+    "sched",
+    "kernel/task",
+    "kernel/proc"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "scheduler",
+    "swtch",
+    "clone",
+    "exit",
+    "wait4",
+    "yield",
+    "sleep",
+    "wakeup",
+    "cpuinit",
+    "mycpu",
+    "schedule",
+    "sys_fork"
+  ],
+  "repo_hotspots": [
+    "Cargo.toml",
+    "Makefile",
+    "bootloader",
+    "bootloader/SBI",
+    "debug",
+    "debug/kendryte_openocd",
+    "debug/openocd_cfg",
+    "doc",
+    "doc/img",
+    "include"
+  ],
+  "preferred_tools": [
+    "read_code_segment",
+    "lsp_get_call_graph",
+    "lsp_get_definition",
+    "lsp_get_references",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "精读 include/sched/proc.h 中 struct proc 和 struct cpu 定义，记录关键字段 (context/state/pid/trapframe/child/sibling 等)",
+    "分析 kernel/sched/swtch.S 汇编，确认保存/恢复的寄存器集合 (ra/sp/s0-s11)",
+    "追踪 scheduler() → __get_runnable_no_lock() → swtch() 调用链，理解调度循环和优先级队列机制",
+    "分析 clone() 函数，确认地址空间复制 (copysegs)、文件表复制 (copyfdtable)、父子关系建立",
+    "分析 exit() 调用链 (已获取 call graph)，确认资源回收路径 (delsegs/dropfdtable/iput) 和 ZOMBIE 状态处理",
+    "分析 wait4() 实现，确认阻塞机制 (sleep 在子进程 ZOMBIE 状态) 和参数处理",
+    "检查 kernel/sched/signal.c 和 include/sched/signal.h，确认信号处理实现程度",
+    "分析 main.c 中多核启动流程，确认 IPI 唤醒机制和每核 cpu 结构体使用情况"
+  ]
+}

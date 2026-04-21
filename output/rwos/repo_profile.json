@@ -1,0 +1,65 @@
+{
+  "repo_url": "https://gitlab.eduxiji.net/Ruanzhihan/rwos",
+  "repo_path": "repos\\rwos",
+  "framework_guess": [
+    "uCore"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "board_guess": [
+    "k210",
+    "qemu"
+  ],
+  "language_mix": [
+    "Rust",
+    "C/C++"
+  ],
+  "core_paths": [
+    "Makefile",
+    "kern",
+    "kern/debug",
+    "kern/driver",
+    "kern/fs",
+    "kern/init",
+    "kern/libs",
+    "kern/mm",
+    "kern/process",
+    "kern/schedule",
+    "kern/sync",
+    "kern/syscall",
+    "kern/trap",
+    "libs",
+    "pdf",
+    "tools",
+    "user",
+    "user/libs",
+    "user/mnt"
+  ],
+  "entry_candidates": [],
+  "doc_paths": [
+    "README.md",
+    "README.MD",
+    "readme.md"
+  ],
+  "history_available": true,
+  "root_entries": [
+    ".git",
+    ".vscode",
+    "CMakeLists.txt",
+    "Makefile",
+    "OSCOMP_决赛一阶段.md",
+    "OSCOMP_决赛二阶段.md",
+    "OSCOMP_决赛总结.md",
+    "OSCOMP_初赛阶段.md",
+    "Readme.md",
+    "build",
+    "compile_flags.txt",
+    "kern",
+    "libs",
+    "pdf",
+    "tools",
+    "user"
+  ],
+  "readme_summary": "# Readme： About RWOS ## 1：作品说明 来自南开大学的两位靓仔：阮志涵和吴昌昊，基于uCore的基础上，进行了一系列的魔改，添加，修正，最终得到了一个五脏俱全的麻雀：RWOS。 作为一个操作系统，RWOS实现了上电启动，加载运行，物理内存管理，虚拟内存管理，内核/用户态的进程，线程管理，文件系统等功能，提供了一系列中断，异常的响应处理机制，能够完美的通过绝大部分测试样例。 具体到其中每一个测试样例的实现上，我们提供了另外一个说明文档：OSCOMP.md，感兴趣的读者可以通过这个文档对项目的实现有一个全局的了解（可以结合源代码一起阅读）。markdown文档有可能出现图片不全的情况，因此我们同时生成了OSCOMP.pdf 供大家阅读。 ## 2：作品目录 根目录下包括五个主目录：build，kern，libs，tools以及user。其中主要的代码位于kern，libs和user这三个目录下。 首先是kern。kern内包含了在内核态所使用的一系列代码，子目录与功能对应关系如下 > debug 内核调试 > > driver 内核驱动 > > fs 文件系统 > > init 内核总控 > > libs 库函数 > > mm 内存管理 > > process 进程管理 > > schedule 进程调度 > > sync 同步互斥相关 > > syscall 系统调用 > > trap 中断处理 libs提供了一系列标准库文件，例如stdio.h，stdlib.h等。通过这些库为用户态提供服务。 我们在tools中放置了链接脚本和烧录工具： > boot.ld bootloader的链接脚本 > > kernel.ld 内核态代码的链接脚本 > > user.ld 用户态代码的链接脚本 > > grade.sh ucore自带评分"
+}

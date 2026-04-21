@@ -1,4 +1,17 @@
 # os_agent_d_describe.py
+#
+# 每阶段 Cursor 式管线（固定）:
+#   ① Plan     — 阶段提示词 + 启发式 plan + LLM 自主探索 → 锁定计划与 execution_steps（须按序执行）
+#   ② Execute  — System + 单条 Human（计划+任务合并）后 ReAct 写章节
+#   ③ Review（可选）— DESCRIBE_STAGE_REVIEW=1 且本阶段为 JSON-QA 并成功校验时：仅将
+#      「describe_stage_qa 题单」+「coerce_answers_payload_by_stage_qa 覆写前的 JSON」
+#      送审；不含工具摘录。01_overview / 10_history 不审。
+#      侧车：_per_stage/<stage_id>_review.json（失败见 *_review_error.json）。
+#
+# API Key / MODEL_NAME 等仍从仓库根目录 .env 读取（load_dotenv）。
+#
+import copy
+import json
 import os
 import re
 import sys
@@ -6,18 +19,81 @@ import time
 import logging
 from datetime import datetime
 
-import langchain
 from dotenv import load_dotenv
+
+# 尽早加载：override=True 使 .env 覆盖系统/用户环境变量里误设的 HF_ENDPOINT 等（默认 load_dotenv 不覆盖）
+load_dotenv(override=True)
+
+import langchain
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage, SystemMessage
 
-from core.agent_builder import build_agent, SYSTEM_PROMPT
+from core.agent_builder import (
+    build_chat_model,
+    build_executor_agent,
+    build_planner_agent,
+    SYSTEM_PROMPT,
+    DESCRIBE_SYSTEM_PROMPT_JSON,
+)
 from core.utils import repo_name_from_url, format_tool_call_summary, format_tool_result_summary
 from core.error_handling import ErrorType, RetryConfig, classify_error, calculate_backoff, ErrorTracker
+from core.per_types import StageState
+from core.per_planner import (
+    apply_llm_plan_overlay,
+    build_repo_profile,
+    build_dynamic_context,
+    ensure_execution_steps,
+    plan_stage,
+    render_plan_context,
+)
+from core.per_executor import extract_stage_artifacts
+from core.describe_stage_qa import load_stage_qa, list_question_ids
+from core.describe_stage_review import (
+    build_stage_qa_question_sheet,
+    describe_stage_review_applies,
+    describe_stage_review_enabled,
+    run_describe_stage_review,
+)
+from core.describe_json_qa import (
+    SCHEMA_VERSION as JSON_QA_SCHEMA_VERSION,
+    build_bailian_response_format_json_schema,
+    coerce_answers_payload_by_stage_qa,
+    coerce_answers_payload_defaults,
+    parse_answers_json,
+    render_answers_to_markdown,
+    validate_answers_payload,
+)
+from core.per_llm_stages import (
+    PLANNER_RECURSION_LIMIT,
+    run_llm_planning_agent,
+)
 
 langchain.debug = True
-load_dotenv()
+
+from core.hf_env import apply_hf_hub_env_defaults
+
+apply_hf_hub_env_defaults()
 
 OUTPUT_DIR = "./output"
+
+# 注入 Execute 任务：约束范围与顺序（对齐 Cursor scoped agent）
+STAGE_EXECUTION_CONTRACT = """
+---
+## 【执行契约 — 已锁定计划】
+上文「阶段执行计划」与「须按序完成的执行步骤」为本阶段**唯一**范围与顺序；各章专题要求以该章 prompt 为准。
+1. **严格按 execution_steps** 调用工具并组织正文，勿跳步、勿倒序。
+2. 未在步骤中点名的话题勿擅自铺成长篇；优先满足 must_cover 与 evidence_targets。
+3. **证据**：关键结论须带可核验源码路径（反引号 `路径:行号`）；证据不足写「未发现」或「待核实」，禁止无路径断言。
+4. **README / 文档（分层使用）**：
+   - **允许且鼓励**：用 `list_repo_structure`、`read_code_segment` 阅读根目录 `README.md`、`docs/`、`*.md` 等，提取**如何构建**、**如何运行**（含 QEMU/板级命令）、依赖、目录说明、作者**声称**的评测/CI/课程环境。
+   - **禁止**：仅凭 README、`doc/*.md` 或仓外文档断言「某内核机制已在代码中完整实现」；实现与否必须以源码+LSP/`grep` 为准。
+   - **对照义务**：当 README 声称与代码相关时，须写「README 声称 vs 代码实际」并各附路径；无源码证据则标「待核实」或「未发现」。
+5. **评测/交付适配信号（与本阶段相关时）**：若本章涉及构建、启动、块设备、网络、自测主控或产物交付，应优先用 `grep_in_repo` 等在仓库内检索计划所列启发式信号（如 `Makefile`/`all` 目标、固定内核产物名、自测标记字符串、`scripts/`、CI 配置、多 virtio 等）；**仅在有命中或 README 明确描述且能用源码佐证时**在正文写一小段「评测适配/提交契约」归纳并列出证据文件；否则可写「未发现仓库内评测专用 glue」或省略。
+6. **桩与不可验证数据**：若符号仅为 `return 0`/`ENOSYS`/`todo!`/空体，须标为桩并引用片段；禁止编造具体 commit hash、未在当次 Git 工具输出中出现的短 SHA，或无法 `git`/工具复核的统计口径。
+7. **文风**：原理点到即止，笔墨在实现；忌用大段「典型教学内核/通用教程」代正文。若提及外部框架，一两句带过，随即回到本仓代码。
+8. **粒度**：机制落到字段、枚举分支、`#[cfg(feature)]`、锁与错误路径、分发表与关键调用边；**复杂分支先列 if/平台宏再下结论**，描述须与 `read_code_segment` 一致。
+---
+"""
+
 import openpyxl
 def normalize_url(url: str) -> str:
     """标准化仓库 URL，剔除 .git 后缀、结尾斜杠并统一小写"""
@@ -105,7 +181,7 @@ def _build_base_context(repo_url: str, output_dir: str) -> str:
     # 后续阶段直接使用 repo_path
     repo_hint = f"**仓库已就绪**: 直接使用 repo_path = \"{repo_path}\"。"
 
-    return f"""你是一个操作系统项目的技术分析 Agent。请严格基于仓库中的代码与文档输出结论，避免空泛。
+    return f"""你是一个操作系统项目的技术分析 Agent。请严格基于仓库中的代码与文档输出结论，避免空泛；写作时使用《Operating Systems Internals and Design Principles（Stallings）》的专业术语与抽象层次框架。
 
 基础信息：
 - 仓库 URL: {repo_url}
@@ -115,6 +191,25 @@ def _build_base_context(repo_url: str, output_dir: str) -> str:
 - 分段输出目录 sections_dir: {sections_dir}
 
 {repo_hint}
+
+全局术语与抽象层框架（必须遵守）：
+0. **抽象层面坐标系**：任何机制描述都要先判定属于哪一层，避免“跨层混写/偷换概念”。
+   - **硬件/平台层**：CPU 特权级与指令集 (ISA)、寄存器/特权指令、MMU/TLB、缓存/内存层次、设备控制器、总线、DMA、中断控制器。
+   - **内核机制层**：中断/异常 (interrupt/exception)、陷入 (trap)、系统调用 (system call)、上下文切换 (context switch/dispatcher)、同步与互斥 (mutual exclusion)、调度 (scheduling)、内存管理与虚拟内存 (virtual memory/paging/segmentation)、I/O 子系统与驱动 (device drivers)、文件系统与命名 (file system/VFS)、网络 (networking)、多处理器 (SMP/AMP)。
+   - **OS 服务/接口层**：进程/线程抽象 (process/thread)、地址空间 (address space)、文件描述符与 I/O 抽象、IPC、系统调用 ABI/接口语义、错误码约定。
+   - **保护与安全层**：用户态/内核态隔离 (user mode/kernel mode)、保护域 (protection domain)、访问控制 (access control)、特权检查路径、可信计算基 (TCB) 边界与攻击面。
+   - **部署与可运行性层**：引导链 (bootstrapping)、固件/引导加载器交接、构建配置/条件编译、平台适配矩阵、可观测性 (logging/debug/trace) 与故障模式。
+1. **术语优先级**：优先使用教材常用术语并在首次出现时可括注英文：
+   - 进程 (process)、线程 (thread)、进程/线程控制块 (PCB/TCB)、调度器 (scheduler)、分派器 (dispatcher)、时间片 (time slice)、抢占 (preemption)
+   - 中断 (interrupt)、异常 (exception)、陷入 (trap)、陷入帧/陷入上下文 (trap frame)、系统调用 (system call)
+   - 虚拟地址/物理地址 (VA/PA)、页 (page)、页帧 (frame)、页表 (page table)、TLB、缺页 (page fault)
+   - 设备驱动 (device driver)、设备控制器 (device controller)、MMIO/PIO、DMA、缓冲/缓存 (buffer/cache)
+   - 文件系统 (file system)、目录/目录项 (directory/dentry)、索引节点 (inode)、挂载 (mount)、VFS
+   - 保护/安全 (protection/security)、访问控制 (ACL/capability 如适用)、特权级 (privilege level)
+2. **覆盖性要求（跨章节一致）**：每章开头的 2-4 句必须明确：
+   - 本章关注的**抽象层**（从上面的坐标系中选）；
+   - 本章的**对象**（机制/接口/数据结构/路径）与**证据类型**（源码/LSP/RAG/构建配置）；
+   - 若缺失证据：必须写“未发现/未实现/仅桩接口”并说明搜索范围与关键词。
 
 全局要求（严格遵守）：
 1. **反向证据原则**：如果未找到某功能的实现代码，你必须明确说明“未发现”或“未实现”。**严禁**仅仅因为它是“操作系统”就假设它实现了某些标准功能（如分页、多户）。
@@ -134,8 +229,9 @@ def _build_base_context(repo_url: str, output_dir: str) -> str:
    - **严禁**捏造不存在的文件路径（如声称 `riscv/boot.rs` 存在但实际不在）。如果不确定，不要写路径。
 9. **头文件 vs 实现**：
    - 不要把头文件（`.h`）或 Trait 定义（`.rs` 中的 `trait`）作为功能已实现的证据。必须找到对应的 C 文件（`.c`）或 Rust `impl` 代码块。
+10. **产出**：最终回答为完整 Markdown；执行计划未列出的工具步骤勿自行加戏。文风与粒度细则见每轮附带的执行契约。
 
-输出使用 Markdown，面向"懂 OS 的读者"，每个小节都要解释组件原理 + 在本仓库的具体实现方式。
+输出使用 Markdown，面向懂 OS 的读者：原理点到即止，实现写透（路径与符号）。
 
 **Markdown 格式规范**（严格遵守）：
 1. **标题层级**：
@@ -173,625 +269,288 @@ def _build_base_context(repo_url: str, output_dir: str) -> str:
 """
 
 
+def _build_json_qa_prompt(stage_id: str, stage_title: str) -> tuple[str, list[str]]:
+    """从 core/describe_stage_qa/<stage_id>.json 组装本阶段 prompt，并返回 expected_question_ids。"""
+    stage_qa = load_stage_qa(stage_id)
+    questions = stage_qa.get("questions", []) if isinstance(stage_qa, dict) else []
+    expected_ids = list_question_ids(stage_qa)
+    stage_constraints_md = stage_qa.get("stage_constraints_md", "") if isinstance(stage_qa, dict) else ""
+    if not isinstance(stage_constraints_md, str):
+        stage_constraints_md = ""
+
+    # 题单（评委友好）+ 必须回答（供 planner must_cover 抽取）
+    # + 阶段强相关约束（从 legacy prompt 迁移，避免“只剩题目没剩规范”）
+    # + 输出契约（强约束 JSON）
+    lines: list[str] = []
+    lines.append("## 题单（评委用，小题作答）")
+    lines.append("")
+    for q in questions if isinstance(questions, list) else []:
+        if not isinstance(q, dict):
+            continue
+        qid = str(q.get("question_id", "")).strip()
+        qtype = str(q.get("question_type", "")).strip()
+        stem = str(q.get("stem", "")).strip()
+        if not (qid and qtype and stem):
+            continue
+        lines.append(f"- **{qid}** ({qtype})：{stem}")
+        choices = q.get("choices")
+        if isinstance(choices, list) and choices:
+            for i, c in enumerate(choices):
+                label = chr(ord("A") + i)
+                lines.append(f"  - {label}. {str(c).strip()}")
+    lines.append("")
+
+    lines.append("## 必须回答")
+    lines.append("")
+    for q in questions if isinstance(questions, list) else []:
+        if not isinstance(q, dict):
+            continue
+        qid = str(q.get("question_id", "")).strip()
+        stem = str(q.get("stem", "")).strip()
+        if qid and stem:
+            lines.append(f"- [{qid}] {stem}")
+    lines.append("")
+
+    # 等价实现原则 + 停止条件（来自外部 QA 最佳实践）
+    lines.append("## 分析原则（必须遵守）")
+    lines.append("")
+    lines.append(
+        "**等价实现原则**：题目中出现的算法名、函数名、结构体名、宏名、系统调用名，"
+        "都只是候选关键词或示例，**不是仓库里必须存在的精确标识符**。"
+        "如果仓库采用不同命名，只要语义等价，就应按\u201c等价实现 / 等价接口 / 等价结构\u201d分析，"
+        "**不要持续追逐不存在的名字**，不要因为特定函数名缺失就直接报 `not_found`。"
+    )
+    lines.append("")
+    lines.append(
+        "**停止条件**：一旦你已经能够稳定回答当前问题并闭合一条"
+        "\u201c\u5165\u53e3 \u2192 \u6838\u5fc3\u64cd\u4f5c\uff08\u9875\u8868/\u5206\u914d/\u9501/\u8c03\u5ea6\u7b49\uff09\u201d"
+        "的主链路，就**立即停止扩大搜索范围**，"
+        "不要横向罗列大量相邻能力。已验证负向结论时写\u201c未发现实现\u201d，"
+        "**不要在无直接证据时强行写\u201c未实现\u201d**。"
+    )
+    lines.append("")
+
+    # 阶段强相关约束：一次性迁移到题库 JSON 中，运行时不再读取 legacy_stage_prompts。
+    if stage_constraints_md.strip():
+        lines.append("## 阶段强相关约束")
+        lines.append("")
+        lines.append(stage_constraints_md.strip())
+        lines.append("")
+
+    lines.append("## 输出契约（严格）")
+    lines.append("")
+    lines.append("你在本阶段**最终输出**必须是**唯一一个 JSON 对象**（允许使用 ```json 围栏包裹），不得输出任何额外解释文字。")
+    lines.append("JSON 顶层字段必须包含：`schema_version`、`stage_id`、`stage_title`、`terminology_profile`、`answers`。")
+    lines.append("其中 `answers` 是数组，每个元素必须包含：`question_id`、`question_type`、`stem`、`value`、`evidence`。")
+    lines.append("`tri_state_impl` 的 `value` 只允许：`implemented` / `stub` / `not_found`。")
+    lines.append("### 选择题约束（必须严格遵守，否则视为无效答案）")
+    lines.append("")
+    lines.append("**single_choice（单选）**：")
+    lines.append("- `value` 必须是该题 `choices[]` 中的**某一项的完整原文**，要求**逐字匹配**（完全相等）。")
+    lines.append("- **禁止**输出 `A/B/C/D` 或 `A.`/`B.` 前缀；禁止输出 `1/2/3` 编号；禁止改写/同义改写/缩写；禁止附加解释。")
+    lines.append("- 如果你倾向于输出“字母+选项内容”（如 `A. xxx`），请改为只输出 `xxx`（与 choices 原文完全一致）。")
+    lines.append("- 若证据不足以确定选哪一项，必须选择 `choices[]` 中语义最接近且包含 **“未发现/待核实/不支持/未实现”** 的那一项（若存在）。")
+    lines.append("")
+    lines.append("**multi_choice（多选）**：")
+    lines.append("- `value` 必须是数组（JSON array）。数组中**每个元素**都必须是该题 `choices[]` 中的**完整原文**，要求逐字匹配。")
+    lines.append("- **禁止**输出 `A/C`、`A,C`、`[\"A\",\"C\"]` 这类字母代号；禁止输出带 `A.` 前缀的文本；禁止改写选项。")
+    lines.append("- 若题目允许“未发现/无统计”等选项，且你未找到任何证据支持其他项，优先把该“未发现/无统计”选项作为数组唯一元素。")
+    lines.append(
+        "每条证据 `evidence[]` 必须包含：`path`（仓库相对路径）、`symbol_kind`、`symbol_name`、"
+        "`excerpt`（**否定/未找到结论时见上节须为非空**，其它题型仍建议填写摘录）。"
+    )
+    lines.append("")
+    lines.append(
+        "你必须使用本仓库代码证据作答。若未发现实现，按三态要求输出 `not_found`。"
+        "**不得编造**不存在的文件路径或符号；但**鼓励**在 `evidence` 中给出**可复核的查找过程**（见下节），避免 `evidence` 为空导致评审无法判断你是否真的搜过。"
+    )
+    lines.append("")
+    lines.append("### `not_found` / 否定结论时的证据（强烈建议非空）")
+    lines.append("")
+    lines.append(
+        "当结论为 `not_found` 或选择题/简答表达「未发现」时，`evidence` **优先使用 1～3 条**记录检索过程（仍须真实、可对照）："
+    )
+    lines.append("- `path`：你实际打开或作为检索范围的**真实**仓库相对路径（可为具体文件，或代表性目录如 `kernel/syscall`；禁止虚构路径）。")
+    lines.append("- `symbol_kind`：可用 `search`、`scan`、`doc` 等自说明类别（字符串即可）。")
+    lines.append("- `symbol_name`：简短标签，如 `grep_pattern`、`syscall_table_scan`、`dir_list`。")
+    lines.append(
+        "- `excerpt`：**必填（此场景下）**，写清检索手段、关键字/模式、范围、结果（例如「于 sysnum.h 与 syscall.c 检索 socket/bind/listen 标识符，0 命中」或「已阅读 README 相关段落，未声称网络协议栈」）。"
+    )
+    lines.append("")
+    lines.append("### Mermaid / 多行文本与 JSON 合法性（极其重要）")
+    lines.append("")
+    lines.append(
+        "最终输出必须是 **`json.loads` 一次即可解析** 的合法 JSON。字符串值内的 **物理换行必须写成 `\\n`**，"
+        "字符串内的 **双引号必须写成 `\\\"`**，反斜杠写成 `\\\\`。"
+    )
+    lines.append(
+        "**严禁**在 `value` 的 JSON 字符串中直接嵌入「含真实换行」的 ```mermaid … ``` 围栏块——这是已引发 **Unterminated string / JSON 解析失败** 的高频原因。"
+    )
+    lines.append("若题干要求 Mermaid，任选其一（由易到难）：")
+    lines.append("1. 将整图放在**单行字符串**内，仅用 `\\n` 表示图中换行（整条 `value` 对外仍是合法 JSON）；或")
+    lines.append("2. 使用**无三反引号**的缩略 `graph TD` 文本（节点写 `Func[path:line]`），避免反引号围栏；或")
+    lines.append("3. 用**有序步骤 + 路径:行号**列表代替图，并在 `notes`（若输出该字段）说明「为避免破坏 JSON 未嵌完整 Mermaid」。")
+    lines.append("**禁止**输出「看起来像 JSON、实际不能解析」的内容；宁可简化图，不可输出非法 JSON。")
+    lines.append("")
+    lines.append("你必须按题单顺序输出 answers，且 question_id 必须与题单完全一致（不多不少）。")
+    lines.append("")
+    lines.append("JSON 示例（缩略，仅示意字段；不要复用其中路径/符号）：")
+    lines.append("")
+    lines.append("```json")
+    lines.append("{")
+    lines.append(f"  \"schema_version\": \"{JSON_QA_SCHEMA_VERSION}\",")
+    lines.append(f"  \"stage_id\": \"{stage_id}\",")
+    lines.append(f"  \"stage_title\": \"{stage_title}\",")
+    lines.append("  \"terminology_profile\": \"stallings_en_zh\",")
+    lines.append("  \"answers\": [")
+    lines.append("    {")
+    lines.append("      \"question_id\": \"QXX_001\",")
+    lines.append("      \"question_type\": \"tri_state_impl\",")
+    lines.append("      \"stem\": \"...\",")
+    lines.append("      \"value\": \"not_found\",")
+    lines.append("      \"evidence\": [")
+    lines.append("        {")
+    lines.append("          \"path\": \"kernel/syscall/sysnum.h\",")
+    lines.append("          \"symbol_kind\": \"search\",")
+    lines.append("          \"symbol_name\": \"grep_keyword_scan\",")
+    lines.append(
+        "          \"excerpt\": \"在 sysnum.h 与 syscall.c 检索关键字 xxx，0 命中；并列出已打开文件范围\""
+    )
+    lines.append("        }")
+    lines.append("      ]")
+    lines.append("    }")
+    lines.append("  ]")
+    lines.append("}")
+    lines.append("```")
+    lines.append("")
+
+    return "\n".join(lines).strip() + "\n", expected_ids
+
+
 STAGES = [
 
     {
-        "id": "02_boot_arch",
-        "title": "启动流程与架构初始化",
-        "prompt": """目标：分析“从复位/Bootloader 到内核 main 函数”的完整流程及架构相关初始化。
-
-必须回答：
-- 启动入口在哪里？（汇编文件如 entry.S 或 head.S，链接脚本 linker.ld 中的 ENTRY）
-- CPU 模式切换与初始化（如 RISC-V M-Mode -> S-Mode，x86实模式->保护模式->长模式）。**必须验证是否真的发生了模式切换（查找 sstatus.spp, mstatus.mpp, cr0 等寄存器操作）。**
-- 关键寄存器设置（栈指针 SP、页表基址 SATP/CR3、中断向量表 stvec 等）。
-- 它是如何跳转到 Rust/C 入口函数的？
-- 早期初始化做了什么（BSS 清零、早期串口打印、设备树解析、页表初始化时机）？
-- **浮点单元 (FPU) 初始化**：搜索 `sstatus.fs` (RISC-V) 或 `cpacr_el1` (AArch64) 或 `cr4` (x86_64)。如果没有找到相关代码，**必须明确说明未启用 FPU（状态为未实现）**。
-- **多平台适配**：
-    - **StarFive VisionFive2**：搜索 `visionfive` 或 `jh7110`，分析其启动流程特异性（SBI -> U-Boot）。
-    - **LoongArch**：搜索 `loongarch`，分析其启动流程。
-- **平台与构建配置**：使用 grep_in_repo 搜索 `.toml`/`defconfig`/`Kconfig` 配置文件，分析构建系统如何选择编译目标和平台参数。
-- **固件级启动链（RISC-V 必须）**：如果是 RISC-V，必须描述 SBI->U-Boot->OS 的完整固件级启动链。搜索 `sbi|opensbi|u-boot` 关键词。分析 SBI 如何将控制权移交给内核。
-- **MMU 启用前后串口地址切换**：在 UART 初始化代码中，分析 MMU 启用前（物理地址直接访问）和 MMU 启用后（虚拟地址访问）的串口地址切换逻辑。搜索 `phys_to_virt|virt_to_phys` 或 UART 基址相关常量。
-- **架构对齐检查（Architecture Alignment Check）**：在深入分析初始化代码前，先确认当前 LSP 的 Target Triple 与你正在分析的架构分支（如 `arch/riscv64`）是否匹配。通过读取 `.cargo/config.toml` 或 `Makefile` 获取精准 Triple。**如果发现不匹配或代码块被 `#[cfg]` 灰化，必须调用 `lsp_set_target_arch` 进行强制校准并重启分析。**
-
-要求：
-- **语义发现（🥇 首选）**：使用 `rag_search_code` 搜索 "boot", "_start", "kernel_main", "architecture initialization" 锁定启动入口文件。
-- 使用 `lsp_get_document_outline` **先**查看 arch 初始化文件的整体结构（函数列表+行号），然后有目的地 `read_code_segment` 关键段。
-- 使用 `lsp_get_definition` 追踪 `_start` → `rust_main` / `kernel_main` 的跨文件调用链。每一跳都用 LSP 定位下一个函数的定义位置，**不要凭经验猜路径**。
-- **【必须】使用 `lsp_get_call_graph` 生成启动函数完整调用链**：
-  - 对 `rust_main` 或 `kernel_main`（定位到实际文件后）调用 `lsp_get_call_graph(repo_path, file_path, "rust_main", direction="outgoing", max_depth=4)`
-  - 如返回 `[⚠️ DEGRADED MODE]`，说明 LSP 降级至 Grep 分析，仍需使用该结果并在报告中标注"DEGRADED — 静态 Grep 分析"。
-- 使用 `lsp_get_references` 查找谁调用了关键初始化函数（如 `init_mmu`、`setup_trap`），验证其在启动流程中的位置。
-- 辅以 `grep_in_repo` 搜索汇编入口（`entry.S`/`start.S`）和 `list_repo_structure` 浏览目录。
-- 重点关注 arch/、platform/、boot/ 目录下的初始化代码。
-- **完整追踪**：从 `_start` 到内核 main 函数的每一步调用链，引用文件路径和行号。
-- **严禁幻觉**：
-    1. **汇编入口**：先在 `arch/` 或 `platform/` 下找 `entry.S`, `head.S`, `start.S`。
-    2. **Rust入口**：如果找不到汇编入口，可能是通过 SBI/U-Boot 直接跳转到 Rust 入口，请寻找 `#[entry]`。
-    3. **路径验证**：写下任何文件路径前，必须确认该文件真实存在。
-- **FPU/模式切换验证**：
-    - RISC-V: 搜索 `sstatus.fs` 或 `FS:` 常量。
-    - AArch64: 搜索 `cpacr_el1` 或 `CPACR`。
-    - x86_64: 搜索 `cr0`, `cr4` 寄存器位操作。
-
-输出格式：
-- ## 启动入口与链接脚本分析
-- ## 架构初始化流程（模式切换/FPU/MMU）
-- ## 到达内核主函数的路径（完整调用链）
-- ## 多平台启动流程（StarFive/LoongArch 等）
-- ## 平台配置与构建机制
-- ## 关键代码片段分析
-
-**重要**：完成所有工具调用后，你必须输出一个完整的 Markdown 格式分析报告。
-""",
+        "id": "02_boot_trap",
+        "title": "启动/架构与 Trap/系统调用",
+        "prompt": "",  # JSON-QA: core/describe_stage_qa/02_boot_trap.json
     },
     {
         "id": "03_mem_mgmt",
         "title": "内存管理（物理/虚拟/分配器）",
-        "prompt": """目标：深挖“物理内存管理 + 虚拟内存管理 + 堆/页分配器”。
-
-必须回答（并在源码中找到对应实现）：
-- 物理内存管理：使用什么算法（Bitmap/Buddy System）？FrameAllocator 接口在哪里？
-- 虚拟内存管理：页表如何操作（PageTable 结构、walk/map/unmap 实现）？
-- 内核与用户地址空间设计：是否独立？内核重映射？
-- 堆分配器：使用了什么 Allocator（GlobalAlloc, slab, buddy）？
-- **堆管理 (brk/sbrk)**：搜索 `sys_brk`，是否支持惰性分配（仅调整边界不立即分配物理页）？
-- **用户指针安全**：搜索 `UserInPtr|UserOutPtr|verify_area|check_region`，分析系统调用入口处如何验证用户空间指针合法性。
-- 缺页异常（Page Fault）处理逻辑（如有）。**追踪 handle_page_fault 调用链**。
-- **进程级映射管理**：搜索地址空间管理结构（如 `VmAreaStruct`、`BTreeMap` 管理的映射区间），分析是否有反向映射表（rmap）支持。
-- **高级特性验证**（必须分类为 `✅ 已实现`、`🔸 桩函数`、`❌ 未实现`，并寻找具体代码）：
-  - 写时复制（Copy-on-Write）：搜索 `cow|copy_on_write`，确认是否在 page fault 中处理了 CoW。
-  - 懒分配（Lazy Allocation）：搜索 `lazy|populate`，确认是否推迟了物理页分配。
-  - 共享内存管理（SharedMem）：是否有 `shm` 相关系统调用和数据结构？**深入分析**：搜索 `sys_shmdt` 实现，检查是否使用 `BTreeMap` 进行 O(log n) 定位。搜索 `SharedMemoryManager`，分析 `IPC_RMID` 删除策略（立即删除 vs Arc 引用计数延迟释放）。
-  - **反向映射表（rmap）**：搜索 `rmap|reverse_map|page_to_vma`，检查是否有物理页到虚拟页的反向映射机制。
-  - 交换区/页面置换（Swap）：是否实现了 `swap_out`/`swap_in`？
-  - **大页支持（Huge Page）**：在页表映射中是否处理了 2M/1G 页面？搜索 `HugePage|MapSize::2M|MapSize::1G`。
-  - **零拷贝与 mmap**：搜索 `mmap` 实现，验证是否支持文件映射？是否支持零拷贝IO（sendfile/splice）？**注意：如果是 `mmap` 系统调用，检查它是否真的实现了 MAP_FIXED/MAP_ANON 等标志的处理，还是仅仅是一个空壳？（如果是空壳/仅返回0，标注为桩函数）**
-
-**强制要求**：
-- **语义发现（🥇 首选）**：调用 `rag_search_code` 搜索 "page table", "buddy system", "slab allocator", "mmap implementation" 定位核心内存管理源码。
-- 对于上述每一个特性，如果支持，必须引用代码文件和行号。
-- 如果不支持，必须明确写“未发现实现”或“❌ 未实现”。
-- 追踪一个完整的 `page fault` -> `alloc_frame` -> `map_page` 流程。
-- **LSP 工具使用要求**：
-    - 使用 `lsp_get_definition` 定位 `PageTable`、`FrameAllocator`、`MemorySet` 等核心结构体的精确定义，**不要凭记忆描述字段**。
-    - **【必须】使用 `lsp_get_call_graph` 追踪缺页异常完整链路**：
-      - `lsp_get_call_graph(repo_path, file_of_handle_page_fault, "handle_page_fault", direction="both", max_depth=3)` — 谁触发缺页，它又调用什么？
-      - `lsp_get_call_graph(repo_path, file_of_alloc_frame, "alloc_frame", direction="incoming", max_depth=2)` — 谁调用了物理页分配？
-      - 如返回 `[⚠️ DEGRADED MODE]`，在报告中标注"DEGRADED — 基于 Grep 静态分析"并继续使用结果。
-    - 使用 `lsp_get_references` 追踪 `handle_page_fault` 的调用方（谁调用了它？）。
-    - 使用 `lsp_get_document_outline` 快速浏览内存管理大文件的函数列表，再有目的地读取关键实现。
-- **防幻觉检查**：
-    - **mmap**: 不要看到 `Mmap` 结构体就认为实现了 mmap。检查系统调用入口 `sys_mmap`。
-    - **Stub检测**：如果 `sys_mmap` 只是返回 `0` 或 `Ok`，没有处理 `MAP_FIXED` / `MAP_ANON` 等标志，必须标记为 **Stub**。
-    - **Swap**: 必须找到 `swap_out` / `swap_in` 的实际逻辑，而不仅仅是特质定义。
-
-输出格式：
-- ## 物理内存管理实现（代码引用）
-- ## 虚拟内存与页表操作（代码引用）
-- ## 地址空间布局（内核 vs 用户）
-- ## 堆分配器解析
-- ## 高级内存特性清单（CoW/Lazy/Swap/HugePage - 已实现/未实现）
-- ## 关键代码片段与调用链分析
-
-**重要**：完成所有工具调用后，你必须输出一个完整的 Markdown 格式分析报告。
-""",
+        "prompt": "",
     },
     {
-        "id": "04_process_sched",
-        "title": "进程/线程与调度机制",
-        "prompt": """目标：深挖“任务模型 + 调度算法 + 上下文切换”。
-
-必须回答：
-- 执行实体：Process/Thread/Task 结构体包含哪些字段（Context, State, TrapFrame）？
-- **任务模型扩展**：使用 grep_in_repo 搜索 `Process|ProcessGroup|Session|process`，检查是否存在进程组、会话管理以及 PID/TID 分配机制。
-- 调度策略：算法是什么（FIFO, RR, Priority, Stride, CFS）？Scheduler 实现细节。
-- 状态流转：Ready/Running/Blocked/Exited 状态机。
-- 上下文切换：switch.S 或类似汇编代码，保存了哪些寄存器？
-- **高级特性验证**（必须分类为 `✅ 已实现`、`🔸 桩函数`、`❌ 未实现`，并寻找具体代码）：
-    - **信号机制 (Signal)**：使用 grep_in_repo 搜索 `signal|sigaction|kill`，确认是否实现了信号注册与分发？
-    - **Futex**：搜索 `futex|wait_queue`，是否支持快速用户态互斥锁？
-- **深度调用链追踪（必须）**：
-    - `fork()`: 追踪从系统调用到 `clone_task` / `copy_task` 的完整流程。**必须验证**是否真的复制了地址空间（`memory_set.copy()`）和文件表？
-    - `exec()`: 如何加载 ELF？如何重建地址空间？
-    - `schedule()`: 调度器被谁调用？**验证优先级**：`pick_next_task` 是否真的使用了 `priority` / `stride`，还是仅仅 FIFO？
-    - `exit()`: 资源回收流程，父进程通知。
-- 进程与线程的区别：代码中是否区分了 TCB 和 PCB？还是只有 Task？
-- **层次结构 ID 规则**：搜索 `pgid|session_id|set_sid|setpgid`，分析 PGID（进程组 ID = 组长 PID）和 SID（会话 ID = 会话组长 PGID）的分配规则。
-- **POSIX 资源限制**（必须分类为 `✅ 已实现`、`🔸 桩函数`、`❌ 未实现`）：搜索 `rlimit|RLIMIT|getrlimit|setrlimit|resource_limit`，检查是否实现了资源限制。如果找到，列出支持的资源类型数量（POSIX 定义了 16 种）及软/硬限制双机制。
-
-要求：
-- **语义发现（🥇 首选）**：使用 `rag_search_code` 搜索 "task structure", "scheduler algorithm", "context switch", "fork implementation" 快速锁定进程管理模块。
-- 使用 `lsp_get_definition` 定位 `Task`/`Process`/`TaskInner` 结构体定义，精确列出其字段（不要猜）。
-- 使用 `lsp_get_references` 追踪 `fork`/`exec`/`schedule`/`exit` 的完整跨文件调用链。
-- 使用 `lsp_get_document_outline` 快速查看调度器文件中的所有函数，找到 `pick_next_task`、`schedule` 等关键入口。
-- **【必须】使用 `lsp_get_call_graph` 生成核心进程操作的调用树**：
-  - `lsp_get_call_graph(repo_path, file_of_sys_fork, "sys_fork", direction="outgoing", max_depth=4)` — fork 从 syscall 到内存复制的完整下行链
-  - `lsp_get_call_graph(repo_path, file_of_schedule, "schedule", direction="both", max_depth=3)` — 谁触发调度？调度器下一步调什么？
-  - 如返回 `[⚠️ DEGRADED MODE]`，标注"DEGRADED — 基于 Grep 静态分析"并继续使用结果。
-- **重要**：不要只看一个模块！用 find_os_core_modules 或 grep_in_repo 搜索所有进程/线程相关模块。
-- 查找 context_switch 汇编代码。
-
-输出格式：
-- ## 任务模型与核心数据结构
-- ## 调度算法与策略（代码证据）
-- ## 任务状态机
-- ## 上下文切换实现（汇编分析）
-- ## 进程间通信与同步（Signal/Futex）
-- ## 关键流程追踪（Fork/Exec/Schedule/Exit）
-- ## 进程/线程管理模块扩展
-
-**重要**：完成所有工具调用后，你必须输出一个完整的 Markdown 格式分析报告。
-""",
+        "id": "04_process_smp",
+        "title": "进程/线程/调度与多核",
+        "prompt": "",
     },
     {
-        "id": "05_trap_syscall",
-        "title": "中断、异常与系统调用",
-        "prompt": """目标：分析“Trap 处理流程 + 系统调用分发”。
-
-**注意**：不要假设所有代码都在 `src/` 下。如果基于 ArceOS，Trap 和 Syscall 可能在 `modules/axhal` 或 `modules/axruntime` 中。
-
-必须回答：
-- Trap 入口：trap_handler / trap_vector 在哪里？如何区分中断（Interrupt）和异常（Exception）？
-- 上下文保存：TrapFrame / GeneralRegisters 结构体。**必须用 `lsp_get_definition` 或 `read_code_segment` 读取结构体定义，精确统计包含的寄存器数量和总字节数**，不要凭经验估算。
-- **系统调用分发追踪**：
-    - 用户态 `ecall`/`syscall` 指令。
-    - 内核态 `syscall_handler` 分发逻辑。
-    - **必须找到分发表**（syscall table 或 match 语句）。
-    - **Stub验证**：检查核心 syscall（如 `sys_clone`, `sys_exec`, `sys_mmap`, `sys_write`）等是否直接返回错误、返回 0，或者包含了 `todo!()`/`unimplemented!()`？
-    - **覆盖度统计**：基于上述验证，明确区分并列出“已注册但仅为桩特征（`🔸 桩函数`）”的 syscall 数量，与“完整功能实现（`✅ 已实现`）”的 syscall 数量。
-    - 选择一个具体 syscall（如 `sys_write`）追踪其从 Trap 到真正处理逻辑的路径。
-- **接口/实现分离模式**：如果项目采用了 syscall 接口与实现分离的设计（如 `sys_xxx` 为接口，`sys_xxx_impl` 为实现），必须明确描述此模式。搜索 `_impl` 后缀函数。
-- **用户指针语义化包装**：搜索 `UserInPtr|UserOutPtr|UserInOutPtr`，如果存在此类类型安全包装，需描述其在 syscall 入口处的作用。
-- **外部中断流**：详细分析时钟中断（Timer）处理流程与外部设备中断（如 PLIC/APIC）的分发处理。
-- **信号机制（必须深入）**：
-    - 搜索 `handle_signal|do_signal|POST_TRAP`，分析信号是否在 Trap 返回前被处理。
-    - **三种粒度**：搜索 `sys_kill|sys_tkill|sys_tgkill`，分析是否支持线程级/进程级/进程组级信号发送。
-    - **SIGSEGV**：搜索 `SIGSEGV|sig_segv`，分析非法内存访问时是否发送 SIGSEGV 信号。
-    - **用户自定义信号处理函数**：搜索 `sigreturn|signal_trampoline|trampoline`，分析是否有从内核跳到用户态信号处理函数的跳板代码机制。
-- **缺页异常与内存特性关联（必须）**：
-    - 追踪缺页异常处理链，分析它如何触发 **CoW**（写时复制）和 **Lazy Allocation**（懒分配）。
-    - 搜索 `handle_page_fault|do_page_fault|cow|lazy|alloc`，追踪从 Trap 入口到内存管理模块的完整调用链。
-
-要求：
-- **语义发现（🥇 首选）**：使用 `rag_search_code` 搜索 "trap handler", "syscall table", "interrupt vector", "ecall handling" 精准定位异常分发代码。
-- 使用 `lsp_get_definition` 追踪 syscall 分发链：从 `trap_handler` → `syscall_handler` → 具体 `sys_xxx`，每一跳精确定位。
-- 使用 `lsp_get_document_outline` 查看 trap.rs / syscall.rs 的完整函数列表，掌握所有已实现的 syscall。
-- 使用 `lsp_get_references` 查找 `TrapFrame` 在哪些函数中被使用，验证上下文保存/恢复的完整性。
-- **【必须】使用 `lsp_get_call_graph` 追踪 Trap 完整调用链**：
-  - `lsp_get_call_graph(repo_path, file_of_trap_handler, "trap_handler", direction="outgoing", max_depth=4)` — 从 trap 入口展开完整分发树
-  - `lsp_get_call_graph(repo_path, file_of_sys_write, "sys_write", direction="incoming", max_depth=2)` — 谁调用了 sys_write？
-  - 如返回 `[⚠️ DEGRADED MODE]`，标注降级模式继续使用，关注 outgoing 结果中分发表函数的覆盖情况。
-- 辅以 `grep_in_repo` 搜索 `trap_handler|trap_return|syscall_handler` 确定文件位置。
-- 找到 trap.S / trap.rs，分析 syscall 分发表。
-
-输出格式：
-- ## Trap 处理流程（用户态 <-> 内核态）
-- ## 异常向量表与入口
-- ## 系统调用分发机制（追踪 sys_write）
-- ## 核心 Syscall 实现列表
-- ## 中断处理与信号关联
-- ## 关键代码片段
-
-**重要**：完成所有工具调用后，你必须输出一个完整的 Markdown 格式分析报告。
-""",
+        "id": "05_fs_drivers",
+        "title": "文件系统与设备 I/O",
+        "prompt": "",
     },
     {
-        "id": "06_fs_vfs",
-        "title": "文件系统（VFS + 具体 FS）",
-        "prompt": """目标：深挖"VFS 抽象 + 挂载 + 具体文件系统实现"。
-
-必须回答：
-- VFS 抽象层：File/Inode/Dentry Traits 定义。
-- **具体文件系统（必须代码验证）**：
-  - FAT32/Ext4：是否自己实现了？还是用的 crate？（check Cargo.toml）。**注意：对于组件化的 OS（如 ArceOS），具体的文件系统实现可能独立于 VFS 存在于诸如 `arceos/modules/axfs-ng/src/fs/fat/` 或 `ext4/` 目录中，务必使用搜索功能仔细查找，绝对不要仅仅因为特定目录下没有就断言未实现！**
-  - **具体 FS 的抽象层结构**：搜索 `FatFilesystemInner|Ext4Filesystem|FatFileNode|FatDirNode` 等，分析各层如何实现 VFS trait。这是文件系统架构的核心。
-  - RamFS/TmpFS：是否有内存文件系统？
-- **伪文件系统**：使用 grep_in_repo 搜索 `devfs|procfs|sysfs` 检查是否实现了伪文件系统。若有，分析其实现方式。
-- 文件描述符表：Global 还是 Per-Process？`fd_table` 结构在哪？
-- **功能细节**（必须分类为 `✅ 已实现`、`🔸 桩函数`、`❌ 未实现`）：
-  - 是否支持 `pipe` 套接字？
-  - 是否支持网络 `socket`？
-  - 是否支持 `mmap`？**注意**：必须检查 `sys_mmap` 实现。如果是 **零拷贝**，必须看到 `VmArea` 结构体中有 `shared` 字段或 `MAP_SHARED` 处理逻辑。如果是 `sys_mmap` 仅返回 Ok(0) 没有处理标志位，标注为'桩函数'。
-  - **高级特性**：`poll`/`select`/`epoll` 是否实现？搜索 `sys_poll` / `sys_select` / `sys_epoll`，检查是一律返回 Ready 还是真的检查了文件状态？
-  - **如果上述功能未找到代码，明确写“未实现（❌ 未实现）”**。
-
-- **文件打开流程**：追踪从 `sys_open` 到最终获得文件描述符的完整调用链，说明超级块、Inode、Dentry、File 四大核心数据结构如何协同。
-
-要求：
-- **语义发现（🥇 首选）**：使用 `rag_search_code` 搜索 "VFS trait", "FAT32 implementation", "file descriptor table", "mount logic" 锁定文件系统核心实现。
-- 使用 `lsp_get_definition` 定位 `File` trait、`Inode` trait、`SuperBlock` 等 VFS 核心抽象的精确定义。
-- 使用 `lsp_get_references` 追踪 `sys_open` → `vfs_open` → 具体 FS `open` 的完整调用链。
-- **【必须】使用 `lsp_get_call_graph` 追踪文件打开完整路径**：
-  - `lsp_get_call_graph(repo_path, file_of_sys_open, "sys_open", direction="outgoing", max_depth=4)` — 从 syscall 到 VFS 再到具体 FS 的完整下行链
-  - `lsp_get_call_graph(repo_path, file_of_vfs_open, "vfs_open", direction="both", max_depth=3)` — VFS 中枢节点双向（谁调它，它调谁）
-  - 如返回 `[⚠️ DEGRADED MODE]`，标注"DEGRADED — 静态 Grep 分析"并继续使用，重点关注 outgoing 中 FS trait impl 的调用。
-- 使用 `lsp_get_document_outline` 快速摸清 VFS 和具体 FS 实现文件的内部结构。
-- 使用 grep_in_repo 搜索 "FdTable|FileDescriptor|fd_table" 确认文件描述符表实际命名。
-- **路径精确性（关键）**：注意区分相似目录（如 `core/file/` vs `core/fs/`，`src/fs/imp/` vs `api/src/core/fs/imp/`）。引用每个文件前必须用 `lsp_get_definition` 确认函数的真实定义位置。如果同一模块在多个目录中有实现（如 TmpFS 在 `src/` 和 `api/src/` 中都有），必须全部列出。
-
-输出格式：
-- ## VFS 架构与接口设计
-- ## 具体文件系统支持情况（FAT32/Ext4/RamFS）
-- ## 文件描述符与进程关联
-- ## 管道(Pipe)与套接字(Socket)支持情况
-- ## 缓存机制（Block/Page Cache）
-- ## 零拷贝映射验证（mmap 实现分析）
-- ## 关键代码验证
-
-**重要**：完成所有工具调用后，你必须输出一个完整的 Markdown 格式分析报告。
-""",
-    },
-    {
-        "id": "07_device_drivers",
-        "title": "设备驱动与硬件抽象",
-        "prompt": """目标：分析“设备树/总线 + 驱动框架 + 具体设备驱动”。
-
-**注意**：如果是组件化 OS（如 ArceOS），驱动可能位于 `modules/axdriver` 或独立的 crate 中，不要只在 `drivers/` 目录下找。
-
-必须回答：
-- 设备发现：Device Tree (DTS) 解析或 PCI/Bus 扫描？**必须验证**是否真的解析了 `.dtb` 文件，还是硬编码了地址？
-- 驱动框架：Driver Trait，如何注册/初始化驱动？
-- **组件化与配置**：搜索构建配置文件（Cargo.toml 的 features、Kconfig、条件编译宏），分析如何通过编译选项选择不同的驱动/模块实现。
-- **平台适配**：搜索 `platform/` 或 `boards/` 目录，列出所有支持的目标平台/开发板及其特有驱动，分析项目如何适配不同硬件。
-- 常见设备：
-    - UART/Serial（控制台输出）
-    - Block Device（磁盘读写，VirtIO-Blk）
-    - Net Device（网卡，VirtIO-Net）及网络协议栈（TCP/IP, smoltcp 等实现）
-    - GPU/Input（如有）
-- 中断控制器：PLIC/CLINT/APIC 驱动。
-- **MMU 前后串口地址切换**：分析 UART 驱动在 MMU 启用前（使用物理地址）和 MMU 启用后（使用虚拟地址）的地址切换机制。搜索串口基址常量的不同定义。
-
-要求：
-- **语义发现（🥇 首选）**：使用 `rag_search_code` 搜索 "device driver trait", "virtio-blk driver", "UART initialization", "PCI bus scanning" 快速锁定驱动程序。
-- 使用 `lsp_get_definition` 定位 Driver trait 定义和各设备驱动的 trait impl。
-- 使用 `lsp_get_references` 追踪 `init_drivers` / `probe` 的调用链，理解驱动注册与初始化顺序。
-- 使用 `lsp_get_document_outline` 浏览驱动文件结构，快速发现所有设备相关的 struct 和 impl。
-- 辅以 grep_in_repo 搜索 `axdriver` 或 `driver::` 和构建配置中的 feature flags。
-
-输出格式：
-- ## 驱动框架与设备发现
-- ## 组件化设计与配置机制
-- ## 字符设备驱动（UART/Console）
-- ## 块设备驱动（VirtIO-Blk等）
-- ## 网络设备驱动
-- ## 中断控制器驱动
-- ## 目标平台适配情况
-- ## 其他外设支持
-
-**重要**：完成所有工具调用后，你必须输出一个完整的 Markdown 格式分析报告。
-""",
-    },
-    {
-        "id": "08_sync_ipc",
+        "id": "06_sync_ipc",
         "title": "同步互斥与进程间通信",
-        "prompt": """目标：分析“同步原语 + 锁机制 + IPC”。
-
-必须回答：
-- 锁机制：SpinLock / Mutex / Semaphore / RwLock 实现。
-    - **原子操作**：是使用 Rust `core::sync::atomic` 还是自定义汇编？(grep `ldxr/stxr`, `lock xchg`)
-    - **等待队列 (WaitQueue)**：线程获取锁失败时如何挂起？（find `WaitQueue`, `sleep`, `block`）
-- **IPC 机制（必须代码验证并分类为 `✅ 已实现`、`🔸 桩函数`、`❌ 未实现`，谨防桩代码）**：
-    - 管道 (Pipe)：**实现验证**：是否使用了环形缓冲区 (Ring Buffer) 还是简单字节流？
-    - 消息队列 (MessageQueue)：**必须检查实现**。grep `sys_msgget` 或 `msgget`。
-        - 如果函数体为空、`Ok(0)` 但没有队列逻辑，必须标记为 **`🔸 桩函数`**。
-        - 只有看到了完整的队列结构体操作（push/pop），才可标记为 **`✅ 已实现`**。
-    - 共享内存 (SharedMem)：结合内存管理章节分析（SharedMemoryManager 实现）。
-    - 信号量 (Semaphore)：PV 操作实现。同样需要检查 `sys_semget`, `semop` 区分是否为桩代码。
-    - **信号 (Signal) 作为 IPC**：搜索 `sys_kill|sig_send|signal_send`，分析信号分发机制是否也用于进程间通信。
-    - **信号处理时机**：搜索 `POST_TRAP|do_signal|handle_pending_signal`，分析信号在 Trap 返回用户态前的确切处理位置。
-- **关键流程的跨文件调用链**：对 Futex 等待/唤醒流程，使用 `lsp_get_call_graph` 递归展开完整调用树（优先于 `lsp_get_references` 的单层查找）。
-
-要求：
-- **语义发现（🥇 首选）**：使用 `rag_search_code` 搜索 "SpinLock implementation", "Mutex wait queue", "Pipe ring buffer", "shared memory manager" 锁定同步与 IPC 源码。
-- 使用 `lsp_get_definition` 定位 `Mutex`、`SpinLock`、`WaitQueue` 的结构体定义和 `lock()`/`unlock()` 实现。
-- **【必须】使用 `lsp_get_call_graph` 展开关键 IPC 流程调用链**（`sys_futex` → `futex_wait` → `WaitQueue::sleep`）：
-  - `lsp_get_call_graph(repo_path, file_of_sys_futex, "sys_futex", direction="outgoing", max_depth=4)`
-  - 如返回 `[⚠️ DEGRADED MODE]`，标注后继续使用 Grep 结果。
-- 使用 `lsp_get_references` 查找单节点引用（如哪些地方调用了 `futex_wake`）。
-- 使用 `lsp_get_document_outline` 浏览 IPC 模块文件，发现所有 Pipe/Sem/Shm 实现。
-- 辅以 grep_in_repo 搜索 sync/、ipc/ 模块。
-- **验证消息队列与信号量**：务必区分 Stub（桩）与 Real Implementation（真实实现）。
-
-输出格式：
-- ## 同步与互斥原语（锁与原子操作）
-- ## 等待队列实现机制
-- ## 进程间通信（Pipe/MsgQueue/Sem）
-- ## 关键代码片段
-- ## 未实现/桩函数功能列表（明确列出哪些是“画饼”）
-
-**重要**：完成所有工具调用后，你必须输出一个完整的 Markdown 格式分析报告。
-""",
+        "prompt": "",
     },
     {
-        "id": "09_smp_multicore",
-        "title": "多核支持与并行机制",
-        "prompt": """目标：分析多核/SMP（对称多处理）支持实现。
-
-必须回答：
-- **核心任务：一定要极其仔细地在源码中寻找有没有真正实现多核！** 架构设计是 SMP 还是 AMP？**绝不能仅凭看到一两个宏定义就断言支持多核，必须找到唤醒其他核的切实验证。如果不支持多核，务必明确写“仅支持单核（❌ 未实现）”**。
-- Secondary CPU 启动等主要功能机制：**必须清晰、详尽地描述其详细的底层工作机制**。具体描述 BSP（主核）是如何通过 IPI 或中断控制器发送信号唤醒 AP（从核）的链条，精确到对应文件的代码逻辑。搜索 `smp_boot`, `__cpu_up`。如果找不到启动其他核的代码，那就是单核。
-- 核间中断 (IPI)：搜索 `send_ipi`, `ipi_handler`。
-- **锁的实现**：SpinLock 是否禁用了中断？Mutex 是否支持优先级继承？
-- Per-CPU 变量设计与访问方式。搜索 `axns` 模块，分析 PerCPU 命名空间实现。
-- 多核调度策略：负载均衡、CPU 亲和性（affinity）。
-- 自旋锁/RCU 在多核下的实现差异。
-- **交叉引用前面章节（必须）**：本章与前面章节有大量交叉，必须引用并深化：
-    - 进程调度中的全局唯一 ID 池（搜索 `AtomicUsize` 用于 PID/TID 分配）
-    - 双级注册机制（线程注册到 Process + 全局管理器）
-    - 同步互斥中的 Futex 实现（在多核场景下的行为）
-    - 原子操作（`core::sync::atomic`）在多核下的内存序保证
-
-要求：
-- **语义发现（🥇 首选）**：使用 `rag_search_code` 搜索 "SMP boot", "IPI send", "Per-CPU variables", "multicore scheduler" 锁定多核支持代码。
-- 使用 `lsp_get_definition` 定位 `PerCpu` 结构和 `smp_boot`/`__cpu_up` 的定义。
-- **【必须】使用 `lsp_get_call_graph` 追踪 Secondary CPU 启动链**：
-  - `lsp_get_call_graph(repo_path, file_of_start_secondary, "start_secondary", direction="outgoing", max_depth=4)` — 从 secondary 入口到初始化完成
-  - 如返回 `[⚠️ DEGRADED MODE]`，标注后继续使用 Grep 结果。
-- 使用 `lsp_get_references` 追踪 IPI 分发路径（单层引用）。
-- 辅以 grep_in_repo 搜索 smp/、cpu/、percpu 相关模块。
-- 分析多核安全的数据结构设计。
-
-输出格式：
-- ## 多核架构设计（SMP/AMP）
-- ## Secondary CPU 启动流程
-- ## 核间通信与 IPI 机制
-- ## Per-CPU 变量与数据结构
-- ## 多核调度策略
-- ## 关键代码片段
-
-**重要**：如果项目不支持多核，请明确说明并分析其单核设计。完成所有工具调用后，你必须输出一个完整的 Markdown 格式分析报告。
-""",
-    },
-    {
-        "id": "10_security",
+        "id": "07_security",
         "title": "安全机制与权限模型",
-        "prompt": """目标：分析安全隔离与权限控制机制。
-
-**严格反幻觉要求**：
-1. **证据为王**：描述任何特性（如 Seccomp, Audit, ACL）必须附带 `[Source: path/to/file:L1-L10]` 引用。
-2. **否定确认**：如果搜索不到相关关键词，你必须明确地写“**未发现实现**”。
-3. **禁止臆测**：禁止将 Linux 通用机制套用到当前 OS。
-
-必须回答：
-- **多架构覆盖要求**：本章分析必须覆盖项目支持的所有架构（riscv64, aarch64, x86_64, loongarch64 等），不得仅以某一个架构为视角描述。
-- **Rust 安全性机制**：如果项目使用 Rust 编写，必须指出 RAII、所有权分析、基于生命周期的锁等机制带来的安全性。
-- 用户态/内核态隔离：页表隔离（KPTI）、SMEP/SMAP 是否开启？
-- **权限模型深度验证（关键）**：
-    - **用户/组（UID/GID）**：不仅要看 `Task` 结构体是否有 `uid` 字段，**必须验证**这些字段是否在 `open/write/exec` 等系统调用中被用于权限检查！（grep `check_perm`, `inode_permission`）。如果仅有字段但无检查逻辑，必须注明“**仅有定义但未强制执行（🔸 桩函数）**”。
-    - **Capability/ACL**：搜索 `capability`, `acl`。
-- **安全沙箱 (Seccomp/Prctl)**：
-    - 搜索 `prctl` 或 `seccomp`。
-    - **必须检查实现**：是返回 `ENOSYS`（未实现），还是直接返回 `0`（假装成功），还是真的解析了 BPF 规则？
-    - **Stub判断**：如果 `sys_prctl` 只是 returning 0 without doing anything，标记为 **`🔸 桩函数`**。
-    - 如未找到，明确写“未实现安全沙箱（❌ 未实现）”。
-- **审计与安全启动**：
-    - 搜索 `audit`（审计日志）、`secure_boot`、`signature`（签名验证）。
-- **内存安全**：
-    - 用户指针验证：搜索 `UserInPtr`, `verify_area`, `access_ok`。确认系统调用入口是否严格检查了用户指针？
-    - 缓冲区溢出保护：是否有 `stack_guard`, `canary`？
-
-要求：
-- **语义发现（🥇 首选）**：使用 `rag_search_code` 搜索 "capability check", "seccomp filter", "user pointer verification", "stack canary" 锁定安全机制实现。
-- 使用 `lsp_get_definition` 定位 `Credential`/`UID`/`GID` 等安全相关结构体的定义。
-- **【必须】使用 `lsp_get_call_graph` 追踪权限检查链**：
-  - `lsp_get_call_graph(repo_path, file_of_check_perm, "check_perm", direction="incoming", max_depth=3)` — 哪些 syscall 调用了权限检查？
-  - 如返回 `[⚠️ DEGRADED MODE]`，标注后继续使用 Grep 结果，并用 `lsp_get_references` 补充单层引用。
-- 辅以 grep_in_repo 搜索 security/、auth/、capability 相关模块和 "seccomp|sandbox|prctl"。
-- 查找 syscall 入口处的权限检查逻辑，分析用户/组/权限位的实现。
-
-输出格式：
-- ## 特权级与隔离机制
-- ## 权限检查与访问控制
-- ## 用户/组/权限模型
-- ## 进程间隔离与资源限制（追踪检查链路）
-- ## 安全沙箱与过滤机制（如无则写“未发现”）
-- ## 审计与安全启动机制（如无则写“未发现”）
-- ## 内存安全与系统调用检查
-- ## Rust 语言级安全性机制（如适用）
-- ## 关键代码片段
-
-**重要**：如果项目安全机制较简单，请如实描述。完成所有工具调用后，你必须输出一个完整的 Markdown 格式分析报告。
-""",
+        "prompt": "",
     },
     {
-        "id": "11_network",
+        "id": "08_network",
         "title": "网络子系统与协议栈",
-        "prompt": """目标：深入分析网络子系统与 TCP/IP 协议栈实现。
-
-必须回答：
-- 网络协议栈架构：自实现还是使用 `smoltcp`/`lwip` 等库？（**检查 Cargo.toml 依赖**）**如果完全没有网络支持，明确写“未实现网络功能（❌ 未实现）”**。
-- Socket 接口实现：是否有 `socket`/`bind`/`connect` 等 syscall？还是仅有 Loopback？
-- **功能限制声明（必须）**：分析项目是否已在真实物理网卡上测试过网络功能。如果仅在 QEMU 环境测试或仅支持本地回环通信，必须明确写出该限制。搜索 `loopback|LOOPBACK|127.0.0.1` 确认是否仅有回环设备。
-- **网卡驱动细节**：
-  - 搜索 `drivers/net/`, `virtio-drivers`, `ixgbe` 等。
-  - 列出支持的网卡类型（VirtIO, E1000, RTL8139, Intel 82599 等）。
-  - **PHY/MAC 层抽象**：是否存在独立的 PHY 驱动层？
-  - **错误处理**：描述一个网络操作失败（如 connect timeout）时的错误码传递流程。
-- **高级特性验证（必须 grep 代码）**：
-  - 零拷贝（Zero Copy）：搜索 `DMA` 或 `shared` buffer。只有在驱动层看到 DMA 描述符操作，或者协议栈层有 `mbuf` 传递引用，才算零拷贝。
-  - 多队列（Multi-queue）：是否有 RSS 支持？
-  - **协议支持**：DHCP, DNS, ARP, ICMP, TCP, UDP。
-  - **如果未找到代码，明确说明“不支持”**。
-- 数据包收发流程：追踪从 `virtio-net` 中断到 `tcp_recv` 的路径。
-
-要求：
-- **语义发现（🥇 首选）**：使用 `rag_search_code` 搜索 "smoltcp integration", "socket syscall", "VirtIO-Net driver", "network stack architecture" 锁定网络源码。
-- 使用 `lsp_get_definition` 定位 `Socket` trait、`TcpSocket`/`UdpSocket` 结构体定义。
-- **【必须】使用 `lsp_get_call_graph` 追踪数据发送路径**（`sys_sendto` → 协议栈 → 网卡驱动）：
-  - `lsp_get_call_graph(repo_path, file_of_sys_sendto, "sys_sendto", direction="outgoing", max_depth=4)`
-  - 如返回 `[⚠️ DEGRADED MODE]`，标注后继续使用 Grep 结果。
-- 使用 `lsp_get_references` 查找单层引用（如哪些地方调用了 `socket_write`、`tcp_send`）。
-- 使用 `lsp_get_document_outline` 浏览网络模块文件，发现所有 socket 操作和协议处理函数。
-- 辅以 grep_in_repo 搜索 net/、socket/、tcp/ 相关模块。
-- **严格区分**：使用了网络库（如 smoltcp）vs 自己实现了协议栈。
-
-输出格式：
-- ## 网络子系统架构（自研 vs 第三方库）
-- ## Socket 接口与系统调用
-- ## 协议栈支持详情（TCP/UDP/IP/Ethernet）
-- ## 数据包收发流程追踪
-- ## 高级特性支持验证（零拷贝等）
-
-**重要**：如果项目不支持网络功能，请明确说明。完成所有工具调用后，你必须输出一个完整的 Markdown 格式分析报告。
-""",
+        "prompt": "",
     },
     {
-        "id": "12_debug_error",
+        "id": "09_debug_error",
         "title": "调试机制与错误处理",
-        "prompt": """目标：分析调试支持、日志系统与错误处理机制。
-
-必须回答：
-- 日志系统：print/log 宏如何实现？日志级别设计？
-- Panic 处理：panic! 触发后的流程（栈回溯、寄存器 dump、停机）。
-- **栈回溯 (Backtrace)**：是否支持 `dwarf` 解析或基于 FramePointer 的回溯？使用 grep 搜索 `backtrace` 或 `unwind`。**注意不要被 panic 时的简单 PC 打印误导，Backtrace 指的是打印完整的函数调用栈。**
-- 异常处理：未处理异常的默认行为。
-- 调试接口：
-    - **交互式 Shell**: 是否提供 Monitor/Shell？支持哪些命令（`ps`, `ls`, `help`）？
-    - GDB stub 支持（如有）：**严格检查**。搜索 `handle_gdb_packet`。如果找不到数据包解析循环，就不是 GDB Stub。
-    - 调试控制台/Monitor
-    - 内核调试选项
-    - 是否支持 `perf` 或 `ftrace`？**Tracepoints** 是否插入到了关键路径？
-- 错误码设计：Result/Error 类型定义。
-- 断言与检查：debug_assert、运行时检查。
-
-要求：
-- 使用 `lsp_get_definition` 定位 `panic_handler`、`log` 宏的实现位置。
-- **【必须】使用 `lsp_get_call_graph` 追踪 panic 处理链**（`panic!` → `panic_handler` → 栈回溯 → 停机）：
-  - `lsp_get_call_graph(repo_path, file_of_panic_handler, "panic_handler", direction="incoming", max_depth=3)` — 谁触发了 panic？
-  - 如返回 `[⚠️ DEGRADED MODE]`，标注后继续使用，用 `lsp_get_references` 补充单层引用。
-- 使用 `lsp_get_document_outline` 浏览调试模块，发现所有调试相关函数（backtrace、dump、monitor命令）。
-- 辅以 grep_in_repo 搜索 `gdbstub|monitor|perf|trace` 确认调试工具支持。
-
-输出格式：
-- ## 日志与打印系统
-- ## Panic 处理与栈回溯（明确是否支持 Backtrace）
-- ## 错误码与 Result 设计
-- ## 调试接口与交互式 Shell
-- ## GDB Stub 支持情况（验证代码，排除配置文件干扰）
-- ## 断言与运行时检查
-- ## 关键代码片段
-
-**重要**：完成所有工具调用后，你必须输出一个完整的 Markdown 格式分析报告。
-""",
+        "prompt": "",
     },
-
-
     {
-        "id": "13_history",
+        "id": "10_history",
         "title": "开发历史与里程碑",
-        "prompt": """目标：自主阅读 Git 原始提交记录，推演操作系统的开发时间线。你需要总结"初始版本工作量"、"后续版本的功能演进轨迹"，并将历次重要 Commit 涉及的具体变更归类到对应的操作系统模块中。
+        "prompt": """目标：撰写「开发历史与里程碑」一章，以 **Git 与仓库内可复核证据** 为主，做技术向演进归纳（避免无依据的提交流水账）。
 
-**强烈注意：本阶段不使用任何第三方脚本生成图表。你需要完全依赖自己的代码语义理解能力。**
+**建议覆盖（有证据才写，无则明确写「未发现」）**
+- 若存在 `.git`：用本阶段已启用的 Git 工具概括主分支/标签/作者贡献方向；**禁止**编造未出现在工具输出中的 commit hash 或统计口径。
+- **模块演进**：可结合前文各章已出现的路径，用 `trace_file_evolution` 等追踪关键文件/目录的引入或大改，只写工具输出可支撑的判断。
+- **文档里程碑**：README、CHANGELOG、CI 配置等中与版本或阶段目标相关的陈述，区分「文档声称」与「代码可验证结论」。
+- **缺口**：若历史信息显示某能力被移除、长期标注实验/待办，如实记录。
 
-**⚠️ Token 节约与防死循环规则（绝对红线）**：
-- **严禁**把 `get_git_history_summary` 放在循环里调用。你只需要调用**一次**，它会自动返回贯穿仓库生命周期的浓缩摘要。
-- **严禁**无脑遍历所有的历史节点。
-- 当 `get_git_history_summary` 的结果显示某次重大 Commit 涉及了海量文件（如 `[arceos/modules/] 3500 files`）且你需要知道具体加了什么功能时，**必须且只能**使用 `analyze_git_history(repo_path, max_commits=1, skip=N, path_filter="arceos/modules")` 对该重点目录进行定点下钻。
-- **绝不允许**在未设定 `path_filter` 的情况下对几千个文件的重大提交使用 `analyze_git_history`，这会导致上万行的输出撑爆监控。
-- `find_symbol_first_commit` 可以批量传入多个关键词，请严格合并为 1-2 次统一调用。
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-阶段一：【总体提交浏览与模块分类】
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-1) **调用且仅调用一次** `get_git_history_summary(repo_path)` 获取全局提交概览。
-   该工具会自动返回精炼摘要，包含：日期、SHA、作者、总增删行数、以及**变更量最大的前 3 个确切目录**。
-2) **调用且仅调用一次** `analyze_authors_contribution(repo_path)` 获取该项目的开发者图谱。
-   分析该操作系统是属于“单人独立开发”还是“多人模块化协作”，各个核心目录的主力作者是谁。
-3) 根据以上返回摘要进行**语义归类**：
-   - 识别出提交密集期（快速开发阶段）和平稳期。
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-阶段二：【初始版本工作量深度核实】
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-定义"初始版本"为时间线最早的一批 commit（通常是建立仓库骨架的那几天）。
-
-A. **初始代码规模评估**
-   - 从 `get_git_history_summary` 的返回中找到最早的几个 commit，汇总其增加的代码行数。
-   - 观察这些最早 commit 涉及的模块，总结第一版已经搭起了哪几个子系统。
-
-B. **核心子系统首次引入时间（重点查验）**：
-   调用 `find_symbol_first_commit(repo_path, keywords=[...])` 批量查询以下关键词是何时从无到有被加入的（**尽量合并为 1-2 次调用**）：
-   - 启动入口：`["_start", "rust_main", "kernel_main"]`
-   - 内存管理：`["FrameAllocator", "PageTable", "MemorySet"]`
-   - 进程/任务：`["TaskInner", "spawn_task", "ProcessInner"]`
-   - 文件系统：`["VfsNode", "fat32", "ramfs", "sys_open"]`
-   - 系统调用：`["syscall_handler", "sys_write", "sys_read", "sys_exec"]`
-   - 中断/Trap：`["trap_handler", "TrapFrame", "stvec"]`
-   - 进程间通信(IPC)：`["sys_pipe", "Mailbox", "sys_msgget", "sys_shmget"]`
-   - 设备驱动：`["virtio_blk", "UART", "plic", "device_init"]`
-   - 网络(Network)：`["sys_socket", "smoltcp", "TcpSocket", "udp_send"]`
-
-   根据工具返回的时间：
-   - 若【首次引入】日期在仓库头几天 → 标记为 "**初始版本已有**"
-   - 若【首次引入】日期在中后期 → 标记为 "**后续版本引入**"
-   - 若查询结果显示未找到 → 标记为 "**暂不支持该功能**"
-
-C. **使用 grep_in_repo 探索隐藏功能**（可选）：
-   - 如果遇到分析瓶颈，可用 `grep_in_repo` 搜索关键字（如 `SMP`, `signal`, `mmap`）核实功能是否存在。
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-阶段三：【后续重要功能的代码演进轨迹】
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-根据 `get_git_history_summary` 返回的概览，挑选 **最有代表性的 8-12 次大变动**（通过增删行数和模块判断）。
-对每次大变动，基于概览中的信息写出分析：
-1. **所属模块**：这是在改网络、改内存，还是在改驱动？
-2. **改动性质**：
-   - 【新增功能】：引入了全新的机制（如第一次带入多核 SMP）
-   - 【重构/优化】：大面积重写了既有模块
-   - 【Bug修复】：修复了重大架构缺陷
-3. **工作量与事实**：列出增删规模 (+xxx/-yyy) 以及涉及的主要模块。
-
-**【高级钻取工具（按需使用）】**：
-- 如果某个大变动在 `get_git_history_summary` 中显示修改了大量的核心子系统（例如 `[arceos/modules/] 3500 files`），你需要弄清楚里面包含了什么文件，**必须**使用带目录过滤的精确下钻：`analyze_git_history(repo_path, max_commits=1, skip=N, path_filter="arceos/modules")`。
-- 如果你看到一个极其关键的 Commit（比如标为"Add Network Stack"），但你想知道它到底在底层新增了什么函数接口？调用 `get_commit_diff_summary(repo_path, commit_sha)` 一键透视其底层增删的具体代码逻辑，而不是光靠猜。
-- 如果你想知道一个至关重要的大文件（如 `kernel/sched.rs`）从立项起经历了几次重构，调用 `trace_file_evolution(repo_path, "kernel/sched.rs")` 拉出它演进的生命线。
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-输出格式要求（纯文本 Markdown 历史报告）
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-**必须**严格按照以下结构输出，清晰回答这三个核心问题：
-
-- ## 一、 项目概览与人员协作
-  - **总规模与协作模式**：基于代码规模和作者贡献图，总结这是个单人作业还是社区协作项目？各作者主力负责什么模块。
-  - **初始完成功能**：第一版建立时就已经搭起了哪几个子系统（核心功能引入时点检测结果）。
-
-- ## 二、 后续版本演进与功能完善
-  - 详细罗列后续的历次重大 Commit/迭代中，完成（完善/修改）了哪些 OS 功能模块。
-  - 按模块分类（如：内存管理、驱动、文件系统）列出其演进轨迹及其增加/减少的代码量估算。列出最具代表性的演进记录。
-
-- ## 三、 现状评估与后续修改建议（核心总结）
-  - **目前还缺什么**：基于前面对整个仓库历史和现状的分析，目前这个 OS 还有哪些明显的缺失功能或尚未完善的半成品模块？
-  - **现在还需要怎么改**：给出 3-5 条对该项目当下最迫切的代码修改、架构重构或功能补全的建议方向。
-
-**重要**：完成所有工具调用后，你必须输出一个完整的 Markdown 格式分析报告。
-""",
+**输出形式**：Markdown 本章正文（小节自洽）；**不要**以题库 JSON 对象作为终稿。""",
     },
     {
         "id": "01_overview",
         "title": "项目概览与技术栈",
         "needs_previous_sections": True,
-        "prompt": """目标：建立"这是什么 OS、怎么构建、关键入口在哪"的简明技术字典，并生成全项目的完成度评价。
+        "prompt": """目标：在「项目概览」一章中，**以各前置章节（02–10）已生成的报告为主要依据**，系统整理**每个功能模块所采用的技术、算法、关键数据结构、外部依赖与工具使用**；并补充仓库级技术栈与构建信息。要求**逐模块覆盖、不得遗漏**（与下文「[前面阶段的分析内容]」中的章节一一对应）。
 
-        **严格注意**：区分项目本身名称（如 Undefined OS）与底层框架（如 ArceOS、rCore、xv6等）。如果项目是基于 ArceOS 修改的，必须明确说明"基于 ArceOS 开发"。
-        由于你是最后执行的综合阶段，此时**其他章节（02-13章）的生成报告已经全部提供在你的上下文末尾**，你需要直接利用这些信息来宏观总结整个项目。
+        **定位**：区分仓库对外名称与 README 中可能提及的上游框架名；若声称基于某框架，**一两句**交代关系即可，正文不展开框架教程。
+        本阶段**最后执行**，上下文已含 **02–10** 全文；归纳以各章报告为主，仅在核对入口、架构列表、语言版本时**轻量**调工具。
 
-        请按顺序完成（仓库已克隆到 repo_path，直接使用即可）：
-        1) **融会贯通**：直接阅读并深刻理解上下文中附带的前置章节报告，了解系统整体完成情况，无需再调用工具去查阅底层细枝末节的代码（除非是为了寻找内核入口）。
-        2) analyze_tech_stack(repo_path)：总结语言/构建/依赖。**必须明确提取编程语言（版本、是否no_std）、基础框架来源（rCore/ArceOS/xv6等）、内核类型（宏内核/微内核/混合等）。**
-        3) list_repo_structure(repo_path, max_depth=5)：总结关键目录。
-        4) **寻找架构支持**：代码验证并明确列出该项目支持的所有架构（x86_64, aarch64, riscv64, loongarch64 等）。
-        5) **寻找入口**：搜索并确定真正的 OS 内核入口函数（可借用 LSP 或 grep 快速定位）。
+        **模块—章节对应关系（归纳时必须逐条覆盖；若某章在上下文中缺失或过短，须单独说明「该章无可用内容」并写「待结合仓库核实」）**：
+        - 02 启动/架构与 Trap/系统调用 → 启动链、模式切换、MMU/FPU、Trap 向量、系统调用分发、TrapFrame、用户指针校验等
+        - 03 内存管理 → 物理/虚拟内存、页表、分配器、CoW/Lazy/Swap 等高级特性
+        - 04 进程/线程/调度与多核 → 任务模型、调度算法、上下文切换、信号/Futex、多核启动、IPI、每 CPU 数据等
+        - 05 文件系统与设备 I/O → VFS、具体 FS、fd/mmap、驱动框架、块/网设备等
+        - 06 同步与 IPC → 锁、管道、IPC、Futex 等
+        - 07 安全机制 → 权限、Capability、隔离等
+        - 08 网络协议栈 → socket、协议栈实现形态等
+        - 09 调试与错误处理 → panic、日志、回溯等
+        - 10 演进与历史 → 模块演进、重大提交方向（技术层面归纳即可）
 
-        输出格式要求：
-        - ## 结论摘要（3-5 条，基于前置报告明确项目特性及内核类型）
-        - ## 技术栈与构建（含编程语言版本、所有支持的架构完整列表）
-        - ## 目录结构导读（列出系统关键目录与源码入口）
+        请按顺序完成（repo_path 为仓库根）：
+        1) **通读前置报告**：完整阅读上下文中的各章 Markdown，为下面「各模块技术全景」打草稿；摘录每章出现的**具体技术名词、算法名、crate 名、关键路径/符号**（须能在该章正文中找到依据，勿臆造）。
+        2) analyze_tech_stack(repo_path)：核对/补充语言、构建、依赖与框架判断。
+        3) list_repo_structure(repo_path, max_depth=5)：核对关键目录与入口线索。
+        4) **架构支持**：列出本仓库实际支持的架构（可与前置报告交叉验证）。
+        5) **内核入口**：用 LSP/grep 等**轻量**手段确认主入口符号与文件路径即可。
+        6) **评测与交付信号（轻量）**：`read_code_segment` 阅读根目录 `README.md` 前几屏（若存在则扫 `docs/*.md` 标题区）提取构建/运行/QEMU 命令与作者**声称**的评测或 CI 环境；`grep_in_repo` 检索 `kernel-rv|kernel-la|disk.img|testcode|OS COMP|autograde|gitlab-ci|\\.github/workflows` 等中性模式。仅当有命中或 README 明确描述且能与前置章节或源码锚点交叉时写入下一节；否则在该节写「未发现仓库内评测专用适配信号」。
+
+        输出格式要求（**严格按此顺序**，不得调换；`## 各模块技术全景` 不得省略）：
+
+        - ## 快速总览
+          **报告第一个内容块**。含：
+          **一句话定位**（≤60字）："[OS名称] 基于 [框架/自研] 的 [架构] [内核类型]，主要语言 [x]，[1 个最突出技术点]。"
+          **子系统完成度矩阵**（固定 10 行，不得删行；「关键实现」优先引用前置章节已给出的结论/路径；与 02–09 章对应时注明章节号）：
+          | 子系统 | 完成度 | 关键实现 |
+          |--------|--------|---------|
+          | 启动与 Trap/系统调用（第 02 章） | ✅完整 / 🔸部分 / ❌缺失 | 一句话 |
+          | 内存管理（第 03 章） | ... | ... |
+          | 进程/调度与多核（第 04 章） | ... | ... |
+          | 中断与系统调用（与第 02 章同源时可互引） | ... | ... |
+          | 文件系统与设备 I/O（第 05 章） | ... | ... |
+          | 同步与IPC（第 06 章） | ... | ... |
+          | 多核支持（与第 04 章同源时可互引） | ... | ... |
+          | 网络协议栈（第 08 章） | ... | ... |
+          | 安全机制（第 07 章） | ... | ... |
+          | 调试与错误处理（第 09 章） | ... | ... |
+
+        - ## 评测与交付适配（启发式归纳）
+          **固定小节、紧接在「快速总览」矩阵之后**。不臆测任何一届具体赛题或保密测例；仅综合 **02–09 技术前置章** 与 **本步对 README/`grep` 的轻量结果**，用短段落归纳下列四类（无证据则写「未发现」或「不适用」）：
+          - **Delivery**：`Makefile`/`build.rs`/CI 中是否出现固定产物名（如 `kernel-rv`、`kernel-la`、`disk.img`）、`make all` 等；列路径，不写仓外断言。
+          - **Harness**：是否存在自测主控、固定输出标记、扫盘跑脚本、关机等**输出契约**相关代码或 README 描述；须能指向前置章节或源码 `路径:行号`，否则标待核实。
+          - **PlatformProfile**：README/QEMU 命令与代码中 **QEMU `virt` vs 物理板**、多 virtio、SMP 等是否一致；与 **02/05/04** 等章结论对照。
+          - **SubsystemDepth**：若 README 声称可跑 libc/LTP/压测等，用 **02/05/08** 等章的桩态结论概括**风险缺口**（仍禁止数值打分）。
+          禁止编造未在当次工具输出中出现的 commit hash。
+
+        - ## 各模块技术全景（基于 02–10 章报告提取）
+          **本章核心**：按上表「模块—章节对应」顺序，**每一模块一个小节**（建议 `### 02 …` 至 `### 10 …` 与章节号对齐）。每节须包含：
+          - **技术清单**：条列该技术模块中明确采用的技术/机制（含算法、同步原语、子系统接口风格等）；
+          - **关键实现、证据与细粒度锚点**：路径/符号/字段/cfg 等摘自前置章，须能在该章正文找到依据，勿臆造；
+          - **依赖与工具**：该模块涉及的 crate、驱动/协议栈、或分析中使用的典型工具结论（若有）；
+          - **与相邻模块的衔接**（一两句话即可）。
+          若某模块在前置报告中内容极多，可再分子标题，但**不得合并省略整个模块**。
+
+        - ## 技术栈与构建（编程语言版本、框架、依赖、支持的架构完整列表）
+        - ## 目录结构导读（关键目录与源码入口）
         - ## 总结评价（完成度评估）
-        - 深度结合下文附带的各模块报告情况，用200-300字概括：项目定位与目标、技术栈概览、实现完成度评估（系统主要功能模块是否闭环）。**注意：只做客观的定性评价，绝不要打分（如不要出现x/10这样的评分）。**
+          200-300 字：结合**各模块技术全景**与完成度矩阵，概括闭环情况；**禁止数值打分**（不要出现 x/10 等）。
 
-        **重要**：完成所有工具调用后，你必须输出一个完整的 Markdown 格式分析报告。
+        **收尾**：**「各模块技术全景」**须脱离 02–10 原文仍可读懂各模块技术选型。
         """,
     },
 ]
@@ -824,7 +583,7 @@ def _strip_llm_preamble(text: str) -> str:
     return text
 
 
-def print_step(step_num: int, node_name: str, state: dict, stage_step_num: int = 0, max_steps: int = 1500, stage_limit: int = 500) -> int:
+def print_step(step_num: int, node_name: str, state: dict, stage_step_num: int = 0, max_steps: int = 1500, stage_limit: int = 600) -> int:
     """打印每一步的执行信息（简洁的 agent 风格）
     
     Args:
@@ -885,9 +644,6 @@ def print_step(step_num: int, node_name: str, state: dict, stage_step_num: int =
                 total_this_call = usage.get("total_tokens", 0)
                 if total_this_call > 0:
                     token_count += total_this_call
-                    input_tokens = usage.get("prompt_tokens", 0)
-                    output_tokens = usage.get("completion_tokens", 0)
-                    print(f"   📄 Tokens: {total_this_call:,} (输入:{input_tokens:,} + 输出:{output_tokens:,})")
         
         elif isinstance(msg, ToolMessage):
             tool_name = getattr(msg, "name", "unknown")
@@ -896,6 +652,100 @@ def print_step(step_num: int, node_name: str, state: dict, stage_step_num: int =
             print(f"   ✅ {tool_name}: {summary}")
             
     return token_count
+
+
+def _save_json(path: str, payload: dict):
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        import json
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"  ⚠️  无法写入 JSON 文件 {path}: {e}")
+
+
+def _invoke_describe_stage_review(
+    repo_output_dir: str,
+    stage_id: str,
+    title: str,
+    expected_question_ids: list,
+    payload_before_stage_qa: dict,
+    skip_in_report: bool,
+) -> None:
+    """JSON-QA 校验成功且非 01/10 时，送审题单 + 题库覆写前的答案 JSON。"""
+    if skip_in_report or not describe_stage_review_enabled():
+        return
+    if not describe_stage_review_applies(stage_id, expected_question_ids=expected_question_ids):
+        return
+    sidecar_dir = os.path.join(repo_output_dir, "_per_stage")
+    os.makedirs(sidecar_dir, exist_ok=True)
+    question_sheet = build_stage_qa_question_sheet(stage_id, title)
+    model_json = json.dumps(payload_before_stage_qa, ensure_ascii=False, indent=2)
+    try:
+        parsed_review, review_raw_llm, review_err = run_describe_stage_review(
+            stage_id=stage_id,
+            stage_title=title,
+            question_sheet=question_sheet,
+            model_json_before_stage_qa_coerce=model_json,
+            expected_question_ids=list(expected_question_ids),
+        )
+        review_out = os.path.join(sidecar_dir, f"{stage_id}_review.json")
+        review_err_out = os.path.join(sidecar_dir, f"{stage_id}_review_error.json")
+        if parsed_review is not None:
+            parsed_review["_meta"] = {
+                "review_model": os.environ.get("DESCRIBE_REVIEW_MODEL") or os.getenv("MODEL_NAME", ""),
+            }
+            _save_json(review_out, parsed_review)
+            conf = parsed_review.get("confidence")
+            print(f"\n   📋 Describe Review：confidence={conf} → {review_out}")
+        else:
+            _save_json(
+                review_err_out,
+                {
+                    "error": review_err or "unknown",
+                    "raw_model_output_excerpt": (review_raw_llm or "")[:8000],
+                },
+            )
+            print(f"\n   ⚠️ Describe Review 解析失败（已写入 {review_err_out}）")
+    except Exception as _re:
+        _save_json(
+            os.path.join(sidecar_dir, f"{stage_id}_review_error.json"),
+            {"error": f"{type(_re).__name__}: {_re}"},
+        )
+        print(f"\n   ⚠️ Describe Review 调用失败: {_re}")
+
+
+def _clear_stage_sidecar_artifacts(repo_output_dir: str, stage_id: str) -> None:
+    """重新生成某阶段前删除 _per_stage 下该 stage_id 的旧 JSON，避免与本次 run 混用。"""
+    sidecar_dir = os.path.join(repo_output_dir, "_per_stage")
+    if not os.path.isdir(sidecar_dir):
+        return
+    prefix = f"{stage_id}_"
+    removed: list[str] = []
+    for name in os.listdir(sidecar_dir):
+        if not name.startswith(prefix) or not name.endswith(".json"):
+            continue
+        path = os.path.join(sidecar_dir, name)
+        try:
+            os.remove(path)
+            removed.append(name)
+        except OSError:
+            pass
+    if removed:
+        print(f"   🧹 已清理本阶段上次残留的侧车: {', '.join(sorted(removed))}")
+
+
+def _summarize_section_text(text: str, max_chars: int = 500) -> str:
+    text = _strip_llm_preamble((text or "").strip())
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    if len(text) <= max_chars:
+        return text
+    return text[: max_chars - 3] + "..."
+
+
+def _extract_path_mentions(text: str) -> list[str]:
+    pattern = re.compile(r"`([^`\n]*/[^`\n]+\.(?:rs|c|h|cpp|go|zig|S|s|toml|ld|md|py)(?::\d+(?:-\d+)?)?)`")
+    return [m.group(1) for m in pattern.finditer(text or "")]
 
 
 def main():
@@ -961,11 +811,35 @@ def main():
     except Exception as e:
         print(f"⚠️ RAG 预索引跳过 (将在首次调用时重试): {e}")
     # ------------------------------------------
-    
+
+    repo_profile = build_repo_profile(repo_url=repo_url, repo_path=repo_local_path)
+    _save_json(os.path.join(repo_output_dir, "repo_profile.json"), repo_profile)
+    global_memory = {
+        "section_summaries": {},
+        "mentioned_paths": [],
+        "external_background": {},
+    }
+
     for idx, stage in enumerate(STAGES, 1):
         stage_id = stage["id"]
         title = stage["title"]
         prompt = stage["prompt"]
+        expected_question_ids: list[str] = []
+        # JSON-QA：仅当 STAGES 未写内联 prompt（prompt 为空）时，才从 describe_stage_qa 组装题单并可能覆盖 prompt。
+        # 内联阶段（如 01_overview、10_history）不读题库、不要求 JSON 答案后处理。
+        if not (prompt or "").strip():
+            try:
+                qa_prompt, expected_question_ids = _build_json_qa_prompt(stage_id=stage_id, stage_title=title)
+                if expected_question_ids:
+                    prompt = qa_prompt
+            except Exception:
+                expected_question_ids = []
+        stage_state = StageState(
+            stage_id=stage_id,
+            stage_title=title,
+            stage_type="describe",
+            stage_prompt=prompt,
+        )
 
 
         # 检查是否跳过此阶段
@@ -973,7 +847,7 @@ def main():
         
         # 只有非skip阶段才计入章节号
         if not skip_in_report:
-            # 优先从 stage_id 提取章节号 (例如 "02_boot_arch" -> "02")
+            # 优先从 stage_id 提取章节号 (例如 "02_boot_trap" -> "02")
             chapter_prefix = stage_id.split('_')[0]
             if not chapter_prefix.isdigit():
                 chapter_counter += 1
@@ -997,6 +871,14 @@ def main():
                 print("=" * 80)
                 if not skip_in_report:
                     all_section_paths.append(section_path)
+                    try:
+                        with open(section_path, "r", encoding="utf-8", errors="ignore") as existing_f:
+                            existing_text = existing_f.read().strip()
+                        global_memory["section_summaries"][stage_id] = _summarize_section_text(existing_text)
+                        global_memory["mentioned_paths"].extend(_extract_path_mentions(existing_text))
+                        global_memory["mentioned_paths"] = list(dict.fromkeys(global_memory["mentioned_paths"]))[-100:]
+                    except Exception:
+                        pass
                 continue
             else:
                 print(f"♻️  检测到残留的失败文件 (Size: {os.path.getsize(section_path)} bytes)，将删除并重试: {section_name}")
@@ -1005,9 +887,53 @@ def main():
                 except OSError:
                     pass
 
+        _clear_stage_sidecar_artifacts(repo_output_dir, stage_id)
 
-        # 每个阶段构建 base_ctx
+        # 每个阶段构建 base_ctx（先打出阶段标题，再 Plan，避免日志上像「先 Plan 再阶段一」）
         base_ctx = _build_base_context(repo_url=repo_url, output_dir=repo_output_dir)
+        print("\n" + "=" * 80)
+        print(f"🧩 阶段 {idx}/{len(STAGES)}：{title}")
+        print("=" * 80)
+        print("\n" + "━" * 26 + " ① Plan · 探索并锁定本阶段计划 " + "━" * 26+'\n')
+        stage_state.plan = plan_stage(stage_state, repo_profile=repo_profile, global_memory=global_memory)
+        try:
+            planner_agent = build_planner_agent(stage_id=stage_id)
+            plan_stream_step = 0
+
+            def _on_plan_stream(node_name: str, st: dict) -> None:
+                nonlocal overall_step_count, plan_stream_step
+                overall_step_count += 1
+                plan_stream_step += 1
+                print_step(
+                    overall_step_count,
+                    node_name,
+                    st,
+                    plan_stream_step,
+                    GLOBAL_ESTIMATED_STEPS,
+                    PLANNER_RECURSION_LIMIT,
+                )
+
+            plan_overlay, plan_notes = run_llm_planning_agent(
+                planner_agent,
+                stage_state,
+                repo_profile,
+                repo_local_path,
+                global_memory=global_memory,
+                on_stream_step=_on_plan_stream,
+            )
+            stage_state.metadata["llm_plan_overlay_applied"] = bool(plan_overlay)
+            if plan_overlay:
+                stage_state.plan = apply_llm_plan_overlay(stage_state.plan, plan_overlay)
+            if plan_notes:
+                stage_state.metadata["llm_plan_notes"] = plan_notes
+            if plan_overlay or plan_notes:
+                print(f"   🧩 LLM 规划已合并（overlay_keys={list(plan_overlay.keys()) if plan_overlay else []}）")
+        except Exception as e:
+            stage_state.metadata["llm_plan_overlay_applied"] = False
+            logging.warning("LLM 规划失败，沿用启发式计划: %s", e)
+        stage_state.plan = ensure_execution_steps(stage_state.plan)
+        stage_state.dynamic_context = build_dynamic_context(stage_state, repo_profile=repo_profile, global_memory=global_memory)
+        plan_context = render_plan_context(stage_state)
         
         # 如果是最后整合阶段，需要读取前面所有 section 的内容
         previous_sections_content = ""
@@ -1015,8 +941,8 @@ def main():
             print(f"\n📚 读取前面 {len(all_section_paths)} 个阶段的分析内容...")
             sections_texts = []
             
-            # 限制每个 section 的最大字符数，避免 "lost in the middle" 问题
-            MAX_CHARS_PER_SECTION = 17000  # 每个 section 最多 17000 字符
+            # 限制每个 section 的最大字符数，避免 "lost in the middle"；01 概览需做全模块技术归纳，单章上限略放宽
+            max_chars_per_section = 28000 if stage_id == "01_overview" else 17000
             total_chars = 0
             
             for sp in all_section_paths:
@@ -1024,14 +950,15 @@ def main():
                     with open(sp, "r", encoding="utf-8", errors="ignore") as f:
                         content = f.read().strip()
                         if content:
+                            orig_len = len(content)
                             # 如果内容太长，截取前面部分 + 提示
-                            if len(content) > MAX_CHARS_PER_SECTION:
-                                truncated = content[:MAX_CHARS_PER_SECTION]
+                            if orig_len > max_chars_per_section:
+                                truncated = content[:max_chars_per_section]
                                 # 尝试在段落边界截断
                                 last_para = truncated.rfind("\n\n")
-                                if last_para > MAX_CHARS_PER_SECTION * 0.7:
+                                if last_para > max_chars_per_section * 0.7:
                                     truncated = truncated[:last_para]
-                                content = truncated + f"\n\n... [此部分已截断，原文 {len(content)} 字符]"
+                                content = truncated + f"\n\n... [此部分已截断，原文 {orig_len} 字符]"
                             
                             sections_texts.append(f"--- 来自: {os.path.basename(sp)} ---\n{content}")
                             total_chars += len(content)
@@ -1042,14 +969,13 @@ def main():
                 previous_sections_content = "\n\n" + "=" * 60 + "\n[前面阶段的分析内容摘要]\n" + "=" * 60 + "\n\n"
                 previous_sections_content += "\n\n".join(sections_texts)
                 previous_sections_content += "\n\n" + "=" * 60 + "\n[以上是前面阶段的分析内容，请基于这些内容整合生成最终报告]\n" + "=" * 60 + "\n"
-                print(f"  ✅ 已加载 {len(sections_texts)} 个 section，共 {total_chars} 字符（每个最多 {MAX_CHARS_PER_SECTION} 字符）")
+                print(f"  ✅ 已加载 {len(sections_texts)} 个 section，共 {total_chars} 字符（每个最多 {max_chars_per_section} 字符）")
         
         # 从已解析的 chapter_counter 直接获取章节号
         chapter_num = chapter_counter if not skip_in_report else None
         
-        # 构建任务 prompt
+        # Execute：单条 Human（计划 + 写作任务合并），随后进入 ReAct
         if chapter_num:
-            # 这是一个正式章节，告诉 Agent 输出的是第几章
             chapter_hint = f"""
 **本阶段是最终报告的第 {chapter_num} 章：{title}**
 
@@ -1060,23 +986,54 @@ def main():
 （你的分析内容）
 
 """
-            task = base_ctx + "\n" + chapter_hint + prompt + previous_sections_content
+            human_plan_block = (
+                base_ctx
+                + "\n"
+                + chapter_hint
+                + "\n"
+                + plan_context
+                + "\n"
+                + STAGE_EXECUTION_CONTRACT
+            )
         else:
-            task = base_ctx + "\n" + f"## 阶段 {idx}/{len(STAGES)}：{title}\n\n" + prompt + previous_sections_content
-        
-        inputs = {"messages": [SystemMessage(content=SYSTEM_PROMPT), HumanMessage(content=task)]}
+            human_plan_block = (
+                base_ctx
+                + "\n"
+                + f"## 阶段 {idx}/{len(STAGES)}：{title}\n\n"
+                + plan_context
+                + "\n"
+                + STAGE_EXECUTION_CONTRACT
+            )
+        human_write_block = (
+            "## 本阶段须撰写的分析内容（在遵守上文计划与执行契约的前提下完成）\n\n"
+            + prompt
+            + previous_sections_content
+        )
+        combined_execute_prompt = human_plan_block.rstrip() + "\n\n" + human_write_block
+        inputs = {
+            "messages": [
+                SystemMessage(content=DESCRIBE_SYSTEM_PROMPT_JSON),
+                HumanMessage(content=combined_execute_prompt),
+            ]
+        }
 
-        print("\n" + "=" * 80)
-        print(f"🧩 阶段 {idx}/{len(STAGES)}：{title}")
-        print("=" * 80)
-        print(f"🚀 开始执行 Agent (模型: {os.getenv('MODEL_NAME')})...")
+        print("\n\n   ✅ ① Plan 已锁定 → 执行步骤条数:", len(stage_state.plan.execution_steps) if stage_state.plan else 0)
+        print("\n" + "━" * 26 + " ② Execute · 按锁定计划执行 " + "━" * 26+'\n')
+        print(f"   模型: {os.getenv('MODEL_NAME')} ")
         sys.stdout.flush()  # 强制刷新输出缓冲区
 
-        agent = build_agent(stage_id=stage_id)
+        # 若本阶段为题库 JSON-QA：
+        # 不要在 ReAct 执行阶段启用 response_format/json_schema。
+        # 原因：启用结构化输出会让 LangChain 进入“自动解析工具调用”的模式，
+        # 要求所有 function tools 都是 strict；而本项目工具（如 get_repo_local_path）并非 strict，
+        # 会直接报：`<tool>` is not strict. Only strict function tools can be auto-parsed。
+        #
+        # JSON-QA 的结构化约束交给后处理（extract/validate）完成。
+        agent = build_executor_agent(stage_id=stage_id, model_kwargs=None)
         
         final_state = None
         stage_step_count = 0  # 阶段内步骤计数
-        recursion_limit = 500
+        recursion_limit = 600
         
         stage_tokens = 0  # 阶段内 token 计数
         retry_count = 0
@@ -1156,9 +1113,11 @@ def main():
         stage_text = ""
         is_complete = False
         all_ai_content = []  # 收集所有 AI 回复内容
+        execution_messages = []
         
         if final_state and final_state.get("messages"):
             messages = final_state["messages"]
+            execution_messages = messages
             if messages:
                 # 收集所有 AIMessage 的内容（降低阈值到 20 字符）
                 for m in messages:
@@ -1213,12 +1172,14 @@ def main():
                             
                         # 继续对话，追加 followup 消息
                         followup_inputs = {"messages": safe_messages + [followup_msg]}
+                        followup_final_state = None
                         for event in agent.stream(followup_inputs, config={"recursion_limit": 10}):
                             overall_step_count += 1
                             stage_step_count += 1
                             for node_name, state in event.items():
                                 step_tokens = print_step(overall_step_count, node_name, state, stage_step_count, GLOBAL_ESTIMATED_STEPS, recursion_limit)
                                 stage_tokens += step_tokens
+                                followup_final_state = state
                                 # 提取追问后的回复
                                 if state.get("messages"):
                                     for m in reversed(state["messages"]):
@@ -1234,6 +1195,9 @@ def main():
                                         break
                             if is_complete:
                                 break
+                        # 始终用追问流式最后一帧的完整 messages，保留先前所有 ToolMessage 供证据抽取
+                        if followup_final_state and followup_final_state.get("messages"):
+                            execution_messages = followup_final_state["messages"]
                     except Exception as e:
                         print(f"\n⚠️  追问失败: {e}")
                 
@@ -1243,55 +1207,218 @@ def main():
                     stage_text = f"> ⚠️ **生成警告**: 该章节未能完整生成. Last msg type: {type(last_msg).__name__}"
 
         if not stage_text.strip():
-             stage_text = "> ⚠️ **生成警告**: Agent 未返回有效内容。"
+            stage_text = "> ⚠️ **生成警告**: Agent 未返回有效内容。"
 
-        # 保存阶段结果（除非标记为 skip_in_report）
-        # skip_in_report 在前面文件命名时已经获取
+        stage_text = _strip_llm_preamble(stage_text.strip())
+
+        # --- JSON-QA 后处理：解析/校验/落盘答案 JSON，并渲染为 Markdown 供现有审阅器使用 ---
+        if expected_question_ids:
+            sidecar_dir = os.path.join(repo_output_dir, "_per_stage")
+            os.makedirs(sidecar_dir, exist_ok=True)
+            raw_path = os.path.join(sidecar_dir, f"{stage_id}_answers_raw.txt")
+            json_path = os.path.join(sidecar_dir, f"{stage_id}_answers.json")
+            try:
+                with open(raw_path, "w", encoding="utf-8") as f:
+                    f.write(stage_text.strip() + "\n")
+            except Exception:
+                pass
+
+            try:
+                stage_qa = load_stage_qa(stage_id)
+                payload = parse_answers_json(stage_text)
+                payload = coerce_answers_payload_defaults(payload)
+                payload_before_stage_qa = copy.deepcopy(payload)
+                payload = coerce_answers_payload_by_stage_qa(payload, stage_qa=stage_qa)
+                issues = validate_answers_payload(
+                    payload,
+                    stage_id=stage_id,
+                    stage_title=title,
+                    expected_question_ids=expected_question_ids,
+                )
+                if issues:
+                    _save_json(
+                        os.path.join(sidecar_dir, f"{stage_id}_answers_validate_issues.json"),
+                        {"issues": [{"path": x.path, "reason": x.reason} for x in issues]},
+                    )
+                else:
+                    _save_json(json_path, payload)
+                    stage_text = render_answers_to_markdown(payload).strip()
+                    _invoke_describe_stage_review(
+                        repo_output_dir,
+                        stage_id,
+                        title,
+                        expected_question_ids,
+                        payload_before_stage_qa,
+                        skip_in_report,
+                    )
+            except Exception as e:
+                # JSON 解析/校验失败：将“输出 JSON 前的全部对话 + 原输出”重发给模型，要求仅返回合法 JSON 进行修复重生成。
+                # 注意：这一步必须禁止工具调用，否则会变成“继续探索”而不是“修复 JSON”。
+                stage_qa = load_stage_qa(stage_id)
+
+                repair_error = f"{type(e).__name__}: {e}"
+                _save_json(
+                    os.path.join(sidecar_dir, f"{stage_id}_answers_parse_error.json"),
+                    {"error": repair_error},
+                )
+
+                try:
+                    # 尽量保留上下文：使用执行阶段的完整 messages（包含工具证据），但避免把“未解析 tool_calls 的 AIMessage”带入。
+                    safe_msgs = (execution_messages or []).copy()
+                    while safe_msgs and isinstance(safe_msgs[-1], AIMessage) and getattr(safe_msgs[-1], "tool_calls", None):
+                        safe_msgs.pop()
+
+                    qa_prompt, _expected_ids = _build_json_qa_prompt(stage_id=stage_id, stage_title=title)
+                    # 最多重试 3 次修复重生成
+                    repair_llm = build_chat_model(temperature=0, max_retries=0)
+                    last_repair_exc: Exception | None = None
+                    for attempt in range(1, 4):
+                        try:
+                            repair_instructions = (
+                                "上一次你生成的 JSON 无法被解析或无法通过校验。\n"
+                                f"错误：{repair_error}\n"
+                                f"修复重试次数：{attempt}/3\n\n"
+                                "请你基于上文所有对话与工具证据，重新输出**唯一一个 JSON 对象**（允许 ```json 围栏），不要输出任何额外解释。\n"
+                                "严格遵守题库的 question_id / question_type / stem。\n"
+                                "- single_choice 的 value 必须是 choices 中的完整选项文本（禁止 A/B/C/D）。\n"
+                                "- multi_choice 的 value 必须是数组，元素为 choices 中完整选项文本（禁止字母代号）。\n\n"
+                                "这是题库与输出契约（必须按此修复）：\n\n"
+                                + qa_prompt
+                                + "\n\n"
+                                "这是你上一次的原始输出（供你修复，可能包含多余文字/围栏/不完整 JSON）：\n\n"
+                                "```text\n"
+                                + (stage_text or "")
+                                + "\n```\n"
+                            )
+
+                            repaired = repair_llm.invoke(safe_msgs + [HumanMessage(content=repair_instructions)])
+                            repaired_text = (getattr(repaired, "content", "") or "").strip()
+
+                            with open(raw_path, "a", encoding="utf-8") as f:
+                                f.write(f"\n\n---\n# repair_attempt {attempt}/3\n")
+                                f.write(repaired_text + "\n")
+
+                            payload = parse_answers_json(repaired_text)
+                            payload = coerce_answers_payload_defaults(payload)
+                            payload_before_stage_qa = copy.deepcopy(payload)
+                            payload = coerce_answers_payload_by_stage_qa(payload, stage_qa=stage_qa)
+                            issues = validate_answers_payload(
+                                payload,
+                                stage_id=stage_id,
+                                stage_title=title,
+                                expected_question_ids=expected_question_ids,
+                            )
+                            if not issues:
+                                _save_json(json_path, payload)
+                                stage_text = render_answers_to_markdown(payload).strip()
+                                _invoke_describe_stage_review(
+                                    repo_output_dir,
+                                    stage_id,
+                                    title,
+                                    expected_question_ids,
+                                    payload_before_stage_qa,
+                                    skip_in_report,
+                                )
+                                last_repair_exc = None
+                                break
+                            _save_json(
+                                os.path.join(sidecar_dir, f"{stage_id}_answers_validate_issues.json"),
+                                {"issues": [{"path": x.path, "reason": x.reason} for x in issues]},
+                            )
+                        except Exception as e_attempt:
+                            last_repair_exc = e_attempt
+
+                    if last_repair_exc is not None:
+                        raise last_repair_exc
+                except Exception as e2:
+                    _save_json(
+                        os.path.join(sidecar_dir, f"{stage_id}_answers_repair_error.json"),
+                        {"error": f"{type(e2).__name__}: {e2}"},
+                    )
+
+        artifacts = extract_stage_artifacts(stage_text, execution_messages)
+        stage_state.draft_markdown = artifacts["draft_markdown"] or stage_text
+        stage_state.draft_document = artifacts["draft_document"]
+        stage_state.evidence_index = artifacts["evidence_index"]
+        stage_state.status = "executed"
+
+        sidecar_dir = os.path.join(repo_output_dir, "_per_stage")
+        _save_json(
+            os.path.join(sidecar_dir, f"{stage_id}_plan.json"),
+            stage_state.plan.to_dict() if stage_state.plan else {},
+        )
+
+        # 落盘章节正文
         if skip_in_report:
             print(f"\n⏭️  阶段 {idx} 标记为 skip_in_report，不写入报告")
         else:
             try:
                 os.makedirs(os.path.dirname(section_path), exist_ok=True)
                 with open(section_path, "w", encoding="utf-8") as f:
-                    # 不添加一级标题，由拼接时统一添加
-                    # LLM输出应从二级标题开始
-                    # 剥除 LLM 在报告内容前的过渡性思考文字
-                    clean_text = _strip_llm_preamble(stage_text.strip())
+                    clean_text = _strip_llm_preamble(stage_state.draft_markdown.strip())
                     f.write(clean_text + "\n")
                 all_section_paths.append(section_path)
+                global_memory["section_summaries"][stage_id] = _summarize_section_text(clean_text)
+                global_memory["mentioned_paths"].extend(_extract_path_mentions(clean_text))
+                global_memory["mentioned_paths"] = list(dict.fromkeys(global_memory["mentioned_paths"]))[-100:]
+                if stage_id == "01_overview":
+                    background_items = [
+                        item.excerpt[:300]
+                        for item in stage_state.evidence_index
+                        if item.source_type == "web_background" and item.excerpt
+                    ]
+                    if background_items:
+                        global_memory["external_background"]["competition_background"] = background_items[:4]
                 print(f"\n✅ 已保存阶段输出: {section_path}")
             except Exception as e:
                 print(f"\n⚠️  无法写入阶段文件 {section_path}: {e}")
-        
-        
+
         # 统计本阶段的token使用（已在 print_step 中累加）
         # stage_tokens 已准备好
         
         total_tokens_used += stage_tokens
         if stage_tokens > 0:
-            print(f"\n{'='*80}")
-            print(f"📊 阶段总结:")
-            print(f"   - 步骤数: {stage_step_count}")
-            print(f"   - Token使用: {stage_tokens:,} (累加{stage_step_count}次LLM调用)")
-            print(f"   - 全局累计: {total_tokens_used:,}")
-            print(f"{'='*80}")
+            print(
+                f"   阶段「{title}」token +{stage_tokens:,} "
+                f"（本阶段 {stage_step_count} 次 LLM）→ 累计 {total_tokens_used:,}"
+            )
             sys.stdout.flush()
+
+    # 生成 Call Graph 概览块（缓存由 compile 配置/git/管线指纹自动失效，无需环境变量）
+    callgraph_md = ""
+    try:
+        from tools.callgraph_overview import generate_callgraph_section
+        callgraph_md, cg_llm_tokens = generate_callgraph_section(
+            repo_path=repo_local_path,
+            output_dir=repo_output_dir,
+            top_k=30,
+            use_embedding=True,
+            lsp_refine=True,
+            force_regenerate=False,
+        )
+        if cg_llm_tokens > 0:
+            total_tokens_used += cg_llm_tokens
+            print(
+                f"   Call Graph（domain×layer）token +{cg_llm_tokens:,} "
+                f"→ 累计 {total_tokens_used:,}"
+            )
+            sys.stdout.flush()
+    except Exception as e:
+        print(f"\n⚠️  Call Graph 生成失败: {e}")
+        import traceback; traceback.print_exc()
 
     # 合并总报告 - 生成专业的、类似人类撰写的技术文档
     final_report_path = os.path.join(repo_output_dir, f"OS技术分析报告_{repo_name}.md")
     try:
-        final_stage_path = None
-        executive_summary = ""
-        project_evaluation = ""
+        # 01_overview 排最前，其余按文件名排序
+        overview_sections = [p for p in all_section_paths if os.path.basename(p).startswith("01_")]
+        other_sections = sorted([p for p in all_section_paths if not os.path.basename(p).startswith("01_")])
+        content_sections = overview_sections + other_sections
 
-        
-        # 其他章节（排除第15阶段）
-        content_sections = sorted([p for p in all_section_paths if p != final_stage_path])
-        
         with open(final_report_path, "w", encoding="utf-8") as out:
             # 标题和元数据
             out.write(f"# {repo_name} 操作系统技术分析报告\n\n")
-            
+
             # 加载作者信息
             author_info = get_author_info(repo_url)
             if author_info:
@@ -1310,77 +1437,58 @@ def main():
             out.write(f"> **分析日期**: {datetime.now().strftime('%Y年%m月%d日')}\n\n")
             out.write(f"> **分析工具**: OS-Agent-D\n\n")
             out.write("---\n\n")
-            
-            # 执行摘要
-            if executive_summary:
-                out.write(executive_summary + "\n\n")
-                out.write("---\n\n")
-            
+
             # 目录
             out.write("## 目录\n\n")
             for i, p in enumerate(content_sections, 1):
-                # 从文件名提取章节标题（因为section文件不再包含一级标题）
                 try:
-                    # 文件名格式：01_项目概览与技术栈.md
                     filename = os.path.basename(p)
-                    # 去除编号前缀和.md后缀
                     title = os.path.splitext(filename)[0]
                     if '_' in title:
-                        title = title.split('_', 1)[1]  # 去除 "01_" 前缀
-                    # 将下划线替换为空格（如果有）
+                        title = title.split('_', 1)[1]
                     title = title.replace('_', ' ')
                     out.write(f"{i}. {title}\n")
                 except Exception:
                     filename = os.path.splitext(os.path.basename(p))[0]
                     out.write(f"{i}. {filename}\n")
-            
-            # 添加总结评价到目录
-            if project_evaluation:
-                out.write(f"{len(content_sections) + 1}. 项目总结与评价\n")
-            
+
             out.write("\n---\n\n")
-            
+
+            # Call Graph 概览（放在目录之后、章节正文之前）
+            if callgraph_md:
+                out.write(callgraph_md)
+                out.write("\n---\n\n")
+
             # 正文：依次输出各章节内容
             for i, p in enumerate(content_sections, 1):
                 try:
-                    # 从文件名提取标题
                     filename = os.path.basename(p)
                     chapter_title = os.path.splitext(filename)[0]
                     if '_' in chapter_title:
                         chapter_title = chapter_title.split('_', 1)[1]
                     chapter_title = chapter_title.replace('_', ' ')
-                    
+
                     with open(p, "r", encoding="utf-8", errors="ignore") as f:
                         content = f.read().strip()
-                        
-                        # 添加章节标题（一级标题）
+
                         out.write(f"\n# {chapter_title}\n\n")
-                        
-                        # 内容应该从二级标题开始，直接写入
-                        # 如果LLM错误地输出了一级标题，降级处理
+
                         if content.startswith("# "):
-                            # 将一级标题转为二级标题
                             content = "##" + content[1:]
-                        
+
                         out.write(content + "\n\n")
                         out.write("---\n\n")
                 except Exception as e:
                     print(f"  ⚠️  无法读取章节 {p}: {e}")
-            
-            # 总结评价
-            if project_evaluation:
-                out.write(f"\n# 项目总结与评价\n\n")
-                out.write(project_evaluation + "\n\n")
-                out.write("---\n\n")
-            
+
             # 页脚
             out.write(f"\n---\n\n")
             out.write(f"*本报告由 OS-Agent-D 自动生成*  \n")
             out.write(f"*生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*  \n")
             out.write(f"*分析耗时: {(datetime.now() - start_time).total_seconds()/60:.1f} 分钟*\n")
-        
+
         print(f"\n📄 已生成最终报告: {final_report_path}")
-        print(f"   报告包含 {len(content_sections)} 个主要章节{'+ 执行摘要和总结' if executive_summary else ''}")
+        print(f"   报告包含 {len(content_sections)} 个主要章节")
     except Exception as e:
         print(f"\n⚠️  无法生成总报告: {e}")
         import traceback

@@ -10,31 +10,67 @@
 
 ### 1. OS-Agent D：自动源码描述 (`os_agent_d_describe.py`) ✨ **增强版**
 
-对 OS 仓库进行 **13 阶段**的深度技术分析，内置本地 RAG 语义搜索、LSP 调用图分析、智能重试与错误追踪机制：
+对 OS 仓库进行 **阶段化**深度技术分析（`STAGES`：**02→09 技术章 → `10_history` → `01_overview` 置底**；另含 **00** 仓库准备、**0.5** RAG 预索引），现已升级为**阶段级 Plan-Execute (PE)** 架构，内置本地 RAG 语义搜索、LSP 调用图分析、智能重试；Execute 阶段受锁定 **`execution_steps`** 与执行契约约束。各阶段计划在 `_per_stage/*_plan.json` 落盘便于对照与复跑。
 
 | 阶段 | 内容 |
 |------|------|
 | 00 | 仓库准备（本地直连克隆，无 LLM 开销） |
 | 0.5 | RAG 预索引（代码向量化，支持后续语义搜索，已有索引自动跳过） |
-| 01 | 项目概览与技术栈 |
-| 02 | 启动流程与架构初始化 |
+| 02 | 启动/架构与 Trap/系统调用 |
 | 03 | 内存管理（物理/虚拟/分配器） |
-| 04 | 进程/线程与调度机制 |
-| 05 | 中断、异常与系统调用 |
-| 06 | 文件系统（VFS + 具体 FS） |
-| 07 | 设备驱动与硬件抽象 |
-| 08 | 同步互斥与进程间通信 |
-| 09 | 多核支持与并行机制 |
-| 10 | 安全机制与权限模型 |
-| 11 | 网络子系统与协议栈 |
-| 12 | 调试机制与错误处理 |
-| 13 | 开发历史与里程碑（Git 语义化分析） |
+| 04 | 进程/线程/调度与多核 |
+| 05 | 文件系统与设备 I/O |
+| 06 | 同步互斥与进程间通信 |
+| 07 | 安全机制与权限模型 |
+| 08 | 网络子系统与协议栈 |
+| 09 | 调试机制与错误处理 |
+| 10 | 开发历史与里程碑（Git 语义化分析） |
+| 01 | 项目概览与技术栈（**最后执行**，依赖 02–10 各章） |
 
 **核心分析机制（三级联动）：**
 
 1. 🔍 **RAG 语义搜索（首选）**：`rag_search_code` 对整个仓库代码建立本地向量索引（Jina Embedding），支持语义级模糊搜索（如"查找页表映射实现"），穿透复杂目录结构直接定位相关代码块，大幅减少无效的目录遍历。
 2. 🌳 **LSP 拓扑展开**：通过 `lsp_get_call_graph`（多层递归调用树，包含变量到引用的智能降级）、`lsp_get_definition`（跨文件跳转）、`lsp_get_references` 构建精确的 AST 调用拓扑图。
 3. 🛠️ **分层降级兜底**：当 LSP 失败时，系统**首选 Tree-sitter AST 解析**（C/C++/Rust/Go/Zig），再退到语言感知正则、通用 Grep；仅在汇编或前述路径都失败时才使用 ASM 词法兜底。系统具备“智能分层切换”：LSP -> Tree-sitter -> Language-aware Static -> Grep -> ASM(最终兜底)。
+
+**v4.0 新增：阶段级 Plan-Execute 闭环**
+
+1. 🧭 **Plan**：每章生成结构化 `PlanSpec`（`seed_paths`、`must_cover`、`entry_symbols` 等），并锁定 **`execution_steps`**（4～8 条短句）；Execute **须按该顺序**调工具与收束正文（见 `render_plan_context` + `STAGE_EXECUTION_CONTRACT`）。
+2. 🧠 **Execute**：ReAct Agent 做证据搜集与章节 Markdown；可抽取 `evidence_index` / `claim_map` 供内存侧逻辑参考；章节正文写入 `sections/*.md`，计划写入 `_per_stage/{stage_id}_plan.json`。
+
+**v4.0 受限外部背景补充**
+
+- 新增 `web_search` 工具，但**默认关闭**。
+- 该工具只允许查询“全国大学生操作系统比赛”背景、赛道定位、目标要求、功能要求和公开技术背景。
+- `web_search` 结果只能用于**技术概览 / 概述总结**，**绝不能**作为仓库实现事实、查重判断或源码证据。
+
+**报告拼装（各阶段结束后）：Call Graph 概览块** (`tools/callgraph_overview.py`) ✨ **新增**
+
+所有分析阶段完成后，在报告 TOC 之后、各章节正文之前，自动插入 **Call Graph 概览块**，让评委一眼看懂 OS 的架构枢纽与调用关系。
+
+| 步骤 | 内容 |
+|------|------|
+| 1. Tree-sitter 全库解析 | 遍历配置的源码扩展名（含 `.c/.h/.rs/.go/.zig` 等），提取函数/宏/typedef（节点）与单文件调用（边），构建 NetworkX `DiGraph` |
+| 2. Clang 语义过滤（C/C++） | 用 **libclang** 按 `compile_flags.txt` / `compile_commands.json` 解析 TU，收集**预处理后可进入 AST 的函数定义**；从图中剔除条件编译裁掉的符号，使 PageRank 更接近真实构建。**环境**：`pip install clang`（Python 绑定）+ 系统安装 **LLVM**（含 `libclang.dll`；Windows 下代码会尝试 `C:\\Program Files\\LLVM\\bin\\libclang.dll`）。也可设 `LIBCLANG_PATH` 指向该文件。不可用时跳过并打日志。 |
+| 3. PageRank Top-k | `nx.pagerank(alpha=0.85)` 选出枢纽（默认 k=30，可改） |
+| 4. LSP 精化（可选） | 对前 30 个枢纽调用 `lsp_get_call_graph(..., max_depth=4 或参数 lsp_max_depth)`，补充跨文件边；若 LSP 返回降级/空则跳过 |
+| 5. LLM 批量分类 | 对 Top-k 做 domain×layer **单次** LLM 分类；返回的 token 计入 `describe` 总用量（见阶段结束与收尾汇总） |
+| 6. SVG 渲染 | `domain`（列）× `layer`（行）二维网格，Bezier 连线 |
+| 7. 表格与缓存 | 文件级表、枢纽表；落盘 `callgraph_overview.{svg,md,meta.json}`；**缓存**由 `input_fingerprint`（compile 配置、git HEAD、管线版本、`top_k`/`lsp_max_depth`、libclang 可用性）自动失效，**无需**设置 Call Graph 相关环境变量 |
+
+**代码参数（非环境变量）**：在 `os_agent_d_describe.py` 中调用 `generate_callgraph_section(top_k=30, lsp_refine=True, lsp_max_depth=None, force_regenerate=False)`；返回 **`(markdown, llm_total_tokens)`**，第二项为步骤 5 的 LLM token，**已并入** `describe` 末尾「总Token使用」。`lsp_max_depth` 为 `None` 时用默认 `4`；`force_regenerate=True` 仅用于强制忽略缓存。
+
+**LSP 精化**：建议目标仓库有与真实编译一致的 `compile_flags.txt` 或 `compile_commands.json`（Bear/CMake），减轻条件编译符号上的 `DEGRADED`。
+
+若终端显示 **「LSP 成功精化节点数: 0」**：表示对 Top 枢纽的每次 `lsp_get_call_graph` 均得到**空结果**或含 **`DEGRADED`**（clangd/rust-analyzer 无法可靠索引），常见原因是 **C/C++ 工程根目录缺少 `compile_commands.json`**。可在仓库内用 Bear/CMake 等生成该文件后重跑；未精化时调用图仍以 **Tree-sitter + 语义过滤后的边**为主。
+
+结果落盘（`output/<repo>/`，指纹未变时命中缓存）：
+
+- `callgraph_overview.svg`：矢量图，可单独打开、做 diff  
+- `callgraph_overview.md`：章节正文，用**相对路径**引用同目录 SVG（体积小、可读）  
+- `callgraph_overview_meta.json`：统计、k、Top-k、`classified`、`input_fingerprint` 等  
+
+---
 
 ### 2. OS-Agent D：自动报告评估 (`os_agent_d_evaluate.py`) ✨ **增强版**
 
@@ -44,11 +80,13 @@
 
 面向小型操作系统的分析比对，系统分为两阶段架构，快速在新旧作品间进行查重与创新点分析：
 
-- **粗筛模块 (`os_agent_c_coarse.py`)**：多维度加权余弦相似度检索，内置两项量化增强：
-  - **结构化精确特征**：LLM 额外从 D 报告中提取 JSON 精确字段（框架名、分配器、调度器、syscall 数量、TrapFrame 字节数等 13 项），与向量余弦相似度叠加加分（最高 +0.15）。
+- **粗筛模块 (`os_agent_c_coarse.py`)**：采用 **`pre-plan + deterministic pipeline`**，不引入完整 reviewer 闭环。先通过轻量 `coarse_preplan` 判断框架生态、关键 section 和粗筛锚点，再进入多维度加权余弦相似度检索。内置三项量化增强：
+  - **结构化精确特征（扩展版）**：LLM 会额外从 D 报告中提取更宽的 JSON 精确字段集，不再只覆盖少量校正项，而是同时覆盖框架/架构/内核类型、页表模式、物理页与堆分配器、任务模型、调度器、信号/Futex/IPC、VFS/主次文件系统、`mmap`/共享内存、socket 真实实现形态、`poll/select`、块设备/网卡/设备发现、`procfs/devfs/tmpfs`、安全权限模型，以及 `syscall_count_real`、`trapframe_bytes` 等数值字段。
+  - **精确字段加分规则（更新版）**：粗筛会先计算原始分 `raw_total = cosine_score + struct_score`，其中 `struct_score` 会按字段精确匹配叠加加分，覆盖内存管理、任务/IPC、文件系统、网络/驱动、安全与 SMP 等稳定事实字段，最高原始加分为 **+0.30**。最终再将总分**严格归一化到 `0~1`**（同时输出 `0~100%`），保证“完全相似 = `1.0` = `100%`”，避免查重场景中出现 `>1` 的误导。
   - **框架感知权重**：自动识别两个项目是否基于同一框架（ArceOS/rCore/xv6 等），同框架时将框架贡献维度（D1/D2/D7）权重减半，自研核心维度（D3~D8）权重上调 ×1.4，防止因共享框架导致虚高相似度。
+  - **阶段缓存与断点续跑**：粗筛的指纹构建已支持分阶段落盘。`features`、`struct_features`、`embeddings` 会保存在 `output/<repo>/_coarse_stage/` 下，重跑时自动检查本地阶段缓存并跳过已完成阶段，避免因单次超时或中断整轮白跑。现在**最终 `fingerprint.json` 也依赖阶段缓存完整性**：只要某个阶段缓存缺失，即使 `fingerprint.json` 仍在，也会自动判定为需要重组最终指纹，而不是直接命中旧总缓存。
 
-- **精比模块 (`os_agent_c_fine.py`)**：基于 LLM Agent 对粗筛出的 Top-K 候选进行源码级深度比对，包含两大量化相似度维度：
+- **精比模块 (`os_agent_c_fine.py`)**：**阶段级 Plan → Execute**（与 Describe 同为两阶段管线）。对粗筛出的 Top-K 候选逐阶段生成对比草稿，在源码级深度比对的基础上，增加“代码相似 vs 设计相似”区分。并保留两大量化相似度维度：
   - **Token Jaccard 相似度**（`compare_function_tokens`）：对同名函数体 token 化后计算 Jaccard 指数，去除语言关键字后输出独有符号摘要，提供函数实现层面的客观数字证据。
   - **Call Graph Jaccard 相似度**（`compare_call_graphs`）：对比两项目调用图的节点集合，输出节点 Jaccard = |交集| / |并集|，量化调用拓扑结构的相似程度。
   - **综合评分锚定**：Agent 被强制要求对 5 个核心函数分别获取 Token Jaccard 与 CG Jaccard，以 `综合相似度 = Token Jaccard 均值 × 0.5 + CG Jaccard 均值 × 0.5` 为锚，结合 4 档评级区间（高度相似 / 改进版 / 受启发 / 独立）输出 0-100 最终评分，确保结论有量化依据可追溯。
@@ -145,6 +183,17 @@ void mappages(pagetable_t pagetable, uint64 va, ...) { ... }
 | 建索引时代码截断 | ≤ 2000 字符/块 |
 | 搜索结果截断 | ≤ 800 字符/块（防 Token 溢出） |
 
+#### Hugging Face Hub（嵌入模型拉取）
+
+逻辑在 **`core/hf_env.py`** 的 `apply_hf_hub_env_defaults()`（各入口在 `load_dotenv` 之后会调用）：
+
+| 情况 | 行为 |
+|------|------|
+| **`HF_ENDPOINT` 未设置** | 默认写入国内镜像 **`https://hf-mirror.com`**（可用 `OS_AGENT_HF_ENDPOINT` 改默认基址；`OS_AGENT_USE_HF_MIRROR=false` 则不改写，走库默认官方）。 |
+| **`.env` / 环境已设置 `HF_ENDPOINT`** | **原样使用**（写官方即官方，写镜像即镜像）。 |
+
+`os_agent_d_describe.py` 使用 **`load_dotenv(override=True)`**，避免系统里误带的 `HF_ENDPOINT` 盖住仓库 `.env`。详见仓库根目录 **`.env.example`** 中 Hugging Face 小节。
+
 ---
 
 ## 🚀 快速开始
@@ -237,6 +286,12 @@ MODEL_NAME=deepseek/deepseek-v3.2
 
 # 要分析的 OS 仓库地址（必需）
 REPO_URL=https://github.com/example/os-project.git
+
+# 可选：启用 web_search（仅用于比赛背景/赛道目标/技术概览）
+ENABLE_WEB_SEARCH=false
+# TAVILY_API_KEY=
+# SERPER_API_KEY=
+# 嵌入模型与 HF 镜像（默认国内镜像）：见 .env.example「Hugging Face」一节
 ```
 
 #### 配置项说明
@@ -247,6 +302,9 @@ REPO_URL=https://github.com/example/os-project.git
 | `OPENAI_API_BASE` | ✅ | API 地址（支持 OpenRouter、DeepSeek 等） |
 | `MODEL_NAME` | ❌ | LLM 模型名称，默认 `deepseek/deepseek-v3.2` |
 | `REPO_URL` | ✅ | 要分析的 OS 仓库 Git 地址 |
+| `ENABLE_WEB_SEARCH` | ❌ | 是否启用 `web_search`（默认关闭，仅用于比赛背景与技术概览） |
+| `TAVILY_API_KEY` / `SERPER_API_KEY` | ❌ | `web_search` 的 provider 密钥，至少配置一种 |
+| `HF_ENDPOINT` 等 | ❌ | 代码嵌入拉取：见上文「Hugging Face Hub」与 `.env.example` |
 
 ### 4. 运行分析
 
@@ -259,11 +317,24 @@ python os_agent_d_describe.py
 ```
 output/
 └── <os-name>/
-    ├── sections/          # 各章节分段报告
+    ├── sections/               # 各章节分段报告
     │   ├── 01_项目概览与技术栈.md
     │   ├── 02_启动流程与架构初始化.md
     │   └── ...
-    └── report.md          # 最终完整报告
+    ├── _per_stage/             # 阶段侧车（repo_profile + 各章 plan.json）
+    │   ├── repo_profile.json
+    │   ├── 03_mem_mgmt_plan.json
+    │   └── ...
+    ├── _coarse_stage/          # 粗筛阶段缓存（按项目）
+    │   ├── fingerprint_features.json
+    │   ├── fingerprint_struct_features.json
+    │   └── fingerprint_embeddings.json
+    ├── coarse_preplan.json     # 粗筛 pre-plan 结果
+    ├── fingerprint.json        # 粗筛最终指纹（features + struct_features + embeddings）
+    ├── coarse_screening.json   # 粗筛 Top-K 结果
+    ├── coarse_screening.md     # 粗筛可读报告
+    ├── OS技术分析报告_<os-name>.md
+    └── describe_error_report.json
 ```
 
 ---
@@ -347,7 +418,7 @@ evaluation/
    output_dir: C:\...\output\my-os
    评估输出: C:\...\evaluation\my-os
    模型: deepseek/deepseek-v3.2
-   章节总数: 13
+   章节总数: 11
    日志文件: C:\...\evaluation\my-os\evaluation.log
    重试配置: 最大3次, 退避2-60秒
 ============================================================
@@ -387,7 +458,7 @@ evaluation/
 ============================================================
 ✅ 评估任务完成
    📊 统计:
-      - 总章节数: 13
+      - 总章节数: 11
       - 成功: 12
       - 失败: 1
       - 跳过: 2
@@ -405,16 +476,27 @@ evaluation/
 > 从最早期的基础描述模块，本作在各个子版本的演进中不断填补了 LLM 的认知短板，并建立起牢不可破的沙盒机制。
 
 #### 🆕 **v3.3 OS-Agent C 客观量化查重增强 & 并发安全修复**（2026-03-20）
-- **结构化精确特征提取**：粗筛阶段新增 LLM JSON 精确字段提取（框架、分配器、调度器、syscall 数量、TrapFrame 字节数等 13 项），以加分项叠加到向量余弦相似度，减少单靠嵌入向量造成的误判。
+- **结构化精确特征提取**：粗筛阶段新增 LLM JSON 精确字段提取，并在后续版本中从最初 13 项少量校正字段扩展为覆盖更广的精确特征集（框架/架构/内核类型、页表模式、分配器、任务模型、IPC、VFS/FS、socket 形态、I/O 多路复用、驱动/设备发现、`procfs/devfs/tmpfs`、安全权限模型及关键数值字段），显著减少单靠嵌入向量造成的误判。
 - **框架感知权重调整**：同框架项目间自动降低框架贡献维度（D1/D2/D7）权重、上调自研核心维度（D3~D8）权重，防止共享框架导致的虚高相似度评分。
+- **精确字段加分升级**：`struct_score` 由原先少数字段的最高 **+0.15**，升级为覆盖多类稳定实现事实字段的最高 **+0.30**；同时粗筛最终分改为**严格归一化到 `0~1 / 0~100%`**，确保“完全相似 = 100%”语义稳定，更适合查重排序与阈值判断。
 - **Token Jaccard 工具**：新增 `compare_function_tokens`，对两仓库中同名函数体进行 token 化并计算 Jaccard 相似度，输出独有关键词摘要，提供代码实现层面的客观数字证据。
 - **Call Graph Jaccard 输出**：增强 `compare_call_graphs`，在输出末尾追加节点集合 Jaccard = |交集| / |并集|，量化调用拓扑结构相似度。
 - **c09_innovation 双维量化锚定**：强制 Agent 对 5 个核心函数分别获取 Token Jaccard 与 CG Jaccard，以加权均值确定最终 0-100 评分区间，结论有量化证据可追溯。
 - **`lsp_set_target_arch` 竞争修复**：补加 `async with _lsp_global_lock`，确保 LSP 重启操作等待所有飞行中请求完成后才执行，消除并发调用时的竞态窗口。
 - **`compare_function_tokens` 类型安全**：`syscall_count_real` 和 `trapframe_bytes` 的精确加分逻辑增加 `int()` 类型规范化，防止 LLM 以字符串输出数字时导致的 `TypeError`。
 
+#### 🆕 **v4.0 阶段级 Plan-Execute 与执行契约**（2026-03-27；后续迭代）
+- **阶段级 Plan-Execute**：`os_agent_d_describe.py` 与 `os_agent_c_fine.py` 使用 `StageState` / `PlanSpec`；Describe 在 Plan 中锁定 **`execution_steps`**，Execute 提示词注入 **`STAGE_EXECUTION_CONTRACT`**（证据路径、文风与粒度等）。
+- **动态上下文**：`repo_profile`、`evidence_cache`、`external_background` 等经 `render_plan_context` 注入 Execute。
+- **证据账本 (`evidence_index`)**：可从工具轨迹抽取，供 Execute 与内存侧逻辑参考；**不**写入 `_per_stage`。
+- **粗筛链路保持轻量**：`os_agent_c_coarse.py` 没有硬套完整 PE，而是新增 `coarse_preplan` 与 `validate_coarse_output()`，继续保持“预侦察 + 指纹构建 + 向量检索”的确定性流水线。
+- **受限 `web_search`**：新增 `tools/web_search.py`，默认关闭，只允许用于“全国大学生操作系统比赛”背景、赛道定位、目标要求和技术概览；禁止作为源码实现证据或查重依据。
+- **细粒度并发保护而非降并发**：保留多 tool call / 多阶段并行能力，只对共享状态热点加最小粒度保护。当前已覆盖同仓库 LSP polyfill/目标架构切换、同项目 RAG 向量索引落盘、同仓库 clone，以及同目标文件写入/导出 PDF，避免把正常的只读检索也串行化。
+- **中断后不留“锁死”状态**：并发保护统一采用进程内锁，不落磁盘锁文件；`LSP` 的 `run_coroutine_threadsafe(...).result(timeout=...)` 在超时、异常或手动中断时会主动取消后台 future，避免同一进程里下一次运行被残留协程继续占锁。
+- **粗筛最终缓存语义收紧**：`fingerprint.json` 不再单独视为充分缓存命中条件；只有当 `features`、`struct_features`、`embeddings` 三个阶段缓存也完整且 schema 版本匹配时才会直接加载。只要任一阶段缓存缺失，即使最终指纹仍在，也会自动进入重组流程。
+
 #### 🆕 **v3.2 终局合成与抗幻觉架构重构**（2026-03-19）
-- **报告生成逆向思维法**：颠覆了流程式生成的刻板印象，将 `01_overview` 移至分析大循环的最后一环执行。Agent 现在会携带前置 12 章的几万字上下文全集，以前所未有的上帝视角凝练出最终的项目概览与完成度评价，并通过首字母编排算法自动归位至报告首发位置。
+- **报告生成逆向思维法**：颠覆了流程式生成的刻板印象，将 `01_overview` 移至分析大循环的最后一环执行。Agent 现在会携带前置技术章与历史章（02–10）的全量上下文，以前所未有的上帝视角凝练出最终的项目概览与完成度评价，并通过首字母编排算法自动归位至报告首发位置。
 - **封杀数字虚构幻觉**：删除冗余旧阶段，并以硬性“防打分负向 Prompt”取代，有效抑制了大模型在评价完成度时随意虚构 `7.5/10` 一类不严谨的数字评分体系。
 - **自动选手画像注入**：集成纯 Python (`openpyxl`) 的解析桥梁，智能从 `collected-data.xlsx` 回读开发者的学校、年份、赛事及队伍画像，直接雕刻于最终报告顶部。
 
@@ -459,10 +541,10 @@ evaluation/
 
 ```
 OS-Agent/
-├── os_agent_d_describe.py          # Agent D：OS 源码深度描述（16 阶段）
+├── os_agent_d_describe.py          # Agent D：OS 源码深度描述（10 个 LLM 阶段 + 仓库准备/RAG 预索引）
 ├── os_agent_d_evaluate.py          # Agent D：报告自动评估
-├── os_agent_c_coarse.py            # Agent C：粗筛（本地 Embedding 相似度比对）
-├── os_agent_c_fine.py              # Agent C：精比（LLM 深度源码逐项比对）
+├── os_agent_c_coarse.py            # Agent C：粗筛（pre-plan + 向量相似度检索）
+├── os_agent_c_fine.py              # Agent C：精比（阶段级 Plan→Execute）
 ├── check_env.py                    # 环境检查脚本（含依赖预检与 LSP 自动安装）
 ├── test_api.py                     # LLM API 连通性快速测试
 ├── force_download_jina.py          # Jina 嵌入模型强制下载脚本
@@ -472,25 +554,31 @@ OS-Agent/
 ├── .env                            # 环境变量配置（需自行创建）
 ├── .env.example                    # 环境变量配置模板
 ├── core/
-│   ├── agent_builder.py            # Agent 构建器（工具绑定、LSP、grep 等）
+│   ├── agent_builder.py            # Agent 构建器（planner/executor/sub-agent）
 │   ├── code_rag.py                 # 代码 RAG 引擎（AST 解析 + 向量索引）
 │   ├── vectorizer.py               # 本地 Embedding 向量化（Jina 模型）+ 结构化精确特征提取
 │   ├── vector_store.py             # 向量数据库存取（含框架感知权重 + 精确字段加分）
 │   ├── utils.py                    # 公共工具函数（格式化、仓库名解析）
-│   └── error_handling.py           # 错误处理模块（分类、重试、追踪）
+│   ├── error_handling.py           # 错误处理模块（分类、重试、追踪）
+│   ├── per_types.py                # v4.0：StageState / PlanSpec 等核心数据结构
+│   ├── per_planner.py              # v4.0：plan 阶段、repo_profile、dynamic_context
+│   ├── per_executor.py             # v4.0：草稿与 evidence_index 抽取
+│   ├── per_llm_stages.py           # v4.0：LLM 规划 Agent（Plan JSON 解析与合并）
+│   └── hf_env.py                   # Hugging Face 默认镜像、嵌入模型加载
 ├── tools/
 │   ├── lsp_ops.py                  # LSP 封装（callHierarchy、定义、引用、大纲）
 │   ├── file_ops.py                 # 文件操作（read_code_segment、grep_in_repo）
 │   ├── git_ops.py                  # Git 操作（历史分析、作者贡献、Diff 透视）
-│   ├── callgraph_ops.py            # 调用图分析（跨文件调用关系）
 │   ├── compare_ops.py              # 项目比对工具（Agent C 精比辅助，含 Token/CG Jaccard）
 │   ├── describe_ops.py             # 描述模块专用工具
-│   └── eval_ops.py                 # 评估专用工具（人类文档搜索、声明验证）
+│   ├── eval_ops.py                 # 评估专用工具（人类文档搜索、声明验证）
+│   └── web_search.py               # v4.0：受限外部背景搜索（默认关闭）
 ├── repos/                          # 克隆的 OS 仓库（运行时自动克隆，.gitignore 忽略）
 ├── output/                         # 描述模块输出（按项目名划分）
 │   └── <os-name>/
 │       ├── sections/               # 各章节分段报告
-│       ├── report.md               # 最终完整报告
+│       ├── _per_stage/             # v4.0：侧车（repo_profile、各阶段 *_plan.json）
+│       ├── OS技术分析报告_<os-name>.md
 │       └── describe_error_report.json  # 错误报告（如有）
 └── evaluation/                     # 评估模块输出（按项目名划分）
     └── <os-name>/
@@ -521,6 +609,15 @@ OS-Agent/
 - `prompt`: 分析提示词
 - `skip_in_report`: 是否跳过写入最终报告
 
+### v4.0：侧车计划产物
+
+`describe` 在每章 **Plan** 合并后、**Execute** 写完章节时，将结构化计划落盘，便于对照提示词与执行契约、排查断点续跑问题：
+
+- `repo_profile.json`：仓库级先验（框架猜测、架构、关键目录、语言混合）
+- `*_plan.json`：阶段 `PlanSpec`（含 **`execution_steps`**、`must_cover`、`seed_paths` 等）
+
+`evidence_index` 仅在内存中用于 Execute / 工具侧逻辑，**不**写入 `_per_stage`。`fine compare` 仅在 `vs_<候选>_per/` 下保留 `*_plan.json`。
+
 ### 支持的 CPU 架构
 
 `find_os_core_modules` 工具支持自动识别以下架构相关代码：
@@ -548,6 +645,16 @@ OS-Agent/
 | `get_commit_diff_summary` | 硬截断 20000 字符 | 透视极度模糊的 Commit 留言，去除干扰注释和空行，向 LLM 呈现最原生核心的功能大修逻辑 |
 | **阶段隔离限制** | 严格白名单 | LLM 将只能在对应 Stage 获取特定工具（如 14 阶段才给 Git 工具） |
 
+### 并发与共享状态策略
+
+系统默认**不主动降低并发度**。只有在工具存在共享状态或共享输出路径时，才做细粒度保护：
+
+- **仓库级 LSP 配置锁**：保护 `compile_flags.txt`、`Cargo.toml`、`src/lib.rs`、`.os_agent_lsp_target` 的生成与切换，避免同仓库并行 polyfill 或切架构时互相覆盖。
+- **项目级 RAG 索引锁**：保护 `output/<proj>/_vector_db/chunks.json` 与 `vectors.npy` 的构建和落盘，避免同项目被重复建索引或写坏索引文件。
+- **仓库级 clone 锁**：只串行同一个 `repos/<name>` 目录的克隆，其他仓库仍可并行。
+- **目标路径写锁**：`write_file()` 与 `convert_md_to_pdf()` 仅在写入同一路径时串行，避免覆盖。
+- **只读工具不受影响**：源码读取、grep/RAG 查询、评估文档读取、受限 `web_search` 等不因上述保护被整体串行化。
+
 **截断提示**：所有工具在输出被截断时会明确告知 LLM，例如：
 ```
 📊 统计: 分析了 20 个文件，共 45 个结构体，128 个函数
@@ -565,6 +672,31 @@ OS-Agent/
 - 网络/API/超时错误自动重试（最多 3 次，指数退避）
 - 单阶段失败不影响后续阶段执行
 - 运行结束时输出错误摘要，并生成 `output/<os-name>/describe_error_report.json`
+
+**v4.0** 可结合 `_per_stage/*_plan.json` 与 `repo_profile.json` 对照各章锁定步骤与 must_cover；章节正文以 `sections/*.md` 为准。
+
+**Describe 无工具 Review（可选）**：`DESCRIBE_STAGE_REVIEW=1` 时，仅对 **JSON-QA 且校验成功** 的阶段在落盘前送审：材料为 **`core/describe_stage_qa` 题单** + **`coerce_answers_payload_by_stage_qa` 覆写题面前的答案 JSON**（证据以答案 JSON 内 `evidence` 为准，**不含**工具回传摘录）。`01_overview`、`10_history` 不审。结果 `_per_stage/<stage_id>_review.json`：含逐题 **`question_reviews[]`**（`question_id`、`confidence`、`review` 文字）、全阶段 **`confidence`** 与 **`summary_zh`** 总评等；默认关闭。可选 `DESCRIBE_REVIEW_MODEL`。
+
+若某章质量不符预期，优先检查 `output/<os-name>/_per_stage/` 下对应 `*_plan.json` 与 `os_agent_d_describe.py` 中该阶段 `prompt` / 执行契约。
+
+并发保护相关的运行时保证：
+- 当前锁都是**进程内锁**，不会在磁盘上遗留 `.lock` 一类文件，因此程序被终止后，下次启动不会因为旧锁残留而无法运行。
+- 对 `LSP` 后台协程，若出现超时、异常或手动中断，系统会主动取消对应 future，避免“本次虽然停了，但后台还在继续跑并占着仓库级锁”的情况。
+- 共享状态保护只影响**同一仓库 / 同一项目 / 同一路径**的竞争写入；不会把其他仓库、其他输出路径、或只读查询一起拖成串行。
+
+### Q: web_search 什么时候该开？
+
+只建议在以下场景开启：
+- 写项目概述时补充“全国大学生操作系统比赛”背景
+- 解释赛道定位、目标要求、功能要求
+- 补充 OS 架构常识或比赛生态背景
+
+**不要**用它做：
+- 仓库实现事实判断
+- 查重结论判断
+- 替代源码证据
+
+如果不配置 `ENABLE_WEB_SEARCH=true` 和 provider 密钥，系统会自动保持关闭。
 
 ### Q: 如何评估已有的报告？
 
@@ -622,7 +754,13 @@ VERBOSE_LOGGING=true
 - C 实现的 OS（如 xv6, Linux）
 - 混合实现的 OS
 
----
+### Q: 终端里大量 `LSP [...] STDERR: I[...]` 是什么？
+
+本地 **clangd / rust-analyzer** 等会把运行日志写到 **stderr**，属于**正常索引/编译数据库加载信息**，一般**不是**分析失败。若需降噪，可自行调低对应 Language Server 的日志级别或重定向 stderr。
+
+### Q: 嵌入模型仍连 `huggingface.co`？
+
+先确认进程内实际基址：日志里应有 `HF_ENDPOINT=...`（`apply_hf_hub_env_defaults` 打出）。若 `.env` 已写官方地址则会**按官方**访问；若未写 `HF_ENDPOINT` 仍走官方，检查是否设置了 **`OS_AGENT_USE_HF_MIRROR=false`**，或系统环境变量是否抢先于 `.env`（Describe 已 `load_dotenv(override=True)`）。
 
 ---
 

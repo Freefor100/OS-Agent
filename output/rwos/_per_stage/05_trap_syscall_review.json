@@ -1,0 +1,102 @@
+{
+  "passed": false,
+  "score": 0.42,
+  "severity": "major",
+  "failed_rules": [
+    "must_cover_gap",
+    "missing_path_citation"
+  ],
+  "missing_evidence": [
+    {
+      "paragraph_id": "5.1.2",
+      "claim_id": "TrapFrame 结构体精确定义",
+      "reason": "must_cover 明确要求'必须用 lsp_get_definition 或 read_code_segment 读取结构体定义'，但证据摘要为空，未提供实际工具调用结果验证 36 字段 288 字节"
+    },
+    {
+      "paragraph_id": "5.3.2",
+      "claim_id": "系统调用覆盖度统计",
+      "reason": "声称'逐一检查 syscalls[] 数组中每个函数的实现'并统计 48 项已实现/4 项桩函数，但无 read_code_segment 或 lsp_get_definition 证据支撑"
+    },
+    {
+      "paragraph_id": "5.2.2",
+      "claim_id": "CoW 与 Lazy Allocation 检测",
+      "reason": "声称使用 grep_in_repo 搜索 cow|lazy.*alloc 未找到实现，但证据摘要为空，无实际搜索结果"
+    },
+    {
+      "paragraph_id": "5.6.2",
+      "claim_id": "信号机制缺陷分析",
+      "reason": "声称使用 grep_in_repo 搜索 handle_signal|do_signal|sigreturn|signal_trampoline 仅找到宏定义，但无工具证据"
+    },
+    {
+      "paragraph_id": "5.7",
+      "claim_id": "接口/实现分离模式检测",
+      "reason": "声称使用 grep_in_repo 搜索 _impl 后缀函数未找到，但无工具证据"
+    },
+    {
+      "paragraph_id": "5.1.3",
+      "claim_id": "完整调用链追踪",
+      "reason": "声称使用 lsp_get_call_graph 追踪 trap 调用链，但证据摘要为空"
+    }
+  ],
+  "weak_claims": [
+    {
+      "paragraph_id": "5.1.2",
+      "claim": "TrapFrame 结构体 36 字段 288 字节（pushregs 32 个通用寄存器 + status/epc/tval/cause）",
+      "reason": "未使用 lsp_get_definition 或 read_code_segment 实际读取 kern/trap/trap.h 验证结构体定义，字段数量和字节数为推测"
+    },
+    {
+      "paragraph_id": "5.3.2",
+      "claim": "syscalls[] 数组 52 项，48 项已实现，4 项桩函数（sys_getuid/sys_geteuid/sys_getgid/sys_getegid 返回 0）",
+      "reason": "未提供 syscalls[] 数组实际代码片段或 lsp_get_definition 验证桩函数实现"
+    },
+    {
+      "paragraph_id": "5.3.1",
+      "claim": "NUM_SYSCALLS = 52（数组索引 0-51）",
+      "reason": "未使用 grep_in_repo 或 read_code_segment 验证 NUM_SYSCALLS 宏定义"
+    },
+    {
+      "paragraph_id": "5.6.2",
+      "claim": "sys_rt_sigreturn 仅在 libs/unistd.h 中定义宏，未注册到 syscalls[] 数组",
+      "reason": "未使用 grep_in_repo 验证 SYS_rt_sigreturn 定义位置及 syscalls[] 数组是否包含该项"
+    }
+  ],
+  "format_issues": [],
+  "missed_modules": [],
+  "repair_actions": [
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "5.1.2",
+      "hint": "使用 lsp_get_definition 或 read_code_segment 读取 kern/trap/trap.h 中 struct trapframe 和 struct pushregs 定义，精确统计字段数量（应为 32+4=36）和总字节数（36×8=288），附工具输出"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "5.3.2",
+      "hint": "使用 read_code_segment 读取 kern/syscall/syscall.c 中 syscalls[] 数组定义（约 430-488 行），使用 lsp_get_definition 验证 sys_getuid 等 4 个桩函数实现，附代码片段"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "5.2.2",
+      "hint": "使用 grep_in_repo 搜索 'cow|Cow|COW|lazy.*alloc|Lazy.*Alloc' 关键词，提供实际搜索结果（应为空或仅注释）作为 CoW/Lazy Allocation 未实现的证据"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "5.6.2",
+      "hint": "使用 grep_in_repo 搜索 'handle_signal|do_signal|sigreturn|signal_trampoline|sys_tkill|sys_tgkill'，提供搜索结果证明信号投递机制缺失"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "5.7",
+      "hint": "使用 grep_in_repo 搜索 '_impl\\b' 或 '_impl(' 模式，提供搜索结果证明接口/实现分离模式缺失"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "5.1.3",
+      "hint": "使用 lsp_get_call_graph 追踪 trap() 函数的 incoming/outgoing 调用链，提供实际工具输出替代 mermaid 伪代码"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "5.3.1",
+      "hint": "使用 grep_in_repo 搜索 'NUM_SYSCALLS' 宏定义，确认系统调用总数；使用 read_code_segment 读取 syscalls[] 数组完整定义"
+    }
+  ]
+}

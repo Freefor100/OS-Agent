@@ -1,0 +1,137 @@
+```json
+{
+  "schema_version": "v1",
+  "stage_id": "08_network",
+  "stage_title": "网络子系统与协议栈",
+  "terminology_profile": "stallings_en_zh",
+  "answers": [
+    {
+      "question_id": "Q08_001",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在网络子系统实现（协议栈或 socket 层）？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "include/sysnum.h",
+          "symbol_kind": "header",
+          "symbol_name": "SYS_*",
+          "excerpt": "系统调用编号定义中无 SYS_socket/SYS_bind/SYS_connect/SYS_sendto/SYS_recvfrom 等网络相关调用"
+        },
+        {
+          "path": "kernel/",
+          "symbol_kind": "directory",
+          "symbol_name": "kernel",
+          "excerpt": "kernel/ 目录下无 net/、tcp/、udp/、socket/ 等网络相关子目录"
+        },
+        {
+          "path": "kernel/hal/virtio_disk.c",
+          "symbol_kind": "source",
+          "symbol_name": "virtio_disk_rw",
+          "excerpt": "HAL 层仅实现 virtio-blk 磁盘驱动，无 virtio-net 网卡驱动"
+        }
+      ]
+    },
+    {
+      "question_id": "Q08_002",
+      "question_type": "single_choice",
+      "stem": "协议栈来源更接近哪种？",
+      "value": "未发现",
+      "evidence": [
+        {
+          "path": "Cargo.toml",
+          "symbol_kind": "config",
+          "symbol_name": "workspace",
+          "excerpt": "Cargo.toml 仅定义 bootloader workspace，无 smoltcp/lwip/embassy-net 等网络协议栈依赖"
+        },
+        {
+          "path": "include/errno.h",
+          "symbol_kind": "header",
+          "symbol_name": "ENONET/ENOTUNIQ",
+          "excerpt": "errno.h 中虽有 ENONET 等网络相关错误码，但仅为 POSIX 兼容占位符，无实际网络实现"
+        }
+      ]
+    },
+    {
+      "question_id": "Q08_003",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 socket 系统调用接口（socket/bind/connect/sendto/recvfrom 等）？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "include/sysnum.h",
+          "symbol_kind": "header",
+          "symbol_name": "SYS_*",
+          "excerpt": "系统调用编号 1-276 中无 socket/bind/connect/sendto/recvfrom/listen/accept 等网络调用"
+        },
+        {
+          "path": "kernel/syscall/sysfile.c",
+          "symbol_kind": "source",
+          "symbol_name": "sys_*",
+          "excerpt": "syscall 层仅实现文件/进程/内存类系统调用，无网络 syscall 实现"
+        }
+      ]
+    },
+    {
+      "question_id": "Q08_004",
+      "question_type": "short_answer",
+      "stem": "选择一个发送路径（优先 sys_sendto），追踪：syscall → 协议栈 → 网卡驱动。列 3-6 个关键节点并给证据。",
+      "value": "未实现网络功能（❌ 未实现）。无法追踪发送路径，原因如下：\n1. 无 sys_sendto 系统调用：include/sysnum.h 中无 SYS_sendto 定义\n2. 无协议栈：全仓库 grep 未发现 tcp/udp/ip 等协议处理代码\n3. 无网卡驱动：kernel/hal/ 仅有 virtio_disk.c（磁盘），无 virtio-net 或 e1000 等网卡驱动\n4. 无 socket 抽象：include/fs/file.h 中文件类型仅支持普通文件/管道/设备，无 socket 类型",
+      "evidence": []
+    },
+    {
+      "question_id": "Q08_005",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现网卡驱动（virtio-net/e1000 等）与收包中断路径？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/hal/virtio_disk.c",
+          "symbol_kind": "source",
+          "symbol_name": "virtio_disk_init/virtio_disk_intr",
+          "excerpt": "virtio 驱动仅实现 device_id=2 的磁盘设备（VIRTIO_BLK_T_IN/OUT），无 device_id=1 的网卡设备支持"
+        },
+        {
+          "path": "include/hal/virtio.h:8",
+          "symbol_kind": "header",
+          "symbol_name": "VIRTIO_MMIO_DEVICE_ID",
+          "excerpt": "注释说明 device_id=1 为网卡、device_id=2 为磁盘，但代码仅实现磁盘驱动"
+        },
+        {
+          "path": "kernel/hal/",
+          "symbol_kind": "directory",
+          "symbol_name": "hal",
+          "excerpt": "HAL 目录包含 disk.c/sdcard.c/virtio_disk.c 等存储驱动，无 net/ 或网卡驱动文件"
+        }
+      ]
+    },
+    {
+      "question_id": "Q08_006",
+      "question_type": "multi_choice",
+      "stem": "协议支持情况（多选；未发现则留空并在 notes 写 not_found）：",
+      "value": [],
+      "evidence": [],
+      "notes": "not_found - 全仓库 grep 未发现 Ethernet/ARP/IPv4/IPv6/ICMP/UDP/TCP/DHCP/DNS 等协议实现代码"
+    },
+    {
+      "question_id": "Q08_007",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在零拷贝/共享缓冲/DMA 描述符等路径（zero-copy）？（必须三态；仅有名词不算 implemented）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/hal/virtio_disk.c",
+          "symbol_kind": "source",
+          "symbol_name": "virtq_desc",
+          "excerpt": "virtio_disk 使用 DMA 描述符（virtq_desc）但仅用于磁盘 I/O，无网络零拷贝路径"
+        },
+        {
+          "path": "kernel/fs/bio.c",
+          "symbol_kind": "source",
+          "symbol_name": "buf",
+          "excerpt": "buf 结构用于块设备缓存，无网络 mbuf/sk_buff 等共享缓冲机制"
+        }
+      ]
+    }
+  ]
+}
+```

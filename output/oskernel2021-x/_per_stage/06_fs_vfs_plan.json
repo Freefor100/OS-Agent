@@ -1,0 +1,117 @@
+{
+  "stage_id": "06_fs_vfs",
+  "goal": "分析 oskernel2021-x 的文件系统实现：VFS 抽象层（file/dirent 结构）、FAT32 具体实现、fd table 设计、pipe/mmap 功能细节及伪文件系统支持情况。",
+  "must_cover": [
+    "VFS 抽象层：struct file 定义（kernel/include/file.h），无独立 Inode/Dentry trait，dirent 兼具 inode 功能",
+    "具体文件系统：FAT32 自实现（kernel/fat32.c 1041 行），无 Ext4/RamFS/procfs/devfs",
+    "fd table：Per-Process (struct proc::ofile[NOFILE]) + Global ftable (file.c)",
+    "pipe 支持：✅ 已实现（kernel/pipe.c），支持阻塞读写",
+    "mmap 支持：✅ 已实现（sys_mmap），有 vma 链表管理，但 MAP_SHARED 仅注释未实际处理",
+    "poll/select/epoll：❌ 未实现（grep 无 sys_poll/sys_select/sys_epoll）",
+    "mount 机制：fat32.c 中有 mount_table 结构，支持多挂载点",
+    "VFS 抽象层：File/Inode/Dentry Traits 定义。",
+    "**具体文件系统（必须代码验证）**：",
+    "FAT32/Ext4：是否自己实现了？还是用的 crate？（check Cargo.toml）。**注意：对于组件化的 OS（如 ArceOS），具体的文件系统实现可能独立于 VFS 存在于诸如 `arceos/modules/axfs-ng/src/fs/fat/` 或 `ext4/` 目录中，务必使用搜索功能仔细查找，绝对不要仅仅因为特定目录下没有就断言未实现！**",
+    "**具体 FS 的抽象层结构**：搜索 `FatFilesystemInner|Ext4Filesystem|FatFileNode|FatDirNode` 等，分析各层如何实现 VFS trait。这是文件系统架构的核心。",
+    "RamFS/TmpFS：是否有内存文件系统？",
+    "**伪文件系统**：使用 grep_in_repo 搜索 `devfs|procfs|sysfs` 检查是否实现了伪文件系统。若有，分析其实现方式。",
+    "文件描述符表：Global 还是 Per-Process？`fd_table` 结构在哪？",
+    "**功能细节**（必须分类为 `✅ 已实现`、`🔸 桩函数`、`❌ 未实现`）：",
+    "是否支持 `pipe` 套接字？",
+    "是否支持网络 `socket`？",
+    "是否支持 `mmap`？**注意**：必须检查 `sys_mmap` 实现。如果是 **零拷贝**，必须看到 `VmArea` 结构体中有 `shared` 字段或 `MAP_SHARED` 处理逻辑。如果是 `sys_mmap` 仅返回 Ok(0) 没有处理标志位，标注为'桩函数'。",
+    "**高级特性**：`poll`/`select`/`epoll` 是否实现？搜索 `sys_poll` / `sys_select` / `sys_epoll`，检查是一律返回 Ready 还是真的检查了文件状态？"
+  ],
+  "evidence_targets": [
+    "VFS 设计：kernel/include/file.h (struct file), kernel/include/fat32.h (struct dirent)",
+    "具体文件系统：kernel/fat32.c (FAT32 实现), kernel/file.c (文件操作)",
+    "fd table：kernel/include/proc.h (ofile 数组), kernel/file.c (ftable)",
+    "pipe/mmap：kernel/pipe.c, kernel/sysfile.c (sys_mmap/sys_pipe)",
+    "缺少的功能：grep 确认无 procfs/devfs/sysfs, 无 poll/select/epoll",
+    "VFS 设计",
+    "具体文件系统",
+    "fd table",
+    "pipe/mmap"
+  ],
+  "seed_paths": [
+    "kernel/include/file.h",
+    "kernel/include/fat32.h",
+    "kernel/include/proc.h",
+    "kernel/file.c",
+    "kernel/fat32.c",
+    "kernel/pipe.c",
+    "kernel/sysfile.c",
+    "kernel/include/param.h",
+    "fs",
+    "vfs",
+    "file",
+    "inode",
+    "kernel/fs",
+    "kernel/kalloc.c:43-49"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "struct file",
+    "struct dirent",
+    "struct vma",
+    "sys_open",
+    "sys_mmap",
+    "sys_pipe",
+    "filealloc",
+    "dirlookup",
+    "pipealloc",
+    "fat32_init",
+    "vfs_open",
+    "openat"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "bootloader",
+    "bootloader/SBI",
+    "debug",
+    "debug/kendryte_openocd",
+    "debug/openocd_cfg",
+    "doc",
+    "img",
+    "kernel",
+    "kernel/include"
+  ],
+  "preferred_tools": [
+    "read_code_segment",
+    "grep_in_repo",
+    "lsp_get_call_graph",
+    "lsp_get_definition"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "review_checklist": [
+    "关键问题是否回答",
+    "重要结论是否给出源码路径",
+    "是否避免将 README 当成实现证据",
+    "是否标出未实现/桩函数",
+    "must_cover_count=12"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "精读 kernel/include/file.h 和 kernel/include/fat32.h，确认 VFS 抽象结构（file/dirent）字段含义",
+    "分析 kernel/file.c 中 ftable 全局文件表与 filealloc/filedup/fileclose 的引用计数机制",
+    "追踪 kernel/proc.h 中 ofile[NOFILE] 如何与 ftable 配合，确认 fd 是 Per-Process 还是 Global",
+    "阅读 kernel/fat32.c 的 fat32_init、dirlookup、eread/ewrite，验证 FAT32 自实现细节",
+    "检查 kernel/pipe.c 的 pipealloc/piperead/pipewrite，确认 pipe 是否支持阻塞同步",
+    "分析 kernel/sysfile.c 的 sys_mmap 实现，检查 vma 链表管理及 MAP_SHARED 处理逻辑（注释掉的部分）",
+    "grep 搜索 sys_poll/sys_select/sys_epoll 及 devfs/procfs，确认高级 I/O 和伪文件系统缺失",
+    "对照 must_cover 清单，将各功能标记为✅已实现/🔸桩函数/❌未实现，整理源码路径证据"
+  ]
+}

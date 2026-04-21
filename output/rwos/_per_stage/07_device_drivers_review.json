@@ -1,0 +1,93 @@
+{
+  "passed": false,
+  "score": 0.35,
+  "severity": "critical",
+  "failed_rules": [
+    "missing_path_citation",
+    "must_cover_gap",
+    "unverified_claims"
+  ],
+  "missing_evidence": [
+    {
+      "paragraph_id": "7.1.1",
+      "claim_id": "io.h 宏定义",
+      "reason": "kern/driver/io.h 文件内容及宏定义未通过 read_code_segment 验证，证据索引显示无实际证据"
+    },
+    {
+      "paragraph_id": "7.1.1",
+      "claim_id": "无 DTS 解析",
+      "reason": "grep 搜索结果声称未找到 DTS 相关代码，但证据索引为'无'，未执行实际搜索验证"
+    },
+    {
+      "paragraph_id": "7.1.2",
+      "claim_id": "无 platform/boards 目录",
+      "reason": "未调用 list_repo_structure 验证目录结构，仅口头声称"
+    },
+    {
+      "paragraph_id": "7.3.1",
+      "claim_id": "SBI 调用实现",
+      "reason": "libs/sbi.h 和 kern/driver/console.c 代码片段未通过 read_code_segment 验证"
+    },
+    {
+      "paragraph_id": "7.6.1",
+      "claim_id": "无 Kconfig/Cargo features",
+      "reason": "未验证构建配置文件实际内容，must_cover 要求搜索 Cargo.toml/Kconfig"
+    }
+  ],
+  "weak_claims": [
+    {
+      "paragraph_id": "7.2.2",
+      "claim": "init_device 宏调用链",
+      "reason": "lsp_get_call_graph 结果未提供，调用链声称未验证"
+    },
+    {
+      "paragraph_id": "7.6.2",
+      "claim": "Makefile 条件编译",
+      "reason": "Makefile 内容标注为'推断'，未实际读取验证"
+    },
+    {
+      "paragraph_id": "7.9",
+      "claim": "kern_init 初始化顺序",
+      "reason": "kern/init/init.c 代码片段未通过 read_code_segment 验证"
+    }
+  ],
+  "format_issues": [],
+  "missed_modules": [],
+  "repair_actions": [
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "7.1.1",
+      "hint": "使用 read_code_segment 读取 kern/driver/io.h 完整内容，验证 IO_REGION_* 和硬件地址宏定义"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "7.1.1",
+      "hint": "使用 grep_in_repo 搜索 'device.?tree|\\.dtb|pci_' 验证无 DTS/PCI 代码"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "7.1.2",
+      "hint": "使用 list_repo_structure 验证无 platform/boards 目录，列出顶层目录结构"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "7.3.1",
+      "hint": "使用 read_code_segment 读取 libs/sbi.h 和 kern/driver/console.c 验证 SBI 调用实现"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "7.6.1",
+      "hint": "读取 Makefile 和构建配置文件，验证无 Kconfig/Cargo features"
+    },
+    {
+      "action_type": "rewrite_paragraph",
+      "target_paragraph_id": "7.6.2",
+      "hint": "移除'推断'标注，提供 Makefile 实际内容作为证据"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "7.9",
+      "hint": "使用 read_code_segment 读取 kern/init/init.c 验证初始化顺序"
+    }
+  ]
+}

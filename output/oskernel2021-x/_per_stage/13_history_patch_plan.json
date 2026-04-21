@@ -1,0 +1,25 @@
+{
+  "summary": "合并初始功能符号查询并覆盖缺口，为各历史段落补充带路径引用的证据",
+  "actions": [
+    {
+      "action_type": "rewrite_paragraph",
+      "target_paragraph_id": "p001",
+      "hint": "合并 find_symbol_first_commit 为单次批量调用，覆盖 FrameAllocator/TaskInner 等缺口，引用文件路径"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "p002",
+      "hint": "调用 analyze_authors_contribution 获取贡献统计，引用具体输出及路径"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "p003",
+      "hint": "调用 get_git_history_summary 提取最早 commit 增删行，引用路径"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "p004",
+      "hint": "调用 get_commit_diff_summary 获取关键 commit 变更语义，引用核心文件路径"
+    }
+  ]
+}

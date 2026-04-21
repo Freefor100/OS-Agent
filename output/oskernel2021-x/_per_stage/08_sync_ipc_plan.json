@@ -1,0 +1,121 @@
+{
+  "stage_id": "08_sync_ipc",
+  "goal": "分析 oskernel2021-x 的同步原语（SpinLock/SleepLock）与 IPC 机制（Pipe/Signal），验证原子操作实现、等待队列机制，并确认消息队列/信号量/共享内存/Futex 是否缺失或为桩代码。",
+  "must_cover": [
+    "SpinLock 实现：使用 RISC-V amoswap 原子指令（__sync_lock_test_and_set）",
+    "SleepLock 实现：基于 SpinLock + sleep/wakeup 等待队列机制",
+    "等待队列：通过 proc->chan 和 sleep()/wakeup() 实现线程挂起/唤醒",
+    "管道 (Pipe)：✅ 已实现，使用环形缓冲区 (data[PIPESIZE]) + sleep/wakeup 阻塞机制",
+    "信号 (Signal)：✅ 已实现 sys_kill，但仅设置 killed 标志，无完整信号处理框架",
+    "消息队列 (MessageQueue)：❌ 未实现（grep 无 sys_msgget/msgget）",
+    "信号量 (Semaphore)：❌ 未实现（grep 无 sys_semget/semop）",
+    "共享内存 (SharedMem)：❌ 未实现（grep 无 sys_shmget/shmat）",
+    "Futex：❌ 未实现（grep 无 futex 相关代码）",
+    "原子操作：使用 GCC 内置 __sync_* 系列，非自定义汇编",
+    "信号处理时机：trap.c 中无 do_signal/handle_pending_signal，信号仅在 kill() 中设置标志",
+    "锁机制：SpinLock / Mutex / Semaphore / RwLock 实现。",
+    "**原子操作**：是使用 Rust `core::sync::atomic` 还是自定义汇编？(grep `ldxr/stxr`, `lock xchg`)",
+    "**等待队列 (WaitQueue)**：线程获取锁失败时如何挂起？（find `WaitQueue`, `sleep`, `block`）",
+    "**IPC 机制（必须代码验证并分类为 `✅ 已实现`、`🔸 桩函数`、`❌ 未实现`，谨防桩代码）**：",
+    "管道 (Pipe)：**实现验证**：是否使用了环形缓冲区 (Ring Buffer) 还是简单字节流？",
+    "消息队列 (MessageQueue)：**必须检查实现**。grep `sys_msgget` 或 `msgget`。",
+    "如果函数体为空、`Ok(0)` 但没有队列逻辑，必须标记为 **`🔸 桩函数`**。",
+    "只有看到了完整的队列结构体操作（push/pop），才可标记为 **`✅ 已实现`**。",
+    "共享内存 (SharedMem)：结合内存管理章节分析（SharedMemoryManager 实现）。",
+    "信号量 (Semaphore)：PV 操作实现。同样需要检查 `sys_semget`, `semop` 区分是否为桩代码。",
+    "**信号 (Signal) 作为 IPC**：搜索 `sys_kill|sig_send|signal_send`，分析信号分发机制是否也用于进程间通信。"
+  ],
+  "evidence_targets": [
+    "SpinLock 原子操作实现 (kernel/spinlock.c:33-71)",
+    "SleepLock 等待队列机制 (kernel/sleeplock.c:20-48)",
+    "Pipe 环形缓冲区实现 (kernel/pipe.c:13-120)",
+    "sys_kill 信号发送 (kernel/sysproc.c:205-212)",
+    "kill() 函数仅设置 killed 标志 (kernel/proc.c:722-740)",
+    "trap.c 中无信号处理逻辑 (kernel/trap.c:56-140)",
+    "锁与同步原语",
+    "IPC",
+    "Futex",
+    "管道/信号"
+  ],
+  "seed_paths": [
+    "kernel/spinlock.c",
+    "kernel/sleeplock.c",
+    "kernel/pipe.c",
+    "kernel/include/spinlock.h",
+    "kernel/include/sleeplock.h",
+    "kernel/include/pipe.h",
+    "kernel/proc.c:722-740",
+    "kernel/sysproc.c:205-212",
+    "kernel/trap.c:56-140",
+    "sync",
+    "lock",
+    "ipc",
+    "futex",
+    "pipe"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "acquire",
+    "release",
+    "acquiresleep",
+    "releasesleep",
+    "sleep",
+    "wakeup",
+    "pipewrite",
+    "piperead",
+    "sys_kill",
+    "kill",
+    "Mutex",
+    "SpinLock"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "bootloader",
+    "bootloader/SBI",
+    "debug",
+    "debug/kendryte_openocd",
+    "debug/openocd_cfg",
+    "doc",
+    "img",
+    "kernel",
+    "kernel/include"
+  ],
+  "preferred_tools": [
+    "read_code_segment",
+    "lsp_get_call_graph",
+    "lsp_get_definition",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "review_checklist": [
+    "关键问题是否回答",
+    "重要结论是否给出源码路径",
+    "是否避免将 README 当成实现证据",
+    "是否标出未实现/桩函数",
+    "must_cover_count=12"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "精读 kernel/spinlock.c:24-71，记录 acquire/release 使用的__sync_lock_test_and_set 和__sync_lock_release 原子操作",
+    "精读 kernel/sleeplock.c:20-48，分析 acquiresleep 如何通过 sleep() 将失败获取锁的线程挂起到等待队列",
+    "精读 kernel/pipe.c:13-120，验证 PIPESIZE 环形缓冲区实现及 pipewrite/piperead 中的 sleep/wakeup 阻塞机制",
+    "精读 kernel/proc.c:659-700 的 sleep() 函数和 kernel/proc.c 中 wakeup() 实现，理解等待队列工作原理",
+    "精读 kernel/sysproc.c:205-212 的 sys_kill 和 kernel/proc.c:722-740 的 kill()，确认信号仅设置 killed 标志",
+    "检查 kernel/trap.c:56-140 的 usertrap()，确认无 do_signal/handle_pending_signal 调用，信号无实际处理",
+    "汇总 grep 结果：确认 sys_msgget/sys_semget/sys_shmget/futex 均不存在，标记为❌未实现",
+    "对照 must_cover 清单，输出最终结论：SpinLock✅、SleepLock✅、Pipe✅、Signal🔸(桩)、MsgQueue❌、Semaphore❌、SharedMem❌、Futex❌"
+  ]
+}

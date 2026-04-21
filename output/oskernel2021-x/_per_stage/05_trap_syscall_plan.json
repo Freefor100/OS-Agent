@@ -1,0 +1,119 @@
+{
+  "stage_id": "05_trap_syscall",
+  "goal": "分析 Trap 处理流程与系统调用分发机制，包括中断/异常入口、上下文保存结构、syscall 分发表及实现覆盖度。",
+  "must_cover": [
+    "Trap 入口：usertrap() 在 trap.c，通过 trampoline.S 的 uservec 进入；kerneltrap() 处理内核态中断。",
+    "中断/异常区分：trap.c:usertrap() 通过 scause==8 判断系统调用(ecall)，devintr() 区分外部中断(0x8000000000000009)和定时器中断(0x8000000000000005)。",
+    "TrapFrame 结构：include/trap.h 定义 struct trapframe，含 33 个 64 位寄存器字段（kernel_satp 到 t6），共 288 字节。",
+    "系统调用分发：syscall.c 中 syscalls[] 数组为分发表，syscall() 函数通过 a7 寄存器获取 syscall 号并查表调用。",
+    "Stub 验证：sys_mprotect、sys_set_tid_address、sys_getuid、sys_ioctl、sys_renameat2、sys_rt_sigaction、sys_rt_sigprocmask、sys_fcntl、sys_faccessat、sys_utimensat、sys_syslog、sys_sendfile、sys_writev 等返回 0 作为桩函数。",
+    "覆盖度统计：约 13 个桩函数（返回 0），其余如 sys_write、sys_clone、sys_mmap、sys_exec 等为完整实现。",
+    "接口/实现分离模式：未发现 _impl 后缀模式，syscall 直接实现功能。",
+    "用户指针语义化包装：未发现 UserInPtr/UserOutPtr 类型，使用 fetchaddr/fetchstr/copyin2/copyout2 进行用户空间访问校验。",
+    "外部中断流：PLIC 管理外部中断（UART/DISK），timer.c 处理时钟中断，devintr() 统一分发。",
+    "Trap 入口：trap_handler / trap_vector 在哪里？如何区分中断（Interrupt）和异常（Exception）？",
+    "上下文保存：TrapFrame / GeneralRegisters 结构体。**必须用 `lsp_get_definition` 或 `read_code_segment` 读取结构体定义，精确统计包含的寄存器数量和总字节数**，不要凭经验估算。",
+    "**系统调用分发追踪**：",
+    "用户态 `ecall`/`syscall` 指令。",
+    "内核态 `syscall_handler` 分发逻辑。",
+    "**必须找到分发表**（syscall table 或 match 语句）。",
+    "**Stub验证**：检查核心 syscall（如 `sys_clone`, `sys_exec`, `sys_mmap`, `sys_write`）等是否直接返回错误、返回 0，或者包含了 `todo!()`/`unimplemented!()`？",
+    "**覆盖度统计**：基于上述验证，明确区分并列出“已注册但仅为桩特征（`🔸 桩函数`）”的 syscall 数量，与“完整功能实现（`✅ 已实现`）”的 syscall 数量。",
+    "选择一个具体 syscall（如 `sys_write`）追踪其从 Trap 到真正处理逻辑的路径。",
+    "**接口/实现分离模式**：如果项目采用了 syscall 接口与实现分离的设计（如 `sys_xxx` 为接口，`sys_xxx_impl` 为实现），必须明确描述此模式。搜索 `_impl` 后缀函数。",
+    "**用户指针语义化包装**：搜索 `UserInPtr|UserOutPtr|UserInOutPtr`，如果存在此类类型安全包装，需描述其在 syscall 入口处的作用。",
+    "**外部中断流**：详细分析时钟中断（Timer）处理流程与外部设备中断（如 PLIC/APIC）的分发处理。"
+  ],
+  "evidence_targets": [
+    "trap 入口 (trap.c:usertrap, trampoline.S:uservec)",
+    "syscall 分发 (syscall.c:syscalls[], syscall())",
+    "TrapFrame 结构 (include/trap.h:struct trapframe)",
+    "用户指针校验 (syscall.c:fetchaddr, fetchstr)",
+    "中断处理 (trap.c:devintr, plic.c, timer.c)",
+    "trap 入口",
+    "syscall 分发",
+    "TrapFrame",
+    "用户指针校验"
+  ],
+  "seed_paths": [
+    "kernel/trap.c",
+    "kernel/syscall.c",
+    "kernel/include/trap.h",
+    "kernel/trampoline.S",
+    "kernel/kernelvec.S",
+    "kernel/sysfile.c",
+    "kernel/sysproc.c",
+    "kernel/timer.c",
+    "kernel/plic.c",
+    "kernel/proc.c",
+    "trap",
+    "syscall",
+    "interrupt",
+    "exception"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "usertrap",
+    "kerneltrap",
+    "syscall",
+    "devintr",
+    "uservec",
+    "trapframe",
+    "plic_claim",
+    "timer_tick",
+    "trap_handler",
+    "syscall_dispatch",
+    "TrapFrame",
+    "_start"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "bootloader",
+    "bootloader/SBI",
+    "debug",
+    "debug/kendryte_openocd",
+    "debug/openocd_cfg",
+    "doc",
+    "img",
+    "kernel",
+    "kernel/include"
+  ],
+  "preferred_tools": [
+    "lsp_get_call_graph",
+    "lsp_get_definition",
+    "read_code_segment",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "review_checklist": [
+    "关键问题是否回答",
+    "重要结论是否给出源码路径",
+    "是否避免将 README 当成实现证据",
+    "是否标出未实现/桩函数",
+    "must_cover_count=12"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "使用 lsp_get_call_graph 分析 usertrap 的 incoming 调用链，确认从 trampoline.S:uservec 进入的路径。",
+    "使用 lsp_get_definition 精确定位 struct trapframe 定义，验证 33 个寄存器字段及 288 字节大小。",
+    "使用 lsp_get_references 追踪 syscall() 函数的调用点，确认仅在 usertrap() 中被调用。",
+    "读取 syscall.c 中 syscalls[] 数组完整内容，统计已注册 syscall 数量并标记桩函数（返回 0 的函数）。",
+    "使用 grep_in_repo 搜索 sys_mmap、sys_clone、sys_exec、sys_write 等关键 syscall 的实现，验证其是否包含完整逻辑而非桩函数。",
+    "读取 trap.c:devintr() 函数，分析外部中断（PLIC）和定时器中断的区分逻辑及处理流程。",
+    "检查 sysfile.c 和 sysproc.c 中各 syscall 实现，统计桩函数数量（如 sys_mprotect、sys_ioctl 等返回 0 的函数）。",
+    "汇总分析结果，明确列出已实现 syscall 与桩函数的分类清单及数量统计。"
+  ]
+}

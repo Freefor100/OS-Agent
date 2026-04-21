@@ -1,0 +1,97 @@
+{
+  "passed": false,
+  "score": 0.55,
+  "severity": "major",
+  "failed_rules": [
+    "evidence_not_verified",
+    "missing_path_citation"
+  ],
+  "missing_evidence": [
+    {
+      "paragraph_id": "4.1",
+      "claim_id": "proc_struct_definition",
+      "reason": "声称 proc_struct 定义于 kern/process/proc.h:47-77，但证据摘要为空，无法验证路径及行号准确性"
+    },
+    {
+      "paragraph_id": "4.2.1",
+      "claim_id": "stride_scheduler_implementation",
+      "reason": "声称 Stride 调度器实现于 kern/schedule/default_sched_stride.c:11/129，但无证据支持 BIG_STRIDE 定义及 stride_pick_next 实现"
+    },
+    {
+      "paragraph_id": "4.3",
+      "claim_id": "proc_state_enum",
+      "reason": "声称进程状态枚举位于 kern/process/proc.h:13-17，但证据摘要为空"
+    },
+    {
+      "paragraph_id": "4.4",
+      "claim_id": "switch_assembly",
+      "reason": "声称 switch_to 汇编代码位于 kern/process/switch.S，但无证据验证 14 个寄存器保存/恢复逻辑"
+    },
+    {
+      "paragraph_id": "4.5.1",
+      "claim_id": "signal_mechanism",
+      "reason": "声称 do_rt_sigaction 实现于 kern/process/signal.c:35，但无证据验证信号处理数组及注册逻辑"
+    },
+    {
+      "paragraph_id": "4.6.1",
+      "claim_id": "fork_flow",
+      "reason": "声称 fork 流程涉及 kern/process/proc.c 多个函数（alloc_proc:92, copy_mm:332, copy_thread:379 等），但无证据验证调用链"
+    },
+    {
+      "paragraph_id": "4.6.2",
+      "claim_id": "exec_flow",
+      "reason": "声称 load_icode 实现于 kern/process/proc.c:628，但无证据验证 ELF 解析及地址空间重建逻辑"
+    }
+  ],
+  "weak_claims": [
+    {
+      "paragraph_id": "4.2.2",
+      "claim_id": "schedule_call_graph",
+      "reason": "声称通过 lsp_get_call_graph 分析 schedule() 函数，但证据摘要中无 LSP 分析结果支持"
+    },
+    {
+      "paragraph_id": "4.7.1",
+      "claim_id": "thread_support",
+      "reason": "声称搜索 clone_task/sys_clone 无实现代码，但证据摘要中无 grep 结果支持"
+    }
+  ],
+  "format_issues": [],
+  "missed_modules": [],
+  "repair_actions": [
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "4.1",
+      "hint": "使用 read_code_segment 读取 kern/process/proc.h 验证 proc_struct 定义及行号，或使用 grep_in_repo 搜索 struct proc_struct"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "4.2.1",
+      "hint": "使用 read_code_segment 读取 kern/schedule/default_sched_stride.c 验证 BIG_STRIDE 宏定义及 stride_pick_next 函数实现"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "4.4",
+      "hint": "使用 read_code_segment 读取 kern/process/switch.S 验证 switch_to 汇编代码中 14 个寄存器（ra,sp,s0-s11）的保存/恢复逻辑"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "4.5.1",
+      "hint": "使用 read_code_segment 读取 kern/process/signal.c 验证 do_rt_sigaction 实现，使用 grep_in_repo 搜索 do_sigreturn 验证信号分发机制缺失"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "4.6.1",
+      "hint": "使用 lsp_get_call_graph 或 read_code_segment 验证 do_fork 调用链（alloc_proc→setup_kstack→copy_mm→copy_thread→hash_proc→wakeup_proc）"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "4.6.2",
+      "hint": "使用 read_code_segment 读取 kern/process/proc.c 中 load_icode 函数验证 ELF 解析及地址空间重建逻辑"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "4.7",
+      "hint": "使用 grep_in_repo 搜索 Process|ProcessGroup|Session|sys_clone|sys_setpgid 验证线程组、进程组、会话管理实现状态"
+    }
+  ]
+}

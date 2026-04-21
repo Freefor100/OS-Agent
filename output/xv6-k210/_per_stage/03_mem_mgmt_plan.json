@@ -1,0 +1,116 @@
+{
+  "stage_id": "03_mem_mgmt",
+  "goal": "分析 xv6-k210 内存管理模块：物理页分配器、页表机制、缺页处理、COW/Lazy 实现、mmap 及 TLB 刷新等核心功能",
+  "must_cover": [
+    "[Q03_001] 内存管理形态：C 语言实现的分页式内存管理（类 xv6/RISC-V Sv39）",
+    "[Q03_002] 物理页帧分配器：已实现（pm.c 中的 allocpage/freepage）",
+    "[Q03_003] 分配算法：空闲链表（free list）+ 单页/多页分桶",
+    "[Q03_004] 核心数据结构：struct run{next, npage} + struct pm_allocator{lock, freelist, npage}",
+    "[Q03_005] 并发控制：双锁分桶（single/multiple 独立 spinlock），持锁范围覆盖 alloc/free 全程",
+    "[Q03_006] 页表实现：已实现（walk/map/unmappages/mappages）",
+    "[Q03_007] 页表 API：walk()、mappages()、unmappages()、uvmalloc()",
+    "[Q03_008] 页表并发：依赖进程地址空间隔离 + 关中断（trap 路径），无显式每进程页表锁",
+    "[Q03_009] 地址空间：内核/用户共享高地址 trampoline，用户空间 0~MAXUVA，内核 KERNBASE~PHYSTOP",
+    "[Q03_010] 缺页异常：已实现（handle_page_fault 联动 alloc/map）",
+    "[Q03_011] 缺页链路：usertrap→handle_excp→handle_page_fault→{lazy/loadelf/mmap/COW}→uvmalloc/allocpage→mappages→sfence_vma",
+    "[Q03_012] COW：已实现（fork 时标记 PTE_COW，store fault 触发 copy）",
+    "[Q03_013] Lazy Allocation：已实现（HEAP/STACK 段 fault 时分配）",
+    "[Q03_014] Swap：未实现（仅 mmap file 有 page_file_swap 占位）",
+    "[Q03_015] mmap：已实现（do_mmap/do_munmap，支持 MAP_ANON/MAP_SHARED）",
+    "[Q03_016] Page Cache：未发现独立页缓存管理结构",
+    "[Q03_001] 该 OS 的内存管理实现语言/形态更接近哪类？（只选最贴近的一项）",
+    "[Q03_002] 是否存在“物理页帧分配器 (Physical Frame Allocator)”的真实实现？（必须三态）",
+    "[Q03_003] 物理内存分配算法更接近哪种？",
+    "[Q03_004] 物理页帧分配器的核心数据结构是什么？（例如 bitmap 数组、buddy free list、slab cache 表、`struct run` 单链表等；必须引用结构体/字段证据）",
+    "[Q03_005] 物理分配器的并发控制锁粒度是什么？（全局大锁 / per-CPU / 分桶 / 无锁+关中断 / 其他；必须给锁对象类型与持锁范围证据）",
+    "[Q03_006] 是否存在“页表 (page table) 结构体 + walk/map/unmap”的真实实现？（必须三态）"
+  ],
+  "evidence_targets": [
+    "物理页分配器 pm.c: struct run 链表 + single/multiple 分桶锁",
+    "页表操作 vm.c: walk/mappages/unmappages/uvmalloc",
+    "缺页处理 vm.c: handle_page_fault 分支到 lazy/loadelf/mmap/COW",
+    "COW 机制 vm.c: PTE_COW 标记 + handle_store_page_fault_cow",
+    "mmap 实现 mmap.c: do_mmap + handle_page_fault_mmap",
+    "TLB 刷新 riscv.h: sfence_vma 宏",
+    "用户检查 vm.c: copyin/copyout/walkaddr",
+    "段管理 usrmm.h: struct seg 链表",
+    "物理页分配",
+    "页表映射",
+    "页故障处理",
+    "堆分配器"
+  ],
+  "seed_paths": [
+    "kernel/mm/pm.c",
+    "kernel/mm/vm.c",
+    "kernel/mm/mmap.c",
+    "kernel/mm/kmalloc.c",
+    "kernel/trap/trap.c",
+    "include/mm/vm.h",
+    "include/mm/usrmm.h",
+    "include/memlayout.h",
+    "include/hal/riscv.h",
+    "mm",
+    "memory",
+    "vm",
+    "kernel/mm",
+    "os/src/mm"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "handle_page_fault",
+    "allocpage",
+    "freepage",
+    "walk",
+    "mappages",
+    "uvmalloc",
+    "sfence_vma",
+    "handle_store_page_fault_cow",
+    "do_mmap",
+    "copyin",
+    "alloc_frame",
+    "map_page"
+  ],
+  "repo_hotspots": [
+    "Cargo.toml",
+    "Makefile",
+    "bootloader",
+    "bootloader/SBI",
+    "debug",
+    "debug/kendryte_openocd",
+    "debug/openocd_cfg",
+    "doc",
+    "doc/img",
+    "include"
+  ],
+  "preferred_tools": [
+    "read_code_segment",
+    "lsp_get_definition",
+    "lsp_get_references",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "1. 精读 kernel/mm/pm.c 前 100 行，确认 struct run 和 pm_allocator 定义及 single/multiple 分桶锁初始化逻辑",
+    "2. 读取 kernel/mm/vm.c 的 walk() 和 mappages() 实现（约 211-330 行），取证页表遍历和映射流程",
+    "3. 读取 handle_page_fault() 完整实现（1039-1105 行）及四个子处理函数，绘制缺页分发决策树",
+    "4. 读取 handle_store_page_fault_cow()（975-1000 行）和 uvmcopy() 中 COW 标记逻辑，确认 fork 时 PTE_COW 设置点",
+    "5. 读取 kernel/mm/mmap.c 的 do_mmap() 和 handle_page_fault_mmap()，确认 mmap 系统调用到缺页映射的链路",
+    "6. 搜索并读取 copyin/copyout/walkaddr 实现，总结用户指针校验机制",
+    "7. 汇总 memlayout.h 和 riscv.h 中的内存常量（PGSIZE/PHYSTOP/MAXVA），计算物理内存总量和虚拟地址空间位数",
+    "8. 整合证据，按 must_cover 30 题逐一作答，绘制 Mermaid 主链路图（usertrap→handle_excp→handle_page_fault→uvmalloc→mappages→sfence_vma）"
+  ]
+}

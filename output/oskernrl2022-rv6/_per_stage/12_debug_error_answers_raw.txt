@@ -1,0 +1,168 @@
+```json
+{
+  "schema_version": "v1",
+  "stage_id": "12_debug_error",
+  "stage_title": "调试机制与错误处理",
+  "terminology_profile": "stallings_en_zh",
+  "answers": [
+    {
+      "question_id": "Q12_001",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在日志系统（log/printk/println 宏）与日志级别控制？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "src/printf.c",
+          "symbol_kind": "function",
+          "symbol_name": "__debug_info",
+          "excerpt": "void __debug_info(char *fmt, ...){ #ifdef DEBUG ... }"
+        },
+        {
+          "path": "src/printf.c",
+          "symbol_kind": "function",
+          "symbol_name": "__debug_warn",
+          "excerpt": "void __debug_warn(char *fmt, ...){ #ifdef WARNING ... }"
+        },
+        {
+          "path": "src/printf.c",
+          "symbol_kind": "function",
+          "symbol_name": "__debug_error",
+          "excerpt": "void __debug_error(char *fmt, ...){ #ifdef ERROR ... }"
+        },
+        {
+          "path": "src/include/printf.h",
+          "symbol_kind": "function_decl",
+          "symbol_name": "__debug_info",
+          "excerpt": "void __debug_info(char *fmt, ...); void __debug_warn(char *fmt, ...); void __debug_error(char *fmt, ...);"
+        }
+      ]
+    },
+    {
+      "question_id": "Q12_002",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 panic/崩溃处理路径（panic_handler/oom/abort 等）？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "src/printf.c",
+          "symbol_kind": "function",
+          "symbol_name": "panic",
+          "excerpt": "panic(char *s) { printf(\"panic: \"); printf(s); printf(\"\\n\"); backtrace(); panicked = 1; for(;;) ; }"
+        },
+        {
+          "path": "src/include/printf.h",
+          "symbol_kind": "function_decl",
+          "symbol_name": "panic",
+          "excerpt": "void panic(char *s) __attribute__((noreturn));"
+        }
+      ]
+    },
+    {
+      "question_id": "Q12_003",
+      "question_type": "short_answer",
+      "stem": "panic 路径会输出哪些诊断？（寄存器 dump/栈回溯/停机；必须引用实现证据）",
+      "value": "panic 路径输出 panic 消息字符串，调用 backtrace() 打印返回地址 (ra) 链，然后进入死循环停机。不包含寄存器 dump（trapframedump 仅在用户态异常时调用，非 panic 路径）。",
+      "evidence": [
+        {
+          "path": "src/printf.c:140-148",
+          "symbol_kind": "function",
+          "symbol_name": "panic",
+          "excerpt": "panic(char *s) { printf(\"panic: \"); printf(s); printf(\"\\n\"); backtrace(); panicked = 1; for(;;) ; }"
+        },
+        {
+          "path": "src/printf.c:151-159",
+          "symbol_kind": "function",
+          "symbol_name": "backtrace",
+          "excerpt": "void backtrace() { uint64 *fp = (uint64 *)r_fp(); ... printf(\"backtrace:\\n\"); while (fp < bottom) { uint64 ra = *(fp - 1); printf(\"%p\\n\", ra - 4); fp = (uint64 *)*(fp - 2); } }"
+        },
+        {
+          "path": "src/trap.c:109-115",
+          "symbol_kind": "function",
+          "symbol_name": "usertrap",
+          "excerpt": "trapframedump 仅在 usertrap 中用户态异常时调用，panic 路径不调用 trapframedump"
+        }
+      ]
+    },
+    {
+      "question_id": "Q12_004",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现栈回溯 (backtrace/unwind/stack_trace)？（必须三态；仅打印 ra 不算）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "src/printf.c:151-159",
+          "symbol_kind": "function",
+          "symbol_name": "backtrace",
+          "excerpt": "void backtrace() { uint64 *fp = (uint64 *)r_fp(); uint64 *bottom = (uint64 *)PGROUNDUP((uint64)fp); printf(\"backtrace:\\n\"); while (fp < bottom) { uint64 ra = *(fp - 1); printf(\"%p\\n\", ra - 4); fp = (uint64 *)*(fp - 2); } }"
+        },
+        {
+          "path": "src/include/printf.h",
+          "symbol_kind": "function_decl",
+          "symbol_name": "backtrace",
+          "excerpt": "void backtrace();"
+        }
+      ]
+    },
+    {
+      "question_id": "Q12_005",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在交互式内核 monitor/shell？（必须三态；若 implemented 列出 3-10 个命令入口证据）",
+      "value": "not_found",
+      "evidence": []
+    },
+    {
+      "question_id": "Q12_006",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 GDB stub（需数据包解析循环，如 handle_gdb_packet）？（必须三态）",
+      "value": "not_found",
+      "evidence": []
+    },
+    {
+      "question_id": "Q12_007",
+      "question_type": "short_answer",
+      "stem": "错误码/错误类型体系是什么？（errno/Result/Error enum；给类型定义与传播点证据）",
+      "value": "采用标准 POSIX errno.h 定义（EPERM=1 至 ERANGE=34 等共 98+ 个错误码）。函数通过返回 -1 或 RES_ERROR 表示错误，成功返回 RES_OK 或 0。",
+      "evidence": [
+        {
+          "path": "src/include/errno.h",
+          "symbol_kind": "header",
+          "symbol_name": "errno.h",
+          "excerpt": "#define EPERM 1 /* Operation not permitted */ ... #define ERANGE 34 /* Math result not representable */"
+        },
+        {
+          "path": "src/diskio.c:58",
+          "symbol_kind": "function",
+          "symbol_name": "disk_initialize",
+          "excerpt": "return result == 0 ? RES_OK : RES_ERROR;"
+        },
+        {
+          "path": "src/copy.c:22",
+          "symbol_kind": "function",
+          "symbol_name": "copyout",
+          "excerpt": "return -1;"
+        }
+      ]
+    },
+    {
+      "question_id": "Q12_008",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 trace/perf/ftrace 等跟踪机制或 tracepoints？（必须三态）",
+      "value": "stub",
+      "evidence": [
+        {
+          "path": "syscall/syscall.c:11-13",
+          "symbol_kind": "function",
+          "symbol_name": "syscall",
+          "excerpt": "// trace\n    if ((p->tmask & (1 << num)) != 0) {\n      printf(\"pid %d: %s -> %d\\n\", p->pid, sysnames[num], p->trapframe->a0);\n    }"
+        },
+        {
+          "path": "src/include/proc.h:153",
+          "symbol_kind": "struct_field",
+          "symbol_name": "tmask",
+          "excerpt": "int tmask; // trace mask"
+        }
+      ]
+    }
+  ]
+}
+```

@@ -1,0 +1,116 @@
+{
+  "stage_id": "10_security",
+  "goal": "分析 oskernel2021-x 的安全机制与权限模型，验证 UID/GID 权限检查、Capability/ACL、安全沙箱（seccomp/prctl）、用户态/内核态隔离（KPTI/SMEP/SMAP）等关键安全特性的实现状态。",
+  "must_cover": [
+    "多架构覆盖：本项目仅支持 riscv64 架构（QEMU/K210），无 aarch64/x86_64/loongarch64 支持",
+    "Rust 安全性机制：本项目为纯 C 实现，无 Rust 所有权/RAII 机制",
+    "用户态/内核态隔离：验证页表隔离机制，检查 KPTI/SMEP/SMAP 是否实现",
+    "UID/GID 权限模型：sys_getuid 仅返回 0（桩函数），struct proc 无 uid 字段，open/write/exec 无权限检查逻辑",
+    "Capability/ACL：搜索结果为空，未实现能力机制",
+    "安全沙箱（seccomp/prctl）：搜索结果为空，未实现任何安全沙箱机制",
+    "审计与安全启动：检查是否有审计日志或安全启动验证机制",
+    "**多架构覆盖要求**：本章分析必须覆盖项目支持的所有架构（riscv64, aarch64, x86_64, loongarch64 等），不得仅以某一个架构为视角描述。",
+    "**Rust 安全性机制**：如果项目使用 Rust 编写，必须指出 RAII、所有权分析、基于生命周期的锁等机制带来的安全性。",
+    "用户态/内核态隔离：页表隔离（KPTI）、SMEP/SMAP 是否开启？",
+    "**权限模型深度验证（关键）**：",
+    "**用户/组（UID/GID）**：不仅要看 `Task` 结构体是否有 `uid` 字段，**必须验证**这些字段是否在 `open/write/exec` 等系统调用中被用于权限检查！（grep `check_perm`, `inode_permission`）。如果仅有字段但无检查逻辑，必须注明“**仅有定义但未强制执行（🔸 桩函数）**”。",
+    "**Capability/ACL**：搜索 `capability`, `acl`。",
+    "**安全沙箱 (Seccomp/Prctl)**：",
+    "搜索 `prctl` 或 `seccomp`。",
+    "**必须检查实现**：是返回 `ENOSYS`（未实现），还是直接返回 `0`（假装成功），还是真的解析了 BPF 规则？",
+    "**Stub判断**：如果 `sys_prctl` 只是 returning 0 without doing anything，标记为 **`🔸 桩函数`**。",
+    "如未找到，明确写“未实现安全沙箱（❌ 未实现）”。",
+    "**审计与安全启动**："
+  ],
+  "evidence_targets": [
+    "权限模型：struct proc 无 uid/gid 字段，sys_getuid 返回 0",
+    "用户身份：stat.h 中 st_uid/st_gid 仅用于文件元数据，未与进程关联",
+    "隔离边界：vm.c/trap.c 中无 KPTI/SMEP/SMAP 相关代码",
+    "安全机制：无 capability/seccomp/prctl 实现",
+    "权限模型",
+    "用户身份",
+    "隔离边界",
+    "安全机制"
+  ],
+  "seed_paths": [
+    "kernel/include/proc.h",
+    "kernel/include/stat.h",
+    "kernel/sysproc.c",
+    "kernel/sysfile.c",
+    "kernel/vm.c",
+    "kernel/trap.c",
+    "kernel/trampoline.S",
+    "kernel/include/vm.h",
+    "kernel/include/riscv.h",
+    "security",
+    "capability",
+    "uid",
+    "perm",
+    "auth"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "sys_getuid",
+    "sys_open",
+    "fopen",
+    "usertrap",
+    "kvminit",
+    "usertrapret",
+    "sys_kill",
+    "sys_execve",
+    "cap",
+    "permission",
+    "check_perm",
+    "_start"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "bootloader",
+    "bootloader/SBI",
+    "debug",
+    "debug/kendryte_openocd",
+    "debug/openocd_cfg",
+    "doc",
+    "img",
+    "kernel",
+    "kernel/include"
+  ],
+  "preferred_tools": [
+    "read_code_segment",
+    "lsp_get_definition",
+    "lsp_get_call_graph",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "review_checklist": [
+    "关键问题是否回答",
+    "重要结论是否给出源码路径",
+    "是否避免将 README 当成实现证据",
+    "是否标出未实现/桩函数",
+    "must_cover_count=12"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "使用 read_code_segment 精读 kernel/sysproc.c 中 sys_getuid 实现，确认其返回 0 的桩函数行为",
+    "使用 read_code_segment 检查 kernel/sysfile.c 中 fopen/sys_open 实现，验证是否有任何 uid/gid 权限检查逻辑",
+    "使用 read_code_segment 分析 kernel/vm.c 中 kvminit 和 kernel/trap.c 中 usertrapret，确认页表切换机制及是否存在 KPTI 相关代码",
+    "使用 grep_in_repo 搜索 PTE_U、SSTATUS_SPP 等标志位，验证用户/内核模式隔离机制",
+    "使用 read_code_segment 检查 kernel/trampoline.S，分析用户态/内核态切换时的页表切换逻辑",
+    "使用 lsp_get_call_graph 分析 sys_open 的调用链，确认从系统调用到文件打开的完整路径中无权限检查",
+    "汇总证据，标记所有未实现的安全特性为「❌ 未实现」或「🔸 桩函数」",
+    "对照 must_cover 清单，撰写最终分析报告，明确标注本项目仅支持 riscv64 架构且安全机制简化"
+  ]
+}

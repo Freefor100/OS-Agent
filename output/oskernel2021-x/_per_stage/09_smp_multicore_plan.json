@@ -1,0 +1,117 @@
+{
+  "stage_id": "09_smp_multicore",
+  "goal": "分析 oskernel2021-x 的多核/SMP 支持实现，确认是否真正实现了双核启动、IPI 机制、Per-CPU 状态管理及并发保护机制。",
+  "must_cover": [
+    "多核启动机制：BSP(核 0) 如何通过 SBI IPI 唤醒 AP(核 1)",
+    "Per-CPU 状态设计：struct cpu 数组、mycpu()、cpuid() 实现",
+    "自旋锁实现：acquire/release 中 push_off/pop_off 禁用中断机制",
+    "调度器设计：每核独立 scheduler() 循环，无负载均衡",
+    "交叉引用：PID 分配是否原子、Futex 是否存在、内存序保证",
+    "明确结论：支持双核 SMP 还是仅单核",
+    "**核心任务：一定要极其仔细地在源码中寻找有没有真正实现多核！** 架构设计是 SMP 还是 AMP？**绝不能仅凭看到一两个宏定义就断言支持多核，必须找到唤醒其他核的切实验证。如果不支持多核，务必明确写“仅支持单核（❌ 未实现）”**。",
+    "Secondary CPU 启动等主要功能机制：**必须清晰、详尽地描述其详细的底层工作机制**。具体描述 BSP（主核）是如何通过 IPI 或中断控制器发送信号唤醒 AP（从核）的链条，精确到对应文件的代码逻辑。搜索 `smp_boot`, `__cpu_up`。如果找不到启动其他核的代码，那就是单核。",
+    "核间中断 (IPI)：搜索 `send_ipi`, `ipi_handler`。",
+    "**锁的实现**：SpinLock 是否禁用了中断？Mutex 是否支持优先级继承？",
+    "Per-CPU 变量设计与访问方式。搜索 `axns` 模块，分析 PerCPU 命名空间实现。",
+    "多核调度策略：负载均衡、CPU 亲和性（affinity）。",
+    "自旋锁/RCU 在多核下的实现差异。",
+    "**交叉引用前面章节（必须）**：本章与前面章节有大量交叉，必须引用并深化：",
+    "进程调度中的全局唯一 ID 池（搜索 `AtomicUsize` 用于 PID/TID 分配）",
+    "双级注册机制（线程注册到 Process + 全局管理器）",
+    "同步互斥中的 Futex 实现（在多核场景下的行为）",
+    "原子操作（`core::sync::atomic`）在多核下的内存序保证"
+  ],
+  "evidence_targets": [
+    "main.c 中 hartid==0 分支发送 IPI 唤醒其他核",
+    "struct cpu cpus[NCPU] 定义及 mycpu() 通过 tp 寄存器获取 CPU ID",
+    "spinlock.c 中 acquire() 调用 push_off() 禁用中断",
+    "intr.c 中 push_off/pop_off 的嵌套计数机制",
+    "sbi.h 中 sbi_send_ipi() 通过 SBI ecall 实现",
+    "scheduler() 每核独立运行，无负载均衡逻辑",
+    "多核启动",
+    "CPU 本地状态",
+    "IPI",
+    "并发保护"
+  ],
+  "seed_paths": [
+    "kernel/main.c",
+    "kernel/proc.c",
+    "kernel/spinlock.c",
+    "kernel/intr.c",
+    "kernel/include/sbi.h",
+    "kernel/include/proc.h",
+    "kernel/include/spinlock.h",
+    "kernel/include/param.h",
+    "smp",
+    "cpu",
+    "hart",
+    "scheduler",
+    "interrupt",
+    "kernel/sysproc.c:412"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "main",
+    "mycpu",
+    "cpuid",
+    "acquire",
+    "release",
+    "push_off",
+    "pop_off",
+    "sbi_send_ipi",
+    "scheduler",
+    "start_secondary",
+    "boot_secondary",
+    "cpu_init"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "bootloader",
+    "bootloader/SBI",
+    "debug",
+    "debug/kendryte_openocd",
+    "debug/openocd_cfg",
+    "doc",
+    "img",
+    "kernel",
+    "kernel/include"
+  ],
+  "preferred_tools": [
+    "read_code_segment",
+    "lsp_get_call_graph",
+    "lsp_get_definition",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "review_checklist": [
+    "关键问题是否回答",
+    "重要结论是否给出源码路径",
+    "是否避免将 README 当成实现证据",
+    "是否标出未实现/桩函数",
+    "must_cover_count=12"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "1. 精读 kernel/main.c:30-80，确认 BSP(核 0) 通过 sbi_send_ipi() 唤醒 AP(核 1) 的完整流程",
+    "2. 分析 kernel/proc.c:85-110 的 cpuid()/mycpu() 实现，确认通过 tp 寄存器获取 CPU ID 的机制",
+    "3. 追踪 kernel/spinlock.c:24-75 的 acquire/release，验证 push_off/pop_off 是否禁用中断及嵌套计数",
+    "4. 读取 kernel/intr.c:12-40，理解 push_off/pop_off 的嵌套计数和中断状态恢复逻辑",
+    "5. 检查 kernel/include/sbi.h:63-70，确认 sbi_send_ipi() 通过 SBI ecall 实现",
+    "6. 分析 kernel/proc.c:551-590 的 scheduler()，确认每核独立调度、无负载均衡",
+    "7. 搜索 AtomicUsize/futex 确认 PID 分配是否原子、是否有 Futex 实现",
+    "8. 综合证据撰写结论：支持双核 SMP，但功能有限（无负载均衡、无 CPU 亲和性、无 Futex）"
+  ]
+}

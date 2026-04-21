@@ -1,0 +1,33 @@
+{
+  "stage": "feature_summaries",
+  "sections_dir": "G:\\OS-Agent\\output\\rwos\\sections",
+  "features": {
+    "D1_tech_stack": "RWOS 是基于 uCore 框架开发的 RISC-V 64 位单体内核操作系统。核心语言为 C99 标准，混合汇编，非 Rust 环境。目标架构仅支持 RISC-V 64，其他架构未见代码。构建系统采用 Makefile 主导，命令为 make。无第三方 Rust crate 依赖，关键库依赖为 libs/sbi.h。内核编译为单一镜像，运行于 S-Mode，包含进程、内存及文件系统模块，适配 K210 与 QEMU 平台。",
+    "D2_boot_arch": "启动链为 ROM 加载 RustSBI 跳转至 kern/init/entry.S 的 kern_entry。MMU entry.S 设 satp 启 Sv39。未发现内核 M→S 切换，由 RustSBI 完成，跑 S-Mode。FPU 未实现。多平台仅支持 K210，未发现 VisionFive2 或 LoongArch。",
+    "D3_memory": "物理内存采用 First-Fit 链表分配器。页表基于 Sv39 三级，结构体 mm_struct 管理 pgdir。堆分配器为 SLOB 算法。高级特性：懒分配与 Swap(FIFO) 已实现；CoW、大页、共享内存、rmap 未实现；mmap 为桩函数。缺页链：pgfault_handler→do_pgfault→get_pte。用户指针经 user_mem_check 验证地址范围、VMA 及权限，防止内核非法访问。",
+    "D4_process_sched": "rwos 采用单层进程模型，使用 proc_struct，未区分进程线程。调度算法为 Stride，基于斜堆实现，无多调度器。切换由 switch.S 实现，存 14 寄存器，无浮点上下文。进程组、会话及 PGID/SID 未实现。信号仅支持 sigaction 注册，kill 仅设退出标志，无分发与用户态跳板。Futex/rlimit 均未实现。fork 真正复制地址空间物理页。",
+    "D5_trap_syscall": "Trap 入口基于汇编 trap.S，TrapFrame 含 36 寄存器共 288 字节。系统调用经函数指针表分发，注册 52 项，48 项完整实现（覆盖文件/进程/内存），4 项桩函数，sys_clone 等核心调用非桩。无接口/实现分离设计。信号未在 Trap 返回前检查。缺页异常未关联 CoW 或 Lazy 分配。用户指针无 UserInPtr 包装，仅依赖运行时校验。",
+    "D6_filesystem": "rwos 采用基于 inode 与 inode_ops 函数指针的 VFS 抽象层，无直接访问文件系统。仅支持自研 SFS 及 DevFS，FAT32、ext4、RamFS、TmpFS、ProcFS、SysFS 均未实现。文件描述符表采用 Per-Process 设计，进程私有。Pipe 基于环形缓冲区同步。Socket 网络 IO 及 poll/select/epoll 缺失。mmap 受限，仅拷贝式映射，无 MAP_SHARED/MAP_ANON 及零拷贝。文件打开经 vfs_open 协同 file、inode、files_struct 与 inode_ops 完成操作分发。",
+    "D7_device_driver": "驱动框架基于 C 函数指针表与宏注册，通过文件系统挂载。设备发现采用纯硬编码物理地址，无设备树。支持高速串口（固件抽象）、内存盘及 SPI 模式 SD 卡块设备，无网络驱动。中断控制器无独立驱动，由固件管理。构建配置无菜单配置或特性开关，仅靠脚本。目标平台仅支持 K210 开发板，无多平台适配。",
+    "D8_sync_ipc": "无独立自旋/互斥/读写锁，基于信号量 + 等待队列，原子操作用 RISC-V AMO。等待队列用链表。Pipe 已实现环形缓冲区；MsgQueue(sys_msgget) 为桩函数，共享内存未实现；SysV 信号量仅定义接口；Signal 仅支持终止，缺处理函数与 sigreturn；Futex 无调用链，未实现。",
+    "D9_smp_security": "仅支持单核，未实现 SMP 及 Secondary CPU 启动。IPI 仅有 SBI 声明，Per-CPU 变量缺失。调度为单全局队列，无负载均衡与亲和性。安全上，实现页表隔离及用户指针验证，但未配置 SMEP/SMAP。UID/GID 未实现，权限检查缺失。Seccomp/Prctl 仅为桩，Capability/ACL 不支持。纯 C，无 Rust 安全。",
+    "D10_net_debug": "网络部分：未实现网络功能。无协议栈及网卡驱动，Socket 接口仅用户态定义，内核无实现，无 TCP/UDP 支持，无回环测试。调试部分：日志系统仅基础打印无级别。Panic 处理已实现但缺寄存器转储。栈回溯与 DWARF 解析均为桩函数。调试接口含 Monitor，无 GDB Stub。性能追踪未实现。整体处于教学操作系统初级阶段，核心调试工具缺失，需外部调试。"
+  },
+  "completed_dims": [
+    "D1_tech_stack",
+    "D2_boot_arch",
+    "D3_memory",
+    "D4_process_sched",
+    "D5_trap_syscall",
+    "D6_filesystem",
+    "D7_device_driver",
+    "D8_sync_ipc",
+    "D9_smp_security",
+    "D10_net_debug"
+  ],
+  "token_usage_total": {
+    "prompt_tokens": 60348,
+    "completion_tokens": 85590,
+    "total_tokens": 145938
+  }
+}

@@ -1,0 +1,104 @@
+{
+  "stage_id": "01_overview",
+  "goal": "建立 oskernel2021-x 的技术字典：明确其为 xv6-riscv 移植到 K210 的教学内核，纯 C 实现（Bootloader 为 Rust），支持 riscv64 架构（QEMU/K210 双平台），定位关键入口与目录结构",
+  "must_cover": [
+    "项目定位：xv6-riscv 移植到 K210 的教学用简化内核",
+    "编程语言：内核纯 C，Bootloader(RustSBI) 为 Rust",
+    "支持架构：仅 riscv64（QEMU 与 K210 双平台）",
+    "关键入口：_start(entry_k210.S/entry_qemu.S) → main(kernel/main.c)",
+    "核心目录：kernel/(内核源码), xv6-user/(用户程序), bootloader/SBI/(RustSBI)",
+    "## 结论摘要（3-5 条，基于前置报告明确项目特性及内核类型）",
+    "## 技术栈与构建（含编程语言版本、所有支持的架构完整列表）",
+    "## 目录结构导读（列出系统关键目录与源码入口）",
+    "## 总结评价（完成度评估）",
+    "深度结合下文附带的各模块报告情况，用200-300字概括：项目定位与目标、技术栈概览、实现完成度评估（系统主要功能模块是否闭环）。**注意：只做客观的定性评价，绝不要打分（如不要出现x/10这样的评分）。**"
+  ],
+  "evidence_targets": [
+    "README.md 明确说明 xv6-riscv on k210",
+    "Makefile 显示 C 编译工具链 riscv64-unknown-elf-gcc",
+    "kernel/main.c 为内核主入口，调用 scheduler()",
+    "entry_k210.S/entry_qemu.S 定义 _start 入口汇编",
+    "bootloader/SBI/rustsbi-k210/Cargo.toml 证明 Bootloader 为 Rust",
+    "语言与框架来源",
+    "支持架构",
+    "入口函数",
+    "关键目录"
+  ],
+  "seed_paths": [
+    "README.md",
+    "Makefile",
+    "kernel/main.c",
+    "kernel/entry_k210.S",
+    "kernel/entry_qemu.S",
+    "bootloader/SBI/rustsbi-k210/Cargo.toml",
+    "kernel/include/defs.h",
+    "kernel/include/memlayout.h",
+    "Cargo.toml",
+    ".cargo",
+    "arch",
+    "platform",
+    "kernel",
+    "os"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "_start",
+    "main",
+    "scheduler",
+    "userinit",
+    "trapinithart",
+    "kernel_main",
+    "rust_main",
+    "start"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "bootloader",
+    "bootloader/SBI",
+    "debug",
+    "debug/kendryte_openocd",
+    "debug/openocd_cfg",
+    "doc",
+    "img",
+    "kernel",
+    "kernel/include"
+  ],
+  "preferred_tools": [
+    "lsp_get_call_graph",
+    "lsp_get_definition",
+    "lsp_get_references",
+    "read_code_segment",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "review_checklist": [
+    "关键问题是否回答",
+    "重要结论是否给出源码路径",
+    "是否避免将 README 当成实现证据",
+    "是否标出未实现/桩函数",
+    "must_cover_count=5"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 12000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 18,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "确认入口链：阅读 entry_k210.S 与 entry_qemu.S，验证 _start → main 调用关系",
+    "追踪 main() 初始化流程：使用 lsp_get_call_graph 分析 kernel/main.c 中 main() 的 outgoing 调用（kinit/kvminit/trapinithart/scheduler 等）",
+    "验证双平台支持：grep Makefile 中 platform 条件编译，确认 k210 与 qemu 的 OBJS 差异",
+    "确认技术栈：分析 bootloader/SBI 下 Cargo.toml，记录 Rust 依赖与版本",
+    "定位关键模块入口：使用 lsp_get_definition 查找 scheduler、userinit、trapinithart 的定义位置",
+    "对照 must_cover 收束：汇总 README/Makefile/入口文件证据，形成技术字典摘要",
+    "标记未实现功能：根据 TODO 与代码桩函数，记录 U-mode 异常等未完成项"
+  ]
+}

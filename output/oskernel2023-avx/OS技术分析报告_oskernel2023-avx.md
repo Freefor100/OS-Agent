@@ -1,871 +1,20 @@
 # oskernel2023-avx 操作系统技术分析报告
 
+> **年份**: 2023
+
+> **赛事**: 操作系统赛
+
+> **子赛事**: 内核实现赛道
+
+> **学校**: 华中科技大学
+
+> **队伍名称**: AVX
+
 > **仓库地址**: https://gitlab.eduxiji.net/202310487101114/oskernel2023-avx
-> **分析日期**: 2026年03月14日
+
+> **分析日期**: 2026年04月04日
+
 > **分析工具**: OS-Agent-D
-
----
-
-## 仓库目录文件结构
-
-```bash
-oskernel2023-avx/
-├── doc/
-│   ├── pic/
-│   │   ├── aux1.png (327.0KB)
-│   │   ├── aux2.png (450.9KB)
-│   │   ├── user_memory.png (97.9KB)
-│   │   └── user_stack.png (45.5KB)
-│   ├── AVX512OS.pdf (889.7KB)
-│   ├── buffer_cache.md (70L, 2.3KB)
-│   ├── dynamic_link.md (122L, 5.6KB)
-│   ├── futex.md (100L, 6.6KB)
-│   ├── memory.md (24L, 2.2KB)
-│   ├── net.md (165L, 5.9KB)
-│   ├── problem.md (12L, 1.2KB)
-│   ├── sd_driver.md (113L, 6.0KB)
-│   ├── signal.md (31L, 1.2KB)
-│   ├── thread.md (242L, 9.6KB)
-│   ├── uboot_command.md (31L, 827B)
-│   └── 初赛提测.md (68L, 2.9KB)
-├── kernel/
-│   ├── include/
-│   │   ├── buf.h (25L, 463B)
-│   │   ├── console.h (8L, 128B)
-│   │   ├── context.h (26L, 332B)
-│   │   ├── defs.h (61L, 1.3KB)
-│   │   ├── disk.h (11L, 179B)
-│   │   ├── dmac.h (1539L, 45.7KB)
-│   │   ├── elf.h (83L, 1.7KB)
-│   │   ├── error.h (121L, 5.1KB)
-│   │   ├── fat32.h (120L, 3.9KB)
-│   │   ├── fcntl.h (16L, 363B)
-│   │   ├── file.h (79L, 2.2KB)
-│   │   ├── fpioa.h (1036L, 51.7KB)
-│   │   ├── futex.h (31L, 779B)
-│   │   ├── gpiohs.h (278L, 7.7KB)
-│   │   ├── intr.h (10L, 116B)
-│   │   ├── kalloc.h (11L, 204B)
-│   │   ├── memlayout.h (121L, 4.3KB)
-│   │   ├── mmap.h (30L, 670B)
-│   │   ├── param.h (26L, 1.1KB)
-│   │   ├── pipe.h (26L, 674B)
-│   │   ├── plic.h (101L, 5.8KB)
-│   │   ├── printf.h (26L, 415B)
-│   │   ├── proc.h (154L, 5.1KB)
-│   │   ├── pselect.h (10L, 230B)
-│   │   ├── queue.h (202L, 8.4KB)
-│   │   ├── ramdisk.h (9L, 163B)
-│   │   ├── ring_buffer.h (31L, 994B)
-│   │   ├── riscv.h (374L, 7.4KB)
-│   │   ├── riscv_io.h (85L, 2.5KB)
-│   │   ├── rusage.h (23L, 1.0KB)
-│   │   ├── sbi.h (116L, 3.3KB)
-│   │   ├── sd_final.h (263L, 12.8KB)
-│   │   ├── sdcard.h (12L, 214B)
-│   │   ├── sem.h (27L, 524B)
-│   │   ├── signal.h (80L, 2.9KB)
-│   │   ├── sleeplock.h (24L, 606B)
-│   │   ├── socket.h (98L, 2.9KB)
-│   │   ├── spi.h (492L, 18.0KB)
-│   │   ├── spinlock.h (30L, 660B)
-│   │   ├── stat.h (47L, 1.1KB)
-│   │   ├── string.h (19L, 716B)
-│   │   ├── syscall.h (14L, 307B)
-│   │   ├── sysctl.h (1078L, 28.6KB)
-│   │   ├── sysinfo.h (27L, 976B)
-│   │   ├── sysnum.h (117L, 3.2KB)
-│   │   ├── thread.h (50L, 1.2KB)
-│   │   ├── timer.h (66L, 1.3KB)
-│   │   ├── trap.h (60L, 2.0KB)
-│   │   ├── types.h (38L, 863B)
-│   │   ├── uart.h (6L, 177B)
-│   │   ├── uart8250.h (14L, 339B)
-│   │   ├── uname.h (15L, 318B)
-│   │   ├── utils.h (339L, 11.7KB)
-│   │   ├── virtio.h (84L, 2.8KB)
-│   │   ├── vm.h (40L, 2.0KB)
-│   │   └── vma.h (39L, 1.2KB)
-│   ├── lwip/
-│   │   ├── api/
-│   │   │   ├── api_lib.c (1374L, 45.8KB)
-│   │   │   ├── api_msg.c (2177L, 70.1KB)
-│   │   │   ├── err.c (111L, 4.6KB)
-│   │   │   ├── if_api.c (98L, 3.4KB)
-│   │   │   ├── netbuf.c (233L, 7.2KB)
-│   │   │   ├── netdb.c (429L, 13.9KB)
-│   │   │   ├── netifapi.c (361L, 11.8KB)
-│   │   │   ├── sockets.c (4382L, 145.3KB)
-│   │   │   └── tcpip.c (675L, 21.2KB)
-│   │   ├── arch/
-│   │   │   ├── atoi.c (14L, 234B)
-│   │   │   ├── errno.c (5L, 75B)
-│   │   │   ├── rand.c (10L, 217B)
-│   │   │   ├── string.c (7L, 174B)
-│   │   │   └── sys_arch.c (232L, 5.3KB)
-│   │   ├── core/
-│   │   │   ├── ipv4/
-│   │   │   │   ├── acd.c (548L, 19.2KB)
-│   │   │   │   ├── autoip.c (361L, 12.8KB)
-│   │   │   │   ├── dhcp.c (2196L, 82.4KB)
-│   │   │   │   ├── etharp.c (1311L, 49.7KB)
-│   │   │   │   ├── icmp.c (422L, 14.7KB)
-│   │   │   │   ├── igmp.c (824L, 28.6KB)
-│   │   │   │   ├── ip4.c (1230L, 43.8KB)
-│   │   │   │   ├── ip4_addr.c (312L, 8.7KB)
-│   │   │   │   └── ip4_frag.c (897L, 31.0KB)
-│   │   │   ├── ipv6/
-│   │   │   │   ├── dhcp6.c (854L, 30.0KB)
-│   │   │   │   ├── ethip6.c (124L, 4.4KB)
-│   │   │   │   ├── icmp6.c (426L, 15.4KB)
-│   │   │   │   ├── inet6.c (55L, 2.1KB)
-│   │   │   │   ├── ip6.c (1518L, 56.2KB)
-│   │   │   │   ├── ip6_addr.c (350L, 10.4KB)
-│   │   │   │   ├── ip6_frag.c (868L, 31.3KB)
-│   │   │   │   ├── mld6.c (603L, 19.0KB)
-│   │   │   │   └── nd6.c (2519L, 88.1KB)
-│   │   │   ├── altcp.c (621L, 17.4KB)
-│   │   │   ├── altcp_alloc.c (83L, 3.0KB)
-│   │   │   ├── altcp_tcp.c (519L, 16.3KB)
-│   │   │   ├── def.c (247L, 7.5KB)
-│   │   │   ├── dns.c (1686L, 55.6KB)
-│   │   │   ├── inet_chksum.c (613L, 19.9KB)
-│   │   │   ├── init.c (453L, 21.0KB)
-│   │   │   ├── ip.c (162L, 4.8KB)
-│   │   │   ├── mem.c (1020L, 36.0KB)
-│   │   │   ├── memp.c (442L, 12.1KB)
-│   │   │   ├── netif.c (1823L, 55.9KB)
-│   │   │   ├── pbuf.c (1534L, 52.7KB)
-│   │   │   ├── raw.c (662L, 21.3KB)
-│   │   │   ├── stats.c (154L, 6.2KB)
-│   │   │   ├── sys.c (147L, 5.8KB)
-│   │   │   ├── tcp.c (2639L, 88.4KB)
-│   │   │   ├── tcp_in.c (2271L, 85.3KB)
-│   │   │   ├── tcp_out.c (2322L, 82.0KB)
-│   │   │   ├── timeouts.c (446L, 13.3KB)
-│   │   │   └── udp.c (1331L, 45.7KB)
-│   │   ├── include/
-│   │   │   ├── arch/
-│   │   │   │   ├── atoi.h (6L, 123B)
-│   │   │   │   ├── cc.h (96L, 1.8KB)
-│   │   │   │   ├── errno.h (8L, 86B)
-│   │   │   │   ├── perf.h (7L, 104B)
-│   │   │   │   ├── rand.h (10L, 122B)
-│   │   │   │   ├── string.h (3L, 81B)
-│   │   │   │   └── sys_arch.h (39L, 824B)
-│   │   │   ├── compat/
-│   │   │   │   ├── posix/
-│   │   │   │   │   ├── arpa/
-│   │   │   │   │   │   └── inet.h (33L, 1.6KB)
-│   │   │   │   │   ├── net/
-│   │   │   │   │   │   └── if.h (36L, 1.7KB)
-│   │   │   │   │   ├── sys/
-│   │   │   │   │   │   └── socket.h (33L, 1.6KB)
-│   │   │   │   │   └── netdb.h (33L, 1.5KB)
-│   │   │   │   └── stdc/
-│   │   │   │       └── errno.h (33L, 1.6KB)
-│   │   │   ├── lwip/
-│   │   │   │   ├── apps/
-│   │   │   │   │   ├── FILES (141B)
-│   │   │   │   │   ├── altcp_proxyconnect.h (79L, 2.8KB)
-│   │   │   │   │   ├── altcp_tls_mbedtls_opts.h (111L, 4.2KB)
-│   │   │   │   │   ├── fs.h (139L, 5.0KB)
-│   │   │   │   │   ├── http_client.h (160L, 6.0KB)
-│   │   │   │   │   ├── httpd.h (256L, 10.7KB)
-│   │   │   │   │   ├── httpd_opts.h (416L, 16.6KB)
-│   │   │   │   │   ├── lwiperf.h (109L, 4.1KB)
-│   │   │   │   │   ├── mdns.h (154L, 5.5KB)
-│   │   │   │   │   ├── mdns_domain.h (80L, 3.3KB)
-│   │   │   │   │   ├── mdns_opts.h (121L, 4.0KB)
-│   │   │   │   │   ├── mdns_out.h (138L, 5.5KB)
-│   │   │   │   │   ├── mdns_priv.h (237L, 7.5KB)
-│   │   │   │   │   ├── mqtt.h (205L, 7.4KB)
-│   │   │   │   │   ├── mqtt_opts.h (103L, 3.0KB)
-│   │   │   │   │   ├── mqtt_priv.h (104L, 3.3KB)
-│   │   │   │   │   ├── netbiosns.h (51L, 1.9KB)
-│   │   │   │   │   ├── netbiosns_opts.h (66L, 2.5KB)
-│   │   │   │   │   ├── smtp.h (128L, 4.6KB)
-│   │   │   │   │   ├── smtp_opts.h (80L, 1.8KB)
-│   │   │   │   │   ├── snmp.h (145L, 5.4KB)
-│   │   │   │   │   ├── snmp_core.h (377L, 14.8KB)
-│   │   │   │   │   ├── snmp_mib2.h (78L, 2.9KB)
-│   │   │   │   │   ├── snmp_opts.h (297L, 9.7KB)
-│   │   │   │   │   ├── snmp_scalar.h (113L, 4.5KB)
-│   │   │   │   │   ├── snmp_snmpv2_framework.h (32L, 781B)
-│   │   │   │   │   ├── snmp_snmpv2_usm.h (24L, 459B)
-│   │   │   │   │   ├── snmp_table.h (134L, 5.5KB)
-│   │   │   │   │   ├── snmp_threadsync.h (114L, 3.8KB)
-│   │   │   │   │   ├── snmpv3.h (114L, 3.9KB)
-│   │   │   │   │   ├── sntp.h (81L, 2.9KB)
-│   │   │   │   │   ├── sntp_opts.h (215L, 8.4KB)
-│   │   │   │   │   ├── tftp_client.h (50L, 2.1KB)
-│   │   │   │   │   ├── tftp_common.h (108L, 3.9KB)
-│   │   │   │   │   ├── tftp_opts.h (106L, 3.0KB)
-│   │   │   │   │   └── tftp_server.h (42L, 1.7KB)
-│   │   │   │   ├── priv/
-│   │   │   │   │   ├── altcp_priv.h (159L, 6.8KB)
-│   │   │   │   │   ├── api_msg.h (272L, 9.0KB)
-│   │   │   │   │   ├── mem_priv.h (84L, 3.3KB)
-│   │   │   │   │   ├── memp_priv.h (161L, 5.4KB)
-│   │   │   │   │   ├── memp_std.h (153L, 6.8KB)
-│   │   │   │   │   ├── nd6_priv.h (143L, 4.3KB)
-│   │   │   │   │   ├── raw_priv.h (69L, 2.5KB)
-│   │   │   │   │   ├── sockets_priv.h (175L, 5.8KB)
-│   │   │   │   │   ├── tcp_priv.h (523L, 22.5KB)
-│   │   │   │   │   └── tcpip_priv.h (176L, 6.0KB)
-│   │   │   │   ├── prot/
-│   │   │   │   │   ├── acd.h (91L, 4.0KB)
-│   │   │   │   │   ├── autoip.h (65L, 2.2KB)
-│   │   │   │   │   ├── dhcp.h (178L, 6.4KB)
-│   │   │   │   │   ├── dhcp6.h (138L, 5.4KB)
-│   │   │   │   │   ├── dns.h (140L, 5.4KB)
-│   │   │   │   │   ├── etharp.h (114L, 3.9KB)
-│   │   │   │   │   ├── ethernet.h (127L, 4.0KB)
-│   │   │   │   │   ├── iana.h (97L, 2.9KB)
-│   │   │   │   │   ├── icmp.h (105L, 3.6KB)
-│   │   │   │   │   ├── icmp6.h (172L, 5.0KB)
-│   │   │   │   │   ├── ieee.h (91L, 3.0KB)
-│   │   │   │   │   ├── igmp.h (90L, 3.0KB)
-│   │   │   │   │   ├── ip.h (59L, 2.1KB)
-│   │   │   │   │   ├── ip4.h (131L, 4.5KB)
-│   │   │   │   │   ├── ip6.h (235L, 7.2KB)
-│   │   │   │   │   ├── mld6.h (71L, 2.4KB)
-│   │   │   │   │   ├── nd6.h (274L, 8.1KB)
-│   │   │   │   │   ├── tcp.h (100L, 3.7KB)
-│   │   │   │   │   └── udp.h (68L, 2.3KB)
-│   │   │   │   ├── acd.h (109L, 4.0KB)
-│   │   │   │   ├── altcp.h (207L, 7.4KB)
-│   │   │   │   ├── altcp_tcp.h (72L, 2.7KB)
-│   │   │   │   ├── altcp_tls.h (196L, 7.2KB)
-│   │   │   │   ├── api.h (434L, 18.2KB)
-│   │   │   │   ├── arch.h (402L, 14.3KB)
-│   │   │   │   ├── autoip.h (90L, 3.1KB)
-│   │   │   │   ├── debug.h (161L, 5.2KB)
-│   │   │   │   ├── def.h (156L, 5.5KB)
-│   │   │   │   ├── dhcp.h (155L, 6.1KB)
-│   │   │   │   ├── dhcp6.h (104L, 3.8KB)
-│   │   │   │   ├── dns.h (131L, 4.9KB)
-│   │   │   │   ├── err.h (117L, 3.4KB)
-│   │   │   │   ├── errno.h (198L, 9.5KB)
-│   │   │   │   ├── etharp.h (110L, 4.2KB)
-│   │   │   │   ├── ethip6.h (68L, 2.3KB)
-│   │   │   │   ├── icmp.h (110L, 3.8KB)
-│   │   │   │   ├── icmp6.h (72L, 2.6KB)
-│   │   │   │   ├── if_api.h (70L, 2.5KB)
-│   │   │   │   ├── igmp.h (115L, 4.4KB)
-│   │   │   │   ├── inet.h (188L, 7.8KB)
-│   │   │   │   ├── inet_chksum.h (104L, 3.9KB)
-│   │   │   │   ├── init.h (100L, 3.6KB)
-│   │   │   │   ├── init.h.cmake.in (3.7KB)
-│   │   │   │   ├── ip.h (328L, 14.1KB)
-│   │   │   │   ├── ip4.h (109L, 4.0KB)
-│   │   │   │   ├── ip4_addr.h (225L, 9.7KB)
-│   │   │   │   ├── ip4_frag.h (100L, 3.1KB)
-│   │   │   │   ├── ip6.h (93L, 3.4KB)
-│   │   │   │   ├── ip6_addr.h (372L, 19.7KB)
-│   │   │   │   ├── ip6_frag.h (144L, 5.6KB)
-│   │   │   │   ├── ip6_zone.h (306L, 13.9KB)
-│   │   │   │   ├── ip_addr.h (468L, 21.4KB)
-│   │   │   │   ├── mem.h (82L, 2.5KB)
-│   │   │   │   ├── memp.h (155L, 5.2KB)
-│   │   │   │   ├── mld6.h (99L, 3.6KB)
-│   │   │   │   ├── nd6.h (90L, 3.2KB)
-│   │   │   │   ├── netbuf.h (116L, 4.6KB)
-│   │   │   │   ├── netdb.h (150L, 5.3KB)
-│   │   │   │   ├── netif.h (698L, 27.0KB)
-│   │   │   │   ├── netifapi.h (161L, 5.6KB)
-│   │   │   │   ├── opt.h (3593L, 114.7KB)
-│   │   │   │   ├── pbuf.h (326L, 14.5KB)
-│   │   │   │   ├── raw.h (143L, 5.4KB)
-│   │   │   │   ├── sio.h (142L, 4.3KB)
-│   │   │   │   ├── snmp.h (213L, 7.6KB)
-│   │   │   │   ├── sockets.h (707L, 26.0KB)
-│   │   │   │   ├── stats.h (491L, 15.0KB)
-│   │   │   │   ├── sys.h (575L, 20.8KB)
-│   │   │   │   ├── tcp.h (500L, 19.0KB)
-│   │   │   │   ├── tcpbase.h (88L, 2.7KB)
-│   │   │   │   ├── tcpip.h (114L, 4.3KB)
-│   │   │   │   ├── timeouts.h (128L, 4.1KB)
-│   │   │   │   └── udp.h (195L, 7.9KB)
-│   │   │   └── netif/
-│   │   │       ├── ppp/
-│   │   │       │   ├── polarssl/
-│   │   │       │   │   ├── arc4.h (81L, 2.8KB)
-│   │   │       │   │   ├── des.h (92L, 3.1KB)
-│   │   │       │   │   ├── md4.h (97L, 3.2KB)
-│   │   │       │   │   ├── md5.h (96L, 3.2KB)
-│   │   │       │   │   └── sha1.h (96L, 3.2KB)
-│   │   │       │   ├── ccp.h (164L, 5.0KB)
-│   │   │       │   ├── chap-md5.h (36L, 1.5KB)
-│   │   │       │   ├── chap-new.h (200L, 6.2KB)
-│   │   │       │   ├── chap_ms.h (44L, 1.7KB)
-│   │   │       │   ├── eap.h (169L, 5.6KB)
-│   │   │       │   ├── ecp.h (62L, 2.0KB)
-│   │   │       │   ├── eui64.h (102L, 3.1KB)
-│   │   │       │   ├── fsm.h (182L, 6.4KB)
-│   │   │       │   ├── ipcp.h (134L, 5.1KB)
-│   │   │       │   ├── ipv6cp.h (191L, 7.7KB)
-│   │   │       │   ├── lcp.h (179L, 6.8KB)
-│   │   │       │   ├── magic.h (130L, 4.9KB)
-│   │   │       │   ├── mppe.h (181L, 6.3KB)
-│   │   │       │   ├── ppp.h (698L, 25.0KB)
-│   │   │       │   ├── ppp_impl.h (736L, 26.1KB)
-│   │   │       │   ├── ppp_opts.h (610L, 15.7KB)
-│   │   │       │   ├── pppapi.h (137L, 4.5KB)
-│   │   │       │   ├── pppcrypt.h (144L, 4.7KB)
-│   │   │       │   ├── pppdebug.h (88L, 3.2KB)
-│   │   │       │   ├── pppoe.h (187L, 7.4KB)
-│   │   │       │   ├── pppol2tp.h (209L, 8.9KB)
-│   │   │       │   ├── pppos.h (125L, 4.6KB)
-│   │   │       │   ├── upap.h (131L, 4.2KB)
-│   │   │       │   └── vj.h (169L, 6.4KB)
-│   │   │       ├── bridgeif.h (127L, 5.2KB)
-│   │   │       ├── bridgeif_opts.h (90L, 3.5KB)
-│   │   │       ├── etharp.h (3L, 140B)
-│   │   │       ├── ethernet.h (77L, 2.9KB)
-│   │   │       ├── ieee802154.h (112L, 5.3KB)
-│   │   │       ├── lowpan6.h (89L, 2.9KB)
-│   │   │       ├── lowpan6_ble.h (78L, 3.1KB)
-│   │   │       ├── lowpan6_common.h (82L, 3.1KB)
-│   │   │       ├── lowpan6_opts.h (122L, 4.3KB)
-│   │   │       ├── slipif.h (86L, 3.1KB)
-│   │   │       └── zepif.h (81L, 2.9KB)
-│   │   ├── netif/
-│   │   │   ├── ppp/
-│   │   │   │   ├── polarssl/
-│   │   │   │   │   ├── README (825B)
-│   │   │   │   │   ├── arc4.c (99L, 3.0KB)
-│   │   │   │   │   ├── des.c (375L, 18.4KB)
-│   │   │   │   │   ├── md4.c (278L, 8.6KB)
-│   │   │   │   │   ├── md5.c (286L, 8.9KB)
-│   │   │   │   │   └── sha1.c (319L, 9.3KB)
-│   │   │   │   ├── PPPD_FOLLOWUP (12.9KB)
-│   │   │   │   ├── auth.c (2497L, 66.4KB)
-│   │   │   │   ├── ccp.c (1703L, 51.4KB)
-│   │   │   │   ├── chap-md5.c (130L, 4.5KB)
-│   │   │   │   ├── chap-new.c (682L, 20.9KB)
-│   │   │   │   ├── chap_ms.c (963L, 34.5KB)
-│   │   │   │   ├── demand.c (443L, 13.4KB)
-│   │   │   │   ├── eap.c (2385L, 68.0KB)
-│   │   │   │   ├── ecp.c (175L, 6.6KB)
-│   │   │   │   ├── eui64.c (56L, 2.1KB)
-│   │   │   │   ├── fsm.c (792L, 20.7KB)
-│   │   │   │   ├── ipcp.c (2341L, 79.1KB)
-│   │   │   │   ├── ipv6cp.c (1488L, 50.4KB)
-│   │   │   │   ├── lcp.c (2691L, 91.6KB)
-│   │   │   │   ├── magic.c (282L, 10.1KB)
-│   │   │   │   ├── mppe.c (403L, 12.7KB)
-│   │   │   │   ├── multilink.c (589L, 15.4KB)
-│   │   │   │   ├── ppp.c (1671L, 51.2KB)
-│   │   │   │   ├── pppapi.c (408L, 14.3KB)
-│   │   │   │   ├── pppcrypt.c (65L, 2.3KB)
-│   │   │   │   ├── pppoe.c (1262L, 40.7KB)
-│   │   │   │   ├── pppol2tp.c (1268L, 43.6KB)
-│   │   │   │   ├── pppos.c (937L, 32.6KB)
-│   │   │   │   ├── upap.c (674L, 18.2KB)
-│   │   │   │   ├── utils.c (969L, 22.4KB)
-│   │   │   │   └── vj.c (686L, 23.1KB)
-│   │   │   ├── FILES (858B)
-│   │   │   ├── bridgeif.c (573L, 19.9KB)
-│   │   │   ├── bridgeif_fdb.c (214L, 7.1KB)
-│   │   │   ├── ethernet.c (342L, 12.0KB)
-│   │   │   ├── lowpan6.c (930L, 30.1KB)
-│   │   │   ├── lowpan6_ble.c (444L, 14.4KB)
-│   │   │   ├── lowpan6_common.c (933L, 35.7KB)
-│   │   │   ├── slipif.c (545L, 16.3KB)
-│   │   │   └── zepif.c (297L, 8.7KB)
-│   │   └── lwipopts.h (155L, 4.4KB)
-│   ├── SignalTrampoline.S (6L, 117B)
-│   ├── bin.S (12L, 266B)
-│   ├── bio.c (146L, 3.6KB)
-│   ├── console.c (204L, 4.4KB)
-│   ├── disk.c (48L, 895B)
-│   ├── entry_qemu.S (19L, 314B)
-│   ├── entry_visionfive.S (29L, 529B)
-│   ├── exec.c (566L, 15.8KB)
-│   ├── fat32.c (1184L, 32.8KB)
-│   ├── file.c (566L, 13.8KB)
-│   ├── fs.c (66L, 1.9KB)
-│   ├── futex.c (70L, 1.8KB)
-│   ├── intr.c (45L, 1.2KB)
-│   ├── kalloc.c (95L, 2.2KB)
-│   ├── kernelvec.S (86L, 2.0KB)
-│   ├── main.c (99L, 2.5KB)
-│   ├── mmap.c (118L, 3.0KB)
-│   ├── net.mk (2.3KB)
-│   ├── pipe.c (139L, 3.2KB)
-│   ├── plic.c (58L, 1.2KB)
-│   ├── printf.c (334L, 7.7KB)
-│   ├── proc.c (1221L, 32.2KB)
-│   ├── pselect.c (170L, 4.3KB)
-│   ├── ramdisk.c (36L, 895B)
-│   ├── ring_buffer.c (113L, 3.7KB)
-│   ├── sd_final.c (642L, 16.5KB)
-│   ├── sddata.S (10L, 216B)
-│   ├── sem.c (75L, 1.8KB)
-│   ├── signal.c (80L, 2.2KB)
-│   ├── sleeplock.c (43L, 873B)
-│   ├── socket_new.c (165L, 4.9KB)
-│   ├── spinlock.c (99L, 3.3KB)
-│   ├── string.c (126L, 2.2KB)
-│   ├── swtch.S (46L, 912B)
-│   ├── syscall.c (500L, 14.4KB)
-│   ├── sysctl.c (315L, 7.8KB)
-│   ├── sysfile.c (1553L, 36.4KB)
-│   ├── sysproc.c (600L, 13.2KB)
-│   ├── syssig.c (111L, 2.7KB)
-│   ├── syssocket.c (468L, 13.4KB)
-│   ├── systime.c (201L, 4.9KB)
-│   ├── thread.c (77L, 2.0KB)
-│   ├── timer.c (134L, 3.2KB)
-│   ├── trampoline.S (147L, 3.7KB)
-│   ├── trap.c (274L, 7.9KB)
-│   ├── uart.c (185L, 4.9KB)
-│   ├── uart8250.c (130L, 4.0KB)
-│   ├── utils.c (24L, 705B)
-│   ├── virtio_disk.c (262L, 7.2KB)
-│   ├── vm.c (705L, 18.6KB)
-│   ├── vma.c (335L, 8.0KB)
-│   └── xv6-riscv-license (1.2KB)
-├── linker/
-│   ├── qemu.ld (1.2KB)
-│   └── visionfive.ld (1.3KB)
-├── tools/
-│   ├── addr2line.py (22L, 728B)
-│   └── cmd.txt (130B)
-├── xv6-user/
-│   ├── busybox_test.c (788L, 32.5KB)
-│   ├── cat.c (39L, 718B)
-│   ├── echo.c (17L, 337B)
-│   ├── find.c (57L, 1.1KB)
-│   ├── forktest.c (48L, 833B)
-│   ├── grading_init.c (30L, 539B)
-│   ├── grep.c (96L, 2.1KB)
-│   ├── grind.c (337L, 7.9KB)
-│   ├── init-for-test.S (1280L, 19.0KB)
-│   ├── init.c (50L, 1.1KB)
-│   ├── initcode.S (28L, 450B)
-│   ├── kill.c (15L, 296B)
-│   ├── ln.c (13L, 323B)
-│   ├── ls.c (57L, 1.1KB)
-│   ├── mkdir.c (21L, 397B)
-│   ├── modify_file_name.sh (115B)
-│   ├── mv.c (54L, 1.3KB)
-│   ├── myDup3.c (14L, 296B)
-│   ├── printf.c (100L, 2.1KB)
-│   ├── rm.c (21L, 413B)
-│   ├── sh.c (579L, 11.7KB)
-│   ├── sleep.c (17L, 395B)
-│   ├── strace.c (26L, 619B)
-│   ├── stressfs.c (47L, 1.1KB)
-│   ├── test.c (31L, 907B)
-│   ├── ulib.c (174L, 3.2KB)
-│   ├── umalloc.c (84L, 1.8KB)
-│   ├── user.h (61L, 1.7KB)
-│   ├── usertests.c (2647L, 58.6KB)
-│   ├── usys.pl (923B)
-│   ├── wc.c (51L, 966B)
-│   ├── xargs.c (61L, 1.3KB)
-│   ├── xargstest.sh (99B)
-│   ├── xv6-riscv-license (1.2KB)
-│   └── zombie.c (12L, 266B)
-├── .clang-format (6.3KB)
-├── .gitignore (581B)
-├── LICENSE (1.1KB)
-├── Makefile (8.5KB)
-├── README (2.1KB)
-├── README.md (23L, 317B)
-├── compile_flags.txt (1.1KB)
-└── taskList.md (26L, 1.7KB)
-
-根目录文档: README, README.md, taskList.md
-
-📊 统计: 31 个目录, 436 个文件 (深度限制: 10 层)
-```
-
----
-
-## 执行摘要（Executive Summary）
-
-本项目是一个基于 **xv6-riscv** 教学操作系统扩展的 64 位 RISC-V 内核，采用 **C 语言宏内核**架构。项目定位为教学/实验操作系统，开发周期 36 天（2023 年 7 月 -8 月），代码规模约 13 万行（含 lwIP 协议栈）。
-
-**技术栈概览**：
-- **目标架构**：RISC-V 64 (`riscv64gc-unknown-none-elf`)
-- **支持平台**：QEMU 虚拟机 + StarFive VisionFive 2 开发板（双平台条件编译）
-- **编程语言**：C99 标准 + RISC-V 汇编
-- **构建系统**：GNU Make + riscv64-unknown-elf 工具链
-- **关键集成**：lwIP TCP/IP 协议栈（回环模式）、自研 FAT32 文件系统驱动
-
-**实现完成度评估**：
-系统主要功能模块基本闭环。核心子系统（虚拟内存管理、进程/线程调度、FAT32 文件系统、Socket 网络接口、中断异常处理、同步原语）均有完整代码实现。但部分高级特性（写时复制、惰性分配、真实网卡驱动、多核 SMP 调度、文件权限检查）仅存在于文档或为桩函数实现。系统整体达到教学演示级别，具备用户程序执行、文件读写、本地网络通信能力。
-
----
-
-## 核心架构与机制提炼
-
-### 内存管理子系统
-
-#### 物理页分配器
-采用**空闲链表（Free List）**机制管理物理内存，定义于 `kernel/kalloc.c`：
-- 数据结构：`struct run` 链表节点 + `kmem` 全局管理器（含自旋锁）
-- 分配策略：从链表头摘取页框（`kalloc()`）
-- 释放策略：插入链表头并用 `0x01` 填充（`kfree()`）
-- 多核保护：通过 `acquire(&kmem.lock)` 保证并发安全
-- **未实现**：Buddy System、Slab 分配器、大页支持
-
-#### 虚拟内存与页表
-采用 **RISC-V Sv39 三级页表**方案（`kernel/vm.c`）：
-- 页表遍历：`walk()` 函数支持按需分配中间级页表
-- 地址映射：`mappages()` 批量映射虚拟地址到物理地址
-- 地址空间布局：
-  - 内核基址：`KERNBASE = 0x80200000`
-  - 用户空间上限：`MAXUVA = 0x80000000`（2GB）
-  - mmap 区域：`USER_MMAP_START` 向下增长
-  - 用户栈：从 `MAXUVA` 向下动态扩展
-- MMU 启用流程：`kvminit()` 创建内核页表 → `kvminithart()` 设置 `satp` 寄存器 → `sfence_vma()` 刷新 TLB
-
-#### VMA（Virtual Memory Area）管理
-定义于 `kernel/include/vma.h`，采用**双向循环链表**组织：
-- 每个进程 `struct proc` 包含 `struct vma *vma` 头节点
-- 支持类型：`MMAP`、`STACK`
-- 栈扩展机制：`handle_stack_page_fault()` 处理缺页异常，每次扩展 `100 * PGSIZE = 400KB`
-- **未实现**：反向映射表（rmap）、写时复制（CoW）
-
-#### 堆管理（brk/sbrk）
-- `sys_sbrk()` / `sys_brk()` 调用 `growproc()` 扩展堆空间
-- **立即分配物理页**：`uvmalloc1()` 循环调用 `kalloc()` + `mappages()`
-- **未实现惰性分配**：堆扩展非懒加载，与栈的缺页扩展机制不一致
-
-#### mmap 系统调用
-实现于 `kernel/mmap.c` + `kernel/vma.c`：
-- 支持标志：`MAP_FIXED`、`MAP_ANONYMOUS`、`MAP_SHARED`、`MAP_PRIVATE`
-- 文件映射：mmap 时立即读取文件内容到用户页
-- 匿名映射：仅创建 VMA，不分配物理页
-- **未实现零拷贝优化**：`MAP_SHARED` 未实现多进程共享同一物理页
-- **未实现 CoW**：`MAP_PRIVATE` 无写时复制机制
-
----
-
-### 进程与线程调度子系统
-
-#### 进程控制块（PCB）
-定义于 `kernel/include/proc.h` 的 `struct proc`：
-- 5 状态枚举：`UNUSED`、`SLEEPING`、`RUNNABLE`、`RUNNING`、`ZOMBIE`
-- 关键字段：`main_thread`（主线程指针）、`thread_queue`（线程链表）、`pagetable`（用户页表）、`ofile[NOFILE]`（文件描述符表）、`sigaction[]`（信号处理函数表）
-- 线程模型：1:N 模型，一个进程可包含多个内核级线程
-
-#### 线程控制块（TCB）
-定义于 `kernel/include/thread.h` 的 `struct thread`：
-- 6 状态枚举：`t_UNUSED`、`t_SLEEPING`、`t_RUNNABLE`、`t_RUNNING`、`t_ZOMBIE`、`t_TIMING`
-- 独立内核栈：每个线程有独立的 `kstack` 和 `trapframe`
-- 线程创建：`sys_clone()` 检测 `CLONE_VM` 标志调用 `thread_clone()`
-
-#### 调度器实现
-位于 `kernel/proc.c:669-753` 的 `scheduler()`：
-- **调度算法**：简单轮询（Round-Robin），线性扫描全局 `proc[NPROC]` 数组
-- **线程选择**：在进程内遍历 `thread_queue` 查找第一个 `t_RUNNABLE` 线程
-- **上下文切换**：通过 `swtch()` 汇编函数保存/恢复 14 个 callee-saved 寄存器（`ra, sp, s0-s11`）
-- **多核行为**：每个 CPU 独立运行 `scheduler()`，无全局任务队列或负载均衡
-- **未实现**：CFS 调度器、优先级调度、时间片轮转、CPU 亲和性
-
-#### 进程间通信（IPC）
-- **信号机制**（`kernel/signal.c`）：
-  - 支持 65 个信号（`SIGRTMIN=32` 到 `SIGRTMAX=64`）
-  - 信号注册：`sys_rt_sigaction()` 设置处理函数
-  - 信号发送：`sys_kill()` 设置 `p->sig_pending` 位图
-  - 信号分发：`sighandle()` 修改 `trapframe->epc` 指向处理函数
-  - 信号返回：`SIGTRAMPOLINE` + `sys_rt_sigreturn()` 恢复上下文
-  - **缺陷**：`sys_kill()` 中 `pid` 被错误赋值为 `myproc()->pid`，无法向其他进程发送信号
-- **Futex**（`kernel/futex.c`）：
-  - 全局固定大小队列 `futexQueue[FUTEX_COUNT=1024]`
-  - 支持操作：`FUTEX_WAIT`、`FUTEX_WAKE`、`FUTEX_REQUEUE`
-  - 超时支持：通过 `t_TIMING` 状态和 `awakeTime` 实现定时唤醒
-- **管道**（`kernel/pipe.c`）：
-  - 512 字节环形缓冲区
-  - 阻塞式读写：满时写端睡眠，空时读端睡眠
-- **未实现**：POSIX 消息队列（`msgget`）、共享内存（`shmget`）
-
----
-
-### 文件系统子系统
-
-#### VFS 架构设计
-采用**轻量级直接耦合**设计，无严格 VFS 抽象层：
-- **无独立 Inode/Dentry 抽象**：直接使用 FAT32 的 `struct dirent` 作为 inode+dentry 合体
-- **文件类型判别**：通过 `struct file` 的 `type` 枚举区分（`FD_NONE`、`FD_PIPE`、`FD_ENTRY`、`FD_DEVICE`、`FD_SOCK`、`FD_NULL`）
-- **全局文件表**：`ftable` 管理所有 `struct file` 实例，进程通过 `ofile[]` 指向全局表项
-- **文件描述符分配**：`fdalloc()` 线性扫描 `proc->ofile[]` 查找空闲槽位
-
-#### FAT32 文件系统驱动
-实现于 `kernel/fat32.c`（1184 行）：
-- 初始化：`fat32_init()` 扫描磁盘查找 FAT32 签名，解析 BPB（BIOS Parameter Block）
-- 目录项缓存：`ecache` 管理 50 个 `dirent` 缓存项，LRU 淘汰策略
-- 路径解析：`ename()` / `enameparent()` 递归查找目录项
-- 文件创建：`new_create()` 分配簇并更新 FAT 表
-- 文件读写：`eread()` / `ewrite()` 通过簇链遍历访问数据
-- 长文件名支持：通过 `long_name_entry_t` 结构支持 VFAT 长文件名
-
-#### 块缓存（Block Cache）
-实现于 `kernel/bio.c`：
-- 数据结构：`struct buf` 含 `valid`、`refcnt`、`data[BSIZE]`、LRU 链表指针
-- 全局管理器：`bcache` 含自旋锁和双向链表头
-- LRU 策略：`head.next` 指向最近使用，`head.prev` 指向最久未使用
-- 读写接口：`bread()` 未命中时调用 `disk_read()`，`bwrite()` 写回磁盘
-
-#### 未实现功能
-- **ext4/ramfs**：无代码实现
-- **tmpfs/procfs**：仅 `sys_statfs()` 硬编码返回魔术数字，无实际挂载/读写逻辑
-- **Page Cache**：无独立页面缓存层，文件内容直接读写
-- **poll/select/epoll**：无 I/O 多路复用机制
-- **munmap/mprotect**：桩函数（返回 0 无逻辑）
-
----
-
-### 中断与异常处理子系统
-
-#### Trap 处理架构
-采用**双入口模式**区分用户态和内核态 Trap：
-- **用户态入口**：`kernel/trampoline.S:uservec` 保存用户寄存器到 `trapframe`，跳转到 `usertrap()`
-- **内核态入口**：`kernel/kernelvec.S:kernelvec` 处理内核执行期间的中断
-- **向量基址配置**：`trapinithart()` 设置 `stvec` 寄存器指向 `kernelvec`
-
-#### 异常分类与处理
-在 `usertrap()` 中通过 `scause` 寄存器判断 Trap 类型：
-- **scause = 8**：用户态 `ecall` 指令 → 调用 `syscall()` 分发系统调用
-- **scause = 13/15**：加载/存储页故障 → 调用 `handle_stack_page_fault()` 处理栈扩展
-- **scause & 0x8000000000000000 != 0**：中断 → 调用 `devintr()` 分发设备中断
-- **scause = 3**：`ebreak` 断点异常 → 打印调试信息
-
-#### 中断分发流程
-`devintr()` 函数（`kernel/trap.c:204`）进一步区分中断源：
-- **外部中断**（`scause = 0x8000000000000009`）：通过 PLIC 控制器获取中断号，分发到 UART、磁盘等设备处理函数
-- **定时器中断**（`scause = 0x8000000000000005`）：调用 `timer_tick()`，返回 2 表示需要调度
-
-#### 系统调用分发机制
-- **分发表**：`kernel/syscall.c` 维护 `syscalls[]` 函数指针表（约 100 个条目）
-- **调用约定**：`a7` 寄存器传递系统调用号，`a0-a5` 传递参数
-- **返回值**：结果存入 `p->trapframe->a0`
-- **实现状态**：约 70% 完整实现，15% 桩函数，15% 未实现
-
-#### Trampoline 汇编桩代码
-`kernel/trampoline.S` 实现关键的汇编桩代码：
-- **uservec**：交换 `a0` 与 `sscratch`（trapframe 地址），保存 32 个用户寄存器，切换到内核页表，跳转到 `usertrap()`
-- **userret**：切换到用户页表，恢复 32 个用户寄存器，执行 `sret` 返回用户态
-- **信号跳板**：`signalTrampoline` 执行 `ecall` 触发 `SYS_rt_sigreturn`
-
----
-
-### 设备驱动与硬件抽象
-
-#### 双平台支持架构
-通过 Makefile 条件编译区分 QEMU 和 VisionFive 2 平台：
-- **QEMU 平台**：
-  - 入口文件：`kernel/entry_qemu.S`
-  - 块设备：VirtIO-MMIO 磁盘驱动（`kernel/virtio_disk.c`）
-  - UART：16550a 驱动（`kernel/uart.c`）
-  - 中断模式：S-mode PLIC（`PLIC_SCLAIM`）
-- **VisionFive 2 平台**：
-  - 入口文件：`kernel/entry_visionfive.S`
-  - 块设备：SD 卡驱动（`kernel/sd_final.c`）
-  - UART：UART8250 驱动（`kernel/uart8250.c`）
-  - 中断模式：M-mode PLIC（`PLIC_MCLAIM`）
-
-#### 字符设备驱动（UART）
-- **QEMU 平台**：`kernel/uart.c` 实现 16550a UART 驱动，配置波特率 38.4K，支持中断收发
-- **VisionFive 平台**：`kernel/uart8250.c` 实现参数化 UART8250 驱动，支持时钟频率、波特率、寄存器偏移配置
-- **Console 抽象层**：`kernel/console.c` 提供统一的 `consputc()` 接口，屏蔽底层 UART 差异
-- **MMU 地址切换**：MMU 启用前使用物理地址，启用后通过 `uart8250_change_base_addr(UART_V)` 切换到虚拟地址
-
-#### 块设备驱动
-- **VirtIO-MMIO**（`kernel/virtio_disk.c`）：
-  - 设备验证：检查 `MAGIC_VALUE`、`VERSION`、`DEVICE_ID`
-  - VirtIO 状态机：`ACKNOWLEDGE` → `DRIVER` → `FEATURES_OK` → `DRIVER_OK`
-  - VirtQueue 初始化：分配描述符表、可用环、已用环
-  - 读写操作：`virtio_disk_rw()` 分配 3 个描述符（header + data + status），通知设备后睡眠等待中断唤醒
-- **SD 卡驱动**（`kernel/sd_final.c`）：
-  - 状态机：`IDLE`、`CMD_WAIT`、`CMD_DONE`、`DATA_WAIT`、`DATA_DONE`
-  - 事件驱动模型：`SDIO_WaitEvent()` / `SDIO_WakeEvent()`
-- **RAM Disk**（`kernel/ramdisk.c`）：备用方案，用于无真实块设备的测试场景
-
-#### 网络设备驱动
-- **❌ 无真实网卡驱动**：未实现 VirtIO-Net、E1000、RTL8139 等驱动
-- **lwIP 协议栈集成**（`kernel/lwip/`）：
-  - 运行模式：仅回环（Loopback），IP 固定为 `127.0.0.1`
-  - 网络接口：`netif_loopif_init()` 初始化 "lo" 接口
-  - 数据包传递：`netif_loop_output()` 直接将数据包送回协议栈，不经过硬件
-- **Socket 系统调用**（`kernel/syssocket.c`）：
-  - 完整实现：`sys_socket`、`sys_bind`、`sys_connect`、`sys_listen`、`sys_accept`、`sys_sendto`、`sys_recvfrom`
-  - 底层转发：调用 `lwip_socket()`、`lwip_bind()` 等 lwIP API
-
-#### 中断控制器驱动（PLIC）
-实现于 `kernel/plic.c`：
-- 初始化：`plicinit()` 设置 UART/DISK 中断优先级
-- 中断使能：`plicinithart()` 配置 `PLIC_SENABLE` 寄存器
-- 中断处理：`plic_claim()` 获取中断号，`plic_complete()` 通知完成
-- 平台差异：QEMU 使用 S-mode（`PLIC_SCLAIM`），VisionFive 使用 M-mode（`PLIC_MCLAIM`）
-
----
-
-### 同步互斥原语
-
-#### 自旋锁（SpinLock）
-实现于 `kernel/spinlock.c`：
-- 数据结构：`struct spinlock` 含 `locked`、`name`、`cpu` 字段
-- 原子操作：使用 `__sync_lock_test_and_set()` 实现原子交换（编译为 `amoswap.w.aq` 指令）
-- 获取锁：`acquire()` 禁用中断（`push_off()`），自旋等待直到 `locked=0`
-- 释放锁：`release()` 设置 `locked=0`，恢复中断状态（`pop_off()`）
-- 内存序：使用 `__sync_synchronize()` 发出 fence 指令保证多核可见性
-- **未实现**：优先级继承、自适应自旋
-
-#### 睡眠锁（SleepLock）
-实现于 `kernel/sleeplock.c`：
-- 数据结构：`struct sleeplock` 嵌套 `spinlock` 保护状态
-- 获取锁：`acquiresleep()` 当锁被占用时调用 `sleep()` 挂起进程
-- 释放锁：`releasesleep()` 调用 `wakeup()` 唤醒等待者
-- 适用场景：长时间持有的临界区（如文件锁、设备访问）
-
-#### 信号量（Semaphore）
-实现于 `kernel/sem.c`：
-- PV 操作：`sem_wait()` 当 `value<=0` 时睡眠，`sem_post()` 增加 `value` 并唤醒
-- 超时支持：`sem_wait_with_milli_timeout()` 实现带超时的 P 操作
-- 使用场景：进程/线程间同步
-
----
-
-### 多核支持机制
-
-#### Per-CPU 数据结构
-定义于 `kernel/include/proc.h` 的 `struct cpu`：
-- 字段：`proc`（当前运行进程）、`context`（调度器上下文）、`noff`（中断禁用嵌套深度）、`intena`（中断使能状态）
-- 存储方式：全局数组 `cpus[NCPU]`，通过 `r_tp()` 读取 hartid 索引访问
-- **未实现**：Per-CPU 段优化、缓存行对齐
-
-#### Secondary CPU 启动
-在 `kernel/main.c` 中尝试启动第二个 hart：
-- 启动方式：`sbi_hart_start(2, (unsigned long)_start, 0)` 通过 SBI 调用
-- 从核行为：初始化后进入无限 UART 轮询循环，**未调用 `scheduler()`**
-- **实质**：AMP（非对称多处理）模式，从核仅处理 UART 中断，不参与进程调度
-
-#### 核间通信（IPI）
-- **接口定义**：`kernel/include/sbi.h` 定义 `sbi_send_ipi()`
-- **实际使用**：❌ 整个代码库中无任何调用
-- **未实现**：IPI 中断处理程序、调度器间通信、任务迁移
-
-#### 多核调度策略
-- **全局进程表**：所有 CPU 轮询同一个 `proc[]` 数组
-- **无负载均衡**：未实现 per-CPU 运行队列或任务迁移
-- **竞争问题**：多核并发遍历 `proc[]` 可能导致锁竞争
-
----
-
-### 安全机制与权限模型
-
-#### 特权级隔离
-- **页表隔离**：通过 `PTE_U` 位区分用户页与内核页
-- **用户页检查**：`walkaddr()` 拒绝内核访问非用户页
-- **未实现**：KPTI（内核页表隔离）、SMEP（ Supervisor Mode Execution Prevention）、SMAP（Supervisor Mode Access Prevention）
-
-#### 用户/组 ID 机制
-- **字段定义**：`struct proc` 含 `uid`、`gid` 字段
-- **系统调用**：`sys_setuid()`、`sys_getuid()`、`sys_getgid()` 可读写 UID/GID
-- **权限检查**：❌ 文件系统操作（`sys_open`、`sys_write`）未验证进程 UID 与文件所有权
-- **文件 stat**：`kstat()` / `ekstat()` 硬编码 `st_uid=0`、`st_gid=0`、`st_mode=0777`
-- **实质**：单用户操作系统设计，所有进程以 root 权限运行
-
-#### 用户指针验证
-- **访问函数**：`copyin()` / `copyout()` 通过 `walkaddr()` 验证地址合法性
-- **检查内容**：页表映射存在性、`PTE_V` 有效位、`PTE_U` 用户位
-- **未实现**：显式的 `verify_area()` 接口、`UserInPtr`/`UserOutPtr` 类型安全包装
-
-#### 安全沙箱与审计
-- **❌ 未实现**：Seccomp 系统调用过滤、Prctl 进程控制、Capability 细粒度权限、Audit 安全审计日志
-- **❌ 未实现**：安全启动（ELF 加载无签名验证）、Stack Canary 栈保护
-
----
-
-## 问题与缺陷揭露
-
-### 未实现的核心功能模块
-
-| 功能模块 | 状态 | 具体缺失内容 | 文件位置证据 |
-|---------|------|-------------|-------------|
-| **写时复制（CoW）** | ❌ 未实现 | `fork()` 直接复制物理页，无写保护机制 | `kernel/vm.c:382-414` `uvmcopy()` |
-| **惰性堆分配** | ❌ 未实现 | `sys_sbrk()` 立即分配物理页，非懒加载 | `kernel/vm.c:299-329` `growproc()` |
-| **共享内存（shm）** | ❌ 未实现 | 无 `sys_shmget`、`sys_shmat`、`sys_shmdt` | 全库搜索无匹配 |
-| **消息队列（msg）** | ❌ 未实现 | 无 `sys_msgget`、`sys_msgsnd`、`sys_msgrcv` | 全库搜索无匹配 |
-| **反向映射表（rmap）** | ❌ 未实现 | 无页到 VMA 的反向映射 | 全库搜索无匹配 |
-| **页面置换（Swap）** | ❌ 未实现 | 无交换区管理、换页机制 | 全库搜索无匹配 |
-| **大页支持（Huge Page）** | ❌ 未实现 | 无 2M/1G 大页页表代码 | 全库搜索无匹配 |
-| **ext4 文件系统** | ❌ 未实现 | 仅支持 FAT32 | 全库搜索无匹配 |
-| **ramfs/tmpfs** | 🔸 桩函数 | `sys_statfs()` 硬编码返回魔术数字，无实际实现 | `kernel/sysfile.c:1106-1128` |
-| **procfs/devfs/sysfs** | ❌ 未实现 | 无 `/proc`、`/sys`、`/dev` 实际实现 | 全库搜索无匹配 |
-| **真实网卡驱动** | ❌ 未实现 | 仅 lwIP 回环模式，无 VirtIO-Net/E1000/RTL8139 | `kernel/main.c:71` `tcpip_init_with_loopback()` |
-| **ICMP/Ping** | ❌ 未实现 | lwIP 配置 `LWIP_ICMP=0` | `kernel/lwip/lwipopts.h` |
-| **DHCP** | ❌ 未实现 | lwIP 配置 `LWIP_DHCP=0`，IP 固定 | `kernel/lwip/lwipopts.h` |
-| **poll/select/epoll** | ❌ 未实现 | 无 I/O 多路复用系统调用 | 全库搜索无匹配 |
-| **零拷贝（sendfile）** | ❌ 未实现 | 无 `sys_sendfile`、`sys_splice` | 全库搜索无匹配 |
-| **GDB Stub** | ❌ 未实现 | 无 GDB 远程调试协议实现 | 全库搜索无匹配 |
-| **内核 Monitor** | ❌ 未实现 | 无内核级调试命令行 | 全库搜索无匹配 |
-| **DWARF 栈回溯** | ❌ 未实现 | 仅基于 Frame Pointer，无法处理优化代码 | `kernel/printf.c:280-289` |
-| **多核 SMP 调度** | ❌ 未实现 | 从核仅轮询 UART，未进入调度器 | `kernel/main.c:85-92` |
-| **IPI 通信** | ❌ 未实现 | 仅有接口定义，无任何调用 | `kernel/include/sbi.h:82-84` |
-| **负载均衡** | ❌ 未实现 | 无 per-CPU 运行队列或任务迁移 | 全库搜索无匹配 |
-| **RCU 机制** | ❌ 未实现 | 无读拷贝更新机制 | 全库搜索无匹配 |
-| **文件权限检查** | ❌ 未实现 | `sys_open`、`sys_write` 未验证 UID/GID | `kernel/sysfile.c:455-462` |
-| **Capability 机制** | ❌ 未实现 | 无细粒度权限控制 | 全库搜索无匹配 |
-| **Seccomp 沙箱** | ❌ 未实现 | 无系统调用过滤机制 | 全库搜索无匹配 |
-| **安全启动** | ❌ 未实现 | ELF 加载无签名验证 | `kernel/exec.c` |
-| **Stack Canary** | ❌ 未实现 | 无栈溢出保护 | 全库搜索无匹配 |
-| **SMAP/SMEP** | ❌ 未实现 | 未设置 `sstatus.SUM` 等保护位 | `kernel/include/riscv.h` |
-| **FPU 初始化** | ❌ 未实现 | 无 `sstatus.FS` 设置代码 | 全库搜索无匹配 |
-| **CFS 调度器** | ❌ 未实现 | 仅简单轮询，无虚拟运行时间 | `kernel/proc.c:669-753` |
-| **优先级继承** | ❌ 未实现 | 自旋锁无优先级字段 | `kernel/include/spinlock.h` |
-
----
-
-### 桩函数与部分实现
-
-| 系统调用/功能 | 状态 | 桩代码特征 | 文件位置 |
-|--------------|------|-----------|---------|
-| `sys_munmap` | 🔸 桩函数 | 仅 `return 0`，无实际逻辑 | `kernel/sysfile.c:1132-1138` |
-| `sys_mprotect` | 🔸 桩函数 | 声明存在但未找到实现体 | `kernel/sysproc.c:550` |
-| `sys_sched_setscheduler` | 🔸 桩函数 | `// TODO` + `return 0` | `kernel/sysproc.c:217` |
-| `sys_sched_getscheduler` | 🔸 桩函数 | `return 0` | `kernel/sysproc.c:191` |
-| `sys_sched_getaffinity` | 🔸 桩函数 | 硬编码返回 `affinity = 1` | `kernel/sysproc.c:198-212` |
-| `sys_madvise` | 🔸 桩函数 | `// TODO` + `return 0` | `kernel/sysproc.c:577` |
-| `sys_umask` | 🔸 桩函数 | `// TODO` + `return 0` | `kernel/sysproc.c:547` |
-| `sys_exit_group` | 🔸 桩函数 | `return 0` | `kernel/sysproc.c:423` |
-| `sys_rt_sigtimedwait` | 🔸 桩函数 | `return 0` | `kernel/syssig.c:106` |
-| `sys_tkill` | 🔸 桩函数 | 仅打印调试信息，返回 0 | `kernel/thread.c:69-76` |
-| `sys_getsockopt` | 🔸 桩函数 | 未找到完整实现 | `kernel/syssocket.c` |
-| `sys_setsockopt` | 🔸 桩函数 | 调用 lwIP 但标记 `unused` | `kernel/socket_new.c:83` |
-| `sys_socketpair` | 🔸 桩函数 | 返回 0 无实现 | 系统调用表声明 |
-| `tgkill` | 🔸 部分实现 | 缺少线程组验证逻辑 | `kernel/proc.c:912-917` |
-| `tkill` | 🔸 桩函数 | 未实现线程级信号发送 | `kernel/thread.c:69-76` |
-| `sys_kill` | ⚠️ 缺陷 | `pid` 被错误赋值为 `myproc()->pid` | `kernel/sysproc.c:339-358` |
-| `tmpfs/procfs` | 🔸 桩函数 | `sys_statfs()` 硬编码返回魔术数字 | `kernel/sysfile.c:1106-1128` |
-| `/dev/null` | 🔸 特殊处理 | 硬编码判断路径返回 `FD_NULL` | `kernel/sysfile.c:935-947` |
-| M-Mode → S-Mode 切换 | 🔸 假设完成 | 内核无显式切换代码，依赖固件 | 全库搜索无匹配 |
-
----
-
-### 与完整操作系统的客观差距
-
-1. **内存管理**：缺少 CoW、Lazy Allocation、Swap 等高级内存优化机制，内存利用率较低，fork 性能未优化
-
-2. **文件系统**：仅支持 FAT32 单一文件系统，无 ext4/ramfs 等替代方案，无 Page Cache 层，文件读写性能受限
-
-3. **网络子系统**：仅支持本机回环通信，无真实网卡驱动，无法与外部网络交互，网络功能仅具教学演示价值
-
-4. **多核支持**：本质为单核操作系统，从核未参与调度，无 IPI 通信、负载均衡、任务迁移等 SMP 核心机制
-
-5. **安全机制**：UID/GID 仅作为标识字段，未在文件系统访问中强制执行权限检查，所有进程以 root 权限运行，无 Seccomp/Capability 等沙箱机制
-
-6. **进程间通信**：缺少 POSIX 消息队列、共享内存等标准 IPC 机制，仅支持管道、信号、Futex
-
-7. **调试支持**：无 GDB Stub、内核 Monitor、DWARF 栈回溯等高级调试功能，主要依赖打印日志和 QEMU 内置调试器
-
-8. **调度算法**：采用简单轮询策略，无 CFS、优先级调度、时间片管理等现代调度特性，实时性保障不足
 
 ---
 
@@ -884,6 +33,98 @@ oskernel2023-avx/
 11. 网络子系统与协议栈
 12. 调试机制与错误处理
 13. 开发历史与里程碑
+
+---
+
+## Call Graph 概览
+
+> 先以 Tree-sitter 扫描全库，再对 C/C++ 用 **Clang AST**（与仓库根 `compile_flags.txt` / `compile_commands.json` 一致）剔除**条件编译未进入翻译单元**的函数节点，得到参与 PageRank 的 **5771** 个函数、**4205** 条调用边。
+> Clang 语义过滤已移除 933 个在条件编译下未进入翻译单元的 C/C++ 函数节点（语义解析 149/149 个文件）。
+>
+> 用 **PageRank** 选出架构枢纽 **Top-30** 个函数（参数 **k=30**；若全库可排名节点不足 k，则实际个数可能小于 k）。
+> 按 **domain（列）× layer（行）** 二维网格布局（**domain/layer 由 LLM 根据函数名与代码片段分类**），
+> 同格多节点限制在格内排布；连线体现调用关系。
+> **可变网格**：在 **k=30** 配置下，**未出现**的 domain 列、layer 行会**压缩**宽高，把画布让给有节点的列/行。
+> **layer 为何常落在 kernel**：PageRank 枢纽多为调度/内存/VFS 等**内核通用逻辑**，且 `kernel` 表示「既非 syscall 入口、也非直接 MMIO」的广义内核代码，模型容易默认成 kernel；已对 **`sys_*` 命名**做确定性修正为 `syscall_boundary`。缓存随 **compile 配置 / git / 管线版本** 自动失效；需强制全量重算时可调用 `generate_callgraph_section(..., force_regenerate=True)`。
+
+### 函数级 Call Graph（PageRank Top-30，图示 30 个函数）
+
+![函数级 Call Graph](callgraph_overview.svg)
+
+*（图：`callgraph_overview.svg`，与报告同目录）*
+
+**图例**：列 = domain 分类，行 = layer 层次（**userspace** → **syscall_boundary** → **kernel** → **hardware**）
+节点颜色：`arch_platform`=#f4d03f / `trap_syscall`=#e74c3c / `process_sched`=#3498db / `memory_vm`=#2ecc71 / `fs_storage`=#9b59b6
+节点**第一行**仅为**符号名**；**第二行**：**函数定义**只写相对源路径；**宏**、**类型别名（typedef）**、**仅引用（调用侧）**等在第二行用**中文**标明类别并附路径或调用方文件（来自静态解析或调用边）。
+列宽按该 domain 列下最长节点标签**动态**估算（有上下限），避免固定死宽度。
+
+### 文件级调用关系
+
+<table style="border-collapse:collapse;width:auto;max-width:100%;table-layout:auto">
+<thead><tr>
+<th style="text-align:left;padding:6px 10px;border:1px solid #ddd;background:#f6f8fa">源文件</th>
+<th style="text-align:left;padding:6px 10px;border:1px solid #ddd;background:#f6f8fa">domain</th>
+<th style="text-align:left;padding:6px 10px;border:1px solid #ddd;background:#f6f8fa">调用的文件（权重）</th>
+</tr></thead>
+<tbody>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>kernel/console.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">arch_platform</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">uart8250.c×1, sbi.h×1</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>kernel/intr.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">arch_platform</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">riscv.h×10, proc.c×5, printf.c×2</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>kernel/kalloc.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">memory_vm</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">proc.c×14, riscv.h×10, printf.c×9, spinlock.c×6, string.c×4</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>kernel/lwip/core/mem.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">memory_vm</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">printf.c×7, proc.c×7, riscv.h×3, spinlock.c×3, intr.c×2</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>kernel/lwip/core/memp.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">memory_vm</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">printf.c×13, proc.c×12, riscv.h×5, spinlock.c×5, fat32.c×2</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>kernel/lwip/core/pbuf.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">memory_vm</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">printf.c×7, mem.c×5, proc.c×5, memp.c×2, riscv.h×2</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>kernel/printf.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">runtime_common</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">proc.c×7, riscv.h×6, spinlock.c×5, console.c×2, printf.c×1</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>kernel/proc.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">process_sched</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">riscv.h×14, printf.c×7, intr.c×4, spinlock.c×3, file.c×1</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>kernel/spinlock.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">sync_ipc</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">riscv.h×10, proc.c×8, printf.c×4, intr.c×3</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>kernel/syscall.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">trap_syscall</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">proc.c×12, riscv.h×12, intr.c×6, printf.c×3, string.c×1</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>kernel/vm.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">memory_vm</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">printf.c×5, spinlock.c×3, string.c×2, proc.c×2, intr.c×2</td></tr>
+</tbody></table>
+
+### PageRank Top-30 枢纽函数（k=30）
+
+<table style="border-collapse:collapse;width:auto;max-width:100%;table-layout:auto">
+<thead><tr>
+<th style="text-align:left;padding:6px 10px;border:1px solid #ddd;background:#f6f8fa">符号</th>
+<th style="text-align:left;padding:6px 10px;border:1px solid #ddd;background:#f6f8fa">类型</th>
+<th style="text-align:left;padding:6px 10px;border:1px solid #ddd;background:#f6f8fa">domain</th>
+<th style="text-align:left;padding:6px 10px;border:1px solid #ddd;background:#f6f8fa">layer</th>
+<th style="text-align:left;padding:6px 10px;border:1px solid #ddd;background:#f6f8fa">定义路径 / 引用位置</th>
+<th style="text-align:left;padding:6px 10px;border:1px solid #ddd;background:#f6f8fa">PR</th>
+<th style="text-align:left;padding:6px 10px;border:1px solid #ddd;background:#f6f8fa">in°</th>
+<th style="text-align:left;padding:6px 10px;border:1px solid #ddd;background:#f6f8fa">out°</th>
+</tr></thead>
+<tbody>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>mycpu</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">函数定义</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">process_sched</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">kernel</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>kernel/proc.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#1</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">36</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">2</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>cpuid</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">函数定义</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">arch_platform</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">hardware</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>kernel/proc.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#2</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">32</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">1</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>r_tp</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">函数定义</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">arch_platform</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">hardware</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>kernel/include/riscv.h</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#3</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">28</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">0</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>myproc</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">函数定义</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">process_sched</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">kernel</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>kernel/proc.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#4</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">121</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">10</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>release</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">函数定义</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">sync_ipc</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">kernel</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>kernel/spinlock.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#5</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">83</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">13</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>acquire</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">函数定义</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">sync_ipc</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">kernel</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>kernel/spinlock.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#6</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">81</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">11</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>holding</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">函数定义</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">sync_ipc</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">kernel</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>kernel/spinlock.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#7</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">31</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">3</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>pop_off</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">函数定义</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">arch_platform</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">kernel</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>kernel/intr.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#8</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">35</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">11</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>printf</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">函数定义</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">runtime_common</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">kernel</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>kernel/printf.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#9</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">139</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">30</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>push_off</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">函数定义</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">arch_platform</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">kernel</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>kernel/intr.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#10</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">42</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">7</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>r_sstatus</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">函数定义</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">arch_platform</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">hardware</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>kernel/include/riscv.h</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#11</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">41</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">0</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>memset</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">函数定义</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">runtime_common</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">kernel</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>kernel/string.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#12</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">62</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">0</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>u16_t</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">类型别名（typedef）</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">runtime_common</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">kernel</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>类型别名（typedef） · kernel/lwip/include/arch/cc.h</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#13</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">37</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">0</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>memp_free</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">函数定义</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">memory_vm</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">kernel</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>kernel/lwip/core/memp.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#14</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">22</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">21</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>mem_free</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">函数定义</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">memory_vm</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">kernel</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>kernel/lwip/core/mem.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#15</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">3</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">36</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>intr_get</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">函数定义</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">arch_platform</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">hardware</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>kernel/include/riscv.h</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#16</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">51</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">1</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>do_memp_free_pool</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">函数定义</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">memory_vm</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">kernel</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>kernel/lwip/core/memp.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#17</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">3</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">27</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>argraw</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">函数定义</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">trap_syscall</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">syscall_boundary</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>kernel/syscall.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#18</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">7</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">16</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>pbuf_free</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">函数定义</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">memory_vm</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">kernel</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>kernel/lwip/core/pbuf.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#19</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">40</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">31</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>consputc</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">函数定义</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">arch_platform</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">hardware</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>kernel/console.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#20</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">59</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">2</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>debug_print</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">函数定义</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">runtime_common</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">kernel</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>kernel/printf.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#21</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">78</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">7</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>memmove</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">函数定义</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">runtime_common</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">kernel</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>kernel/string.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#22</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">37</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">0</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>intr_on</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">函数定义</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">arch_platform</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">hardware</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>kernel/include/riscv.h</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#23</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">71</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">2</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>kfree</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">函数定义</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">memory_vm</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">kernel</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>kernel/kalloc.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#24</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">33</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">23</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>argint</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">函数定义</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">trap_syscall</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">syscall_boundary</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>kernel/syscall.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#25</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">53</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">10</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>kalloc</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">函数定义</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">memory_vm</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">kernel</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>kernel/kalloc.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#26</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">30</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">28</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>exit</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">函数定义</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">process_sched</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">kernel</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>kernel/proc.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#27</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">153</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">32</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>argaddr</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">函数定义</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">trap_syscall</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">syscall_boundary</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>kernel/syscall.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#28</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">56</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">10</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>walk</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">函数定义</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">memory_vm</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">kernel</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>kernel/vm.c</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#29</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">44</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">19</td></tr>
+<tr><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code>w_sstatus</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">函数定义</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">arch_platform</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">hardware</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top"><code style='white-space:pre-wrap;word-break:break-all'>kernel/include/riscv.h</code></td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">#30</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">49</td><td style="text-align:left;padding:6px 10px;border:1px solid #ddd;vertical-align:top">0</td></tr>
+</tbody></table>
 
 ---
 
@@ -7797,5 +7038,5 @@ uint64 sys_copy_file_range(void) {
 ---
 
 *本报告由 OS-Agent-D 自动生成*  
-*生成时间: 2026-03-14 04:51:07*  
-*分析耗时: 30.7 分钟*
+*生成时间: 2026-04-04 16:32:24*  
+*分析耗时: 1.7 分钟*

@@ -1,0 +1,121 @@
+{
+  "stage_id": "02_boot_arch",
+  "goal": "分析从 RustSBI (M-Mode) 到内核 main() (S-Mode) 的完整启动流程，验证模式切换、MMU 初始化、串口地址映射及多平台适配。",
+  "must_cover": [
+    "启动入口：entry_qemu.S/entry_k210.S 中的 _entry/_start，链接脚本 ENTRY 定义",
+    "模式切换：RustSBI 中 mstatus.mpp 设置 (S-Mode)，内核 entry.S 直接 call main 无显式 M->S 切换",
+    "关键寄存器：stvec 设置 (trapinithart)、satp 设置 (kvminithart)、栈指针 SP 初始化",
+    "跳转机制：entry.S 中 call main 指令直接跳转到 C 入口",
+    "早期初始化：BSS 清零 (链接脚本定义)、串口初始化 (consoleinit)、页表初始化 (kvminit/kvminithart)",
+    "FPU 状态：未实现 (搜索 sstatus.fs 无结果)",
+    "多平台：仅支持 RISC-V K210 和 QEMU，无 VisionFive2/LoongArch 适配",
+    "固件启动链：RustSBI (M-Mode) -> 内核 (S-Mode)，通过 ecall 调用 SBI",
+    "MMU 与串口地址：UART 物理地址 (QEMU:0x10000000, K210:0x38000000) + VIRT_OFFSET 虚拟映射",
+    "启动入口在哪里？（汇编文件如 entry.S 或 head.S，链接脚本 linker.ld 中的 ENTRY）",
+    "CPU 模式切换与初始化（如 RISC-V M-Mode -> S-Mode，x86实模式->保护模式->长模式）。**必须验证是否真的发生了模式切换（查找 sstatus.spp, mstatus.mpp, cr0 等寄存器操作）。**",
+    "关键寄存器设置（栈指针 SP、页表基址 SATP/CR3、中断向量表 stvec 等）。",
+    "它是如何跳转到 Rust/C 入口函数的？",
+    "早期初始化做了什么（BSS 清零、早期串口打印、设备树解析、页表初始化时机）？",
+    "**浮点单元 (FPU) 初始化**：搜索 `sstatus.fs` (RISC-V) 或 `cpacr_el1` (AArch64) 或 `cr4` (x86_64)。如果没有找到相关代码，**必须明确说明未启用 FPU（状态为未实现）**。",
+    "**多平台适配**：",
+    "**StarFive VisionFive2**：搜索 `visionfive` 或 `jh7110`，分析其启动流程特异性（SBI -> U-Boot）。",
+    "**LoongArch**：搜索 `loongarch`，分析其启动流程。",
+    "**平台与构建配置**：使用 grep_in_repo 搜索 `.toml`/`defconfig`/`Kconfig` 配置文件，分析构建系统如何选择编译目标和平台参数。",
+    "**固件级启动链（RISC-V 必须）**：如果是 RISC-V，必须描述 SBI->U-Boot->OS 的完整固件级启动链。搜索 `sbi|opensbi|u-boot` 关键词。分析 SBI 如何将控制权移交给内核。",
+    "**MMU 启用前后串口地址切换**：在 UART 初始化代码中，分析 MMU 启用前（物理地址直接访问）和 MMU 启用后（虚拟地址访问）的串口地址切换逻辑。搜索 `phys_to_virt|virt_to_phys` 或 UART 基址相关常量。"
+  ],
+  "evidence_targets": [
+    "启动入口汇编 (entry_qemu.S, entry_k210.S)",
+    "链接脚本 (qemu.ld, k210.ld) 中的 ENTRY 和 BASE_ADDRESS",
+    "RustSBI 模式切换代码 (main.back.rs 中 mstatus.mpp 设置)",
+    "main() 函数初始化序列 (kvminit, kvminithart, trapinithart)",
+    "UART 地址定义与映射 (memlayout.h, uart.c, vm.c)",
+    "SBI 调用接口 (sbi.h 中的 ecall 封装)",
+    "启动入口",
+    "模式切换",
+    "页表/MMU",
+    "trap 向量"
+  ],
+  "seed_paths": [
+    "kernel/entry_qemu.S",
+    "kernel/entry_k210.S",
+    "linker/qemu.ld",
+    "linker/k210.ld",
+    "kernel/main.c",
+    "kernel/vm.c",
+    "kernel/trap.c",
+    "kernel/include/memlayout.h",
+    "kernel/include/riscv.h",
+    "kernel/include/sbi.h",
+    "bootloader/SBI/rustsbi-k210/src/main.back.rs",
+    "Makefile",
+    "arch",
+    "boot"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "_entry",
+    "_start",
+    "main",
+    "kvminit",
+    "kvminithart",
+    "trapinithart",
+    "w_stvec",
+    "w_satp",
+    "sbi_console_putchar",
+    "usertrap",
+    "start",
+    "rust_main"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "bootloader",
+    "bootloader/SBI",
+    "debug",
+    "debug/kendryte_openocd",
+    "debug/openocd_cfg",
+    "doc",
+    "img",
+    "kernel",
+    "kernel/include"
+  ],
+  "preferred_tools": [
+    "read_code_segment",
+    "lsp_get_call_graph",
+    "lsp_get_definition",
+    "grep_in_repo",
+    "rag_search_code"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "review_checklist": [
+    "关键问题是否回答",
+    "重要结论是否给出源码路径",
+    "是否避免将 README 当成实现证据",
+    "是否标出未实现/桩函数",
+    "must_cover_count=12"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "精读 entry_qemu.S 和 entry_k210.S，确认栈指针设置和 call main 跳转逻辑",
+    "分析 RustSBI main.back.rs 中 mstatus.mpp 设置和 ecall 跳转机制，验证 M->S 模式切换",
+    "追踪 main() 调用链：kvminit()->kvminithart()->trapinithart()，确认页表和中断向量初始化顺序",
+    "检查 memlayout.h 中 UART/VIRT_OFFSET 定义，对照 vm.c 中 kvmmap(UART_V,...) 验证 MMU 前后地址映射",
+    "搜索 sstatus.fs 或 FPU 相关代码，确认 FPU 未实现并记录证据",
+    "使用 lsp_get_call_graph 分析 main() 的 outgoing 调用链 (max_depth=2)，生成调用图快照",
+    "对照 Makefile 确认平台编译配置 (platform=k210/qemu) 如何影响入口文件和 UART 地址",
+    "汇总启动流程时序图：RustSBI->entry.S->main()->kvminit/kvminithart->scheduler()"
+  ]
+}

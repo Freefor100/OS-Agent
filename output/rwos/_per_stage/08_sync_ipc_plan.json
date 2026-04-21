@@ -1,0 +1,122 @@
+{
+  "stage_id": "08_sync_ipc",
+  "goal": "分析 rwos 的同步互斥原语（Semaphore/Monitor/WaitQueue）与 IPC 机制（Pipe/Signal），验证实现完整性并识别桩函数。",
+  "must_cover": [
+    "锁机制：Semaphore 实现（sem.c），基于 WaitQueue 的阻塞/唤醒机制。",
+    "原子操作：使用 RISC-V AMO 指令（amo.or.d/amo.and.d）实现原子位操作（atomic.h）。",
+    "等待队列 (WaitQueue)：wait.c 实现，线程获取锁失败时通过 wait_current_set 挂起，wakeup_proc 唤醒。",
+    "Monitor 条件变量：monitor.c 实现 Hoare 语义的 cond_wait/cond_signal。",
+    "管道 (Pipe)：✅ 已实现，使用环形缓冲区（pipe_state.c，PIPE_BUFSIZE），含 reader_queue/writer_queue 等待队列。",
+    "消息队列/信号量系统调用：❌ 未实现，SYS_msgget/SYS_semget/SYS_semop 仅在 unistd.h 定义，syscall.c 无对应处理。",
+    "Futex：❌ 未实现，SYS_futex 仅定义，无 sys_futex 实现。",
+    "信号 (Signal)：✅ 已实现基础框架，do_kill 设置 PF_EXITING 标志，trap 返回用户态前检查并调用 do_exit。",
+    "信号处理时机：trap.c:288 在 trap_dispatch 返回后、schedule 前检查 PF_EXITING。",
+    "共享内存：需结合 mm 章节分析（本阶段仅标记待查）。",
+    "无 SpinLock/Mutex/RwLock 独立实现，统一使用 Semaphore + WaitQueue。",
+    "锁机制：SpinLock / Mutex / Semaphore / RwLock 实现。",
+    "**原子操作**：是使用 Rust `core::sync::atomic` 还是自定义汇编？(grep `ldxr/stxr`, `lock xchg`)",
+    "**等待队列 (WaitQueue)**：线程获取锁失败时如何挂起？（find `WaitQueue`, `sleep`, `block`）",
+    "**IPC 机制（必须代码验证并分类为 `✅ 已实现`、`🔸 桩函数`、`❌ 未实现`，谨防桩代码）**：",
+    "管道 (Pipe)：**实现验证**：是否使用了环形缓冲区 (Ring Buffer) 还是简单字节流？",
+    "消息队列 (MessageQueue)：**必须检查实现**。grep `sys_msgget` 或 `msgget`。",
+    "如果函数体为空、`Ok(0)` 但没有队列逻辑，必须标记为 **`🔸 桩函数`**。",
+    "只有看到了完整的队列结构体操作（push/pop），才可标记为 **`✅ 已实现`**。",
+    "共享内存 (SharedMem)：结合内存管理章节分析（SharedMemoryManager 实现）。",
+    "信号量 (Semaphore)：PV 操作实现。同样需要检查 `sys_semget`, `semop` 区分是否为桩代码。",
+    "**信号 (Signal) 作为 IPC**：搜索 `sys_kill|sig_send|signal_send`，分析信号分发机制是否也用于进程间通信。"
+  ],
+  "evidence_targets": [
+    "Semaphore 实现 (kern/sync/sem.c)",
+    "WaitQueue 机制 (kern/sync/wait.c)",
+    "Monitor 条件变量 (kern/sync/monitor.c)",
+    "原子操作 (libs/atomic.h)",
+    "管道环形缓冲区 (kern/fs/pipe/pipe_state.c)",
+    "信号处理流程 (kern/process/signal.c, kern/trap/trap.c)",
+    "系统调用表 (kern/syscall/syscall.c)",
+    "锁与同步原语",
+    "IPC",
+    "Futex",
+    "管道/信号"
+  ],
+  "seed_paths": [
+    "kern/sync/sem.c",
+    "kern/sync/sem.h",
+    "kern/sync/wait.c",
+    "kern/sync/wait.h",
+    "kern/sync/monitor.c",
+    "kern/sync/monitor.h",
+    "kern/fs/pipe/pipe_state.c",
+    "kern/fs/pipe/pipe_state.h",
+    "kern/process/signal.c",
+    "kern/process/signal.h",
+    "kern/trap/trap.c",
+    "kern/syscall/syscall.c",
+    "sync",
+    "lock"
+  ],
+  "framework_guess": [
+    "uCore"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "sem_init",
+    "up",
+    "down",
+    "wait_current_set",
+    "wakeup_queue",
+    "cond_wait",
+    "cond_signal",
+    "pipe_state_read",
+    "pipe_state_write",
+    "do_kill",
+    "Mutex",
+    "SpinLock"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "kern",
+    "kern/debug",
+    "kern/driver",
+    "kern/fs",
+    "kern/init",
+    "kern/libs",
+    "kern/mm",
+    "kern/process",
+    "kern/schedule"
+  ],
+  "preferred_tools": [
+    "read_code_segment",
+    "lsp_get_call_graph",
+    "lsp_get_references",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "review_checklist": [
+    "关键问题是否回答",
+    "重要结论是否给出源码路径",
+    "是否避免将 README 当成实现证据",
+    "是否标出未实现/桩函数",
+    "must_cover_count=12"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "精读 kern/sync/sem.c 和 wait.c，验证 Semaphore 如何通过 WaitQueue 实现阻塞/唤醒，记录关键函数调用链。",
+    "分析 kern/sync/monitor.c 的 cond_wait/cond_signal 实现，确认是否符合 Hoare 语义（next_count/next 信号量机制）。",
+    "验证 libs/atomic.h 的原子操作实现，确认使用 RISC-V AMO 指令而非自定义汇编或 C11 atomic。",
+    "深入阅读 kern/fs/pipe/pipe_state.c，确认环形缓冲区实现细节（p_rpos/p_wpos 索引、PIPE_BUFSIZE 大小）及等待队列使用。",
+    "检查 kern/syscall/syscall.c 的系统调用表，确认 SYS_msgget/SYS_semget/SYS_futex 等无对应处理函数，标记为未实现。",
+    "追踪 do_kill (proc.c) 到 trap.c:288 的 PF_EXITING 检查逻辑，确认信号导致进程退出的确切时机。",
+    "使用 lsp_get_call_graph 分析 down/up 函数的调用者，验证 Semaphore 在内核中的使用场景（如 pipe_state、sfs 等）。",
+    "汇总证据，区分✅已实现（Semaphore/Pipe/Signal 基础）、❌未实现（MsgQueue/Semaphore 系统调用/Futex），形成结论。"
+  ]
+}

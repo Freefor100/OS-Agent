@@ -1,0 +1,103 @@
+{
+  "passed": false,
+  "score": 0.65,
+  "severity": "major",
+  "failed_rules": [
+    "missing_path_citation",
+    "must_cover_gap",
+    "unsupported_claim"
+  ],
+  "missing_evidence": [
+    {
+      "paragraph_id": "1.1",
+      "claim_id": "uCore 架构继承",
+      "reason": "声称代码结构与 uCore-RISC-V 高度一致，但未提供具体对比证据或源码路径支撑"
+    },
+    {
+      "paragraph_id": "1.2.2",
+      "claim_id": "仅支持单一架构",
+      "reason": "声称不支持 x86_64/aarch64/loongarch64，但未展示源码中条件编译宏的缺失证据"
+    },
+    {
+      "paragraph_id": "1.4.1",
+      "claim_id": "entry.S 启动逻辑",
+      "reason": "引用 entry.S:5-32 但未验证实际代码内容是否匹配所述逻辑"
+    },
+    {
+      "paragraph_id": "1.5",
+      "claim_id": "信号机制仅注册无分发",
+      "reason": "关键完成度结论未提供具体源码路径证明信号分发缺失"
+    },
+    {
+      "paragraph_id": "1.5",
+      "claim_id": "UID/GID 权限为桩函数",
+      "reason": "安全机制缺失结论未标注具体桩函数位置"
+    }
+  ],
+  "weak_claims": [
+    {
+      "claim": "贡献者 rrrzh 占比超 90%",
+      "reason": "Git 贡献统计未提供具体命令或证据来源"
+    },
+    {
+      "claim": "2021-05-07 首日即引入完整框架",
+      "reason": "Git 历史分析未提供具体提交哈希或日志证据"
+    },
+    {
+      "claim": "通过 lmbench 验证了基础性能",
+      "reason": "性能验证结论未提供测试结果或日志证据"
+    }
+  ],
+  "format_issues": [
+    {
+      "issue": "缺少独立的「## 结论摘要」章节",
+      "description": "must_cover 要求 3-5 条结论摘要，但正文中未以独立章节呈现"
+    },
+    {
+      "issue": "200-300 字概括段落缺失",
+      "description": "must_cover 要求用 200-300 字概括项目定位/技术栈/完成度，1.5 节虽详细但不符合格式要求"
+    }
+  ],
+  "missed_modules": [
+    "libs/sbi.h 的 SBI 接口实现细节",
+    "kern/mm/swap.c 交换区机制是否实际可用",
+    "user/ 目录下具体应用列表及功能验证"
+  ],
+  "repair_actions": [
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "1.1",
+      "hint": "补充 uCore 架构对比的具体源码路径，如 proc_struct 定义位置 (kern/process/proc.h:xx)"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "1.5",
+      "hint": "为信号机制残缺结论添加具体源码证据，如 signal 相关函数在 syscall.c 中的桩实现位置"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "1.5",
+      "hint": "为 UID/GID 桩函数标注具体文件行号，如 kern/process/proc.c 中相关权限检查函数"
+    },
+    {
+      "action_type": "rewrite_paragraph",
+      "target_paragraph_id": "1.1",
+      "hint": "在 1.1 节后增加独立的「## 结论摘要」章节，列出 3-5 条基于源码的项目特性结论"
+    },
+    {
+      "action_type": "append_missing_module",
+      "target_paragraph_id": "1.3",
+      "hint": "在目录结构表中补充 libs/sbi.h 和 user/ 关键应用的说明"
+    },
+    {
+      "action_type": "rewrite_paragraph",
+      "target_paragraph_id": "1.5",
+      "hint": "在 1.5 节末尾增加 200-300 字的客观定性总结段落，明确项目定位、技术栈概览、完成度评估（不打分）"
+    },
+    {
+      "action_type": "drop_unsupported_claim",
+      "target_paragraph_id": "1.1",
+      "hint": "移除或补充证据支持「贡献者占比」「首日提交策略」等 Git 历史相关断言"
+    }
+  ]
+}

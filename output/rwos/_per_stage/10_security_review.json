@@ -1,0 +1,107 @@
+{
+  "passed": true,
+  "score": 0.75,
+  "severity": "major",
+  "failed_rules": [
+    "incomplete_search_evidence",
+    "missing_negative_proof"
+  ],
+  "missing_evidence": [
+    {
+      "paragraph_id": "10.1.2",
+      "claim_id": "SSTATUS_SUM 未配置",
+      "reason": "断言搜索 SSTATUS_SUM/SUM/PUM 无匹配结果，但未提供 grep 搜索输出作为证据"
+    },
+    {
+      "paragraph_id": "10.2.1",
+      "claim_id": "proc_struct 无 uid/gid 字段",
+      "reason": "虽给出结构体片段(行47-77)，但未展示完整结构体定义以确认全貌"
+    },
+    {
+      "paragraph_id": "10.2.2",
+      "claim_id": "无权限检查函数",
+      "reason": "断言搜索 check_perm/inode_permission 无结果，但未提供 grep 搜索证据"
+    },
+    {
+      "paragraph_id": "10.3",
+      "claim_id": "Capability/ACL 未实现",
+      "reason": "断言搜索 capability/acl 无结果，但未提供 grep 搜索证据"
+    },
+    {
+      "paragraph_id": "10.5",
+      "claim_id": "Seccomp/Prctl 未实现",
+      "reason": "断言系统调用表中未注册 sys_prctl/sys_seccomp，但未展示系统调用表完整内容"
+    },
+    {
+      "paragraph_id": "10.6",
+      "claim_id": "审计与安全启动未实现",
+      "reason": "断言搜索 audit/secure_boot/signature 无结果，但未提供 grep 搜索证据"
+    },
+    {
+      "paragraph_id": "10.7.1",
+      "claim_id": "栈保护机制未实现",
+      "reason": "断言搜索 stack_canary/stack_guard/__stack_chk 无结果，但未提供 grep 搜索证据"
+    }
+  ],
+  "weak_claims": [
+    {
+      "paragraph_id": "10.9",
+      "claim_id": "仅支持 RISC-V 64 架构",
+      "reason": "断言项目仅支持 RISC-V 64，但未展示目录结构或架构相关条件编译证据"
+    },
+    {
+      "paragraph_id": "10.4.1",
+      "claim_id": "files_cloexec 在 do_execve 中被注释",
+      "reason": "引用行号 1017，但未展示 do_execve 函数上下文以确认注释状态"
+    }
+  ],
+  "format_issues": [],
+  "missed_modules": [],
+  "repair_actions": [
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "10.1.2",
+      "hint": "使用 grep_in_repo 搜索 SSTATUS_SUM/SUM/PUM，将搜索结果（无匹配）作为证据附上"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "10.2.1",
+      "hint": "使用 read_code_segment 读取 kern/process/proc.h 完整 proc_struct 定义（行47-77），确认无 uid/gid 字段"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "10.2.2",
+      "hint": "使用 grep_in_repo 搜索 check_perm|inode_permission|permission_check，将无结果作为证据"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "10.3",
+      "hint": "使用 grep_in_repo 搜索 capability|acl|access_control_list，将无结果作为证据"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "10.5",
+      "hint": "使用 read_code_segment 读取 kern/syscall/syscall.c 系统调用表部分，展示无 sys_prctl/sys_seccomp 注册"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "10.6",
+      "hint": "使用 grep_in_repo 搜索 audit|secure_boot|signature|verify_signature，将无结果作为证据"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "10.7.1",
+      "hint": "使用 grep_in_repo 搜索 stack_canary|stack_guard|__stack_chk，将无结果作为证据"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "10.9",
+      "hint": "使用 list_repo_structure 展示顶层目录结构，证明无 aarch64/x86_64/loongarch64 等架构目录"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "10.4.1",
+      "hint": "使用 read_code_segment 读取 kern/process/proc.c do_execve 函数相关行（约1010-1025），展示 files_cloexec 被注释的上下文"
+    }
+  ]
+}

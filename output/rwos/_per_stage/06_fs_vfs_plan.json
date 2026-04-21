@@ -1,0 +1,122 @@
+{
+  "stage_id": "06_fs_vfs",
+  "goal": "深挖 rwos 的 VFS 抽象层设计、具体文件系统 SFS 实现、设备文件系统、pipe 实现、fd_table 结构，以及 mmap/pipe/socket/poll 等高级特性的实现状态。",
+  "must_cover": [
+    "VFS 抽象层：inode_ops 函数指针表、fs 结构体、vfs_mount/vfs_open 等核心接口",
+    "具体文件系统 SFS：sfs_fs.c/sfs_inode.c 实现，如何对接 VFS inode_ops",
+    "设备文件系统 devfs：kern/fs/devs/ 下 dev_null/dev_zero 等字符设备实现",
+    "Pipe 实现：kern/fs/pipe/ 下的 pipe_inode/pipe_root/pipe_state 机制",
+    "文件描述符表：files_struct 结构（Per-Process），fd_array 布局",
+    "mmap 实现：do_mmap 仅支持 VM_READ/VM_WRITE/VM_STACK，无 MAP_SHARED/零拷贝，标注为'功能受限'",
+    "socket/epoll/poll/select：仅定义了 syscall 号，未实现具体处理函数，标注为'❌ 未实现'",
+    "伪文件系统 procfs/sysfs：未实现，仅 vfs.h 中有注释提及",
+    "挂载机制：vfs_mount/vfs_unmount 流程，sfs_mount 示例",
+    "VFS 抽象层：File/Inode/Dentry Traits 定义。",
+    "**具体文件系统（必须代码验证）**：",
+    "FAT32/Ext4：是否自己实现了？还是用的 crate？（check Cargo.toml）。**注意：对于组件化的 OS（如 ArceOS），具体的文件系统实现可能独立于 VFS 存在于诸如 `arceos/modules/axfs-ng/src/fs/fat/` 或 `ext4/` 目录中，务必使用搜索功能仔细查找，绝对不要仅仅因为特定目录下没有就断言未实现！**",
+    "**具体 FS 的抽象层结构**：搜索 `FatFilesystemInner|Ext4Filesystem|FatFileNode|FatDirNode` 等，分析各层如何实现 VFS trait。这是文件系统架构的核心。",
+    "RamFS/TmpFS：是否有内存文件系统？",
+    "**伪文件系统**：使用 grep_in_repo 搜索 `devfs|procfs|sysfs` 检查是否实现了伪文件系统。若有，分析其实现方式。",
+    "文件描述符表：Global 还是 Per-Process？`fd_table` 结构在哪？",
+    "**功能细节**（必须分类为 `✅ 已实现`、`🔸 桩函数`、`❌ 未实现`）：",
+    "是否支持 `pipe` 套接字？",
+    "是否支持网络 `socket`？",
+    "是否支持 `mmap`？**注意**：必须检查 `sys_mmap` 实现。如果是 **零拷贝**，必须看到 `VmArea` 结构体中有 `shared` 字段或 `MAP_SHARED` 处理逻辑。如果是 `sys_mmap` 仅返回 Ok(0) 没有处理标志位，标注为'桩函数'。",
+    "**高级特性**：`poll`/`select`/`epoll` 是否实现？搜索 `sys_poll` / `sys_select` / `sys_epoll`，检查是一律返回 Ready 还是真的检查了文件状态？"
+  ],
+  "evidence_targets": [
+    "VFS 设计 (kern/fs/vfs/vfs.h, inode.h)",
+    "SFS 文件系统 (kern/fs/sfs/sfs_fs.c, sfs_inode.c)",
+    "设备文件系统 (kern/fs/devs/dev.c)",
+    "Pipe 实现 (kern/fs/pipe/pipe.c, pipe_inode.c)",
+    "fd_table 结构 (kern/fs/fs.h, file.c)",
+    "mmap 实现 (kern/process/proc.c do_mmap)",
+    "syscall 分发 (kern/syscall/syscall.c)",
+    "VFS 设计",
+    "具体文件系统",
+    "fd table",
+    "pipe/mmap"
+  ],
+  "seed_paths": [
+    "kern/fs/vfs/vfs.h",
+    "kern/fs/vfs/inode.h",
+    "kern/fs/fs.h",
+    "kern/fs/file.c",
+    "kern/fs/sfs/sfs_fs.c",
+    "kern/fs/sfs/sfs_inode.c",
+    "kern/fs/devs/dev.c",
+    "kern/fs/pipe/pipe.c",
+    "kern/fs/pipe/pipe_inode.c",
+    "kern/syscall/syscall.c",
+    "kern/process/proc.c",
+    "kern/mm/vmm.h",
+    "fs",
+    "vfs"
+  ],
+  "framework_guess": [
+    "uCore"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "vfs_open",
+    "vfs_mount",
+    "inode_ops",
+    "sfs_do_mount",
+    "pipe_open",
+    "file_pipe",
+    "do_mmap",
+    "files_struct",
+    "sys_mmap",
+    "sys_pipe",
+    "sys_open",
+    "openat"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "kern",
+    "kern/debug",
+    "kern/driver",
+    "kern/fs",
+    "kern/init",
+    "kern/libs",
+    "kern/mm",
+    "kern/process",
+    "kern/schedule"
+  ],
+  "preferred_tools": [
+    "lsp_get_definition",
+    "lsp_get_references",
+    "lsp_get_call_graph",
+    "read_code_segment",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "review_checklist": [
+    "关键问题是否回答",
+    "重要结论是否给出源码路径",
+    "是否避免将 README 当成实现证据",
+    "是否标出未实现/桩函数",
+    "must_cover_count=12"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "使用 lsp_get_definition 定位 vfs_open/vfs_mount/inode_ops 的定义，分析 VFS 抽象层接口设计",
+    "使用 lsp_get_call_graph (max_depth=2) 分析 vfs_open 的调用链，理解从 syscall 到 VFS 再到具体 FS 的流转",
+    "读取 kern/fs/sfs/sfs_fs.c 和 sfs_inode.c 关键片段，验证 SFS 如何实现 VFS inode_ops 接口",
+    "读取 kern/fs/devs/dev.c 和 kern/fs/pipe/pipe.c，分析设备文件和管道的实现机制",
+    "使用 grep_in_repo 搜索 files_struct/fd_array，确认文件描述符表是 Per-Process 还是 Global",
+    "读取 kern/process/proc.c 中 do_mmap 实现，检查是否处理 MAP_SHARED 标志，判断是否为零拷贝",
+    "使用 grep_in_repo 搜索 sys_poll/sys_select/sys_epoll/sys_socket，确认这些 syscall 是否有实际处理函数",
+    "综合以上证据，分类标注各功能为'✅ 已实现'/'🔸 桩函数'/'❌ 未实现'，并整理源码路径"
+  ]
+}

@@ -1,0 +1,122 @@
+{
+  "stage_id": "02_boot_arch",
+  "goal": "分析 RISC-V 64 架构下从复位到内核 main 函数的完整启动流程，包括 MMU 初始化、模式切换验证、trap 向量设置、早期串口打印机制及 FPU 状态。",
+  "must_cover": [
+    "启动入口：kern/init/entry.S 中的 kern_entry 符号，链接脚本 tools/kernel.ld 指定 ENTRY(kern_entry)",
+    "MMU 初始化：entry.S 中计算并设置 satp 寄存器启用 Sv39 页表，建立 identity mapping",
+    "模式切换验证：未发现 M-Mode→S-Mode 切换代码，假设由 RustSBI 固件完成移交",
+    "关键寄存器：stvec 设置 trap 向量 (__alltraps)，sscratch 用于内核/用户栈切换，satp 设置页表基址",
+    "跳转到 Rust 入口：entry.S 最后 jr t0 跳转到 kern_init 函数",
+    "早期初始化：init.c 中 BSS 清零、串口通过 SBI 实现 (console.c 调用 sbi_console_putchar)",
+    "FPU 初始化：未找到 sstatus.fs 或 FPU 相关初始化代码，状态为未实现",
+    "多平台适配：未发现 visionfive/jh7110/loongarch 相关代码，仅支持 K210 (tools/rustsbi-k210.bin)",
+    "固件级启动链：依赖 RustSBI (SBI 实现)，通过 ecall 指令调用 SBI 服务",
+    "MMU 启用前后串口地址：串口通过 SBI 抽象，无需物理/虚拟地址切换",
+    "构建配置：Makefile 中 CFLAGS 指定 -march=rv64imafdc -mabi=lp64d，目标架构 riscv64",
+    "启动入口在哪里？（汇编文件如 entry.S 或 head.S，链接脚本 linker.ld 中的 ENTRY）",
+    "CPU 模式切换与初始化（如 RISC-V M-Mode -> S-Mode，x86实模式->保护模式->长模式）。**必须验证是否真的发生了模式切换（查找 sstatus.spp, mstatus.mpp, cr0 等寄存器操作）。**",
+    "关键寄存器设置（栈指针 SP、页表基址 SATP/CR3、中断向量表 stvec 等）。",
+    "它是如何跳转到 Rust/C 入口函数的？",
+    "早期初始化做了什么（BSS 清零、早期串口打印、设备树解析、页表初始化时机）？",
+    "**浮点单元 (FPU) 初始化**：搜索 `sstatus.fs` (RISC-V) 或 `cpacr_el1` (AArch64) 或 `cr4` (x86_64)。如果没有找到相关代码，**必须明确说明未启用 FPU（状态为未实现）**。",
+    "**多平台适配**：",
+    "**StarFive VisionFive2**：搜索 `visionfive` 或 `jh7110`，分析其启动流程特异性（SBI -> U-Boot）。",
+    "**LoongArch**：搜索 `loongarch`，分析其启动流程。",
+    "**平台与构建配置**：使用 grep_in_repo 搜索 `.toml`/`defconfig`/`Kconfig` 配置文件，分析构建系统如何选择编译目标和平台参数。",
+    "**固件级启动链（RISC-V 必须）**：如果是 RISC-V，必须描述 SBI->U-Boot->OS 的完整固件级启动链。搜索 `sbi|opensbi|u-boot` 关键词。分析 SBI 如何将控制权移交给内核。"
+  ],
+  "evidence_targets": [
+    "启动入口 (kern/init/entry.S, tools/kernel.ld)",
+    "MMU 初始化 (entry.S 中 satp 设置)",
+    "Trap 向量 (kern/trap/trap.c idt_init, trapentry.S)",
+    "SBI 调用 (libs/sbi.h, kern/driver/console.c)",
+    "FPU 状态 (未实现)",
+    "平台适配 (仅 K210)",
+    "启动入口",
+    "模式切换",
+    "页表/MMU",
+    "trap 向量"
+  ],
+  "seed_paths": [
+    "kern/init/entry.S",
+    "kern/init/init.c",
+    "tools/kernel.ld",
+    "kern/trap/trap.c",
+    "kern/trap/trapentry.S",
+    "kern/driver/console.c",
+    "libs/sbi.h",
+    "libs/riscv.h",
+    "kern/mm/pmm.c",
+    "kern/mm/memlayout.h",
+    "Makefile",
+    "tools/rustsbi-k210.bin",
+    "arch",
+    "boot"
+  ],
+  "framework_guess": [
+    "uCore"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "kern_entry",
+    "kern_init",
+    "__alltraps",
+    "trap",
+    "idt_init",
+    "cons_init",
+    "pmm_init",
+    "write_csr",
+    "read_csr",
+    "_start",
+    "start",
+    "rust_main"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "kern",
+    "kern/debug",
+    "kern/driver",
+    "kern/fs",
+    "kern/init",
+    "kern/libs",
+    "kern/mm",
+    "kern/process",
+    "kern/schedule"
+  ],
+  "preferred_tools": [
+    "read_code_segment",
+    "lsp_get_call_graph",
+    "lsp_get_definition",
+    "grep_in_repo",
+    "rag_search_code"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "review_checklist": [
+    "关键问题是否回答",
+    "重要结论是否给出源码路径",
+    "是否避免将 README 当成实现证据",
+    "是否标出未实现/桩函数",
+    "must_cover_count=12"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "精读 kern/init/entry.S 完整代码，分析 satp 寄存器计算逻辑和页表 boot_page_table_sv39 结构",
+    "使用 lsp_get_call_graph 分析 kern_init 的 incoming 调用链，确认从 entry.S 的跳转方式",
+    "读取 kern/trap/trap.c 的 idt_init 函数，验证 stvec 和 sscratch 的设置时机",
+    "搜索 sstatus.fs 或 FPU 相关寄存器操作，确认 FPU 初始化状态（预期未实现）",
+    "分析 kern/driver/console.c 与 libs/sbi.h 的调用关系，确认串口通过 SBI 抽象而非直接 MMIO",
+    "读取 Makefile 中 CFLAGS 和架构配置，确认编译目标为 riscv64gc-unknown-none-elf",
+    "检查 kern/mm/pmm.c 中 va_pa_offset 的计算，验证虚实地址映射偏移量",
+    "综合以上证据，撰写启动流程分析报告，明确标注未实现功能（FPU、多平台适配）"
+  ]
+}

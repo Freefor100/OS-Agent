@@ -1,0 +1,33 @@
+{
+  "stage": "feature_summaries",
+  "sections_dir": "G:\\OS-Agent\\output\\oskernel2021-x\\sections",
+  "features": {
+    "D1_tech_stack": "oskernel2021-x 项目基于 xv6-riscv 框架，采用宏内核架构。内核主体使用 C99/C11 标准，Bootloader 采用 Rust 2018/2021 Edition 且为 no_std 环境。目标架构仅支持 RISC-V 64，x86_64、AArch64 及 LoongArch64 未见代码。关键依赖包含 rustsbi 固件。构建系统混合使用 Makefile 与 Cargo，主要命令为 make 及 make RUSTSBI。支持 FAT32 文件系统。",
+    "D2_boot_arch": "启动链：RustSBI(M 模)→内核 (S 模)，mret 切换。MMU 于 main() 经 kvminit/hart 启用 Sv39。入口：kernel/entry_qemu.S 与 kernel/entry_k210.S。FPU 未实现。仅适配 K210/QEMU，无 StarFive/LoongArch。",
+    "D3_memory": "物理内存采用空闲链表分配器。页表基于 Sv39 三级结构，关键结构 pagetable_t，函数含 walk、mappages。堆分配通过 sys_sbrk 调用 uvmalloc 实现立即分配。高级特性中，CoW、懒分配、Swap、大页、共享内存及 rmap 均未实现；mmap 已实现但不支持 MAP_FIXED/MAP_ANON；sendfile 为桩函数。缺页异常处理链为 usertrap→VMA 查找→kalloc→mappages。用户指针安全通过 fetchaddr 与 copyin2 边界检查及 walkaddr 页表验证。",
+    "D4_process_sched": "执行实体为进程，用 struct proc，无线程控制块。调度算法为 FIFO 轮询，代码仅有 FIFO，无多调度器支持。上下文切换由 swtch.S 实现，保存 13 个 callee-saved 寄存器，无浮点上下文。进程组/会话/PGID/SID 无。信号 kill 仅设标志位，sigaction 为桩函数，无用户态跳板。Futex 无。rlimit 无。fork 复制地址空间。",
+    "D5_trap_syscall": "Trap 入口为汇编 trap.S。TrapFrame 含 33 寄存器，288 字节。系统调用通过 C 函数指针表。注册 syscall 约 60 个，47 个完整（覆盖文件/进程/内存），13 个桩，核心 clone/exec/mmap 非桩。无接口/实现分离。信号在 Trap 返回前检查。缺页触发 Lazy 分配，无 CoW。用户指针无安全包装，用 fetchaddr。",
+    "D6_filesystem": "VFS 无 Trait 抽象，目录项融合 Inode/Dentry，全局函数操作。仅自研 FAT32，不支持 ext4/ProcFS。进程文件表与全局表双层描述符结构。管道环形缓冲区阻塞 IO，套接字未实现。mmap 私有映射可用，共享映射写回为桩实现，poll/epoll 未支持。打开协同文件表及目录项缓存完成解析。",
+    "D7_device_driver": "无 Driver Trait，采用条件编译，设备地址硬编码。支持 UART 及块设备（VirtIO-Blk 仅 QEMU 测试/SDCard K210），无网络显卡驱动。中断控制器为 PLIC，QEMU S-Mode 与 K210 M-Mode。无 Cargo/Kconfig，Makefile。支持 QEMU、K210。",
+    "D8_sync_ipc": "锁机制：自旋锁基于 GCC 原子函数生成原子交换指令，获取时禁中断；无互斥锁、读写锁及信号量锁实现。等待队列通过进程通道及睡眠唤醒遍历数组实现。IPC 方面：管道已实现，采用环形缓冲区；消息队列、共享内存、信号量 IPC 均未实现；信号仅 sys_kill 设标志，信号处理为桩函数；Futex 调用链未实现。",
+    "D9_smp_security": "采用 SMP 双核。BSP 经 IPI 唤醒无 smp_boot。IPI 启动无 ipi_handler。Per-CPU 经 tp 访问，无 axns。调度器每核独立，无负载均衡、亲和性。用户/内核隔离，无 KPTI/SMEP/SMAP。UID/GID 缺失，getuid 桩，syscall 无权限检查。指针 copyin2 验证。纯 C 内核，无 Rust/Cap/Seccomp。",
+    "D10_net_debug": "未实现网络功能。无 Socket 接口、协议栈及网卡驱动，仅支持 UART 与块设备。调试方面，日志基于 printf 无级别控制，Panic 含帧指针栈回溯但无 DWARF 解析。提供用户态 Shell 与 strace 系统调用追踪。无 GDB Stub 及内核 Monitor，依赖 OpenOCD 硬件调试。无 perf 或 ftrace 性能追踪。整体为教学用简化内核。"
+  },
+  "completed_dims": [
+    "D1_tech_stack",
+    "D2_boot_arch",
+    "D3_memory",
+    "D4_process_sched",
+    "D5_trap_syscall",
+    "D6_filesystem",
+    "D7_device_driver",
+    "D8_sync_ipc",
+    "D9_smp_security",
+    "D10_net_debug"
+  ],
+  "token_usage_total": {
+    "prompt_tokens": 73944,
+    "completion_tokens": 114931,
+    "total_tokens": 188875
+  }
+}

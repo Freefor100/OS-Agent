@@ -1,0 +1,116 @@
+{
+  "stage_id": "07_security",
+  "goal": "分析 xv6-k210 的安全机制与权限模型，确认特权级隔离形态、UID/GID 权限检查链、用户指针验证机制、栈保护/溢出防护、安全沙箱等特性的实现状态（三态判定）。",
+  "must_cover": [
+    "[Q07_001] 特权级隔离形态：RISC-V S-mode/U-mode 隔离，通过 sstatus.PUM/SUM 位控制",
+    "[Q07_002] UID/GID 字段存在性：stat 结构体有 uid/gid 字段，但 proc 结构体无 UID/GID 凭证字段",
+    "[Q07_003] syscall 权限检查链：sys_getuid 返回硬编码 0，无真实权限检查逻辑",
+    "[Q07_004] 权限检查入口点：exec.c 中 AT_UID/AT_GID 硬编码为 0，无 check_perm/inode_permission 调用",
+    "[Q07_005] 用户指针验证：实现 copyin2/copyout2 + safememmove 机制，通过 permit_usr_mem/protect_usr_mem 切换 sstatus.PUM/SUM",
+    "[Q07_006] seccomp/prctl 沙箱：未实现（搜索无结果，sys_trace 仅设置 tmask 用于 tracing）",
+    "[Q07_007] 栈保护/溢出防护：未发现 stack canary/guard page 机制（grep 无匹配）",
+    "[Q07_008] 审计/安全启动：未发现 audit/secure_boot/signature 相关逻辑",
+    "[Q07_009] 架构支持：仅 riscv64gc-unknown-none-elf（Makefile 与 Cargo.toml 确认），无多架构安全初始化差异",
+    "[Q07_010] Rust 安全机制：bootloader 使用 Rust 但内核为 C，无 RAII/所有权相关内核安全机制",
+    "[Q07_011] KPTI 页表隔离：实现 trampoline 页映射（TRAMPOLINE 宏），usertrapret 保存 kernel_satp，具备基本隔离形态",
+    "[Q07_012] UID/GID 检查链验证：仅有字段定义（stat.h）和 AT_UID 辅助向量，但 syscall 路径无真实检查（🔸 桩函数）",
+    "[Q07_013] 访问控制模型：无 DAC/MAC/ACL 实现，接近无访问控制（仅文件 mode 位基础检查）",
+    "[Q07_014] 完整性策略：无 Biba/代码签名/W^X 实现，仅通过 PUM/SUM 位限制用户态访问内核页",
+    "[Q07_001] 特权级隔离形态更接近哪种？",
+    "[Q07_002] 是否存在凭证/权限数据结构（UID/GID/Credential/Capability/ACL 等）？（必须三态）",
+    "[Q07_003] 是否能证实在 syscall 路径上真实执行了权限检查（open/exec/write 等）？（必须三态；仅有字段不算 implemented）",
+    "[Q07_004] 若存在权限检查：入口点与核心检查函数链路是什么？（列 2-5 个节点并给证据）",
+    "[Q07_005] 是否实现用户指针验证（access_ok/verify_area/UserInPtr/copyin/copyout 等）？（必须三态）",
+    "[Q07_006] 是否实现 seccomp/prctl/sandbox 等系统调用过滤/沙箱？（必须三态；stub 需说明形态：ENOSYS/return 0）",
+    "[Q07_007] 是否存在栈保护/溢出防护（stack canary/guard page）或等价机制？（必须三态）",
+    "[Q07_008] 是否存在审计/安全启动（audit/secure boot/signature）相关逻辑？（必须三态）"
+  ],
+  "evidence_targets": [
+    "特权级隔离：include/hal/riscv.h 中 SSTATUS_PUM/SUM 定义，vm.h 中 permit_usr_mem/protect_usr_mem 函数",
+    "UID/GID 字段：include/fs/stat.h 中 kstat 结构体 uid/gid 字段，kernel/exec.c 中 AT_UID/AT_GID 硬编码为 0",
+    "权限检查缺失：kernel/syscall/sysproc.c 中 sys_getuid 返回 0，无 check_perm/inode_permission 调用",
+    "用户指针验证：kernel/mm/vm.c 中 safememmove + copyin2/copyout2 机制，kernel/trap/trap.c 中 usertrap 调用 protect_usr_mem",
+    "trampoline 隔离：include/memlayout.h 中 TRAMPOLINE 宏，kernel/trap/trampoline.S 中用户/内核切换代码",
+    "无栈保护：grep 搜索 canary/guard_page/PMP 无结果",
+    "无审计/安全启动：grep 搜索 audit/secure_boot/signature 无结果",
+    "单架构支持：Makefile 中 TOOLPREFIX=riscv64-unknown-elf，bootloader/SBI/*/Cargo.toml 中 target=riscv64gc-unknown-none-elf",
+    "权限模型",
+    "用户身份",
+    "隔离边界",
+    "安全机制"
+  ],
+  "seed_paths": [
+    "include/hal/riscv.h",
+    "include/mm/vm.h",
+    "include/fs/stat.h",
+    "include/sched/proc.h",
+    "kernel/syscall/sysproc.c",
+    "kernel/syscall/sysfile.c",
+    "kernel/exec.c",
+    "kernel/mm/vm.c",
+    "kernel/trap/trap.c",
+    "kernel/trap/trampoline.S",
+    "include/memlayout.h",
+    "Makefile",
+    "security",
+    "capability"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "sys_getuid",
+    "permit_usr_mem",
+    "protect_usr_mem",
+    "safememmove",
+    "copyin2",
+    "copyout2",
+    "usertrap",
+    "usertrapret",
+    "trampoline",
+    "AT_UID",
+    "cap",
+    "permission"
+  ],
+  "repo_hotspots": [
+    "Cargo.toml",
+    "Makefile",
+    "bootloader",
+    "bootloader/SBI",
+    "debug",
+    "debug/kendryte_openocd",
+    "debug/openocd_cfg",
+    "doc",
+    "doc/img",
+    "include"
+  ],
+  "preferred_tools": [
+    "read_code_segment",
+    "grep_in_repo",
+    "lsp_get_definition",
+    "lsp_get_references"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "1. 使用 read_code_segment 精读 include/sched/proc.h 完整 proc 结构体，确认是否存在 uid/gid/credential 字段",
+    "2. 使用 grep_in_repo 搜索 check_perm/inode_permission/access 等权限检查函数，验证 syscall 路径是否有真实检查",
+    "3. 使用 lsp_get_definition 定位 sys_openat/sys_execve/sys_write 的实现文件，读取其前 50 行检查参数验证逻辑",
+    "4. 使用 read_code_segment 读取 kernel/mm/vm.c 中 safememmove/copyin2/copyout2 完整实现（约 710-850 行），分析用户指针验证机制",
+    "5. 使用 read_code_segment 读取 kernel/trap/trap.c 中 usertrap/usertrapret 函数（约 80-200 行），确认 protect_usr_mem/permit_usr_mem 调用位置",
+    "6. 使用 grep_in_repo 搜索 W^X/WORX/PTE_X/PTE_W 等页表权限位，检查是否存在代码/数据分离保护",
+    "7. 使用 read_code_segment 读取 include/fs/stat.h 完整内容，确认 mode 字段是否用于权限检查",
+    "8. 汇总证据，对 Q07_001 至 Q07_014 逐一给出三态判定（Implemented/Not Implemented/Stub），标注🔸 桩函数"
+  ]
+}

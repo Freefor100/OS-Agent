@@ -1,0 +1,82 @@
+{
+  "passed": false,
+  "score": 0.55,
+  "severity": "major",
+  "failed_rules": [
+    "must_cover_gap",
+    "missing_path_citation",
+    "inconsistent_claim"
+  ],
+  "missing_evidence": [
+    {
+      "paragraph_id": "3.3.1",
+      "claim_id": "内核重映射在 pmm_init 完成",
+      "reason": "草稿提到内核重映射代码但未明确说明在 pmm_init 函数中完成，缺少 pmm_init 的具体路径引用"
+    },
+    {
+      "paragraph_id": "3.7",
+      "claim_id": "Lazy 已实现",
+      "reason": "must_cover 明确要求 Lazy❌未实现（仅注释提及），但草稿声称✅已实现，存在直接矛盾，需验证代码中是否有真正的惰性分配实现或仅为注释"
+    },
+    {
+      "paragraph_id": "3.1",
+      "claim_id": "物理页管理算法类型",
+      "reason": "must_cover 询问 Bitmap/Buddy System，草稿回答 First-Fit（分配策略而非数据结构），未说明空闲页管理的底层数据结构（free_list 链表既非 Bitmap 也非 Buddy）"
+    },
+    {
+      "paragraph_id": "3.2.1",
+      "claim_id": "PageTable 结构定义",
+      "reason": "must_cover 要求说明 PageTable 结构，草稿仅描述页表项格式（PTE 宏定义），未展示 PageTable 结构体定义"
+    },
+    {
+      "paragraph_id": "3.1.1",
+      "claim_id": "FrameAllocator 接口位置",
+      "reason": "must_cover 要求说明 FrameAllocator 接口位置，草稿仅列出 alloc_pages/free_pages 但未明确 FrameAllocator 接口定义位置"
+    }
+  ],
+  "weak_claims": [
+    {
+      "paragraph_id": "3.7",
+      "claim": "Lazy ✅ 已实现",
+      "reason": "与 must_cover 要求（Lazy❌未实现）直接冲突，mm_brk 的惰性分配是标准 brk 行为，非 mmap 级别的 Lazy Allocation"
+    },
+    {
+      "paragraph_id": "3.1.2",
+      "claim": "First-Fit 算法实现",
+      "reason": "First-Fit 是分配策略，must_cover 询问的是空闲页管理数据结构（Bitmap/Buddy），概念层级不匹配"
+    }
+  ],
+  "format_issues": [],
+  "missed_modules": [
+    "pmm_init（内核重映射初始化函数）",
+    "PageTable 结构体定义",
+    "FrameAllocator 接口定义"
+  ],
+  "repair_actions": [
+    {
+      "action_type": "rewrite_paragraph",
+      "target_paragraph_id": "3.7",
+      "hint": "修正 Lazy 实现状态：must_cover 要求 Lazy❌未实现（仅注释提及），需核实代码中是否仅有注释提及而无实际惰性分配逻辑，或澄清 brk 惰性分配与 mmap Lazy Allocation 的区别"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "3.3.1",
+      "hint": "补充 pmm_init 函数的具体路径和代码片段，证明内核重映射在该函数中完成"
+    },
+    {
+      "action_type": "rewrite_paragraph",
+      "target_paragraph_id": "3.1.1",
+      "hint": "澄清物理页管理数据结构：说明空闲页管理使用 free_list 链表（非 Bitmap/Buddy），并补充 FrameAllocator 接口的具体定义位置"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "3.2.1",
+      "hint": "补充 PageTable 结构体的定义位置和代码片段，或说明 RISC-V Sv39 中页表为纯数组结构无显式结构体"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": null,
+      "hint": "收集证据验证草稿中引用的所有代码路径（如 kern/mm/pmm.c:321 等）是否真实存在且内容匹配"
+    }
+  ]
+}

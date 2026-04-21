@@ -140,109 +140,110 @@ def _detect_target_arch(repo_path: str) -> Optional[str]:
     return None
 
 async def _polyfill_context(repo_path: str, scan_results: Dict[str, bool], lang: str):
-    # C/C++ (clangd) 补全逻辑
-    # 哪怕有 Makefile/CMakeLists，如果没有 compile_commands.json，clangd 依然是个瞎子
-    has_c_config = False
-    if lang in ["c", "cpp"]:
-        has_c_config = scan_results.get("compile_commands.json", False)
-    
-    if lang in ["c", "cpp"] and not has_c_config:
-        compile_flags_path = os.path.join(repo_path, "compile_flags.txt")
-        # 总是重新生成，以防克隆后文件变动
-        include_dirs = {_abspath(repo_path)}
-        for root, dirs, files in os.walk(repo_path):
-            # 跳过无关目录，防止生成的 flags 过载
-            dirs[:] = [d for d in dirs if d not in {".git", ".github", "target", "vendor", "node_modules", "build", "dist"}]
-            if any(f.endswith('.h') or f.endswith('.hpp') for f in files):
-                include_dirs.add(_abspath(root))
-                # Also add the parent directory to handle includes like "proc/thread.h"
-                include_dirs.add(os.path.dirname(_abspath(root)))
-            # If the directory is named 'include', proactively add it even if it directly contains no headers
-            if os.path.basename(os.path.normpath(root)) == "include":
-                include_dirs.add(_abspath(root))
-        if include_dirs:
-            try:
-                with open(compile_flags_path, 'w', encoding='utf-8') as f:
-                    # 声明这大概率是一个 C 语言或 C++ 内核项目
-                    f.write("-xc\n")
+    async with _get_polyfill_lock(repo_path):
+        # C/C++ (clangd) 补全逻辑
+        # 哪怕有 Makefile/CMakeLists，如果没有 compile_commands.json，clangd 依然是个瞎子
+        has_c_config = False
+        if lang in ["c", "cpp"]:
+            has_c_config = scan_results.get("compile_commands.json", False)
 
-                    # 裸机/内核环境标志：
-                    # -ffreestanding: 告知 clangd 不假设标准 C 运行时存在（无 main 入口、无 libc）
-                    # -fno-builtin:   禁止将 exit/exec/memcpy 等识别为编译器内建函数，
-                    #                 避免与内核自定义同名函数冲突导致 prepareCallHierarchy 失败
-                    f.write("-ffreestanding\n")
-                    f.write("-fno-builtin\n")
-
-                    # 注入交叉编译目标架构，防止 clangd 在 x86 主机上解析异构汇编报错
-                    target_arch = _detect_target_arch(repo_path)
-                    if target_arch:
-                        base_arch = target_arch.split('-')[0].replace('gc', '')
-                        f.write(f"--target={base_arch}\n")
-
-                    # 将根目录和所有包含头文件的目录加入搜索路径
-                    for d in include_dirs:
-                        # 对于 Windows 上的 clangd，路径中的反斜杠可能需要转义或统一替换为正斜杠
-                        sanitized_path = d.replace('\\', '/')
-                        f.write(f"-I{sanitized_path}\n")
-            except Exception as e:
-                logger.error(f"Failed to generate compile_flags.txt: {e}")
-
-    # Rust (rust-analyzer) 补全逻辑
-    if lang == "rust":
-        if not scan_results["Cargo.toml"]:
-            has_rs = False
+        if lang in ["c", "cpp"] and not has_c_config:
+            compile_flags_path = os.path.join(repo_path, "compile_flags.txt")
+            # 总是重新生成，以防克隆后文件变动
+            include_dirs = {_abspath(repo_path)}
             for root, dirs, files in os.walk(repo_path):
-                dirs[:] = [d for d in dirs if d not in {".git", "target", "vendor"}]
-                if any(f.endswith('.rs') for f in files):
-                    has_rs = True
-                    break
-            
-            if has_rs:
-                cargo_toml_path = os.path.join(repo_path, "Cargo.toml")
-                if not os.path.exists(cargo_toml_path):
-                    # 收集子目录中的所有 Cargo.toml 路径，组装成 workspace members
-                    members = []
-                    for root, dirs, files in os.walk(repo_path):
-                        dirs[:] = [d for d in dirs if d not in {".git", "target", "vendor", ".github"}]
-                        if root != repo_path and "Cargo.toml" in files:
-                            rel_path = os.path.relpath(root, repo_path).replace('\\', '/')
-                            members.append(rel_path)
-                    
-                    try:
-                        with open(cargo_toml_path, 'w', encoding='utf-8') as f:
-                            if members:
-                                # 这种情况下生成 "Virtual Manifest"，即只有 [workspace] 而没有 [package]
-                                # 这样 cargo metadata 就不会报错要求根目录必须有 src/lib.rs 了
-                                f.write('[workspace]\nmembers = [\n')
-                                for m in members:
-                                    f.write(f'    "{m}",\n')
-                                f.write(']\n')
-                            else:
-                                f.write('[package]\nname = "os_kernel_dummy"\nversion = "0.1.0"\nedition = "2021"\n')
-                    except Exception as e:
-                        logger.error(f"Failed to generate Cargo.toml: {e}")
-                
-                # 如果存在 Cargo.toml，检查是否存在有效的 target 文件 (src/lib.rs 或 src/main.rs) 或者包含 members
-                # 防止 rust-analyzer 的 cargo metadata 报错 `no targets specified in the manifest` 而彻底罢工
-                if os.path.exists(cargo_toml_path):
-                    with open(cargo_toml_path, 'r', encoding='utf-8') as f:
-                        content = f.read()
-                    # 只有如果是 [package] 类型的 manifest 且没有目标文件时，才强制创建 dummy src
-                    # Virtual Manifest ([workspace]) 模式下不需要也不能在根目录创建 src/lib.rs
-                    if "[package]" in content:
-                        src_dir = os.path.join(repo_path, "src")
-                        has_target = os.path.exists(os.path.join(src_dir, "lib.rs")) or os.path.exists(os.path.join(src_dir, "main.rs"))
-                        if not has_target:
-                            os.makedirs(src_dir, exist_ok=True)
-                            try:
-                                with open(os.path.join(src_dir, "lib.rs"), 'w', encoding='utf-8') as f:
-                                    f.write("// Dummy lib created by os-agent to satisfy rust-analyzer workspace loader\n")
-                            except Exception as e:
-                                logger.error(f"Failed to generate dummy src/lib.rs: {e}")
-    
-        # Rust: cargo fetch — 让 rust-analyzer 能解析 git 远程依赖
-        if scan_results["Cargo.toml"] or os.path.exists(os.path.join(repo_path, "Cargo.toml")):
-            await _ensure_cargo_fetched(repo_path)
+                # 跳过无关目录，防止生成的 flags 过载
+                dirs[:] = [d for d in dirs if d not in {".git", ".github", "target", "vendor", "node_modules", "build", "dist"}]
+                if any(f.endswith('.h') or f.endswith('.hpp') for f in files):
+                    include_dirs.add(_abspath(root))
+                    # Also add the parent directory to handle includes like "proc/thread.h"
+                    include_dirs.add(os.path.dirname(_abspath(root)))
+                # If the directory is named 'include', proactively add it even if it directly contains no headers
+                if os.path.basename(os.path.normpath(root)) == "include":
+                    include_dirs.add(_abspath(root))
+            if include_dirs:
+                try:
+                    with open(compile_flags_path, 'w', encoding='utf-8') as f:
+                        # 声明这大概率是一个 C 语言或 C++ 内核项目
+                        f.write("-xc\n")
+
+                        # 裸机/内核环境标志：
+                        # -ffreestanding: 告知 clangd 不假设标准 C 运行时存在（无 main 入口、无 libc）
+                        # -fno-builtin:   禁止将 exit/exec/memcpy 等识别为编译器内建函数，
+                        #                 避免与内核自定义同名函数冲突导致 prepareCallHierarchy 失败
+                        f.write("-ffreestanding\n")
+                        f.write("-fno-builtin\n")
+
+                        # 注入交叉编译目标架构，防止 clangd 在 x86 主机上解析异构汇编报错
+                        target_arch = _detect_target_arch(repo_path)
+                        if target_arch:
+                            base_arch = target_arch.split('-')[0].replace('gc', '')
+                            f.write(f"--target={base_arch}\n")
+
+                        # 将根目录和所有包含头文件的目录加入搜索路径
+                        for d in include_dirs:
+                            # 对于 Windows 上的 clangd，路径中的反斜杠可能需要转义或统一替换为正斜杠
+                            sanitized_path = d.replace('\\', '/')
+                            f.write(f"-I{sanitized_path}\n")
+                except Exception as e:
+                    logger.error(f"Failed to generate compile_flags.txt: {e}")
+
+        # Rust (rust-analyzer) 补全逻辑
+        if lang == "rust":
+            if not scan_results["Cargo.toml"]:
+                has_rs = False
+                for root, dirs, files in os.walk(repo_path):
+                    dirs[:] = [d for d in dirs if d not in {".git", "target", "vendor"}]
+                    if any(f.endswith('.rs') for f in files):
+                        has_rs = True
+                        break
+
+                if has_rs:
+                    cargo_toml_path = os.path.join(repo_path, "Cargo.toml")
+                    if not os.path.exists(cargo_toml_path):
+                        # 收集子目录中的所有 Cargo.toml 路径，组装成 workspace members
+                        members = []
+                        for root, dirs, files in os.walk(repo_path):
+                            dirs[:] = [d for d in dirs if d not in {".git", "target", "vendor", ".github"}]
+                            if root != repo_path and "Cargo.toml" in files:
+                                rel_path = os.path.relpath(root, repo_path).replace('\\', '/')
+                                members.append(rel_path)
+
+                        try:
+                            with open(cargo_toml_path, 'w', encoding='utf-8') as f:
+                                if members:
+                                    # 这种情况下生成 "Virtual Manifest"，即只有 [workspace] 而没有 [package]
+                                    # 这样 cargo metadata 就不会报错要求根目录必须有 src/lib.rs 了
+                                    f.write('[workspace]\nmembers = [\n')
+                                    for m in members:
+                                        f.write(f'    "{m}",\n')
+                                    f.write(']\n')
+                                else:
+                                    f.write('[package]\nname = "os_kernel_dummy"\nversion = "0.1.0"\nedition = "2021"\n')
+                        except Exception as e:
+                            logger.error(f"Failed to generate Cargo.toml: {e}")
+
+                    # 如果存在 Cargo.toml，检查是否存在有效的 target 文件 (src/lib.rs 或 src/main.rs) 或者包含 members
+                    # 防止 rust-analyzer 的 cargo metadata 报错 `no targets specified in the manifest` 而彻底罢工
+                    if os.path.exists(cargo_toml_path):
+                        with open(cargo_toml_path, 'r', encoding='utf-8') as f:
+                            content = f.read()
+                        # 只有如果是 [package] 类型的 manifest 且没有目标文件时，才强制创建 dummy src
+                        # Virtual Manifest ([workspace]) 模式下不需要也不能在根目录创建 src/lib.rs
+                        if "[package]" in content:
+                            src_dir = os.path.join(repo_path, "src")
+                            has_target = os.path.exists(os.path.join(src_dir, "lib.rs")) or os.path.exists(os.path.join(src_dir, "main.rs"))
+                            if not has_target:
+                                os.makedirs(src_dir, exist_ok=True)
+                                try:
+                                    with open(os.path.join(src_dir, "lib.rs"), 'w', encoding='utf-8') as f:
+                                        f.write("// Dummy lib created by os-agent to satisfy rust-analyzer workspace loader\n")
+                                except Exception as e:
+                                    logger.error(f"Failed to generate dummy src/lib.rs: {e}")
+
+            # Rust: cargo fetch — 让 rust-analyzer 能解析 git 远程依赖
+            if scan_results["Cargo.toml"] or os.path.exists(os.path.join(repo_path, "Cargo.toml")):
+                await _ensure_cargo_fetched(repo_path)
 
 # --- 阶段 3：多路复用 LSP 客户端构建 (Multiplexing LSP Gateway) ---
 class LSPClient:
@@ -672,7 +673,10 @@ def _resolve_lsp_binary(base_name: str, cwd: Optional[str] = None) -> str:
             candidates.append(f"/usr/bin/{name}")
             candidates.append(f"/usr/local/bin/{name}")
             candidates.append(os.path.join(home, ".local", "bin", name))
-        
+        # 龙芯交叉工具链常见解压路径（未加入 PATH 时 check_env / LSP 仍可探测）
+            if "loongarch" in name:
+                candidates.append(os.path.join("/opt", "loongarch64-tools", "bin", name))
+           
         for c in candidates:
             if os.path.isfile(c):
                 logger.info(f"Resolved {base_name} via {name} at fallback path: {c}")
@@ -773,17 +777,22 @@ class MultiplexingLSPGateway:
                 return None
 
     async def force_restart_client(self, repo_path: str, lang: str):
-        """强制清理并关闭特定语言的 LSP 客户端，以便在配置更改（如图架构切换）后重建。"""
+        """强制清理并关闭特定语言的 LSP 客户端，以便在配置更改（如架构切换）后重建。
+
+        加锁顺序必须与 get_client 保持一致：先 self.lock，再 _lsp_global_lock。
+        否则会与“先拿全局锁、再进 gateway 锁”的路径形成 ABBA 死锁。
+        """
         abs_repo = _abspath(repo_path)
         key = f"{abs_repo}_{lang}"
         async with self.lock:
-            if key in self.clients:
-                logger.info(f"Force restarting LSP client for {lang} in {abs_repo}...")
-                client = self.clients.pop(key)
-                try:
-                    await client.stop()
-                except Exception:
-                    pass
+            async with _lsp_global_lock:
+                if key in self.clients:
+                    logger.info(f"Force restarting LSP client for {lang} in {abs_repo}...")
+                    client = self.clients.pop(key)
+                    try:
+                        await client.stop()
+                    except Exception:
+                        pass
 
     async def stop_all(self):
         async with self.lock:
@@ -807,6 +816,23 @@ _lsp_thread.start()
 _gateway = MultiplexingLSPGateway()
 # 全局并发锁：防止大模型并发调用多个 LSP 搜索导致 LSP 服务端直接崩溃
 _lsp_global_lock = asyncio.Lock()
+_polyfill_lock_guard = threading.Lock()
+_polyfill_repo_locks = {}
+
+
+def _get_polyfill_lock(repo_path: str):
+    key = _abspath(repo_path)
+    with _polyfill_lock_guard:
+        if key not in _polyfill_repo_locks:
+            _polyfill_repo_locks[key] = asyncio.Lock()
+        return _polyfill_repo_locks[key]
+
+
+def _cancel_future_safely(future):
+    try:
+        future.cancel()
+    except Exception:
+        pass
 
 def _cleanup_lsp():
     # 退出前清理子进程
@@ -1294,6 +1320,49 @@ def _find_symbol_positions(abs_path: str, symbol: str) -> List[Tuple[int, int]]:
         pass
     return positions
 
+
+def _diagnose_call_graph_prepare_failure(symbol: str, file_lines: List[str]) -> str:
+    """
+    prepareCallHierarchy 在所有锚点均为空时，根据当前文件内容给出**可打印的成因说明**
+    （常见：宏名、token 拼接宏、索引/编译数据库问题、锚点落在非函数实体等）。
+    """
+    if not file_lines:
+        return (
+            f"无法读取 `{symbol}` 所在文件内容，无法判断根因；"
+            "请确认路径与编码。后续将尝试语义引用或静态兜底。"
+        )
+    text = "\n".join(line.rstrip("\r") for line in file_lines)
+    # 符号作为 #define 的宏名（callHierarchy 通常不支持以宏名为根）
+    if re.search(rf"(?m)^\s*#\s*define\s+{re.escape(symbol)}\b", text):
+        return (
+            f"宏名：本文件存在 `#define {symbol}`，该名是预处理宏而非函数实体；"
+            "callHierarchy 无法以宏名为根，故 prepareCallHierarchy 为空。"
+        )
+    # token 粘贴类宏（如 SYSCALL(name) → sys_##name），展开处常无稳定函数根节点
+    if re.search(
+        rf"(?m)^\s*#\s*define\b.*##.*\b{re.escape(symbol)}\b", text
+    ) or re.search(rf"(?m)^\s*#\s*define\b.*\b{re.escape(symbol)}\b.*##", text):
+        return (
+            f"宏展开/token 拼接：`{symbol}` 出现在带 ## 的 #define 附近，符号可能由宏展开生成；"
+            "LSP 常无法对其建立标准 callHierarchy，prepareCallHierarchy 为空。"
+        )
+    # 非 # 行中是否存在「标识符 + (」形态（粗判函数定义/声明）
+    non_pp = "\n".join(
+        ln.rstrip("\r")
+        for ln in file_lines
+        if ln.strip() and not ln.lstrip().startswith("#")
+    )
+    if re.search(rf"\b{re.escape(symbol)}\s*\(", non_pp):
+        return (
+            f"索引或实体类别：本文件非 # 行中存在 `{symbol}(...)` 形声明/定义，但 prepareCallHierarchy 仍全空；"
+            "多见 compile_commands 与当前 TU 不一致、条件编译导致索引不全，或该实体不被视为可层级化的函数根。"
+        )
+    return (
+        f"锚点/定义形态：预处理行外未见典型 `{symbol}(...)` 定义；"
+        f"可能仅在 syscall 表、extern 或宏体中出现，callHierarchy 锚点无效。"
+    )
+
+
 async def _async_lsp_request(repo_path: str, file_path: str, symbol: str, method: str) -> str:
     ext = os.path.splitext(file_path)[1].lower()
     
@@ -1500,9 +1569,14 @@ def lsp_get_definition(repo_path: str, file_path: str, symbol: str) -> str:
     try:
         return future.result(timeout=60.0)
     except TimeoutError:
+        _cancel_future_safely(future)
         return f"Error: LSP 获取定义超时 (60s)。此符号可能解析较深，请尝试使用 grep_search 作为替代方案。"
     except Exception as e:
+        _cancel_future_safely(future)
         return f"Error: LSP 执行异常: {e}"
+    except BaseException:
+        _cancel_future_safely(future)
+        raise
 
 @tool
 def lsp_get_references(repo_path: str, file_path: str, symbol: str) -> str:
@@ -1523,9 +1597,14 @@ def lsp_get_references(repo_path: str, file_path: str, symbol: str) -> str:
     try:
         return future.result(timeout=60.0)
     except TimeoutError:
+        _cancel_future_safely(future)
         return f"Error: LSP 获取引用超时 (60s)。请尝试缩小搜索范围或使用 grep_search。"
     except Exception as e:
+        _cancel_future_safely(future)
         return f"Error: LSP 执行异常: {e}"
+    except BaseException:
+        _cancel_future_safely(future)
+        raise
 
 
 
@@ -1656,9 +1735,14 @@ def lsp_get_document_outline(repo_path: str, file_path: str) -> str:
     try:
         return future.result(timeout=30.0)
     except TimeoutError:
+        _cancel_future_safely(future)
         return f"Error: LSP 获取 {file_path} 大纲超时 (30s)。文件可能过大或解析器挂起，请直接阅读文件。"
     except Exception as e:
+        _cancel_future_safely(future)
         return f"Error: LSP Outline 执行异常: {e}"
+    except BaseException:
+        _cancel_future_safely(future)
+        raise
 
 
 # --- 阶段 6：函数调用链图谱 (Call Graph / Call Hierarchy) ---
@@ -1689,7 +1773,7 @@ def _grep_fallback_call_graph(repo_path: str, file_path: str, symbol: str, direc
 
     # --- Outgoing: 解析函数体，提取调用 ---
     if direction in ("outgoing", "both"):
-        lines_out.append("》出升调用 [Grep Fallback] — 正则解析函数体")
+        lines_out.append("》出向调用 [Grep Fallback] — 正则解析函数体")
         try:
             with open(abs_file, "r", encoding="utf-8", errors="ignore") as f:
                 src = f.read()
@@ -1780,7 +1864,139 @@ def _grep_fallback_call_graph(repo_path: str, file_path: str, symbol: str, direc
         else:
             lines_out.append(f"  未在全库中不到 `{symbol}(` 的调用点")
 
+    lines_out.append(_fallback_metadata("lsp->treesitter->lang_static->grep", "low", "callHierarchy_unavailable"))
     return "\n".join(lines_out)
+
+
+def _static_call_graph_fallback(repo_path: str, file_path: str, symbol: str, direction: str, lang: str) -> str:
+    """
+    按你要求的链路做 Call Graph 兜底：
+      Tree-sitter -> Language-aware Static -> Grep -> ASM
+
+    注意：这里的输出目标是“可用的静态调用镜像”，精度低于 LSP，但比纯 Grep 更接近语言语义。
+    """
+    abs_repo = _abspath(repo_path)
+    abs_file = _abspath(os.path.join(repo_path, file_path))
+
+    banner = (
+        f"\n⚠️  [Call Graph DEGRADED — Static Fallback] symbol='{symbol}'  file={file_path}\n"
+        f"    已按链路降级：LSP → Tree-sitter → Language-aware Static → Grep → ASM。\n"
+    )
+    print(banner, flush=True)
+
+    # ---------- 1) Tree-sitter: 尝试定位函数体并提取 call sites ----------
+    try:
+        if TreeSitterFallback._ensure_loaded() and lang in (TreeSitterFallback._langs or {}):
+            try:
+                with open(abs_file, "rb") as f:
+                    code_bytes = f.read()
+            except Exception:
+                code_bytes = b""
+
+            if code_bytes:
+                parser = TreeSitterFallback._parser_cls()
+                parser.language = TreeSitterFallback._langs[lang]
+                tree = parser.parse(code_bytes)
+                root = tree.root_node
+
+                # 抽取函数节点：Rust=function_item / C=function_definition / Go=function_declaration/method_declaration / Zig=function_declaration
+                if lang == "rust":
+                    fn_types = {"function_item"}
+                elif lang in ("c", "cpp"):
+                    fn_types = {"function_definition"}
+                elif lang == "go":
+                    fn_types = {"function_declaration", "method_declaration"}
+                elif lang == "zig":
+                    fn_types = {"function_declaration"}
+                else:
+                    fn_types = set()
+
+                def _node_name(n):
+                    return TreeSitterFallback._get_definition_name(n, code_bytes, lang)
+
+                target_fn = None
+
+                def _find(n):
+                    nonlocal target_fn
+                    if target_fn is not None:
+                        return
+                    if n.type in fn_types:
+                        nm = _node_name(n)
+                        if nm == symbol:
+                            target_fn = n
+                            return
+                    for ch in n.children:
+                        _find(ch)
+
+                _find(root)
+
+                if target_fn is not None:
+                    fn_src = code_bytes[target_fn.start_byte:target_fn.end_byte].decode("utf-8", errors="ignore")
+
+                    SKIP = {
+                        "if", "for", "while", "match", "return", "let", "fn", "use", "pub", "mod",
+                        "unsafe", "impl", "trait", "struct", "enum", "type", "const", "static",
+                        "super", "self", "Self", "loop", "continue", "break",
+                        "println", "format", "assert", "panic", "todo", "unimplemented", "dbg",
+                        "write", "writeln",
+                    }
+
+                    calls = {}
+                    if direction in ("outgoing", "both"):
+                        # Rust: 支持 foo( 与 foo::bar( 与 foo!( ；C/Go/Zig: 支持 foo(
+                        for m in re.finditer(r"\b([a-zA-Z_][a-zA-Z0-9_]*)\s*(?:(?:!?\s*)\(|::\s*[a-zA-Z_][a-zA-Z0-9_]*\s*\()", fn_src):
+                            name = m.group(1)
+                            if name in SKIP or (name and name[0].isupper()):
+                                continue
+                            # 行号估算：基于函数片段内的换行
+                            line_in_fn = fn_src.count("\n", 0, m.start()) + 1
+                            calls.setdefault(name, line_in_fn)
+
+                    if calls:
+                        out = [f"[Call Graph — Tree-sitter Static ⚠️] {symbol}  ← {file_path}"]
+                        out.append("[⚠️ DEGRADED MODE] LSP callHierarchy 不可用，本结果由 Tree-sitter + 语言规则静态提取生成。")
+                        out.append(_fallback_metadata("lsp->treesitter->lang_static", "medium", "callHierarchy_unavailable"))
+                        if direction in ("outgoing", "both"):
+                            out.append("》出向调用 [Tree-sitter] — 静态提取函数体内 call sites")
+                            for name, ln in sorted(calls.items(), key=lambda x: x[1]):
+                                # 用 file_path 的起始行+偏移不可靠，这里只给“函数体内相对行”
+                                out.append(f"  ├── {name}()  ← {file_path}:(fn+{ln})")
+                        if direction in ("incoming", "both"):
+                            out.append("\n》入向调用 [Tree-sitter] — 需要全库索引，静态层仅给出 Grep 模式候选")
+                        return "\n".join(out)
+    except Exception:
+        # Tree-sitter 失败就继续向下
+        pass
+
+    # ---------- 2) Language-aware static ----------
+    try:
+        if direction in ("outgoing", "both"):
+            # 语言感知层目前只有 definition/references 能力；call graph 用“函数体级正则”近似
+            # 如果能在该文件里定位到定义行，就用 _grep_fallback_call_graph 的 outgoing 提取（它本质就是语言感知正则）
+            lang_like = _grep_fallback_call_graph(repo_path, file_path, symbol, "outgoing")
+            if lang_like and "[Call Graph — Grep Fallback" in lang_like:
+                # 复用 grep 的输出结构，但提升语义标签并修正 metadata
+                upgraded = lang_like.replace("Grep Fallback", "Language-aware Static")
+                upgraded = upgraded.replace(
+                    _fallback_metadata("lsp->treesitter->lang_static->grep", "low", "callHierarchy_unavailable"),
+                    _fallback_metadata("lsp->treesitter->lang_static", "medium", "callHierarchy_unavailable"),
+                )
+                return upgraded
+    except Exception:
+        pass
+
+    # ---------- 3) Generic Grep ----------
+    try:
+        return _grep_fallback_call_graph(repo_path, file_path, symbol, direction)
+    except Exception:
+        pass
+
+    # ---------- 4) ASM ----------
+    if direction in ("outgoing", "both"):
+        asm_res = ASMLexicalParser.fallback_references(repo_path, file_path, symbol)
+        return asm_res + _fallback_metadata("lsp->treesitter->lang_static->grep->asm", "low", "static_all_failed")
+    asm_res = ASMLexicalParser.fallback_references(repo_path, file_path, symbol)
+    return asm_res + _fallback_metadata("lsp->treesitter->lang_static->grep->asm", "low", "static_all_failed")
 
 
 async def _async_lsp_call_graph(
@@ -1805,12 +2021,23 @@ async def _async_lsp_call_graph(
         return f"Error: 文件未找到 {file_path}"
 
     positions = _find_symbol_positions(abs_file, symbol)
-    client = await _gateway.get_client(repo_path, lang)
-    if not client:
-        msg = f"[call_graph] LSP 客户端启动失败，自动转入 Grep Fallback (symbol={symbol})"
+    if not positions:
+        msg = (
+            f"Error: [call_graph] 符号 `{symbol}` 在 `{file_path}` 中未出现，无法生成调用图。"
+            "请先用 `grep_in_repo` 或 `read_code_segment` 确认定义所在文件，"
+            "再以「定义所在路径 + 符号名」重新调用 `lsp_get_call_graph`。"
+            "（不在此场景下做静态兜底，以免在错误文件上产生误导性结果。）"
+        )
         logger.warning(msg)
         print(f"\n⚠️  {msg}", flush=True)
-        return _grep_fallback_call_graph(repo_path, file_path, symbol, direction)
+        return msg
+
+    client = await _gateway.get_client(repo_path, lang)
+    if not client:
+        msg = f"[call_graph] LSP 客户端启动失败，自动转入分层静态兜底 (symbol={symbol})"
+        logger.warning(msg)
+        print(f"\n⚠️  {msg}", flush=True)
+        return _static_call_graph_fallback(repo_path, file_path, symbol, direction, lang)
 
     abs_file_unix = abs_file.replace(chr(92), '/')
     if not abs_file_unix.startswith('/'):
@@ -1886,7 +2113,7 @@ async def _async_lsp_call_graph(
         lines_out = [f"{prefix}├── {name}{detail_str}{loc_str}"]
 
         if node_key in visited:
-            lines_out[-1] += "  (循环引用，已剩略)"
+            lines_out[-1] += "  (循环引用，已省略)"
             return lines_out
         visited.add(node_key)
 
@@ -1914,7 +2141,7 @@ async def _async_lsp_call_graph(
         lines_out = [f"{prefix}├── {name}{detail_str}{loc_str}"]
 
         if node_key in visited:
-            lines_out[-1] += "  (循环引用，已剩略)"
+            lines_out[-1] += "  (循环引用，已省略)"
             return lines_out
         visited.add(node_key)
 
@@ -1973,25 +2200,32 @@ async def _async_lsp_call_graph(
                     break
 
         if not root_items or not isinstance(root_items, list) or len(root_items) == 0:
-            # 【新增强化】：Semantic Fallback for Variables/Statics
-            # 当调用图准备失败时（通常是因为符号是变量而非函数），由于变量没有“控制流”调用关系，
-            # 我们自动转向“语义引用查找”，这能提供比单纯 Grep 更精准的跨文件符号使用分析。
-            reason = f"注意：符号 '{symbol}' 似乎是一个变量、常量或静态引用（LSP 调用图协议仅支持函数/方法）。系统已自动为您切换至【高精度语义引用查找】以分析其数据流向。"
-            logger.info(f"[call_graph] {symbol} is not a function. Falling back to semantic references.")
-            
-            # 异步调用引用查找逻辑 (reuse existing _async_lsp_request)
+            # prepareCallHierarchy 全空：先用源码启发式判断根因（宏 / 宏展开 / 索引问题等），再降级
+            diag = _diagnose_call_graph_prepare_failure(symbol, _file_lines)
+            print(f"\n💡 [call_graph] prepareCallHierarchy 全空 — 根因分析:\n   {diag}", flush=True)
+            logger.info(
+                "[call_graph] prepareCallHierarchy empty for symbol=%s file=%s — %s",
+                symbol,
+                file_path,
+                diag.replace("\n", " "),
+            )
+
+            reason = (
+                f"{diag} "
+                "系统将依次尝试【语义引用 textDocument/references】；若仍无效则进入分层静态兜底。"
+            )
+
             ref_result = await _async_lsp_request(repo_path, file_path, symbol, "textDocument/references")
-            
-            # 如果解析出了有效的引用列表（非 Error 且非“未解析出”提示）
+
             if "结果列表" in ref_result or "共被解析出" in ref_result:
-                header = f"\n💡 {reason}\n"
+                header = f"\n💡 [call_graph] {reason}\n"
                 return header + ref_result
-            
-            # 最后防线：如果语义引用查找也彻底失效（常见于宏生成或 ASM），再执行 Grep 降级
-            msg = f"[call_graph] LSP 语义解析（CallGraph & References）均无效，自动转入终极 Grep Fallback (symbol={symbol})"
-            logger.warning(msg)
-            print(f"\n⚠️  {msg}", flush=True)
-            return _grep_fallback_call_graph(repo_path, file_path, symbol, direction)
+
+            msg = f"[call_graph] LSP 语义解析（CallGraph & References）均无效，自动转入分层静态兜底 (symbol={symbol})"
+            logger.warning("%s | %s", msg, diag.replace("\n", " "))
+            print(f"\n⚠️  {msg}\n   根因摘要: {diag}", flush=True)
+            static_body = _static_call_graph_fallback(repo_path, file_path, symbol, direction, lang)
+            return f"[call_graph 根因] {diag}\n\n{static_body}"
 
 
         root_item = root_items[0]
@@ -2004,7 +2238,7 @@ async def _async_lsp_call_graph(
 
         if direction in ("outgoing", "both"):
             visited.clear()
-            result_lines.append("\n》出吐调用 (Outgoing Calls) — '{root_name}' 调用了谁？")
+            result_lines.append(f"\n》出向调用 (Outgoing Calls) — '{root_name}' 调用了谁？")
             async with _lsp_global_lock:
                 calls = await get_calls(root_item, "callHierarchy/outgoingCalls")
             child_items = [c.get("to", {}) for c in calls]
@@ -2033,10 +2267,10 @@ async def _async_lsp_call_graph(
         return "\n".join(result_lines)
 
     except Exception as e:
-        msg = f"[call_graph] 内部异常: {e}，自动转入 Grep Fallback (symbol={symbol})"
+        msg = f"[call_graph] 内部异常: {e}，自动转入分层静态兜底 (symbol={symbol})"
         logger.warning(msg)
         print(f"\n⚠️  {msg}", flush=True)
-        return _grep_fallback_call_graph(repo_path, file_path, symbol, direction)
+        return _static_call_graph_fallback(repo_path, file_path, symbol, direction, lang)
 
 
 @tool
@@ -2075,15 +2309,20 @@ def lsp_get_call_graph(repo_path: str, file_path: str, symbol: str,
     try:
         return future.result(timeout=120.0)
     except TimeoutError:
+        _cancel_future_safely(future)
         msg = f"[call_graph] LSP 超时 (120s)，自动转入 Grep Fallback (symbol={symbol})"
         logger.warning(msg)
         print(f"\n⚠️  {msg}", flush=True)
         return _grep_fallback_call_graph(repo_path, file_path, symbol, direction)
     except Exception as e:
+        _cancel_future_safely(future)
         msg = f"[call_graph] 外层异常: {e}，自动转入 Grep Fallback (symbol={symbol})"
         logger.warning(msg)
         print(f"\n⚠️  {msg}", flush=True)
         return _grep_fallback_call_graph(repo_path, file_path, symbol, direction)
+    except BaseException:
+        _cancel_future_safely(future)
+        raise
 
 
 async def _async_lsp_set_target_arch(repo_path: str, target: str) -> str:
@@ -2091,18 +2330,18 @@ async def _async_lsp_set_target_arch(repo_path: str, target: str) -> str:
     repo_path = _abspath(repo_path)
     marker = os.path.join(repo_path, ".os_agent_lsp_target")
 
-    # 必须持锁再重启：避免在其他 LSP 请求持有 _lsp_global_lock 期间
-    # force_restart_client 杀死进程，导致那些请求的 Future 收到异常后强制降级。
-    async with _lsp_global_lock:
-        try:
+    try:
+        async with _get_polyfill_lock(repo_path):
             with open(marker, 'w', encoding='utf-8') as f:
                 f.write(target)
 
-            # 强制重启 rust-analyzer 以应用新架构
+            # 注意：重启内部会按 self.lock -> _lsp_global_lock 的顺序拿锁，
+            # 必须避免在这里先拿 _lsp_global_lock 再去调用 force_restart_client，
+            # 否则会与 get_client 的锁顺序相反，形成潜在死锁。
             await _gateway.force_restart_client(repo_path, "rust")
-            return f"Successfully set LSP target to '{target}' and restarted rust-analyzer for {repo_path}."
-        except Exception as e:
-            return f"Error setting target arch: {e}"
+        return f"Successfully set LSP target to '{target}' and restarted rust-analyzer for {repo_path}."
+    except Exception as e:
+        return f"Error setting target arch: {e}"
 
 
 @tool
@@ -2133,4 +2372,8 @@ def lsp_set_target_arch(repo_path: str, target: str) -> str:
     try:
         return future.result(timeout=10.0)
     except Exception as e:
+        _cancel_future_safely(future)
         return f"Error executing lsp_set_target_arch: {e}"
+    except BaseException:
+        _cancel_future_safely(future)
+        raise

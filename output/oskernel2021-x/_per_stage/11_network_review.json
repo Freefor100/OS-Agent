@@ -1,0 +1,65 @@
+{
+  "passed": false,
+  "score": 0.65,
+  "severity": "major",
+  "failed_rules": [
+    "missing_path_citation"
+  ],
+  "missing_evidence": [
+    {
+      "paragraph_id": "系统调用列表分析",
+      "claim_id": null,
+      "reason": "声称检查了 kernel/include/sysnum.h 和 kernel/syscall.c 无网络相关 syscall，但证据索引摘要为空，需调用 grep_in_repo 或 read_code_segment 验证"
+    },
+    {
+      "paragraph_id": "文件描述符类型验证",
+      "claim_id": null,
+      "reason": "声称检查了 kernel/include/file.h:4-9 无 FD_SOCKET 类型，需调用 read_code_segment 验证 file 结构体定义"
+    },
+    {
+      "paragraph_id": "网卡驱动验证",
+      "claim_id": null,
+      "reason": "声称检查了 kernel/include/virtio.h 和 kernel/virtio_disk.c 仅支持 VIRTIO_BLK，需调用 read_code_segment 验证"
+    },
+    {
+      "paragraph_id": "协议支持验证",
+      "claim_id": null,
+      "reason": "声称全仓库搜索无 tcp/udp/ethernet 等关键词匹配，但证据索引摘要为空，需调用 grep_in_repo 验证"
+    }
+  ],
+  "weak_claims": [
+    {
+      "paragraph_id": "sys_sendfile 桩函数说明",
+      "reason": "声称 sys_sendfile 为桩函数，但未提供该函数上下文的完整代码片段以确认其确实无实际逻辑"
+    }
+  ],
+  "format_issues": [],
+  "missed_modules": [],
+  "repair_actions": [
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "系统调用列表分析",
+      "hint": "调用 grep_in_repo(repo_path, 'SYS_socket|SYS_bind|SYS_connect|SYS_listen', file_extensions='h,c') 验证无网络相关 syscall 定义"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "文件描述符类型验证",
+      "hint": "调用 read_code_segment('kernel/include/file.h', start_line=1, end_line=20) 验证 file 结构体定义及枚举类型"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "网卡驱动验证",
+      "hint": "调用 read_code_segment('kernel/include/virtio.h', start_line=1, end_line=30) 和 read_code_segment('kernel/virtio_disk.c', start_line=50, end_line=70) 验证 VIRTIO 设备 ID 检查逻辑"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "协议支持验证",
+      "hint": "调用 grep_in_repo(repo_path, 'tcp|udp|ethernet|ip_input|dhcp|dns', file_extensions='c,h') 验证无协议栈相关代码"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "sys_sendfile 桩函数说明",
+      "hint": "调用 read_code_segment('kernel/sysproc.c', start_line=420, end_line=430) 验证 sys_sendfile 函数完整实现"
+    }
+  ]
+}

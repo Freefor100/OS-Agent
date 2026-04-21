@@ -1,0 +1,568 @@
+{
+  "schema_version": "v1",
+  "stage_id": "04_process_sched",
+  "stage_title": "进程/线程与调度机制",
+  "terminology_profile": "stallings_en_zh",
+  "answers": [
+    {
+      "question_id": "Q04_001",
+      "question_type": "short_answer",
+      "stem": "执行实体 (Execution Entity) 抽象是什么？\n请按以下格式作答（每项必须有代码证据）：\n- 顶层类型名: ___（如 Process / Task / Thread / TaskControlBlock）\n- 结构体路径: ___\n- 关键字段（至少列 3 个）: Context=___, State=___, PID=___, TrapFrame=___\n- 是否区分 PCB 与 TCB: ___（是 / 否 / 待核实）",
+      "value": "顶层类型名: struct proc\n结构体路径: src/include/proc.h:128-170\n关键字段: Context=context (struct context), State=state (enum procstate), PID=pid (int), TrapFrame=trapframe (struct trapframe*)\n是否区分 PCB 与 TCB: 否 (统一使用 struct proc，通过 CLONE_VM|CLONE_THREAD 标志区分进程/线程)",
+      "evidence": [
+        {
+          "path": "src/include/proc.h",
+          "symbol_kind": "struct",
+          "symbol_name": "proc",
+          "excerpt": "struct proc { int magic; struct spinlock lock; enum procstate state; struct proc *parent; int pid; struct context context; struct trapframe *trapframe; pagetable_t pagetable; ... }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_002",
+      "question_type": "short_answer",
+      "stem": "任务/进程的生命周期状态机有哪些状态与流转点？（Ready/Running/Blocked/Exited 等；需状态枚举/字段证据）",
+      "value": "五态模型：UNUSED (未使用), SLEEPING (睡眠/阻塞), RUNNABLE (就绪), RUNNING (运行), ZOMBIE (僵尸)\n流转点:\n- UNUSED→RUNNABLE: allocproc() 初始化后 readyq_push()\n- RUNNABLE→RUNNING: scheduler() 选中并 w_satp 切换页表\n- RUNNING→SLEEPING: sleep() 调用 sched()\n- SLEEPING→RUNNABLE: wakeup() 调用 readyq_push()\n- RUNNING→ZOMBIE: exit() 设置 state=ZOMBIE\n- ZOMBIE→UNUSED: wait4pid() 调用 freeproc()",
+      "evidence": [
+        {
+          "path": "src/include/proc.h",
+          "symbol_kind": "enum",
+          "symbol_name": "procstate",
+          "excerpt": "enum procstate { UNUSED, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };"
+        },
+        {
+          "path": "src/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "scheduler",
+          "excerpt": "p->state = RUNNING; w_satp(MAKE_SATP(p->pagetable)); swtch(&c->context, &p->context);"
+        },
+        {
+          "path": "src/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "exit",
+          "excerpt": "p->state = ZOMBIE; sched();"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_003",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在上下文切换 (Context Switch) 实现（switch.S/__switch/swtch/context_switch）？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "src/swtch.S",
+          "symbol_kind": "assembly",
+          "symbol_name": "swtch",
+          "excerpt": "swtch: sd ra, 0(a0); sd sp, 8(a0); sd s0-s11, 16-104(a0); ld ra, 0(a1); ld sp, 8(a1); ld s0-s11, 16-104(a1); ret"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_004",
+      "question_type": "short_answer",
+      "stem": "上下文切换保存/恢复了哪些寄存器集合？（例如 RISC-V s0-s11；必须引用汇编/结构体证据）",
+      "value": "保存/恢复 14 个寄存器：ra (返回地址), sp (栈指针), s0-s11 (被调用者保存寄存器)\n证据：src/swtch.S 中 sd/ld 指令序列，偏移 0-104 字节共 12*8=96 字节 + ra+sp 共 112 字节",
+      "evidence": [
+        {
+          "path": "src/swtch.S",
+          "symbol_kind": "assembly",
+          "symbol_name": "swtch",
+          "excerpt": "sd ra, 0(a0); sd sp, 8(a0); sd s0, 16(a0); ... sd s11, 104(a0); ld ra, 0(a1); ... ld s11, 104(a1)"
+        },
+        {
+          "path": "src/include/cpu.h",
+          "symbol_kind": "struct",
+          "symbol_name": "context",
+          "excerpt": "struct context { uint64 ra; uint64 sp; uint64 s0-s11; };"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_005",
+      "question_type": "short_answer",
+      "stem": "调度算法 (Scheduling Algorithm) 属于哪类？\n请按格式作答：\n- 算法名称: ___（必须是以下之一：FCFS / Round-Robin (RR) / Stride/Proportional-Share / MLFQ / CFS / Priority / 其他）\n- 代码证据（关键字段/函数）: ___\n  - RR: timeslice/slice 字段位置=___\n  - Stride: stride 字段与比较逻辑位置=___\n  - MLFQ: 多级队列 VecDeque/数组层级证据=___\n  - Priority: priority 字段参与 pick_next 排序证据=___",
+      "value": "算法名称: FCFS (First-Come First-Served) / FIFO\n代码证据:\n- readyq 为单队列 (src/proc.c:28 queue readyq)\n- queue_push/queue_pop 使用 list_add_before/list_next 实现 FIFO (src/include/queue.h:36-48)\n- 无 timeslice/slice 字段 (grep 搜索无结果)\n- 无 priority/stride 字段参与调度 (grep 搜索无相关调度逻辑)\n- scheduler() 直接 readyq_pop() 无优先级比较 (src/proc.c:124)",
+      "evidence": [
+        {
+          "path": "src/proc.c",
+          "symbol_kind": "variable",
+          "symbol_name": "readyq",
+          "excerpt": "queue readyq;"
+        },
+        {
+          "path": "src/include/queue.h",
+          "symbol_kind": "function",
+          "symbol_name": "queue_pop",
+          "excerpt": "struct proc* queue_pop(queue* q){ if(!queue_empty(q)){ qlock(q); struct list* l = list_next(&q->head); list_del(l); p = dlist_entry(l, struct proc, dlist); ... } }"
+        },
+        {
+          "path": "src/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "scheduler",
+          "excerpt": "struct proc* p = readyq_pop(); if(p){ p->state = RUNNING; swtch(&c->context, &p->context); }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_006",
+      "question_type": "short_answer",
+      "stem": "调度器 (Scheduler)核心入口/关键函数有哪些？（schedule/pick_next 等；给 1-3 个入口与证据）",
+      "value": "1. scheduler() (src/proc.c:119): 主调度循环，每核启动时调用 (src/main.c:95)，无限循环从 readyq 取进程\n2. sched() (src/proc.c:520): 主动让出 CPU，调用 swtch 切换到 cpu->context\n3. yield() (src/proc.c:655): 将当前进程放回 readyq 并调用 sched()",
+      "evidence": [
+        {
+          "path": "src/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "scheduler",
+          "excerpt": "void scheduler(){ struct cpu *c = mycpu(); while(1){ struct proc* p = readyq_pop(); ... swtch(&c->context, &p->context); } }"
+        },
+        {
+          "path": "src/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "sched",
+          "excerpt": "void sched(void){ struct proc *p = myproc(); swtch(&p->context, &mycpu()->context); }"
+        },
+        {
+          "path": "src/main.c",
+          "symbol_kind": "function",
+          "symbol_name": "main",
+          "excerpt": "printf(\"hart %d scheduler!\\n\", hartid); scheduler();"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_007",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 fork/clone（创建新执行实体）？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "src/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "clone",
+          "excerpt": "int clone(uint64 flag, uint64 stack, uint64 ptid, uint64 tls, uint64 ctid) { struct proc *np; if((flag & CLONE_THREAD) && (flag & CLONE_VM)) { np = allocproc(p, 1); ... } else { np = allocproc(p, 0); ... } }"
+        },
+        {
+          "path": "src/sysproc.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_clone",
+          "excerpt": "uint64 sys_clone(void) { uint64 flag, stack, ptid, ctid, tls; argaddr(0, &flag); ... return clone(flag, stack, ptid, tls, ctid); }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_008",
+      "question_type": "short_answer",
+      "stem": "fork/clone 是否复制地址空间与文件表？（必须给复制路径证据；若 stub 需说明形态）",
+      "value": "是，根据 CLONE_VM/CLONE_FILES 标志区分:\n- 地址空间：proc_pagetable() 中 thread_create=1 时调用 vma_shallow_mapping (共享)，thread_create=0 时调用 vma_deep_mapping (复制) (src/proc.c:330-360)\n- 文件表：clone() 中循环调用 filedup() 复制 ofile 数组，edup() 复制 cwd (src/proc.c:458-460)\n- CLONE_VM|CLONE_THREAD 时共享地址空间 (浅拷贝)，否则深拷贝",
+      "evidence": [
+        {
+          "path": "src/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "clone",
+          "excerpt": "for(i = 0; i < NOFILE; i++) if(p->ofile[i]) np->ofile[i] = filedup(p->ofile[i]); np->cwd = edup(p->cwd);"
+        },
+        {
+          "path": "src/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "proc_pagetable",
+          "excerpt": "if(thread_create) { while(nvma != p->vma) { if(nvma->type != TRAP && vma_shallow_mapping(...) < 0) ... } } else { while(nvma != p->vma) { if(nvma->type != TRAP && vma_deep_mapping(...) < 0) ... } }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_009",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 exec（装载 ELF/重建地址空间）？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "src/exec.c",
+          "symbol_kind": "function",
+          "symbol_name": "exec",
+          "excerpt": "int exec(char *path, char **argv, char **env) { struct proc* np = kmalloc(sizeof(struct proc)); proc_pagetable(np, 0, 0); loadelf(np, ep, &elf, &phdr, 0); ... }"
+        },
+        {
+          "path": "src/sysproc.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_execve",
+          "excerpt": "uint64 sys_execve() { char *path, *argv[MAXARG], *env[MAXARG]; argstr(0, &path); ... int ret = exec(path, argv, env); }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_010",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 wait/waitpid（父子回收同步）？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "src/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "wait4pid",
+          "excerpt": "int wait4pid(int pid, uint64 addr) { struct proc *p = myproc(); while(1){ child = findchild(p, zombiecond, pid, &chan); if(child != NULL){ freeproc(child); return kidpid; } sleep(p, &p->lock); } }"
+        },
+        {
+          "path": "src/sysproc.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_wait4",
+          "excerpt": "uint64 sys_wait4() { int pid; uint64 addr; argint(0, &pid); argaddr(1, &addr); return wait4pid(pid, addr); }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_011",
+      "question_type": "single_choice",
+      "stem": "waitpid / wait4 的阻塞实现 (Blocking Implementation) 更接近哪种？",
+      "value": "A. 真正阻塞：移出就绪队列 + WaitQueue/条件变量唤醒 (Wait Queue or Condition Variable)",
+      "evidence": [
+        {
+          "path": "src/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "wait4pid",
+          "excerpt": "if(pid == -1) sleep(p, &p->lock); else sleep(chan, &p->lock);"
+        },
+        {
+          "path": "src/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "sleep",
+          "excerpt": "queue* q = findwaitq(chan); waitq_push(q, p); p->state = SLEEPING; sched();"
+        },
+        {
+          "path": "src/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "wakeup",
+          "excerpt": "queue* q = findwaitq(chan); while((p = waitq_pop(q))!=NULL){ p->state = RUNNABLE; readyq_push(p); }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_012",
+      "question_type": "short_answer",
+      "stem": "PID 分配器实现是什么？（自增/bitmap/空闲栈复用/只分配不回收；必须给证据）",
+      "value": "单调自增，不回收 (只分配不回收)\n实现：nextpid 全局变量，allocpid() 中 nextpid = nextpid + 1\n无 bitmap/空闲栈复用机制，PID 泄漏风险",
+      "evidence": [
+        {
+          "path": "src/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "allocpid",
+          "excerpt": "int allocpid() { acquire(&pid_lock); pid = nextpid; nextpid = nextpid + 1; release(&pid_lock); return pid; }"
+        },
+        {
+          "path": "src/proc.c",
+          "symbol_kind": "variable",
+          "symbol_name": "nextpid",
+          "excerpt": "int nextpid = 1;"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_013",
+      "question_type": "short_answer",
+      "stem": "父子进程树如何存储？（children Vec/链表/parent+sibling 指针；必须给结构体字段证据）",
+      "value": "parent 指针 + 全局遍历\n- struct proc 含 parent 指针 (src/include/proc.h:133)\n- 无 children 链表/数组\n- findchild() 通过遍历全局 proc 数组并检查 np->parent == p 查找子进程 (src/proc.c:611-625)\n- reparent() 遍历全局数组修改 orphan 子进程的 parent 为 initproc (src/proc.c:634-650)\n时间复杂度 O(NPROC)",
+      "evidence": [
+        {
+          "path": "src/include/proc.h",
+          "symbol_kind": "struct",
+          "symbol_name": "proc",
+          "excerpt": "struct proc *parent;"
+        },
+        {
+          "path": "src/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "findchild",
+          "excerpt": "for(struct proc* np = proc; np < &proc[NPROC]; np++){ if(np->parent == p && cond(np, pid)){ ... } }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_014",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现信号 (signal) 或 futex？（若二者都无则 not_found；若只实现其一需说明并给证据）",
+      "value": "stub",
+      "evidence": [
+        {
+          "path": "src/include/proc.h",
+          "symbol_kind": "struct",
+          "symbol_name": "proc",
+          "excerpt": "ksigaction_t *sig_act; __sigset_t sig_set; __sigset_t sig_pending; struct sig_frame *sig_frame;"
+        },
+        {
+          "path": "src/include/proc.h",
+          "symbol_kind": "function",
+          "symbol_name": "do_futex",
+          "excerpt": "int do_futex(int* uaddr, int futex_op, int val, ktime_t *timeout, int *addr2, int val2, int val3);"
+        },
+        {
+          "path": "src/proc.c",
+          "symbol_kind": "grep",
+          "symbol_name": "do_futex",
+          "excerpt": "仅在 src/include/proc.h:199 声明，无函数体实现 (grep 仅找到声明)"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_015",
+      "question_type": "short_answer",
+      "stem": "与 09 多核的交叉一致性：是否存在每核队列/任务迁移/IPI resched？（需与第 9 章互指证据或写不适用）",
+      "value": "不适用 (单队列全局共享)\n- 仅一个全局 readyq (src/proc.c:28)\n- struct cpu 无 per-CPU readyq 字段 (src/include/cpu.h:28-34)\n- 无任务迁移/负载均衡代码\n- IPI 仅用于启动 (sbi_send_ipi)，无 IPI resched 机制\n与第 9 章交叉验证：若 09 判定为 SMP 启动但无调度迁移，此处一致",
+      "evidence": [
+        {
+          "path": "src/proc.c",
+          "symbol_kind": "variable",
+          "symbol_name": "readyq",
+          "excerpt": "queue readyq;"
+        },
+        {
+          "path": "src/include/cpu.h",
+          "symbol_kind": "struct",
+          "symbol_name": "cpu",
+          "excerpt": "struct cpu { struct proc *proc; struct context context; int noff; int intena; };"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_016",
+      "question_type": "short_answer",
+      "stem": "exit() 资源回收路径：调用链是什么？是否真正回收地址空间/文件表/通知父进程？（必须给调用链证据；桩则说明）",
+      "value": "调用链:\n1. exit(n) (src/proc.c:720)\n2. 关闭文件：fileclose() 循环关闭 ofile (src/proc.c:727-733)\n3. 释放 cwd：eput(p->cwd) (src/proc.c:735)\n4. 唤醒父进程：wakeup(getparent(p)) (src/proc.c:738)\n5. 重继子进程：reparent(p) (src/proc.c:739)\n6. 设置僵尸态：p->state = ZOMBIE (src/proc.c:742)\n7. 调度：sched() (永不返回) (src/proc.c:745)\n8. wait4pid() 中 freeproc() 回收页表/栈/信号 (src/proc.c:169-206)",
+      "evidence": [
+        {
+          "path": "src/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "exit",
+          "excerpt": "for(int fd = 0; fd < NOFILE; fd++){ fileclose(f); } eput(p->cwd); wakeup(getparent(p)); reparent(p); p->state = ZOMBIE; sched();"
+        },
+        {
+          "path": "src/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "freeproc",
+          "excerpt": "if(p->pagetable) proc_freepagetable(p); sigaction_free(p->sig_act); sigframefree(p->sig_frame); p->state = UNUSED;"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_017",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现进程组/会话（Process Group / Session，pgid/session/set_sid/setpgid）？（必须三态；有则区分真实检查链 vs 仅占位字段）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "src/include/proc.h",
+          "symbol_kind": "grep",
+          "symbol_name": "pgid",
+          "excerpt": "grep 'setpgid|set_sid|getpgid|getsid' 无匹配 (仅 ff.h 中有 session 字样但与进程组无关)"
+        },
+        {
+          "path": "src/proc.c",
+          "symbol_kind": "grep",
+          "symbol_name": "session",
+          "excerpt": "无进程组/会话相关实现代码"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_018",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 POSIX 资源限制（rlimit/RLIMIT/getrlimit/setrlimit）？（必须三态；若 implemented 需说明支持的资源类型数量及软/硬限制机制）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "src/include/proc.h",
+          "symbol_kind": "struct",
+          "symbol_name": "rlimit",
+          "excerpt": "struct rlimit { rlim_t rlim_cur; rlim_t rlim_max; }; 但仅定义结构体，无 getrlimit/setrlimit 函数"
+        },
+        {
+          "path": "src/proc.c",
+          "symbol_kind": "grep",
+          "symbol_name": "getrlimit",
+          "excerpt": "grep 'getrlimit|setrlimit' 无匹配 (0 结果)"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_019",
+      "question_type": "single_choice",
+      "stem": "该 OS 是否区分了 TCB（线程控制块）与 PCB（进程控制块）？",
+      "value": "B. 仅有统一 Task 结构（无区分）",
+      "evidence": [
+        {
+          "path": "src/include/proc.h",
+          "symbol_kind": "struct",
+          "symbol_name": "proc",
+          "excerpt": "仅 struct proc 一种结构体，通过 clone() 的 CLONE_VM|CLONE_THREAD 标志区分进程/线程语义"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_020",
+      "question_type": "tri_state_impl",
+      "stem": "调度切换路径上是否存在页表切换（w_satp/sfence.vma/写 CR3/TTBR 等）？（必须三态；给调用点 路径 证据）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "src/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "scheduler",
+          "excerpt": "w_satp(MAKE_SATP(p->pagetable)); sfence_vma(); swtch(&c->context, &p->context); w_satp(MAKE_SATP(kernel_pagetable)); sfence_vma();"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_021",
+      "question_type": "single_choice",
+      "stem": "用户线程与内核线程的映射模型 (User-Level Thread to Kernel-Level Thread Mapping) 更接近哪种？（Stallings Ch4）",
+      "value": "A. 1:1（每个用户线程对应一个内核线程，如 Linux pthread）",
+      "evidence": [
+        {
+          "path": "src/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "clone",
+          "excerpt": "clone() 创建新 struct proc 实例，用户态线程库可通过 clone(CLONE_VM|CLONE_THREAD) 创建内核级线程"
+        },
+        {
+          "path": "usrinit/user.h",
+          "symbol_kind": "function",
+          "symbol_name": "clone",
+          "excerpt": "extern int clone(uint64 flag, uint64 stack, uint64 ptid, uint64 tls, uint64 ctid); 用户态可调用"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_022",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现线程局部存储 (Thread-Local Storage, TLS)？（必须三态；搜索 thread_local|TLS|__thread|#[thread_local]；若 implemented 需说明 TLS 的访问方式：tp 寄存器/段寄存器/其他）",
+      "value": "stub",
+      "evidence": [
+        {
+          "path": "src/include/proc.h",
+          "symbol_kind": "macro",
+          "symbol_name": "CLONE_SETTLS",
+          "excerpt": "#define CLONE_SETTLS 0x00080000 /* create a new TLS for the child */"
+        },
+        {
+          "path": "src/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "clone",
+          "excerpt": "np->trapframe->tp = tls; 仅将 tls 参数存入 tp 寄存器，无实际 TLS 分配/管理机制"
+        },
+        {
+          "path": "src/proc.c",
+          "symbol_kind": "grep",
+          "symbol_name": "CLONE_SETTLS",
+          "excerpt": "clone() 函数中未检查 CLONE_SETTLS 标志，无 TLS 描述符处理逻辑"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_023",
+      "question_type": "multi_choice",
+      "stem": "调度器是否追踪/优化以下哪些性能指标 (Scheduling Criteria, Stallings Ch9)？（多选；未发现则留空并在 notes 写 not_found）",
+      "value": [
+        "F. 未发现调度性能统计"
+      ],
+      "evidence": [
+        {
+          "path": "src/proc.c",
+          "symbol_kind": "grep",
+          "symbol_name": "CPU utilization",
+          "excerpt": "无 CPU 利用率/吞吐量/周转时间等统计代码"
+        },
+        {
+          "path": "src/proc.c",
+          "symbol_kind": "struct",
+          "symbol_name": "tms",
+          "excerpt": "struct tms proc_tms 存在但仅用于 times() 系统调用，非调度优化"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_024",
+      "question_type": "tri_state_impl",
+      "stem": "优先级调度是否实现老化 (Aging, Stallings Ch9) 以防止低优先级进程饥饿 (Starvation)？（必须三态；搜索 age/aging/boost_priority 或等价；若 not_found 需说明是否存在饥饿风险）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "src/proc.c",
+          "symbol_kind": "grep",
+          "symbol_name": "aging",
+          "excerpt": "grep 'aging|boost_priority|priority.*age' 无匹配"
+        },
+        {
+          "path": "src/include/proc.h",
+          "symbol_kind": "struct",
+          "symbol_name": "proc",
+          "excerpt": "struct proc 无 priority 字段，FCFS 调度无饥饿风险概念"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_025",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现公平份额调度 (Fair-Share Scheduling, Stallings Ch9) 或 CPU 配额 (CPU Quota/cgroup)？（必须三态；搜索 fair_share/cgroup/cpu_quota/weight 等）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "src/proc.c",
+          "symbol_kind": "grep",
+          "symbol_name": "fair_share",
+          "excerpt": "grep 'fair_share|cgroup|cpu_quota|weight' 仅找到 CLONE_NEWCGROUP 宏定义，无实现"
+        },
+        {
+          "path": "src/include/proc.h",
+          "symbol_kind": "macro",
+          "symbol_name": "CLONE_NEWCGROUP",
+          "excerpt": "#define CLONE_NEWCGROUP 0x02000000 /* New cgroup namespace */ 仅宏定义，无 cgroup 实现"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_026",
+      "question_type": "single_choice",
+      "stem": "调度器的抢占模式 (Preemption Mode, Stallings Ch9) 更接近哪种？",
+      "value": "A. 完全抢占 (Fully Preemptive)：时钟中断可随时抢占运行进程",
+      "evidence": [
+        {
+          "path": "src/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "usertrap",
+          "excerpt": "时钟中断 (scause 0x8000000000000005L) 调用 timer_tick()，可触发调度"
+        },
+        {
+          "path": "src/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "yield",
+          "excerpt": "yield() 可在任何时刻调用，将当前进程放回 readyq 并 sched()"
+        },
+        {
+          "path": "src/trap.c",
+          "symbol_kind": "grep",
+          "symbol_name": "proc_tick",
+          "excerpt": "proc_tick() 被注释 (src/trap.c:256)，但 timer_tick() 仍存在，时钟中断可抢占"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_027",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现最短作业优先调度 (Shortest Job First / SJF 或 SRTF, Stallings Ch9)？（必须三态；或等价的基于预测 burst 时间的调度）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "src/proc.c",
+          "symbol_kind": "grep",
+          "symbol_name": "SJF",
+          "excerpt": "grep 'SJF|shortest.*job|burst' 无匹配"
+        },
+        {
+          "path": "src/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "scheduler",
+          "excerpt": "scheduler() 直接 readyq_pop() 无 burst 时间预测或排序逻辑"
+        }
+      ]
+    }
+  ]
+}

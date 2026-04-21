@@ -20,6 +20,8 @@ class VectorStore:
     # 自研核心维度（真正区分两个项目自研代码相似度的维度）
     CUSTOM_CORE_DIMS = {"D3_memory", "D4_process_sched", "D5_trap_syscall",
                         "D6_filesystem", "D8_sync_ipc"}
+    STRUCT_SCORE_CAP = 0.30
+    TOTAL_SCORE_CAP = 1.0 + STRUCT_SCORE_CAP
 
     def __init__(self, output_dir: str = "./output"):
         self.output_dir = output_dir
@@ -47,43 +49,104 @@ class VectorStore:
     @staticmethod
     def _compute_struct_score(sf_query: dict, sf_target: dict) -> float:
         """
-        计算两个 struct_features 之间的精确字段加分（最高 0.15）。
+        计算两个 struct_features 之间的精确字段加分（最高 0.30）。
         字段均为 null 时不加分（双方未知不等于相同）。
         """
         score = 0.0
+        unknown_markers = {None, "", "unknown"}
+
+        def _normalize(value):
+            if isinstance(value, str):
+                return value.strip().lower()
+            return value
 
         def _match(key, bonus):
             q = sf_query.get(key)
             t = sf_target.get(key)
-            if q is not None and t is not None and q == t:
+            if q not in unknown_markers and t not in unknown_markers and q == t:
                 return bonus
             return 0.0
 
-        score += _match("allocator_crate", 0.04)
-        score += _match("network_stack", 0.03)
-        score += _match("fat32_source", 0.02)
+        def _match_normalized(key, bonus):
+            q = _normalize(sf_query.get(key))
+            t = _normalize(sf_target.get(key))
+            if q not in unknown_markers and t not in unknown_markers and q == t:
+                return bonus
+            return 0.0
+
+        def _match_bool(key, bonus):
+            q = sf_query.get(key)
+            t = sf_target.get(key)
+            if isinstance(q, bool) and isinstance(t, bool) and q == t:
+                return bonus
+            return 0.0
+
+        score += _match("kernel_type", 0.01)
+        score += _match("arch_primary", 0.01)
+        score += _match("boot_flow", 0.01)
+        score += _match("page_table_mode", 0.015)
+        score += _match("pm_allocator", 0.02)
+        score += _match("allocator_crate", 0.02)
+        score += _match("heap_allocator", 0.015)
+        score += _match("task_model", 0.015)
+        score += _match("scheduler", 0.015)
+        score += _match("signal_support", 0.01)
+        score += _match("futex_support", 0.01)
+        score += _match("ipc_primitives", 0.015)
+        score += _match("msgqueue_support", 0.01)
+        score += _match("shm_support", 0.015)
+        score += _match("semaphore_ipc", 0.01)
+        score += _match("signal_ipc", 0.01)
+        score += _match("vfs_style", 0.015)
+        score += _match("fs_primary", 0.015)
+        score += _match("fs_secondary", 0.01)
+        score += _match("fat32_source", 0.01)
+        score += _match("pipe_impl", 0.01)
+        score += _match("mmap_support", 0.015)
+        score += _match("network_stack", 0.015)
+        score += _match("socket_support", 0.01)
+        score += _match("socket_impl", 0.015)
+        score += _match("io_multiplexing", 0.015)
+        score += _match("block_driver", 0.015)
+        score += _match("net_driver", 0.01)
+        score += _match("device_discovery", 0.01)
+        score += _match("driver_model", 0.01)
+        score += _match("irq_controller", 0.01)
+        score += _match("uid_gid_model", 0.01)
+        score += _match("procfs_support", 0.01)
+        score += _match("devfs_support", 0.01)
+        score += _match("tmpfs_support", 0.01)
+        score += _match_normalized("vfs_trait", 0.01)
+        score += _match_bool("cow", 0.005)
+        score += _match_bool("lazy_alloc", 0.005)
+        score += _match_bool("swap", 0.005)
+        score += _match_bool("smp", 0.005)
+        score += _match_bool("per_cpu", 0.005)
+        score += _match_bool("load_balance", 0.005)
+        score += _match_bool("user_mem_protect", 0.005)
+        score += _match_bool("procfs_devfs", 0.005)
         # trapframe_bytes 做 int 规范化，避免 "248" vs 248 的字符串/整数不等问题
         q_tf = sf_query.get("trapframe_bytes")
         t_tf = sf_target.get("trapframe_bytes")
         if q_tf is not None and t_tf is not None:
             try:
                 if int(q_tf) == int(t_tf):
-                    score += 0.03
+                    score += 0.02
             except (TypeError, ValueError):
                 pass
 
-        # syscall_count_real：差值越小加分越多（最高 0.03）
+        # syscall_count_real：差值越小加分越多（最高 0.02）
         # 做 int() 转换，防止 LLM 将数字以字符串形式输出导致 TypeError
         q_cnt = sf_query.get("syscall_count_real")
         t_cnt = sf_target.get("syscall_count_real")
         if q_cnt is not None and t_cnt is not None:
             try:
                 delta = abs(int(q_cnt) - int(t_cnt))
-                score += (1.0 - min(delta / 50.0, 1.0)) * 0.03
+                score += (1.0 - min(delta / 50.0, 1.0)) * 0.02
             except (TypeError, ValueError):
                 pass  # 无法转换则不加分
 
-        return min(score, 0.15)
+        return min(score, VectorStore.STRUCT_SCORE_CAP)
 
     # ------------------------------------------------------------------
     # 检索
@@ -176,15 +239,27 @@ class VectorStore:
                 dim_scores[dim_id] = round(cos_sim, 4)
                 cosine_weighted += weights.get(dim_id, 0.0) * cos_sim
 
-            # 精确字段加分
+            cosine_weighted = max(0.0, min(1.0, cosine_weighted))
+
+            # 精确字段加分（原始值）+ 归一化最终分
             struct_score = VectorStore._compute_struct_score(q_sf, t_sf)
-            total_score = cosine_weighted + struct_score
+            raw_total_score = cosine_weighted + struct_score
+            total_score = raw_total_score / VectorStore.TOTAL_SCORE_CAP
+            total_score = max(0.0, min(1.0, total_score))
+            struct_score_normalized = (
+                struct_score / VectorStore.STRUCT_SCORE_CAP
+                if VectorStore.STRUCT_SCORE_CAP > 0
+                else 0.0
+            )
 
             results.append({
                 "name": name,
                 "total_score": round(total_score, 4),
+                "similarity_percent": round(total_score * 100.0, 2),
                 "cosine_score": round(cosine_weighted, 4),
                 "struct_score": round(struct_score, 4),
+                "struct_score_normalized": round(struct_score_normalized, 4),
+                "raw_total_score": round(raw_total_score, 4),
                 "same_framework": same_framework,
                 "dim_scores": dim_scores,
             })

@@ -1,0 +1,20 @@
+{
+  "summary": "合并证据补充与术语修正，聚焦 TrapFrame 大小、入口函数及桩函数验证",
+  "actions": [
+    {
+      "action_type": "rewrite_paragraph",
+      "target_paragraph_id": "p001",
+      "hint": "读取 kernel/include/trap.h 修正 trapframe 结构描述：33 个 uint64 字段共 264 字节，补充文件路径引用"
+    },
+    {
+      "action_type": "rewrite_paragraph",
+      "target_paragraph_id": "p002",
+      "hint": "澄清 Trap 入口：确认 xv6-riscv 使用 uservec/kernelvec 而非 trap_handler，修正异常向量表描述"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "p003",
+      "hint": "grep 验证 sys_mprotect 等桩函数是否存在于 sysproc.c，并确认 GeneralRegisters 结构体定义情况"
+    }
+  ]
+}

@@ -1,0 +1,142 @@
+{
+  "target": "oskernel2023-zmz",
+  "library_dir": "G:\\OS-Agent\\output",
+  "timestamp": "2026-03-28T12:55:20.301601",
+  "top_k": 5,
+  "coarse_preplan_path": "./output\\oskernel2023-zmz\\coarse_preplan.json",
+  "coarse_preplan": {
+    "target": "oskernel2023-zmz",
+    "framework_guess": [
+      "ArceOS",
+      "xv6"
+    ],
+    "arch_guess": [
+      "riscv64"
+    ],
+    "critical_dims": [
+      "framework",
+      "allocator"
+    ],
+    "available_sections": [
+      "01_项目概览与技术栈.md",
+      "02_启动流程与架构初始化.md",
+      "03_内存管理物理虚拟分配器.md",
+      "04_进程线程与调度机制.md",
+      "05_中断异常与系统调用.md",
+      "06_文件系统VFS__具体_FS.md",
+      "07_设备驱动与硬件抽象.md",
+      "08_同步互斥与进程间通信.md",
+      "09_多核支持与并行机制.md",
+      "10_安全机制与权限模型.md",
+      "11_网络子系统与协议栈.md",
+      "12_调试机制与错误处理.md",
+      "13_开发历史与里程碑.md",
+      "14_执行摘要与总结评价.md"
+    ]
+  },
+  "dimension_weights": {
+    "D1_tech_stack": 0.08,
+    "D2_boot_arch": 0.06,
+    "D3_memory": 0.15,
+    "D4_process_sched": 0.15,
+    "D5_trap_syscall": 0.1,
+    "D6_filesystem": 0.12,
+    "D7_device_driver": 0.06,
+    "D8_sync_ipc": 0.08,
+    "D9_smp_security": 0.08,
+    "D10_net_debug": 0.12
+  },
+  "target_fingerprint_path": "./output\\oskernel2023-zmz\\fingerprint.json",
+  "target_vectors": {
+    "D10_net_debug": {
+      "feature_text": "网络：未实现网络功能。无 smoltcp/lwip 及 Socket，无网卡驱动，不支持 TCP/UDP 协议，仅限非网络测试。\n调试：日志系统已实现，支持分级彩色输出。Panic 含帧指针栈回溯，无 DWARF 解析。Shell 可用，无 Monitor/GDB Stub，需外部 OpenOCD。支持基础系统追踪，无 perf 分析。",
+      "vector_length": 768
+    },
+    "D1_tech_stack": {
+      "feature_text": "项目 xv6-k210 基于 xv6-riscv 移植，采用宏内核架构。内核用 C 语言（no_std），SBI 固件使用 Rust（no_std）。支持 RISC-V 64 位，含 k210 及 qemu 仿真。框架源自 xv6-riscv。Rust 依赖含 spin、buddy_system_allocator、k210-pac。构建采用 Makefile，主要 make 及 cargo build。",
+      "vector_length": 768
+    },
+    "D2_boot_arch": {
+      "feature_text": "启动链为 SBI→Kernel，CPU 经 M-Mode→S-Mode 切换，通过 mret 进入内核。入口文件为 kernel/entry_qemu.S 或 kernel/entry_k210.S。MMU 采用 SV39 页表，在 main 初始化并写 satp 启用。FPU 已启用，通过 floatinithart 配置。多平台支持 K210 与 QEMU，StarFive VisionFive2 与 LoongArch 未实现。",
+      "vector_length": 768
+    },
+    "D3_memory": {
+      "feature_text": "物理内存为链表式空闲列表（双池）。页表为 Sv39 三级，结构 pagetable_t。内核堆 Slab 式 kmalloc，用户 sbrk 分配。CoW/Lazy/mmap(全支持) 已实现；Swap/Huge/SharedMem/rmap 未实现。缺页链：handle_page_fault→lazy/cow→allocpage。用户指针无 verify_area，依赖 walkaddr 及缺页异常。",
+      "vector_length": 768
+    },
+    "D4_process_sched": {
+      "feature_text": "执行实体为统一 `struct proc`，PCB/TCB 合一。调度为优先级队列，同优先级内代码仅有 FIFO，无多调度器。上下文切换由 `swtch.S` 保存 13 寄存器，支持浮点惰性保存。无进程组会话及 PGID/SID 管理。信号支持 `kill` 但缺失 `sigaction` 分发跳板。Futex 未实现。rlimit 仅为桩函数。`fork` 复制地址空间。",
+      "vector_length": 768
+    },
+    "D5_trap_syscall": {
+      "feature_text": "入口采用汇编 trap.S。帧结构含 70 字段共 808 字节。系统调用经函数指针表分发，注册 74 个，20+ 完整实现（含 clone/exec/mmap），6 个桩函数（如 getuid 返 0），覆盖文件、进程及内存，无网络。接口层与核心逻辑分离。信号在调度时检查。缺页异常中触发 Lazy 与 CoW。用户指针经验证，无 UserInPtr 包装。",
+      "vector_length": 768
+    },
+    "D6_filesystem": {
+      "feature_text": "含 VFS 层，有 Inode/Dentry/SuperBlock/File 接口指针。FAT32 自研（非外部 crate），ext4 未支持。RamFS 为桩，DevFS/ProcFS 实现。描述符表每进程。Pipe 环形缓冲区。Socket 未支持。mmap 支持共享/匿名。poll/select 简化，epoll 缺失。打开流程协同四大结构，定位 Inode 分配 File 及 Fd。",
+      "vector_length": 768
+    },
+    "D7_device_driver": {
+      "feature_text": "系统双层架构，SBI 层用 Rust Trait 抽象，内核集中注册。设备地址硬编码，无设备树解析。支持 UART(16550/QEMU 仅测，UARTHS) 及块设备 (VirtIO-Blk/QEMU 仅测，SD 卡)，无网络驱动。中断采用 PLIC。Makefile、Cargo 编译。支持 QEMU、K210。",
+      "vector_length": 768
+    },
+    "D8_sync_ipc": {
+      "feature_text": "锁含自旋锁（禁中断、RISC-V 原子指令）与睡眠锁（含等待队列）。等待队列基于双向链表。IPC：管道已实现（1024 字节环形缓冲区）；消息队列未实现，无 sys_msgget 逻辑；共享内存仅 mmap 映射，System V 未实现；信号量未实现；信号已实现（sys_kill 分发）。Futex 未实现。",
+      "vector_length": 768
+    },
+    "D9_smp_security": {
+      "feature_text": "采用 SMP 架构。Secondary CPU 经 IPI 唤醒，send_ipi 无 ipi_handler。Per-CPU 基于 tp。无负载均衡与亲和性。S/U 态及 PTE_U 隔离，SSTATUS_PUM，无 KPTI。UID/GID syscall 桩实现，返回 0，无权限检查。无 Seccomp 沙箱。用户指针 copyin2 验证。内核 C，无 Rust 特性及 Capability/ACL。",
+      "vector_length": 768
+    }
+  },
+  "results": [
+    {
+      "name": "xv6-k210",
+      "total_score": 0.9061,
+      "similarity_percent": 90.61,
+      "cosine_score": 0.8779,
+      "struct_score": 0.3,
+      "struct_score_normalized": 1.0,
+      "raw_total_score": 1.1779,
+      "same_framework": true,
+      "dim_scores": {
+        "D10_net_debug": 0.9471,
+        "D1_tech_stack": 0.8748,
+        "D2_boot_arch": 0.9053,
+        "D3_memory": 0.912,
+        "D4_process_sched": 0.9333,
+        "D5_trap_syscall": 0.7146,
+        "D6_filesystem": 0.8659,
+        "D7_device_driver": 0.749,
+        "D8_sync_ipc": 0.9593,
+        "D9_smp_security": 0.7758
+      }
+    },
+    {
+      "name": "oskernrl2022-rv6",
+      "total_score": 0.857,
+      "similarity_percent": 85.7,
+      "cosine_score": 0.8141,
+      "struct_score": 0.3,
+      "struct_score_normalized": 1.0,
+      "raw_total_score": 1.1141,
+      "same_framework": true,
+      "dim_scores": {
+        "D10_net_debug": 0.8938,
+        "D1_tech_stack": 0.7619,
+        "D2_boot_arch": 0.8795,
+        "D3_memory": 0.8589,
+        "D4_process_sched": 0.8447,
+        "D5_trap_syscall": 0.6187,
+        "D6_filesystem": 0.7599,
+        "D7_device_driver": 0.825,
+        "D8_sync_ipc": 0.9582,
+        "D9_smp_security": 0.7486
+      }
+    }
+  ],
+  "validation": {
+    "passed": true,
+    "issues": []
+  }
+}

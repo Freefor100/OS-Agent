@@ -1,0 +1,69 @@
+{
+  "passed": false,
+  "score": 0.75,
+  "severity": "minor",
+  "failed_rules": [
+    "missing_path_citation"
+  ],
+  "missing_evidence": [
+    {
+      "paragraph_id": "技术栈与构建-编程语言与版本",
+      "claim_id": "kernel目录下58个.c文件",
+      "reason": "具体文件数量未经工具验证，证据索引为空"
+    },
+    {
+      "paragraph_id": "技术栈与构建-构建工具链",
+      "claim_id": "Makefile:75定义CFLAGS",
+      "reason": "精确行号引用未经read_code_segment实际读取验证"
+    },
+    {
+      "paragraph_id": "技术栈与构建-构建工具链",
+      "claim_id": "Makefile共179行",
+      "reason": "文件行数未经工具验证"
+    },
+    {
+      "paragraph_id": "技术栈与构建-编程语言与版本",
+      "claim_id": "bootloader/SBI/rustsbi-k210/Cargo.toml存在",
+      "reason": "路径存在性未经list_repo_structure验证"
+    }
+  ],
+  "weak_claims": [
+    {
+      "claim": "58个.c文件，无C++或Rust内核代码",
+      "reason": "具体数字缺乏证据支撑，建议改为定性描述或通过工具验证"
+    },
+    {
+      "claim": "Makefile:75定义CFLAGS=-Wall -Werror -O...",
+      "reason": "精确行号和内容未经实际读取验证"
+    }
+  ],
+  "format_issues": [],
+  "missed_modules": [],
+  "repair_actions": [
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "技术栈与构建-编程语言与版本",
+      "hint": "使用list_repo_structure验证kernel/目录下.c文件实际数量，或改为'多个.c文件'等定性描述"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "技术栈与构建-构建工具链",
+      "hint": "使用read_code_segment读取Makefile第70-80行内容验证CFLAGS定义及行号"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "技术栈与构建-构建工具链",
+      "hint": "使用list_repo_structure获取Makefile实际行数，或移除具体行数声称"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "目录结构导读-关键入口与调用链",
+      "hint": "使用read_code_segment验证entry_k210.S、entry_qemu.S中_start/_entry符号，main.c中main()函数的存在"
+    },
+    {
+      "action_type": "normalize_terminology",
+      "target_paragraph_id": "技术栈与构建-编程语言与版本",
+      "hint": "将具体数字声称改为定性描述（如'数十个.c文件'），除非能提供工具验证证据"
+    }
+  ]
+}

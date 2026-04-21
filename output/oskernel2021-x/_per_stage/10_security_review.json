@@ -1,0 +1,51 @@
+{
+  "passed": true,
+  "score": 0.87,
+  "severity": "minor",
+  "failed_rules": [
+    "evidence_index_empty",
+    "missing_grep_verification"
+  ],
+  "missing_evidence": [
+    {
+      "paragraph_id": "权限模型深度验证",
+      "claim_id": "open/write/exec 权限检查验证",
+      "reason": "must_cover 明确要求 grep check_perm/inode_permission 验证权限检查逻辑，草稿仅通过阅读 fopen() 代码推断无检查，未展示 grep 搜索结果的直接证据"
+    },
+    {
+      "paragraph_id": "KPTI/SMEP/SMAP 实现状态",
+      "claim_id": "SMEP/SMAP 未实现",
+      "reason": "声称'搜索 SMEP/SMAP 无结果'但未在证据索引中展示 grep 命令及输出"
+    }
+  ],
+  "weak_claims": [
+    {
+      "claim": "Capability/ACL 搜索结果为空",
+      "reason": "未展示具体 grep 命令和搜索范围，仅陈述结论"
+    }
+  ],
+  "format_issues": [],
+  "missed_modules": [],
+  "repair_actions": [
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "权限模型深度验证",
+      "hint": "补充 grep -r 'check_perm|inode_permission|access_check' kernel/ 的搜索结果截图或输出，明确证明无权限检查函数被调用"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "KPTI/SMEP/SMAP 实现状态",
+      "hint": "补充 grep -r 'SMEP|SMAP|pmp|supervisor_mode_execution' kernel/ 的搜索结果，证明 RISC-V 下无对应机制实现"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "安全沙箱与过滤机制",
+      "hint": "补充 grep -r 'seccomp|prctl|capability|acl' kernel/ 的完整搜索输出，而非仅陈述'未找到匹配内容'"
+    },
+    {
+      "action_type": "normalize_terminology",
+      "target_paragraph_id": "Rust 语言级安全性机制",
+      "hint": "明确区分'内核代码（纯 C）'与'固件代码（RustSBI）'的边界，避免读者误解整个项目语言构成"
+    }
+  ]
+}

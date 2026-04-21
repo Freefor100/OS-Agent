@@ -1,0 +1,85 @@
+{
+  "passed": false,
+  "score": 0.72,
+  "severity": "major",
+  "failed_rules": [
+    "missing_path_citation",
+    "must_cover_gap",
+    "unverified_search_claim"
+  ],
+  "missing_evidence": [
+    {
+      "paragraph_id": "9.1",
+      "claim_id": "多核启动代码缺失",
+      "reason": "声称搜索 smp_boot/start_secondary/__cpu_up/boot_secondary 均无匹配结果，但未提供 grep 或 RAG 搜索工具的输出作为证据支撑"
+    },
+    {
+      "paragraph_id": "9.1",
+      "claim_id": "Per-CPU 设计缺失",
+      "reason": "声称搜索 hart_id/cpuid/per_cpu/smp_init 均无结果，但未提供搜索工具输出证据"
+    },
+    {
+      "paragraph_id": "9.3",
+      "claim_id": "sbi_send_ipi 无调用点",
+      "reason": "声称除声明外无任何代码调用 sbi_send_ipi，但未提供 lsp_get_references 或 grep 搜索结果"
+    },
+    {
+      "paragraph_id": "9.4",
+      "claim_id": "全局变量多核安全性分析",
+      "reason": "声称 rq/__rq/last_pid/nr_process/current 无锁/非原子保护，但未提供这些变量定义的源码路径验证"
+    }
+  ],
+  "weak_claims": [
+    {
+      "paragraph_id": "9.5.1",
+      "claim": "spin_lock 仅为宏定义，非真正自旋锁",
+      "reason": "未验证项目中是否存在其他 spin_lock 实现形式（如内联函数、不同架构的备选实现），仅引用了 kmalloc.c 中的宏定义"
+    },
+    {
+      "paragraph_id": "9.8",
+      "claim": "原子操作未用于关键路径",
+      "reason": "声称 PID 分配/进程计数/就绪队列操作未使用原子指令，但未提供这些关键路径的代码片段作为对比证据"
+    }
+  ],
+  "format_issues": [],
+  "missed_modules": [
+    "Mutex 锁实现及优先级继承机制"
+  ],
+  "repair_actions": [
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "9.1",
+      "hint": "使用 grep_in_repo 搜索 'smp_boot|start_secondary|__cpu_up|boot_secondary'，附上完整搜索输出（包括 0 结果的明确说明）"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "9.1",
+      "hint": "使用 grep_in_repo 搜索 'hart_id|cpuid|per_cpu|smp_init'，附上完整搜索输出"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "9.3",
+      "hint": "使用 lsp_get_references 或 grep_in_repo 验证 sbi_send_ipi 的调用点，提供搜索结果截图或输出"
+    },
+    {
+      "action_type": "append_missing_module",
+      "target_paragraph_id": "9.5",
+      "hint": "补充 Mutex 锁实现分析：搜索 mutex_lock/mutex_unlock 符号，检查是否存在优先级继承机制（如优先级队列、优先级反转处理）"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "9.5.1",
+      "hint": "使用 grep_in_repo 搜索 'spin_lock' 的所有定义和实现，确认是否仅有宏定义而无其他实现形式"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "9.6",
+      "hint": "使用 read_code_segment 读取 kern/process/proc.c:get_pid 函数的完整实现，验证 last_pid 的非原子操作"
+    },
+    {
+      "action_type": "normalize_terminology",
+      "target_paragraph_id": "9.10",
+      "hint": "总结表格中 '多核安全性' 列对未实现功能标注 'N/A' 不够准确，建议改为 '不适用（单核设计）' 或 '❌ 未实现'"
+    }
+  ]
+}

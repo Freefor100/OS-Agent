@@ -1,0 +1,112 @@
+{
+  "stage_id": "10_security",
+  "goal": "分析 oskernrl2022-rv6 的安全机制与权限模型，覆盖特权级隔离、UID/GID 凭证、权限检查链、用户指针验证、栈保护、seccomp/审计等安全特性，并确认仅支持 riscv64 架构。",
+  "must_cover": [
+    "[Q10_001] 特权级隔离形态：RISC-V U/S 双态隔离（无 S/U 页表隔离）",
+    "[Q10_002] UID/GID 字段存在（struct proc 含 uid/gid），但无 Capability/ACL 结构",
+    "[Q10_003] syscall 路径权限检查：faccessat 有浅层检查但 open/write 无 UID/GID 验证链",
+    "[Q10_004] 权限检查入口点：sys_faccessat → ename → (mode 检查)，但无 inode_permission 深层链路",
+    "[Q10_005] 用户指针验证：copyin/copyout/walkaddr(PTE_U 检查) 实现有效",
+    "[Q10_006] seccomp/prctl/sandbox：未发现（无 sys_prctl，无 ENOSYS 桩）",
+    "[Q10_007] 栈保护/溢出防护：未发现 stack canary/guard page 代码证据",
+    "[Q10_008] 审计/安全启动：未发现 audit/secure_boot/signature 逻辑",
+    "[Q10_009] 架构支持：仅 riscv64（Makefile/linker 均指向 riscv，无其他架构目录）",
+    "[Q10_010] Rust 安全机制：不适用（项目为纯 C/汇编）",
+    "[Q10_011] KPTI 页表隔离：未实现（kernel/user 共用页表，仅靠 PTE_U 位隔离）",
+    "[Q10_012] UID/GID 检查链：仅有字段定义，syscall 路径无强制检查（🔸 桩函数形态）",
+    "[Q10_013] 访问控制模型：接近 DAC（自主访问控制），基于文件 mode 位",
+    "[Q10_014] 完整性策略：无 Biba/代码签名/W^X（PTE_RWX 可同时设置）",
+    "[Q10_001] 特权级隔离形态更接近哪种？",
+    "[Q10_002] 是否存在凭证/权限数据结构（UID/GID/Credential/Capability/ACL 等）？（必须三态）",
+    "[Q10_003] 是否能证实在 syscall 路径上真实执行了权限检查（open/exec/write 等）？（必须三态；仅有字段不算 implemented）",
+    "[Q10_004] 若存在权限检查：入口点与核心检查函数链路是什么？（列 2-5 个节点并给证据）",
+    "[Q10_005] 是否实现用户指针验证（access_ok/verify_area/UserInPtr/copyin/copyout 等）？（必须三态）",
+    "[Q10_006] 是否实现 seccomp/prctl/sandbox 等系统调用过滤/沙箱？（必须三态；stub 需说明形态：ENOSYS/return 0）",
+    "[Q10_007] 是否存在栈保护/溢出防护（stack canary/guard page）或等价机制？（必须三态）",
+    "[Q10_008] 是否存在审计/安全启动（audit/secure boot/signature）相关逻辑？（必须三态）"
+  ],
+  "evidence_targets": [
+    "权限模型：struct proc 含 uid/gid 字段但 sys_open/sys_write 未使用",
+    "用户身份：sys_getuid/sys_setuid 仅读写字段无验证",
+    "隔离边界：PTE_U 位 + sstatus.SPP 实现 U/S 态隔离",
+    "安全机制：copyin/copyout 通过 walkaddr 验证 PTE_U",
+    "权限模型",
+    "用户身份",
+    "隔离边界",
+    "安全机制"
+  ],
+  "seed_paths": [
+    "src/include/proc.h:128-150",
+    "src/sysproc.c:47-95",
+    "src/sysfile.c:39-120",
+    "src/sysfile.c:493-568",
+    "src/file.c:263-340",
+    "src/copy.c:1-100",
+    "src/vm.c:165-210",
+    "src/include/riscv.h:345-354",
+    "src/trap.c:140-175",
+    "linker/kernel.ld",
+    "security",
+    "capability",
+    "uid",
+    "perm"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "sys_faccessat",
+    "sys_openat",
+    "sys_write",
+    "copyin",
+    "copyout",
+    "walkaddr",
+    "sys_setuid",
+    "sys_setgid",
+    "usertrapret",
+    "experm",
+    "sys_getuid",
+    "cap"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "bin",
+    "doc",
+    "linker",
+    "sbi",
+    "sd",
+    "src",
+    "src/include",
+    "src/sifive",
+    "syscall"
+  ],
+  "preferred_tools": [
+    "read_code_segment",
+    "lsp_get_call_graph",
+    "lsp_get_definition",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "1. 使用 lsp_get_definition 定位 struct proc 定义，确认 uid/gid 字段位置及初始化点（proc.c:allocproc）",
+    "2. 使用 lsp_get_call_graph 追踪 sys_faccessat 的 incoming 调用链，验证是否被 syscall 表正确调度",
+    "3. 使用 read_code_segment 精读 sys_openat(39-120 行) 和 filewrite(299-330 行)，确认无 UID/GID 检查逻辑",
+    "4. 使用 grep_in_repo 搜索 'PTE_R|PTE_W|PTE_X' 组合，验证 W^X 策略是否缺失（mmap.c/exec.c）",
+    "5. 使用 read_code_segment 读取 trap.c:140-175(usertrapret)，确认 sstatus.SPP 清零实现 U 态返回",
+    "6. 使用 lsp_get_references 查找 copyin/copyout 的全局引用，统计 syscall 中用户指针验证覆盖率",
+    "7. 对照 must_cover 逐条整理证据：字段定义 vs 检查链缺失、PTE_U 验证存在但无 KPTI",
+    "8. 收束结论：标记 UID/GID 为🔸桩函数形态，访问控制为 DAC 模型，完整性策略未实现"
+  ]
+}

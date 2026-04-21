@@ -1,0 +1,111 @@
+{
+  "stage_id": "11_network",
+  "goal": "确认 rwos 网络子系统实现状态：经全面审计，本项目未实现任何网络功能（❌ 未实现），仅有 syscall 号定义但无内核实现。",
+  "must_cover": [
+    "协议栈架构：❌ 未实现任何网络协议栈，无 smoltcp/lwip 等依赖",
+    "Socket 接口：❌ 仅有 SYS_socket/SYS_connect 等 syscall 号定义（libs/unistd.h），内核 syscall.c 中无对应处理函数",
+    "功能限制声明：❌ 完全未实现网络功能，无 loopback/回环设备，无物理网卡驱动",
+    "网卡驱动：❌ 无 drivers/net/ 目录，仅支持 UART/SPI/SDCard 等设备（针对 K210 开发板）",
+    "PHY/MAC 层：❌ 不存在",
+    "错误处理：❌ 无网络相关错误码（ENET/ECONN 等）",
+    "高级特性：❌ 零拷贝/多队列/DMA 均不存在",
+    "协议支持：❌ DHCP/DNS/ARP/ICMP/TCP/UDP 均未实现",
+    "网络协议栈架构：自实现还是使用 `smoltcp`/`lwip` 等库？（**检查 Cargo.toml 依赖**）**如果完全没有网络支持，明确写“未实现网络功能（❌ 未实现）”**。",
+    "Socket 接口实现：是否有 `socket`/`bind`/`connect` 等 syscall？还是仅有 Loopback？",
+    "**功能限制声明（必须）**：分析项目是否已在真实物理网卡上测试过网络功能。如果仅在 QEMU 环境测试或仅支持本地回环通信，必须明确写出该限制。搜索 `loopback|LOOPBACK|127.0.0.1` 确认是否仅有回环设备。",
+    "**网卡驱动细节**：",
+    "搜索 `drivers/net/`, `virtio-drivers`, `ixgbe` 等。",
+    "列出支持的网卡类型（VirtIO, E1000, RTL8139, Intel 82599 等）。",
+    "**PHY/MAC 层抽象**：是否存在独立的 PHY 驱动层？",
+    "**错误处理**：描述一个网络操作失败（如 connect timeout）时的错误码传递流程。",
+    "**高级特性验证（必须 grep 代码）**：",
+    "零拷贝（Zero Copy）：搜索 `DMA` 或 `shared` buffer。只有在驱动层看到 DMA 描述符操作，或者协议栈层有 `mbuf` 传递引用，才算零拷贝。",
+    "多队列（Multi-queue）：是否有 RSS 支持？",
+    "**协议支持**：DHCP, DNS, ARP, ICMP, TCP, UDP。"
+  ],
+  "evidence_targets": [
+    "syscall.c 中无 sys_socket/sys_connect 等实现（仅定义到 sys_getegid）",
+    "libs/unistd.h 中定义了 SYS_socket(198)~SYS_sendmmsg(269) 但仅为桩",
+    "kern/driver/ 目录无 net/ 子目录，仅 ide.c/ramdisk.c/sdcard.c 等存储设备驱动",
+    "error.h 中无 ENET/ECONN/ETIMEDOUT 等网络错误码",
+    "grep 搜索 smoltcp/lwip/netstack 无结果",
+    "grep 搜索 loopback/127.0.0.1/eth/netif 无网络相关结果",
+    "协议栈",
+    "socket API",
+    "poll/epoll",
+    "驱动接入"
+  ],
+  "seed_paths": [
+    "kern/syscall/syscall.c",
+    "libs/unistd.h",
+    "kern/driver/",
+    "libs/error.h",
+    "kern/fs/devs/",
+    "user/libs/syscall.c",
+    "net",
+    "tcp",
+    "udp",
+    "socket",
+    "lwip",
+    "smoltcp",
+    "kern/driver",
+    "kern/fs"
+  ],
+  "framework_guess": [
+    "uCore"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "sys_socket",
+    "tcp",
+    "udp",
+    "poll",
+    "epoll"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "kern",
+    "kern/debug",
+    "kern/driver",
+    "kern/fs",
+    "kern/init",
+    "kern/libs",
+    "kern/mm",
+    "kern/process",
+    "kern/schedule"
+  ],
+  "preferred_tools": [
+    "grep_in_repo",
+    "list_repo_structure",
+    "read_code_segment"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "review_checklist": [
+    "关键问题是否回答",
+    "重要结论是否给出源码路径",
+    "是否避免将 README 当成实现证据",
+    "是否标出未实现/桩函数",
+    "must_cover_count=12"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "确认 libs/unistd.h 中 SYS_socket(198)~SYS_sendmmsg(269) 仅为 syscall 号定义，无实际实现",
+    "验证 kern/syscall/syscall.c 中 syscalls[] 表无 sys_socket/sys_connect 等网络 syscall 处理函数",
+    "确认 kern/driver/ 目录无 net/ 子目录，仅存在 sdcard.c/ide.c/ramdisk.c 等存储设备驱动",
+    "检查 libs/error.h 确认无 ENET/ECONN/ETIMEDOUT 等网络相关错误码定义",
+    "搜索 smoltcp/lwip/netstack 确认无第三方协议栈依赖",
+    "搜索 loopback/127.0.0.1/eth 确认无回环设备或网卡驱动",
+    "查阅 OSCOMP 文档确认项目是否声明过网络功能（决赛二阶段 lmbench 文档提到跳过网络测试）",
+    "汇总证据，明确结论：rwos 完全未实现网络子系统（❌ 未实现）"
+  ]
+}

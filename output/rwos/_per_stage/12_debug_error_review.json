@@ -1,0 +1,90 @@
+{
+  "passed": false,
+  "score": 0.62,
+  "severity": "major",
+  "failed_rules": [
+    "must_cover_gap",
+    "missing_evidence_verification",
+    "unverified_path_citation"
+  ],
+  "missing_evidence": [
+    {
+      "paragraph_id": "12.2.2",
+      "claim_id": "print_stackframe_panic",
+      "reason": "声明 print_stackframe() 直接 panic 需代码片段验证，证据摘要为空"
+    },
+    {
+      "paragraph_id": "12.2.2",
+      "claim_id": "print_debuginfo_panic",
+      "reason": "声明 print_debuginfo() 直接 panic 需代码片段验证，证据摘要为空"
+    },
+    {
+      "paragraph_id": "12.5",
+      "claim_id": "gdb_stub_missing",
+      "reason": "声明搜索 handle_gdb_packet 无结果需提供 grep 输出证据"
+    },
+    {
+      "paragraph_id": "12.1.2",
+      "claim_id": "log_level_missing",
+      "reason": "声明搜索 log_、LOG_、printk 无结果需提供搜索证据"
+    },
+    {
+      "paragraph_id": "12.8",
+      "claim_id": "tracepoint_missing",
+      "reason": "声明搜索 perf、ftrace、tracepoint 无结果需提供搜索证据"
+    }
+  ],
+  "weak_claims": [
+    {
+      "paragraph_id": "12.2.1",
+      "claim_id": "call_graph_analysis",
+      "reason": "声称使用 lsp_get_call_graph 分析但未提供工具输出截图或结果摘要"
+    },
+    {
+      "paragraph_id": "12.4.1",
+      "claim_id": "monitor_commands",
+      "reason": "命令列表声称来自 kmonitor.c:20-23 但未提供实际代码片段"
+    }
+  ],
+  "format_issues": [
+    {
+      "issue": "证据索引摘要为空",
+      "impact": "无法验证所有路径引用的真实性"
+    }
+  ],
+  "missed_modules": [
+    "内核调试选项（编译时配置如 CONFIG_DEBUG 等）"
+  ],
+  "repair_actions": [
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "12.2.2",
+      "hint": "使用 read_code_segment 读取 kern/debug/kdebug.c:76-92 验证 print_stackframe() 实现，使用 grep 搜索 print_debuginfo 提供证据"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "12.5",
+      "hint": "使用 grep_in_repo 搜索 handle_gdb_packet|gdbstub|gdb_serial 并提供完整输出，证明确实无结果"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "12.1.2",
+      "hint": "使用 grep_in_repo 搜索 log_|LOG_|printk 并提供输出，证明无日志级别宏"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "12.8",
+      "hint": "使用 grep_in_repo 搜索 tracepoint|ftrace|perf_event 并提供输出"
+    },
+    {
+      "action_type": "append_missing_module",
+      "target_paragraph_id": null,
+      "hint": "补充内核调试选项说明，检查是否存在编译时配置选项（如 Kconfig、Makefile 中的调试相关宏）"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "12.4.1",
+      "hint": "使用 read_code_segment 读取 kern/debug/kmonitor.c:20-30 验证 commands 数组定义"
+    }
+  ]
+}

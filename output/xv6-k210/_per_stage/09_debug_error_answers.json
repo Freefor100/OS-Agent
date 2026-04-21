@@ -1,0 +1,186 @@
+{
+  "schema_version": "v1",
+  "stage_id": "09_debug_error",
+  "stage_title": "调试机制与错误处理",
+  "terminology_profile": "stallings_en_zh",
+  "answers": [
+    {
+      "question_id": "Q09_001",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在日志系统（log/printk/println 宏）与日志级别控制？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "include/utils/debug.h",
+          "symbol_kind": "macro",
+          "symbol_name": "__debug_msg",
+          "excerpt": "#ifdef DEBUG 条件下定义 __debug_msg 为 printf，否则为空操作"
+        },
+        {
+          "path": "include/utils/debug.h",
+          "symbol_kind": "macro",
+          "symbol_name": "__debug_assert",
+          "excerpt": "DEBUG 模式下检查条件失败时调用 panic，否则为空操作"
+        },
+        {
+          "path": "include/printf.h",
+          "symbol_kind": "function",
+          "symbol_name": "printf",
+          "excerpt": "内核 printf 函数声明，用于日志输出"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_002",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 panic/崩溃处理路径（panic_handler/oom/abort 等）？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/printf.c",
+          "symbol_kind": "function",
+          "symbol_name": "__panic",
+          "excerpt": "void __panic(char *s) { printf(...); backtrace(); intr_off(); for(;;); }"
+        },
+        {
+          "path": "include/printf.h",
+          "symbol_kind": "macro",
+          "symbol_name": "panic",
+          "excerpt": "#define panic(s) do { printf(...); __panic(s); } while(0)"
+        },
+        {
+          "path": "bootloader/SBI/rustsbi-k210/src/main.back.rs",
+          "symbol_kind": "function",
+          "symbol_name": "panic_handler",
+          "excerpt": "#[panic_handler] fn panic(info: &PanicInfo) -> ! { println!(\"[rustsbi] {}\", info); loop {} }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_003",
+      "question_type": "short_answer",
+      "stem": "panic 路径会输出哪些诊断？（寄存器 dump/栈回溯/停机；必须引用实现证据）",
+      "value": "输出错误消息（含 CPU ID、文件路径、行号）、调用 backtrace() 打印栈帧返回地址、关闭中断并进入无限循环停机。无寄存器 dump。",
+      "evidence": [
+        {
+          "path": "kernel/printf.c",
+          "symbol_kind": "function",
+          "symbol_name": "__panic",
+          "excerpt": "printf(__ERROR(\"panic\")\": \"); printf(s); printf(\"\\n\"); backtrace(); intr_off(); for(;;);"
+        },
+        {
+          "path": "include/printf.h",
+          "symbol_kind": "macro",
+          "symbol_name": "panic",
+          "excerpt": "printf(__ERROR(__module_name__)\": hart %d at %s: %d\\n\", cpuid(), __FILE__, __LINE__); __panic(s);"
+        },
+        {
+          "path": "kernel/printf.c",
+          "symbol_kind": "function",
+          "symbol_name": "backtrace",
+          "excerpt": "基于 FramePointer 遍历栈帧，打印每个帧的 ra 地址（返回地址减 4）"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_004",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现栈回溯 (backtrace/unwind/stack_trace)？（必须三态；仅打印 ra 不算）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/printf.c",
+          "symbol_kind": "function",
+          "symbol_name": "backtrace",
+          "excerpt": "void backtrace() { uint64 *fp = (uint64 *)r_fp(); ... while (fp < bottom) { uint64 ra = *(fp - 1); printf(\"%p\\n\", ra - 4); fp = (uint64 *)*(fp - 2); } }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_005",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在交互式内核 monitor/shell？（必须三态；若 implemented 列出 3-10 个命令入口证据）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "xv6-user/sh.c",
+          "symbol_kind": "function",
+          "symbol_name": "export",
+          "excerpt": "int export(char *argv) - 支持 -p 打印所有环境变量或设置新环境变量"
+        },
+        {
+          "path": "xv6-user/sh.c",
+          "symbol_kind": "function",
+          "symbol_name": "runcmd",
+          "excerpt": "void runcmd(struct cmd *cmd) - 执行命令，支持 EXEC/REDIR/PIPE/LIST/BACK 等类型"
+        },
+        {
+          "path": "xv6-user/sh.c",
+          "symbol_kind": "function",
+          "symbol_name": "parsecmd",
+          "symbol_name_detail": "parsecmd",
+          "excerpt": "struct cmd *parsecmd(char*) - 解析 shell 命令行"
+        },
+        {
+          "path": "xv6-user/sh.c",
+          "symbol_kind": "function",
+          "symbol_name": "replace",
+          "excerpt": "int replace(char *buf) - 替换环境变量引用 $VAR"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_006",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 GDB stub（需数据包解析循环，如 handle_gdb_packet）？（必须三态）",
+      "value": "not_found",
+      "evidence": []
+    },
+    {
+      "question_id": "Q09_007",
+      "question_type": "short_answer",
+      "stem": "错误码/错误类型体系是什么？（errno/Result/Error enum；给类型定义与传播点证据）",
+      "value": "POSIX errno 风格宏定义（EPERM/ENOENT/ENOMEM 等），定义于 include/errno.h，无 Rust Result/Error enum。错误码通过系统调用返回值传播（负值表示错误）。",
+      "evidence": [
+        {
+          "path": "include/errno.h",
+          "symbol_kind": "macro",
+          "symbol_name": "EPERM",
+          "excerpt": "#define EPERM 1 /* Operation not permitted */"
+        },
+        {
+          "path": "include/errno.h",
+          "symbol_kind": "macro",
+          "symbol_name": "ENOENT",
+          "excerpt": "#define ENOENT 2 /* No such file or directory */"
+        },
+        {
+          "path": "include/errno.h",
+          "symbol_kind": "macro",
+          "symbol_name": "ENOSYS",
+          "excerpt": "#define ENOSYS 38 /* Invalid system call number */"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_008",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 trace/perf/ftrace 等跟踪机制或 tracepoints？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/syscall/sysproc.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_trace",
+          "excerpt": "sys_trace(void) { myproc()->tmask = 1; return 0; }"
+        },
+        {
+          "path": "xv6-user/strace.c",
+          "symbol_kind": "function",
+          "symbol_name": "main",
+          "excerpt": "strace 用户工具：调用 trace() 系统调用后 execve 执行目标程序"
+        }
+      ]
+    }
+  ]
+}

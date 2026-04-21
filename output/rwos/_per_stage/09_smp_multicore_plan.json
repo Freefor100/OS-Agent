@@ -1,0 +1,120 @@
+{
+  "stage_id": "09_smp_multicore",
+  "goal": "确认 rwos 多核/SMP 支持状态：经全面搜索，未发现任何多核启动代码（无 smp_boot/start_secondary 等符号），无 Per-CPU 设计，无 IPI 处理逻辑，仅支持单核。",
+  "must_cover": [
+    "❌ 未实现多核：搜索 smp_boot/__cpu_up/start_secondary/boot_secondary 均无结果",
+    "❌ 无 Per-CPU 变量：搜索 hart_id/cpuid/per_cpu 均无结果",
+    "❌ 无 IPI 处理机制：虽有 sbi_send_ipi 声明，但无实际调用与 handler",
+    "锁机制：spin_lock 仅为宏定义，实际通过 local_intr_save 禁用中断实现，非真正自旋锁",
+    "原子操作：使用 RISC-V AMO 指令实现，支持多核内存序但无多核场景",
+    "PID 分配：使用静态 last_pid 递增，无原子保护（单核安全）",
+    "调度：单就绪队列，无负载均衡/affinity",
+    "交叉引用：第 8 章信号量通过关中断保护，第 5 章 Trap 无 IPI 处理分支",
+    "**核心任务：一定要极其仔细地在源码中寻找有没有真正实现多核！** 架构设计是 SMP 还是 AMP？**绝不能仅凭看到一两个宏定义就断言支持多核，必须找到唤醒其他核的切实验证。如果不支持多核，务必明确写“仅支持单核（❌ 未实现）”**。",
+    "Secondary CPU 启动等主要功能机制：**必须清晰、详尽地描述其详细的底层工作机制**。具体描述 BSP（主核）是如何通过 IPI 或中断控制器发送信号唤醒 AP（从核）的链条，精确到对应文件的代码逻辑。搜索 `smp_boot`, `__cpu_up`。如果找不到启动其他核的代码，那就是单核。",
+    "核间中断 (IPI)：搜索 `send_ipi`, `ipi_handler`。",
+    "**锁的实现**：SpinLock 是否禁用了中断？Mutex 是否支持优先级继承？",
+    "Per-CPU 变量设计与访问方式。搜索 `axns` 模块，分析 PerCPU 命名空间实现。",
+    "多核调度策略：负载均衡、CPU 亲和性（affinity）。",
+    "自旋锁/RCU 在多核下的实现差异。",
+    "**交叉引用前面章节（必须）**：本章与前面章节有大量交叉，必须引用并深化：",
+    "进程调度中的全局唯一 ID 池（搜索 `AtomicUsize` 用于 PID/TID 分配）",
+    "双级注册机制（线程注册到 Process + 全局管理器）",
+    "同步互斥中的 Futex 实现（在多核场景下的行为）",
+    "原子操作（`core::sync::atomic`）在多核下的内存序保证"
+  ],
+  "evidence_targets": [
+    "多核启动代码缺失（grep 无匹配）",
+    "Per-CPU 设计缺失（grep 无匹配）",
+    "IPI 仅有 SBI 声明无实际使用",
+    "spin_lock 宏定义为关中断（kmalloc.c:43）",
+    "PID 分配非原子（proc.c:get_pid 使用静态变量）",
+    "单就绪队列（sched.c:__rq）",
+    "多核启动",
+    "CPU 本地状态",
+    "IPI",
+    "并发保护"
+  ],
+  "seed_paths": [
+    "kern/init/init.c",
+    "kern/process/proc.c",
+    "kern/schedule/sched.c",
+    "kern/sync/sync.h",
+    "kern/sync/sem.c",
+    "kern/mm/kmalloc.c",
+    "kern/trap/trap.c",
+    "libs/sbi.h",
+    "libs/atomic.h",
+    "kern/driver/intr.c",
+    "smp",
+    "cpu",
+    "hart",
+    "scheduler"
+  ],
+  "framework_guess": [
+    "uCore"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "kern_init",
+    "proc_init",
+    "get_pid",
+    "schedule",
+    "sem_init",
+    "spin_lock_irqsave",
+    "local_intr_save",
+    "sbi_send_ipi",
+    "start_secondary",
+    "boot_secondary",
+    "cpu_init",
+    "ipi"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "kern",
+    "kern/debug",
+    "kern/driver",
+    "kern/fs",
+    "kern/init",
+    "kern/libs",
+    "kern/mm",
+    "kern/process",
+    "kern/schedule"
+  ],
+  "preferred_tools": [
+    "grep_in_repo",
+    "read_code_segment",
+    "lsp_get_definition",
+    "lsp_get_references"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "review_checklist": [
+    "关键问题是否回答",
+    "重要结论是否给出源码路径",
+    "是否避免将 README 当成实现证据",
+    "是否标出未实现/桩函数",
+    "must_cover_count=12"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "1. 确认多核启动代码缺失：记录 grep smp_boot/start_secondary/__cpu_up 无匹配结果",
+    "2. 确认 Per-CPU 设计缺失：记录 grep hart_id/cpuid/per_cpu 无匹配结果",
+    "3. 分析锁实现：读取 kmalloc.c:43 和 sync.h，证明 spin_lock 仅为关中断宏",
+    "4. 分析 PID 分配：读取 proc.c:get_pid()，指出静态 last_pid 无原子保护（单核安全）",
+    "5. 分析调度器：读取 sched.c，确认单全局就绪队列__rq，无负载均衡",
+    "6. 分析 IPI：读取 sbi.h 和 trap.c，确认仅有 SBI 声明，interrupt_handler 无 IPI 处理分支",
+    "7. 交叉引用第 8 章：说明信号量通过 local_intr_save 保护，在多核下不安全",
+    "8. 交叉引用第 5 章：说明 Trap 处理无核间中断分发逻辑",
+    "9. 总结结论：明确标注「仅支持单核（❌ 未实现 SMP）」，列出所有证据路径"
+  ]
+}

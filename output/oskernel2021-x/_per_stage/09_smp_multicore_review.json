@@ -1,0 +1,127 @@
+{
+  "passed": false,
+  "score": 0.35,
+  "severity": "critical",
+  "failed_rules": [
+    "missing_path_citation",
+    "must_cover_gap",
+    "unsupported_claim",
+    "no_tool_verification"
+  ],
+  "missing_evidence": [
+    {
+      "paragraph_id": "多核架构设计（SMP/AMP）",
+      "claim_id": "CPU 数量定义 kernel/include/param.h:5",
+      "reason": "无工具调用验证该文件及行号是否存在，证据索引摘要为空"
+    },
+    {
+      "paragraph_id": "Secondary CPU 启动流程",
+      "claim_id": "BSP 通过 sbi_send_ipi 唤醒 AP (kernel/main.c:61-65)",
+      "reason": "核心多核启动声称无 grep_in_repo 或 read_code_segment 验证，无法确认代码真实存在"
+    },
+    {
+      "paragraph_id": "Secondary CPU 启动流程",
+      "claim_id": "RustSBI mp_hook 实现 (bootloader/SBI/rustsbi-k210/src/main.rs:47-75)",
+      "reason": "跨仓库代码引用无工具验证，且项目声称基于 xv6-riscv(C 语言)，Rust 代码来源存疑"
+    },
+    {
+      "paragraph_id": "Per-CPU 变量与数据结构",
+      "claim_id": "struct cpu 定义 (kernel/include/proc.h:33-39)",
+      "reason": "无 lsp_get_definition 或 read_code_segment 验证结构体真实定义"
+    },
+    {
+      "paragraph_id": "Per-CPU 变量与数据结构",
+      "claim_id": "axns 模块 PerCPU 命名空间实现",
+      "reason": "must_cover 明确要求搜索 axns 模块，但草稿完全未提及该模块分析"
+    },
+    {
+      "paragraph_id": "自旋锁与中断控制",
+      "claim_id": "acquire/release 实现 (kernel/spinlock.c:23-84)",
+      "reason": "无工具验证锁实现代码，无法确认 push_off/pop_off 调用链"
+    },
+    {
+      "paragraph_id": "多核调度策略",
+      "claim_id": "scheduler 实现 (kernel/proc.c:551-592)",
+      "reason": "无 lsp_get_call_graph 或 read_code_segment 验证调度器代码"
+    },
+    {
+      "paragraph_id": "并发保护机制",
+      "claim_id": "grep_in_repo 搜索 futex 返回空结果",
+      "reason": "声称的 grep 搜索结果无实际工具调用证据支撑"
+    },
+    {
+      "paragraph_id": "核间通信与 IPI 机制",
+      "claim_id": "grep_in_repo 搜索 ipi_handler 返回空结果",
+      "reason": "声称的 grep 搜索结果无实际工具调用证据支撑"
+    }
+  ],
+  "weak_claims": [
+    {
+      "claim": "本项目实现了基础的双核 SMP 支持",
+      "reason": "核心结论无任何工具验证证据，证据索引摘要显示为空，无法确认多核启动代码真实存在"
+    },
+    {
+      "claim": "BSP 通过 SBI IPI 机制唤醒 AP",
+      "reason": "未使用 rag_search_code 或 grep_in_repo 验证 sbi_send_ipi 调用链，可能为臆测"
+    },
+    {
+      "claim": "项目基于 xv6-riscv 架构，采用 C 语言实现",
+      "reason": "同时引用 Rust 代码 (rustsbi-k210)，架构描述存在矛盾，需验证实际项目结构"
+    }
+  ],
+  "format_issues": [
+    {
+      "issue": "所有代码引用均无工具验证",
+      "location": "全文",
+      "suggestion": "每个 file:line 引用应附带工具调用证据（如 read_code_segment 或 grep_in_repo 结果）"
+    }
+  ],
+  "missed_modules": [
+    "axns (PerCPU 命名空间实现，must_cover 明确要求)",
+    "smp_boot / __cpu_up (must_cover 要求搜索的启动函数)",
+    "send_ipi / ipi_handler (must_cover 要求搜索的 IPI 相关函数)",
+    "Mutex 实现及优先级继承机制 (must_cover 要求分析)"
+  ],
+  "repair_actions": [
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "Secondary CPU 启动流程",
+      "hint": "使用 grep_in_repo 搜索 'sbi_send_ipi' 和 'smp_boot' 验证启动代码真实存在，使用 read_code_segment 读取 kernel/main.c 相关行"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "Per-CPU 变量与数据结构",
+      "hint": "使用 grep_in_repo 搜索 'axns' 模块，使用 lsp_get_definition 验证 struct cpu、mycpu、cpuid 定义"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "核间通信与 IPI 机制",
+      "hint": "使用 grep_in_repo 搜索 'send_ipi' 和 'ipi_handler'，记录实际搜索结果（存在或不存在）"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "自旋锁与中断控制",
+      "hint": "使用 read_code_segment 读取 kernel/spinlock.c 和 kernel/intr.c 验证 acquire/release/push_off/pop_off 实现"
+    },
+    {
+      "action_type": "append_missing_module",
+      "target_paragraph_id": null,
+      "hint": "新增章节分析 axns 模块的 PerCPU 命名空间实现，搜索 'axns' 关键词"
+    },
+    {
+      "action_type": "rewrite_paragraph",
+      "target_paragraph_id": "多核架构设计（SMP/AMP）",
+      "hint": "在确认工具验证前，将'实现了基础的双核 SMP 支持'改为'声称支持双核 SMP，需工具验证'，避免未经验证的断言"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "并发保护机制",
+      "hint": "使用 grep_in_repo 搜索 'futex' 和 'AtomicUsize'，记录实际搜索结果作为未实现证据"
+    },
+    {
+      "action_type": "normalize_terminology",
+      "target_paragraph_id": "Secondary CPU 启动流程",
+      "hint": "统一架构描述，澄清 C 语言内核与 Rust bootloader 的关系，避免架构描述矛盾"
+    }
+  ]
+}

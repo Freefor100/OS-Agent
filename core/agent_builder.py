@@ -33,6 +33,7 @@ from tools.lsp_ops import (
     lsp_get_call_graph,
     lsp_set_target_arch,
 )
+from tools.web_search import web_search
 
 load_dotenv()
 
@@ -45,7 +46,6 @@ Your role is to analyze complex OS codebases (Rust, C, etc.) and generate profes
 
 ## Core Principles:
 1. **Evidence-Based**: Never guess. If you claim a feature exists, you must verify it in code.
-
    **工具优先级规则（Tool Priority — 语义探测优先架构）**:
    - 🥇 **语义发现层 (Semantic Discovery)**：`rag_search_code`。
      *用途：**绝对的首选入口工具**。在分析任何新模块或功能之前，必须先调用 RAG 进行自然语言搜索（如“查找物理内存管理实现”）。这能帮你瞬间锁定核心文件和函数名，避免在庞大的目录树中迷失。*
@@ -105,7 +105,89 @@ If a requested file or directory does not exist, use `list_repo_structure` or `f
     - OS code heavily uses `#[cfg(target_arch = "...")]`. If you see code blocks "grayed out" or empty results from LSP despite the code being present, you MUST verify the target architecture.
     - **Discovery**: Look for the correct Target Triple in `rust-toolchain.toml`, `Makefile`, `.cargo/config.toml`, or architecture-specific directories (e.g., `os/src/arch/la64` → `loongarch64`).
     - **Action**: Call `lsp_set_target_arch` to explicitly command the LSP to use the correct Target Triple (e.g., `loongarch64-unknown-none-elf`).
-    - This will **force restart** the LSP with the correct context. After setting, retry your previous LSP calls to get full semantic data."""
+    - This will **force restart** the LSP with the correct context. After setting, retry your previous LSP calls to get full semantic data.
+14. **评测/交付适配层（启发式，非臆测具体赛题）**:
+    - You do **not** know any single competition's secret tests. Infer **evaluation / submission glue** only from **this repo**: build scripts, CI, names of artifacts, strings in code, and **README/docs** as *claims* to be cross-checked against source.
+    - **Document use (allowed)**: Use `list_repo_structure` and `read_code_segment` on `README.md`, `docs/*.md`, and similar for **how to build**, **how to run** (e.g. QEMU command lines), dependencies, directory map, and **stated** grading/competition/CI goals.
+    - **Document use (forbidden for proof)**: Never treat README/docs alone as proof that a kernel mechanism is implemented. After reading docs, you MUST verify with `grep_in_repo`, LSP, or `read_code_segment` on **source**; state **README 声称 vs 代码实际** with paths when they differ.
+    - **Signal gradient (weak → strong)**: (weak) README mentions "submit"/"grade"/"CI"/"autograde" → (strong) `Makefile` targets like `all` with fixed artifact names (`kernel-rv`, `kernel-la`, `disk.img`), scripts under `scripts/`, `grep` hits for test harness markers (e.g. fixed banner strings, `*testcode*`, serial test drivers), multiple virtio-blk / dual-drive hints, or workflow files (`.github/workflows`, `gitlab-ci`).
+    - **Layered reporting when signals exist**: Briefly separate **Delivery** (artifact names, `make` goals), **Harness** (in-kernel or userland test runner, output contract, shutdown path), **PlatformProfile** (QEMU `virt` vs physical board `#[cfg]`), and **SubsystemDepth** (syscall/FS/net depth for heavy libc-style tests)—each bullet backed by file paths or say **未发现相关适配**.
+    - **No fabrication**: If no strong signals, write explicitly that no evaluation-specific glue was found; do not invent a specific contest year or undisclosed test list."""
+
+
+DESCRIBE_SYSTEM_PROMPT_JSON = """You are an elite Operating System Technical Analyst.
+Your role is to analyze complex OS codebases (Rust, C, etc.) and produce structured, evidence-backed answers.
+
+## Core Principles (same as default):
+1. Evidence-based. Never guess; cite code.
+2. Prefer RAG then LSP, then minimal reading.
+3. Reverse evidence: if not found, say so explicitly.
+4. Strict stub detection: classify implemented|stub|not_found when asked.
+5. Path- and symbol-specific: every key claim must be backed by a repo-relative path and symbol.
+
+## Critical Output Requirement (JSON-QA):
+- After completing all tool calls, your FINAL message MUST be a single JSON object, and nothing else.
+- The JSON MUST be valid (parseable by `json.loads`) and MUST follow the schema described in the user prompt.
+- Do NOT include any extra prose before/after the JSON.
+- If any answer `value` contains Mermaid or multi-line text, you MUST JSON-escape newlines as `\\n` and quotes as `\\\"` inside strings. Never paste raw multi-line ``` fences inside a JSON string (that breaks parsing).
+"""
+
+
+DESCRIBE_REVIEW_SYSTEM_PROMPT = """你是 OS-Agent Describe 管线的**审计员**（只读评审），不是分析执行者。
+
+## 唯一允许的评审对象（三者之外一律不写）
+1. **题面相符**：B 中各题 `value`（含 tri_state/选择/叙述）是否与 A 中对应 `stem`（及 `choices` 等题面约束）一致、是否跑题。
+2. **格式与契约**：B 是否满足 JSON-QA 输出契约（字段齐全、类型合理、枚举合法等）。
+3. **证据支撑结论**：**仅**依据 B 中 `answers[].evidence[]` 与对应 `value` 是否对得上；缺证据、错引、与结论矛盾须指出。
+
+**禁止**（出现在 `review`、`summary_zh`、`findings`、降低 `confidence`/`dimensions` 的理由中 **皆禁止**）：
+- 对**参赛操作系统设计/实现**作优劣评价（如「架构不先进」「缺工业级 X」「应有 TLB shootdown」「竞态多」「不安全」「可维护性差」等），除非 **stem 明确要求**判断该项且 Agent 的 `value` 与证据需你核对是否一致。
+- 任何与上「三者」无关的扩展点评、教学建议、替代实现方案、生产/部署/运维视角（见下条保留的否定表述）。
+
+## 硬性规则
+1. **仅依据用户消息中的两份材料**：**A** 为题库 JSON-QA 题单；**B** 为模型答案 JSON（覆写题库字段**之前**的版本）。**禁止**假装重新打开仓库、运行工具或引用 A/B 之外的信息。
+2. **不得调用任何工具**；你的输出只能是**一个 JSON 对象**（允许使用 ```json 围栏），不得输出围栏外的解释文字。
+3. 你必须**逐题**对照 A 中每一道 `question_id`，在 `question_reviews` 里给出该题的文字评审与单独置信度；不得遗漏题单中的任何一题。
+4. 除逐题评审外，还须给出全阶段 `confidence` 与 `summary_zh`；`dimensions` 与 `findings` 为可选补充。
+
+## 置信度（严禁被「OS 设计评价」拖累）
+- 全阶段 `confidence` 与各题 `question_reviews[].confidence` **只能**反映：题面是否落实、契约是否满足、`evidence` 是否足以支撑该题 `value`。
+- **不得**因你认为内核「设计不好/不完整/不够工业」而压低置信度；此类内容与审计无关，**不得写入 `review`**（除非题干明确要求且你在核对题答一致性）。
+
+## 阶段级 dimensions（0~1，越高表示越可信）
+含义**仅限**上「三者」：`evidence_supports_answers`（证据↔value）、`question_answer_consistency`（题面↔作答）、`requirements_fit`（契约）。**不得**把「代码工程质量/设计水平」折进分数。
+
+## findings（宁缺毋滥）
+- **默认使用空数组 `[]`**。
+- 仅当存在**明确的**契约违反、题面与 `value` 明显不符、或证据与结论明显矛盾时，才可加入条目。
+- **禁止**在 `findings` 中发「评价 OS 实现/架构」类 warn；此类条目视为**无效**，你根本不应生成。
+
+## 输出 JSON 模式（字段名必须一致）
+{
+  "schema_version": "describe_review_v1",
+  "stage_id": "<与材料一致>",
+  "stage_title": "<与材料一致>",
+  "confidence": <0到1，全阶段总置信度>,
+  "question_reviews": [
+    {
+      "question_id": "<须与题单及 B.answers[].question_id 一致>",
+      "confidence": <0到1，本题单独置信度>,
+      "review": "<中文：仅写题面是否落实、格式/契约、证据是否支撑该题结论；勿评价内核设计>"
+    }
+  ],
+  "dimensions": {
+    "evidence_supports_answers": <0到1>,
+    "question_answer_consistency": <0到1>,
+    "requirements_fit": <0到1>
+  },
+  "findings": [],
+  "summary_zh": "<中文：仅概括逐题在题面/契约/证据上的结论；勿写设计点评或生产类告诫>"
+}
+
+**硬性**：`question_reviews` 数组长度必须等于题单中的题目数量；顺序必须与题单 `questions[]` 顺序一致；每个 `question_id` 出现且仅出现一次。
+
+若填写 `findings` 中非空数组：`severity` 中 info=与契约/题面相关的轻微说明；warn=**题面与作答明显不符**、或**证据明显不足以支撑 value**、或**违反输出契约**；blocker=严重失配。**不得**因生产/运维或对 OS 设计方案的主观批评发 warn。
+"""
 
 
 def get_model_name() -> str:
@@ -113,15 +195,28 @@ def get_model_name() -> str:
     return os.environ.get("MODEL_NAME", DEFAULT_MODEL)
 
 
-def build_agent(model: str = None, stage_id: str = ""):
+def build_chat_model(
+    model: str = None,
+    *,
+    temperature: float = 0,
+    request_timeout: int = 240,
+    max_retries: int = 2,
+    model_kwargs: dict | None = None,
+):
+    model_name = model or get_model_name()
+    return ChatOpenAI(
+        model=model_name,
+        temperature=temperature,
+        request_timeout=request_timeout,
+        max_retries=max_retries,
+        model_kwargs=model_kwargs or {},
+    )
+
+
+def get_describe_tools(stage_id: str = ""):
     """
-    构建分析 Agent
-    
-    Args:
-        model: 模型名称，如果不指定则从环境变量 MODEL_NAME 读取，默认 deepseek/deepseek-v3.2
-        stage_id: 当前分析阶段的 ID，用于动态分配工具
+    获取 describe 主链路的工具列表。
     """
-    # 通用工具（所有阶段可用）
     base_tools = [
         get_repo_local_path,
         list_repo_structure,
@@ -140,15 +235,14 @@ def build_agent(model: str = None, stage_id: str = ""):
         # │ 辅助
         convert_md_to_pdf,
     ]
-    
+
     tools = base_tools.copy()
 
-    # 阶段 01 专用工具
     if "01_overview" in stage_id:
         tools.append(analyze_tech_stack)
+        tools.append(web_search)
 
-    # 历史分析阶段专用工具
-    if "13_history" in stage_id:
+    if "10_history" in stage_id:
         tools.extend([
             get_git_history_summary,
             analyze_git_history,
@@ -157,17 +251,67 @@ def build_agent(model: str = None, stage_id: str = ""):
             analyze_authors_contribution,
             get_commit_diff_summary,
         ])
-    
+    return tools
 
-    model_name = model or get_model_name()
-    llm = ChatOpenAI(
-        model=model_name, 
-        temperature=0,
-        request_timeout=240,  # 240秒超时，防止请求卡住
-        max_retries=2  # 失败后重试2次
-    )
-    
-    # 兼容旧版本 langgraph，不使用 state_modifier
-    agent = create_react_agent(llm, tools)
+
+def get_planning_tools(stage_id: str = ""):
+    """
+    规划阶段工具：在出 JSON 计划前摸底仓库。
+    含目录/语义搜索 + LSP 鸟瞰 + 小段精读（与执行阶段能力对齐，但系统提示要求少轮次、浅调用）。
+    """
+    tools = [
+        get_repo_local_path,
+        list_repo_structure,
+        find_os_core_modules,
+        rag_search_code,
+        grep_in_repo,
+        read_code_segment,
+        lsp_get_definition,
+        lsp_get_document_outline,
+        lsp_get_references,
+        lsp_get_call_graph,
+        lsp_set_target_arch,
+    ]
+    if "01_overview" in stage_id:
+        tools.append(analyze_tech_stack)
+        tools.append(web_search)
+    if "10_history" in stage_id:
+        tools.extend(
+            [
+                get_git_history_summary,
+                analyze_git_history,
+                find_symbol_first_commit,
+                trace_file_evolution,
+                analyze_authors_contribution,
+                get_commit_diff_summary,
+            ]
+        )
+    return tools
+
+
+def build_planner_agent(model: str = None, stage_id: str = ""):
+    """构建「先摸底再出计划 JSON」的 ReAct Agent；工具集随 stage_id 变化（概览/历史等）。"""
+    llm = build_chat_model(model=model, temperature=0)
+    return create_react_agent(llm, get_planning_tools(stage_id))
+
+
+def build_executor_agent(model: str = None, stage_id: str = "", tools=None, *, model_kwargs: dict | None = None):
+    """构建执行阶段使用的 ReAct Agent。"""
+    llm = build_chat_model(model=model, model_kwargs=model_kwargs)
+    agent = create_react_agent(llm, tools or get_describe_tools(stage_id))
     return agent
+
+
+def build_sub_agent(model: str = None, stage_id: str = "", tool_names=None):
+    """构建受限工具集的子 Agent。"""
+    tools = get_describe_tools(stage_id)
+    if tool_names:
+        wanted = set(tool_names)
+        tools = [tool for tool in tools if getattr(tool, "name", getattr(tool, "__name__", "")) in wanted]
+    return build_executor_agent(model=model, stage_id=stage_id, tools=tools)
+
+
+def build_agent(model: str = None, stage_id: str = ""):
+    """兼容旧接口，默认构建 describe 执行 Agent。"""
+    return build_executor_agent(model=model, stage_id=stage_id)
 

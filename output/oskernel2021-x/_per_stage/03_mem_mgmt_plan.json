@@ -1,0 +1,121 @@
+{
+  "stage_id": "03_mem_mgmt",
+  "goal": "分析内存管理模块：物理页分配器(kalloc)、页表映射(walk/mappages)、缺页异常处理、堆分配(sbrk/brk)、用户指针验证、VMA 管理，并验证 COW/懒分配/共享内存等高级特性实现状态。",
+  "must_cover": [
+    "物理页分配：kalloc.c 使用空闲链表(freelist)管理 4KB 页，非 Buddy/Bitmap",
+    "页表操作：vm.c 中 walk() 实现三级页表遍历，mappages() 完成映射",
+    "内核/用户地址空间：独立页表(pagetable/kpagetable)，内核重映射在 kvminit()",
+    "堆分配器：sys_sbrk/sys_brk 调用 growproc()，通过 uvmalloc 立即分配物理页",
+    "用户指针验证：syscall 入口使用 fetchaddr/copyin2 验证地址是否 < p->sz",
+    "缺页异常：无 handle_page_fault 函数，page fault 直接 panic 或未显式处理",
+    "VMA 管理：struct vma 链表管理映射区间，sys_mmap/sys_munmap 操作，无 BTreeMap",
+    "COW: ❌ 未实现 (grep 无 cow 关键词，uvmcopy 直接复制物理页)",
+    "懒分配: ❌ 未实现 (uvmalloc 立即 kalloc 分配物理页)",
+    "共享内存: ❌ 未实现 (无 sys_shm/shmat/shmdt，仅 mmap 文件映射)",
+    "物理内存管理：使用什么算法（Bitmap/Buddy System）？FrameAllocator 接口在哪里？",
+    "虚拟内存管理：页表如何操作（PageTable 结构、walk/map/unmap 实现）？",
+    "内核与用户地址空间设计：是否独立？内核重映射？",
+    "堆分配器：使用了什么 Allocator（GlobalAlloc, slab, buddy）？",
+    "**堆管理 (brk/sbrk)**：搜索 `sys_brk`，是否支持惰性分配（仅调整边界不立即分配物理页）？",
+    "**用户指针安全**：搜索 `UserInPtr|UserOutPtr|verify_area|check_region`，分析系统调用入口处如何验证用户空间指针合法性。",
+    "缺页异常（Page Fault）处理逻辑（如有）。**追踪 handle_page_fault 调用链**。",
+    "**进程级映射管理**：搜索地址空间管理结构（如 `VmAreaStruct`、`BTreeMap` 管理的映射区间），分析是否有反向映射表（rmap）支持。",
+    "**高级特性验证**（必须分类为 `✅ 已实现`、`🔸 桩函数`、`❌ 未实现`，并寻找具体代码）：",
+    "写时复制（Copy-on-Write）：搜索 `cow|copy_on_write`，确认是否在 page fault 中处理了 CoW。",
+    "懒分配（Lazy Allocation）：搜索 `lazy|populate`，确认是否推迟了物理页分配。",
+    "共享内存管理（SharedMem）：是否有 `shm` 相关系统调用和数据结构？**深入分析**：搜索 `sys_shmdt` 实现，检查是否使用 `BTreeMap` 进行 O(log n) 定位。搜索 `SharedMemoryManager`，分析 `IPC_RMID` 删除策略（立即删除 vs Arc 引用计数延迟释放）。"
+  ],
+  "evidence_targets": [
+    "物理页分配: kernel/kalloc.c (kalloc/kfree/freerange)",
+    "页表映射: kernel/vm.c (walk/mappages/vmunmap)",
+    "堆分配: kernel/proc.c (growproc), kernel/sysproc.c (sys_sbrk/sys_brk)",
+    "用户指针验证: kernel/syscall.c (fetchaddr/copyin2), kernel/vm.c (walkaddr)",
+    "VMA 管理: kernel/proc.h (struct vma), kernel/sysfile.c (sys_mmap/sys_munmap)",
+    "fork 内存复制: kernel/vm.c (uvmcopy), kernel/proc.c (fork)",
+    "物理页分配",
+    "页表映射",
+    "页故障处理",
+    "堆分配器"
+  ],
+  "seed_paths": [
+    "kernel/kalloc.c",
+    "kernel/vm.c",
+    "kernel/proc.c",
+    "kernel/sysproc.c",
+    "kernel/sysfile.c",
+    "kernel/syscall.c",
+    "kernel/include/vm.h",
+    "kernel/include/proc.h",
+    "kernel/include/kalloc.h",
+    "kernel/trap.c",
+    "mm",
+    "memory",
+    "vm",
+    "kernel/mm"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "kalloc",
+    "kfree",
+    "walk",
+    "mappages",
+    "vmunmap",
+    "uvmalloc",
+    "uvmcopy",
+    "growproc",
+    "sys_sbrk",
+    "sys_mmap",
+    "handle_page_fault",
+    "alloc_frame"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "bootloader",
+    "bootloader/SBI",
+    "debug",
+    "debug/kendryte_openocd",
+    "debug/openocd_cfg",
+    "doc",
+    "img",
+    "kernel",
+    "kernel/include"
+  ],
+  "preferred_tools": [
+    "read_code_segment",
+    "lsp_get_call_graph",
+    "lsp_get_definition",
+    "lsp_get_references"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "review_checklist": [
+    "关键问题是否回答",
+    "重要结论是否给出源码路径",
+    "是否避免将 README 当成实现证据",
+    "是否标出未实现/桩函数",
+    "must_cover_count=12"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "1. 精读 kernel/kalloc.c 全文，确认物理页分配器使用空闲链表而非 Buddy/Bitmap，记录 kinit/kalloc/kfree 实现细节",
+    "2. 精读 kernel/vm.c 关键函数：walk() 页表遍历、mappages() 映射、uvmalloc()/uvmcopy() 分配与复制，确认无 COW 机制",
+    "3. 追踪 sys_sbrk/sys_brk 调用链：sysproc.c → growproc(proc.c) → uvmalloc(vm.c)，验证是否惰性分配",
+    "4. 分析用户指针验证：读取 syscall.c 中 fetchaddr/copyin2 实现，确认验证逻辑为地址 < p->sz 检查",
+    "5. 深入 VMA 管理：读取 sysfile.c 中 sys_mmap/sys_munmap 完整实现，分析 vma 链表操作，确认无 BTreeMap/rmap",
+    "6. 检查 trap.c 中 usertrap/kerneltrap 处理逻辑，搜索 page fault 相关 scause 值处理，确认无 handle_page_fault",
+    "7. 使用 lsp_get_call_graph 分析 growproc 调用链(深度 2)，验证内存分配路径完整性",
+    "8. 汇总证据：对 COW/懒分配/共享内存三项分类标记(❌未实现)，引用具体代码行号作为证据"
+  ]
+}

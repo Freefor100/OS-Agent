@@ -1,0 +1,47 @@
+{
+  "stage_id": "09_debug_error",
+  "stage_title": "调试机制与错误处理",
+  "questions": [
+    {
+      "question_id": "Q09_001",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在日志系统（log/printk/println 宏）与日志级别控制？（必须三态）"
+    },
+    {
+      "question_id": "Q09_002",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 panic/崩溃处理路径（panic_handler/oom/abort 等）？（必须三态）"
+    },
+    {
+      "question_id": "Q09_003",
+      "question_type": "short_answer",
+      "stem": "panic 路径会输出哪些诊断？（寄存器 dump/栈回溯/停机；必须引用实现证据）"
+    },
+    {
+      "question_id": "Q09_004",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现栈回溯 (backtrace/unwind/stack_trace)？（必须三态；仅打印 ra 不算）"
+    },
+    {
+      "question_id": "Q09_005",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 **内核驻留的交互式监视器（kernel monitor）**？（对齐 Stallings《操作系统：精髓与设计原理》语境：**在内核态上下文**接受命令、用于探查/操控系统的监视器；**不包括**仅在用户态运行的常规 shell，如 `xv6-user/sh.c`、`user/` 下用户程序等——除非题面另有定义。必须三态；若 `implemented`：须给出 3–10 个 **用户可键入的 monitor 命令名** 及对应 **内核内** 解析/分发入口的 `路径:行号` 证据；仅以用户态 shell 充当内核 monitor 视为 **未切题** 应判 `stub` 或 `not_found` 并说明理由。）"
+    },
+    {
+      "question_id": "Q09_006",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 GDB stub（需数据包解析循环，如 handle_gdb_packet）？（必须三态）"
+    },
+    {
+      "question_id": "Q09_007",
+      "question_type": "short_answer",
+      "stem": "错误码/错误类型体系是什么？（errno/Result/Error enum；给类型定义与传播点证据）"
+    },
+    {
+      "question_id": "Q09_008",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 trace/perf/ftrace 等跟踪机制或 tracepoints？（必须三态）"
+    }
+  ],
+  "stage_constraints_md": "**本阶段须额外覆盖**：\n- **Kernel monitor（Stallings 意义）**：仅统计 **`kernel/`**（或经引导后**仅内核可达**的调试循环）内的交互监视器；须与用户态 shell 区分。若存在：**命令名 + 内核处理入口**列表；若无：明确「未发现」。**禁止**把 `xv6-user/`、`user/` 等用户态 shell 单独当作内核 monitor 的充分证据。\n\n必须回答：\n- 日志系统：print/log 宏如何实现？日志级别设计？\n- Panic 处理：panic! 触发后的流程（栈回溯、寄存器 dump、停机）。**须一句话结论**：是否包含寄存器 dump、是否调用回溯辅助函数，并附 `路径:行号`。\n- **栈回溯 (Backtrace)**：是否支持 `dwarf` 解析或基于 FramePointer 的回溯？**必须** `grep_in_repo` 搜索 `backtrace|unwind|stack_trace|StackTrace`，在正文**摘录关键命中行或明确写零命中**。**注意**：不要被 panic 时仅打印若干寄存器/`ra` 误导为完整回溯；`doc/*.md` 不得单独作为「已实现回溯」的证据，须 C/Rust 源码 `路径:行号`。\n- 异常处理：未处理异常的默认行为。\n- 调试接口：\n    - **Kernel monitor vs 用户态 shell**：是否提供 **内核监视器**（非用户态 `sh`）？若声称有，命令须在 **内核源码** 中有分发实现；支持哪些命令（如 `ps`/`help` 等须对应内核侧入口）。\n    - GDB stub 支持（如有）：**严格检查**。搜索 `handle_gdb_packet`。如果找不到数据包解析循环，就不是 GDB Stub。\n    - 调试控制台/Monitor\n    - 内核调试选项\n    - 是否支持 `perf` 或 `ftrace`？**Tracepoints** 是否插入到了关键路径？\n- 错误码设计：Result/Error 类型定义。\n- 断言与检查：debug_assert、运行时检查。\n\n要求：\n- 使用 `lsp_get_definition` 定位 `panic_handler`、`log` 宏的实现位置。\n- **【必须】使用 `lsp_get_call_graph` 追踪 panic 处理链**（`panic!` → `panic_handler` → 栈回溯 → 停机）：\n  - `lsp_get_call_graph(repo_path, file_of_panic_handler, \"panic_handler\", direction=\"incoming\", max_depth=3)` — 谁触发了 panic？\n  - 如返回 `[⚠️ DEGRADED MODE]`，标注后继续使用，用 `lsp_get_references` 补充单层引用。\n- 使用 `lsp_get_document_outline` 浏览调试模块，发现所有调试相关函数（backtrace、dump、monitor命令）。\n- 辅以 grep_in_repo 搜索 `gdbstub|monitor|perf|trace` 确认调试工具支持。\n\n**【评测与交付适配 — 本阶段启发式】**（须源码证据；无则略）：\n- 长测例下 **panic/回溯/日志与资源泄漏**的稳定性风险；若有 monitor 或 GDB 脚本与测例集成，列出路径。\n- 无命中时不写具体赛题名称。"
+}

@@ -1,0 +1,111 @@
+{
+  "stage_id": "12_debug_error",
+  "goal": "分析调试机制与错误处理：日志系统、panic处理、栈回溯、错误码体系、调试接口（shell/GDB stub）、trace机制。",
+  "must_cover": [
+    "[Q12_001] 日志系统：printf宏实现，__debug_info/__debug_error条件编译，无级别控制",
+    "[Q12_002] panic处理：panic()函数存在，调用backtrace()后死循环停机",
+    "[Q12_003] panic诊断：输出panic消息+backtrace（仅打印ra），无寄存器dump",
+    "[Q12_004] 栈回溯：基于FramePointer的backtrace()实现，非DWARF解析",
+    "[Q12_005] 交互式shell：未发现内核monitor/shell命令入口",
+    "[Q12_006] GDB stub：未实现（无handle_gdb_packet等数据包解析）",
+    "[Q12_007] 错误码：errno.h定义标准POSIX错误码，函数返回-1/RES_ERROR",
+    "[Q12_008] trace机制：仅syscall.c有trace注释，无实际tracepoints/perf/ftrace",
+    "[Q12_001] 是否存在日志系统（log/printk/println 宏）与日志级别控制？（必须三态）",
+    "[Q12_002] 是否存在 panic/崩溃处理路径（panic_handler/oom/abort 等）？（必须三态）",
+    "[Q12_003] panic 路径会输出哪些诊断？（寄存器 dump/栈回溯/停机；必须引用实现证据）",
+    "[Q12_004] 是否实现栈回溯 (backtrace/unwind/stack_trace)？（必须三态；仅打印 ra 不算）",
+    "[Q12_005] 是否存在交互式内核 monitor/shell？（必须三态；若 implemented 列出 3-10 个命令入口证据）",
+    "[Q12_006] 是否实现 GDB stub（需数据包解析循环，如 handle_gdb_packet）？（必须三态）",
+    "[Q12_007] 错误码/错误类型体系是什么？（errno/Result/Error enum；给类型定义与传播点证据）",
+    "[Q12_008] 是否存在 trace/perf/ftrace 等跟踪机制或 tracepoints？（必须三态）",
+    "若存在 monitor/shell：**命令实现文件**列表；若无：明确「未发现」。",
+    "日志系统：print/log 宏如何实现？日志级别设计？",
+    "Panic 处理：panic! 触发后的流程（栈回溯、寄存器 dump、停机）。**须一句话结论**：是否包含寄存器 dump、是否调用回溯辅助函数，并附 `路径:行号`。",
+    "**栈回溯 (Backtrace)**：是否支持 `dwarf` 解析或基于 FramePointer 的回溯？**必须** `grep_in_repo` 搜索 `backtrace|unwind|stack_trace|StackTrace`，在正文**摘录关键命中行或明确写零命中**。**注意**：不要被 panic 时仅打印若干寄存器/`ra` 误导为完整回溯；`doc/*.md` 不得单独作为「已实现回溯」的证据，须 C/Rust 源码 `路径:行号`。",
+    "异常处理：未处理异常的默认行为。",
+    "调试接口："
+  ],
+  "evidence_targets": [
+    "panic实现：src/printf.c:140-150",
+    "backtrace实现：src/printf.c:151-165",
+    "trapframedump：src/trap.c:263-297（仅异常时调用，非panic路径）",
+    "错误码定义：src/include/errno.h",
+    "调试宏：src/printf.c:__debug_info/__debug_error/__debug_warn",
+    "日志输出：consputc通过sbi_console_putchar实现",
+    "panic/debug",
+    "日志系统",
+    "回溯",
+    "错误处理"
+  ],
+  "seed_paths": [
+    "src/printf.c",
+    "src/include/printf.h",
+    "src/trap.c",
+    "src/include/trap.h",
+    "src/include/errno.h",
+    "src/include/debug.h",
+    "src/dev.c",
+    "syscall/syscall.c",
+    "debug",
+    "log",
+    "panic",
+    "assert",
+    "backtrace",
+    "src/syssig.c:102"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "panic",
+    "backtrace",
+    "trapframedump",
+    "consputc",
+    "__debug_error",
+    "__debug_info",
+    "panic_handler",
+    "log",
+    "assert",
+    "main"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "bin",
+    "doc",
+    "linker",
+    "sbi",
+    "sd",
+    "src",
+    "src/include",
+    "src/sifive",
+    "syscall"
+  ],
+  "preferred_tools": [
+    "read_code_segment",
+    "grep_in_repo",
+    "lsp_get_definition"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "确认panic()实现：读取src/printf.c:140-150，验证调用backtrace()后死循环",
+    "确认backtrace()实现：读取src/printf.c:151-165，确认基于FP回溯仅打印ra",
+    "确认trapframedump调用点：grep验证仅在trap.c:109/115用户异常时调用，panic路径无寄存器dump",
+    "确认日志宏：读取printf.c中__debug_info/__debug_error实现，确认依赖DEBUG/ERROR宏条件编译",
+    "确认无shell：grep搜索command/cmd_/shell无命令解析入口，仅SD卡命令",
+    "确认无GDB stub：grep搜索gdb/handle_gdb无匹配",
+    "确认错误码体系：读取errno.h列出EPERM~ERANGE等标准定义，函数返回-1或RES_ERROR",
+    "确认无trace机制：syscall.c仅注释// trace，无实际tracepoint宏或perf基础设施"
+  ]
+}

@@ -32,7 +32,6 @@ from typing import Optional
 
 from dotenv import load_dotenv
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
-from langchain_openai import ChatOpenAI
 try:
     # LangGraph v1+ 提示：create_react_agent 迁移到 langchain.agents
     from langchain.agents import create_agent as create_react_agent
@@ -40,10 +39,16 @@ except Exception:
     # 兼容旧版依赖
     from langgraph.prebuilt import create_react_agent
 
-from core.agent_builder import get_model_name
-from core.utils import repo_name_from_url, format_tool_call_summary, format_tool_result_summary
+from core.agent_builder import get_model_name, build_chat_model
+from core.utils import repo_name_from_url, format_tool_call_summary, format_tool_result_summary, parse_env_repo_list
+from core.per_types import StageState
+from core.per_planner import build_dynamic_context, build_repo_profile, plan_stage, render_plan_context
 
 load_dotenv()
+from core.hf_env import apply_hf_hub_env_defaults
+
+apply_hf_hub_env_defaults()
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(name)s | %(levelname)s | %(message)s",
@@ -55,6 +60,40 @@ logger = logging.getLogger("os_agent_c_fine")
 DEFAULT_OUTPUT_DIR = "./output"
 DEFAULT_RECURSION_LIMIT = 150
 DEFAULT_STAGE_LIMIT = 150  # 仅用于终端展示，建议与 recursion_limit 保持一致
+
+
+def _get_coarse_score_info(cand_info: dict) -> dict:
+    """兼容新旧 coarse_screening.json 的粗筛分数字段。"""
+    total_score = float(cand_info.get("total_score", 0.0) or 0.0)
+    similarity_percent = cand_info.get("similarity_percent")
+    raw_total_score = cand_info.get("raw_total_score")
+
+    if similarity_percent is None:
+        if total_score > 1.0:
+            # 兼容旧版粗筛：旧 total_score 可能是未归一化原始分
+            raw_total_score = total_score if raw_total_score is None else raw_total_score
+            total_score = min(total_score, 1.0)
+            similarity_percent = total_score * 100.0
+        else:
+            similarity_percent = total_score * 100.0
+
+    if raw_total_score is None:
+        raw_total_score = total_score
+
+    return {
+        "total_score": float(total_score),
+        "similarity_percent": float(similarity_percent),
+        "raw_total_score": float(raw_total_score),
+    }
+
+
+def _save_json(path: str, payload: dict):
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"      ⚠️ 无法写入 JSON 文件 {path}: {e}")
 
 def _strip_llm_preamble(text: str, *, announce: bool = True) -> str:
     """剥掉 LLM 输出中第一个 Markdown 标题（# 开头）之前的过渡性口水文字。
@@ -196,7 +235,7 @@ COMPARE_STAGES = [
 7. **缺页异常处理差异**：是否与 CoW / Lazy Allocation 关联
 8. **用户指针安全**：UserInPtr / UserOutPtr 类型安全包装对比
 
-加载两个项目的 05_ section 报告，使用 `compare_feature_summary` 对比 D5_trap_syscall 维度。
+加载两个项目的 02_ section 报告，使用 `compare_feature_summary` 对比 D5_trap_syscall 维度。
 
 输出格式：## Trap 差异 → ## syscall 分发差异 → ## Call Graph 差异 → ## 覆盖度对比""",
     },
@@ -217,7 +256,7 @@ COMPARE_STAGES = [
 6. **poll/select/epoll 支持状态差异**
 7. **使用 `compare_call_graphs` 对比 sys_open 或 vfs_open 调用链**
 
-加载两个项目的 06_ section 报告，使用 `compare_feature_summary` 对比 D6_filesystem 维度。
+加载两个项目的 05_ section 报告，使用 `compare_feature_summary` 对比 D6_filesystem 维度。
 
 **创新点发现**：如果 {target} 实现了 {candidate} 没有的伪文件系统（如 ProcFS），标注为创新点。
 
@@ -244,7 +283,7 @@ COMPARE_STAGES = [
 4. **等待队列差异**：WaitQueue 实现方式
 5. **【必须】使用 `compare_call_graphs` 对比 `sys_futex` 或 `futex_wait` 调用链**
 
-加载两个项目的 07_ 和 08_ section 报告，使用 `compare_feature_summary` 分别对比 D7_device_driver 和 D8_sync_ipc 维度。
+加载两个项目的 05_ 和 06_ section 报告，使用 `compare_feature_summary` 分别对比 D7_device_driver 和 D8_sync_ipc 维度。
 
 **桩代码检测**：如果 sys_msgget/sys_semget 函数体为空或仅返回 Ok(0)，标注为'桩函数'。
 
@@ -279,7 +318,7 @@ COMPARE_STAGES = [
 5. **【必须】使用 `compare_call_graphs` 对比 `sys_sendto` 或 `socket_write` 调用链**
    - 如果两个项目都不支持网络，此步跳过并在报告中注明
 
-加载两个项目的 09_/10_/11_ section 报告，使用 `compare_feature_summary` 对比 D9_smp_security 和 D10_net_debug 维度。
+加载两个项目的 04_/07_/08_/09_ section 报告，使用 `compare_feature_summary` 对比 D9_smp_security 与 D10_net_debug 维度（D9 侧重 04/07 章证据，D10 侧重 08/09 章证据）。
 
 **Call Graph 退避策略**：如果 compare_call_graphs 返回'未找到函数'或'Call Graph 获取失败'，改用 `grep_in_repo` 搜索对应函数名进行文本级对比，并在报告中标注'降级分析'。
 
@@ -296,7 +335,7 @@ COMPARE_STAGES = [
 3. **调试接口差异**：交互式 Shell / GDB Stub / Monitor
 4. **错误码设计差异**：Result/Error 类型定义
 
-加载两个项目的 12_ section 报告进行对比。
+加载两个项目的 09_ section 报告进行对比。
 
 输出格式：## 调试机制差异 → ## 错误处理机制差异 → ## 日志系统对比""",
     },
@@ -393,6 +432,26 @@ def _build_compare_agent(target_name: str, candidate_name: str):
 6. **差异大的维度重点分析**，差异小的维度简要总结
 7. **输出格式**：最终输出完整 Markdown 格式对比报告"""
 
+    system_prompt += """
+
+**工具使用规约（必须遵守，用于确保 LSP 与兜底链路有效）**：
+
+1. **Call Graph 工具入口选择**：
+   - 调用 `compare_call_graphs(repo_a, repo_b, entry_function)` 前，必须确保 `entry_function` 是“真实函数/方法定义名”。
+   - 禁止把模块名、文件名、宏名、trait 声明名、重导出别名当作 entry_function 直接传入。
+
+2. **如何找到正确的 entry_function**（按优先级）：
+   - 优先用 `search_code_snippets(repo_name, query="<你要找的入口含义/关键词>")` 定位真正的 handler/dispatch 函数；
+   - 或用 `grep_in_repo(repo_path, pattern)` 搜索 `fn xxx` / `xxx(...) {` 的定义形态；
+   - 若某阶段 prompt 给出的是概念入口（如 trap_handler），但仓库真实入口是 `trap::handler`/`syscall_dispatch` 等，必须改用真实函数名再调用 `compare_call_graphs`。
+
+3. **理解降级与置信度**：
+   - `compare_call_graphs` 内部优先走 LSP；当 LSP 不可用会按链路降级：LSP → Tree-sitter → Language-aware Static → Grep → ASM。
+   - 若输出末尾包含 `[Fallback Metadata] ... confidence=low` 或出现 “DEGRADED”，必须在报告中明确标注“降级分析”，并尽量通过换入口函数名/换更靠近核心路径的函数再跑一次以提升置信度。
+
+4. **输出约束**：
+   - 报告中的每个调用链结论必须能落到文件路径/符号名；若只能得到低置信度调用镜像，必须写明局限（宏/内联/间接调用不可追踪）。"""
+
     tools = [
         load_project_report,
         load_project_fingerprint,
@@ -404,12 +463,7 @@ def _build_compare_agent(target_name: str, candidate_name: str):
         grep_in_repo,
     ]
 
-    llm = ChatOpenAI(
-        model=get_model_name(),
-        temperature=0,
-        request_timeout=240,
-        max_retries=2,
-    )
+    llm = build_chat_model(model=get_model_name(), temperature=0, request_timeout=240, max_retries=2)
     return create_react_agent(llm, tools), system_prompt
 
 
@@ -443,12 +497,20 @@ def run_fine_compare(
         ErrorTracker, classify_error, calculate_backoff, RetryConfig,
     )
     error_tracker = ErrorTracker(comparison_dir)
+    target_repo_path = os.path.normpath(os.path.join("./repos", target_name))
+    target_profile = build_repo_profile(
+        repo_url=os.environ.get("REPO_URL", "").strip() or target_name,
+        repo_path=target_repo_path,
+    )
 
     all_reports = []
 
     for rank, cand_info in enumerate(candidates, 1):
         cand_name = cand_info["name"]
-        total_score = cand_info.get("total_score", 0)
+        score_info = _get_coarse_score_info(cand_info)
+        total_score = score_info["total_score"]
+        similarity_percent = score_info["similarity_percent"]
+        raw_total_score = score_info["raw_total_score"]
 
         report_path = os.path.join(comparison_dir, f"vs_{cand_name}.md")
 
@@ -459,31 +521,57 @@ def run_fine_compare(
             continue
 
         print(f"\n{'=' * 60}")
-        print(f"🆚 #{rank}: {target_name} vs {cand_name} (粗筛得分: {total_score:.4f})")
+        print(
+            f"🆚 #{rank}: {target_name} vs {cand_name} "
+            f"(粗筛相似度: {total_score:.4f} / {similarity_percent:.2f}%, raw={raw_total_score:.4f})"
+        )
         print(f"{'=' * 60}")
 
         agent, system_prompt = _build_compare_agent(target_name, cand_name)
         stage_texts = []
+        candidate_repo_path = os.path.normpath(os.path.join("./repos", cand_name))
+        candidate_profile = build_repo_profile(repo_url=cand_name, repo_path=candidate_repo_path)
+        candidate_memory = {
+            "section_summaries": {},
+            "mentioned_paths": [],
+            "external_background": {},
+            "target_profile": target_profile,
+            "candidate_profile": candidate_profile,
+        }
 
         cand_sections_dir = os.path.join(comparison_dir, f"vs_{cand_name}_sections")
         os.makedirs(cand_sections_dir, exist_ok=True)
+        meta_dir = os.path.join(comparison_dir, f"vs_{cand_name}_per")
+        os.makedirs(meta_dir, exist_ok=True)
+        _save_json(os.path.join(meta_dir, "candidate_profile.json"), candidate_profile)
 
         for stage in COMPARE_STAGES:
             title = stage["title"]
             prompt = stage["prompt"].format(target=target_name, candidate=cand_name)
             print(f"\n======== {stage['id']}: {title} =========")
+            stage_state = StageState(
+                stage_id=stage["id"],
+                stage_title=title,
+                stage_type="fine_compare",
+                stage_prompt=prompt,
+            )
+            stage_state.plan = plan_stage(stage_state, repo_profile=candidate_profile, global_memory=candidate_memory)
+            stage_state.dynamic_context = build_dynamic_context(stage_state, repo_profile=candidate_profile, global_memory=candidate_memory)
+            planned_prompt = render_plan_context(stage_state)
 
             stage_file_path = os.path.join(cand_sections_dir, f"{stage['id']}.md")
             if os.path.exists(stage_file_path) and os.path.getsize(stage_file_path) > 50:
                 print(f"      ⏭️  跳过（找到本地缓存: {stage['id']}.md）")
                 with open(stage_file_path, "r", encoding="utf-8") as sf:
-                    stage_texts.append(sf.read())
+                    cached_text = sf.read()
+                    stage_texts.append(cached_text)
+                    candidate_memory["section_summaries"][stage["id"]] = cached_text[:500]
                 continue
 
             inputs = {
                 "messages": [
                     SystemMessage(content=system_prompt),
-                    HumanMessage(content=prompt),
+                    HumanMessage(content=planned_prompt + "\n\n" + prompt),
                 ]
             }
 
@@ -562,19 +650,23 @@ def run_fine_compare(
                 # 防御：兜底再剥一次（例如 stage_text 来自缓存/非 succeeded 分支）
                 stage_text = _strip_llm_preamble(stage_text, announce=False)
 
+            _save_json(os.path.join(meta_dir, f"{stage['id']}_plan.json"), stage_state.plan.to_dict() if stage_state.plan else {})
+
             stage_texts.append(stage_text)
             if succeeded:
                 retry_info = f"，重试 {retry} 次" if retry > 0 else ""
                 with open(stage_file_path, "w", encoding="utf-8") as sf:
                     sf.write(stage_text)
                 print(f"      ✅ 完成 ({len(stage_text)} 字符{retry_info}) -> 已存档: {stage['id']}.md")
+                candidate_memory["section_summaries"][stage["id"]] = stage_text[:500]
             else:
                 print(f"      ❌ 失败（已重试 {retry} 次）")
 
         # 合并为单个候选的对比报告
         with open(report_path, "w", encoding="utf-8") as f:
             f.write(f"# {target_name} vs {cand_name} 对比报告\n\n")
-            f.write(f"> **粗筛相似度**: {total_score:.4f}\n")
+            f.write(f"> **粗筛相似度**: {total_score:.4f} / {similarity_percent:.2f}%\n")
+            f.write(f"> **粗筛原始分**: {raw_total_score:.4f}\n")
             f.write(f"> **生成时间**: {datetime.now().strftime('%Y-%m-%d %H:%M')}\n\n")
             f.write("---\n\n")
             for text in stage_texts:
@@ -600,9 +692,18 @@ def _generate_summary(target: str, candidates: list, reports: list, output_dir: 
         f.write(f"# {target} 相似度对比总报告\n\n")
         f.write(f"> **生成时间**: {datetime.now().strftime('%Y-%m-%d %H:%M')}\n")
         f.write(f"> **分析工具**: OS-Agent-C (精比模块)\n\n---\n\n")
-        f.write("## 粗筛结果\n\n| 排名 | 项目 | 相似度 |\n|------|------|--------|\n")
+        f.write(
+            "## 粗筛结果\n\n"
+            "| 排名 | 项目 | 相似度(0~1) | 百分比 | raw(cos+sf) |\n"
+            "|------|------|-------------|--------|-------------|\n"
+        )
         for i, c in enumerate(candidates, 1):
-            f.write(f"| {i} | {c['name']} | {c.get('total_score', 0):.4f} |\n")
+            score_info = _get_coarse_score_info(c)
+            f.write(
+                f"| {i} | {c['name']} | {score_info['total_score']:.4f} | "
+                f"{score_info['similarity_percent']:.2f}% | "
+                f"{score_info['raw_total_score']:.4f} |\n"
+            )
         f.write("\n## 精比报告\n\n")
         for rp in reports:
             f.write(f"- [{os.path.basename(rp)}](comparison_details/{os.path.basename(rp)})\n")
@@ -668,20 +769,11 @@ def main():
     candidates = []
 
     # 尝试读取环境变量中的 COMPARE_CANDIDATES
-    env_candidates = os.environ.get("COMPARE_CANDIDATES", "").strip()
     env_candidates_list = []
-    if env_candidates:
-        try:
-            if env_candidates.startswith("[") and env_candidates.endswith("]"):
-                import ast
-                env_candidates_list = ast.literal_eval(env_candidates)
-            elif env_candidates.startswith("{") and env_candidates.endswith("}"):
-                inner = env_candidates[1:-1]
-                env_candidates_list = [x.strip().strip("'\"") for x in inner.split(",") if x.strip()]
-            else:
-                env_candidates_list = [x.strip() for x in env_candidates.split(",") if x.strip()]
-        except Exception as e:
-            print(f"⚠️ 解析 COMPARE_CANDIDATES 环境变量失败: {e}")
+    try:
+        env_candidates_list = parse_env_repo_list("COMPARE_CANDIDATES")
+    except Exception as e:
+        print(f"⚠️ 解析 COMPARE_CANDIDATES 环境变量失败: {e}")
 
     if env_candidates_list:
         parsed_list = []

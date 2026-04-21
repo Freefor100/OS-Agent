@@ -1,0 +1,77 @@
+{
+  "passed": false,
+  "score": 0.65,
+  "severity": "major",
+  "failed_rules": [
+    "missing_path_citation",
+    "must_cover_gap",
+    "unverified_architecture_claim"
+  ],
+  "missing_evidence": [
+    {
+      "paragraph_id": "VFS 架构与接口设计",
+      "claim_id": "struct file 定义路径",
+      "reason": "草稿引用 kernel/include/file.h:5-14 但证据索引为空，未经验证"
+    },
+    {
+      "paragraph_id": "具体文件系统支持情况",
+      "claim_id": "FAT32 实现行数",
+      "reason": "声称 kernel/fat32.c 有 1041 行但未提供证据支撑"
+    },
+    {
+      "paragraph_id": "具体 FS 的抽象层结构",
+      "claim_id": "VFS trait 实现分析",
+      "reason": "must_cover 明确要求搜索 FatFilesystemInner|Ext4Filesystem|FatFileNode|FatDirNode 等结构体，草稿完全未进行此类搜索"
+    }
+  ],
+  "weak_claims": [
+    {
+      "claim": "本项目基于 xv6-riscv 架构，采用 C 语言实现",
+      "reason": "must_cover 中提到的结构体命名风格（FatFilesystemInner）类似 Rust，与声称的 C/xv6 架构矛盾，需验证实际项目类型"
+    },
+    {
+      "claim": "grep 无 sys_poll/sys_select/sys_epoll 匹配",
+      "reason": "声称使用 grep_in_repo 但证据索引为空，未展示实际搜索结果"
+    }
+  ],
+  "format_issues": [
+    {
+      "issue": "证据索引摘要为空",
+      "impact": "所有代码路径引用（如 file.h:5-14, fat32.c:71 等）均未经验证"
+    }
+  ],
+  "missed_modules": [
+    "FatFilesystemInner",
+    "Ext4Filesystem",
+    "FatFileNode",
+    "FatDirNode",
+    "VFS trait 实现层"
+  ],
+  "repair_actions": [
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "VFS 架构与接口设计",
+      "hint": "使用 lsp_get_document_outline 或 read_code_segment 验证 kernel/include/file.h 中 struct file 的实际定义和行号"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "具体文件系统支持情况",
+      "hint": "使用 grep_in_repo 搜索 'FatFilesystem|FatFileNode|FatDirNode' 验证 FAT32 实现的实际结构体命名"
+    },
+    {
+      "action_type": "append_missing_module",
+      "target_paragraph_id": "具体 FS 的抽象层结构",
+      "hint": "must_cover 明确要求分析各层如何实现 VFS trait，需补充搜索并描述 FatFilesystemInner 等结构体与 VFS 接口的关系"
+    },
+    {
+      "action_type": "rewrite_paragraph",
+      "target_paragraph_id": "第 6 章：文件系统（VFS + 具体 FS）开篇",
+      "hint": "验证项目实际架构（xv6-riscv/C 还是 Rust 组件化），修正可能错误的架构声明"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "高级 I/O 特性支持情况",
+      "hint": "使用 grep_in_repo 实际执行 sys_poll|sys_select|sys_epoll 搜索并展示结果截图或输出"
+    }
+  ]
+}

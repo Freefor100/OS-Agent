@@ -1,0 +1,115 @@
+{
+  "stage_id": "06_sync_ipc",
+  "goal": "分析 xv6-k210 的同步互斥原语（SpinLock/SleepLock/WaitQueue）与 IPC 机制（Pipe/Signal），验证 sleep/wakeup 不变量、管道实现形态、信号处理流程，并确认缺失的 IPC 原语（f",
+  "must_cover": [
+    "[Q06_001] 同步原语类型：SpinLock、SleepLock（基于 spinlock+sleep）、WaitQueue（双向链表实现）",
+    "[Q06_002] Mutex 实现形态：SleepLock 作为 mutex 使用（见 fs.h 注释 mutex, I/O control）",
+    "[Q06_003] WaitQueue 存在性：implemented（include/sync/waitqueue.h + kernel/sched/proc.c 的 sleep/wakeup）",
+    "[Q06_004] sleep/wakeup 不变量：sleep 入口 proc.c:582，持锁检查条件，wakeup proc.c:392 先唤醒后释放",
+    "[Q06_005] Pipe 实现：implemented（kernel/fs/pipe.c，环形缓冲 PIPE_SIZE=512）",
+    "[Q06_006] pipe 缓冲形态：环形缓冲（circular buffer，nread/nwrite 模运算）",
+    "[Q06_007] pipe 阻塞语义：阻塞式（pipelock/pipeunlock + wait_queue + sleep/wakeup）",
+    "[Q06_008] SysV IPC：not_found（无 msgget/semget/shmget 系统调用）",
+    "[Q06_009] futex：not_found（无 futex_wait/futex_wake 实现）",
+    "[Q06_010] 信号机制：implemented（sys_rt_sigaction/sys_kill/sys_rt_sigreturn，见 kernel/sched/signal.c）",
+    "[Q06_011] signal handler 上下文：sig_frame 保存 trapframe，sigreturn 恢复（kernel/sched/signal.c:244-283）",
+    "[Q06_012] RwLock：not_found（无读写锁实现）",
+    "[Q06_013] 原子操作来源：RISC-V 原生原子指令（include/hal/riscv.h 中的原子操作）",
+    "[Q06_014] 死锁四条件：成立（互斥/占有等待/不可抢占/循环等待均可能）",
+    "[Q06_015] 死锁处理策略：prevention（锁顺序注释，如 proc.c:249/454/603）",
+    "[Q06_016] 全局锁顺序规范：implemented（proc_lock 优先于其他锁，见 proc.c 注释）",
+    "[Q06_001] 该内核提供了哪些同步原语？（SpinLock/Mutex/RwLock/Semaphore/Condvar/WaitQueue 等；列出类型定义证据）",
+    "[Q06_002] Mutex 更接近哪种实现？",
+    "[Q06_003] 是否存在等待队列 (Wait Queue, WaitQueue) 与 sleep/wakeup（或等价阻塞/唤醒）实现？（必须三态）",
+    "[Q06_004] sleep / wakeup 不变量 (Sleep-Wakeup Invariant) 分析，按格式填写：",
+    "sleep 入口函数: ___（路径）",
+    "入睡前持有的锁: ___（无则写 none）"
+  ],
+  "evidence_targets": [
+    "SpinLock/SleepLock 定义（include/sync/spinlock.h, sleeplock.h）",
+    "WaitQueue 实现（include/sync/waitqueue.h）",
+    "sleep/wakeup 实现（kernel/sched/proc.c:392/582）",
+    "Pipe 环形缓冲与阻塞语义（kernel/fs/pipe.c）",
+    "信号处理流程（kernel/sched/signal.c, kernel/trap/trap.c）",
+    "锁顺序注释（kernel/sched/proc.c:249/454/603）",
+    "锁与同步原语",
+    "IPC",
+    "Futex",
+    "管道/信号"
+  ],
+  "seed_paths": [
+    "include/sync/spinlock.h",
+    "include/sync/sleeplock.h",
+    "include/sync/waitqueue.h",
+    "kernel/sync/spinlock.c",
+    "kernel/sync/sleeplock.c",
+    "kernel/sched/proc.c",
+    "kernel/fs/pipe.c",
+    "include/fs/pipe.h",
+    "kernel/sched/signal.c",
+    "include/sched/signal.h",
+    "kernel/trap/trap.c",
+    "kernel/syscall/syssignal.c",
+    "sync",
+    "lock"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "acquire",
+    "release",
+    "sleep",
+    "wakeup",
+    "acquiresleep",
+    "releasesleep",
+    "wait_queue_init",
+    "pipealloc",
+    "piperead",
+    "pipewrite",
+    "Mutex",
+    "SpinLock"
+  ],
+  "repo_hotspots": [
+    "Cargo.toml",
+    "Makefile",
+    "bootloader",
+    "bootloader/SBI",
+    "debug",
+    "debug/kendryte_openocd",
+    "debug/openocd_cfg",
+    "doc",
+    "doc/img",
+    "include"
+  ],
+  "preferred_tools": [
+    "read_code_segment",
+    "lsp_get_definition",
+    "lsp_get_references",
+    "lsp_get_call_graph",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "1. 读取 kernel/sched/proc.c 的 sleep() 和 wakeup() 完整实现（行 392-420, 582-620），分析持锁顺序与防丢 wakeup 机制",
+    "2. 读取 kernel/fs/pipe.c 的 pipelock/pipeunlock/pipewakeup 实现，验证 wait_queue 与 sleep/wakeup 的协作流程",
+    "3. 读取 kernel/sched/signal.c 的 sighandle() 和 sigreturn()，确认用户态 handler 上下文构建与恢复流程",
+    "4. 使用 lsp_get_references 追踪 sleep/wakeup 的所有调用点，验证不变量在 pipe/bio/wait4 中的一致性",
+    "5. 使用 grep_in_repo 搜索 futex/SysV IPC/Barrier/Condvar 等关键词，确认缺失的原语并记录证据",
+    "6. 读取 kernel/sched/proc.c 中关于锁顺序的注释（行 249/454/603），整理死锁预防策略",
+    "7. 对照 must_cover 清单，逐项填写 Q06_001 至 Q06_020 的答案与证据路径",
+    "8. 生成最终 JSON 题单作答，确保每个三态问题都有 implemented/not_found 状态与代码证据"
+  ]
+}

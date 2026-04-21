@@ -1,0 +1,115 @@
+{
+  "passed": false,
+  "score": 0.55,
+  "severity": "major",
+  "failed_rules": [
+    "missing_path_citation",
+    "missing_evidence_verification",
+    "must_cover_gap"
+  ],
+  "missing_evidence": [
+    {
+      "paragraph_id": "11.1",
+      "claim_id": "无第三方协议栈依赖",
+      "reason": "声称搜索 smoltcp/lwip 结果为空，但未提供 grep_in_repo 或 rag_search_code 的输出证据"
+    },
+    {
+      "paragraph_id": "11.1",
+      "claim_id": "无网络驱动目录",
+      "reason": "声称 kern/driver/ 目录结构，但未提供 list_repo_structure 的输出证据"
+    },
+    {
+      "paragraph_id": "11.2.1",
+      "claim_id": "libs/unistd.h:198-269 syscall 号定义",
+      "reason": "引用具体行号但未提供 read_code_segment 验证，需确认文件存在且内容匹配"
+    },
+    {
+      "paragraph_id": "11.2.2",
+      "claim_id": "kern/syscall/syscall.c:430-490 syscalls[] 表",
+      "reason": "引用具体行号但未提供 read_code_segment 验证，需确认 syscalls[] 表实际范围"
+    },
+    {
+      "paragraph_id": "11.3",
+      "claim_id": "搜索 loopback|127.0.0.1 无结果",
+      "reason": "声称搜索但无证据，需验证是否真的无回环设备相关代码"
+    },
+    {
+      "paragraph_id": "11.5",
+      "claim_id": "libs/error.h:1-33 错误码定义",
+      "reason": "引用具体行号但未提供 read_code_segment 验证"
+    },
+    {
+      "paragraph_id": "11.6",
+      "claim_id": "搜索 DMA|zero.copy|rss|poll 等关键词",
+      "reason": "多次声称搜索结果为空或仅有非网络用途，但无 grep_in_repo 输出证据"
+    }
+  ],
+  "weak_claims": [
+    {
+      "claim": "项目中不存在 Cargo.toml 或 Kconfig 等配置文件声明网络库依赖",
+      "reason": "rwos 是 C 项目，不应期望有 Cargo.toml；应检查是否有其他依赖管理机制（如 Makefile 中的子模块）"
+    },
+    {
+      "claim": "syscalls[] 表最大索引仅约 60",
+      "reason": "声称过于模糊，应给出精确的最大索引值和文件行号"
+    }
+  ],
+  "format_issues": [
+    {
+      "issue": "部分代码片段使用 ```c 标记但未注明文件路径",
+      "suggestion": "应在代码块上方标注文件路径如 `kern/syscall/syscall.c:430-490`"
+    }
+  ],
+  "missed_modules": [
+    "未检查是否存在任何网络相关的头文件（如 net/*.h）",
+    "未检查 VFS 层是否有 socket 相关的文件操作接口",
+    "未检查用户态库（如 libc）是否有 socket 相关封装函数"
+  ],
+  "repair_actions": [
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "11.1",
+      "hint": "调用 list_repo_structure(repo_path, max_depth=3) 获取 kern/ 目录完整结构，证明无 net/ 子目录"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "11.1",
+      "hint": "调用 grep_in_repo(pattern='smoltcp|lwip|netstack', max_results=10) 验证无第三方协议栈"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "11.2.1",
+      "hint": "调用 read_code_segment(file_path='libs/unistd.h', start_line=195, end_line=275) 验证 syscall 号定义"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "11.2.2",
+      "hint": "调用 read_code_segment(file_path='kern/syscall/syscall.c', start_line=420, end_line=500) 验证 syscalls[] 表实际范围"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "11.3",
+      "hint": "调用 grep_in_repo(pattern='loopback|127\\.0\\.0\\.1|LOOPBACK', max_results=10) 验证无回环设备"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "11.5",
+      "hint": "调用 read_code_segment(file_path='libs/error.h', start_line=1, end_line=40) 验证错误码定义范围"
+    },
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "11.6",
+      "hint": "调用 grep_in_repo(pattern='zero.?copy|zerocopy|DMA.*net|multi.*queue', max_results=10) 验证高级特性"
+    },
+    {
+      "action_type": "rewrite_paragraph",
+      "target_paragraph_id": "11.1",
+      "hint": "修正'Cargo.toml'表述，明确说明这是 C 项目，应检查的是子模块或外部库依赖机制"
+    },
+    {
+      "action_type": "normalize_terminology",
+      "target_paragraph_id": "11.2.2",
+      "hint": "将'约 60 个 syscall'改为精确数字，如'最大索引为 60（SYS_getegid）'"
+    }
+  ]
+}

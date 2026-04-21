@@ -1,0 +1,32 @@
+{
+  "passed": false,
+  "score": 0.75,
+  "severity": "major",
+  "failed_rules": [
+    "readme_over_source"
+  ],
+  "missing_evidence": [
+    {
+      "paragraph_id": "p001",
+      "claim_id": "",
+      "reason": "本段结论主要依赖 README/文档，缺少源码证据"
+    }
+  ],
+  "weak_claims": [],
+  "format_issues": [],
+  "missed_modules": [],
+  "repair_actions": [
+    {
+      "action_type": "add_evidence",
+      "target_paragraph_id": "p001",
+      "target_claim_id": "",
+      "hint": "仅补充源码证据；若确无实现，则降级为文档提及但未见代码"
+    },
+    {
+      "action_type": "rewrite_paragraph",
+      "target_paragraph_id": "p001",
+      "target_claim_id": "",
+      "hint": "补充源码证据后重写；若仍无实现，则显式降级该结论"
+    }
+  ]
+}

@@ -47,6 +47,10 @@ def classify_error(exception: Exception) -> ErrorType:
     error_msg = str(exception).lower()
     error_type_name = type(exception).__name__.lower()
 
+    # 超时错误（优先于网络错误，避免 APITimeoutError 被误判为网络错误）
+    if "timeout" in error_msg or "timeout" in error_type_name:
+        return ErrorType.TIMEOUT_ERROR
+
     # 网络相关错误
     if any(keyword in error_msg for keyword in ["connection", "network", "socket", "dns"]):
         return ErrorType.NETWORK_ERROR
@@ -58,10 +62,6 @@ def classify_error(exception: Exception) -> ErrorType:
         return ErrorType.API_ERROR
     if "openai" in error_type_name or "api" in error_type_name:
         return ErrorType.API_ERROR
-
-    # 超时错误
-    if "timeout" in error_msg or "timeout" in error_type_name:
-        return ErrorType.TIMEOUT_ERROR
 
     # JSON 解析错误
     if "json" in error_msg or "json" in error_type_name:

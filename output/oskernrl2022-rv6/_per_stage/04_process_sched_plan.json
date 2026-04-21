@@ -1,0 +1,118 @@
+{
+  "stage_id": "04_process_sched",
+  "goal": "分析进程/线程与调度机制：执行实体抽象、状态机、上下文切换、调度算法、fork/clone/exec/wait/exit 实现、信号/Futex、PID 分配、资源回收等",
+  "must_cover": [
+    "[Q04_001] 执行实体抽象：struct proc (PCB)，含 context/state/pid/pagetable 等字段",
+    "[Q04_002] 状态机：UNUSED/SLEEPING/RUNNABLE/RUNNING/ZOMBIE 五态",
+    "[Q04_003] 上下文切换：swtch.S 实现，保存/恢复 ra/sp/s0-s11 共 14 个寄存器",
+    "[Q04_004] 切换时页表操作：scheduler() 中 w_satp/sfence_vma 显式切换页表",
+    "[Q04_005] 调度算法：FIFO/FCFS（readyq 为单队列，无 timeslice/priority/stride 字段）",
+    "[Q04_006] 调度器入口：scheduler() 为主循环，sched() 为主动让出 CPU",
+    "[Q04_007] fork/clone：clone() 实现，支持 CLONE_VM/CLONE_FILES 等标志区分线程/进程",
+    "[Q04_008] 地址空间/文件表复制：clone 中 filedup/edup 复制文件表，proc_pagetable 处理页表",
+    "[Q04_009] exec：sys_execve 调用 exec() 装载 ELF 重建地址空间",
+    "[Q04_010] wait：wait4pid() 实现阻塞等待子进程退出",
+    "[Q04_011] wait 阻塞机制：sleep/wakeup 基于等待队列 chan",
+    "[Q04_012] PID 分配：自增计数器 nextpid（allocpid 函数）",
+    "[Q04_013] 父子树：parent 指针 + children 隐式遍历（findchild）",
+    "[Q04_014] 信号已实现（sig_act/sig_pending/sig_frame），Futex 仅定义宏无实现",
+    "[Q04_015] 多核交叉：每核 scheduler 循环，无显式任务迁移/IPI 证据",
+    "[Q04_016] exit 回收：关闭文件表、eput cwd、wakeup 父进程、设 ZOMBIE、调用 sched",
+    "[Q04_001] 执行实体 (Execution Entity) 抽象是什么？",
+    "顶层类型名: ___（如 Process / Task / Thread / TaskControlBlock）",
+    "结构体路径: ___",
+    "关键字段（至少列 3 个）: Context=___, State=___, PID=___, TrapFrame=___",
+    "是否区分 PCB 与 TCB: ___（是 / 否 / 待核实）",
+    "[Q04_002] 任务/进程的生命周期状态机有哪些状态与流转点？（Ready/Running/Blocked/Exited 等；需状态枚举/字段证据）"
+  ],
+  "evidence_targets": [
+    "struct proc 定义 (src/include/proc.h:128-170)",
+    "enum procstate 五态 (src/include/proc.h:90)",
+    "swtch.S 汇编 (src/swtch.S)",
+    "scheduler() 与 sched() (src/proc.c:119-150, 520-540)",
+    "clone() 实现 (src/proc.c:408-490)",
+    "wait4pid()/exit() (src/proc.c:675-750)",
+    "信号结构体与 Futex 宏 (src/include/proc.h:18-50, 150-165)",
+    "allocpid() (src/proc.c:154-165)",
+    "exec() 调用链 (src/exec.c, src/sysproc.c:11-35)",
+    "任务模型",
+    "调度器",
+    "上下文切换",
+    "信号/Futex"
+  ],
+  "seed_paths": [
+    "src/include/proc.h",
+    "src/include/cpu.h",
+    "src/proc.c",
+    "src/swtch.S",
+    "src/sysproc.c",
+    "src/exec.c",
+    "src/include/queue.h",
+    "src/include/signal.h",
+    "src/trampoline.S",
+    "doc/内核实现--信号相关.md",
+    "doc/内核实现--Futex.md",
+    "doc/内核设计--进程队列.md",
+    "task",
+    "proc"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "scheduler",
+    "sched",
+    "clone",
+    "allocproc",
+    "swtch",
+    "wait4pid",
+    "exit",
+    "sys_execve",
+    "allocpid",
+    "wakeup",
+    "schedule",
+    "sys_fork"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "bin",
+    "doc",
+    "linker",
+    "sbi",
+    "sd",
+    "src",
+    "src/include",
+    "src/sifive",
+    "syscall"
+  ],
+  "preferred_tools": [
+    "read_code_segment",
+    "lsp_get_call_graph",
+    "lsp_get_definition",
+    "lsp_get_references",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "精读 src/include/proc.h:128-170 提取 struct proc 全部字段，确认 context/state/pid/pagetable/sig_* 等关键字段",
+    "精读 src/swtch.S 全文件，列出保存/恢复的寄存器清单（ra/sp/s0-s11），确认无页表切换指令",
+    "精读 src/proc.c:119-150 scheduler() 函数，记录 w_satp/sfence_vma 调用点，确认页表切换时机",
+    "精读 src/proc.c:408-490 clone() 函数，分析 CLONE_VM/CLONE_FILES 分支，确认地址空间/文件表复制逻辑",
+    "精读 src/proc.c:675-750 wait4pid()/exit()，追踪 sleep/wakeup 调用链与资源回收步骤",
+    "grep 搜索 do_futex 确认无实现体；grep getrlimit/setrlimit 确认无系统调用",
+    "对 scheduler() 调用 lsp_get_call_graph(direction='incoming', max_depth=2) 确认调用来源（main.c 每核启动）",
+    "对 clone() 调用 lsp_get_references 确认 sys_clone 调用点及用户态入口"
+  ]
+}

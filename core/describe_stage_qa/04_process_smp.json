@@ -1,0 +1,255 @@
+{
+  "stage_id": "04_process_smp",
+  "stage_title": "进程/线程/调度与多核",
+  "questions": [
+    {
+      "question_id": "Q04_001",
+      "question_type": "short_answer",
+      "stem": "执行实体 (Execution Entity) 抽象是什么？\n请按以下格式作答（每项必须有代码证据）：\n- 顶层类型名: ___（如 Process / Task / Thread / TaskControlBlock）\n- 结构体路径: ___\n- 关键字段（至少列 3 个）: Context=___, State=___, PID=___, TrapFrame=___\n- 是否区分 PCB 与 TCB: ___（是 / 否 / 待核实）"
+    },
+    {
+      "question_id": "Q04_002",
+      "question_type": "short_answer",
+      "stem": "任务/进程的生命周期状态机有哪些状态与流转点？（Ready/Running/Blocked/Exited 等；需状态枚举/字段证据）"
+    },
+    {
+      "question_id": "Q04_003",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在上下文切换 (Context Switch) 实现（switch.S/__switch/swtch/context_switch）？（必须三态）"
+    },
+    {
+      "question_id": "Q04_004",
+      "question_type": "short_answer",
+      "stem": "上下文切换保存/恢复了哪些寄存器集合？（例如 RISC-V s0-s11；必须引用汇编/结构体证据）"
+    },
+    {
+      "question_id": "Q04_005",
+      "question_type": "short_answer",
+      "stem": "调度算法 (Scheduling Algorithm) 属于哪类？\n请按格式作答：\n- 算法名称: ___（必须是以下之一：FCFS / Round-Robin (RR) / Stride/Proportional-Share / MLFQ / CFS / Priority / 其他）\n- 代码证据（关键字段/函数）: ___\n  - RR: timeslice/slice 字段位置=___\n  - Stride: stride 字段与比较逻辑位置=___\n  - MLFQ: 多级队列 VecDeque/数组层级证据=___\n  - Priority: priority 字段参与 pick_next 排序证据=___"
+    },
+    {
+      "question_id": "Q04_006",
+      "question_type": "short_answer",
+      "stem": "调度器 (Scheduler)核心入口/关键函数有哪些？（schedule/pick_next 等；给 1-3 个入口与证据）"
+    },
+    {
+      "question_id": "Q04_007",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 fork/clone（创建新执行实体）？（必须三态）"
+    },
+    {
+      "question_id": "Q04_008",
+      "question_type": "short_answer",
+      "stem": "fork/clone 是否复制地址空间与文件表？（必须给复制路径证据；若 stub 需说明形态）"
+    },
+    {
+      "question_id": "Q04_009",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 exec（装载 ELF/重建地址空间）？（必须三态）"
+    },
+    {
+      "question_id": "Q04_010",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 wait/waitpid（父子回收同步）？（必须三态）"
+    },
+    {
+      "question_id": "Q04_011",
+      "question_type": "single_choice",
+      "stem": "waitpid / wait4 的阻塞实现 (Blocking Implementation) 更接近哪种？",
+      "choices": [
+        "真正阻塞：移出就绪队列 + WaitQueue/条件变量唤醒 (Wait Queue or Condition Variable)",
+        "真正阻塞：使用 channel/future/async 等异步机制",
+        "忙等/轮询（yield 循环检查，Busy-Polling）",
+        "未发现/不支持"
+      ]
+    },
+    {
+      "question_id": "Q04_012",
+      "question_type": "short_answer",
+      "stem": "PID 分配器实现是什么？（自增/bitmap/空闲栈复用/只分配不回收；必须给证据）"
+    },
+    {
+      "question_id": "Q04_013",
+      "question_type": "short_answer",
+      "stem": "父子进程树如何存储？（children Vec/链表/parent+sibling 指针；必须给结构体字段证据）"
+    },
+    {
+      "question_id": "Q04_014",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现信号 (signal) 或 futex？（若二者都无则 not_found；若只实现其一需说明并给证据）"
+    },
+    {
+      "question_id": "Q04_015",
+      "question_type": "short_answer",
+      "stem": "与 09 多核的交叉一致性：是否存在每核队列/任务迁移/IPI resched？（需与第 9 章互指证据或写不适用）"
+    },
+    {
+      "question_id": "Q04_016",
+      "question_type": "short_answer",
+      "stem": "exit() 资源回收路径：调用链是什么？是否真正回收地址空间/文件表/通知父进程？（必须给调用链证据；桩则说明）"
+    },
+    {
+      "question_id": "Q04_017",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现进程组/会话（Process Group / Session，pgid/session/set_sid/setpgid）？（必须三态；有则区分真实检查链 vs 仅占位字段）"
+    },
+    {
+      "question_id": "Q04_018",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 POSIX 资源限制（rlimit/RLIMIT/getrlimit/setrlimit）？（必须三态；若 implemented 需说明支持的资源类型数量及软/硬限制机制）"
+    },
+    {
+      "question_id": "Q04_019",
+      "question_type": "single_choice",
+      "stem": "该 OS 是否区分了 TCB（线程控制块）与 PCB（进程控制块）？",
+      "choices": [
+        "区分 TCB 与 PCB（不同结构体，独立字段）",
+        "仅有统一 Task 结构（无区分）",
+        "未发现/待核实"
+      ]
+    },
+    {
+      "question_id": "Q04_020",
+      "question_type": "tri_state_impl",
+      "stem": "调度切换路径上是否存在页表切换（w_satp/sfence.vma/写 CR3/TTBR 等）？（必须三态；给调用点 路径 证据）"
+    },
+    {
+      "question_id": "Q04_021",
+      "question_type": "single_choice",
+      "stem": "用户线程与内核线程的映射模型 (User-Level Thread to Kernel-Level Thread Mapping) 更接近哪种？（Stallings Ch4）",
+      "choices": [
+        "1:1（每个用户线程对应一个内核线程，如 Linux pthread）",
+        "N:1（多个用户线程复用一个内核线程，用户态调度）",
+        "M:N（混合映射，M 用户线程映射到 N 内核线程）",
+        "仅内核线程（无独立用户线程库）",
+        "无线程（仅进程/Task 不可再分）"
+      ]
+    },
+    {
+      "question_id": "Q04_022",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现线程局部存储 (Thread-Local Storage, TLS)？（必须三态；搜索 thread_local|TLS|__thread|#[thread_local]；若 implemented 需说明 TLS 的访问方式：tp 寄存器/段寄存器/其他）"
+    },
+    {
+      "question_id": "Q04_023",
+      "question_type": "multi_choice",
+      "stem": "调度器是否追踪/优化以下哪些性能指标 (Scheduling Criteria, Stallings Ch9)？（多选；未发现则留空并在 notes 写 not_found）",
+      "choices": [
+        "CPU 利用率 (CPU Utilization)",
+        "吞吐量 (Throughput)",
+        "周转时间 (Turnaround Time)",
+        "等待时间 (Waiting Time)",
+        "响应时间 (Response Time)",
+        "未发现调度性能统计"
+      ]
+    },
+    {
+      "question_id": "Q04_024",
+      "question_type": "tri_state_impl",
+      "stem": "优先级调度是否实现老化 (Aging, Stallings Ch9) 以防止低优先级进程饥饿 (Starvation)？（必须三态；搜索 age/aging/boost_priority 或等价；若 not_found 需说明是否存在饥饿风险）"
+    },
+    {
+      "question_id": "Q04_025",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现公平份额调度 (Fair-Share Scheduling, Stallings Ch9) 或 CPU 配额 (CPU Quota/cgroup)？（必须三态；搜索 fair_share/cgroup/cpu_quota/weight 等）"
+    },
+    {
+      "question_id": "Q04_026",
+      "question_type": "single_choice",
+      "stem": "调度器的抢占模式 (Preemption Mode, Stallings Ch9) 更接近哪种？",
+      "choices": [
+        "完全抢占 (Fully Preemptive)：时钟中断可随时抢占运行进程",
+        "非抢占 (Non-Preemptive / Run-to-completion)：进程主动让出才切换",
+        "部分抢占（内核路径不可抢占，用户路径可抢占）",
+        "未发现"
+      ]
+    },
+    {
+      "question_id": "Q04_027",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现最短作业优先调度 (Shortest Job First / SJF 或 SRTF, Stallings Ch9)？（必须三态；或等价的基于预测 burst 时间的调度）"
+    },
+    {
+      "question_id": "Q04_028",
+      "question_type": "single_choice",
+      "stem": "该 OS 的多核形态更接近哪种？",
+      "choices": [
+        "SMP（对称多处理）",
+        "ASMP（非对称多处理 Asymmetric Multiprocessing）",
+        "仅单核",
+        "未发现/待核实"
+      ]
+    },
+    {
+      "question_id": "Q04_029",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 Secondary CPU / AP 启动链（BSP 唤醒 AP，上线后进入 idle/调度）？（必须三态）"
+    },
+    {
+      "question_id": "Q04_030",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 IPI（核间中断）发送与处理？（必须三态）"
+    },
+    {
+      "question_id": "Q04_031",
+      "question_type": "short_answer",
+      "stem": "若存在 IPI：发送与处理路径分别在哪些函数/文件？（给关键入口与证据）"
+    },
+    {
+      "question_id": "Q04_032",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 per-CPU 变量/结构（PerCpu、CPU-local storage 等）？（必须三态）"
+    },
+    {
+      "question_id": "Q04_033",
+      "question_type": "short_answer",
+      "stem": "per-CPU 的实现方式是什么？（例如 TLS/tp 寄存器/gsbase/数组索引 hartid；需证据）"
+    },
+    {
+      "question_id": "Q04_034",
+      "question_type": "tri_state_impl",
+      "stem": "调度是否存在跨核负载均衡/迁移/亲和性？（必须三态）"
+    },
+    {
+      "question_id": "Q04_035",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 TLB shootdown（跨核页表一致性刷新）？（必须三态；需与 03 互指）"
+    },
+    {
+      "question_id": "Q04_036",
+      "question_type": "short_answer",
+      "stem": "与 03/04/05/08 章的交叉一致性 (Cross-Chapter Consistency)，按以下四项分别作答（每项须给证据路径或写「单核不适用」）：\n- 03 TLB: 多核页表修改后 TLB 刷新策略=___\n- 04 调度: 每核运行队列/负载均衡/IPI resched=___\n- 05 Trap: per-CPU trap 栈/时钟中断初始化与 AP 上线顺序=___\n- 08 锁: SpinLock 关中断行为在多核下是否安全=___"
+    },
+    {
+      "question_id": "Q04_037",
+      "question_type": "single_choice",
+      "stem": "SpinLock 在获取锁时是否禁用中断（关中断保护临界区）？",
+      "choices": [
+        "是，获取时关中断、释放时恢复",
+        "否，纯自旋不关中断",
+        "未发现/待核实"
+      ]
+    },
+    {
+      "question_id": "Q04_038",
+      "question_type": "short_answer",
+      "stem": "NCPU/MAXCPU（或等价宏）与链接脚本中的每 hart 栈/入口布局是否对应？（搜索 _max_hart_id 等；给宏定义与链接脚本对应证据，或写未发现）"
+    },
+    {
+      "question_id": "Q04_039",
+      "question_type": "tri_state_impl",
+      "stem": "是否使用 AtomicUsize/原子变量分配 PID/TID（全局唯一 ID 池）？（必须三态；给实现证据）"
+    },
+    {
+      "question_id": "Q04_040",
+      "question_type": "tri_state_impl",
+      "stem": "是否支持实时调度 (Real-Time Scheduling, Stallings Ch10)？（必须三态；搜索 SCHED_FIFO / SCHED_RR / realtime / RT priority / deadline 等）"
+    },
+    {
+      "question_id": "Q04_041",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 NUMA (Non-Uniform Memory Access) 感知的内存分配或调度策略？（必须三态；搜索 numa / node_id / local_memory 等；嵌入式单 SoC 可写 not_found 并说明架构）"
+    }
+  ],
+  "stage_constraints_md": "### 原 04 进程/调度\n\n**本阶段须额外覆盖**：\n- `pick_next_task`/`schedule` 是否**真**使用优先级/时间片/stride 或仅为 FIFO（给证据）；与地址空间/信号模块的**硬耦合点**（路径）。\n- 进程组/会话/rlimit 等扩展：是**实检查**还是仅占位字段。\n- **章节交叉引用（与 09 多核）**：若存在 **每核运行队列**、**负载均衡**、**IPI 触发 resched**、任务迁移，须与 **第 9 章** 的 SMP 证据链互指（路径一致）；若 09 判定单核，本章对「多核调度/迁移」一句写明不适用即可，避免与 09 矛盾。\n\n必须回答：\n- 执行实体：Process/Thread/Task 结构体包含哪些字段（Context, State, TrapFrame）？**禁止**仅凭存在 `fork`/`exec` 等标准接口名就推断「已完整实现」；须用 `read_code_segment` 对照**数据结构体与资源复制路径**。\n- **任务模型扩展**：使用 grep_in_repo 搜索 `Process|ProcessGroup|Session|process`，检查是否存在进程组、会话管理以及 PID/TID 分配机制。\n- 调度策略：算法是什么（FIFO, RR, Priority, Stride, CFS）？Scheduler 实现细节。\n- 状态流转：Ready/Running/Blocked/Exited 状态机。\n- **上下文切换（Context Switch）**：`grep_in_repo` 搜索 `switch.S|context_switch|__switch|swtch`；用 `read_code_segment` 判定保存的寄存器集合是**完整被调用者保存寄存器**（如 RISC-V `s0-s11` 等）还是**裁剪/仅保存子集**；结论须附 `路径:行号`。\n- **PID 分配与回收**：搜索 `PidAllocator|pid_alloc|alloc_pid|next_pid|free_pid|release_pid`；判定 PID 是**单调自增**、**bitmap 复用**、**空闲栈/队列**复用，还是**只分配不回收**（常见比赛半成品）；须附证据片段。\n- **父子进程树（Process Tree）**：在 `TaskControlBlock`/`Process`/`TaskInner`（或本仓等价）中判定子进程/线程的挂载方式：例如 `Vec<Arc<...>>`、`LinkedList`、显式 `parent`/`children`/`sibling` 指针等；说明遍历与删除复杂度相关实现点 `路径:行号`。\n- **调度算法 (Scheduling Algorithm)鉴定（防“看着像 RR”）**：搜索 `pick_next|scheduler|schedule`；**强制**写出本仓实际算法名（Round-Robin / Stride / MLFQ / FIFO 等）并给出**代码级证明**（如存在 `stride` 字段与比较、`VecDeque` 多级队列、`timeslice`/`slice` 递减、`priority` 参与排序等）；禁止无代码仅凭命名猜测。\n- **阻塞与唤醒（Sleep/Wakeup）**：追踪 `waitpid|sys_waitpid|wait4`（或等价）；判定是 **yield/轮询忙等**、还是 **从就绪队列移出并进入等待队列**（`WaitQueue`/`sleep`/`block_on` 等）；附 `路径:行号`。\n- **高级特性验证**（必须分类为 `✅ 已实现`、`🔸 桩函数`、`❌ 未实现`，并寻找具体代码）：\n    - **信号机制 (Signal)**：使用 grep_in_repo 搜索 `signal|sigaction|kill`，确认是否实现了信号注册与分发？\n    - **Futex**：搜索 `futex|wait_queue`，是否支持快速用户态互斥锁？\n- **深度调用链追踪（必须）**：\n    - `fork()`: 追踪从系统调用到 `clone_task` / `copy_task` 的完整流程。**必须验证**是否真的复制了地址空间（`memory_set.copy()`）和文件表？\n    - `exec()`: 如何加载 ELF？如何重建地址空间？\n    - `schedule()`: 调度器 (Scheduler)被谁调用？**验证优先级**：`pick_next_task` 是否真的使用了 `priority` / `stride`，还是仅仅 FIFO？\n    - `exit()`: 资源回收流程，父进程通知。\n- 进程与线程的区别：代码中是否区分了 TCB 和 PCB？还是只有 Task？\n- **层次结构 ID 规则**：搜索 `pgid|session_id|set_sid|setpgid`，分析 PGID（进程组 ID = 组长 PID）和 SID（会话 ID = 会话组长 PGID）的分配规则。\n- **POSIX 资源限制**（必须分类为 `✅ 已实现`、`🔸 桩函数`、`❌ 未实现`）：搜索 `rlimit|RLIMIT|getrlimit|setrlimit|resource_limit`，检查是否实现了资源限制。如果找到，列出支持的资源类型数量（POSIX 定义了 16 种）及软/硬限制双机制。\n- **时间片 / `proc_tick`（或本仓等价）**：阅读实现中的 **if/条件分支** 再叙述「是否时间片轮转/RR」；禁止凭术语臆断，须 `路径:行号`。\n- **调度与地址空间耦合**：若在调度或返回用户路径中存在 `w_satp`/`sfence.vma`/切换页表，须显式标出调用点 `路径:行号` 及触发条件。\n\n要求：\n- **语义发现（🥇 首选）**：使用 `rag_search_code` 搜索 \"task structure\", \"scheduler algorithm\", \"context switch\", \"fork implementation\", \"PidAllocator\", \"waitpid\", \"switch.S\" 快速锁定进程管理模块。\n- 使用 `lsp_get_definition` 定位 `Task`/`Process`/`TaskInner` 结构体定义，精确列出其字段（不要猜）。\n- 使用 `lsp_get_references` 追踪 `fork`/`exec`/`schedule`/`exit` 的完整跨文件调用链。\n- 使用 `lsp_get_document_outline` 快速查看调度器 (Scheduler)文件中的所有函数，找到 `pick_next_task`、`schedule` 等关键入口。\n- **【必须】使用 `lsp_get_call_graph` 生成核心进程操作的调用树**：\n  - `lsp_get_call_graph(repo_path, file_of_sys_fork, \"sys_fork\", direction=\"outgoing\", max_depth=4)` — fork 从 syscall 到内存复制的完整下行链\n  - `lsp_get_call_graph(repo_path, file_of_schedule, \"schedule\", direction=\"both\", max_depth=3)` — 谁触发调度？调度器 (Scheduler)下一步调什么？\n  - 如返回 `[⚠️ DEGRADED MODE]`，标注\"DEGRADED — 基于 Grep 静态分析\"并继续使用结果。\n- 进程与调度实现常分散在多目录，请用 `find_os_core_modules` 与 `grep_in_repo` 扫全仓。\n- 查找 context_switch 汇编代码。\n\n**【评测与交付适配 — 本阶段启发式】**（须源码证据；无则略）：\n- **脚本驱动测例**依赖可靠的 **`fork`/`execve`/`wait`、文件描述符继承、当前工作目录**：若存在自测主控或 README 描述串行跑 shell 脚本，须指出本仓这些路径上与「仅交互 shell」的差异及证据 `路径:行号`。\n- 与 **Harness 输出契约**无直接代码关联时不要臆测赛题；仅在有 `grep` 命中测试调度相关符号或 README 明确描述时写一小段。\n\n### 原 09 多核\n\n**本阶段须额外覆盖**：\n- **SMP 真伪**：要么给出 AP 在线全链证据（谁唤醒、何处进 idle）；要么明确单核结论，并说明「未找到 AP 启动链」或有关 API 未编译/未调用等依据——勿仅凭宏断言多核。\n\n必须回答：\n- **核心任务：一定要极其仔细地在源码中寻找有没有真正实现多核！** 架构设计是 SMP 还是 AMP？**绝不能仅凭看到一两个宏定义就断言支持多核，必须找到唤醒其他核的切实验证。如果不支持多核，务必明确写“仅支持单核（❌ 未实现）”**。\n- Secondary CPU 启动等主要功能机制：**必须清晰、详尽地描述其详细的底层工作机制**。具体描述 BSP（主核）是如何通过 IPI 或中断控制器发送信号唤醒 AP（从核）的链条，精确到对应文件的代码逻辑。搜索 `smp_boot`, `__cpu_up`。如果找不到启动其他核的代码，那就是单核。\n- 核间中断 (IPI)：搜索 `send_ipi`, `ipi_handler`。\n- **锁的实现**：SpinLock 是否禁用了中断？Mutex 是否支持优先级继承？\n- Per-CPU 变量设计与访问方式。搜索 `axns` 模块，分析 PerCPU 命名空间实现。\n- 多核调度策略：负载均衡、CPU 亲和性（affinity）。\n- 自旋锁/RCU 在多核下的实现差异。\n- **`NCPU` / `MAXCPU` 与链接脚本**：将 `NCPU`（或本仓等价宏）与 `link-k210.ld`/`kernel.ld` 等中的 `_max_hart_id`、每 hart 栈/入口布局**对照引用**（须 `路径:行号`），避免仅口述宏而未对照链接脚本。\n- **交叉引用前面章节（必须）**：本章与前面章节有大量交叉，必须引用并深化（各条均须落到**具体路径:行号**或明确「前文未涉及故本章首次给出」）：\n    - **03 内存管理**：Buddy/Slab/帧分配与 **页表 map/unmap** 上的**锁粒度**；**TLB shootdown** 或与 `sfence`/`tlbi`/`invlpg`、**IPI** 联动的远程刷新路径。若本章发现多核下 TLB 刷新而 03 未写清，须在本章**显式补齐**并说明与 03 的关系（补充证据而非口头否定前文）。\n    - **04 进程/调度**：全局/每核运行队列、迁移（migration）、在 IPI 或 **resched** 路径上与调度的耦合。\n    - **05 中断与系统调用**：每核时钟/计时器中断、**per-CPU trap 栈** 或 trampoline 与次级核上线的先后顺序。\n    - **08 同步与 IPC**：自旋锁 vs 阻塞锁在多核下的行为；`WaitQueue` 唤醒是否可能跨核竞争。\n    - 进程调度中的全局唯一 ID 池（搜索 `AtomicUsize` 用于 PID/TID 分配）\n    - 双级注册机制（线程注册到 Process + 全局管理器）\n    - 同步互斥中的 Futex 实现（在多核场景下的行为）\n    - 原子操作（`core::sync::atomic`）在多核下的内存序保证\n\n要求：\n- **语义发现（🥇 首选）**：使用 `rag_search_code` 搜索 \"SMP boot\", \"IPI send\", \"Per-CPU variables\", \"multicore scheduler\" 锁定多核支持代码。\n- 使用 `lsp_get_definition` 定位 `PerCpu` 结构和 `smp_boot`/`__cpu_up` 的定义。\n- **【必须】使用 `lsp_get_call_graph` 追踪 Secondary CPU 启动链**：\n  - `lsp_get_call_graph(repo_path, file_of_start_secondary, \"start_secondary\", direction=\"outgoing\", max_depth=4)` — 从 secondary 入口到初始化完成\n  - 如返回 `[⚠️ DEGRADED MODE]`，标注后继续使用 Grep 结果。\n- 使用 `lsp_get_references` 追踪 IPI 分发路径（单层引用）。\n- 辅以 grep_in_repo 搜索 smp/、cpu/、percpu 相关模块。\n- 分析多核安全的数据结构设计。\n\n**【评测与交付适配 — 本阶段启发式】**（须源码证据；无则略）：\n- 若 README/`Makefile`/脚本中出现 **`-smp`>1** 或 `SMP=1` 等，须把 **AP 启动链、IPI、每核计时器/调度** 与「评测串行跑测例但仍多核在线」的稳定性风险写清；无多核证据则维持单核结论。\n- 禁止仅凭宏名断言「能跑多核评测」。"
+}

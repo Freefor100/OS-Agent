@@ -1,0 +1,115 @@
+{
+  "stage_id": "08_sync_ipc",
+  "goal": "分析该内核的同步互斥与IPC机制，覆盖锁原语、sleep/wakeup、pipe、futex、signal等核心组件，为Q08题单提供代码证据。",
+  "must_cover": [
+    "[Q08_001] 同步原语：SpinLock（已实现）、SleepLock（已实现），无Mutex/Condvar/Semaphore/RwLock",
+    "[Q08_003] WaitQueue实现：waitq_pool[100] + findwaitq/allocwaitq/delwaitq，sleep/wakeup三态完备",
+    "[Q08_004] sleep/wakeup不变量：sleep入口proc.c:542，持p->lock防丢wakeup，wakeup入口proc.c:580",
+    "[Q08_005] Pipe已实现：环形缓冲PIPESIZE=512，阻塞语义（满写阻塞/空读阻塞）",
+    "[Q08_008] SysV IPC未实现：无msgget/semget/shmget系统调用",
+    "[Q08_009] Futex声明但未完全实现：有do_futex声明和FUTEX_*宏，但缺sys_futex和具体实现",
+    "[Q08_010] Signal已实现：sigaction/kill/sigreturn/trampoline，有sig_trampoline.S",
+    "[Q08_012] RwLock未实现",
+    "[Q08_013] 原子操作：__sync_lock_test_and_set / __sync_synchronize / __sync_lock_release",
+    "[Q08_017] Condvar/Monitor未实现",
+    "[Q08_019] 消息传递：仅pipe，无mailbox/POSIX mq",
+    "[Q08_020] Barrier：仅sifive/barrier.h中的多核启动屏障，非用户态屏障",
+    "[Q08_001] 该内核提供了哪些同步原语？（SpinLock/Mutex/RwLock/Semaphore/Condvar/WaitQueue 等；列出类型定义证据）",
+    "[Q08_002] Mutex 更接近哪种实现？",
+    "[Q08_003] 是否存在等待队列 (Wait Queue, WaitQueue) 与 sleep/wakeup（或等价阻塞/唤醒）实现？（必须三态）",
+    "[Q08_004] sleep / wakeup 不变量 (Sleep-Wakeup Invariant) 分析，按格式填写：",
+    "sleep 入口函数: ___（路径）",
+    "入睡前持有的锁: ___（无则写 none）",
+    "防丢 wakeup (Lost Wakeup Prevention) 机制: ___（如：持队列锁检查条件 / 无防护）",
+    "wakeup 函数: ___（路径）",
+    "唤醒与锁释放顺序: ___（先唤醒后释放 / 先释放后唤醒 / 其他）",
+    "[Q08_005] 是否实现管道 (Pipe)？（必须三态）"
+  ],
+  "evidence_targets": [
+    "SpinLock实现 (src/spinlock.c)",
+    "SleepLock实现 (src/sleeplock.c)",
+    "WaitQueue机制 (src/proc.c:540-592)",
+    "Pipe环形缓冲 (src/pipe.c, src/include/pipe.h)",
+    "Signal处理 (src/signal.c, src/syssig.c, src/include/signal.h)",
+    "Futex声明 (src/include/proc.h:18-50, do_futex声明)",
+    "Barrier实现 (src/sifive/barrier.h)",
+    "锁与同步原语",
+    "IPC",
+    "Futex",
+    "管道/信号"
+  ],
+  "seed_paths": [
+    "src/spinlock.c",
+    "src/sleeplock.c",
+    "src/proc.c",
+    "src/pipe.c",
+    "src/signal.c",
+    "src/syssig.c",
+    "src/include/pipe.h",
+    "src/include/signal.h",
+    "src/include/proc.h",
+    "src/include/spinlock.h",
+    "src/include/sleeplock.h",
+    "src/sifive/barrier.h",
+    "sync",
+    "lock"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "acquire",
+    "release",
+    "acquiresleep",
+    "releasesleep",
+    "sleep",
+    "wakeup",
+    "piperead",
+    "pipewrite",
+    "set_sigaction",
+    "sigreturn",
+    "Mutex",
+    "SpinLock"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "bin",
+    "doc",
+    "linker",
+    "sbi",
+    "sd",
+    "src",
+    "src/include",
+    "src/sifive",
+    "syscall"
+  ],
+  "preferred_tools": [
+    "read_code_segment",
+    "lsp_get_call_graph",
+    "lsp_get_definition",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "1. 读取src/spinlock.c和src/sleeplock.c，确认SpinLock和SleepLock的完整实现细节（acquire/release/acquiresleep/releasesleep）",
+    "2. 读取src/proc.c:540-592，分析sleep/wakeup的调用链和防丢wakeup机制（持p->lock）",
+    "3. 读取src/pipe.c和src/include/pipe.h，确认环形缓冲大小(PIPESIZE=512)和阻塞语义（piperead/pipewrite中的sleep/wakeup调用）",
+    "4. 读取src/signal.c和src/syssig.c，确认sigaction/kill/sigreturn的实现，查找sig_trampoline.S证据",
+    "5. 在src/include/proc.h和src/中搜索sys_futex或futex系统调用实现，确认Futex是否真实实现",
+    "6. 搜索msgget/semget/shmget等SysV IPC系统调用，确认未实现",
+    "7. 读取src/sifive/barrier.h，确认Barrier仅用于多核启动而非用户态同步",
+    "8. 汇总证据，按Q08题单格式作答，标注各同步原语的实现状态（implemented/not_found）"
+  ]
+}
