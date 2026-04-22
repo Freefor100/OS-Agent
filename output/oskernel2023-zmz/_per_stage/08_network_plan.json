@@ -1,0 +1,110 @@
+{
+  "stage_id": "08_network",
+  "goal": "确认网络子系统实现状态：经全面搜索，未发现任何网络协议栈（smoltcp/lwip）、socket 系统调用、网卡驱动（virtio-net/e1000）或数据包收发路径代码。",
+  "must_cover": [
+    "[Q08_001] 不存在网络子系统实现（❌ 未实现）",
+    "[Q08_002] 协议栈来源：D. 未发现",
+    "[Q08_003] 未实现 socket 系统调用接口（❌ 未实现）",
+    "[Q08_004] 无发送路径可追踪（无网络实现）",
+    "[Q08_005] 未实现网卡驱动与收包中断路径（❌ 未实现）",
+    "[Q08_006] 协议支持：无（not_found）",
+    "[Q08_007] 零拷贝：❌ 未实现（仅有磁盘 DMA，无网络 DMA）",
+    "功能限制声明：项目仅支持磁盘 I/O（virtio-blk）和串口通信，无网络功能",
+    "virtio 驱动仅支持磁盘（DEVICE_ID=2），不支持网络（DEVICE_ID=1）",
+    "[Q08_001] 是否存在网络子系统实现（协议栈或 socket 层）？（必须三态）",
+    "[Q08_002] 协议栈来源更接近哪种？",
+    "[Q08_003] 是否实现 socket 系统调用接口（socket/bind/connect/sendto/recvfrom 等）？（必须三态）",
+    "[Q08_004] 选择一个发送路径（优先 sys_sendto），追踪：syscall → 协议栈 → 网卡驱动。列 3-6 个关键节点并给证据。",
+    "[Q08_005] 是否实现网卡驱动（virtio-net/e1000 等）与收包中断路径？（必须三态）",
+    "[Q08_006] 协议支持情况（多选；未发现则留空并在 notes 写 not_found）：",
+    "[Q08_007] 是否存在零拷贝/共享缓冲/DMA 描述符等路径（zero-copy）？（必须三态；仅有名词不算 implemented）",
+    "若仅回环/仅 QEMU：写明**限制**；若多网卡：列**各自入口文件**与 feature 开关。",
+    "若无网络实现：单列一节说明依据即可。",
+    "网络协议栈架构：自实现还是使用 `smoltcp`/`lwip` 等库？（**检查 Cargo.toml 依赖**）**如果完全没有网络支持，明确写“未实现网络功能（❌ 未实现）”**。",
+    "Socket 接口实现：是否有 `socket`/`bind`/`connect` 等 syscall？还是仅有 Loopback？",
+    "**功能限制声明（必须）**：分析项目是否已在真实物理网卡上测试过网络功能。如果仅在 QEMU 环境测试或仅支持本地回环通信，必须明确写出该限制。搜索 `loopback|LOOPBACK|127.0.0.1` 确认是否仅有回环设备。",
+    "**网卡驱动细节**："
+  ],
+  "evidence_targets": [
+    "sysnum.h 无 socket/bind/connect/sendto/recvfrom 系统调用号",
+    "syscall.c 无网络相关 syscall 处理函数",
+    "virtio.h 仅定义磁盘相关结构（virtio_blk_req），无网络队列定义",
+    "virtio_disk.c 仅实现磁盘驱动，无网络收发包逻辑",
+    "poll.c 仅支持文件/管道轮询，无 socket 轮询",
+    "include/hal/ 目录无网卡驱动头文件",
+    "kernel/hal/ 目录无网卡驱动实现",
+    "Cargo.toml 无 smoltcp/lwip 等网络库依赖",
+    "协议栈",
+    "socket API",
+    "poll/epoll",
+    "驱动接入"
+  ],
+  "seed_paths": [
+    "include/hal/virtio.h",
+    "kernel/hal/virtio_disk.c",
+    "include/sysnum.h",
+    "kernel/syscall/syscall.c",
+    "include/fs/poll.h",
+    "kernel/fs/poll.c",
+    "Cargo.toml",
+    "Makefile",
+    "net",
+    "tcp",
+    "udp",
+    "socket",
+    "lwip",
+    "smoltcp"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "sys_socket",
+    "tcp",
+    "udp",
+    "poll",
+    "epoll",
+    "_start",
+    "start"
+  ],
+  "repo_hotspots": [
+    "Cargo.toml",
+    "Makefile",
+    "debug",
+    "debug/kendryte_openocd",
+    "debug/openocd_cfg",
+    "doc",
+    "doc/img",
+    "include",
+    "include/fs",
+    "include/hal"
+  ],
+  "preferred_tools": [
+    "grep_in_repo",
+    "read_code_segment",
+    "list_repo_structure"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "确认 sysnum.h 中无 SYS_socket/SYS_bind/SYS_connect 等网络系统调用号定义",
+    "确认 syscall.c 中无网络 syscall 处理函数注册",
+    "确认 virtio_disk.c 仅处理 VIRTIO_BLK_T_IN/OUT 磁盘请求，无网络包处理",
+    "确认 include/hal/ 和 kernel/hal/ 目录下无 virtio_net.c 或 e1000.c 等网卡驱动",
+    "检查 Cargo.toml 确认无 smoltcp/lwip/embassy-net 等网络协议栈依赖",
+    "搜索 loopback/127.0.0.1 确认无回环网络实现",
+    "确认 poll.c 仅支持文件描述符轮询，无 socket 事件处理",
+    "汇总证据，明确标注'未实现网络功能（❌ 未实现）'并完成各小题作答"
+  ]
+}

@@ -1,0 +1,53 @@
+{
+  "schema_version": "describe_review_v1",
+  "stage_id": "08_network",
+  "stage_title": "网络子系统与协议栈",
+  "confidence": 1.0,
+  "question_reviews": [
+    {
+      "question_id": "Q08_001",
+      "confidence": 1.0,
+      "review": "题面要求三态判断，value 为 not_found。证据列举了 sysnum.h 无网络调用号、syscall.c 无处理函数、virtio.h 无网络初始化，证据充分支撑结论，题答一致。"
+    },
+    {
+      "question_id": "Q08_002",
+      "confidence": 1.0,
+      "review": "题面为单选，选项含「D. 未发现」。value 为「未发现」，匹配选项。证据显示 Cargo.toml 无协议栈依赖且 hal 目录无网卡驱动，支撑该选择，符合契约。"
+    },
+    {
+      "question_id": "Q08_003",
+      "confidence": 1.0,
+      "review": "题面要求三态判断 socket 系统调用，value 为 not_found。证据通过 grep 和扫描 syscall 表确认无相关定义与处理函数，证据与结论一致，格式合规。"
+    },
+    {
+      "question_id": "Q08_004",
+      "confidence": 1.0,
+      "review": "题面要求追踪发送路径，value 说明因未实现网络功能无法追踪，并列出缺失证据（无调用号、无驱动等）。在实现不存在的前提下，该回答逻辑自洽且证据支撑「无法追踪」的结论。"
+    },
+    {
+      "question_id": "Q08_005",
+      "confidence": 1.0,
+      "review": "题面要求三态判断网卡驱动与中断，value 为 not_found。证据扫描 kernel/hal 和 include/hal 目录确认无网卡驱动文件，且 virtio.h 仅初始化磁盘，证据支撑结论，一致。"
+    },
+    {
+      "question_id": "Q08_006",
+      "confidence": 1.0,
+      "review": "题面为多选，要求未发现则留空并在 notes 写 not_found。value 为空数组，notes 包含 not_found 说明。证据显示全仓库搜索协议栈关键词 0 命中，符合契约与题面要求。"
+    },
+    {
+      "question_id": "Q08_007",
+      "confidence": 1.0,
+      "review": "题面要求三态判断零拷贝路径，value 为 not_found。证据指出 DMA 描述符仅用于磁盘 I/O 而非网络，无网络 mbuf 机制，证据支撑「网络零拷贝未实现」的结论，一致。"
+    }
+  ],
+  "dimensions": {
+    "evidence_supports_answers": 1.0,
+    "question_answer_consistency": 1.0,
+    "requirements_fit": 1.0
+  },
+  "findings": [],
+  "summary_zh": "所有 7 道题目均已完成作答。答案 value 与证据 excerpts 高度一致，均指向该项目当前未实现网络子系统、协议栈、网卡驱动及相关系统调用。Q08_006 严格遵守了未发现时留空并备注 not_found 的契约要求。所有题面约束（三态、单选、多选、简答）均被正确响应，无格式错误或逻辑矛盾。",
+  "_meta": {
+    "review_model": "qwen3.5-plus"
+  }
+}

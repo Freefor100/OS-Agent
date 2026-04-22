@@ -1,0 +1,118 @@
+{
+  "schema_version": "describe_review_v1",
+  "stage_id": "06_sync_ipc",
+  "stage_title": "同步互斥与进程间通信",
+  "confidence": 1.0,
+  "question_reviews": [
+    {
+      "question_id": "Q06_001",
+      "confidence": 1.0,
+      "review": "题面要求列出同步原语及类型定义证据。回答涵盖 SpinLock/SleepLock/WaitQueue 并给出结构体 excerpt 证据，未实现项明确说明，符合题面约束。"
+    },
+    {
+      "question_id": "Q06_002",
+      "confidence": 1.0,
+      "review": "单选题，选择阻塞锁（Choice B）。证据展示 acquiresleep 中调用 sleep() 挂起，支撑结论，题答一致。"
+    },
+    {
+      "question_id": "Q06_003",
+      "confidence": 1.0,
+      "review": "三态题，value 为 implemented。证据提供 wait_queue 结构体及 sleep/wakeup 函数实现，支撑充分。"
+    },
+    {
+      "question_id": "Q06_004",
+      "confidence": 1.0,
+      "review": "填空题，五项不变量分析均填写。证据对应 sleep/wakeup 代码逻辑及 pipe 调用场景，题答一致。"
+    },
+    {
+      "question_id": "Q06_005",
+      "confidence": 1.0,
+      "review": "三态题，value 为 implemented。证据提供 pipe 结构体、分配函数及 syscall 入口，支撑充分。"
+    },
+    {
+      "question_id": "Q06_006",
+      "confidence": 1.0,
+      "review": "单选题，选择字节环形缓冲区（Choice A）。证据展示 PIPESIZE 宏及模运算索引，支撑结论。"
+    },
+    {
+      "question_id": "Q06_007",
+      "confidence": 1.0,
+      "review": "单选题，选择阻塞（Choice A）。证据展示 pipewritable/readable 中调用 sleep 挂起，支撑结论。"
+    },
+    {
+      "question_id": "Q06_008",
+      "confidence": 1.0,
+      "review": "三态题，value 为 not_found。证据展示 syscall 搜索无命中及目录扫描结果，支撑负面结论。"
+    },
+    {
+      "question_id": "Q06_009",
+      "confidence": 1.0,
+      "review": "三态题，value 为 not_found。证据展示 futex 相关标识符搜索无命中，支撑负面结论。"
+    },
+    {
+      "question_id": "Q06_010",
+      "confidence": 1.0,
+      "review": "三态题，value 为 implemented。证据提供 sigaction 结构、处理函数及 trampoline 汇编，支撑充分。"
+    },
+    {
+      "question_id": "Q06_011",
+      "confidence": 1.0,
+      "review": "简答题，要求描述上下文构建与 sigreturn 恢复。回答分步描述流程并给出对应函数证据，符合题面。"
+    },
+    {
+      "question_id": "Q06_012",
+      "confidence": 1.0,
+      "review": "单选题，选择未发现/不支持（Choice C）。证据展示目录扫描及 grep 无命中，支撑结论。"
+    },
+    {
+      "question_id": "Q06_013",
+      "confidence": 1.0,
+      "review": "单选题，选择自定义汇编（Choice B）。证据展示 GCC 原子内置函数生成 arch 指令，在 C 内核语境下符合选项定义。"
+    },
+    {
+      "question_id": "Q06_014",
+      "confidence": 1.0,
+      "review": "简答题，要求逐条分析 Coffman 四条件。回答覆盖四项并结合锁实现给出证据，符合题面。"
+    },
+    {
+      "question_id": "Q06_015",
+      "confidence": 1.0,
+      "review": "单选题，选择死锁预防（Choice A）。证据引用代码注释中的锁顺序意图，支撑预防策略结论。"
+    },
+    {
+      "question_id": "Q06_016",
+      "confidence": 1.0,
+      "review": "三态题，value 为 stub。证据展示仅有注释无代码规范，结论与证据一致（视为部分/存根状态）。"
+    },
+    {
+      "question_id": "Q06_017",
+      "confidence": 1.0,
+      "review": "三态题，value 为 not_found。证据展示 condvar/monitor 相关搜索无命中，支撑负面结论。"
+    },
+    {
+      "question_id": "Q06_018",
+      "confidence": 1.0,
+      "review": "简答题，要求验证三个经典同步问题。回答逐项说明未找到或 Pipe 隐含实现，证据对应，符合题面。"
+    },
+    {
+      "question_id": "Q06_019",
+      "confidence": 1.0,
+      "review": "三态题，value 为 not_found。证据展示消息传递相关 syscall 及目录扫描无命中，支撑结论。"
+    },
+    {
+      "question_id": "Q06_020",
+      "confidence": 1.0,
+      "review": "三态题，value 为 not_found。证据展示 barrier 相关搜索无命中，支撑负面结论。"
+    }
+  ],
+  "dimensions": {
+    "evidence_supports_answers": 1.0,
+    "question_answer_consistency": 1.0,
+    "requirements_fit": 1.0
+  },
+  "findings": [],
+  "summary_zh": "所有 20 道题目均已完成作答。题面约束（如三态、单选、填空、简答）均被满足。各题 value 与提供的 evidence  excerpts 逻辑一致，无证据缺失或矛盾。JSON 契约字段齐全。未发现题答不符或格式违规。",
+  "_meta": {
+    "review_model": "qwen3.5-plus"
+  }
+}

@@ -1,0 +1,103 @@
+{
+  "stage_id": "10_history",
+  "goal": "撰写「开发历史与里程碑」章节，基于 Git 提交历史、关键文件演进轨迹、README 文档声明，归纳 xv6-k210 在 2023-08-09 至 2023-08-21 期间的技术演进脉络与里程碑事件。",
+  "must_cover": [
+    "两位核心贡献者 (zrhxlhydjcx, ZEMINGMA) 的分工与贡献统计",
+    "初始提交 (b7ffeec) 的骨架搭建意义",
+    "exec.c 的多次重构与信号机制引入 (df1fdc3)",
+    "用户程序与测试框架的演进 (d17dd26)",
+    "README 中声明的功能进度清单与代码证据对照",
+    "当前缺口：网络子系统缺失、安全机制为 stub、部分实验性代码痕迹",
+    "若存在 `.git`：用本阶段已启用的 Git 工具概括主分支/标签/作者贡献方向；**禁止**编造未出现在工具输出中的 commit hash 或统计口径。",
+    "**模块演进**：可结合前文各章已出现的路径，用 `trace_file_evolution` 等追踪关键文件/目录的引入或大改，只写工具输出可支撑的判断。",
+    "**文档里程碑**：README、CHANGELOG、CI 配置等中与版本或阶段目标相关的陈述，区分「文档声称」与「代码可验证结论」。",
+    "**缺口**：若历史信息显示某能力被移除、长期标注实验/待办，如实记录。"
+  ],
+  "evidence_targets": [
+    "作者贡献统计 (Commits/增删行数/专注模块)",
+    "初始提交 b7ffeec 的核心文件清单",
+    "exec.c 在 df1fdc3 的信号机制重构证据",
+    "d17dd26 提交中用户程序加载与调试工具引入",
+    "README.md 中 Progress 清单的 12 项功能",
+    "Makefile 中平台切换 (k210/qemu) 与 SBI 集成历史",
+    "kernel/mesg/signal.c 移除与 kernel/sched/signal.c 迁移",
+    "当前未实现功能：网络、安全凭证、动态链接器",
+    "作者贡献",
+    "重大提交",
+    "模块演进",
+    "当前缺口",
+    "CI/产物名/自测相关演进(有工具证据时)"
+  ],
+  "seed_paths": [
+    "kernel/exec.c",
+    "kernel/sched/signal.c",
+    "kernel/main.c",
+    "include/sched/signal.h",
+    "README.md",
+    "Makefile",
+    "xv6-user/run_test.c",
+    "kernel/mm/usrmm.c",
+    "git",
+    "history",
+    "scripts",
+    ".github",
+    "include/fs",
+    "include/mm"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "_start",
+    "exec",
+    "sigaction",
+    "uvminit",
+    "load_elf_interp",
+    "main",
+    "git",
+    "start"
+  ],
+  "repo_hotspots": [
+    "Cargo.toml",
+    "Makefile",
+    "debug",
+    "debug/kendryte_openocd",
+    "debug/openocd_cfg",
+    "doc",
+    "doc/img",
+    "include",
+    "include/fs",
+    "include/hal"
+  ],
+  "preferred_tools": [
+    "get_git_history_summary",
+    "analyze_authors_contribution",
+    "trace_file_evolution",
+    "get_commit_diff_summary",
+    "read_code_segment",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 4000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "使用 get_git_history_summary 输出 48 次提交的精炼摘要，识别提交密度最高的模块 (kernel/exec.c, kernel/sched/proc.c)",
+    "调用 analyze_authors_contribution 获取两位作者的贡献图谱，记录各自专注的 Top-3 目录与增删行数",
+    "对 kernel/exec.c 执行 trace_file_evolution，追踪其从初始提交到最终版本的 12 次变更，识别 df1fdc3 信号重构与 d17dd26 用户程序加载两次关键演进",
+    "使用 get_commit_diff_summary 解析 b7ffeec (初始骨架)、df1fdc3 (信号机制)、d17dd26 (用户程序调试) 三次里程碑提交的核心变更",
+    "读取 README.md 的 Progress 清单 (12 项已实现功能)，与 kernel/ 目录下的实际实现文件 (如 kernel/trap/trap.c 对应中断、kernel/fs/ 对应文件系统) 进行证据对照",
+    "grep_in_repo 搜索 \"TODO\" \"FIXME\" \"stub\" 等关键词，识别当前缺口与未实现功能 (如网络、安全凭证)",
+    "检查 kernel/mesg/signal.c 的移除与 kernel/sched/signal.c 的引入历史，说明信号机制的代码组织重构",
+    "综合以上证据，撰写章节：按时间线归纳 3 个里程碑 (骨架搭建→信号/进程完善→用户程序调试)，列出 README 声明与代码证据对照表，记录当前缺口"
+  ]
+}

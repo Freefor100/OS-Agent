@@ -1,0 +1,223 @@
+{
+  "schema_version": "describe_review_v1",
+  "stage_id": "04_process_smp",
+  "stage_title": "进程/线程/调度与多核",
+  "confidence": 1.0,
+  "question_reviews": [
+    {
+      "question_id": "Q04_001",
+      "confidence": 1.0,
+      "review": "题面格式要求已落实，value 列出类型名、路径、字段及 PCB/TCB 区分情况，evidence 引用 struct proc 及 context 支撑结论，一致。"
+    },
+    {
+      "question_id": "Q04_002",
+      "confidence": 1.0,
+      "review": "题面要求状态机与流转点，value 列出四态及转换函数，evidence 引用 enum 及具体函数行号支撑，一致。"
+    },
+    {
+      "question_id": "Q04_003",
+      "confidence": 1.0,
+      "review": "tri_state_impl 格式正确，value 为 implemented，evidence 引用 swtch.S 汇编实现支撑，一致。"
+    },
+    {
+      "question_id": "Q04_004",
+      "confidence": 1.0,
+      "review": "题面要求寄存器集合，value 列出具体寄存器及 struct context 布局，evidence 引用汇编与头文件支撑，一致。"
+    },
+    {
+      "question_id": "Q04_005",
+      "confidence": 1.0,
+      "review": "题面要求算法名称及证据，value 指明 Priority 并列出优先级定义与队列数组，evidence 引用宏与函数支撑，一致。"
+    },
+    {
+      "question_id": "Q04_006",
+      "confidence": 1.0,
+      "review": "题面要求核心入口，value 列出 scheduler/sched 等函数，evidence 引用 proc.c 对应函数体支撑，一致。"
+    },
+    {
+      "question_id": "Q04_007",
+      "confidence": 1.0,
+      "review": "tri_state_impl 格式正确，value 为 implemented，evidence 引用 clone 函数支撑，一致。"
+    },
+    {
+      "question_id": "Q04_008",
+      "confidence": 1.0,
+      "review": "题面要求复制路径证据，value 列出地址空间与文件表复制调用，evidence 引用 clone 函数内具体行号支撑，一致。"
+    },
+    {
+      "question_id": "Q04_009",
+      "confidence": 1.0,
+      "review": "tri_state_impl 格式正确，value 为 implemented，evidence 引用 execve 函数支撑，一致。"
+    },
+    {
+      "question_id": "Q04_010",
+      "confidence": 1.0,
+      "review": "tri_state_impl 格式正确，value 为 implemented，evidence 引用 wait4 函数支撑，一致。"
+    },
+    {
+      "question_id": "Q04_011",
+      "confidence": 1.0,
+      "review": "single_choice 格式正确，value 选择真正阻塞选项，evidence 引用 sleep 及队列操作支撑，一致。"
+    },
+    {
+      "question_id": "Q04_012",
+      "confidence": 1.0,
+      "review": "题面要求 PID 分配器实现，value 说明全局自增无回收，evidence 引用__pid 变量及分配位置支撑，一致。"
+    },
+    {
+      "question_id": "Q04_013",
+      "confidence": 1.0,
+      "review": "题面要求父子树存储方式，value 说明指针链表结构，evidence 引用 struct proc 字段支撑，一致。"
+    },
+    {
+      "question_id": "Q04_014",
+      "confidence": 1.0,
+      "review": "tri_state_impl 格式正确，value 为 stub，evidence 引用 signal 相关代码及 futex 未找到支撑，一致。"
+    },
+    {
+      "question_id": "Q04_015",
+      "confidence": 1.0,
+      "review": "题面要求多核交叉一致性，value 说明无每核队列/迁移，evidence 引用全局队列数组及 IPI 用途支撑，一致。"
+    },
+    {
+      "question_id": "Q04_016",
+      "confidence": 1.0,
+      "review": "题面要求 exit 回收调用链，value 列出详细步骤，evidence 引用 exit 及 freeproc 函数支撑，一致。"
+    },
+    {
+      "question_id": "Q04_017",
+      "confidence": 1.0,
+      "review": "tri_state_impl 格式正确，value 为 not_found，evidence 引用 grep 结果及结构体字段缺失支撑，一致。"
+    },
+    {
+      "question_id": "Q04_018",
+      "confidence": 1.0,
+      "review": "tri_state_impl 格式正确，value 为 stub，evidence 引用 sys_prlimit64 返回 0 及注释支撑，一致。"
+    },
+    {
+      "question_id": "Q04_019",
+      "confidence": 1.0,
+      "review": "single_choice 格式正确，value 选择统一 Task 结构选项，evidence 引用 struct proc 无独立 TCB 支撑，一致。"
+    },
+    {
+      "question_id": "Q04_020",
+      "confidence": 1.0,
+      "review": "tri_state_impl 格式正确，value 为 implemented，evidence 引用 scheduler 中 w_satp/sfence_vma 支撑，一致。"
+    },
+    {
+      "question_id": "Q04_021",
+      "confidence": 1.0,
+      "review": "single_choice 格式正确，value 选择仅内核线程选项，evidence 引用无用户线程库支撑，一致。"
+    },
+    {
+      "question_id": "Q04_022",
+      "confidence": 1.0,
+      "review": "tri_state_impl 格式正确，value 为 not_found，evidence 引用 grep 结果及仅 ELF 头定义支撑，一致。"
+    },
+    {
+      "question_id": "Q04_023",
+      "confidence": 1.0,
+      "review": "multi_choice 格式正确，value 选择未发现统计选项，evidence 引用 struct 字段无相关指标支撑，一致。"
+    },
+    {
+      "question_id": "Q04_024",
+      "confidence": 1.0,
+      "review": "tri_state_impl 格式正确，value 为 not_found，evidence 引用 grep 结果及 proc_tick 逻辑支撑，一致。"
+    },
+    {
+      "question_id": "Q04_025",
+      "confidence": 1.0,
+      "review": "tri_state_impl 格式正确，value 为 not_found，evidence 引用 grep 结果支撑，一致。"
+    },
+    {
+      "question_id": "Q04_026",
+      "confidence": 1.0,
+      "review": "single_choice 格式正确，value 选择完全抢占选项，evidence 引用时钟中断触发 yield 支撑，一致。"
+    },
+    {
+      "question_id": "Q04_027",
+      "confidence": 1.0,
+      "review": "tri_state_impl 格式正确，value 为 not_found，evidence 引用 grep 结果及调度逻辑支撑，一致。"
+    },
+    {
+      "question_id": "Q04_028",
+      "confidence": 1.0,
+      "review": "single_choice 格式正确，value 选择 SMP 选项，evidence 引用 NCPU 及双核启动支撑，一致。"
+    },
+    {
+      "question_id": "Q04_029",
+      "confidence": 1.0,
+      "review": "tri_state_impl 格式正确，value 为 implemented，evidence 引用 main.c AP 唤醒流程支撑，一致。"
+    },
+    {
+      "question_id": "Q04_030",
+      "confidence": 1.0,
+      "review": "tri_state_impl 格式正确，value 为 implemented，evidence 引用 IPI 发送与清除函数支撑，一致。"
+    },
+    {
+      "question_id": "Q04_031",
+      "confidence": 1.0,
+      "review": "题面要求 IPI 路径，value 列出发送与处理函数/文件，evidence 引用具体代码位置支撑，一致。"
+    },
+    {
+      "question_id": "Q04_032",
+      "confidence": 1.0,
+      "review": "tri_state_impl 格式正确，value 为 implemented，evidence 引用 struct cpu 及 cpus 数组支撑，一致。"
+    },
+    {
+      "question_id": "Q04_033",
+      "confidence": 1.0,
+      "review": "题面要求 per-CPU 实现方式，value 说明 tp 寄存器索引数组，evidence 引用 inithartid 及 mycpu 支撑，一致。"
+    },
+    {
+      "question_id": "Q04_034",
+      "confidence": 1.0,
+      "review": "tri_state_impl 格式正确，value 为 not_found，evidence 引用 grep 结果及全局队列支撑，一致。"
+    },
+    {
+      "question_id": "Q04_035",
+      "confidence": 1.0,
+      "review": "tri_state_impl 格式正确，value 为 not_found，evidence 引用 grep 结果及仅本地刷新支撑，一致。"
+    },
+    {
+      "question_id": "Q04_036",
+      "confidence": 1.0,
+      "review": "题面要求四章交叉一致性，value 逐项作答，evidence 引用对应章节代码支撑，一致。"
+    },
+    {
+      "question_id": "Q04_037",
+      "confidence": 1.0,
+      "review": "single_choice 格式正确，value 选择关中断选项，evidence 引用 acquire/release 中 push_off/pop_off支撑，一致。"
+    },
+    {
+      "question_id": "Q04_038",
+      "confidence": 1.0,
+      "review": "题面要求 NCPU 与链接脚本对应，value 说明栈大小匹配，evidence 引用 param.h 及 entry.S 支撑，一致。"
+    },
+    {
+      "question_id": "Q04_039",
+      "confidence": 1.0,
+      "review": "tri_state_impl 格式正确，value 为 not_found，evidence 引用非原子自增代码支撑，一致。"
+    },
+    {
+      "question_id": "Q04_040",
+      "confidence": 1.0,
+      "review": "tri_state_impl 格式正确，value 为 not_found，evidence 引用 grep 结果支撑，一致。"
+    },
+    {
+      "question_id": "Q04_041",
+      "confidence": 1.0,
+      "review": "tri_state_impl 格式正确，value 为 not_found，evidence 引用 grep 结果支撑，一致。"
+    }
+  ],
+  "dimensions": {
+    "evidence_supports_answers": 1.0,
+    "question_answer_consistency": 1.0,
+    "requirements_fit": 1.0
+  },
+  "findings": [],
+  "summary_zh": "全阶段 41 题均已作答，题面格式要求（short_answer/tri_state/single_choice/multi_choice）均被正确遵循。所有 value 结论均有对应的 evidence 字段支撑，引用路径、符号及代码片段与结论逻辑一致。未发现契约违反、题面跑题或证据与结论矛盾的情况。",
+  "_meta": {
+    "review_model": "qwen3.5-plus"
+  }
+}

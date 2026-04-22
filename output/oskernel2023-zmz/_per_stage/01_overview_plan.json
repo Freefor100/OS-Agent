@@ -1,0 +1,113 @@
+{
+  "stage_id": "01_overview",
+  "goal": "完成项目概览与技术栈章节：整理 xv6-k210 的语言/框架/架构、构建系统、核心模块布局、入口链、关键数据结构与算法、交付产物信号，为后续 02-10 章提供统一索引。",
+  "must_cover": [
+    "语言与框架来源（C/Rust 混合、xv6-riscv 移植）",
+    "支持架构（riscv64，k210 与 QEMU 双平台）",
+    "入口函数与启动链（_start → main → scheduler）",
+    "关键目录结构（kernel/, include/, xv6-user/, sbi/, linker/）",
+    "README 构建与运行命令（make build/run/fs/qemu）",
+    "评测/交付产物信号（k210.bin、fs.img、target/kernel）",
+    "核心模块技术要点：内存管理（pm.c 多/单页分配器、kmalloc.c slab 灵感、vm.c 页表）、进程调度（proc.c PCB/哈希表/上下文切换）、Trap/系统调用（trap.c/usertrap/syscall.c 分发）、文件系统（fs.c VFS 框架 + fat32/）、同步（spinlock.c/sleeplock.c）",
+    "调试与错误处理（printf.c panic/backtrace、debug.h 宏）",
+    "02 启动/架构与 Trap/系统调用 → 启动链、模式切换、MMU/FPU、Trap 向量、系统调用分发、TrapFrame、用户指针校验等",
+    "03 内存管理 → 物理/虚拟内存、页表、分配器、CoW/Lazy/Swap 等高级特性",
+    "04 进程/线程/调度与多核 → 任务模型、调度算法、上下文切换、信号/Futex、多核启动、IPI、每 CPU 数据等",
+    "05 文件系统与设备 I/O → VFS、具体 FS、fd/mmap、驱动框架、块/网设备等",
+    "06 同步与 IPC → 锁、管道、IPC、Futex 等",
+    "07 安全机制 → 权限、Capability、隔离等",
+    "08 网络协议栈 → socket、协议栈实现形态等",
+    "09 调试与错误处理 → panic、日志、回溯等",
+    "10 演进与历史 → 模块演进、重大提交方向（技术层面归纳即可）",
+    "## 快速总览",
+    "## 评测与交付适配（启发式归纳）",
+    "**Delivery**：`Makefile`/`build.rs`/CI 中是否出现固定产物名（如 `kernel-rv`、`kernel-la`、`disk.img`）、`make all` 等；列路径，不写仓外断言。"
+  ],
+  "evidence_targets": [
+    "语言与框架来源",
+    "支持架构",
+    "入口函数",
+    "关键目录",
+    "README 构建与运行命令",
+    "评测/交付产物信号(kernel-rv 等)",
+    "评测/交付产物信号(kernel-rv等)"
+  ],
+  "seed_paths": [
+    "README.md",
+    "Makefile",
+    "Cargo.toml",
+    "kernel/main.c",
+    "kernel/entry.S",
+    "kernel/trap/trap.c",
+    "kernel/syscall/syscall.c",
+    "kernel/mm/pm.c",
+    "kernel/mm/vm.c",
+    "kernel/mm/kmalloc.c",
+    "kernel/sched/proc.c",
+    "kernel/fs/fs.c",
+    "docs",
+    "build.rs"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "_start",
+    "main",
+    "scheduler",
+    "usertrap",
+    "syscall",
+    "allocpage",
+    "freepage",
+    "fork",
+    "exit",
+    "panic",
+    "kernel_main",
+    "rust_main"
+  ],
+  "repo_hotspots": [
+    "Cargo.toml",
+    "Makefile",
+    "debug",
+    "debug/kendryte_openocd",
+    "debug/openocd_cfg",
+    "doc",
+    "doc/img",
+    "include",
+    "include/fs",
+    "include/hal"
+  ],
+  "preferred_tools": [
+    "list_repo_structure",
+    "analyze_tech_stack",
+    "find_os_core_modules",
+    "read_code_segment",
+    "grep_in_repo",
+    "lsp_get_document_outline",
+    "lsp_get_definition",
+    "lsp_get_call_graph"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 12000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 18,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "1. 以 README.md 和 Makefile 为起点，提取构建命令、平台选项（k210/qemu）、产物路径（k210.bin、fs.img、target/kernel），整理为「构建与交付」小节。",
+    "2. 读取 kernel/entry*.S 与 kernel/main.c，梳理启动链：_start → main → cpuinit/kvminit/procinit → scheduler，记录多核唤醒（sbi_send_ipi）与每核初始化路径。",
+    "3. 使用 lsp_get_document_outline 鸟瞰 trap.c、syscall.c、proc.c、vm.c、pm.c、fs.c，定位关键函数（usertrap、syscall_dispatch、fork/yield/sleep、walk/mappages、allocpage/freepage、create/namei），再用 read_code_segment 小段精读实现要点。",
+    "4. 对 entry_symbols 中的核心符号（_start、main、scheduler、usertrap、syscall、allocpage、fork、exit、panic）调用 lsp_get_definition 确认定义位置，并用 lsp_get_references 统计调用面，形成模块间依赖简述。",
+    "5. 针对内存管理模块，对照 pm.c（多/单页分配器）、kmalloc.c（slab 灵感小对象分配）、vm.c（页表创建/映射/Copy-on-Write 支持），提取数据结构（struct run、struct pm_allocator、pagetable_t、pte_t）与关键算法（首次适配、walk/mappages）。",
+    "6. 针对进程/调度模块，从 proc.c 提取 PCB 结构（struct proc）、PID 哈希表、状态机（RUNNABLE/RUNNING/SLEEPING/ZOMBIE）、上下文切换（swtch.S）、调度器循环；补充信号（signal.c）与等待队列机制。",
+    "7. 针对 Trap/系统调用，从 trap.c 提取 usertrap/kerneltrap 路径、scause 分发、trapframe 布局；从 syscall.c 提取系统调用表与参数获取（argint/argaddr/fetchstr），列出已实现 syscall 类别（proc/file/mem/signal/time）。",
+    "8. 汇总文件系统（fs.c VFS 框架 + fat32/ 具体实现）、同步原语（spinlock.c/sleeplock.c）、调试机制（printf.c panic/backtrace、debug.h 宏），并对照 must_cover 逐模块收束，输出技术栈总览表。"
+  ]
+}

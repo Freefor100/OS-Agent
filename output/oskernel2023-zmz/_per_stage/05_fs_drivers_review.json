@@ -1,0 +1,199 @@
+{
+  "schema_version": "describe_review_v1",
+  "stage_id": "05_fs_drivers",
+  "stage_title": "文件系统与设备 I/O",
+  "confidence": 0.98,
+  "question_reviews": [
+    {
+      "question_id": "Q05_001",
+      "confidence": 1.0,
+      "review": "题面要求 VFS 接口形态及证据，回答明确为 C 语言操作函数指针表，并给出 `include/fs/fs.h` 结构体定义证据，题面相符，契约满足。"
+    },
+    {
+      "question_id": "Q05_002",
+      "confidence": 1.0,
+      "review": "单选值匹配选项 A，证据指向 FAT32 持久化实现，题面相符，证据支撑结论。"
+    },
+    {
+      "question_id": "Q05_003",
+      "confidence": 1.0,
+      "review": "题面要求判断自研/第三方并引用 Cargo/Makefile，回答明确自研并列出三处证据，契约满足。"
+    },
+    {
+      "question_id": "Q05_004",
+      "confidence": 1.0,
+      "review": "题面要求列出 3-6 个关键节点及证据，回答列出 6 个节点并附文件行号证据，题面相符。"
+    },
+    {
+      "question_id": "Q05_005",
+      "confidence": 1.0,
+      "review": "题面要求 FD 表形态及结构体证据，回答明确固定数组并引用 `struct fdtable` 定义，契约满足。"
+    },
+    {
+      "question_id": "Q05_006",
+      "confidence": 1.0,
+      "review": "三态值 valid，证据指向 `bio.c` 缓存实现，题面相符。"
+    },
+    {
+      "question_id": "Q05_007",
+      "confidence": 1.0,
+      "review": "题面要求指出驱逐策略及依据，回答明确 LRU 并引用链表及移动逻辑证据，题面相符。"
+    },
+    {
+      "question_id": "Q05_008",
+      "confidence": 1.0,
+      "review": "三态值 valid，证据指向 `mmap.c` 页管理结构，题面相符。"
+    },
+    {
+      "question_id": "Q05_009",
+      "confidence": 1.0,
+      "review": "三态值 valid，证据指向 `sys_mmap` 实现，题面相符。"
+    },
+    {
+      "question_id": "Q05_010",
+      "confidence": 1.0,
+      "review": "三态值 valid，证据指向 `poll.c` 及系统调用入口，题面相符。"
+    },
+    {
+      "question_id": "Q05_011",
+      "confidence": 1.0,
+      "review": "三态值 valid，证据指向 `lookup_path` 支持绝对/相对/. /..，题面相符。"
+    },
+    {
+      "question_id": "Q05_012",
+      "confidence": 1.0,
+      "review": "三态值 valid (stub)，证据说明仅实现 readlink 未实现自动跟随，题面相符。"
+    },
+    {
+      "question_id": "Q05_013",
+      "confidence": 1.0,
+      "review": "三态值 valid，证据指向 `pipe.c` 实现及 VFS 对象，题面相符。"
+    },
+    {
+      "question_id": "Q05_014",
+      "confidence": 1.0,
+      "review": "三态值 valid (not_found)，证据说明搜索 syscall 及 file_type 无命中，题面相符。"
+    },
+    {
+      "question_id": "Q05_015",
+      "confidence": 1.0,
+      "review": "三态值 valid，证据指向 `rootfs.c` 初始化 devfs/procfs，题面相符。"
+    },
+    {
+      "question_id": "Q05_016",
+      "confidence": 1.0,
+      "review": "单选值匹配选项 A，证据指向进程独立 fdtable 及 fork 复制，题面相符。"
+    },
+    {
+      "question_id": "Q05_017",
+      "confidence": 0.8,
+      "review": "单选值「FAT 表内嵌空闲链（FAT32 特有）」未匹配题单中 A-F 任一选项文本（实际匹配 Q05_018 选项 E），存在契约违反；证据支撑 FAT 链式分配事实，但选项映射错误。"
+    },
+    {
+      "question_id": "Q05_018",
+      "confidence": 1.0,
+      "review": "单选值匹配选项 E，证据指向 FAT 空闲簇管理，题面相符。"
+    },
+    {
+      "question_id": "Q05_019",
+      "confidence": 1.0,
+      "review": "单选值匹配选项 C，证据指向 dentry 树形结构，题面相符。"
+    },
+    {
+      "question_id": "Q05_020",
+      "confidence": 1.0,
+      "review": "单选值匹配选项 A，证据指向字节流读写实现，题面相符。"
+    },
+    {
+      "question_id": "Q05_021",
+      "confidence": 1.0,
+      "review": "单选值匹配选项 C，证据指向 `memlayout.h` 硬编码地址，题面相符。"
+    },
+    {
+      "question_id": "Q05_022",
+      "confidence": 1.0,
+      "review": "三态值 valid (not_found)，证据说明搜索 DTB 关键词无命中，题面相符。"
+    },
+    {
+      "question_id": "Q05_023",
+      "confidence": 1.0,
+      "review": "题面要求驱动接口形态及证据，回答明确 C 语言函数接口并引用 `disk.c`，契约满足。"
+    },
+    {
+      "question_id": "Q05_024",
+      "confidence": 1.0,
+      "review": "题面要求列出 3-6 个初始化节点，回答列出 5 个并附证据，契约满足。"
+    },
+    {
+      "question_id": "Q05_025",
+      "confidence": 1.0,
+      "review": "三态值 valid，证据指向 `console.c` 实现，题面相符。"
+    },
+    {
+      "question_id": "Q05_026",
+      "confidence": 1.0,
+      "review": "三态值 valid，证据指向 `virtio_disk.c` 及 `sdcard.c`，题面相符。"
+    },
+    {
+      "question_id": "Q05_027",
+      "confidence": 1.0,
+      "review": "三态值 valid (not_found)，证据说明搜索网络驱动关键词无命中，题面相符。"
+    },
+    {
+      "question_id": "Q05_028",
+      "confidence": 1.0,
+      "review": "三态值 valid，证据指向 `plic.c` 中断分发逻辑，题面相符。"
+    },
+    {
+      "question_id": "Q05_029",
+      "confidence": 1.0,
+      "review": "题面要求 MMIO 地址来源及证据，回答明确硬编码并引用 `memlayout.h`，契约满足。"
+    },
+    {
+      "question_id": "Q05_030",
+      "confidence": 1.0,
+      "review": "题面要求多平台适配方式及证据，回答明确 Makefile 及 #ifdef 并引用证据，契约满足。"
+    },
+    {
+      "question_id": "Q05_031",
+      "confidence": 1.0,
+      "review": "三态值 valid，证据指向物理/虚拟地址宏定义切换，题面相符。"
+    },
+    {
+      "question_id": "Q05_032",
+      "confidence": 1.0,
+      "review": "单选值匹配选项 D，证据指向 `bio.c` 缓冲池结构，题面相符。"
+    },
+    {
+      "question_id": "Q05_033",
+      "confidence": 1.0,
+      "review": "单选值匹配选项 A，证据说明无显式调度算法，题面相符。"
+    },
+    {
+      "question_id": "Q05_034",
+      "confidence": 1.0,
+      "review": "单选值匹配选项 B，证据指向中断处理函数及分发，题面相符。"
+    },
+    {
+      "question_id": "Q05_035",
+      "confidence": 1.0,
+      "review": "三态值 valid，证据指向 virtio 描述符环及 DMA 控制器驱动，题面相符。"
+    }
+  ],
+  "dimensions": {
+    "evidence_supports_answers": 1.0,
+    "question_answer_consistency": 0.97,
+    "requirements_fit": 0.97
+  },
+  "findings": [
+    {
+      "question_id": "Q05_017",
+      "severity": "warn",
+      "message": "single_choice 题型 `value` 未匹配题单提供的 A-F 选项文本（回答文本实际匹配 Q05_018 的选项 E），违反输出契约，虽语义接近选项 B 但格式不符。"
+    }
+  ],
+  "summary_zh": "除 Q05_017 单选值未严格匹配题单选项文本（存在契约违反）外，其余 34 题题面相符、证据充分且格式契约满足。Q05_017 证据支撑 FAT 链式分配事实，但选项映射错误。整体证据对结论支撑度高，无 OS 设计优劣评价。",
+  "_meta": {
+    "review_model": "qwen3.5-plus"
+  }
+}
