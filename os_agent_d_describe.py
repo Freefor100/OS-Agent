@@ -8,6 +8,10 @@
 #      送审；不含工具摘录。01_overview / 10_history 不审。
 #      侧车：_per_stage/<stage_id>_review.json（失败见 *_review_error.json）。
 #
+# 续跑：JSON-QA 阶段若 `_per_stage/<stage_id>_answers.json` 已存在且仍能通过题库校验，
+#      则跳过 LLM，仅用 `render_answers_to_markdown` 重写 `sections/` 下本章 md，文末照常拼接总报告。
+#      无题库阶段（如 01/10 内联 prompt）仍按「sections 下 md >200 字节则跳过」。
+#
 # API Key / MODEL_NAME 等仍从仓库根目录 .env 读取（load_dotenv）。
 #
 import copy
@@ -516,19 +520,6 @@ STAGES = [
         - ## 快速总览
           **报告第一个内容块**。含：
           **一句话定位**（≤60字）："[OS名称] 基于 [框架/自研] 的 [架构] [内核类型]，主要语言 [x]，[1 个最突出技术点]。"
-          **子系统完成度矩阵**（固定 10 行，不得删行；「关键实现」优先引用前置章节已给出的结论/路径；与 02–09 章对应时注明章节号）：
-          | 子系统 | 完成度 | 关键实现 |
-          |--------|--------|---------|
-          | 启动与 Trap/系统调用（第 02 章） | ✅完整 / 🔸部分 / ❌缺失 | 一句话 |
-          | 内存管理（第 03 章） | ... | ... |
-          | 进程/调度与多核（第 04 章） | ... | ... |
-          | 中断与系统调用（与第 02 章同源时可互引） | ... | ... |
-          | 文件系统与设备 I/O（第 05 章） | ... | ... |
-          | 同步与IPC（第 06 章） | ... | ... |
-          | 多核支持（与第 04 章同源时可互引） | ... | ... |
-          | 网络协议栈（第 08 章） | ... | ... |
-          | 安全机制（第 07 章） | ... | ... |
-          | 调试与错误处理（第 09 章） | ... | ... |
 
         - ## 评测与交付适配
           **固定小节、紧接在「快速总览」矩阵之后**。不臆测任何一届具体赛题或保密测例；仅综合 **02–09 技术前置章** 与 **本步对 README/`grep` 的轻量结果**，用短段落归纳下列四类（无证据则写「未发现」或「不适用」）：
@@ -755,6 +746,79 @@ def _invoke_describe_stage_review(
         print(f"\n   ⚠️ Describe Review 调用失败: {_re}")
 
 
+def _resume_stage_from_answers_json(
+    *,
+    repo_output_dir: str,
+    stage_id: str,
+    title: str,
+    expected_question_ids: list[str],
+    section_path: str,
+    skip_in_report: bool,
+    global_memory: dict,
+    all_section_paths: list,
+    idx: int,
+    num_stages: int,
+) -> bool:
+    """若 `_per_stage/<stage_id>_answers.json` 存在且可通过题库校验，则从 JSON 渲染 Markdown 落盘并跳过本阶段 LLM。
+
+    与「仅 md >200 字节就跳过」相比，JSON-QA 阶段以侧车答案为真源，便于改模板或修渲染后一键重出各章与总报告。
+    """
+    if skip_in_report or not expected_question_ids:
+        return False
+    json_path = os.path.join(repo_output_dir, "_per_stage", f"{stage_id}_answers.json")
+    if not os.path.isfile(json_path):
+        return False
+    if os.path.getsize(json_path) < 16:
+        return False
+    try:
+        with open(json_path, "r", encoding="utf-8") as f:
+            payload = json.load(f)
+        if not isinstance(payload, dict):
+            return False
+        stage_qa = load_stage_qa(stage_id)
+        payload = coerce_answers_payload_defaults(payload)
+        payload = coerce_answers_payload_by_stage_qa(payload, stage_qa=stage_qa)
+        issues = validate_answers_payload(
+            payload,
+            stage_id=stage_id,
+            stage_title=title,
+            expected_question_ids=expected_question_ids,
+        )
+        if issues:
+            print(
+                f"   ⚠️  发现 {json_path} 但校验未通过（{len(issues)} 条），本阶段将重新跑 LLM"
+            )
+            return False
+    except Exception as e:
+        print(f"   ⚠️  读取/校验 answers.json 失败 ({type(e).__name__}: {e})，本阶段将重新跑 LLM")
+        return False
+
+    clean_text = _strip_llm_preamble(render_answers_to_markdown(payload).strip())
+    try:
+        os.makedirs(os.path.dirname(section_path), exist_ok=True)
+        with open(section_path, "w", encoding="utf-8") as f:
+            f.write(clean_text + "\n")
+    except Exception as e:
+        print(f"   ⚠️  从 JSON 渲染后无法写入 {section_path}: {e}")
+        return False
+
+    print("=" * 80)
+    print(f"⏭️  阶段 {idx}/{num_stages}：{title}（从 answers.json 渲染 Markdown，跳过 LLM）")
+    print(f"   JSON: {json_path}")
+    print(f"   文件: {section_path}")
+    print("=" * 80)
+
+    if not skip_in_report:
+        all_section_paths.append(section_path)
+        try:
+            global_memory["section_summaries"][stage_id] = _summarize_section_text(clean_text)
+            global_memory["mentioned_paths"].extend(_extract_path_mentions(clean_text))
+            global_memory["mentioned_paths"] = list(dict.fromkeys(global_memory["mentioned_paths"]))[-100:]
+        except Exception:
+            pass
+    return True
+
+
 def _clear_stage_sidecar_artifacts(repo_output_dir: str, stage_id: str) -> None:
     """重新生成某阶段前删除 _per_stage 下该 stage_id 的旧 JSON，避免与本次 run 混用。"""
     sidecar_dir = os.path.join(repo_output_dir, "_per_stage")
@@ -909,6 +973,21 @@ def main():
             section_name = f"00_{_slug(title)}.md"
         
         section_path = os.path.join(sections_dir, section_name)
+
+        # JSON-QA 阶段：侧车 answers.json 为真源时，从 JSON 重新渲染本章 md（跳过 Plan/Execute），总报告仍由文末合并逻辑生成。
+        if _resume_stage_from_answers_json(
+            repo_output_dir=repo_output_dir,
+            stage_id=stage_id,
+            title=title,
+            expected_question_ids=expected_question_ids,
+            section_path=section_path,
+            skip_in_report=skip_in_report,
+            global_memory=global_memory,
+            all_section_paths=all_section_paths,
+            idx=idx,
+            num_stages=len(STAGES),
+        ):
+            continue
 
         # 简单的断点续传：如果文件已存在且内容看起来正常（>200字节），则跳过
         if os.path.exists(section_path):

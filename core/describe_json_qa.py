@@ -9,6 +9,13 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 SCHEMA_VERSION = "v1"
 TERMINOLOGY_PROFILE_DEFAULT = "stallings_en_zh"
 
+# tri_state_impl 的 JSON 取值（校验用英文）；渲染 Markdown 时改为中文表述
+_TRI_STATE_IMPL_MARKDOWN_ZH: Dict[str, str] = {
+    "implemented": "已实现",
+    "stub": "桩实现",
+    "not_found": "未发现",
+}
+
 JSON_SCHEMA_V1: Dict[str, Any] = {
     "type": "object",
     "additionalProperties": False,
@@ -398,10 +405,16 @@ def coerce_answers_payload_defaults(payload: Dict[str, Any]) -> Dict[str, Any]:
     return out
 
 
-def _format_answer_value_for_markdown(value: Any) -> str:
-    """渲染答案正文：字符串原样输出，其余类型 JSON（紧凑）。"""
+def _format_answer_value_for_markdown(value: Any, *, question_type: Optional[str] = None) -> str:
+    """渲染答案正文：字符串原样输出，其余类型 JSON（紧凑）。
+
+    ``tri_state_impl`` 的枚举值在 md 中译为中文，与 JSON 内英文取值并存（校验仍以英文为准）。
+    """
     if isinstance(value, str):
-        return (value or "").strip()
+        s = (value or "").strip()
+        if (question_type or "").strip() == "tri_state_impl" and s in _TRI_STATE_IMPL_MARKDOWN_ZH:
+            return _TRI_STATE_IMPL_MARKDOWN_ZH[s]
+        return s
     return json.dumps(value, ensure_ascii=False)
 
 
@@ -415,6 +428,7 @@ def render_answers_to_markdown(payload: Dict[str, Any]) -> str:
             continue
         qid = str(a.get("question_id", "")).strip()
         stem = str(a.get("stem", "")).strip()
+        qtype = str(a.get("question_type", "")).strip()
         value = a.get("value")
         notes = (a.get("notes") or "").strip() if isinstance(a.get("notes"), str) else ""
 
@@ -423,7 +437,7 @@ def render_answers_to_markdown(payload: Dict[str, Any]) -> str:
         else:
             lines.append(f"### {qid}")
         lines.append("")
-        lines.append(_format_answer_value_for_markdown(value))
+        lines.append(_format_answer_value_for_markdown(value, question_type=qtype))
         if notes:
             lines.append("")
             lines.append(notes)
