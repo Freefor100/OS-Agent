@@ -1,0 +1,186 @@
+{
+  "schema_version": "v1",
+  "stage_id": "09_debug_error",
+  "stage_title": "调试机制与错误处理",
+  "terminology_profile": "stallings_en_zh",
+  "answers": [
+    {
+      "question_id": "Q09_001",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在日志系统（log/printk/println 宏）与日志级别控制？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "include/printf.h",
+          "symbol_kind": "macro",
+          "symbol_name": "printf",
+          "excerpt": "void printf(char *fmt, ...); 定义基础打印函数。"
+        },
+        {
+          "path": "include/utils/debug.h",
+          "symbol_kind": "macro",
+          "symbol_name": "__debug_info",
+          "excerpt": "#define __debug_info(func, ...) \\n\\t__debug_msg(__INFO(__module_name__)\": \"func\": \"__VA_ARGS__) 定义 info 级别日志宏。"
+        },
+        {
+          "path": "include/utils/debug.h",
+          "symbol_kind": "macro",
+          "symbol_name": "__debug_warn",
+          "excerpt": "#define __debug_warn(func, ...) \\n\\t__debug_msg(__WARN(__module_name__)\": \"func\": \"__VA_ARGS__) 定义 warn 级别日志宏。"
+        },
+        {
+          "path": "include/utils/debug.h",
+          "symbol_kind": "macro",
+          "symbol_name": "__debug_error",
+          "excerpt": "#define __debug_error(func, ...) do {\\n\\t__debug_msg(__ERROR(__module_name__)\": \"func\": \"__VA_ARGS__);\\n\\tprintf(\"%s: line %d\\n\", __FILE__, __LINE__);\\n} while (0) 定义 error 级别日志宏。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_002",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 panic/崩溃处理路径（panic_handler/oom/abort 等）？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "include/printf.h",
+          "symbol_kind": "macro",
+          "symbol_name": "panic",
+          "excerpt": "#define panic(s) do {\\n\\tprintf(__ERROR(__module_name__)\": hart %d at %s: %d\\n\", \\n\\t\\t\\tcpuid(), __FILE__, __LINE__\\n\\t);\\n\\t__panic(s);\\n} while (0) 定义 panic 宏，调用__panic。"
+        },
+        {
+          "path": "kernel/printf.c",
+          "symbol_kind": "function",
+          "symbol_name": "__panic",
+          "excerpt": "void __panic(char *s) {\\n\\tprintf(__ERROR(\"panic\")\": \");\\n\\tprintf(s);\\n\\tprintf(\"\\n\");\\n\\tbacktrace();\\n\\tpanicked = 1;\\n\\tintr_off();\\n\\tfor(;;) ;\\n} 实现 panic 处理，输出信息、回溯并停机。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_003",
+      "question_type": "short_answer",
+      "stem": "panic 路径会输出哪些诊断？（寄存器 dump/栈回溯/停机；必须引用实现证据）",
+      "value": "Panic 路径会输出 panic 消息字符串、调用栈回溯（backtrace），然后关闭中断并进入无限循环停机。不直接输出通用寄存器 dump，但 backtrace 会打印帧中的返回地址。",
+      "evidence": [
+        {
+          "path": "kernel/printf.c",
+          "symbol_kind": "function",
+          "symbol_name": "__panic",
+          "excerpt": "void __panic(char *s) {\\n\\tprintf(__ERROR(\"panic\")\": \");\\n\\tprintf(s);\\n\\tprintf(\"\\n\");\\n\\tbacktrace();\\n\\tpanicked = 1; // freeze uart output from other CPUs\\n\\tintr_off();\\n\\tfor(;;) ;\\n} 输出消息，调用 backtrace，关中断，死循环。"
+        },
+        {
+          "path": "kernel/printf.c",
+          "symbol_kind": "function",
+          "symbol_name": "backtrace",
+          "excerpt": "void backtrace() {\\n\\tuint64 *fp = (uint64 *)r_fp();\\n\\tuint64 *bottom = (uint64 *)PGROUNDUP((uint64)fp);\\n\\tprintf(\"backtrace:\\n\");\\n\\twhile (fp < bottom) {\\n\\t\\tuint64 ra = *(fp - 1);\\n\\t\\tprintf(\"%p\\n\", ra - 4);\\n\\t\\tfp = (uint64 *)*(fp - 2);\\n\\t}\\n} 通过帧指针遍历栈帧，打印返回地址 ra。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_004",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现栈回溯 (backtrace/unwind/stack_trace)？（必须三态；仅打印 ra 不算）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/printf.c",
+          "symbol_kind": "function",
+          "symbol_name": "backtrace",
+          "excerpt": "void backtrace() {\\n\\tuint64 *fp = (uint64 *)r_fp();\\n\\tuint64 *bottom = (uint64 *)PGROUNDUP((uint64)fp);\\n\\tprintf(\"backtrace:\\n\");\\n\\twhile (fp < bottom) {\\n\\t\\tuint64 ra = *(fp - 1);\\n\\t\\tprintf(\"%p\\n\", ra - 4);\\n\\t\\tfp = (uint64 *)*(fp - 2);\\n\\t}\\n} 实现基于帧指针 fp 的栈回溯，遍历栈帧并打印返回地址。"
+        },
+        {
+          "path": "include/printf.h",
+          "symbol_kind": "declaration",
+          "symbol_name": "backtrace",
+          "excerpt": "void backtrace(); 声明回溯函数。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_005",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 **内核驻留的交互式监视器（kernel monitor）**？（对齐 Stallings《操作系统：精髓与设计原理》语境：**在内核态上下文**接受命令、用于探查/操控系统的监视器；**不包括**仅在用户态运行的常规 shell，如 `xv6-user/sh.c`、`user/` 下用户程序等——除非题面另有定义。必须三态；若 `implemented`：须给出 3–10 个 **用户可键入的 monitor 命令名** 及对应 **内核内** 解析/分发入口的 `路径:行号` 证据；仅以用户态 shell 充当内核 monitor 视为 **未切题** 应判 `stub` 或 `not_found` 并说明理由。）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/console.c",
+          "symbol_kind": "function",
+          "symbol_name": "consoleintr",
+          "excerpt": "void consoleintr(int c) {\\n\\tacquire(&cons.lock);\\n\\tswitch(c){\\n\\tcase C('P'):  // Print process list.\\n\\t\\tprocdump();\\n\\t\\tbreak;\\n\\tcase C('E'):  // Print file-entry list.\\n\\t\\trootfs_print();\\n\\t\\tbreak;\\n\\tcase C('K'):  // Print mem-alloc list.\\n\\t\\tkmview();\\n\\t\\tbreak;\\n\\tcase C('B'):  // Print mem-alloc list.\\n\\t\\tbprint();\\n\\t\\tbreak;\\n\\tcase C('Q'):  // Print physical memory status\\n\\t\\tpm_dump();\\n\\t\\tbreak;\\n... 在内核控制台输入中断处理中解析特殊控制字符并执行内核诊断命令。"
+        },
+        {
+          "path": "kernel/console.c",
+          "symbol_kind": "comment",
+          "symbol_name": "monitor_commands",
+          "excerpt": "命令列表：Ctrl-P (procdump), Ctrl-E (rootfs_print), Ctrl-K (kmview), Ctrl-B (bprint), Ctrl-Q (pm_dump)。这些是在内核态 consoleintr 中直接处理的监视命令。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_006",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 GDB stub（需数据包解析循环，如 handle_gdb_packet）？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/",
+          "symbol_kind": "search",
+          "symbol_name": "gdb_stub",
+          "excerpt": "在 kernel 目录下搜索 gdb、stub、packet 等关键词，未发现 GDB stub 实现代码。Makefile 中的 -gdb 选项是 QEMU 模拟器的功能，非内核实现。"
+        },
+        {
+          "path": "Makefile",
+          "symbol_kind": "config",
+          "symbol_name": "QEMUOPTS",
+          "excerpt": "QEMUOPTS += -gdb tcp::1234  #for debug 这是 QEMU 的调试接口配置，并非内核内的 GDB stub 实现。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_007",
+      "question_type": "short_answer",
+      "stem": "错误码/错误类型体系是什么？（errno/Result/Error enum；给类型定义与传播点证据）",
+      "value": "使用标准的 errno 整数错误码体系。定义在 include/errno.h 中（如 EPERM, ENOENT 等）。系统调用通过返回负值的 errno 来传播错误（如 -EBADF, -ENOMEM）。",
+      "evidence": [
+        {
+          "path": "include/errno.h",
+          "symbol_kind": "header",
+          "symbol_name": "errno_definitions",
+          "excerpt": "#define\\tEPERM\\t\\t\\t 1\\t/* Operation not permitted */\\n#define\\tENOENT\\t\\t\\t 2\\t/* No such file or directory */\\n... 定义了一系列标准 errno 错误码。"
+        },
+        {
+          "path": "kernel/syscall/sysfile.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_read",
+          "excerpt": "int sys_read(void) {\\n\\tstruct file *f;\\n\\tint n;\\n\\tuint64 p;\\n\\tif (argfd(0, 0, &f) < 0)\\n\\t\\treturn -EBADF;  // 返回负值 errno 表示错误\\n... 系统调用返回负的错误码。"
+        },
+        {
+          "path": "kernel/syscall/sysproc.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_sleep",
+          "excerpt": "int sys_sleep(void) {\\n...\\n\\tif (SIGTERM == p->killed) {\\n\\t\\tret = -EINTR;\\n\\t\\tbreak;\\n\\t}\\n... 返回 -EINTR 表示被信号中断。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_008",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 trace/perf/ftrace 等跟踪机制或 tracepoints？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/syscall/sysproc.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_trace",
+          "excerpt": "uint64 sys_trace(void) {\\n\\t// int mask;\\n\\t// if(argint(0, &mask) < 0) {\\n\\t//   return -1;\\n\\t// }\\n\\tmyproc()->tmask = 1;  // 设置进程跟踪掩码\\n\\treturn 0;\\n} 实现 sys_trace 系统调用以启用跟踪。"
+        },
+        {
+          "path": "kernel/syscall/syscall.c",
+          "symbol_kind": "function",
+          "symbol_name": "syscall",
+          "excerpt": "void syscall(void) {\\n...\\n\\t// trace\\n\\tint trace = p->tmask;// & (1 << (p->trapframe->a7 - 1));\\n\\tif (trace) {\\n\\t\\tprintf(\"pid %d: %s(\", p->pid, sysnames[num]);\\n\\t}\\n\\tp->trapframe->a0 = syscalls[num]();\\n\\tif (trace) {\\n\\t\\tprintf(\") -> %d\\n\", p->trapframe->a0);\\n\\t}\\n... 根据 tmask 打印系统调用名称、参数和返回值，实现简单的 syscall trace。"
+        }
+      ]
+    }
+  ]
+}

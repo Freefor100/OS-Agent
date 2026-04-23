@@ -19,6 +19,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from core.agent_builder import DESCRIBE_REVIEW_SYSTEM_PROMPT, build_chat_model, get_model_name
+from core.utils import llm_message_total_tokens
 
 logger = logging.getLogger(__name__)
 
@@ -81,15 +82,16 @@ def parse_review_llm_output(content: str) -> Dict[str, Any]:
     return out
 
 
-def _normalize_one_question_review(item: Any) -> Optional[Tuple[str, Any, str]]:
+def _normalize_one_question_review(item: Any) -> Optional[Tuple[str, Any, Any, str]]:
     if not isinstance(item, dict):
         return None
     qid = str(item.get("question_id", "")).strip()
     if not qid:
         return None
-    conf = item.get("confidence")
+    se = item.get("score_evidence")
+    sc = item.get("score_consistency")
     rev = str(item.get("review", "") or item.get("review_zh", "")).strip()
-    return (qid, conf, rev)
+    return (qid, se, sc, rev)
 
 
 def coerce_review_payload(
@@ -99,28 +101,27 @@ def coerce_review_payload(
     stage_title: str,
     expected_question_ids: List[str],
 ) -> Dict[str, Any]:
-    dims_in = data.get("dimensions") if isinstance(data.get("dimensions"), dict) else {}
-
     raw_list = data.get("question_reviews")
     if not isinstance(raw_list, list):
         raw_list = data.get("per_question_reviews") or data.get("questions_review") or []
 
-    by_id: Dict[str, Tuple[Any, str]] = {}
+    by_id: Dict[str, Tuple[Any, Any, str]] = {}
     for item in raw_list:
         parsed = _normalize_one_question_review(item)
         if not parsed:
             continue
-        qid, conf, rev = parsed
-        by_id[qid] = (conf, rev)
+        qid, se, sc, rev = parsed
+        by_id[qid] = (se, sc, rev)
 
     question_reviews: List[Dict[str, Any]] = []
     for qid in expected_question_ids:
         if qid in by_id:
-            conf, rev = by_id[qid]
+            se, sc, rev = by_id[qid]
             question_reviews.append(
                 {
                     "question_id": qid,
-                    "confidence": conf,
+                    "score_evidence": se,
+                    "score_consistency": sc,
                     "review": rev if rev else "（审计输出中本题为空白评审）",
                 }
             )
@@ -128,7 +129,8 @@ def coerce_review_payload(
             question_reviews.append(
                 {
                     "question_id": qid,
-                    "confidence": None,
+                    "score_evidence": None,
+                    "score_consistency": None,
                     "review": "（审计 JSON 未包含本题；视为输出不完整）",
                 }
             )
@@ -139,11 +141,6 @@ def coerce_review_payload(
         "stage_title": str(data.get("stage_title") or stage_title),
         "confidence": data.get("confidence"),
         "question_reviews": question_reviews,
-        "dimensions": {
-            "evidence_supports_answers": dims_in.get("evidence_supports_answers"),
-            "question_answer_consistency": dims_in.get("question_answer_consistency"),
-            "requirements_fit": dims_in.get("requirements_fit"),
-        },
         "findings": data.get("findings") if isinstance(data.get("findings"), list) else [],
         "summary_zh": str(data.get("summary_zh") or ""),
     }
@@ -162,20 +159,16 @@ REVIEW_STAGES_02_09: tuple[str, ...] = (
 )
 
 
-def _load_review_quality_weights() -> dict[str, float]:
-    raw = (os.environ.get("REVIEW_QUALITY_WEIGHTS") or "").strip()
-    if raw:
-        try:
-            wj = json.loads(raw)
-            return {
-                "w_mean": float(wj.get("w_mean", 0.45)),
-                "w_excerpt": float(wj.get("w_excerpt", 0.25)),
-                "w_rich": float(wj.get("w_rich", 0.20)),
-                "w_dim": float(wj.get("w_dim", 0.10)),
-            }
-        except Exception:
-            pass
-    return {"w_mean": 0.45, "w_excerpt": 0.25, "w_rich": 0.20, "w_dim": 0.10}
+def _load_stage_title_from_qa(stage_id: str) -> str:
+    try:
+        from core.describe_stage_qa import load_stage_qa
+
+        d = load_stage_qa(stage_id)
+        if isinstance(d, dict) and d.get("stage_title"):
+            return str(d.get("stage_title"))
+    except Exception:
+        pass
+    return stage_id
 
 
 def _coerce_float_01(x: Any) -> Optional[float]:
@@ -206,14 +199,19 @@ def recompute_confidence_scheme_a(
     *,
     fallback: Any = None,
 ) -> Optional[float]:
-    """全阶段分：各题有数值的 confidence 的均值，若任一题 <0.7 则不超过 0.75。无数值时回退为 fallback。"""
+    """全阶段分：各题有数值的 mean_score 的均值，若任一题 <0.7 则不超过 0.75。无数值时回退为 fallback。"""
     confs: list[float] = []
     for item in question_reviews or []:
         if not isinstance(item, dict):
             continue
-        c = _coerce_float_01(item.get("confidence"))
-        if c is not None:
-            confs.append(c)
+        se = _coerce_float_01(item.get("score_evidence"))
+        sc = _coerce_float_01(item.get("score_consistency"))
+        if se is not None and sc is not None:
+            confs.append((se + sc) / 2.0)
+        elif se is not None:
+            confs.append(se)
+        elif sc is not None:
+            confs.append(sc)
     if not confs:
         return _coerce_float_01(fallback) if fallback is not None else None
     m = sum(confs) / len(confs)
@@ -221,51 +219,6 @@ def recompute_confidence_scheme_a(
     if any(c < 0.7 for c in confs):
         out = min(out, 0.75)
     return out
-
-
-def _expected_evidence_n(question_type: str) -> float:
-    t = (question_type or "").strip()
-    if t in ("short_answer", "multi_choice"):
-        return 1.5
-    return 1.0
-
-
-def compute_payload_quality_metrics(payload: Dict[str, Any]) -> Dict[str, Any]:
-    """对覆写题面前的答案 JSON 做证据统计（excerpt 覆盖、丰富度等）。"""
-    answers = payload.get("answers")
-    if not isinstance(answers, list):
-        answers = []
-    total_ev = 0
-    nonempty = 0
-    per_q_rich: list[float] = []
-    for a in answers:
-        if not isinstance(a, dict):
-            continue
-        ev = a.get("evidence")
-        if not isinstance(ev, list):
-            ev = []
-        exp = _expected_evidence_n(str(a.get("question_type") or ""))
-        n_nonempty = 0
-        for it in ev:
-            if not isinstance(it, dict):
-                continue
-            total_ev += 1
-            ex = it.get("excerpt")
-            if isinstance(ex, str) and ex.strip():
-                nonempty += 1
-                n_nonempty += 1
-        if ev:
-            per_q_rich.append(min(1.0, float(n_nonempty) / max(exp, 0.5)))
-        else:
-            per_q_rich.append(0.0)
-    excerpt_coverage = (float(nonempty) / float(total_ev)) if total_ev else 0.0
-    evidence_richness = (sum(per_q_rich) / len(per_q_rich)) if per_q_rich else 0.0
-    return {
-        "excerpt_coverage": round(excerpt_coverage, 4),
-        "evidence_richness": round(evidence_richness, 4),
-        "total_evidence_items": total_ev,
-        "nonempty_excerpt_items": nonempty,
-    }
 
 
 def enrich_review_with_report_quality(
@@ -285,9 +238,16 @@ def enrich_review_with_report_quality(
     for item in qrs:
         if not isinstance(item, dict):
             continue
-        c = _coerce_float_01(item.get("confidence"))
-        if c is not None:
-            mean_q += c
+        se = _coerce_float_01(item.get("score_evidence"))
+        sc = _coerce_float_01(item.get("score_consistency"))
+        if se is not None and sc is not None:
+            mean_q += (se + sc) / 2.0
+            nq += 1
+        elif se is not None:
+            mean_q += se
+            nq += 1
+        elif sc is not None:
+            mean_q += sc
             nq += 1
     if nq:
         mean_q = mean_q / nq
@@ -295,32 +255,15 @@ def enrich_review_with_report_quality(
         mq = _coerce_float_01(review.get("confidence"))
         mean_q = mq if mq is not None else 0.0
 
-    dims = review.get("dimensions") if isinstance(review.get("dimensions"), dict) else {}
-    dvals: list[float] = []
-    for k in ("evidence_supports_answers", "question_answer_consistency", "requirements_fit"):
-        dv = _coerce_float_01(dims.get(k)) if isinstance(dims, dict) else None
-        if dv is not None:
-            dvals.append(dv)
-    mean_d = sum(dvals) / len(dvals) if dvals else 0.0
-
-    metrics = compute_payload_quality_metrics(payload)
-    w = _load_review_quality_weights()
-    rqs = (
-        w["w_mean"] * mean_q
-        + w["w_excerpt"] * metrics["excerpt_coverage"]
-        + w["w_rich"] * metrics["evidence_richness"]
-        + w["w_dim"] * mean_d
-    )
+    # 完全以 LLM 逐题审核的 confidence（结合了题目要求、证据支撑度）为主
+    rqs = mean_q
     rqs = max(0.0, min(1.0, float(rqs)))
     rqs = round(rqs, 2)
     review["report_quality_score"] = rqs
 
     meta: Dict[str, Any] = dict(review.get("_meta")) if isinstance(review.get("_meta"), dict) else {}
     meta["quality"] = {
-        **metrics,
         "mean_question_confidence": round(mean_q, 4),
-        "mean_dimensions": round(mean_d, 4),
-        "weights": w,
     }
     review["_meta"] = meta
     return review
@@ -342,12 +285,14 @@ def run_describe_stage_review(
     question_sheet: str,
     model_json_before_stage_qa_coerce: str,
     expected_question_ids: List[str],
-) -> Tuple[Optional[Dict[str, Any]], str, Optional[str]]:
+) -> Tuple[Optional[Dict[str, Any]], str, Optional[str], int]:
     """
     无工具 invoke。材料 A=题单，B=覆写前 JSON 字符串。
 
     若输出无法 JSON 解析或无法 `coerce_review_payload`，会按 `DESCRIBE_REVIEW_MAX_ATTEMPTS`（默认 3）
     对同一审阅模型**追加修复轮**重试，直至成功或达到上限；失败时返回最后一次原文与错误信息。
+
+    第四项：本阶段 review 的 LLM 调用**累计** total_tokens（与 print_step 同源；未返回则为 0）。
     """
     id_line = ", ".join(expected_question_ids) if expected_question_ids else "(无)"
     user_parts = [
@@ -376,8 +321,10 @@ def run_describe_stage_review(
     ]
     last_err: Optional[str] = None
     raw_text = ""
+    review_tokens_total = 0
     for attempt in range(1, max_attempts + 1):
         msg = llm.invoke(messages)
+        review_tokens_total += llm_message_total_tokens(msg)
         raw_text = (getattr(msg, "content", None) or "").strip()
         try:
             parsed = parse_review_llm_output(raw_text)
@@ -389,12 +336,12 @@ def run_describe_stage_review(
             )
             if attempt > 1:
                 logger.info("Describe review OK on attempt %s/%s", attempt, max_attempts)
-            return coerced, raw_text, None
+            return coerced, raw_text, None, review_tokens_total
         except Exception as e:
             last_err = f"{type(e).__name__}: {e}"
             logger.warning("Describe review parse failed attempt %s/%s: %s", attempt, max_attempts, last_err)
             if attempt >= max_attempts:
-                return None, raw_text, last_err
+                return None, raw_text, last_err, review_tokens_total
             tail = (raw_text or "")[-6000:].replace("```", "`\u200b`")
             repair = (
                 "你的上一段输出**无法**被解析为合法 JSON，或结构不符合 `describe_review_v1` 要求（必须含全部 question_id 的"
@@ -403,7 +350,7 @@ def run_describe_stage_review(
                 "请**只**重新输出**一个** JSON 对象，字段名与系统说明一致，可用 ```json 围栏。不要写任何其他解释或道歉。"
             )
             messages = list(messages) + [AIMessage(content=raw_text), HumanMessage(content=repair)]
-    return None, raw_text, last_err or "unknown"
+    return None, raw_text, last_err or "unknown", review_tokens_total
 
 
 def _load_stage_title_from_qa(stage_id: str) -> str:

@@ -1,0 +1,227 @@
+{
+  "schema_version": "describe_review_v1",
+  "stage_id": "03_mem_mgmt",
+  "stage_title": "内存管理（物理/虚拟/分配器）",
+  "confidence": 0.97,
+  "question_reviews": [
+    {
+      "question_id": "Q03_001",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "答案选择 B 符合题面选项约束。证据引用 Makefile 与 C 源文件路径，能直接支撑语言/形态结论。"
+    },
+    {
+      "question_id": "Q03_002",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态值 implemented 合法。证据列出具体分配函数名与头文件声明，支撑充分。"
+    },
+    {
+      "question_id": "Q03_003",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "选择 D 符合题面。证据展示 struct run 链表结构，直接对应空闲链表算法。"
+    },
+    {
+      "question_id": "Q03_004",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "简答内容明确列出核心结构体。证据摘录结构体定义，字段与描述一致。"
+    },
+    {
+      "question_id": "Q03_005",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "结论明确为全局锁。证据展示了锁宏定义与结构体，但未直接展示持锁临界区代码行，支撑度略减。"
+    },
+    {
+      "question_id": "Q03_006",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态值合法。证据列出 walk/map/unmap 函数原型，支撑实现存在性。"
+    },
+    {
+      "question_id": "Q03_007",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "列出 3 个关键入口，符合题面数量要求。证据对应函数摘录，一致性好。"
+    },
+    {
+      "question_id": "Q03_008",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "结论提及进程锁。证据展示 proc 结构含锁及 TLB 刷新调用，但未显式展示页表修改时的持锁代码片段。"
+    },
+    {
+      "question_id": "Q03_009",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "选择 A 符合题面。证据展示 SATP 切换汇编与页表创建函数，支撑独立页表结论。"
+    },
+    {
+      "question_id": "Q03_010",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态值合法。证据展示异常入口与分发函数，支撑缺页处理链路存在。"
+    },
+    {
+      "question_id": "Q03_011",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "链路节点 5 个，符合 3-5 个要求。证据对应各节点函数摘录，调用关系清晰。"
+    },
+    {
+      "question_id": "Q03_012",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态值合法。证据展示 PTE_COW 宏与 fault 处理逻辑，支撑 CoW 实现。"
+    },
+    {
+      "question_id": "Q03_013",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态值合法。证据展示 lazy fault 处理函数，支撑惰性分配结论。"
+    },
+    {
+      "question_id": "Q03_014",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态值 not_found 合法。证据说明搜索路径与结果，支撑无 swap 结论。"
+    },
+    {
+      "question_id": "Q03_015",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态值合法。证据展示 mmap 系统调用与标志位定义，支撑实现存在。"
+    },
+    {
+      "question_id": "Q03_016",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "三态值 stub 合法。证据引用 bio.c 块缓存而非统一页缓存，支撑 stub 判定，但证据与严格页缓存略有差异。"
+    },
+    {
+      "question_id": "Q03_017",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态值 stub 合法。证据展示同步写回函数且说明无后台线程，支撑结论。"
+    },
+    {
+      "question_id": "Q03_018",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态值 not_found 合法。证据说明仅本地刷新无 IPI，支撑无射击机制结论。"
+    },
+    {
+      "question_id": "Q03_019",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "简答明确指令与函数。证据提供内联汇编定义与调用点，支撑充分。"
+    },
+    {
+      "question_id": "Q03_020",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "简答列出检查函数。证据展示 copyin/out 及范围检查逻辑，支撑安全机制结论。"
+    },
+    {
+      "question_id": "Q03_021",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "选择 F 符合题面。证据与 Q03_014 一致，支撑无置换结论。"
+    },
+    {
+      "question_id": "Q03_022",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "三态值 not_found 合法。证据列出搜索关键字，符合题面 not_found 要求，但无代码实证。"
+    },
+    {
+      "question_id": "Q03_023",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "填空内容完整。证据引用宏定义常量，支撑数值来源。"
+    },
+    {
+      "question_id": "Q03_024",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "选择 C 符合题面。证据同时展示硬件 PTE 位与软件检查函数，支撑双重保护结论。"
+    },
+    {
+      "question_id": "Q03_025",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "简答明确结构体。证据展示 seg 链表定义与 proc 关联，支撑统一管理机制。"
+    },
+    {
+      "question_id": "Q03_026",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "选择 C 符合题面。证据说明 RISC-V 纯分页架构，支撑无硬件分段结论。"
+    },
+    {
+      "question_id": "Q03_027",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "选择 A 符合题面。证据展示缺页时分配逻辑，支撑按需调页结论。"
+    },
+    {
+      "question_id": "Q03_028",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "简答明确首次适配策略。证据展示查找间隙函数与基地址宏，支撑放置策略。"
+    },
+    {
+      "question_id": "Q03_029",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "三态值 not_found 合法。证据列出搜索关键字，符合题面要求，但无代码实证。"
+    },
+    {
+      "question_id": "Q03_030",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "链路格式符合 Mermaid 语法要求。证据支撑各节点函数存在与调用关系。"
+    },
+    {
+      "question_id": "Q03_031",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "选择 B 符合题面。证据展示空闲链表分配逻辑，支撑外部碎片风险结论。"
+    },
+    {
+      "question_id": "Q03_032",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "选择 C 符合题面。证据展示 SATP 寄存器与 MMU 翻译机制，支撑运行时绑定。"
+    },
+    {
+      "question_id": "Q03_033",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "选择 C 符合题面。证据与 Q03_021 一致，支撑无置换结论。"
+    },
+    {
+      "question_id": "Q03_034",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "三态值 not_found 合法。证据列出搜索关键字与同步写回分析，符合题面要求。"
+    }
+  ],
+  "findings": [],
+  "summary_zh": "本报告整体质量较高，题面相符度极佳（所有 consistency 均为 1.00）。证据支撑度方面，大部分题目提供了具体的代码摘录与符号定义（score_evidence 多为 0.95），但在部分涉及“未实现/搜索”类题目（如 Q03_022/029/034）或锁持有权细节（Q03_005/008）上，证据主要为搜索陈述或宏定义，未展示完整调用上下文，故评分略低（0.90）。全阶段 confidence 按各题均值方案 A 汇总计算，无低分截断。",
+  "report_quality_score": 0.78,
+  "_meta": {
+    "quality": {
+      "mean_question_confidence": 0.9706,
+      "mean_dimensions": 0.0
+    },
+    "review_model": "qwen3.5-plus",
+    "baseline": true,
+    "run_at": "2026-04-23T22:08:26",
+    "baseline_execute_tokens": 591103,
+    "baseline_review_tokens": 21947,
+    "baseline_stage_total_tokens": 613050
+  }
+}

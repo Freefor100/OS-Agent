@@ -1,0 +1,57 @@
+{
+  "schema_version": "describe_review_v1",
+  "stage_id": "08_network",
+  "stage_title": "网络子系统与协议栈",
+  "confidence": 0.93,
+  "question_reviews": [
+    {
+      "question_id": "Q08_001",
+      "score_evidence": 0.95,
+      "score_consistency": 1.00,
+      "review": "题面要求三态，回答符合。证据列举了系统调用表、内核目录检索，支撑“未发现”结论，证据详实。"
+    },
+    {
+      "question_id": "Q08_002",
+      "score_evidence": 0.90,
+      "score_consistency": 0.90,
+      "review": "选项值为“未发现”对应选项 D，语义一致但建议统一用选项标号（A/B/C/D）。证据支撑充分，搜索了头文件与关键词。"
+    },
+    {
+      "question_id": "Q08_003",
+      "score_evidence": 0.95,
+      "score_consistency": 1.00,
+      "review": "三态回答合规。证据覆盖系统调用号定义、分发表及用户库接口，闭环证明无 socket 接口，无缺失。"
+    },
+    {
+      "question_id": "Q08_004",
+      "score_evidence": 0.90,
+      "score_consistency": 0.95,
+      "review": "因未实现而说明无法追踪，符合逻辑。证据链证明了缺少 syscall 及驱动，支撑结论，虽无路径节点但理由充分。"
+    },
+    {
+      "question_id": "Q08_005",
+      "score_evidence": 0.95,
+      "score_consistency": 1.00,
+      "review": "三态合规。证据通过排除法（现有中断均为磁盘/串口）支撑无网卡中断结论，路径清晰。"
+    },
+    {
+      "question_id": "Q08_006",
+      "score_evidence": 0.90,
+      "score_consistency": 0.70,
+      "review": "选项留空正确，但题面明确要求“在 notes 写 not_found\"，答案 JSON 缺失 notes 字段，违反契约。"
+    },
+    {
+      "question_id": "Q08_007",
+      "score_evidence": 0.95,
+      "score_consistency": 1.00,
+      "review": "三态合规。证据区分了通用 DMA 与网络零拷贝，支撑“未发现网络零拷贝”结论，摘录具体。"
+    }
+  ],
+  "findings": [
+    {
+      "severity": "warn",
+      "message": "题面要求未发现时在 notes 字段写 not_found，但答案 JSON 中缺失 notes 字段，违反输出契约。"
+    }
+  ],
+  "summary_zh": "本报告整体证据支撑度较高，多数题目能引用具体代码路径与搜索结果为结论提供闭环证明。Q08_006 违反题面关于 notes 字段的契约要求，导致一致性扣分；Q08_002 选项值建议使用标号以增强规范性。其余题目题面相符度与证据充分性均表现良好，全阶段分按各题均值方案汇总。"
+}

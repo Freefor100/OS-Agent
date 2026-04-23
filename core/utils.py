@@ -8,6 +8,7 @@ import ast
 import os
 import json
 import re
+from typing import Any
 
 
 def _stringify_tool_arg(v):
@@ -294,3 +295,20 @@ def format_tool_result_summary(tool_name: str, content: str) -> str:
         return f"返回开发历史分析 ({line_count} 行, {content_len} 字符)"
     else:
         return f"返回 {content_len} 字符 ({line_count} 行)"
+
+
+def llm_message_total_tokens(msg: Any) -> int:
+    """从 LangChain Chat 返回的 AIMessage 等取 total_tokens，与 `os_agent_d_describe.print_step` 一致。
+
+    若提供方未在 response_metadata 中返回用量，则返回 0（与终端「未携带 token_usage」行为一致）。"""
+    metadata = getattr(msg, "response_metadata", None) or {}
+    if not isinstance(metadata, dict):
+        return 0
+    usage = metadata.get("token_usage") or {}
+    if not isinstance(usage, dict):
+        return 0
+    t = usage.get("total_tokens")
+    try:
+        return int(t) if t is not None else 0
+    except (TypeError, ValueError):
+        return 0

@@ -728,7 +728,7 @@ def _invoke_describe_stage_review(
     question_sheet = build_stage_qa_question_sheet(stage_id, title)
     model_json = json.dumps(payload_before_stage_qa, ensure_ascii=False, indent=2)
     try:
-        parsed_review, review_raw_llm, review_err = run_describe_stage_review(
+        parsed_review, review_raw_llm, review_err, _review_tokens = run_describe_stage_review(
             stage_id=stage_id,
             stage_title=title,
             question_sheet=question_sheet,

@@ -1,0 +1,149 @@
+{
+  "schema_version": "describe_review_v1",
+  "stage_id": "06_sync_ipc",
+  "stage_title": "同步互斥与进程间通信",
+  "confidence": 0.75,
+  "question_reviews": [
+    {
+      "question_id": "Q06_001",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "答案列出了具体的同步原语类型定义，证据中的 struct 摘录直接支撑了 value 中的声明，题面相符度高。"
+    },
+    {
+      "question_id": "Q06_002",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "证据展示了 acquiresleep 中调用 sleep 函数，有效支撑了阻塞锁（Blocking Mutex）的结论，选项选择符合题面。"
+    },
+    {
+      "question_id": "Q06_003",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "三态结论为 implemented，证据覆盖了 wait_queue 结构体及 sleep/wakeup 函数实现，支撑充分。"
+    },
+    {
+      "question_id": "Q06_004",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "填空内容完整，证据中的代码片段展示了锁的获取与释放逻辑，能支撑防丢 wakeup 机制的分析。"
+    },
+    {
+      "question_id": "Q06_005",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "Pipe 实现结论明确，证据提供了结构体定义与分配函数，完全符合题面要求。"
+    },
+    {
+      "question_id": "Q06_006",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "证据中的取模运算 (nwrite % PIPESIZE) 直接证明了环形缓冲区形态，与选项 A 一致。"
+    },
+    {
+      "question_id": "Q06_007",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "证据显示在缓冲满/空时调用 sleep，直接支撑阻塞语义的结论，题面相符。"
+    },
+    {
+      "question_id": "Q06_008",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "结论为 not_found，证据提供了系统调用号的检索结果作为否定证据，符合逻辑。"
+    },
+    {
+      "question_id": "Q06_009",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "结论为 not_found，证据展示了相关 syscall 检索缺失，支撑充分。"
+    },
+    {
+      "question_id": "Q06_010",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "信号机制实现证据链完整（结构体、syscall 号、汇编桩），完全支撑 implemented 结论。"
+    },
+    {
+      "question_id": "Q06_011",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "详细描述了上下文构建与恢复过程，证据中的代码片段直接对应 value 中的逻辑描述。"
+    },
+    {
+      "question_id": "Q06_012",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "结论为未发现，证据提供了目录搜索记录，符合 not_found 的举证要求。"
+    },
+    {
+      "question_id": "Q06_013",
+      "score_evidence": 0.3,
+      "score_consistency": 1.0,
+      "review": "严重矛盾：value 声称使用 Rust 标准库原子操作，但 evidence 显示文件后缀为.c 且使用 GCC 内置函数 (__sync_...)，证据无法支撑结论且存在事实冲突。"
+    },
+    {
+      "question_id": "Q06_014",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "逐条分析了死锁条件，证据引用了锁获取与 sleep 逻辑，支撑了关于循环等待可能性的分析。"
+    },
+    {
+      "question_id": "Q06_015",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "结论为忽略策略，证据显示未找到死锁处理机制代码，逻辑自洽。"
+    },
+    {
+      "question_id": "Q06_016",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "结论为 not_found，证据展示了锁顺序规范检索结果为空，符合题面要求。"
+    },
+    {
+      "question_id": "Q06_017",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "结论为 implemented (Mesa 语义)，证据中 sleep 返回前重新获取锁的逻辑支撑了 Mesa 语义判断。"
+    },
+    {
+      "question_id": "Q06_018",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "对三个经典问题分别给出了状态，Pipe 作为生产者 - 消费者证据充分，其余未找到证据合理。"
+    },
+    {
+      "question_id": "Q06_019",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "结论为 not_found，证据提供了消息队列相关 syscall 检索结果，支撑充分。"
+    },
+    {
+      "question_id": "Q06_020",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "结论为 not_found，证据展示了 barrier 相关关键字检索结果为空，符合题面要求。"
+    }
+  ],
+  "findings": [
+    {
+      "question_id": "Q06_013",
+      "severity": "warn",
+      "message": "证据与结论严重矛盾：Value 声称 Rust 原子操作，Evidence 显示为 C 语言实现 (__sync 内置函数)。"
+    }
+  ],
+  "summary_zh": "整体报告质量较高，大部分题目证据详实且题面相符。但 Q06_013 存在严重证据与结论矛盾（语言实现不匹配），导致该题证据分极低并触发全阶段置信度截断（方案 A）。其余题目在契约遵循与证据支撑上表现良好。",
+  "report_quality_score": 0.76,
+  "_meta": {
+    "quality": {
+      "mean_question_confidence": 0.9537,
+      "mean_dimensions": 0.0
+    },
+    "review_model": "qwen3.5-plus",
+    "baseline": true,
+    "run_at": "2026-04-23T22:23:31",
+    "baseline_execute_tokens": 585061,
+    "baseline_review_tokens": 16151,
+    "baseline_stage_total_tokens": 601212
+  }
+}
