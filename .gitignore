@@ -46,6 +46,10 @@ repos/xv6-k210/.git/
 #   cd repos && git clone xv6-k210.git.bundle xv6_k210_git_tmp
 #   rm -rf xv6-k210/.git && mv xv6_k210_git_tmp/.git xv6-k210/.git && rm -rf xv6_k210_git_tmp
 #
+# 已有 repos/xv6-k210/.git 后，对齐嵌套仓库工作区与 HEAD（消除大量「已删除」；会覆盖未提交改动，请先备份）：
+#   git -C repos/xv6-k210 restore .
+#   （Git 较旧无 restore：git -C repos/xv6-k210 checkout -- .）
+#
 # 校验：git -C repos/xv6-k210 rev-parse HEAD
 # （bundle 内含 scene/main 等分支；恢复后可用 git -C repos/xv6-k210 status 查看工作区）
 # ---------- end xv6-k210 bundle ----------
