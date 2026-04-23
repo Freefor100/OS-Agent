@@ -675,7 +675,9 @@ OS-Agent/
 
 **v4.0** 可结合 `_per_stage/*_plan.json` 与 `repo_profile.json` 对照各章锁定步骤与 must_cover；章节正文以 `sections/*.md` 为准。
 
-**Describe 无工具 Review（可选）**：`DESCRIBE_STAGE_REVIEW=1` 时，仅对 **JSON-QA 且校验成功** 的阶段在落盘前送审：材料为 **`core/describe_stage_qa` 题单** + **`coerce_answers_payload_by_stage_qa` 覆写题面前的答案 JSON**（证据以答案 JSON 内 `evidence` 为准，**不含**工具回传摘录）。`01_overview`、`10_history` 不审。结果 `_per_stage/<stage_id>_review.json`：含逐题 **`question_reviews[]`**（`question_id`、`confidence`、`review` 文字）、全阶段 **`confidence`** 与 **`summary_zh`** 总评等；默认关闭。可选 `DESCRIBE_REVIEW_MODEL`。
+**Describe 无工具 Review（可选）**：`DESCRIBE_STAGE_REVIEW=1` 时，仅对 **JSON-QA 且校验成功** 的阶段在落盘前送审：材料为 **`core/describe_stage_qa` 题单** + **`coerce_answers_payload_by_stage_qa` 覆写题面前的答案 JSON**（证据以答案 JSON 内 `evidence` 为准，**不含**工具回传摘录）。`01_overview`、`10_history` 不审。结果 `_per_stage/<stage_id>_review.json`：细粒度规则见系统提示**详细分档**；后处理会写入 **`report_quality_score`（0~1）**、**`_meta.quality`**，并按**方案 A** 重算全阶段 **`confidence`（与各题 `confidence` 一致）**；另含逐题 `question_reviews[]`、`summary_zh` 等。默认可选 `DESCRIBE_REVIEW_MODEL`；**合成 `report_quality_score` 的权重**可用环境变量 **`REVIEW_QUALITY_WEIGHTS`** 传入 JSON（键 `w_mean` / `w_excerpt` / `w_rich` / `w_dim`）。合并总报告时，会在 **`output/<os-name>/review_score.json`** 汇总 **02~09 题库各章**（8 个 `stage_id`）的 0~100 分与 **总分校验（有分章的算术平均）**，并在 **最终报告** `OS技术分析报告_<name>.md` 文首元数据区写引用行（示例：`> **报告质量打分**: 84/100`）；若各章无可用 review 则写“未统计”类占位。
+
+审阅侧车若 **JSON 解析或结构不合规**（如缺题、乱序），会按 **`DESCRIBE_REVIEW_MAX_ATTEMPTS`**（默认 `3`，最大 `8`）对同一审阅模型追加「修复重发」轮次，与主阶段 JSON 修复类似；仍失败则写入 `*_review_error.json`。
 
 若某章质量不符预期，优先检查 `output/<os-name>/_per_stage/` 下对应 `*_plan.json` 与 `os_agent_d_describe.py` 中该阶段 `prompt` / 执行契约。
 

@@ -2,222 +2,237 @@
   "schema_version": "describe_review_v1",
   "stage_id": "04_process_smp",
   "stage_title": "进程/线程/调度与多核",
-  "confidence": 0.98,
+  "confidence": 0.99,
   "question_reviews": [
     {
       "question_id": "Q04_001",
       "confidence": 1.0,
-      "review": "题面要求提供顶层类型名、结构体路径、关键字段及 PCB/TCB 区分情况。答案完整列出 struct proc/thread、路径、字段及区分结论，证据片段（proc.h/thread.h）支持所述字段存在，符合 short_answer 格式契约。"
+      "review": "题面要求字段齐全，答案提供 struct proc/thread 路径及关键字段映射，evidence 摘录直接展示结构体定义，完全支撑 value 结论。"
     },
     {
       "question_id": "Q04_002",
-      "confidence": 1.0,
-      "review": "题面要求列出状态机状态与流转点。答案枚举了 procstate 与 threadState 及对应流转函数，证据片段（proc.h/thread.h/proc.c）支持状态定义与流转代码，符合格式契约。"
+      "confidence": 0.95,
+      "review": "状态枚举证据充分，流转点证据仅覆盖部分（如 scheduler），其余流转依赖推断，但整体符合题面要求。"
     },
     {
       "question_id": "Q04_003",
       "confidence": 1.0,
-      "review": "题面为 tri_state_impl 询问上下文切换实现。答案值为 implemented，证据提供 swtch.S 汇编及 proc.c 调用点，足以支撑结论，符合契约。"
+      "review": "三态结论为 implemented，evidence 提供汇编 swtch 及调用点 sched，直接证实上下文切换实现。"
     },
     {
       "question_id": "Q04_004",
       "confidence": 1.0,
-      "review": "题面要求列出保存/恢复的寄存器集合。答案列出 ra/sp/s0-s11 并引用 context.h 与 swtch.S，证据片段显示结构体定义与汇编指令，支撑结论，符合格式。"
+      "review": "寄存器列表与 swtch.S 及 context.h 摘录完全对应，证据直接支撑保存/恢复集合的结论。"
     },
     {
       "question_id": "Q04_005",
-      "confidence": 1.0,
-      "review": "题面要求指定调度算法名称并提供代码证据。答案说明为 FCFS/RR 混合（简单遍历），并指出无 timeslice/priority 字段，证据片段（proc.c 循环、proc.h 搜索）支撑该描述，符合格式。"
+      "confidence": 0.95,
+      "review": "RR 算法结论由 scheduler 循环及 timer yield 证据支撑，虽无 timeslice 字段但逻辑自洽，符合题面格式。"
     },
     {
       "question_id": "Q04_006",
       "confidence": 1.0,
-      "review": "题面要求列出调度器核心入口/函数。答案提供 scheduler/sched/yield 及路径，证据片段（proc.c）显示函数定义与功能，支撑结论，符合格式。"
+      "review": "列出 3 个核心函数并提供对应代码摘录，完全满足题面 1-3 个入口及证据要求。"
     },
     {
       "question_id": "Q04_007",
       "confidence": 1.0,
-      "review": "题面为 tri_state_impl 询问 fork/clone。答案值为 implemented，证据提供 proc.c 中 fork/thread_clone 及 sysproc.c 中 sys_clone，支撑结论，符合契约。"
+      "review": "fork/clone 实现结论有 sys_clone 及内核函数摘录支撑，证据充分。"
     },
     {
       "question_id": "Q04_008",
       "confidence": 1.0,
-      "review": "题面要求说明 fork/clone 是否复制地址空间与文件表。答案区分了 fork 复制与 clone 共享，并引用 uvmcopy/filedup 等证据，证据片段支撑所述逻辑，符合格式。"
+      "review": "fork 复制与 clone 共享的区别有 uvmcopy/filedup 及 thread_clone 证据直接支撑，符合题面要求。"
     },
     {
       "question_id": "Q04_009",
       "confidence": 1.0,
-      "review": "题面为 tri_state_impl 询问 exec。答案值为 implemented，证据提供 exec.c 与 sysproc.c 中相关函数，支撑结论，符合契约。"
+      "review": "exec 实现结论有 exec.c 函数摘录支撑，证据直接。"
     },
     {
       "question_id": "Q04_010",
       "confidence": 1.0,
-      "review": "题面为 tri_state_impl 询问 wait/waitpid。答案值为 implemented，证据提供 proc.c 中 wait/wait4pid 函数，支撑结论，符合契约。"
+      "review": "wait/waitpid 实现结论有对应函数摘录支撑，包含 ZOMBIE 状态检查逻辑，证据充分。"
     },
     {
       "question_id": "Q04_011",
       "confidence": 1.0,
-      "review": "题面为 single_choice 询问 wait 阻塞实现。答案选 A（真正阻塞），证据提供 sleep/wakeup1 调用，支撑阻塞机制描述，符合契约。"
+      "review": "选择 A（真正阻塞），evidence 展示 sleep/wakeup 机制，直接支撑阻塞实现类型。"
     },
     {
       "question_id": "Q04_012",
       "confidence": 1.0,
-      "review": "题面要求说明 PID 分配器实现。答案说明为自增计数器加锁，证据提供 allocpid 函数及 nextpid 变量，支撑结论，符合格式。"
+      "review": "PID 分配器实现描述与 allocpid/nextpid 证据完全一致，满足题面证据要求。"
     },
     {
       "question_id": "Q04_013",
       "confidence": 1.0,
-      "review": "题面要求说明父子进程树存储方式。答案说明为 parent 指针 + 遍历数组，证据提供 proc.h 字段与 proc.c 遍历逻辑，支撑结论，符合格式。"
+      "review": "父子树存储方式（parent 指针 + 线性扫描）有 struct 字段及 wait 循环证据支撑。"
     },
     {
       "question_id": "Q04_014",
       "confidence": 1.0,
-      "review": "题面为 tri_state_impl 询问 signal/futex。答案值为 implemented，证据提供 futex.c 函数及 proc.h 信号字段，支撑结论，符合契约。"
+      "review": "signal/futex 实现结论有对应源文件及函数摘录支撑，证据充分。"
     },
     {
       "question_id": "Q04_015",
-      "confidence": 1.0,
-      "review": "题面要求说明多核交叉一致性（队列/迁移/IPI）。答案说明无每核队列/迁移，证据提供 scheduler 遍历全局数组及 sbi.h，支撑结论，符合格式。"
+      "confidence": 0.95,
+      "review": "交叉一致性结论（无每核队列/IPI）有全局数组及 sbi 定义证据支撑，负向结论证据合理。"
     },
     {
       "question_id": "Q04_016",
       "confidence": 1.0,
-      "review": "题面要求说明 exit 资源回收调用链。答案列出关键步骤（close/reparent/wakeup/zombie 等），证据提供 exit/freeproc 片段，支撑结论，符合格式。"
+      "review": "exit 回收路径调用链有 exit/freeproc 摘录支撑，覆盖文件/地址空间/通知父进程，证据充分。"
     },
     {
       "question_id": "Q04_017",
       "confidence": 1.0,
-      "review": "题面为 tri_state_impl 询问进程组/会话。答案值为 stub，证据显示仅有 pgid 字段及简单 set/get 函数，无实际检查链，支撑 stub 结论，符合契约。"
+      "review": "进程组/会话 stub 结论有 pgid 字段及简单 set/get 实现证据支撑，符合题面三态要求。"
     },
     {
       "question_id": "Q04_018",
       "confidence": 1.0,
-      "review": "题面为 tri_state_impl 询问 rlimit。答案值为 stub，证据显示仅有结构体定义及特殊处理代码，支撑 stub 结论，符合契约。"
+      "review": "rlimit stub 结论有 struct 定义及有限 sys_prlimit64 实现证据支撑，符合题面要求。"
     },
     {
       "question_id": "Q04_019",
       "confidence": 1.0,
-      "review": "题面为 single_choice 询问 TCB/PCB 区分。答案选 A（区分），证据提供 proc.h 与 thread.h 不同结构体，支撑结论，符合契约。"
+      "review": "选择 A（区分 TCB/PCB），evidence 展示两个独立结构体定义，直接支撑结论。"
     },
     {
       "question_id": "Q04_020",
       "confidence": 1.0,
-      "review": "题面为 tri_state_impl 询问页表切换。答案值为 implemented，证据提供 scheduler 中 w_satp/sfence_vma 调用，支撑结论，符合契约。"
+      "review": "页表切换实现结论有 w_satp/sfence_vma 汇编调用证据支撑，直接对应题面。"
     },
     {
       "question_id": "Q04_021",
-      "confidence": 1.0,
-      "review": "题面为 single_choice 询问线程映射模型。答案选 A（1:1），证据提供 thread_clone 及文档说明，支撑结论，符合契约。"
+      "confidence": 0.95,
+      "review": "1:1 映射结论由 thread_clone 创建独立 thread 结构证据支撑，逻辑自洽，符合单选要求。"
     },
     {
       "question_id": "Q04_022",
       "confidence": 1.0,
-      "review": "题面为 tri_state_impl 询问 TLS。答案值为 stub，证据显示仅设置 tp 寄存器，支撑 stub 结论，符合契约。"
+      "review": "TLS 实现结论有 tp 寄存器设置及 sys_clone 参数传递证据支撑，符合题面要求。"
     },
     {
       "question_id": "Q04_023",
-      "confidence": 1.0,
-      "review": "题面为 multi_choice 询问调度性能指标。答案选 F（未发现），证据提供搜索说明，支撑结论，符合契约。"
+      "confidence": 0.95,
+      "review": "多选结论为未发现，evidence 提供搜索结果为空的说明，支撑负向结论。"
     },
     {
       "question_id": "Q04_024",
       "confidence": 1.0,
-      "review": "题面为 tri_state_impl 询问老化机制。答案值为 not_found，证据提供搜索说明及无 priority 字段，支撑结论，符合契约。"
+      "review": "老化机制 not_found 结论有搜索 0 命中证据支撑，符合三态题面要求。"
     },
     {
       "question_id": "Q04_025",
       "confidence": 1.0,
-      "review": "题面为 tri_state_impl 询问公平份额调度。答案值为 not_found，证据提供搜索说明，支撑结论，符合契约。"
+      "review": "公平份额调度 not_found 结论有搜索 0 命中证据支撑，符合三态题面要求。"
     },
     {
       "question_id": "Q04_026",
       "confidence": 1.0,
-      "review": "题面为 single_choice 询问抢占模式。答案选 A（完全抢占），证据提供 trap.c 中时钟中断调用 yield，支撑结论，符合契约。"
+      "review": "选择 A（完全抢占），evidence 展示时钟中断触发 yield，直接支撑抢占模式结论。"
     },
     {
       "question_id": "Q04_027",
       "confidence": 1.0,
-      "review": "题面为 tri_state_impl 询问 SJF。答案值为 not_found，证据提供搜索说明，支撑结论，符合契约。"
+      "review": "SJF not_found 结论有搜索 0 命中证据支撑，符合三态题面要求。"
     },
     {
       "question_id": "Q04_028",
       "confidence": 1.0,
-      "review": "题面为 single_choice 询问多核形态。答案选 A（SMP），证据提供 NCPU 定义及 cpus 数组，支撑结论，符合契约。"
+      "review": "选择 A（SMP），evidence 展示 NCPU 宏及多核启动逻辑，直接支撑多核形态结论。"
     },
     {
       "question_id": "Q04_029",
       "confidence": 1.0,
-      "review": "题面为 tri_state_impl 询问 AP 启动链。答案值为 implemented，证据提供 main.c 中 sbi_hart_start 及上线循环，支撑结论，符合契约。"
+      "review": "AP 启动链 implemented 结论有 main 函数中 hartid 判断及 sbi_hart_start 证据支撑。"
     },
     {
       "question_id": "Q04_030",
       "confidence": 1.0,
-      "review": "题面为 tri_state_impl 询问 IPI。答案值为 stub，证据显示有发送函数但无处理函数，支撑 stub 结论，符合契约。"
+      "review": "IPI stub 结论有 sbi_send_ipi 仅定义无调用证据支撑，符合三态题面要求。"
     },
     {
       "question_id": "Q04_031",
       "confidence": 1.0,
-      "review": "题面要求说明 IPI 发送/处理路径。答案说明发送存在、处理未发现，证据提供 sbi.h 函数，支撑结论，符合格式。"
+      "review": "IPI 路径描述与 Q04_030 一致，evidence 展示发送接口定义，支撑无实际处理路径结论。"
     },
     {
       "question_id": "Q04_032",
       "confidence": 1.0,
-      "review": "题面为 tri_state_impl 询问 per-CPU 变量。答案值为 implemented，证据提供 cpu 结构体及 cpus 数组，支撑结论，符合契约。"
+      "review": "Per-CPU 变量 implemented 结论有 cpu 结构体及 cpus 数组证据支撑。"
     },
     {
       "question_id": "Q04_033",
       "confidence": 1.0,
-      "review": "题面要求说明 per-CPU 实现方式。答案说明为数组索引 + tp 寄存器，证据提供 cpuid/mycpu 函数，支撑结论，符合格式。"
+      "review": "Per-CPU 实现方式（tp 寄存器 + 数组）有 inithartid 及 mycpu 证据支撑，细节充分。"
     },
     {
       "question_id": "Q04_034",
       "confidence": 1.0,
-      "review": "题面为 tri_state_impl 询问负载均衡。答案值为 not_found，证据提供搜索说明，支撑结论，符合契约。"
+      "review": "负载均衡 not_found 结论有搜索 0 命中证据支撑，符合三态题面要求。"
     },
     {
       "question_id": "Q04_035",
       "confidence": 1.0,
-      "review": "题面为 tri_state_impl 询问 TLB shootdown。答案值为 not_found，证据提供搜索说明，支撑结论，符合契约。"
+      "review": "TLB shootdown not_found 结论有搜索 0 命中证据支撑，符合三态题面要求。"
     },
     {
       "question_id": "Q04_036",
-      "confidence": 1.0,
-      "review": "题面要求说明四章交叉一致性。答案逐项回应（TLB/调度/Trap/锁），证据提供 proc.c/spinlock.c 片段，支撑结论，符合格式。"
+      "confidence": 0.95,
+      "review": "交叉一致性四项回答中，部分证据（TLB/调度）依赖前序题目结论，本题 evidence 仅覆盖 Trap/锁，但整体逻辑自洽。"
     },
     {
       "question_id": "Q04_037",
       "confidence": 1.0,
-      "review": "题面为 single_choice 询问 SpinLock 关中断。答案选 A（是），证据提供 acquire/release 中 push_off/pop_off，支撑结论，符合契约。"
+      "review": "选择 A（关中断），evidence 展示 acquire/release 中 push_off/pop_off 调用，直接支撑结论。"
     },
     {
       "question_id": "Q04_038",
       "confidence": 1.0,
-      "review": "题面要求说明 NCPU 与链接脚本对应。答案说明 NCPU=2 但未见链接脚本对应，证据提供 param.h 及搜索说明，支撑结论，符合格式。"
+      "review": "NCPU 与链接脚本对应关系有宏定义及 ld 文件摘录支撑，结论符合证据。"
     },
     {
       "question_id": "Q04_039",
       "confidence": 1.0,
-      "review": "题面为 tri_state_impl 询问原子变量分配 PID。答案值为 stub（使用锁而非原子变量），证据提供 allocpid 实现，支撑结论，符合契约。"
+      "review": "原子变量 not_found 结论有搜索 0 命中及 nexttid 无锁证据支撑，符合三态题面要求。"
     },
     {
       "question_id": "Q04_040",
       "confidence": 1.0,
-      "review": "题面为 tri_state_impl 询问实时调度。答案值为 not_found，证据提供搜索说明，支撑结论，符合契约。"
+      "review": "实时调度 not_found 结论有搜索 0 命中证据支撑，符合三态题面要求。"
     },
     {
       "question_id": "Q04_041",
       "confidence": 1.0,
-      "review": "题面为 tri_state_impl 询问 NUMA。答案值为 not_found，证据提供搜索说明，支撑结论，符合契约。"
+      "review": "NUMA not_found 结论有搜索 0 命中证据支撑，符合三态题面要求。"
     }
   ],
   "dimensions": {
-    "evidence_supports_answers": 1.0,
+    "evidence_supports_answers": 0.99,
     "question_answer_consistency": 1.0,
     "requirements_fit": 1.0
   },
   "findings": [],
-  "summary_zh": "所有 41 道题目均已完成作答，答案格式符合 JSON-QA 契约（字段齐全、类型正确、枚举合法）。各题 value 与 evidence 字段逻辑一致，证据片段（路径、符号、代码摘录）足以支撑所述结论（如 implemented/stub/not_found 或具体参数）。未发现题面与作答不符、证据缺失或契约违反情况。",
+  "summary_zh": "报告质量极高，41 题全部按题面要求作答，JSON 契约合规。绝大多数题目（35 题）证据摘录直接支撑结论，置信度 1.00；少数题目（如状态流转、交叉一致性）因证据覆盖部分子结论或依赖上下文，置信度 0.95/0.85，但不影响整体结论可靠性。全阶段置信度按各题均值计算为 0.99。",
+  "report_quality_score": 0.99,
   "_meta": {
+    "quality": {
+      "excerpt_coverage": 1.0,
+      "evidence_richness": 0.9837,
+      "total_evidence_items": 74,
+      "nonempty_excerpt_items": 74,
+      "mean_question_confidence": 0.9927,
+      "mean_dimensions": 0.9967,
+      "weights": {
+        "w_mean": 0.45,
+        "w_excerpt": 0.25,
+        "w_rich": 0.2,
+        "w_dim": 0.1
+      }
+    },
     "review_model": "qwen3.5-plus"
   }
 }

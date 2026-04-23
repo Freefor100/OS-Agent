@@ -1,59 +1,32 @@
 {
   "stage_id": "06_sync_ipc",
-  "goal": "分析该内核的同步互斥原语（SpinLock/SleepLock/WaitQueue）与IPC机制（Pipe/Signal），验证sleep/wakeup不变量，确认缺失的原语（Mutex/RwLock/Semaphore/Condvar/F",
-  "must_cover": [
-    "[Q06_001] 同步原语：SpinLock（include/sync/spinlock.h）、SleepLock（include/sync/sleeplock.h）、WaitQueue（include/sync/waitqueue.h）",
-    "[Q06_002] Mutex实现：无独立Mutex，用SleepLock替代（acquiresleep/releasesleep）",
-    "[Q06_003] WaitQueue存在：基于双向链表dlist，含sleep/wakeup三态机制",
-    "[Q06_004] sleep/wakeup不变量：sleep入口kernel/sched/proc.c:569，持spinlock入睡，wakeup入口kernel/sched/proc.c:386，先唤醒后释放锁",
-    "[Q06_005] Pipe已实现：kernel/fs/pipe.c，环形缓冲PIPESIZE=1024",
-    "[Q06_006] Pipe缓冲形态：环形缓冲区（loop in a buf）",
-    "[Q06_007] Pipe阻塞语义：读写均阻塞（pipewritable/pipereadable中sleep）",
-    "[Q06_008] SysV IPC未实现：无sys_msgget/sys_semget/sys_shmget",
-    "[Q06_009] Futex未实现：无futex_wait/futex_wake/sys_futex",
-    "[Q06_010] Signal机制已实现：sys_kill、sigaction、sigreturn、sig_trampoline",
-    "[Q06_011] Signal handler上下文：kernel/sched/signal.c构建sig_frame保存trapframe，sigreturn恢复",
-    "[Q06_012] RwLock未实现：仅测试用例引用pthread_rwlock，内核无实现",
-    "[Q06_013] 原子操作来源：RISC-V内置__sync_lock_test_and_set/amoswap.w.aq",
-    "[Q06_014] 死锁四条件：均成立（互斥/占有等待/不可抢占/循环等待）",
-    "[Q06_015] 死锁处理策略：预防（锁顺序注释见于usertests.c:952）",
-    "[Q06_016] 全局锁顺序规范：仅reparent2测试注释提及parent-then-child顺序，无强制规范",
-    "[Q06_001] 该内核提供了哪些同步原语？（SpinLock/Mutex/RwLock/Semaphore/Condvar/WaitQueue 等；列出类型定义证据）",
-    "[Q06_002] Mutex 更接近哪种实现？",
-    "[Q06_003] 是否存在等待队列 (Wait Queue, WaitQueue) 与 sleep/wakeup（或等价阻塞/唤醒）实现？（必须三态）",
-    "[Q06_004] sleep / wakeup 不变量 (Sleep-Wakeup Invariant) 分析，按格式填写：",
-    "sleep 入口函数: ___（路径）",
-    "入睡前持有的锁: ___（无则写 none）"
-  ],
   "evidence_targets": [
-    "SpinLock定义与acquire/release实现（include/sync/spinlock.h, kernel/sync/spinlock.c）",
-    "SleepLock定义与acquiresleep/releasesleep实现（include/sync/sleeplock.h, kernel/sync/sleeplock.c）",
-    "WaitQueue定义与sleep/wakeup调用链（include/sync/waitqueue.h, kernel/sched/proc.c）",
-    "Pipe结构与piperead/pipewrite阻塞逻辑（include/fs/pipe.h, kernel/fs/pipe.c）",
-    "Signal handler构建与sigreturn恢复（include/sched/signal.h, kernel/sched/signal.c, kernel/trap/sig_trampoline.S）",
-    "sys_pipe系统调用入口（kernel/syscall/sysfile.c）",
-    "原子操作__sync_lock_test_and_set使用（kernel/sync/spinlock.c）",
-    "锁顺序注释（xv6-user/usertests.c:952）",
+    "自旋锁 spinlock 实现 (acquire/release/holding)",
+    "睡眠锁 sleeplock 实现 (acquiresleep/releasesleep)",
+    "等待队列 wait_queue 机制",
+    "管道 pipe 的读写与阻塞唤醒",
+    "信号 signal 处理框架 (sigaction/sigprocmask/sighandle)",
+    "sleep/wakeup 调度原语",
     "锁与同步原语",
     "IPC",
     "Futex",
     "管道/信号"
   ],
   "seed_paths": [
-    "include/sync/spinlock.h",
-    "include/sync/sleeplock.h",
-    "include/sync/waitqueue.h",
-    "include/fs/pipe.h",
-    "include/sched/signal.h",
     "kernel/sync/spinlock.c",
     "kernel/sync/sleeplock.c",
+    "include/sync/waitqueue.h",
     "kernel/fs/pipe.c",
-    "kernel/sched/proc.c",
     "kernel/sched/signal.c",
+    "kernel/sched/proc.c",
+    "include/fs/pipe.h",
+    "include/sched/signal.h",
     "kernel/syscall/sysfile.c",
-    "kernel/trap/sig_trampoline.S",
+    "kernel/syscall/syssignal.c",
     "sync",
-    "lock"
+    "lock",
+    "ipc",
+    "futex"
   ],
   "framework_guess": [
     "xv6"
@@ -68,10 +41,10 @@
     "releasesleep",
     "sleep",
     "wakeup",
+    "wait_queue_add",
+    "pipealloc",
     "piperead",
     "pipewrite",
-    "sighandle",
-    "sigreturn",
     "Mutex",
     "SpinLock"
   ],
@@ -88,9 +61,10 @@
     "include/hal"
   ],
   "preferred_tools": [
-    "read_code_segment",
     "lsp_get_call_graph",
     "lsp_get_definition",
+    "lsp_get_references",
+    "read_code_segment",
     "grep_in_repo"
   ],
   "avoid_tools": [
@@ -104,12 +78,21 @@
     "max_memory_items": 8
   },
   "execution_steps": [
-    "1. 精读kernel/sched/proc.c中sleep()函数（行569附近）和wakeup()函数（行386附近），记录持锁顺序与唤醒时机",
-    "2. 追踪sleep()的调用者（如pipe.c中的pipewritable/pipereadable），验证sleep前是否持有队列锁",
-    "3. 分析kernel/fs/pipe.c中pipelock/pipeunlock/pipewakeup的锁持有与唤醒顺序，填写Q06_004",
-    "4. 检查kernel/sched/signal.c中sighandle()如何构建sig_frame，验证trapframe保存与sigreturn恢复逻辑",
-    "5. 阅读kernel/trap/sig_trampoline.S，确认用户态handler跳转与SYS_rt_sigreturn系统调用",
-    "6. 用grep验证无futex/condvar/barrier/sys_msgget等符号，确认缺失原语",
-    "7. 对照must_cover逐项填写证据路径与代码行号，完成Q06_001至Q06_020作答"
+    "读取 kernel/sync/spinlock.c 完整实现，分析 acquire/release 的原子操作与中断屏蔽机制",
+    "读取 kernel/sync/sleeplock.c，追踪 acquiresleep 如何调用 sleep 实现阻塞",
+    "读取 include/sync/waitqueue.h，理解 wait_queue 结构体与 add/del/is_first 操作",
+    "在 kernel/sched/proc.c 中定位 sleep 和 wakeup 函数定义，分析其调度逻辑",
+    "使用 lsp_get_call_graph 分析 sleep 的入向调用图 (max_depth=2)，识别哪些模块依赖睡眠机制",
+    "读取 kernel/fs/pipe.c 前 150 行，分析 pipealloc 初始化与 pipelock/pipeunlock 的等待队列使用",
+    "读取 kernel/fs/pipe.c 中 piperead 和 pipewrite 函数，追踪阻塞/唤醒条件",
+    "使用 grep_in_repo 搜索 sys_pipe 调用点，确认 pipe 系统调用入口",
+    "读取 kernel/sched/signal.c 前 150 行，分析 set_sigaction 和 sigprocmask 实现",
+    "在 kernel/sched/signal.c 中定位 sighandle 函数，分析信号投递与处理流程",
+    "读取 kernel/syscall/syssignal.c，确认 sys_rt_sigaction 系统调用实现",
+    "使用 lsp_get_references 查询 sighandle 的全局引用，确认其被何处调用 (如 trap)",
+    "读取 kernel/sched/proc.c 中 wait4 函数，分析进程等待与信号处理的交互",
+    "检查 include/sched/proc.h 中 struct proc 的锁与等待队列相关字段",
+    "使用 grep_in_repo 搜索 poll 相关函数，确认 poll/select 是否依赖 wait_queue",
+    "汇总 spinlock/sleeplock/pipe/signal 的代码证据，准备回答本阶段问题"
   ]
 }

@@ -6,73 +6,73 @@
   "question_reviews": [
     {
       "question_id": "Q07_001",
-      "confidence": 0.95,
-      "review": "作答值匹配选项 A。证据引用 SSTATUS_SPP 位定义及 trap 处理流程，能够支撑用户态/内核态隔离的结论，题面相符且证据有效。"
+      "confidence": 0.98,
+      "review": "单选答案与选项 A 完全一致。三条证据摘录（trap.c, riscv.h）直接展示了 SSTATUS_SPP 位的检查与清除逻辑，充分支撑用户态/内核态隔离的结论，无推断缺口。"
     },
     {
       "question_id": "Q07_002",
       "confidence": 0.95,
-      "review": "作答值 implemented 与证据一致。证据展示了 proc 结构体中的 uid/gid 字段及对应的 syscall 实现，符合题面对于数据结构存在性的要求。"
+      "review": "三态值 'implemented' 符合题面要求。证据摘录了 proc 结构体定义及初始化代码，直接证明 UID/GID 字段存在，满足数据结构存在的题面约束。"
     },
     {
       "question_id": "Q07_003",
       "confidence": 0.95,
-      "review": "作答值 not_found 与证据一致。证据通过搜索关键词零命中及具体 syscall 代码分析，支撑了未执行权限检查的结论，逻辑自洽。"
+      "review": "三态值 'stub' 合法。证据显示 faccessat 仅检查 mode 参数而未校验 uid/gid，且 setuid 无 root 检查，摘录内容与 'stub'（部分实现/占位）结论逻辑自洽，无矛盾。"
     },
     {
       "question_id": "Q07_004",
       "confidence": 0.95,
-      "review": "作答应答了入口点与链路问题，明确指出检查链断裂。证据引用了相关函数代码，支撑了「仅有定义但未强制执行」的结论，符合 short_answer 要求。"
+      "review": "简答要求列 2-5 个节点。答案列出 4 个节点并附带文件行号，证据摘录覆盖了入口函数及关键判断逻辑，满足题面对于链路证据的要求。"
     },
     {
       "question_id": "Q07_005",
       "confidence": 0.95,
-      "review": "作答值 implemented 与证据一致。证据引用 copyin/copyout 等函数中的地址验证逻辑，支撑了用户指针验证已实现的结论。"
+      "review": "三态值 'implemented' 有证据支撑。copyin/copyout 调用 walkaddr 验证地址的摘录直接对应用户指针验证机制，证据与结论匹配度高。"
     },
     {
       "question_id": "Q07_006",
       "confidence": 0.95,
-      "review": "作答值 not_found 与证据一致。证据通过关键词搜索及系统调用表扫描，支撑了未发现沙箱机制的结论。"
+      "review": "三态值 'not_found' 配合负向证据（搜索 0 命中、系统调用表扫描）符合题面逻辑。证据表明已执行搜索动作且无结果，支撑结论。"
     },
     {
       "question_id": "Q07_007",
       "confidence": 0.95,
-      "review": "作答值 stub 与证据一致。证据指出注释存在但实现代码被注释掉，准确反映了「有设计无实现」的状态，符合 tri_state_impl 定义。"
+      "review": "三态值 'stub' 合理。证据显示存在 guard page 相关逻辑（uvmclear）但编译选项禁用 canary，摘录内容解释了为何不是完全 'implemented' 也不是 'not_found'。"
     },
     {
       "question_id": "Q07_008",
       "confidence": 0.95,
-      "review": "作答值 not_found 与证据一致。证据区分了库文件噪声与内核逻辑，支撑了未发现审计/安全启动逻辑的结论。"
+      "review": "三态值 'not_found' 有搜索证据支撑。全目录扫描及启动入口检查摘录均显示无相关逻辑，证据充分支持否定结论。"
     },
     {
       "question_id": "Q07_009",
       "confidence": 0.95,
-      "review": "作答逐架构列出了支持情况及证据。证据引用了入口汇编及 trap 初始化代码，并说明 PMP 配置缺失，符合题面逐架构作答的要求。"
+      "review": "简答要求逐架构作答。答案明确仅支持 RISC-V 并列出初始化证据，证据摘录覆盖特权级配置及负向搜索（无 PMP），满足题面约束。"
     },
     {
       "question_id": "Q07_010",
       "confidence": 0.95,
-      "review": "作答值 not_found 与证据一致。证据确认项目为 C 语言而非 Rust，支撑了不存在 Rust 特定安全机制的结论。"
+      "review": "三态值 'not_found' 配合语言检查证据。题面为条件式（若 Rust），答案通过证明项目为 C 语言来支撑机制不存在，逻辑闭环，证据有效。"
     },
     {
       "question_id": "Q07_011",
       "confidence": 0.95,
-      "review": "作答值 stub 与证据一致。证据指出存在独立页表字段但切换逻辑不严格，准确反映了部分实现的状态，支撑了结论。"
+      "review": "三态值 'not_found' 证据充分。答案区分了标准页表与 KPTI，证据摘录显示无 CR3/TTBR 切换逻辑及关键词搜索 0 命中，支撑结论。"
     },
     {
       "question_id": "Q07_012",
       "confidence": 0.95,
-      "review": "作答明确指出字段存在但无检查链。证据引用结构体定义及搜索零命中结果，支撑了「仅有定义但未强制执行」的结论，符合题面要求。"
+      "review": "简答要求检查链证据。答案明确指出「字段存在但无检查链」并给出搜索关键词 0 命中的证据，与 Q07_003 结论一致，证据支撑充分。"
     },
     {
       "question_id": "Q07_013",
       "confidence": 0.95,
-      "review": "作答值匹配选项 D。证据引用 syscall 中未使用 UID/GID 进行检查的事实，支撑了无细粒度访问控制的结论，题面相符。"
+      "review": "单选答案匹配选项 D。证据显示无 chmod/chown 且 faccessat 不校验身份，直接支撑「无细粒度访问控制」的结论，题答一致。"
     },
     {
       "question_id": "Q07_014",
       "confidence": 0.95,
-      "review": "作答值 stub 与证据一致。证据指出页表权限位存在但无强制 W^X 或签名验证，准确反映了完整性策略的实现程度。"
+      "review": "三态值 'not_found' 有证据支撑。证据包含关键词搜索 0 命中及页表标志扫描（允许 W+X），直接证明无完整性策略，证据与结论对齐。"
     }
   ],
   "dimensions": {
@@ -81,8 +81,23 @@
     "requirements_fit": 0.95
   },
   "findings": [],
-  "summary_zh": "所有 14 道题目均已完成作答，格式符合 JSON-QA 契约。各题作答值（value）与提供的证据（evidence）逻辑一致，未发现证据不足以支撑结论或题面与作答明显不符的情况。tri_state 题目状态判定（implemented/not_found/stub）均有对应代码或搜索结果支撑。全阶段置信度较高，主要基于材料内部的一致性审计。",
+  "summary_zh": "本报告整体质量较高。所有题目均满足 JSON 契约，题面约束（如三态、单选选项、简答节点数）均被严格遵守。证据摘录具体（含文件路径、函数名、代码片段），且能直接支撑对应的结论值，未发现空证据或证据与结论矛盾的情况。全阶段置信度基于各题均值计算，无低分项截断。",
+  "report_quality_score": 0.97,
   "_meta": {
+    "quality": {
+      "excerpt_coverage": 1.0,
+      "evidence_richness": 1.0,
+      "total_evidence_items": 36,
+      "nonempty_excerpt_items": 36,
+      "mean_question_confidence": 0.9521,
+      "mean_dimensions": 0.95,
+      "weights": {
+        "w_mean": 0.45,
+        "w_excerpt": 0.25,
+        "w_rich": 0.2,
+        "w_dim": 0.1
+      }
+    },
     "review_model": "qwen3.5-plus"
   }
 }

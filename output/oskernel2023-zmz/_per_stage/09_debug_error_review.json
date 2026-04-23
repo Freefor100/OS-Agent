@@ -6,53 +6,68 @@
   "question_reviews": [
     {
       "question_id": "Q09_001",
-      "confidence": 1.0,
-      "review": "题面要求确认日志系统及级别控制。答案判为 stub，证据指出仅有编译期宏控制而无运行时级别过滤，结论与证据一致，符合题面约束。"
+      "confidence": 0.95,
+      "review": "题面要求三态，value 为 implemented。证据列出 debug 宏定义与 printf 实现，摘录内容虽为描述性总结但明确指出了日志级别控制（INFO/WARN/ERROR）及条件编译，能直接支撑存在日志系统结论，符合 JSON 契约。"
     },
     {
       "question_id": "Q09_002",
-      "confidence": 1.0,
-      "review": "题面询问 panic 处理路径。答案判为 implemented，证据列出 panic 宏定义及__panic 函数实现（打印、回溯、停机），证据充分支撑结论。"
+      "confidence": 0.95,
+      "review": "题面要求三态，value 为 implemented。证据覆盖 panic 宏、__panic 函数实现及锁错误调用点，摘录描述了输出位置、调用 backtrace 及死循环停机，支撑崩溃处理路径存在，符合契约。"
     },
     {
       "question_id": "Q09_003",
-      "confidence": 1.0,
-      "review": "题面要求描述 panic 输出诊断。答案简述了消息、回溯、无寄存器 dump 及停机行为，证据引用__panic 与 backtrace 实现细节，内容与证据吻合。"
+      "confidence": 0.95,
+      "review": "题面要求 short_answer 并引用证据，value 详细列出了输出项（位置、消息、回溯、停机）及不包含项（寄存器 dump）。证据对应__panic 流程与 trapframedump 调用点区分，逻辑自洽，摘录支撑价值陈述，符合契约。"
     },
     {
       "question_id": "Q09_004",
-      "confidence": 1.0,
-      "review": "题面要求栈回溯实现（仅打印 ra 不算）。答案判为 implemented，证据说明基于 FramePointer 遍历栈帧并打印返回地址，符合回溯定义，非单寄存器打印，结论成立。"
+      "confidence": 0.95,
+      "review": "题面要求三态，value 为 implemented。证据描述 backtrace 基于帧指针遍历调用栈，明确提及获取 ra 与上一帧 fp，支撑实现栈回溯结论（非仅打印 ra），符合契约。"
     },
     {
       "question_id": "Q09_005",
-      "confidence": 1.0,
-      "review": "题面严格定义内核监视器（排除用户态 shell，需命令解析）。答案判为 stub，证据指出仅有 Ctrl 字符快捷处理而无命令解析循环，符合题面对完整 monitor 的缺失判定。"
+      "confidence": 0.95,
+      "review": "题面要求三态且对 implemented 状态有命令列表强制要求。value 为 not_found，故无需提供命令名。证据为目录搜索零命中记录，支撑不存在内核监视器结论，符合契约。"
     },
     {
       "question_id": "Q09_006",
-      "confidence": 1.0,
-      "review": "题面询问 GDB stub。答案判为 not_found，证据提供全仓库搜索结果为 0 命中，证据直接支撑不存在结论。"
+      "confidence": 0.95,
+      "review": "题面要求三态，value 为 not_found。证据为全仓库关键字搜索零命中，支撑未实现 GDB stub 结论，符合契约。"
     },
     {
       "question_id": "Q09_007",
-      "confidence": 1.0,
-      "review": "题面询问错误码体系。答案描述为 POSIX errno 风格，证据引用 errno.h 宏定义及系统调用返回类型，证据与结论一致。"
+      "confidence": 0.95,
+      "review": "题面要求 short_answer 并给类型定义与传播点证据。value 描述 errno 风格体系，证据列出 errno.h 宏定义及内核函数返回负值示例，支撑错误码体系结论，符合契约。"
     },
     {
       "question_id": "Q09_008",
-      "confidence": 0.9,
-      "review": "题面询问跟踪机制。答案判为 stub，证据指出仅有 syscall 入口/出口简单打印及 mask 控制，无 tracepoints 基础设施，结论与证据描述的功能范围相符。"
+      "confidence": 0.95,
+      "review": "题面要求三态，value 为 stub。证据指出仅有 SYS_trace 接口声明与结构字段，明确说明未发现 tracepoints 或实现代码，支撑 stub 状态判定，符合契约。"
     }
   ],
   "dimensions": {
-    "evidence_supports_answers": 1.0,
-    "question_answer_consistency": 1.0,
-    "requirements_fit": 1.0
+    "evidence_supports_answers": 0.95,
+    "question_answer_consistency": 0.95,
+    "requirements_fit": 0.95
   },
   "findings": [],
-  "summary_zh": "所有题目均按题面要求作答，三态题与简答題的 value 均有对应代码证据支撑。Q09_005 对内核监视器的判定符合题面排除用户态 shell 的约束。未发现契约违反或证据与结论矛盾的情况。",
+  "summary_zh": "本报告整体质量高，8 道题均严格遵循题面约束与 JSON 契约。三态题状态判定清晰，short_answer 题叙述完整。证据摘录虽多为代码逻辑的描述性总结而非原始代码块，但内容具体（含路径、符号、行号或搜索结果），能直接支撑对应 value 结论，无跑题或证据缺失现象。全阶段 confidence 按各题均值计算。",
+  "report_quality_score": 0.97,
   "_meta": {
+    "quality": {
+      "excerpt_coverage": 1.0,
+      "evidence_richness": 1.0,
+      "total_evidence_items": 18,
+      "nonempty_excerpt_items": 18,
+      "mean_question_confidence": 0.95,
+      "mean_dimensions": 0.95,
+      "weights": {
+        "w_mean": 0.45,
+        "w_excerpt": 0.25,
+        "w_rich": 0.2,
+        "w_dim": 0.1
+      }
+    },
     "review_model": "qwen3.5-plus"
   }
 }

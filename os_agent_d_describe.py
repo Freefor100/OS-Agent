@@ -6,7 +6,8 @@
 #   ③ Review（可选）— DESCRIBE_STAGE_REVIEW=1 且本阶段为 JSON-QA 并成功校验时：仅将
 #      「describe_stage_qa 题单」+「coerce_answers_payload_by_stage_qa 覆写前的 JSON」
 #      送审；不含工具摘录。01_overview / 10_history 不审。
-#      侧车：_per_stage/<stage_id>_review.json（失败见 *_review_error.json）。
+#      侧车：_per_stage/<stage_id>_review.json（含 report_quality_score 等，失败见 *_review_error.json）。
+#      合并总报告时写根目录 review_score.json（02~09 章均值 0~100）并在总报告文首元数据区输出报告质量打分。
 #
 # 续跑：JSON-QA 阶段若 `_per_stage/<stage_id>_answers.json` 已存在且仍能通过题库校验，
 #      则跳过 LLM，仅用 `render_answers_to_markdown` 重写 `sections/` 下本章 md，文末照常拼接总报告。
@@ -55,7 +56,9 @@ from core.describe_stage_review import (
     build_stage_qa_question_sheet,
     describe_stage_review_applies,
     describe_stage_review_enabled,
+    enrich_review_with_report_quality,
     run_describe_stage_review,
+    write_review_score_json,
 )
 from core.describe_json_qa import (
     SCHEMA_VERSION as JSON_QA_SCHEMA_VERSION,
@@ -85,7 +88,7 @@ STAGE_EXECUTION_CONTRACT = """
 ## 【执行契约 — 已锁定计划】
 上文「阶段执行计划」与「须按序完成的执行步骤」为本阶段**唯一**范围与顺序；各章专题要求以该章 prompt 为准。
 1. **严格按 execution_steps** 调用工具并组织正文，勿跳步、勿倒序。
-2. 未在步骤中点名的话题勿擅自铺成长篇；优先满足 must_cover 与 evidence_targets。
+2. 未在步骤中点名的话题勿擅自铺成长篇；优先满足题单与 evidence_targets。
 3. **证据**：关键结论须带可核验源码路径（反引号 `路径:行号`）；证据不足写「未发现」或「待核实」，禁止无路径断言。
 4. **README / 文档（分层使用）**：
    - **允许且鼓励**：用 `list_repo_structure`、`read_code_segment` 阅读根目录 `README.md`、`docs/`、`*.md` 等，提取**如何构建**、**如何运行**（含 QEMU/板级命令）、依赖、目录说明、作者**声称**的评测/CI/课程环境。
@@ -283,7 +286,7 @@ def _build_json_qa_prompt(stage_id: str, stage_title: str) -> tuple[str, list[st
     if not isinstance(stage_constraints_md, str):
         stage_constraints_md = ""
 
-    # 题单（评委友好）+ 必须回答（供 planner must_cover 抽取）
+    # 题单（评委友好）+ 必须回答
     # + 阶段强相关约束（从 legacy prompt 迁移，避免“只剩题目没剩规范”）
     # + 输出契约（强约束 JSON）
     lines: list[str] = []
@@ -704,12 +707,24 @@ def _invoke_describe_stage_review(
     skip_in_report: bool,
 ) -> None:
     """JSON-QA 校验成功且非 01/10 时，送审题单 + 题库覆写前的答案 JSON。"""
-    if skip_in_report or not describe_stage_review_enabled():
+    if skip_in_report:
+        return
+    if not describe_stage_review_enabled():
+        if describe_stage_review_applies(stage_id, expected_question_ids=expected_question_ids):
+            print(
+                f"\n   ⏭️  ③ Review：跳过（未开启 `DESCRIBE_STAGE_REVIEW=1`，无无工具题单审计）  [{stage_id}]"
+            )
         return
     if not describe_stage_review_applies(stage_id, expected_question_ids=expected_question_ids):
         return
     sidecar_dir = os.path.join(repo_output_dir, "_per_stage")
     os.makedirs(sidecar_dir, exist_ok=True)
+    review_out = os.path.join(sidecar_dir, f"{stage_id}_review.json")
+    _rm = os.environ.get("DESCRIBE_REVIEW_MODEL") or os.getenv("MODEL_NAME", "")
+    print("\n" + "━" * 20 + " ③ Review · 回答质量评估 " + "━" * 20)
+    print(f"   阶段: {stage_id} — {title}")
+    print(f"   题数: {len(expected_question_ids)}  |  模型: {_rm or '(MODEL_NAME)'}")
+    print(f"   侧车: {review_out}")
     question_sheet = build_stage_qa_question_sheet(stage_id, title)
     model_json = json.dumps(payload_before_stage_qa, ensure_ascii=False, indent=2)
     try:
@@ -720,15 +735,25 @@ def _invoke_describe_stage_review(
             model_json_before_stage_qa_coerce=model_json,
             expected_question_ids=list(expected_question_ids),
         )
-        review_out = os.path.join(sidecar_dir, f"{stage_id}_review.json")
         review_err_out = os.path.join(sidecar_dir, f"{stage_id}_review_error.json")
         if parsed_review is not None:
-            parsed_review["_meta"] = {
-                "review_model": os.environ.get("DESCRIBE_REVIEW_MODEL") or os.getenv("MODEL_NAME", ""),
-            }
+            parsed_review = enrich_review_with_report_quality(
+                parsed_review, payload_before_stage_qa
+            )
+            meta = (
+                dict(parsed_review["_meta"])
+                if isinstance(parsed_review.get("_meta"), dict)
+                else {}
+            )
+            meta["review_model"] = os.environ.get("DESCRIBE_REVIEW_MODEL") or os.getenv("MODEL_NAME", "")
+            parsed_review["_meta"] = meta
             _save_json(review_out, parsed_review)
             conf = parsed_review.get("confidence")
-            print(f"\n   📋 Describe Review：confidence={conf} → {review_out}")
+            rqs = parsed_review.get("report_quality_score")
+            print(
+                f"   ✅ ③ Review 已落盘：confidence={conf}  report_quality_score={rqs}"
+            )
+            print("   " + "─" * 66 + "\n")
         else:
             _save_json(
                 review_err_out,
@@ -737,13 +762,15 @@ def _invoke_describe_stage_review(
                     "raw_model_output_excerpt": (review_raw_llm or "")[:8000],
                 },
             )
-            print(f"\n   ⚠️ Describe Review 解析失败（已写入 {review_err_out}）")
+            print(f"   ⚠️  ③ Review 解析失败（已写入 {review_err_out}）")
+            print("   " + "─" * 66 + "\n")
     except Exception as _re:
         _save_json(
             os.path.join(sidecar_dir, f"{stage_id}_review_error.json"),
             {"error": f"{type(_re).__name__}: {_re}"},
         )
-        print(f"\n   ⚠️ Describe Review 调用失败: {_re}")
+        print(f"   ⚠️  ③ Review 调用失败: {_re}")
+        print("   " + "─" * 66 + "\n")
 
 
 def _resume_stage_from_answers_json(
@@ -1537,6 +1564,16 @@ def main():
     # 合并总报告 - 生成专业的、类似人类撰写的技术文档
     final_report_path = os.path.join(repo_output_dir, f"OS技术分析报告_{repo_name}.md")
     try:
+        # 02~09 各章 Describe Review 侧车汇总为 review_score.json（全库级总分 0~100）
+        try:
+            review_score_bundle = write_review_score_json(repo_output_dir)
+        except Exception as e_rs:
+            print(f"\n⚠️  无法写入 review_score.json: {e_rs}")
+            review_score_bundle = {}
+        total_report_quality_100 = None
+        if isinstance(review_score_bundle, dict):
+            total_report_quality_100 = review_score_bundle.get("total_0_100")
+
         # 01_overview 排最前，其余按文件名排序
         overview_sections = [p for p in all_section_paths if os.path.basename(p).startswith("01_")]
         other_sections = sorted([p for p in all_section_paths if not os.path.basename(p).startswith("01_")])
@@ -1563,6 +1600,10 @@ def main():
             out.write(f"> **仓库地址**: {repo_url}\n\n")
             out.write(f"> **分析日期**: {datetime.now().strftime('%Y年%m月%d日')}\n\n")
             out.write(f"> **分析工具**: OS-Agent-D\n\n")
+            if total_report_quality_100 is not None:
+                out.write(f"> **报告质量打分**: {total_report_quality_100}/100\n\n")
+            else:
+                out.write("> **报告质量打分**: 未统计（无 02~09 章节侧车 review 或分数字段）\n\n")
             out.write("---\n\n")
 
             # 目录
@@ -1618,6 +1659,18 @@ def main():
 
         print(f"\n📄 已生成最终报告: {final_report_path}")
         print(f"   报告包含 {len(content_sections)} 个主要章节")
+        _rs_p = os.path.join(repo_output_dir, "review_score.json")
+        if os.path.isfile(_rs_p):
+            if total_report_quality_100 is not None:
+                print(
+                    f"   报告质量汇总: {_rs_p}（02~09 章均值 {total_report_quality_100}/100）"
+                )
+            else:
+                print(f"   报告质量汇总: {_rs_p}（已写入，总分未计）")
+        elif total_report_quality_100 is not None:
+            print(
+                f"   报告质量（02~09 章均值 {total_report_quality_100}/100）"
+            )
     except Exception as e:
         print(f"\n⚠️  无法生成总报告: {e}")
         import traceback

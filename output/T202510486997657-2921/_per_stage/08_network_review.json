@@ -1,0 +1,53 @@
+{
+  "schema_version": "describe_review_v1",
+  "stage_id": "08_network",
+  "stage_title": "网络子系统与协议栈",
+  "confidence": 0.95,
+  "question_reviews": [
+    {
+      "question_id": "Q08_001",
+      "confidence": 1.0,
+      "review": "题面要求三态，回答为 implemented。证据列出协议栈目录、socket 文件抽象及网卡驱动文件，直接支撑存在性结论，格式符合契约。"
+    },
+    {
+      "question_id": "Q08_002",
+      "confidence": 1.0,
+      "review": "题面为单选，回答匹配选项 B（自研协议栈）。证据引用文件头版权信息及配置文件，支撑自研结论，无跑题。"
+    },
+    {
+      "question_id": "Q08_003",
+      "confidence": 1.0,
+      "review": "题面要求三态，回答为 implemented。证据列举 sys_socket/bind/sendto/recvfrom 等 syscall 处理函数及行号，与题面要求的接口一致，证据充分。"
+    },
+    {
+      "question_id": "Q08_004",
+      "confidence": 0.9,
+      "review": "题面要求追踪发送路径并列 3-6 个节点。回答列出 6 个节点，证据对应 syscall、VFS、协议栈、驱动及寄存器通知，逻辑链条完整，证据与描述一致。"
+    },
+    {
+      "question_id": "Q08_005",
+      "confidence": 0.9,
+      "review": "题面要求三态，回答为 implemented。证据包含驱动初始化、中断处理函数及收包逻辑。虽证据提及 trap 层有 panic 注释，但驱动层中断处理函数已实现，证据支撑存在性结论。"
+    },
+    {
+      "question_id": "Q08_006",
+      "confidence": 0.9,
+      "review": "题面为多选，回答列出支持的协议列表。证据对应各协议实现文件，DNS 未选并在证据中说明仅配置使能但未发现实现，逻辑自洽，符合契约。"
+    },
+    {
+      "question_id": "Q08_007",
+      "confidence": 1.0,
+      "review": "题面要求三态，回答为 not_found。证据明确指出发送/接收路径使用 memcpy 拷贝，且 grep 搜索零拷贝关键词无命中，证据有力支撑否定结论。"
+    }
+  ],
+  "dimensions": {
+    "evidence_supports_answers": 0.95,
+    "question_answer_consistency": 1.0,
+    "requirements_fit": 1.0
+  },
+  "findings": [],
+  "summary_zh": "所有题目均按题面要求作答，字段类型与枚举值符合契约。各题证据（文件路径、函数名、代码片段）均能支撑其结论（存在性、来源、路径追踪、协议支持、零拷贝情况）。Q08_005 证据中虽提及 trap 层未完全对接，但驱动层中断处理代码已存在，支撑 implemented 结论；Q08_006 对未选协议（DNS）给出了合理说明。整体一致性好，无契约违反。",
+  "_meta": {
+    "review_model": "qwen3.5-plus"
+  }
+}

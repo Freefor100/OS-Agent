@@ -1,0 +1,119 @@
+{
+  "stage_id": "06_sync_ipc",
+  "goal": "分析同步互斥与IPC实现：识别SpinLock/Mutex/Semaphore/Futex/Pipe/Signal等原语，验证sleep/wakeup不变量，检查SysV IPC与死锁处理策略",
+  "must_cover": [
+    "[Q06_001] 同步原语类型：SpinLock(kernel/devs/spinlock.cc/hh), Semaphore(kernel/libs/semaphore.cc/hh), SleepLock(kernel/proc/sleeplock.cc/hh), Futex(kernel/proc/futex.cc/hh)",
+    "[Q06_002] Mutex实现：未找到独立Mutex类，使用SpinLock+sleep组合实现类似功能",
+    "[Q06_003] WaitQueue三态：k_pm.sleep/wakeup机制存在，使用void*_chan作为等待通道",
+    "[Q06_004] sleep/wakeup不变量：sleep入口k_pm.sleep(路径proc_manager.cc)，入睡前持锁，防丢wakeup通过持锁检查条件实现",
+    "[Q06_005] Pipe实现：已实现(kernel/proc/pipe.cc/hh)，使用环形缓冲区",
+    "[Q06_006] pipe缓冲形态：动态分配循环缓冲区(4KB默认，最大16KB)",
+    "[Q06_007] pipe阻塞语义：支持阻塞/非阻塞模式(O_NONBLOCK标志)",
+    "[Q06_008] SysV IPC：已实现shm(kernel/shm/shm_manager.cc)，semget/sys_semget存在，msgget未找到",
+    "[Q06_009] Futex：已实现(kernel/proc/futex.cc)，支持futex_wait/futex_wake",
+    "[Q06_010] 信号机制：已实现sigaction/kill/sigreturn/trampoline(kernel/proc/signal.cc)",
+    "[Q06_011] signal handler上下文：使用signal_frame结构保存trapframe，sigreturn通过sig_trampoline.S恢复",
+    "[Q06_012] RwLock：未找到独立实现",
+    "[Q06_013] 原子操作来源：EASTL atomic库(thirdparty/EASTL/include/EASTL/atomic.h)",
+    "[Q06_014] 死锁四条件：均成立(互斥/请求保持/不可抢占/循环等待)",
+    "[Q06_015] 死锁处理策略：无主动检测/预防，依赖程序员避免",
+    "[Q06_016] 全局锁顺序规范：未找到lock ordering注释或ABBA检测代码",
+    "[Q06_001] 该内核提供了哪些同步原语？（SpinLock/Mutex/RwLock/Semaphore/Condvar/WaitQueue 等；列出类型定义证据）",
+    "[Q06_002] Mutex 更接近哪种实现？",
+    "[Q06_003] 是否存在等待队列 (Wait Queue, WaitQueue) 与 sleep/wakeup（或等价阻塞/唤醒）实现？（必须三态）",
+    "[Q06_004] sleep / wakeup 不变量 (Sleep-Wakeup Invariant) 分析，按格式填写：",
+    "sleep 入口函数: ___（路径）",
+    "入睡前持有的锁: ___（无则写 none）"
+  ],
+  "evidence_targets": [
+    "SpinLock定义(kernel/devs/spinlock.hh:12-36)",
+    "Semaphore实现(kernel/libs/semaphore.cc:1-100)",
+    "SleepLock实现(kernel/proc/sleeplock.cc:1-43)",
+    "Futex实现(kernel/proc/futex.cc:1-100)",
+    "Pipe环形缓冲(kernel/proc/pipe.hh:35-60, pipe.cc:1-100)",
+    "sleep/wakeup机制(kernel/proc/proc_manager.cc需定位)",
+    "信号处理框架(kernel/proc/signal.cc:1-100, sig_trampoline.S)",
+    "共享内存实现(kernel/shm/shm_manager.cc:1-100)",
+    "sys_kill/sys_rt_sigreturn(syscall_handler.cc)",
+    "锁与同步原语",
+    "IPC",
+    "Futex",
+    "管道/信号"
+  ],
+  "seed_paths": [
+    "kernel/devs/spinlock.cc",
+    "kernel/devs/spinlock.hh",
+    "kernel/libs/semaphore.cc",
+    "kernel/libs/semaphore.hh",
+    "kernel/proc/sleeplock.cc",
+    "kernel/proc/sleeplock.hh",
+    "kernel/proc/futex.cc",
+    "kernel/proc/futex.hh",
+    "kernel/proc/pipe.cc",
+    "kernel/proc/pipe.hh",
+    "kernel/proc/signal.cc",
+    "kernel/proc/proc_manager.cc",
+    "sync",
+    "lock"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64",
+    "loongarch64"
+  ],
+  "entry_symbols": [
+    "SpinLock",
+    "sem_init",
+    "sem_p",
+    "sem_v",
+    "SleepLock",
+    "futex_wait",
+    "futex_sleep",
+    "Pipe::read",
+    "Pipe::write",
+    "k_pm.sleep",
+    "Mutex",
+    "pipe_write"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "busybox",
+    "busybox/loongarch",
+    "busybox/riscv",
+    "docs",
+    "kernel",
+    "kernel/boot",
+    "kernel/devs",
+    "kernel/fs",
+    "kernel/hal"
+  ],
+  "preferred_tools": [
+    "lsp_get_definition",
+    "lsp_get_references",
+    "lsp_get_call_graph",
+    "read_code_segment",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "1. 使用lsp_get_definition定位k_pm.sleep和k_pm.wakeup函数定义(在proc_manager.cc中)",
+    "2. 使用lsp_get_call_graph分析sleep/wakeup调用链(max_depth=2)，验证持锁-睡眠-唤醒顺序",
+    "3. 读取proc_manager.cc中sleep实现(约3800-4000行附近)，确认入睡前持锁和防丢wakeup机制",
+    "4. 使用lsp_get_definition查找Pipe::read/Pipe::write，分析阻塞语义和环形缓冲实现",
+    "5. 读取futex.cc完整实现，验证futex_wait/futex_wake与信号中断处理",
+    "6. 使用grep_in_repo搜索'shmget|semget|msgget'验证SysV IPC实现状态",
+    "7. 读取signal.cc中do_handle/sig_return实现，确认用户态handler上下文构建和sigreturn恢复机制",
+    "8. 使用grep_in_repo搜索'lock.*ordering|deadlock'验证是否存在死锁预防规范"
+  ]
+}

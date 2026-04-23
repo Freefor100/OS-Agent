@@ -1,0 +1,58 @@
+{
+  "schema_version": "describe_review_v1",
+  "stage_id": "09_debug_error",
+  "stage_title": "调试机制与错误处理",
+  "confidence": 0.98,
+  "question_reviews": [
+    {
+      "question_id": "Q09_001",
+      "confidence": 1.0,
+      "review": "题面要求确认日志系统及级别控制。答案判为 stub，证据指出虽有打印宏但 OutputLevel 枚举被注释且无过滤逻辑，证据与结论一致，未跑题，符合 tri_state_impl 契约。"
+    },
+    {
+      "question_id": "Q09_002",
+      "confidence": 1.0,
+      "review": "题面询问 panic 处理路径。答案判为 implemented，证据提供了 panic 宏定义及 k_panic 函数实现细节，支撑结论，符合 tri_state_impl 契约。"
+    },
+    {
+      "question_id": "Q09_003",
+      "confidence": 1.0,
+      "review": "题面要求说明 panic 输出诊断内容。答案明确列出输出项（文件/行/信息）并指出无寄存器/回溯，证据引用 k_panic 实现及 TrapFrame 未使用情况，证据支撑 value，符合 short_answer 契约。"
+    },
+    {
+      "question_id": "Q09_004",
+      "confidence": 1.0,
+      "review": "题面询问栈回溯实现。答案判为 not_found，证据显示源码搜索无命中且 k_panic 无调用，符合 tri_state_impl 契约，证据充分。"
+    },
+    {
+      "question_id": "Q09_005",
+      "confidence": 1.0,
+      "review": "题面严格定义内核监视器（需命令解析/分发）。答案判为 stub，证据指出仅有 TODO 注释及未调用的 procdump，无命令循环，符合题面约束，未将用户态 shell 混淆，证据支撑结论。"
+    },
+    {
+      "question_id": "Q09_006",
+      "confidence": 1.0,
+      "review": "题面询问 GDB stub。答案判为 not_found，证据为源码搜索无命中，符合 tri_state_impl 契约，证据支撑结论。"
+    },
+    {
+      "question_id": "Q09_007",
+      "confidence": 1.0,
+      "review": "题面询问错误码体系。答案描述为 C 风格 errno，证据提供宏定义文件及返回整型的使用示例，符合 short_answer 契约，证据与描述一致。"
+    },
+    {
+      "question_id": "Q09_008",
+      "confidence": 1.0,
+      "review": "题面询问系统级跟踪机制。答案判为 stub，证据区分了 lwext4 内部队列调试与系统级 trace，搜索无系统级命中，证据支撑 stub 结论，符合契约。"
+    }
+  ],
+  "dimensions": {
+    "evidence_supports_answers": 1.0,
+    "question_answer_consistency": 1.0,
+    "requirements_fit": 1.0
+  },
+  "findings": [],
+  "summary_zh": "所有 8 道题目均按题单顺序完成评审。答案值（value）与提供的证据（evidence）逻辑一致，无证据不足或矛盾情况。tri_state_impl 题型均给出明确状态，short_answer 题型均引用具体路径/行号。JSON 结构符合输出契约，无题面跑题现象。",
+  "_meta": {
+    "review_model": "qwen3.5-plus"
+  }
+}

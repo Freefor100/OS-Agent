@@ -1,0 +1,121 @@
+{
+  "stage_id": "02_boot_trap",
+  "goal": "完成启动/架构与Trap/系统调用阶段的证据收集，覆盖启动入口、模式切换、MMU初始化、trap向量、syscall分发等26个子问题",
+  "must_cover": [
+    "[Q02_001] 启动入口：RISC-V entry.S _entry@0x80200000, LoongArch entry.S _entry@0x9000000080000000",
+    "[Q02_002] 启动链：openSBI(M-mode)→entry.S(S-mode)→start.cc→main.cc",
+    "[Q02_003] 特权级切换：RISC-V M→S已证实(start.cc注释), LoongArch PLV0→PLV3",
+    "[Q02_004] 关键寄存器：RISC-V mstatus/sstatus/satp/stvec, LoongArch CRMD/PRMD/PGDL",
+    "[Q02_005] MMU启用：RISC-V satp=0早期禁用→main中w_satp开启; LoongArch pgdl设置",
+    "[Q02_006] 跳转链：_entry→start→main→trap_mgr.init→user_init→scheduler",
+    "[Q02_007] 早期初始化：BSS清零(linker.ld符号)/early UART(uart.cc)/DTB(传参)/页表(init前物理)",
+    "[Q02_008] FPU启用：Cpu::enable_fpu()存在但未在启动链调用",
+    "[Q02_009] Trap向量：RISC-V stvec=kernelvec, LoongArch eentry=kernelvec",
+    "[Q02_010] 构建系统：Makefile ARCH=riscv/loongarch条件编译",
+    "[Q02_011] SBI固件链：RISC-V sbi.hh证实ecall调用, LoongArch无SBI",
+    "[Q02_012] UART地址切换：未发现phys_to_virt显式转换",
+    "[Q02_013] 用户态返回：usertrapret→trampoline.S userret→sret/ertn",
+    "[Q02_014] 多平台：RISC-V+LoongArch双架构支持",
+    "[Q02_015] Trap入口：RISC-V uservec.S, LoongArch uservec.S",
+    "[Q02_016] TrapFrame位置：动态映射TRAPFRAME虚拟地址",
+    "[Q02_001] 启动入口在哪里？（例如 linker.ld 的 ENTRY、`_start`/`start`/`head`/`entry` 标签；必须给文件路径+符号证据）",
+    "[Q02_002] 启动链更接近哪种交接方式？",
+    "[Q02_003] 是否能在代码中证实发生了 CPU 特权级/模式切换？（RISC-V M→S、x86 实→保→长等；必须三态）",
+    "[Q02_004] 模式切换涉及的关键寄存器/位是什么？（例如 RISC-V mstatus/sstatus、x86 cr0/cr4/eflags；必须给证据摘录）",
+    "[Q02_005] 是否启用/初始化了 MMU（设置 SATP/CR3 等并建立页表）？（必须三态）",
+    "[Q02_006] 从入口汇编/固件交接到 C/Rust 主入口函数的跳转链是什么？（列出 3-6 个关键节点并给证据）"
+  ],
+  "evidence_targets": [
+    "启动入口",
+    "模式切换",
+    "页表/MMU",
+    "trap向量",
+    "trap入口",
+    "syscall分发",
+    "TrapFrame",
+    "用户指针校验",
+    "QEMU/README机模与板型差异",
+    "RTC/virtio早期初始化线索",
+    "trap 向量",
+    "trap 入口",
+    "syscall 分发",
+    "QEMU/README 机模与板型差异",
+    "RTC/virtio 早期初始化线索"
+  ],
+  "seed_paths": [
+    "kernel/boot/riscv/entry.S",
+    "kernel/boot/loongarch/entry.S",
+    "kernel/link/riscv/kernel.ld",
+    "kernel/link/loongarch/kernel.ld",
+    "kernel/boot/riscv/start.cc",
+    "kernel/boot/riscv/main.cc",
+    "kernel/boot/loongarch/main.cc",
+    "kernel/trap/riscv/trap.cc",
+    "kernel/trap/loongarch/trap.cc",
+    "kernel/proc/trapframe.hh",
+    "kernel/mem/riscv/trampoline.S",
+    "kernel/sys/syscall_handler.cc",
+    "arch",
+    "boot"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64",
+    "loongarch64"
+  ],
+  "entry_symbols": [
+    "_entry",
+    "start",
+    "main",
+    "trap_handler",
+    "usertrap",
+    "kerneltrap",
+    "uservec",
+    "userret",
+    "syscall",
+    "enable_fpu",
+    "_start",
+    "rust_main"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "busybox",
+    "busybox/loongarch",
+    "busybox/riscv",
+    "docs",
+    "kernel",
+    "kernel/boot",
+    "kernel/devs",
+    "kernel/fs",
+    "kernel/hal"
+  ],
+  "preferred_tools": [
+    "read_code_segment",
+    "lsp_get_call_graph",
+    "lsp_get_definition",
+    "lsp_get_references",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "1. 读取kernel/boot/riscv/start.cc和kernel/boot/loongarch/main.cc完整内容，确认启动链和MMU启用点",
+    "2. 使用lsp_get_call_graph追踪main→trap_mgr.init→inithart调用链(max_depth=2)",
+    "3. 读取kernel/sys/syscall_handler.cc前300行，确认syscall表初始化和边界检查逻辑",
+    "4. 使用grep_in_repo搜索copy_in/copy_out实现，定位用户空间访问安全检查",
+    "5. 读取kernel/proc/signal.cc中handle_signal实现，确认信号处理链路",
+    "6. 使用lsp_get_definition定位mmap_handler并读取其实现，确认缺页异常处理",
+    "7. 读取kernel/mem/virtual_memory_manager.cc中w_satp/w_csr_pgdl调用点，确认MMU启用时机",
+    "8. 对照must_cover清单整理证据，输出JSON报告"
+  ]
+}

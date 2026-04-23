@@ -1,0 +1,118 @@
+{
+  "stage_id": "08_network",
+  "goal": "分析网络子系统实现：确认协议栈来源（onpstack自研）、socket syscall 实现、virtio-net 驱动、收发包路径、协议支持情况（TCP/UDP/ARP/ICMP）、零拷贝与多队列支持状态。",
+  "must_cover": [
+    "[Q08_001] 网络子系统已实现（onpstack 协议栈 + socket 层 + virtio-net 驱动）",
+    "[Q08_002] 协议栈来源：B. 自研协议栈（onpstack，Apache 2.0 许可）",
+    "[Q08_003] Socket syscall 已实现（sys_socket/sys_bind/sys_connect/sys_sendto/sys_recvfrom）",
+    "[Q08_004] 发送路径追踪：sys_sendto → socket_file::sendto → onps sendto → tcp/udp_send → virtio_net_send → MMIO/PCI",
+    "[Q08_005] 网卡驱动已实现（VirtIO-net，RISC-V MMIO + LoongArch PCI 框架），收包中断路径：virtio_net_intr → 唤醒等待进程",
+    "[Q08_006] 协议支持：TCP/UDP/ARP/ICMP 已实现，DHCPv6 有代码但 DHCPv4 未发现，DNS 有错误码但未见解析器实现",
+    "[Q08_007] 零拷贝：未发现 DMA 描述符零拷贝实现（驱动使用 desc/avail/used ring 但数据需拷贝），多队列/RSS：仅定义 VIRTIO_NET_F_MQ 但未实现",
+    "功能限制：仅支持 VirtIO-net 虚拟网卡（QEMU 环境），127.0.0.1 回环有代码但需确认是否独立于物理网卡",
+    "[Q08_001] 是否存在网络子系统实现（协议栈或 socket 层）？（必须三态）",
+    "[Q08_002] 协议栈来源更接近哪种？",
+    "[Q08_003] 是否实现 socket 系统调用接口（socket/bind/connect/sendto/recvfrom 等）？（必须三态）",
+    "[Q08_004] 选择一个发送路径（优先 sys_sendto），追踪：syscall → 协议栈 → 网卡驱动。列 3-6 个关键节点并给证据。",
+    "[Q08_005] 是否实现网卡驱动（virtio-net/e1000 等）与收包中断路径？（必须三态）",
+    "[Q08_006] 协议支持情况（多选；未发现则留空并在 notes 写 not_found）：",
+    "[Q08_007] 是否存在零拷贝/共享缓冲/DMA 描述符等路径（zero-copy）？（必须三态；仅有名词不算 implemented）",
+    "若仅回环/仅 QEMU：写明**限制**；若多网卡：列**各自入口文件**与 feature 开关。",
+    "若无网络实现：单列一节说明依据即可。",
+    "网络协议栈架构：自实现还是使用 `smoltcp`/`lwip` 等库？（**检查 Cargo.toml 依赖**）**如果完全没有网络支持，明确写“未实现网络功能（❌ 未实现）”**。",
+    "Socket 接口实现：是否有 `socket`/`bind`/`connect` 等 syscall？还是仅有 Loopback？",
+    "**功能限制声明（必须）**：分析项目是否已在真实物理网卡上测试过网络功能。如果仅在 QEMU 环境测试或仅支持本地回环通信，必须明确写出该限制。搜索 `loopback|LOOPBACK|127.0.0.1` 确认是否仅有回环设备。",
+    "**网卡驱动细节**：",
+    "搜索 `drivers/net/`, `virtio-drivers`, `ixgbe` 等。"
+  ],
+  "evidence_targets": [
+    "onpstack 协议栈架构（kernel/net/onpstack/）",
+    "socket syscall 实现（kernel/sys/syscall_handler.cc:7191/7366/8085/8193）",
+    "socket_file 封装层（kernel/fs/vfs/file/socket_file.cc）",
+    "virtio-net 驱动初始化与收发（kernel/net/drivers/virtio_net.cc）",
+    "中断处理路径（kernel/trap/riscv/trap.cc:90-94, virtio_net_intr）",
+    "协议实现证据（tcp.cc/udp.cc/arp.cc/icmp.cc）",
+    "回环支持（netif.cc:333 检查 127.0.0.1）",
+    "零拷贝/多队列缺失证据（grep 结果）",
+    "协议栈",
+    "socket API",
+    "poll/epoll",
+    "驱动接入"
+  ],
+  "seed_paths": [
+    "kernel/net/onpstack/",
+    "kernel/net/drivers/virtio_net.cc",
+    "kernel/net/drivers/virtio_net.hh",
+    "kernel/fs/vfs/file/socket_file.cc",
+    "kernel/sys/syscall_handler.cc",
+    "kernel/trap/riscv/trap.cc",
+    "kernel/net/onpstack/ip/tcp.cc",
+    "kernel/net/onpstack/ip/udp.cc",
+    "kernel/net/onpstack/ethernet/arp.cc",
+    "kernel/net/onpstack/ip/icmp.cc",
+    "kernel/net/onpstack/netif/netif.cc",
+    "kernel/net/onpstack/include/port/sys_config.hh",
+    "net",
+    "tcp"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64",
+    "loongarch64"
+  ],
+  "entry_symbols": [
+    "sys_socket",
+    "sys_bind",
+    "sys_connect",
+    "sys_sendto",
+    "sys_recvfrom",
+    "virtio_net_init",
+    "virtio_net_intr",
+    "virtio_net_send",
+    "tcp_send",
+    "udp_send",
+    "tcp",
+    "udp"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "busybox",
+    "busybox/loongarch",
+    "busybox/riscv",
+    "docs",
+    "kernel",
+    "kernel/boot",
+    "kernel/devs",
+    "kernel/fs",
+    "kernel/hal"
+  ],
+  "preferred_tools": [
+    "read_code_segment",
+    "lsp_get_call_graph",
+    "lsp_get_definition",
+    "lsp_get_references",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "1. 精读 socket_file.cc 关键方法（send/recv/connect/bind），确认 onpstack 调用方式与错误处理流程",
+    "2. 使用 lsp_get_call_graph 追踪 sys_sendto 调用链（direction=outgoing, max_depth=3），获取 syscall→socket_file→onpstack→virtio_net 的完整路径",
+    "3. 精读 virtio_net.cc 的 virtio_net_send/virtio_net_recv/virtio_net_intr，分析 DMA 描述符操作与零拷贝证据",
+    "4. 使用 grep_in_repo 搜索 DHCP/DNS 实现细节，确认协议支持状态（特别是 DHCPv4 是否缺失）",
+    "5. 读取 tcp.cc/udp.cc 关键发送函数，追踪数据包如何传递到 virtio_net_send",
+    "6. 检查 trap.cc 中 VIRTIO1_IRQ 处理逻辑，确认收包中断是否已接入（当前代码显示 VIRTIO1_IRQ 仅 panic，需验证实际使用）",
+    "7. 使用 lsp_get_references 查询 virtio_net_intr 被谁调用，确认中断注册与触发路径",
+    "8. 对照 must_cover 整理证据：协议栈来源、socket syscall 列表、驱动类型、协议支持矩阵、零拷贝/多队列状态、功能限制声明"
+  ]
+}

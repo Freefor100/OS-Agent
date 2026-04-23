@@ -1,13 +1,13 @@
-现在我已经收集了足够的证据来回答所有问题。让我整理证据并生成最终的 JSON 输出。
+现在我已经收集了足够的证据来回答所有问题。让我整理分析结果并生成最终的 JSON 输出。
 
-关键证据总结：
-1. **网络子系统存在**：`kernel/syssocket.c` 实现了完整的 socket syscall，`kernel/socket_new.c` 转发到 lwIP
-2. **协议栈来源**：`kernel/lwip/` 目录完整集成第三方 lwIP 协议栈
-3. **Socket 系统调用**：`sys_socket`/`sys_bind`/`sys_connect`/`sys_sendto`/`sys_recvfrom` 等均已实现
-4. **发送路径**：`sys_sendto` → `do_sendto` → `lwip_sendto` → `netconn_send`，数据通过 ring_buffer 在本地 socket 间拷贝
-5. **网卡驱动**：仅有 `virtio_disk.c`（磁盘驱动），无 virtio-net 或以太网驱动
-6. **协议支持**：`lwipopts.h` 显示 TCP/UDP/DNS=1，ICMP/DHCP/ARP=0
-7. **零拷贝**：未发现 DMA 描述符或 mbuf 引用传递，仅 ring_buffer 拷贝
+基于代码证据：
+1. **网络子系统实现**：已实现 - 使用 lwIP 协议栈，有完整的 socket 系统调用接口
+2. **协议栈来源**：第三方库 lwIP（`kernel/lwip/` 目录）
+3. **Socket 系统调用**：已实现 - `sys_socket`、`sys_bind`、`sys_listen`、`sys_accept`、`sys_connect`、`sys_sendto`、`sys_recvfrom` 等
+4. **发送路径**：`sys_sendto` → `do_sendto` → `lwip_sendto` → `netconn_send` → ...
+5. **网卡驱动**：未发现真实网卡驱动，仅支持 loopback（`tcpip_init_with_loopback`、`LWIP_HAVE_LOOPIF`）
+6. **协议支持**：TCP、UDP、IPv4、ARP、DNS（根据 lwipopts.h）
+7. **零拷贝**：未发现 - ring_buffer 使用 `copyin`/`copyout` 进行数据拷贝
 
 ```json
 {
@@ -23,22 +23,22 @@
       "value": "implemented",
       "evidence": [
         {
+          "path": "kernel/lwip/",
+          "symbol_kind": "directory",
+          "symbol_name": "lwip_stack",
+          "excerpt": "lwIP 协议栈完整集成于 kernel/lwip/ 目录，包含 api/、core/、include/ 等子目录"
+        },
+        {
           "path": "kernel/syssocket.c",
           "symbol_kind": "function",
-          "symbol_name": "sys_sendto",
-          "excerpt": "sys_sendto 实现：解析 6 个参数（sockfd, buf, len, flags, dest_addr, addrlen），调用 do_sendto 转发到 lwIP"
+          "symbol_name": "sys_socket",
+          "excerpt": "sys_socket() 实现于 kernel/syssocket.c:66，调用 do_socket() 创建 socket"
         },
         {
           "path": "kernel/socket_new.c",
           "symbol_kind": "function",
-          "symbol_name": "do_sendto",
-          "excerpt": "do_sendto 实现：分配内核缓冲区 kbuf，copyin 从用户态拷贝数据，调用 lwip_sendto 发送到协议栈"
-        },
-        {
-          "path": "kernel/lwip/lwipopts.h",
-          "symbol_kind": "config",
-          "symbol_name": "LWIP_SOCKET",
-          "excerpt": "#define LWIP_SOCKET 1，启用 socket API；#define LWIP_TCP 1, LWIP_UDP 1, LWIP_DNS 1 启用协议支持"
+          "symbol_name": "do_socket",
+          "excerpt": "do_socket() 实现于 kernel/socket_new.c:83，调用 lwip_socket() 创建 lwIP socket"
         }
       ]
     },
@@ -51,20 +51,14 @@
         {
           "path": "kernel/lwip/",
           "symbol_kind": "directory",
-          "symbol_name": "lwip_stack",
-          "excerpt": "kernel/lwip/ 目录完整集成 lwIP 协议栈，包含 api/, core/, include/, netif/ 等标准 lwIP 子目录"
+          "symbol_name": "lwip_source",
+          "excerpt": "完整的 lwIP 协议栈源码位于 kernel/lwip/，包含 api/sockets.c、core/tcp.c、core/udp.c 等标准 lwIP 文件"
         },
         {
-          "path": "kernel/lwip/api/sockets.c",
-          "symbol_kind": "file",
-          "symbol_name": "lwip_sendto",
-          "excerpt": "lwip_sendto 实现（行 1720+）：标准 lwIP socket API，包含 netconn_send, netbuf_alloc 等 lwIP 内部调用"
-        },
-        {
-          "path": "kernel/socket_new.c",
-          "symbol_kind": "include",
-          "symbol_name": "lwip_headers",
-          "excerpt": "#include \"lwip/init.h\", #include \"lwip/sockets.h\", #include \"lwip/tcp.h\" 引入第三方 lwIP 头文件"
+          "path": "kernel/lwipopts.h",
+          "symbol_kind": "config",
+          "symbol_name": "lwip_config",
+          "excerpt": "lwIP 配置选项文件，定义 LWIP_TCP=1、LWIP_UDP=1、LWIP_IPV4=1 等协议栈功能开关"
         }
       ]
     },
@@ -78,31 +72,31 @@
           "path": "kernel/syssocket.c",
           "symbol_kind": "function",
           "symbol_name": "sys_socket",
-          "excerpt": "sys_socket 实现（行 70+）：解析 domain/type/protocol，调用 filealloc 和 fdalloc 分配文件描述符，设置 f->type = FD_SOCK"
+          "excerpt": "sys_socket() 实现于 kernel/syssocket.c:66-107，分配 struct file 并调用 do_socket()"
         },
         {
           "path": "kernel/syssocket.c",
           "symbol_kind": "function",
           "symbol_name": "sys_bind",
-          "excerpt": "sys_bind 实现（行 107+）：解析 sockfd/addr/addrlen，copyin 拷贝 sockaddr_in_compat，调用 do_bind"
-        },
-        {
-          "path": "kernel/syssocket.c",
-          "symbol_kind": "function",
-          "symbol_name": "sys_connect",
-          "excerpt": "sys_connect 实现（行 143+）：等待 tcp_start_listen 标志，调用 do_connect 发起连接"
+          "excerpt": "sys_bind() 实现于 kernel/syssocket.c:109-140，调用 do_bind() 绑定地址"
         },
         {
           "path": "kernel/syssocket.c",
           "symbol_kind": "function",
           "symbol_name": "sys_sendto",
-          "excerpt": "sys_sendto 实现（行 232+）：解析 6 个参数，copyin 拷贝目标地址，调用 do_sendto 发送数据"
+          "excerpt": "sys_sendto() 实现于 kernel/syssocket.c:254-297，调用 do_sendto() 发送数据"
         },
         {
           "path": "kernel/syssocket.c",
           "symbol_kind": "function",
           "symbol_name": "sys_recvfrom",
-          "excerpt": "sys_recvfrom 实现（行 278+）：解析 6 个参数，调用 do_recvfrom 接收数据，copyout 写回用户缓冲区"
+          "excerpt": "sys_recvfrom() 实现于 kernel/syssocket.c:300-347，调用 do_recvfrom() 接收数据"
+        },
+        {
+          "path": "kernel/syscall.c",
+          "symbol_kind": "array",
+          "symbol_name": "syscalls",
+          "excerpt": "syscall 表于 kernel/syscall.c:295-307 注册 socket 相关系统调用：SYS_socket、SYS_bind、SYS_listen、SYS_accept、SYS_connect、SYS_sendto、SYS_recvfrom"
         }
       ]
     },
@@ -110,31 +104,37 @@
       "question_id": "Q08_004",
       "question_type": "short_answer",
       "stem": "选择一个发送路径（优先 sys_sendto），追踪：syscall → 协议栈 → 网卡驱动。列 3-6 个关键节点并给证据。",
-      "value": "发送路径追踪（sys_sendto）：\n1. syscall 入口：kernel/syssocket.c:232 sys_sendto() - 解析用户参数（sockfd, buf, len, flags, dest_addr, addrlen），copyin 拷贝 sockaddr 结构\n2. 内核转发层：kernel/socket_new.c:107 do_sendto() - 分配内核缓冲区 kbuf = kalloc()，copyin 从用户态拷贝数据到 kbuf，调用 lwip_sendto()\n3. lwIP 协议栈：kernel/lwip/api/sockets.c:1720 lwip_sendto() - 验证 socket 类型（TCP/UDP），netbuf_alloc 分配协议栈缓冲区，MEMCPY 拷贝数据\n4. netconn 层：kernel/lwip/api/sockets.c:1807 netconn_send() - 将数据封装为 netbuf，通过 conn->callback 发送到协议栈\n5. 数据传输：kernel/ring_buffer.c:79 write_ring_buffer() - 在本地 socket 间通过 ring_buffer 拷贝数据（非真实网卡）\n\n关键限制：数据路径在 lwIP 协议栈层终止于 ring_buffer，无真实网卡驱动（virtio_disk.c 仅支持磁盘），仅支持 QEMU 回环通信。",
+      "value": "发送路径追踪（sys_sendto）：\n1. sys_sendto (kernel/syssocket.c:254) - 系统调用入口，解析用户参数并调用 do_sendto\n2. do_sendto (kernel/socket_new.c:107) - 内核层封装，分配内核缓冲区并调用 lwip_sendto\n3. lwip_sendto (kernel/lwip/api/sockets.c:1710) - lwIP socket API，处理 UDP/TCP 分发\n4. netconn_send (kernel/lwip/api/api_lib.c) - 网络连接层发送接口\n5. netif_loop_output (kernel/lwip/core/netif.c:1099) - 本地回环网络接口输出（无真实网卡驱动）\n\n注意：该仓库仅实现本地回环（loopback），数据通过 ring_buffer 在本地 socket 间传递，未经过真实网卡驱动。",
       "evidence": [
         {
           "path": "kernel/syssocket.c",
           "symbol_kind": "function",
           "symbol_name": "sys_sendto",
-          "excerpt": "行 232-267：解析 6 个参数，copyin 拷贝 dest_addr，调用 do_sendto(f->socketnum, buf, len, flags, ...)"
+          "excerpt": "sys_sendto() 于 kernel/syssocket.c:254 接收用户参数，调用 do_sendto(f->socketnum, buf, len, flags, ...)"
         },
         {
           "path": "kernel/socket_new.c",
           "symbol_kind": "function",
           "symbol_name": "do_sendto",
-          "excerpt": "行 107-114：void *kbuf = kalloc(); copyin(myproc()->pagetable, kbuf, (uint64)buf, len); ssize_t ret = lwip_sendto(...); kfree(kbuf);"
+          "excerpt": "do_sendto() 于 kernel/socket_new.c:107 分配内核缓冲区 kbuf，copyin 用户数据后调用 lwip_sendto()"
         },
         {
           "path": "kernel/lwip/api/sockets.c",
           "symbol_kind": "function",
           "symbol_name": "lwip_sendto",
-          "excerpt": "行 1720-1809：验证 socket 类型，netbuf_alloc 分配缓冲区，MEMCPY 拷贝数据，调用 netconn_send"
+          "excerpt": "lwip_sendto() 于 kernel/lwip/api/sockets.c:1710 根据 socket 类型分发到 TCP 或 UDP 发送路径"
         },
         {
-          "path": "kernel/ring_buffer.c",
+          "path": "kernel/lwip/core/netif.c",
           "symbol_kind": "function",
-          "symbol_name": "write_ring_buffer",
-          "excerpt": "行 79-104：acquire 锁，copyin 从用户态拷贝数据到 rbuf->buf，更新 tail 指针，实现本地 socket 间数据传递"
+          "symbol_name": "netif_loop_output",
+          "excerpt": "netif_loop_output() 于 kernel/lwip/core/netif.c:1099 处理本地回环数据包，无真实网卡驱动"
+        },
+        {
+          "path": "doc/net.md",
+          "symbol_kind": "doc",
+          "symbol_name": "loopback_design",
+          "excerpt": "文档说明：'测试程序中只存在本机回环，我们的 socket 接口采取了简化的实现方法，不经过 qemu 的网卡，直接通过本机 ring buffer 进行信息传递'"
         }
       ]
     },
@@ -145,28 +145,28 @@
       "value": "not_found",
       "evidence": [
         {
-          "path": "kernel/virtio_disk.c",
-          "symbol_kind": "file",
-          "symbol_name": "virtio_disk_driver",
-          "excerpt": "完整文件 262 行，仅实现 virtio-blk 磁盘驱动（virtio_disk_init/virtio_disk_rw/virtio_disk_intr），无网络相关代码"
-        },
-        {
-          "path": "kernel/",
-          "symbol_kind": "search",
-          "symbol_name": "grep_virtio_net",
-          "excerpt": "grep 'virtio_net|ethernetif' 在 kernel/ 目录 0 命中；仅找到 lwIP 内部的 netif 抽象（非真实驱动）"
+          "path": "kernel/lwip/core/netif.c",
+          "symbol_kind": "function",
+          "symbol_name": "netif_loopif_init",
+          "excerpt": "仅实现 loopback 网络接口（kernel/lwip/core/netif.c:181-184），设置 netif->output = netif_loop_output_ipv4"
         },
         {
           "path": "kernel/main.c",
           "symbol_kind": "function",
           "symbol_name": "tcpip_init_with_loopback",
-          "excerpt": "行 71：tcpip_init_with_loopback() 初始化 lwIP 协议栈，但仅启用 loopback 模式（见 lwipopts.h: LWIP_NETIF_LOOPBACK=1）"
+          "excerpt": "kernel/main.c:71 调用 tcpip_init_with_loopback() 初始化协议栈，仅支持本地回环"
+        },
+        {
+          "path": "kernel/",
+          "symbol_kind": "search",
+          "symbol_name": "grep_virtio_net",
+          "excerpt": "在 kernel/ 目录搜索 virtio-net、e1000、rtl8139、ixgbe 等网卡驱动关键词，未发现真实网卡驱动实现"
         },
         {
           "path": "doc/net.md",
           "symbol_kind": "doc",
-          "symbol_name": "network_design",
-          "excerpt": "文档明确说明：'只存在本机回环，我们的 socket 接口采取了简化的实现方法，不经过 qemu 的网卡，直接通过本机 ring buffer 进行信息传递'"
+          "symbol_name": "loopback_only",
+          "excerpt": "文档明确说明：'不经过 qemu 的网卡，直接通过本机 ring buffer 进行信息传递'，证实无网卡驱动"
         }
       ]
     },
@@ -174,19 +174,37 @@
       "question_id": "Q08_006",
       "question_type": "multi_choice",
       "stem": "协议支持情况（多选；未发现则留空并在 notes 写 not_found）：",
-      "value": ["C. IPv4/IPv6", "E. UDP", "F. TCP", "H. DNS"],
+      "value": [
+        "B. ARP",
+        "C. IPv4/IPv6",
+        "E. UDP",
+        "F. TCP",
+        "H. DNS"
+      ],
       "evidence": [
         {
           "path": "kernel/lwip/lwipopts.h",
           "symbol_kind": "config",
-          "symbol_name": "protocol_config",
-          "excerpt": "#define LWIP_IPV4 1, #define LWIP_IPV6 0（仅 IPv4）, #define LWIP_UDP 1, #define LWIP_TCP 1, #define LWIP_DNS 1"
+          "symbol_name": "lwip_config",
+          "excerpt": "LWIP_ARP=1（ARP 支持）、LWIP_IPV4=1（IPv4 支持）、LWIP_UDP=1（UDP 支持）、LWIP_TCP=1（TCP 支持）、LWIP_DNS=1（DNS 支持）"
         },
         {
-          "path": "kernel/lwip/lwipopts.h",
-          "symbol_kind": "config",
-          "symbol_name": "disabled_protocols",
-          "excerpt": "#define LWIP_ICMP 0（禁用）, #define LWIP_DHCP 0（禁用）, #define LWIP_ARP 1（但仅 loopback 模式，无真实以太网）"
+          "path": "kernel/lwip/core/tcp.c",
+          "symbol_kind": "file",
+          "symbol_name": "tcp_impl",
+          "excerpt": "TCP 协议实现于 kernel/lwip/core/tcp.c（2639 行），包含 tcp_connect、tcp_send 等核心函数"
+        },
+        {
+          "path": "kernel/lwip/core/udp.c",
+          "symbol_kind": "file",
+          "symbol_name": "udp_impl",
+          "excerpt": "UDP 协议实现于 kernel/lwip/core/udp.c（1331 行），包含 udp_send、udp_recv 等核心函数"
+        },
+        {
+          "path": "kernel/lwip/include/lwip/sockets.h",
+          "symbol_kind": "header",
+          "symbol_name": "socket_types",
+          "excerpt": "定义 SOCK_STREAM=1（TCP）、SOCK_DGRAM=2（UDP），证实 TCP/UDP socket 类型支持"
         }
       ]
     },
@@ -200,25 +218,25 @@
           "path": "kernel/socket_new.c",
           "symbol_kind": "function",
           "symbol_name": "do_sendto",
-          "excerpt": "行 108-111：void *kbuf = kalloc(); copyin(..., kbuf, ...); lwip_sendto(..., kbuf, ...); kfree(kbuf); - 显式分配-拷贝-释放，非零拷贝"
+          "excerpt": "do_sendto() 于 kernel/socket_new.c:107-113 使用 kalloc() 分配内核缓冲区，通过 copyin() 从用户空间拷贝数据到内核缓冲区，再调用 lwip_sendto()，存在显式数据拷贝"
+        },
+        {
+          "path": "kernel/socket_new.c",
+          "symbol_kind": "function",
+          "symbol_name": "do_recvfrom",
+          "excerpt": "do_recvfrom() 于 kernel/socket_new.c:117-122 使用 kalloc() 分配内核缓冲区，调用 lwip_recvfrom() 后通过 copyout() 拷贝到用户空间，存在显式数据拷贝"
         },
         {
           "path": "kernel/ring_buffer.c",
           "symbol_kind": "function",
-          "symbol_name": "write_ring_buffer",
-          "excerpt": "行 79-104：copyin 从用户态拷贝数据到 ring_buffer->buf，涉及完整内存拷贝，无 DMA 描述符或共享缓冲"
-        },
-        {
-          "path": "kernel/lwip/api/sockets.c",
-          "symbol_kind": "function",
-          "symbol_name": "lwip_sendto",
-          "excerpt": "行 1770-1780：netbuf_alloc(&buf, short_size) 分配新缓冲区，MEMCPY(buf.p->payload, data, short_size) 再次拷贝数据"
+          "symbol_name": "read_ring_buffer",
+          "excerpt": "read_ring_buffer() 于 kernel/ring_buffer.c:64-82 使用 copyout() 将 ring_buffer 数据拷贝到用户缓冲区，非零拷贝"
         },
         {
           "path": "kernel/",
           "symbol_kind": "search",
-          "symbol_name": "grep_dma_mbuf",
-          "excerpt": "grep 'DMA|mbuf|zero.copy' 在 kernel/ 目录仅找到磁盘驱动中的 DMA（SD 卡控制器），无网络 DMA 或 mbuf 引用传递机制"
+          "symbol_name": "grep_zero_copy",
+          "excerpt": "搜索 DMA、zero_copy、shared_buffer 等关键词，未发现 DMA 描述符操作或共享缓冲区机制，仅发现 SD 卡控制器的 DMA 配置（与网络无关）"
         }
       ]
     }

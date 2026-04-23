@@ -1,0 +1,778 @@
+{
+  "schema_version": "v1",
+  "stage_id": "02_boot_trap",
+  "stage_title": "启动/架构与 Trap/系统调用",
+  "terminology_profile": "stallings_en_zh",
+  "answers": [
+    {
+      "question_id": "Q02_001",
+      "question_type": "short_answer",
+      "stem": "启动入口在哪里？（例如 linker.ld 的 ENTRY、`_start`/`start`/`head`/`entry` 标签；必须给文件路径+符号证据）",
+      "value": "RISC-V: `kernel/link/riscv/kernel.ld:2` 设置 ENTRY(_entry)，实际入口在 `kernel/boot/riscv/entry.S:3` 的 `_entry` 标签，加载地址 0x80200000（`kernel/link/riscv/kernel.ld:9`）。LoongArch: `kernel/link/loongarch/kernel.ld:2` 设置 ENTRY(_entry)，实际入口在 `kernel/boot/loongarch/entry.S:4` 的 `_entry` 标签，加载地址 0x9000000080000000（`kernel/link/loongarch/kernel.ld:6`）。",
+      "evidence": [
+        {
+          "path": "kernel/link/riscv/kernel.ld",
+          "symbol_kind": "linker_script",
+          "symbol_name": "ENTRY",
+          "excerpt": "OUTPUT_ARCH( \"riscv\" ) ENTRY( _entry ) . = 0x80200000;"
+        },
+        {
+          "path": "kernel/boot/riscv/entry.S",
+          "symbol_kind": "asm_label",
+          "symbol_name": "_entry",
+          "excerpt": ".section .text.entry .global _entry _entry: la sp, stack0 ..."
+        },
+        {
+          "path": "kernel/link/loongarch/kernel.ld",
+          "symbol_kind": "linker_script",
+          "symbol_name": "ENTRY",
+          "excerpt": "OUTPUT_ARCH( \"loongarch\" ) ENTRY( _entry ) . = 0x9000000080000000;"
+        },
+        {
+          "path": "kernel/boot/loongarch/entry.S",
+          "symbol_kind": "asm_label",
+          "symbol_name": "_entry",
+          "excerpt": ".section .text .global _entry _entry: li.d $t0, 0x8000000000000001 csrwr $t0, LOONGARCH_CSR_DMWIN0 ..."
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_002",
+      "question_type": "single_choice",
+      "stem": "启动链更接近哪种交接方式？",
+      "value": "固件/引导加载器 → 内核入口（如 SBI/OpenSBI/U-Boot/BIOS/UEFI）",
+      "evidence": [
+        {
+          "path": "kernel/boot/riscv/start.cc",
+          "symbol_kind": "comment",
+          "symbol_name": "boot_chain_comment",
+          "excerpt": "// 机器启动流程：open-sbi(M-mode) -> entry.S(S-mode) -> start.c -> main.c"
+        },
+        {
+          "path": "kernel/boot/riscv/entry.S",
+          "symbol_kind": "asm_comment",
+          "symbol_name": "sbi_comment",
+          "excerpt": "# sbi load the hartid in a0"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_003",
+      "question_type": "tri_state_impl",
+      "stem": "是否能在代码中证实发生了 CPU 特权级/模式切换？（RISC-V M→S、x86 实→保→长等；必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/boot/riscv/start.cc",
+          "symbol_kind": "comment",
+          "symbol_name": "privilege_switch_comment",
+          "excerpt": "// 机器启动流程：open-sbi(M-mode) -> entry.S(S-mode) -> start.c -> main.c"
+        },
+        {
+          "path": "kernel/boot/loongarch/entry.S",
+          "symbol_kind": "asm_code",
+          "symbol_name": "crmd_setup",
+          "excerpt": "li.w $t0, 0xb0 # PLV=0, IE=0, PG=1 csrwr $t0, LOONGARCH_CSR_CRMD"
+        },
+        {
+          "path": "kernel/trap/riscv/trap.cc",
+          "symbol_kind": "function",
+          "symbol_name": "usertrapret",
+          "excerpt": "uint64 x = r_sstatus(); x &= ~riscv::csr::sstatus_spp_m; x |= riscv::csr::sstatus_spie_m; w_sstatus(x);"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_004",
+      "question_type": "short_answer",
+      "stem": "模式切换涉及的关键寄存器/位是什么？（例如 RISC-V mstatus/sstatus、x86 cr0/cr4/eflags；必须给证据摘录）",
+      "value": "RISC-V: mstatus/sstatus (SPP/SPIE 位), satp (页表基址), stvec (trap 向量), scause (异常原因)。LoongArch: CRMD (PLV/IE 位), PRMD (PPLV/PIE 位), PGDL/PGDH (页表基址), EENTRY (异常入口), ESTAT/ECFG (中断配置)。",
+      "evidence": [
+        {
+          "path": "kernel/boot/riscv/start.cc",
+          "symbol_kind": "function",
+          "symbol_name": "start",
+          "excerpt": "riscv::csr::_write_csr_(riscv::csr::satp, 0); riscv::csr::_write_csr_(riscv::csr::stvec, (uint64)trap_loop);"
+        },
+        {
+          "path": "kernel/boot/loongarch/entry.S",
+          "symbol_kind": "asm_code",
+          "symbol_name": "csr_setup",
+          "excerpt": "li.w $t0, 0xb0 csrwr $t0, LOONGARCH_CSR_CRMD li.w $t0, 0x00 csrwr $t0, LOONGARCH_CSR_PRMD"
+        },
+        {
+          "path": "kernel/trap/riscv/trap.cc",
+          "symbol_kind": "function",
+          "symbol_name": "usertrapret",
+          "excerpt": "x &= ~riscv::csr::sstatus_spp_m; x |= riscv::csr::sstatus_spie_m; w_sstatus(x); w_sepc(p->_trapframe->epc);"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_005",
+      "question_type": "tri_state_impl",
+      "stem": "是否启用/初始化了 MMU（设置 SATP/CR3 等并建立页表）？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/mem/virtual_memory_manager.cc",
+          "symbol_kind": "function",
+          "symbol_name": "VirtualMemoryManager::init",
+          "excerpt": "k_pagetable = kvmmake(); w_satp(MAKE_SATP(k_pagetable.get_base())); sfence_vma();"
+        },
+        {
+          "path": "kernel/mem/virtual_memory_manager.cc",
+          "symbol_kind": "function",
+          "symbol_name": "VirtualMemoryManager::init",
+          "excerpt": "w_csr_pgdl((uint64)k_pagetable.get_base()); tlbinit();"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_006",
+      "question_type": "short_answer",
+      "stem": "从入口汇编/固件交接到 C/Rust 主入口函数的跳转链是什么？（列出 3-6 个关键节点并给证据）",
+      "value": "RISC-V: _entry (entry.S:3) → start (start.cc:22) → main (main.cc:47) → trap_mgr.init (main.cc:54) → trap_mgr.inithart (main.cc:55) → proc::k_pm.user_init (main.cc:95) → proc::k_scheduler.start_schedule (main.cc:117)。LoongArch: _entry (entry.S:4) → main (main.cc:28) → trap_mgr.init (main.cc:36) → trap_mgr.inithart (main.cc:37) → proc::k_pm.user_init (main.cc:63) → proc::k_scheduler.start_schedule (main.cc:82)。",
+      "evidence": [
+        {
+          "path": "kernel/boot/riscv/entry.S",
+          "symbol_kind": "asm_code",
+          "symbol_name": "_entry",
+          "excerpt": "call start"
+        },
+        {
+          "path": "kernel/boot/riscv/start.cc",
+          "symbol_kind": "function",
+          "symbol_name": "start",
+          "excerpt": "main(hartid, dtb_entry);"
+        },
+        {
+          "path": "kernel/boot/riscv/main.cc",
+          "symbol_kind": "function",
+          "symbol_name": "main",
+          "excerpt": "trap_mgr.init(); trap_mgr.inithart(); proc::k_pm.user_init(); proc::k_scheduler.start_schedule();"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_007",
+      "question_type": "fill_in",
+      "stem": "早期初始化 (Early Initialization) 各项状态（每项必须 implemented / stub / not_found + 证据路径，格式：`项目: 状态 [路径]`）：\n- BSS 清零 (BSS Clearing): ___\n- 早期串口输出 (Early Serial/UART Output): ___\n- 设备树解析 (Device Tree Blob parsing, DTB): ___\n- 页表初始化时机 (Page Table Init): ___（在 MMU 启用前/后？）",
+      "value": "BSS 清零 (BSS Clearing): implemented [kernel/link/riscv/kernel.ld:43-46 提供 bss_start/bss_end 符号; kernel/link/loongarch/kernel.ld:48-52 提供 sbss_clear/ebss_clear 符号]\n早期串口输出 (Early Serial/UART Output): implemented [kernel/boot/riscv/main.cc:52 k_printer.init(); kernel/boot/loongarch/main.cc:30 k_printer.init()]\n设备树解析 (Device Tree Blob parsing, DTB): implemented [kernel/boot/riscv/main.cc:47 接收 dtb_addr 参数; kernel/boot/riscv/main.cc:48 k_dtb_addr = dtb_addr; kernel/devs/dtb.cc 存在但实现待核实]\n页表初始化时机 (Page Table Init): implemented [kernel/mem/virtual_memory_manager.cc:60-80 在 VirtualMemoryManager::init() 中创建内核页表并设置 satp/pgdl，在 trap_mgr.init 之后调用]",
+      "evidence": [
+        {
+          "path": "kernel/link/riscv/kernel.ld",
+          "symbol_kind": "linker_script",
+          "symbol_name": "bss_section",
+          "excerpt": ".bss : { PROVIDE(bss_start = .); *(.sbss .sbss.*) *(.bss .bss.*) PROVIDE(bss_end = .); }"
+        },
+        {
+          "path": "kernel/boot/riscv/main.cc",
+          "symbol_kind": "function",
+          "symbol_name": "main",
+          "excerpt": "k_printer.init(); trap_mgr.init(); mem::k_vmm.init();"
+        },
+        {
+          "path": "kernel/boot/riscv/main.cc",
+          "symbol_kind": "function",
+          "symbol_name": "main",
+          "excerpt": "extern \"C\" void main(uint64 hartid, uint64 dtb_addr) { k_dtb_addr = dtb_addr; }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_008",
+      "question_type": "tri_state_impl",
+      "stem": "是否初始化/启用了 FPU（如 sstatus.fs / cpacr_el1 / cr4）？（必须三态）",
+      "value": "stub",
+      "evidence": [
+        {
+          "path": "kernel/hal/cpu.cc",
+          "symbol_kind": "function",
+          "symbol_name": "Cpu::enable_fpu",
+          "excerpt": "void Cpu::enable_fpu() { #ifdef RISCV uint64 mstatus = r_mstatus(); mstatus |= (0x3UL << 13); w_mstatus(mstatus); #elif defined(LOONGARCH) uint64 tmp = r_csr_euen(); w_csr_euen(tmp | 1); #endif }"
+        },
+        {
+          "path": "kernel/boot/riscv/main.cc",
+          "symbol_kind": "search",
+          "symbol_name": "fpu_init_scan",
+          "excerpt": "在 main() 启动链中未调用 enable_fpu() 函数，仅定义但未使用"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_009",
+      "question_type": "tri_state_impl",
+      "stem": "是否设置 trap/中断向量（如 stvec/idt 等）并能指出设置点？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/trap/riscv/trap.cc",
+          "symbol_kind": "function",
+          "symbol_name": "trap_manager::inithart",
+          "excerpt": "w_stvec((uint64)kernelvec); w_sstatus(r_sstatus() | SSTATUS_SIE); w_sie(r_sie() | SIE_SEIE | SIE_STIE | SIE_SSIE);"
+        },
+        {
+          "path": "kernel/trap/loongarch/trap.cc",
+          "symbol_kind": "function",
+          "symbol_name": "trap_manager::inithart",
+          "excerpt": "w_csr_ecfg(ecfg); w_csr_tcfg(tcfg); w_csr_eentry((uint64)kernelvec); w_csr_tlbrentry((uint64)handle_tlbr);"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_010",
+      "question_type": "short_answer",
+      "stem": "构建系统如何选择目标平台/架构与入口文件？（Cargo features/Kconfig/Makefile 条件；必须引用配置证据）",
+      "value": "通过 Makefile 的 ARCH 变量选择：`Makefile:14-23` 支持 ARCH=riscv 或 ARCH=loongarch，默认 riscv。使用条件编译标志 -DRISCV 或 -DLOONGARCH (`Makefile:26-31`)。链接脚本根据架构选择：`kernel/link/riscv/kernel.ld` 或 `kernel/link/loongarch/kernel.ld` (`Makefile:48`)。源码通过 #ifdef RISCV / #ifdef LOONGARCH 区分架构特定代码。",
+      "evidence": [
+        {
+          "path": "Makefile",
+          "symbol_kind": "makefile",
+          "symbol_name": "ARCH_selection",
+          "excerpt": "ARCH ?= riscv ifeq ($(ARCH),riscv) CROSS_COMPILE := riscv64-linux-gnu- ARCH_CFLAGS := -DRISCV else ifeq ($(ARCH),loongarch) CROSS_COMPILE := loongarch64-linux-gnu- ARCH_CFLAGS := -DLOONGARCH endif"
+        },
+        {
+          "path": "Makefile",
+          "symbol_kind": "makefile",
+          "symbol_name": "link_script",
+          "excerpt": "LINK_SCRIPT := $(KERNEL_DIR)/link/$(ARCH)/kernel.ld"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_011",
+      "question_type": "tri_state_impl",
+      "stem": "对 RISC-V 平台：是否能证实 SBI/OpenSBI/U-Boot 固件链（固件将控制权移交内核）？（必须三态；搜索 sbi|opensbi|u-boot；非 RISC-V 平台写 not_found 并说明架构）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/boot/riscv/start.cc",
+          "symbol_kind": "comment",
+          "symbol_name": "boot_chain_comment",
+          "excerpt": "// 机器启动流程：open-sbi(M-mode) -> entry.S(S-mode) -> start.c -> main.c"
+        },
+        {
+          "path": "kernel/boot/riscv/entry.S",
+          "symbol_kind": "asm_comment",
+          "symbol_name": "sbi_comment",
+          "excerpt": "# sbi load the hartid in a0"
+        },
+        {
+          "path": "kernel/hal/riscv/sbi.hh",
+          "symbol_kind": "header",
+          "symbol_name": "sbi_header",
+          "excerpt": "SBI 调用接口定义文件存在"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_012",
+      "question_type": "tri_state_impl",
+      "stem": "MMU 启用前后是否存在串口/UART 地址切换逻辑（物理地址→虚拟地址）？（必须三态；搜索 phys_to_virt|virt_to_phys 及 UART 基址常量）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/mem/virtual_memory_manager.cc",
+          "symbol_kind": "function",
+          "symbol_name": "kvmmake",
+          "excerpt": "kvmmap(pt, UART0, UART0, PGSIZE, PTE_R | PTE_W);"
+        },
+        {
+          "path": "kernel/devs/uart.cc",
+          "symbol_kind": "function",
+          "symbol_name": "UartManager::init",
+          "excerpt": "_uart_base = u_addr; 直接使用物理地址初始化，MMU 启用后通过内核页表映射保持同一地址"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_013",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在从内核返回用户态的路径（usertrapret/trap_return/trampoline/eret 等）并设置 stvec/VBAR/IDT？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/trap/riscv/trap.cc",
+          "symbol_kind": "function",
+          "symbol_name": "trap_manager::usertrapret",
+          "excerpt": "w_stvec(TRAMPOLINE + (uservec - trampoline)); ((void (*)(uint64, uint64))fn)(TRAPFRAME, satp);"
+        },
+        {
+          "path": "kernel/trap/loongarch/trap.cc",
+          "symbol_kind": "function",
+          "symbol_name": "trap_manager::usertrapret",
+          "excerpt": "w_csr_eentry((uint64)uservec); userret(TRAPFRAME, pgdl);"
+        },
+        {
+          "path": "kernel/mem/riscv/trampoline.S",
+          "symbol_kind": "asm_code",
+          "symbol_name": "userret",
+          "excerpt": "csrw satp, a1; sfence.vma zero, zero; sret"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_014",
+      "question_type": "short_answer",
+      "stem": "是否支持多平台启动（StarFive VisionFive2/LoongArch/多板型）？（搜索 visionfive|jh7110|loongarch；有则描述差异入口与互斥关系；无则写未发现）",
+      "value": "支持 RISC-V 和 LoongArch 双架构启动。RISC-V 入口：`kernel/boot/riscv/entry.S`，LoongArch 入口：`kernel/boot/loongarch/entry.S`。通过 Makefile 的 ARCH 变量互斥选择 (`Makefile:14-23`)。未发现特定板型（如 VisionFive2、JH7110）的差异化启动代码，使用 QEMU virt 机器作为目标平台 (`Makefile:28-29`)。",
+      "evidence": [
+        {
+          "path": "Makefile",
+          "symbol_kind": "makefile",
+          "symbol_name": "qemu_config",
+          "excerpt": "QEMU_CMD := qemu-system-riscv64 -machine virt QEMU_CMD := qemu-system-loongarch64 -machine virt -cpu la464-loongarch-cpu"
+        },
+        {
+          "path": "kernel/boot/riscv/entry.S",
+          "symbol_kind": "asm_file",
+          "symbol_name": "riscv_entry",
+          "excerpt": "RISC-V 架构入口文件"
+        },
+        {
+          "path": "kernel/boot/loongarch/entry.S",
+          "symbol_kind": "asm_file",
+          "symbol_name": "loongarch_entry",
+          "excerpt": "LoongArch 架构入口文件"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_015",
+      "question_type": "short_answer",
+      "stem": "trap/异常向量入口在哪里？（trap_handler/trap_vector/__alltraps 等；必须给证据）",
+      "value": "RISC-V: 内核态 trap 入口在 `kernel/trap/riscv/kernelvec.S:9` 的 `kernelvec` 标签；用户态 trap 入口在 `kernel/mem/riscv/trampoline.S:15` 的 `uservec` 标签。LoongArch: 内核态 trap 入口在 `kernel/trap/loongarch/kernelvec.S` 的 `kernelvec`；用户态 trap 入口在 `kernel/trap/loongarch/uservec.S` 的 `uservec`。C++ 层分发入口在 `kernel/trap/riscv/trap.cc:199` 的 `trap_manager::usertrap()` 和 `kernel/trap/loongarch/trap.cc:160` 的 `trap_manager::usertrap()`。",
+      "evidence": [
+        {
+          "path": "kernel/trap/riscv/kernelvec.S",
+          "symbol_kind": "asm_label",
+          "symbol_name": "kernelvec",
+          "excerpt": ".globl kernelvec kernelvec: addi sp, sp, -256 ..."
+        },
+        {
+          "path": "kernel/mem/riscv/trampoline.S",
+          "symbol_kind": "asm_label",
+          "symbol_name": "uservec",
+          "excerpt": ".globl uservec uservec: csrrw a0, sscratch, a0 sd ra, 40(a0) ..."
+        },
+        {
+          "path": "kernel/trap/riscv/trap.cc",
+          "symbol_kind": "function",
+          "symbol_name": "trap_manager::usertrap",
+          "excerpt": "void trap_manager::usertrap() { ... if (cause == 8) { syscall::k_syscall_handler.invoke_syscaller(); } }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_016",
+      "question_type": "single_choice",
+      "stem": "trap 上下文 (TrapFrame/TrapContext) 更可能存放在哪里？",
+      "value": "用户地址空间预留页（trampoline/trap_context page）",
+      "evidence": [
+        {
+          "path": "kernel/trap/riscv/trap.cc",
+          "symbol_kind": "function",
+          "symbol_name": "trap_manager::usertrapret",
+          "excerpt": "mem::k_vmm.map_pages(*p->get_pagetable(), TRAPFRAME, PGSIZE, (uint64)(p->get_trapframe()), ...);"
+        },
+        {
+          "path": "kernel/mem/riscv/trampoline.S",
+          "symbol_kind": "asm_comment",
+          "symbol_name": "trapframe_comment",
+          "excerpt": "# sscratch points to where the process's p->trapframe is mapped into user space, at TRAPFRAME."
+        },
+        {
+          "path": "kernel/mem/memlayout.hh",
+          "symbol_kind": "constant",
+          "symbol_name": "TRAPFRAME",
+          "excerpt": "TRAPFRAME 定义为用户地址空间的高地址区域"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_017",
+      "question_type": "short_answer",
+      "stem": "TrapFrame/寄存器保存结构体定义在哪里？寄存器数量与字节数是多少？（必须引用结构体定义证据）",
+      "value": "定义在 `kernel/proc/trapframe.hh`。RISC-V: `struct TrapFrame` (14-42 行) 包含 37 个 uint64 字段 (kernel_satp, kernel_sp, kernel_trap, epc, kernel_hartid, ra, sp, gp, tp, t0-t6, s0-s11, a0-a7)，总计 37*8=296 字节。LoongArch: `struct TrapFrame` (44-79 行) 包含 36 个 uint64 字段 (ra, tp, sp, a0-a7, t0-t8, r21, fp, s0-s8, kernel_sp, kernel_trap, era, kernel_hartid, kernel_pgdl)，总计 36*8=288 字节。",
+      "evidence": [
+        {
+          "path": "kernel/proc/trapframe.hh",
+          "symbol_kind": "struct",
+          "symbol_name": "TrapFrame_RISCV",
+          "excerpt": "struct TrapFrame { /* 0 */ uint64 kernel_satp; /* 8 */ uint64 kernel_sp; ... /* 280 */ uint64 t6; }; // RISC-V 37 字段"
+        },
+        {
+          "path": "kernel/proc/trapframe.hh",
+          "symbol_kind": "struct",
+          "symbol_name": "TrapFrame_LOONGARCH",
+          "excerpt": "struct TrapFrame { /* 0 */ uint64 ra; /* 8 */ uint64 tp; ... /* 280 */ uint64 kernel_pgdl; }; // LoongArch 36 字段"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_018",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在系统调用分发表（syscall table / match 分发）？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/sys/syscall_handler.cc",
+          "symbol_kind": "function",
+          "symbol_name": "SyscallHandler::init",
+          "excerpt": "BIND_SYSCALL(fork); BIND_SYSCALL(wait); BIND_SYSCALL(read); BIND_SYSCALL(write); ... 初始化_syscall_funcs 数组"
+        },
+        {
+          "path": "kernel/sys/syscall_handler.hh",
+          "symbol_kind": "member",
+          "symbol_name": "_syscall_funcs",
+          "excerpt": "uint64 (SyscallHandler::*_syscall_funcs[SYS_NSYSCALLS])();"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_019",
+      "question_type": "tri_state_impl",
+      "stem": "系统调用号是否做边界检查？（越界默认分支/返回错误/panic；必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/sys/syscall_handler.cc",
+          "symbol_kind": "function",
+          "symbol_name": "SyscallHandler::invoke_syscaller",
+          "excerpt": "初始化时所有未绑定的 syscall 默认指向_default_syscall_impl()，该函数调用 panic(\"Syscall not implemented\\n\")"
+        },
+        {
+          "path": "kernel/sys/syscall_handler.cc",
+          "symbol_kind": "function",
+          "symbol_name": "SyscallHandler::_default_syscall_impl",
+          "excerpt": "uint64 SyscallHandler::_default_syscall_impl() { panic(\"Syscall not implemented\\n\"); return 0; }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_020",
+      "question_type": "short_answer",
+      "stem": "选择一个具体 syscall（优先 sys_write），追踪：用户指令 → trap → 分发 → 实现体。列出 3-6 个关键节点并给证据。",
+      "value": "sys_write 调用链：1. 用户态 ecall 指令 (`kernel/trap/riscv/trap.cc:233` cause==8) → 2. usertrap() 设置 epc+=4 并调用 invoke_syscaller() (`kernel/trap/riscv/trap.cc:235-237`) → 3. invoke_syscaller() 从 a7 读取 syscall 号并查表调用 (`kernel/sys/syscall_handler.cc` 通过_syscall_funcs 数组) → 4. sys_write() 实现 (`kernel/sys/syscall_handler.cc:1355`) 从用户空间 copy_in 数据并调用 file->write() → 5. 返回用户态通过 usertrapret() (`kernel/trap/riscv/trap.cc:306`)。",
+      "evidence": [
+        {
+          "path": "kernel/trap/riscv/trap.cc",
+          "symbol_kind": "function",
+          "symbol_name": "trap_manager::usertrap",
+          "excerpt": "if (cause == 8) { p->_trapframe->epc += 4; intr_on(); syscall::k_syscall_handler.invoke_syscaller(); }"
+        },
+        {
+          "path": "kernel/sys/syscall_handler.cc",
+          "symbol_kind": "function",
+          "symbol_name": "SyscallHandler::sys_write",
+          "excerpt": "uint64 SyscallHandler::sys_write() { ... if (mem::k_vmm.copy_in(*pt, buf, p, n) < 0) ... long rc = f->write((ulong)buf, n, -1, true); ... }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_021",
+      "question_type": "short_answer",
+      "stem": "列出 5-10 个“高价值 syscall”（fork/exec/mmap/open/write 等）的实现三态（implemented/stub/not_found），并为每个至少给一条证据。",
+      "value": "sys_fork: stub [`kernel/sys/syscall_handler.cc:537-548` 包含 TODO 宏和 panic(\"未实现该系统调用\")] | sys_exec: stub [`kernel/sys/syscall_handler.cc:530-535` 包含 TODO 宏和 panic] | sys_execve: stub [`kernel/sys/syscall_handler.cc:870` 包含 TODO 宏] | sys_mmap: implemented [`kernel/sys/syscall_handler.cc:2170-2253` 完整实现，调用 proc::k_pm.mmap()] | sys_openat: implemented [`kernel/sys/syscall_handler.cc:1197-1353` 完整实现] | sys_write: implemented [`kernel/sys/syscall_handler.cc:1355-1448` 完整实现，包含 copy_in 和 file->write] | sys_read: implemented [`kernel/sys/syscall_handler.cc` 存在实现] | sys_exit: implemented [`kernel/sys/syscall_handler.cc:551-559` 调用 proc::k_pm.exit()] | sys_clone: not_found [未在 syscall_handler.cc 中找到 sys_clone 实现] | sys_wait4: implemented [BIND_SYSCALL(wait4) 在 init() 中注册]。",
+      "evidence": [
+        {
+          "path": "kernel/sys/syscall_handler.cc",
+          "symbol_kind": "function",
+          "symbol_name": "SyscallHandler::sys_fork",
+          "excerpt": "uint64 SyscallHandler::sys_fork() { panic(\"未实现该系统调用\"); TODO(...); return 0; }"
+        },
+        {
+          "path": "kernel/sys/syscall_handler.cc",
+          "symbol_kind": "function",
+          "symbol_name": "SyscallHandler::sys_mmap",
+          "excerpt": "uint64 SyscallHandler::sys_mmap() { ... void *result = proc::k_pm.mmap(...); return (uint64)result; }"
+        },
+        {
+          "path": "kernel/sys/syscall_handler.cc",
+          "symbol_kind": "function",
+          "symbol_name": "SyscallHandler::sys_write",
+          "excerpt": "uint64 SyscallHandler::sys_write() { ... if (mem::k_vmm.copy_in(*pt, buf, p, n) < 0) ... long rc = f->write(...); }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_022",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在用户指针访问安全检查（copyin/copyout/access_ok/UserInPtr 等）？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/mem/virtual_memory_manager.cc",
+          "symbol_kind": "function",
+          "symbol_name": "VirtualMemoryManager::copy_in",
+          "excerpt": "int VirtualMemoryManager::copy_in(PageTable &pt, void *dst, uint64 src_va, uint64 len) { ... if (pa == 0) { ... return -1; } ... }"
+        },
+        {
+          "path": "kernel/mem/virtual_memory_manager.cc",
+          "symbol_kind": "function",
+          "symbol_name": "VirtualMemoryManager::copy_out",
+          "excerpt": "int VirtualMemoryManager::copy_out(PageTable &pt, uint64 va, const void *p, uint64 len) { ... if ((pte.is_null() || pte.get_data() == 0) && target_vm != nullptr) { ... } }"
+        },
+        {
+          "path": "kernel/sys/syscall_handler.cc",
+          "symbol_kind": "function",
+          "symbol_name": "SyscallHandler::sys_write",
+          "excerpt": "if (mem::k_vmm.copy_in(*pt, buf, p, n) < 0) { printfRed(\"[SyscallHandler::sys_write] Error copying data from user space\\n\"); return -1; }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_023",
+      "question_type": "tri_state_impl",
+      "stem": "时钟中断是否触发抢占调度（timer tick 中调用 yield/schedule/resched）？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/trap/riscv/trap.cc",
+          "symbol_kind": "function",
+          "symbol_name": "trap_manager::kerneltrap",
+          "excerpt": "if (which_dev == 2 && Cpu::get_cpu()->get_cur_proc() != nullptr && Cpu::get_cpu()->get_cur_proc()->_state == proc::RUNNING) { timeslice++; if (timeslice >= 5) { proc::k_scheduler.yield(); timeslice = 0; } }"
+        },
+        {
+          "path": "kernel/trap/riscv/trap.cc",
+          "symbol_kind": "function",
+          "symbol_name": "trap_manager::usertrap",
+          "excerpt": "if (which_dev == 2) { timeslice++; if (timeslice >= 5) { timeslice = 0; proc::k_scheduler.yield(); } }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_024",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在信号处理链路（trap 返回前处理 pending signal、sigreturn/trampoline）？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/trap/riscv/trap.cc",
+          "symbol_kind": "function",
+          "symbol_name": "trap_manager::usertrap",
+          "excerpt": "proc::ipc::signal::handle_signal(); usertrapret();"
+        },
+        {
+          "path": "kernel/proc/signal.cc",
+          "symbol_kind": "function",
+          "symbol_name": "signal::handle_signal",
+          "excerpt": "void handle_signal() { proc::Pcb *p = proc::k_pm.get_cur_pcb(); if (p->_signal == 0) return; ... do_handle(p, signum, act); ... }"
+        },
+        {
+          "path": "kernel/mem/riscv/sig_trampoline.S",
+          "symbol_kind": "asm_file",
+          "symbol_name": "sig_trampoline",
+          "excerpt": "信号返回跳板代码，包含 SYS_rt_sigreturn 调用"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_025",
+      "question_type": "short_answer",
+      "stem": "缺页异常与内存特性（CoW/lazy）是否在 trap 中联动？（若存在，说明入口点与调用到内存模块的证据）",
+      "value": "存在联动。RISC-V: `kernel/trap/riscv/trap.cc:243-254` 在 usertrap() 中检测 cause==13/15/12 (load/store/instruction page fault)，调用 mmap_handler()。mmap_handler() (`kernel/trap/riscv/trap.cc:353-402`) 查找 VMA 并调用 mem::k_vmm.allocate_vma_page() 实现懒分配。LoongArch: `kernel/trap/loongarch/trap.cc:193-207` 类似逻辑，检测 ecode==0x1/0x2/0x8/0x3，调用 mmap_handler()。",
+      "evidence": [
+        {
+          "path": "kernel/trap/riscv/trap.cc",
+          "symbol_kind": "function",
+          "symbol_name": "trap_manager::usertrap",
+          "excerpt": "else if (cause == 13 || cause == 15 || cause == 12) { if (mmap_handler(r_stval(), cause) != 0) { proc::ipc::signal::add_signal(p, proc::ipc::signal::SIGSEGV); } }"
+        },
+        {
+          "path": "kernel/trap/riscv/trap.cc",
+          "symbol_kind": "function",
+          "symbol_name": "mmap_handler",
+          "excerpt": "return mem::k_vmm.allocate_vma_page(*p->get_pagetable(), va, vm, access_type);"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_026",
+      "question_type": "short_answer",
+      "stem": "与 09 多核交叉一致性：per-CPU trap 栈/时钟初始化顺序与 AP 上线是否一致？（互指证据或写单核不适用）",
+      "value": "单核不适用。Makefile 中 QEMU 启动参数为 `-smp 1` (`Makefile:28`)，仅启动单核。trap_mgr.inithart() 在 main() 中被调用 (`kernel/boot/riscv/main.cc:55`)，但未发现 AP 核启动代码或 per-CPU trap 栈初始化逻辑。",
+      "evidence": [
+        {
+          "path": "Makefile",
+          "symbol_kind": "makefile",
+          "symbol_name": "qemu_smp",
+          "excerpt": "QEMU_CMD := qemu-system-riscv64 -machine virt -m 128M -nographic -smp 1"
+        },
+        {
+          "path": "kernel/boot/riscv/main.cc",
+          "symbol_kind": "function",
+          "symbol_name": "main",
+          "excerpt": "trap_mgr.inithart(); // 初始化每个核上的 csr"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_027",
+      "question_type": "fill_in",
+      "stem": "Syscall 实现全量统计 (Syscall Coverage Analysis)，请按格式填写：\n- 分发表路径: ___\n- 完整实现 ✅ (implemented): ___ 个\n- 桩/ENOSYS/return 0 🔸 (stub): ___ 个，代表性例子: ___\n- 未注册 ❌ (not_found): ___ 个\n- 统计依据（grep 或 outline 方式）: ___\n（若无法精确计数，给出区间估计并说明理由）",
+      "value": "分发表路径：kernel/sys/syscall_handler.cc:68-370 (SyscallHandler::init() 中的 BIND_SYSCALL 宏)\n完整实现 ✅ (implemented): 约 80-90 个 [基于 init() 中注册且实现体不包含 TODO/panic 的 syscall 数量估算]\n桩/ENOSYS/return 0 🔸 (stub): 约 20-30 个，代表性例子：sys_fork (kernel/sys/syscall_handler.cc:537), sys_exec (530), sys_execve (870), sys_clone (未找到实现)\n未注册 ❌ (not_found): 约 10-20 个 [未在 init() 中 BIND_SYSCALL 的 syscall]\n统计依据（grep 或 outline 方式）: 通过 read_code_segment 读取 syscall_handler.cc:68-370 统计 BIND_SYSCALL 注册数量，结合 grep 搜索 TODO/panic 关键字识别桩函数",
+      "evidence": [
+        {
+          "path": "kernel/sys/syscall_handler.cc",
+          "symbol_kind": "function",
+          "symbol_name": "SyscallHandler::init",
+          "excerpt": "BIND_SYSCALL(fork); BIND_SYSCALL(wait); ... BIND_SYSCALL(write); ... 约 150+ 个 syscall 注册"
+        },
+        {
+          "path": "kernel/sys/syscall_handler.cc",
+          "symbol_kind": "function",
+          "symbol_name": "SyscallHandler::sys_fork",
+          "excerpt": "panic(\"未实现该系统调用\"); TODO(\"sys_fork\"); return 0;"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_028",
+      "question_type": "short_answer",
+      "stem": "README 与 syscall 声称对照：README 中声称兼容/实现了哪些 syscall 或标准？与代码分发表实际是否一致？（无 README 则写「无 README，仅以代码为准」）",
+      "value": "README.md 未明确列出 syscall 兼容性声称，仅描述模块功能：「sys 🛎️ 系统调用模块：系统调用分发、参数传递、权限检查」。代码中 init() 注册了约 150+ 个 syscall（包括 Linux 兼容的 fork/exec/wait/read/write/mmap 等），但部分关键 syscall（如 sys_fork、sys_exec）实际为桩实现（包含 TODO 和 panic）。README 声称与代码实际存在差距。",
+      "evidence": [
+        {
+          "path": "README.md",
+          "symbol_kind": "markdown",
+          "symbol_name": "syscall_module_desc",
+          "excerpt": "**sys** 🛎️ 系统调用模块：系统调用分发、参数传递、权限检查。"
+        },
+        {
+          "path": "kernel/sys/syscall_handler.cc",
+          "symbol_kind": "function",
+          "symbol_name": "SyscallHandler::sys_fork",
+          "excerpt": "panic(\"未实现该系统调用\"); TODO(\"sys_fork\"); return 0;"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_029",
+      "question_type": "short_answer",
+      "stem": "`_impl` 命名模式搜索结论：grep `_impl\\b|sys_[a-z0-9_]*_impl`，结果是命中了哪些函数（列出），还是「未见该命名模式」？（必须给搜索结论）",
+      "value": "未见该命名模式。在 syscall_handler.cc 中，syscall 实现采用 sys_[name]() 命名（如 sys_write、sys_fork），未使用_sys_[name]_impl 后缀模式。默认未实现处理函数为_default_syscall_impl() (`kernel/sys/syscall_handler.cc:58`)。",
+      "evidence": [
+        {
+          "path": "kernel/sys/syscall_handler.cc",
+          "symbol_kind": "search",
+          "symbol_name": "impl_pattern_scan",
+          "excerpt": "grep '_impl\\b|sys_[a-z0-9_]*_impl' 在 syscall_handler.cc 中 0 命中；仅找到_default_syscall_impl() 作为默认处理函数"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_030",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在外部中断（PLIC/APIC 等）的分发处理逻辑？（必须三态；与时钟中断分开作答）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/trap/riscv/trap.cc",
+          "symbol_kind": "function",
+          "symbol_name": "trap_manager::devintr",
+          "excerpt": "if ((scause & 0x8000000000000000L) && (scause & 0xff) == 9) { int irq = plic_mgr.claim(); if (irq == UART0_IRQ) { ... } else if (irq == VIRTIO0_IRQ) { virtio_disk_intr(); } }"
+        },
+        {
+          "path": "kernel/trap/loongarch/trap.cc",
+          "symbol_kind": "function",
+          "symbol_name": "trap_manager::devintr",
+          "excerpt": "if (estat & ecfg & HWI_VEC) { uint64 irq = extioi_claim(); if (irq & (1UL << UART0_IRQ)) { ... } else if (irq & (1UL << PCIE_IRQ)) { ... } }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_031",
+      "question_type": "tri_state_impl",
+      "stem": "非法内存访问时是否向进程发送 SIGSEGV 信号？（必须三态；搜索 SIGSEGV|sig_segv）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/trap/riscv/trap.cc",
+          "symbol_kind": "function",
+          "symbol_name": "trap_manager::usertrap",
+          "excerpt": "if (mmap_handler(r_stval(), cause) != 0) { printfRed(\"usertrap(): page fault at %p, sending SIGSEGV to pid=%d\\n\", r_stval(), p->_pid); proc::ipc::signal::add_signal(p, proc::ipc::signal::SIGSEGV); }"
+        },
+        {
+          "path": "kernel/trap/riscv/trap.cc",
+          "symbol_kind": "function",
+          "symbol_name": "trap_manager::usertrap",
+          "excerpt": "case 5: // Load access fault case 7: // Store/AMO access fault proc::ipc::signal::add_signal(p, proc::ipc::signal::SIGSEGV);"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_032",
+      "question_type": "short_answer",
+      "stem": "信号发送支持哪些粒度？（搜索 sys_kill/sys_tkill/sys_tgkill；分别是进程级/线程级/进程组级；列出已实现的与其证据）",
+      "value": "支持三种粒度：1. 进程级：sys_kill() (`kernel/sys/syscall_handler.cc:804`) 调用 proc::k_pm.kill_proc(pid) | 2. 线程级：sys_tkill() (`kernel/sys/syscall_handler.cc:2631`) 调用 proc::k_pm.tkill(tid, sig) | 3. 进程组级：sys_tgkill() (`kernel/sys/syscall_handler.cc:2640`) 调用 proc::k_pm.tgkill(tgid, tid, sig)。另外还有 sys_kill_signal() (`kernel/sys/syscall_handler.cc:2606`) 用于发送信号到进程。",
+      "evidence": [
+        {
+          "path": "kernel/sys/syscall_handler.cc",
+          "symbol_kind": "function",
+          "symbol_name": "SyscallHandler::sys_kill",
+          "excerpt": "uint64 SyscallHandler::sys_kill() { int pid; ... return proc::k_pm.kill_proc(pid); }"
+        },
+        {
+          "path": "kernel/sys/syscall_handler.cc",
+          "symbol_kind": "function",
+          "symbol_name": "SyscallHandler::sys_tkill",
+          "excerpt": "uint64 SyscallHandler::sys_tkill() { int tid, sig; ... return proc::k_pm.tkill(tid, sig); }"
+        },
+        {
+          "path": "kernel/sys/syscall_handler.cc",
+          "symbol_kind": "function",
+          "symbol_name": "SyscallHandler::sys_tgkill",
+          "excerpt": "uint64 SyscallHandler::sys_tgkill() { int tgid, tid, sig; ... return proc::k_pm.tgkill(tgid, tid, sig); }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_033",
+      "question_type": "single_choice",
+      "stem": "中断 (Interrupt)、异常 (Exception/Fault/Trap) 的区分机制更接近哪种？（Stallings Ch5；即 trap handler 如何区分「外部中断」与「同步异常」）",
+      "value": "通过 scause/mcause/VBAR 中断原因寄存器区分（硬件编码原因号）",
+      "evidence": [
+        {
+          "path": "kernel/trap/riscv/trap.cc",
+          "symbol_kind": "function",
+          "symbol_name": "trap_manager::usertrap",
+          "excerpt": "uint64 cause = r_scause(); if (cause == 8) { ... syscall } else if (cause == 13 || cause == 15 || cause == 12) { ... page fault } else if ((which_dev = devintr()) != 0) { ... external interrupt }"
+        },
+        {
+          "path": "kernel/trap/loongarch/trap.cc",
+          "symbol_kind": "function",
+          "symbol_name": "trap_manager::usertrap",
+          "excerpt": "if (((r_csr_estat() & CSR_ESTAT_ECODE) >> 16) == 0xb) { ... syscall } else if (((r_csr_estat() & CSR_ESTAT_ECODE) >> 16 == 0x1 || ... ) { ... page fault }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_034",
+      "question_type": "tri_state_impl",
+      "stem": "是否支持中断嵌套 (Nested Interrupt / Interrupt Nesting, Stallings Ch5)？（必须三态；搜索 enable_irq_in_handler / nested_irq / 中断处理时是否重开中断；若 not_found 需说明是否关中断运行整个 handler）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/trap/riscv/trap.cc",
+          "symbol_kind": "comment",
+          "symbol_name": "nested_comment",
+          "excerpt": "// 处理内核态的中断 // 支持嵌套中断 void trap_manager::kerneltrap()"
+        },
+        {
+          "path": "kernel/trap/riscv/trap.cc",
+          "symbol_kind": "function",
+          "symbol_name": "trap_manager::usertrap",
+          "excerpt": "if (cause == 8) { ... intr_on(); syscall::k_syscall_handler.invoke_syscaller(); } // 在 syscall 处理前显式开中断"
+        },
+        {
+          "path": "kernel/trap/loongarch/trap.cc",
+          "symbol_kind": "function",
+          "symbol_name": "trap_manager::usertrap",
+          "excerpt": "intr_on(); syscall::k_syscall_handler.invoke_syscaller(); // 在 syscall 处理前显式开中断"
+        }
+      ]
+    }
+  ]
+}

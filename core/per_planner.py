@@ -481,55 +481,6 @@ def build_repo_profile(repo_url: str, repo_path: str) -> Dict[str, Any]:
     }
 
 
-def extract_stage_questions(prompt: str) -> List[str]:
-    """从阶段 prompt 抽取 must_cover：优先「必须回答」段内条项，再拼接其前的「本章侧重/本阶段须额外覆盖」等条项。
-
-    避免把「要求/强制要求」里偏流程的 `-` 条混进前 12 条（旧逻辑按全文顺序截断会挤掉真正必答项）。
-    """
-    lines = prompt.splitlines()
-
-    def _bullet_text(stripped: str) -> str | None:
-        if not stripped.startswith("- ") or len(stripped) < 6:
-            return None
-        candidate = re.sub(r"^\-\s*", "", stripped).strip()
-        if len(candidate) >= 4:
-            return candidate
-        return None
-
-    must_start = next((i for i, ln in enumerate(lines) if "必须回答" in ln.strip()), -1)
-    if must_start < 0:
-        # 无「必须回答」标题的章节（如 01_overview）：保持全文顺序取前 12 条
-        questions: List[str] = []
-        for raw in lines:
-            t = _bullet_text(raw.strip())
-            if t:
-                questions.append(t)
-        return _dedupe_keep_order(questions[:12])
-
-    must_end = next(
-        (
-            i
-            for i in range(must_start + 1, len(lines))
-            if re.match(r"^(\*\*强制要求\*\*|要求：|输出格式)", lines[i].strip())
-        ),
-        len(lines),
-    )
-    preferred: List[str] = []
-    for raw in lines[must_start:must_end]:
-        t = _bullet_text(raw.strip())
-        if t:
-            preferred.append(t)
-    secondary: List[str] = []
-    for raw in lines[:must_start]:
-        t = _bullet_text(raw.strip())
-        if t:
-            secondary.append(t)
-    # 先 must_cover 核心（必须回答），再补本章侧重/额外覆盖。
-    # JSON-QA 题单可能较长：上限放宽，避免截断导致 planner 覆盖不足。
-    merged = _dedupe_keep_order(preferred + secondary)
-    return merged[:30]
-
-
 def _match_stage_hints(stage_id: str) -> Dict[str, List[str]]:
     if stage_id in STAGE_HINTS:
         return STAGE_HINTS[stage_id]
@@ -576,13 +527,9 @@ def estimate_context_budget(stage_id: str) -> Dict[str, int]:
 
 
 def plan_stage(state: StageState, repo_profile: Dict[str, Any], global_memory: Dict[str, Any]) -> PlanSpec:
-    must_cover = extract_stage_questions(state.stage_prompt)
     hints = _match_stage_hints(state.stage_id)
-    goal_line = next((line.strip() for line in state.stage_prompt.splitlines() if line.strip()), state.stage_title)
     return PlanSpec(
         stage_id=state.stage_id,
-        goal=_norm(goal_line)[:120],
-        must_cover=must_cover,
         evidence_targets=hints.get("evidence_targets", []),
         seed_paths=infer_seed_paths(state.stage_id, repo_profile, global_memory),
         framework_guess=repo_profile.get("framework_guess", []),
@@ -613,11 +560,6 @@ def apply_llm_plan_overlay(base: PlanSpec, overlay: Dict[str, Any]) -> PlanSpec:
     """将 LLM 规划 JSON 合并进启发式 PlanSpec（LLM 列表优先去重拼接）。"""
     if not overlay:
         return base
-    g = overlay.get("goal")
-    new_goal = _norm(str(g))[:120] if isinstance(g, str) and g.strip() else base.goal
-
-    must_llm = _coerce_str_list(overlay.get("must_cover"), 16)
-    must_cover = _dedupe_keep_order(must_llm + base.must_cover)[:22]
 
     et_llm = _coerce_str_list(overlay.get("evidence_targets"), 12)
     evidence_targets = _dedupe_keep_order(et_llm + base.evidence_targets)[:16]
@@ -635,13 +577,11 @@ def apply_llm_plan_overlay(base: PlanSpec, overlay: Dict[str, Any]) -> PlanSpec:
     pt_llm = _coerce_str_list(overlay.get("preferred_tools"), 8)
     preferred_tools = pt_llm if pt_llm else base.preferred_tools
 
-    steps_llm = _coerce_str_list(overlay.get("execution_steps"), 32)
+    steps_llm = _coerce_str_list(overlay.get("execution_steps"), 40)
     execution_steps = steps_llm if steps_llm else base.execution_steps
 
     return replace(
         base,
-        goal=new_goal,
-        must_cover=must_cover,
         evidence_targets=evidence_targets,
         seed_paths=seed_paths,
         entry_symbols=entry_symbols,
@@ -651,19 +591,15 @@ def apply_llm_plan_overlay(base: PlanSpec, overlay: Dict[str, Any]) -> PlanSpec:
 
 
 def ensure_execution_steps(plan: PlanSpec) -> PlanSpec:
-    """若尚无逐步清单，用通用三步 + must_cover 摘要补齐，保证 Execute 总有锁定步骤。"""
+    """若尚无逐步清单，用通用三步补齐，保证 Execute 总有锁定步骤。"""
     if plan.execution_steps:
         return plan
     steps = [
         "对照 seed_paths、entry_symbols，用 rag_search_code / list_repo_structure / LSP 锁定与本阶段相关的关键文件与符号。",
         "对核心入口使用 lsp_get_document_outline → lsp_get_call_graph（单入口、浅深度）→ 必要时 read_code_segment 精读。",
-        "按 must_cover 逐项输出结论，每条附反引号源码路径；无实现则显式写「未发现/桩函数」等，勿臆测。",
+        "按题单逐项输出结论，每条附反引号源码路径；无实现则显式写「未发现/桩函数」等，勿臆测。",
     ]
-    for q in plan.must_cover[:5]:
-        qn = _norm(q)[:120]
-        if qn:
-            steps.append(f"覆盖要点：{qn}")
-    return replace(plan, execution_steps=steps[:32])
+    return replace(plan, execution_steps=steps[:40])
 
 
 def _shorten(text: str, limit: int = 400) -> str:
@@ -707,8 +643,6 @@ def render_plan_context(state: StageState) -> str:
     lines = [
         "## 阶段执行计划（请先按此计划收集证据，再写报告）",
         f"- stage_id: {plan.stage_id}",
-        f"- goal: {plan.goal}",
-        f"- must_cover: {', '.join(plan.must_cover[:8]) or '无'}",
         f"- evidence_targets: {', '.join(plan.evidence_targets[:8]) or '无'}",
         f"- seed_paths: {', '.join(plan.seed_paths[:8]) or '无'}",
         f"- framework_guess: {', '.join(plan.framework_guess[:6]) or '未知'}",
@@ -723,7 +657,7 @@ def render_plan_context(state: StageState) -> str:
     if plan.execution_steps:
         lines.append("")
         lines.append("## 须按序完成的执行步骤（Execute 阶段必须遵守；未列事项勿擅自长篇展开）")
-        for i, st in enumerate(plan.execution_steps[:32], 1):
+        for i, st in enumerate(plan.execution_steps[:40], 1):
             lines.append(f"{i}. {st}")
     lines.extend(
         [

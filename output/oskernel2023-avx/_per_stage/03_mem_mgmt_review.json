@@ -6,183 +6,198 @@
   "question_reviews": [
     {
       "question_id": "Q03_001",
-      "confidence": 1.0,
-      "review": "题面要求选择实现语言形态，答案选 B 并引用 C 语言文件证据，题答一致，证据支撑充分。"
+      "confidence": 0.95,
+      "review": "题面为单选，答案选 B，证据列出 C 语言文件路径及描述性摘录，虽非源码片段但能支撑语言风格判断，符合题面约束。"
     },
     {
       "question_id": "Q03_002",
-      "confidence": 1.0,
-      "review": "题面要求三态判断物理页分配器，答案 implemented 并列出 kalloc/kfree 及结构体证据，一致。"
+      "confidence": 0.98,
+      "review": "三态题选 implemented，证据包含结构体定义与 kalloc/kfree 函数源码，直接支撑物理页分配器实现结论。"
     },
     {
       "question_id": "Q03_003",
-      "confidence": 1.0,
-      "review": "题面要求选择分配算法，答案选 D 并引用 freelist 证据，一致。"
+      "confidence": 0.98,
+      "review": "单选选 D，证据引用 kmem 结构体中 freelist 字段及链表操作逻辑，与空闲链表算法描述一致。"
     },
     {
       "question_id": "Q03_004",
-      "confidence": 1.0,
-      "review": "题面要求简述核心数据结构，答案描述 struct run 及 kmem 并引用代码，一致。"
+      "confidence": 0.98,
+      "review": "简答题要求引用结构体/字段，答案明确 struct run 及 kmem 字段，证据为源码定义，符合题面。"
     },
     {
       "question_id": "Q03_005",
-      "confidence": 1.0,
-      "review": "题面要求简述并发控制锁粒度，答案描述全局锁并引用 acquire/release 证据，一致。"
+      "confidence": 0.98,
+      "review": "简答题要求锁粒度证据，答案指出全局锁，证据展示 acquire/release 包裹临界区，支撑充分。"
     },
     {
       "question_id": "Q03_006",
-      "confidence": 1.0,
-      "review": "题面要求三态判断页表实现，答案 implemented 并列出 walk/mappages 等证据，一致。"
+      "confidence": 0.98,
+      "review": "三态题选 implemented，证据列出 walk/mappages/vmunmap 函数源码，直接支撑页表操作实现。"
     },
     {
       "question_id": "Q03_007",
-      "confidence": 1.0,
-      "review": "题面要求列出页表 API，答案列出 walk/mappages/vmunmap 并引用证据，一致。"
+      "confidence": 0.98,
+      "review": "简答题要求 1-3 个入口，答案列出 3 个函数及路径，证据对应函数签名，符合题面数量约束。"
     },
     {
       "question_id": "Q03_008",
-      "confidence": 1.0,
-      "review": "题面要求简述页表并发控制，答案描述无显式锁并引用代码缺失证据，一致。"
+      "confidence": 0.98,
+      "review": "简答题要求并发控制证据，答案说明无显式锁依赖调用者，证据展示函数体内无锁及 TLB 刷新，逻辑自洽。"
     },
     {
       "question_id": "Q03_009",
-      "confidence": 1.0,
-      "review": "题面要求选择地址空间关系，答案选 B 并引用内核页表初始化证据，一致。"
+      "confidence": 0.98,
+      "review": "单选选 A，证据引用 uvmalloc 双页表参数及 usertrapret 切换 SATP，支撑独立页表结论。"
     },
     {
       "question_id": "Q03_010",
-      "confidence": 1.0,
-      "review": "题面要求三态判断缺页处理，答案 implemented 并引用 trap/vma 证据，一致。"
+      "confidence": 0.98,
+      "review": "三态题选 implemented，证据展示 trap.c 中 scause 判断及 handle_stack_page_fault 调用，支撑缺页处理实现。"
     },
     {
       "question_id": "Q03_011",
-      "confidence": 1.0,
-      "review": "题面要求追踪缺页链路，答案列出 5 个节点并引用对应代码证据，一致。"
+      "confidence": 0.98,
+      "review": "简答题要求 3-5 节点链路，答案列出 5 节点，证据覆盖入口、处理函数及分配/映射调用，符合题面。"
     },
     {
       "question_id": "Q03_012",
-      "confidence": 1.0,
-      "review": "题面要求三态判断 CoW，答案 not_found 并引用搜索及 vma_copy 证据，一致。"
+      "confidence": 0.98,
+      "review": "三态题选 not_found，证据展示 uvmcopy 直接复制内容及 grep 结果，支撑无 CoW 结论。"
     },
     {
       "question_id": "Q03_013",
-      "confidence": 1.0,
-      "review": "题面要求三态判断惰性分配，答案 implemented 并引用缺页分配证据，一致。"
+      "confidence": 0.98,
+      "review": "三态题选 implemented，证据指出缺页时分配物理页，支撑栈的惰性分配结论，符合题面。"
     },
     {
       "question_id": "Q03_014",
-      "confidence": 1.0,
-      "review": "题面要求三态判断 swap，答案 not_found 并引用搜索证据，一致。"
+      "confidence": 0.98,
+      "review": "三态题选 not_found，证据为 grep 搜索结果及 vm.c 扫描，支撑无 swap 结论。"
     },
     {
       "question_id": "Q03_015",
-      "confidence": 1.0,
-      "review": "题面要求三态判断 mmap，答案 implemented 并引用 sys_mmap 及标志位证据，一致。"
+      "confidence": 0.98,
+      "review": "三态题选 implemented，证据列出 mmap 函数实现及标志位宏定义，支撑 mmap 实现结论。"
     },
     {
       "question_id": "Q03_016",
-      "confidence": 1.0,
-      "review": "题面要求三态判断 Page Cache，答案 not_found 并引用搜索证据，一致。"
+      "confidence": 0.98,
+      "review": "三态题选 not_found，证据为 grep 搜索结果及 fat32.c 扫描，支撑无 Page Cache 结论。"
     },
     {
       "question_id": "Q03_017",
-      "confidence": 1.0,
-      "review": "题面要求三态判断脏页回写，答案 not_found 并引用搜索证据，一致。"
+      "confidence": 0.98,
+      "review": "三态题选 not_found，证据为 grep 搜索结果及 fs.c 扫描，支撑无脏页回写结论。"
     },
     {
       "question_id": "Q03_018",
-      "confidence": 1.0,
-      "review": "题面要求三态判断 TLB 射击，答案 not_found 并引用注释代码及搜索证据，一致。"
+      "confidence": 0.98,
+      "review": "三态题选 not_found，证据展示 sfence_vma 仅为本地刷新且无 IPI 调用，支撑无 TLB Shootdown 结论。"
     },
     {
       "question_id": "Q03_019",
-      "confidence": 1.0,
-      "review": "题面要求简述 TLB 刷新点，答案指出指令及函数并引用证据，一致。"
+      "confidence": 0.98,
+      "review": "简答题要求 TLB 刷新点，答案指出 sfence_vma，证据为函数源码，符合题面。"
     },
     {
       "question_id": "Q03_020",
-      "confidence": 1.0,
-      "review": "题面要求简述用户指针检查，答案描述 copyin/out 及 walkaddr 并引用证据，一致。"
+      "confidence": 0.98,
+      "review": "简答题要求用户指针检查机制，答案指出 copyin/walkaddr，证据展示 PTE_U 检查逻辑，支撑充分。"
     },
     {
       "question_id": "Q03_021",
-      "confidence": 1.0,
-      "review": "题面要求选择置换算法，答案选 F 并引用搜索证据，一致。"
+      "confidence": 0.98,
+      "review": "单选选 F，证据为 grep 搜索结果，与 Q03_014 结论一致，符合题面。"
     },
     {
       "question_id": "Q03_022",
-      "confidence": 1.0,
-      "review": "题面要求三态判断工作集，答案 not_found 并引用搜索证据，一致。"
+      "confidence": 0.98,
+      "review": "三态题选 not_found，证据列出已搜关键字，符合题面 not_found 时需列出关键字的约束。"
     },
     {
       "question_id": "Q03_023",
-      "confidence": 1.0,
-      "review": "题面要求填空内存参数，答案给出具体数值并引用宏定义证据，一致。"
+      "confidence": 0.98,
+      "review": "填空题要求从代码常量给证据，答案给出具体数值，证据引用宏定义，符合题面。"
     },
     {
       "question_id": "Q03_024",
-      "confidence": 1.0,
-      "review": "题面要求选择保护机制，答案选 C 并引用页表及软件检查证据，一致。"
+      "confidence": 0.98,
+      "review": "单选选 C，证据结合 PTE 权限位宏及 copyin 软件检查，支撑双重保护结论。"
     },
     {
       "question_id": "Q03_025",
-      "confidence": 1.0,
-      "review": "题面要求简述逻辑内存组织，答案描述 VMA 链表并引用结构体证据，一致。"
+      "confidence": 0.98,
+      "review": "简答题要求结构体证据，答案描述 VMA 链表，证据引用 struct vma 定义，符合题面。"
     },
     {
       "question_id": "Q03_026",
-      "confidence": 1.0,
-      "review": "题面要求选择分段机制，答案选 C 并引用架构扫描证据，一致。"
+      "confidence": 0.95,
+      "review": "单选选 C，证据为描述性扫描结论而非源码片段，但能支撑纯分页结论，符合题面。"
     },
     {
       "question_id": "Q03_027",
-      "confidence": 1.0,
-      "review": "题面要求选择取页策略，答案选 A 并引用缺页分配证据，一致。"
+      "confidence": 0.98,
+      "review": "单选选 A，证据展示缺页异常处理中分配物理页，支撑按需调页结论。"
     },
     {
       "question_id": "Q03_028",
-      "confidence": 1.0,
-      "review": "题面要求简述放置策略，答案描述首次适配并引用 alloc_vma 证据，一致。"
+      "confidence": 0.98,
+      "review": "简答题要求放置策略证据，答案描述首次适配，证据引用 alloc_vma 遍历逻辑，符合题面。"
     },
     {
       "question_id": "Q03_029",
-      "confidence": 1.0,
-      "review": "题面要求三态判断驻留集管理，答案 not_found 并引用搜索证据，一致。"
+      "confidence": 0.98,
+      "review": "三态题选 not_found，证据列出已搜关键字，符合题面约束。"
     },
     {
       "question_id": "Q03_030",
-      "confidence": 0.95,
-      "review": "题面要求给出内存主链路，答案列出关键节点链并引用证据，格式虽为文本链但满足节点要求，一致。"
+      "confidence": 0.98,
+      "review": "简答题要求 Mermaid 链路，答案格式正确，证据覆盖链路中关键函数源码，符合题面。"
     },
     {
       "question_id": "Q03_031",
-      "confidence": 1.0,
-      "review": "题面要求选择碎片类型，答案选 B 并引用分配器结构证据，一致。"
+      "confidence": 0.95,
+      "review": "单选选 B，证据为对空闲链表行为的描述性总结，虽非直接源码但逻辑合理，支撑外部碎片结论。"
     },
     {
       "question_id": "Q03_032",
-      "confidence": 1.0,
-      "review": "题面要求选择重定位时机，答案选 C 并引用分页机制证据，一致。"
+      "confidence": 0.98,
+      "review": "单选选 C，证据引用页表宏及 SATP 切换代码，支撑运行时动态绑定结论。"
     },
     {
       "question_id": "Q03_033",
-      "confidence": 1.0,
-      "review": "题面要求选择置换作用域，答案选 C 并引用无 swap 证据，一致。"
+      "confidence": 0.98,
+      "review": "单选选 C，证据为 grep 结果，与 Q03_014/021 一致，符合题面。"
     },
     {
       "question_id": "Q03_034",
-      "confidence": 1.0,
-      "review": "题面要求三态判断清理策略，答案 not_found 并引用搜索证据，一致。"
+      "confidence": 0.98,
+      "review": "三态题选 not_found，证据列出已搜关键字，符合题面约束。"
     }
   ],
   "dimensions": {
-    "evidence_supports_answers": 1.0,
-    "question_answer_consistency": 1.0,
-    "requirements_fit": 1.0
+    "evidence_supports_answers": 0.98,
+    "question_answer_consistency": 0.99,
+    "requirements_fit": 0.98
   },
   "findings": [],
-  "summary_zh": "全部 34 道题目均已作答。经审计，所有答案的 value 字段与题面要求一致（包括单选、三态、简答及填空），证据字段（evidence）均能有效支撑对应结论（如代码路径、函数名、搜索结果等）。JSON 契约符合，无题答不符或证据缺失情况。",
+  "summary_zh": "报告整体质量高，34 题全部覆盖，题面约束（如三态、单选、Mermaid 格式、证据要求）落实良好。绝大多数题目提供了源码级证据（函数/结构体/宏）直接支撑结论，个别题目证据为描述性文本但不影响可信度。全阶段置信度按各题均值计算，无低分项截断。",
+  "report_quality_score": 0.98,
   "_meta": {
+    "quality": {
+      "excerpt_coverage": 1.0,
+      "evidence_richness": 0.9804,
+      "total_evidence_items": 71,
+      "nonempty_excerpt_items": 71,
+      "mean_question_confidence": 0.9774,
+      "mean_dimensions": 0.9833,
+      "weights": {
+        "w_mean": 0.45,
+        "w_excerpt": 0.25,
+        "w_rich": 0.2,
+        "w_dim": 0.1
+      }
+    },
     "review_model": "qwen3.5-plus"
   }
 }

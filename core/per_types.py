@@ -7,8 +7,6 @@ from typing import Any, Dict, List, Optional
 @dataclass
 class PlanSpec:
     stage_id: str
-    goal: str
-    must_cover: List[str] = field(default_factory=list)
     evidence_targets: List[str] = field(default_factory=list)
     seed_paths: List[str] = field(default_factory=list)
     framework_guess: List[str] = field(default_factory=list)

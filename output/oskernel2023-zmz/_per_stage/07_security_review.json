@@ -2,87 +2,102 @@
   "schema_version": "describe_review_v1",
   "stage_id": "07_security",
   "stage_title": "安全机制与权限模型",
-  "confidence": 1.0,
+  "confidence": 0.95,
   "question_reviews": [
     {
       "question_id": "Q07_001",
-      "confidence": 1.0,
-      "review": "题面要求选择特权级隔离形态，答案选择与 A 选项一致的文本，证据引用 SSTATUS_SPP 宏定义及 sret 指令用法，充分支撑用户态/内核态隔离的结论，题答一致。"
+      "confidence": 0.95,
+      "review": "题面为单选，答案值匹配选项 A，证据引用 SSTATUS 寄存器位定义及 usertrapret 切换代码，直接支撑用户态/内核态隔离结论，无跑题。"
     },
     {
       "question_id": "Q07_002",
-      "confidence": 1.0,
-      "review": "题面询问凭证数据结构存在性，答案定为 stub，证据显示 AUXV 宏定义存在但 PCB 无对应字段且 syscall 硬编码返回 0，证据与 stub 结论相符。"
+      "confidence": 0.95,
+      "review": "题面要求三态，答案选 stub，证据指出 struct proc 无 uid 字段且 sys_getuid 硬编码返回 0，支撑“有字段定义但未实装凭证逻辑”的 stub 状态。"
     },
     {
       "question_id": "Q07_003",
-      "confidence": 1.0,
-      "review": "题面询问 syscall 路径权限检查，答案定为 stub，证据引用代码注释\"assume user as root\"及 syscall 表指向桩函数，证据足以支撑无真实检查的结论。"
+      "confidence": 0.95,
+      "review": "题面要求三态，答案选 stub，证据显示 faccessat 假设 root 及 exec 中仅有注释未实现，支撑“非真实权限检查”结论，证据与值一致。"
     },
     {
       "question_id": "Q07_004",
-      "confidence": 1.0,
-      "review": "题面要求列出入口点与检查链路，答案清晰列出 sys_faccessat 至 mode 位检查流程，证据引用对应代码行及注释，符合 short_answer 题面要求。"
+      "confidence": 0.95,
+      "review": "题面要求列 2-5 节点，答案列出 3 节点链路（sys_faccessat→nameifrom→check），证据对应代码片段，满足数量约束且摘录能对应链路节点。"
     },
     {
       "question_id": "Q07_005",
-      "confidence": 1.0,
-      "review": "题面询问用户指针验证，答案定为 implemented，证据列出 copyin2 等函数声明及与_nocheck 变体的区分，支撑存在验证机制的结论，符合契约。"
+      "confidence": 0.95,
+      "review": "题面要求三态，答案选 implemented，证据展示 fetchaddr 调用 copyin2 及 walkaddr 验证逻辑，直接支撑用户指针验证已实现结论。"
     },
     {
       "question_id": "Q07_006",
-      "confidence": 1.0,
-      "review": "题面询问沙箱/过滤机制，答案定为 not_found，证据显示全局搜索 0 命中且 sys_trace 仅为调试功能，证据支撑结论，无格式错误。"
+      "confidence": 0.95,
+      "review": "题面要求三态，答案选 not_found，证据为关键词 grep 零命中及系统调用表扫描，支撑未发现沙箱机制结论，负向证据充分。"
     },
     {
       "question_id": "Q07_007",
-      "confidence": 1.0,
-      "review": "题面询问栈保护机制，答案定为 stub，证据显示仅有注释提及 guard page 而无实际 canary 实现代码，证据与结论一致，符合 tri_state 要求。"
+      "confidence": 0.95,
+      "review": "题面要求三态，答案选 stub，证据显示 guard page 相关代码被注释或标注废弃，支撑“有设计意图但未实装”的 stub 状态。"
     },
     {
       "question_id": "Q07_008",
-      "confidence": 1.0,
-      "review": "题面询问审计/安全启动，答案定为 not_found，证据显示全局搜索 0 命中，PMP 初始化为全访问，证据支撑结论，题答一致。"
+      "confidence": 0.95,
+      "review": "题面要求三态，答案选 not_found，证据为关键词搜索零命中及 PMP 初始化配置允许所有访问，支撑无审计/安全启动结论。"
     },
     {
       "question_id": "Q07_009",
-      "confidence": 1.0,
-      "review": "题面要求列出架构及安全初始化证据，答案明确仅支持 riscv64 并给出 PMP/页表切换证据，其他架构搜索为 0，完全符合题面约束。"
+      "confidence": 0.95,
+      "review": "题面要求逐架构作答，答案明确仅支持 riscv64 并给出 PMP/寄存器证据，未发现其他架构代码，完全符合题面约束。"
     },
     {
       "question_id": "Q07_010",
-      "confidence": 1.0,
-      "review": "题面询问 Rust 安全机制，答案说明内核为 C 语言，Rust 仅用于 SBI 固件故定为 not_found，逻辑自洽且证据支撑语言构成事实。"
+      "confidence": 0.95,
+      "review": "题面要求三态（若 Rust），答案说明内核主体为 C 故 not_found，证据展示 C 语言锁结构体，逻辑自洽且响应了前提条件。"
     },
     {
       "question_id": "Q07_011",
-      "confidence": 1.0,
-      "review": "题面询问页表隔离，答案定为 implemented，证据展示 proc 结构含独立页表及 trap 切换逻辑，支撑 KPTI 等价机制结论，证据充分。"
+      "confidence": 0.95,
+      "review": "题面要求三态，答案选 not_found，证据显示单页表结构及无 KPTI 关键词，usertrapret 直接切换页表，支撑无隔离结论。"
     },
     {
       "question_id": "Q07_012",
-      "confidence": 1.0,
-      "review": "题面询问 UID/GID 是否真实检查，答案指出字段存在但无检查链，证据引用结构体定义及\"assume root\"注释，证据与结论严格对应。"
+      "confidence": 0.95,
+      "review": "题面要求短答并标注检查链，答案明确“字段存在但无检查链”并给出 stat 定义与 syscall 硬编码证据，完全符合题面特殊约束。"
     },
     {
       "question_id": "Q07_013",
-      "confidence": 1.0,
-      "review": "题面要求选择访问控制模型，答案选择与 A 选项一致的 DAC 描述，证据引用 mode 位检查逻辑，符合题面约束及证据支撑。"
+      "confidence": 0.95,
+      "review": "题面为单选，答案值匹配选项 D，证据支撑无细粒度访问控制（假设 root/无 uid），与选择一致。"
     },
     {
       "question_id": "Q07_014",
-      "confidence": 1.0,
-      "review": "题面询问完整性策略，答案定为 not_found，证据显示无 W^X 或签名验证相关代码，全局搜索 0 命中，证据支撑结论，符合契约。"
+      "confidence": 0.95,
+      "review": "题面要求三态，答案选 not_found，证据显示页表权限位独立设置且 exec 按 ELF 标志设置无 W^X 强制，支撑无完整性策略结论。"
     }
   ],
   "dimensions": {
-    "evidence_supports_answers": 1.0,
-    "question_answer_consistency": 1.0,
-    "requirements_fit": 1.0
+    "evidence_supports_answers": 0.95,
+    "question_answer_consistency": 0.95,
+    "requirements_fit": 0.95
   },
   "findings": [],
-  "summary_zh": "所有 14 道题目均已完成作答。答案值（value）与题面（stem）要求一致，单选择题选项匹配，三态题枚举合法。每道题的证据（evidence）均能直接支撑其结论（如桩实现、未找到、已实现等），未发现证据与结论矛盾或引用错误。输出格式符合 JSON-QA 契约，无缺失字段。",
+  "summary_zh": "本报告质量较高，所有题目均提供了非空且具体的代码摘录作为证据，证据内容能直接支撑答案结论（包括三态判断与短答链路）。题面约束（如单选选项、三态枚举、短答节点数）均得到满足，无跑题或契约违例现象。全阶段置信度按各题均值计算。",
+  "report_quality_score": 0.97,
   "_meta": {
+    "quality": {
+      "excerpt_coverage": 1.0,
+      "evidence_richness": 1.0,
+      "total_evidence_items": 38,
+      "nonempty_excerpt_items": 38,
+      "mean_question_confidence": 0.95,
+      "mean_dimensions": 0.95,
+      "weights": {
+        "w_mean": 0.45,
+        "w_excerpt": 0.25,
+        "w_rich": 0.2,
+        "w_dim": 0.1
+      }
+    },
     "review_model": "qwen3.5-plus"
   }
 }

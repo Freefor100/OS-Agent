@@ -1,0 +1,101 @@
+{
+  "stage_id": "10_history",
+  "goal": "撰写「开发历史与里程碑」章节，基于 Git 提交历史、作者贡献、关键文件演进轨迹及文档证据，归纳 F7LY-OS 从 2025-04 初始化到 2026-01 的技术演进脉络。",
+  "must_cover": [
+    "Git 仓库基本信息：103 commits，时间跨度 2025-04-15 ~ 2026-01-17，4 位贡献者（Dandelion、guankaiqi、gkq、zzy）",
+    "三大里程碑提交：初始化 (25820da9)、决赛一阶段 (6f2898a1)、fat32 支持 (1b84b078)",
+    "模块演进路径：kernel/fs 的 fat32 引入、kernel/proc 的进程管理重构、Makefile 的双架构构建演进",
+    "文档证据：README.md 的 20 次变更、docs/ 目录下 8 份 PDF/PPT 文档的版本迭代",
+    "已知缺口：技术债.md 仅记录 1 条未解决问题、部分 commit 消息过于简略（如 'test'、'5' 等）",
+    "若存在 `.git`：用本阶段已启用的 Git 工具概括主分支/标签/作者贡献方向；**禁止**编造未出现在工具输出中的 commit hash 或统计口径。",
+    "**模块演进**：可结合前文各章已出现的路径，用 `trace_file_evolution` 等追踪关键文件/目录的引入或大改，只写工具输出可支撑的判断。",
+    "**文档里程碑**：README、CHANGELOG、CI 配置等中与版本或阶段目标相关的陈述，区分「文档声称」与「代码可验证结论」。",
+    "**缺口**：若历史信息显示某能力被移除、长期标注实验/待办，如实记录。"
+  ],
+  "evidence_targets": [
+    "作者贡献统计（4 人分工：Dandelion 主导 kernel/thirdparty、gkq 负责 LTP 测试集成、zzy 维护脚本与文档）",
+    "重大提交语义（初始化 23 万行代码导入、决赛阶段 7 万行网络/共享内存新增、fat32 文件系统移植）",
+    "模块演进证据（kernel/fs/fat32/ 目录在 1b84b078 首次引入、kernel/shm/ 在 6f2898a1 加入 COMMON_DIRS）",
+    "CI/测试演进（ltp_judge/ 目录在 1b84b078 新增 6 万行测试判定脚本、scripts/ 在 313510d3 统一迁移）",
+    "文档里程碑（README.md 在 4543937e 单次新增 129 行架构说明、现场赛文档 2218fe23 独立提交）",
+    "作者贡献",
+    "重大提交",
+    "模块演进",
+    "当前缺口",
+    "CI/产物名/自测相关演进(有工具证据时)"
+  ],
+  "seed_paths": [
+    "README.md",
+    "Makefile",
+    "docs/",
+    "kernel/fs/fat32/",
+    "kernel/shm/",
+    "kernel/net/",
+    "ltp_judge/",
+    "scripts/",
+    "开发记录/",
+    "kernel/boot/riscv/main.cc",
+    "kernel/boot/loongarch/main.cc",
+    ".gitignore",
+    "git",
+    "history"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64",
+    "loongarch64"
+  ],
+  "entry_symbols": [
+    "main",
+    "_entry",
+    "init_fs_table",
+    "vfs_ext4_init",
+    "k_smm.init",
+    "SlabAllocator::init",
+    "virtio_disk_init",
+    "print_f7ly",
+    "git"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "busybox",
+    "busybox/loongarch",
+    "busybox/riscv",
+    "docs",
+    "kernel",
+    "kernel/boot",
+    "kernel/devs",
+    "kernel/fs",
+    "kernel/hal"
+  ],
+  "preferred_tools": [
+    "get_git_history_summary",
+    "analyze_authors_contribution",
+    "trace_file_evolution",
+    "get_commit_diff_summary",
+    "analyze_git_history",
+    "read_code_segment",
+    "list_repo_structure"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 4000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "使用 get_commit_diff_summary 解析 3 个里程碑提交（25820da9、6f2898a1、1b84b078）的核心代码变更语义",
+    "对 kernel/fs/fat32/、kernel/shm/、kernel/net/ 三个目录调用 trace_file_evolution 追踪首次引入与后续大改",
+    "读取 README.md 全文与 docs/ 下 3 份关键 PDF 的元数据（文件名、大小、提交时间），建立文档版本时间线",
+    "分析 Makefile 在 6f2898a1 与 1b84b078 两次提交中的构建目标变化，提取双架构支持演进证据",
+    "检查 开发记录/ 目录下 5 篇以上调试日志（如 chdir 驱虫日志、syscall 驱虫日记），提取技术债与未解决问题",
+    "对照 analyze_authors_contribution 输出，将 4 位作者的编辑行数与 seed_paths 映射，形成分工图谱",
+    "汇总 Git 历史中的 'Merge' 提交与简略消息 commit，标注历史信息密度不足的区域作为章节缺口说明"
+  ]
+}

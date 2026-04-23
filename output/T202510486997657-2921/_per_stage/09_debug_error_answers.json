@@ -1,0 +1,162 @@
+{
+  "schema_version": "v1",
+  "stage_id": "09_debug_error",
+  "stage_title": "调试机制与错误处理",
+  "terminology_profile": "stallings_en_zh",
+  "answers": [
+    {
+      "question_id": "Q09_001",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在日志系统（log/printk/println 宏）与日志级别控制？（必须三态）",
+      "value": "stub",
+      "evidence": [
+        {
+          "path": "kernel/libs/printer.hh",
+          "symbol_kind": "macro",
+          "symbol_name": "panic/printf",
+          "excerpt": "定义了 panic/printf/snprintf/assert 宏 (printer.hh:12-15)，但 OutputLevel enum 被注释掉 (printer.hh:4-10)，无日志级别控制机制"
+        },
+        {
+          "path": "kernel/libs/printer.hh",
+          "symbol_kind": "class",
+          "symbol_name": "Printer",
+          "excerpt": "Printer 类提供 print/k_panic/info/warn/error 方法声明，但无级别过滤逻辑"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_002",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 panic/崩溃处理路径（panic_handler/oom/abort 等）？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/libs/printer.hh",
+          "symbol_kind": "macro",
+          "symbol_name": "panic",
+          "excerpt": "panic 宏定义：panic(info, args...) → k_printer.k_panic(__FILE__, __LINE__, info, ##args) (printer.hh:12)"
+        },
+        {
+          "path": "kernel/libs/printer.cc",
+          "symbol_kind": "function",
+          "symbol_name": "k_panic",
+          "excerpt": "k_panic 实现 (printer.cc:520-650)：输出 panic: 文件名：行号：信息，设置_panicked 标志，但无寄存器 dump 或栈回溯调用"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_003",
+      "question_type": "short_answer",
+      "stem": "panic 路径会输出哪些诊断？（寄存器 dump/栈回溯/停机；必须引用实现证据）",
+      "value": "仅输出 panic 字符串 + 文件位置 + 格式化信息，无寄存器 dump、无栈回溯辅助函数调用。k_panic 实现 (printer.cc:520-650) 仅通过 console_putc 逐字符输出文件名：行号：info，未调用任何寄存器保存区 (TrapFrame) 打印或回溯函数。异常处理路径 (trap/riscv/trap.cc:250-260、trap/loongarch/trap.cc:207-208) 在 usertrap 中打印 sepc/stval 或 era/badv 等寄存器，但这是异常处理而非 panic 路径。",
+      "evidence": [
+        {
+          "path": "kernel/libs/printer.cc",
+          "symbol_kind": "function",
+          "symbol_name": "k_panic",
+          "excerpt": "k_panic 实现 (520-650 行)：直接输出 panic: 文件名：行号：info，无寄存器 dump 调用"
+        },
+        {
+          "path": "kernel/proc/trapframe.hh",
+          "symbol_kind": "struct",
+          "symbol_name": "TrapFrame",
+          "excerpt": "TrapFrame 结构体保存寄存器状态，但 k_panic 未使用"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_004",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现栈回溯 (backtrace/unwind/stack_trace)？（必须三态；仅打印 ra 不算）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/libs/printer.cc",
+          "symbol_kind": "search",
+          "symbol_name": "backtrace_scan",
+          "excerpt": "grep 搜索 backtrace|unwind|stack_trace|StackTrace，仅命中 thirdparty/EASTL 头文件中的注释 (unwind semantics)，内核源码 0 命中"
+        },
+        {
+          "path": "kernel/libs/printer.cc",
+          "symbol_kind": "function",
+          "symbol_name": "k_panic",
+          "excerpt": "k_panic 实现 (520-650 行) 无任何回溯函数调用"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_005",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 **内核驻留的交互式监视器（kernel monitor）**？（对齐 Stallings《操作系统：精髓与设计原理》语境：**在内核态上下文**接受命令、用于探查/操控系统的监视器；**不包括**仅在用户态运行的常规 shell，如 `xv6-user/sh.c`、`user/` 下用户程序等——除非题面另有定义。必须三态；若 `implemented`：须给出 3–10 个 **用户可键入的 monitor 命令名** 及对应 **内核内** 解析/分发入口的 `路径:行号` 证据；仅以用户态 shell 充当内核 monitor 视为 **未切题** 应判 `stub` 或 `not_found` 并说明理由。）",
+      "value": "stub",
+      "evidence": [
+        {
+          "path": "kernel/devs/console.cc",
+          "symbol_kind": "function",
+          "symbol_name": "console_intr",
+          "excerpt": "console_intr 中有 CTRL_('P') 处理 (console.cc:94-97)，但仅有 TODO:procdump() 注释，无命令解析循环"
+        },
+        {
+          "path": "kernel/proc/proc_manager.cc",
+          "symbol_kind": "function",
+          "symbol_name": "procdump",
+          "excerpt": "procdump() 已实现 (proc_manager.cc:882-904)，可打印进程列表，但 console_intr 未调用它 (仅 TODO 注释)，无其他命令 (如 help/ps/mem 等) 的分发逻辑"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_006",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 GDB stub（需数据包解析循环，如 handle_gdb_packet）？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/",
+          "symbol_kind": "search",
+          "symbol_name": "gdbstub_scan",
+          "excerpt": "grep 搜索 handle_gdb_packet|gdbstub|gdb_stub，0 命中 (仅 ext4_bg_num_gdb 为文件系统术语)"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_007",
+      "question_type": "short_answer",
+      "stem": "错误码/错误类型体系是什么？（errno/Result/Error enum；给类型定义与传播点证据）",
+      "value": "C 风格 errno 宏定义。ext4_errno.hh (1-50 行) 定义 EPERM/ENOENT/EIO/ENOMEM 等宏 (#define EPERM 1 等)，无 Rust 风格 Result/Error enum。错误码通过 int 返回值传播，如 mmap_handler 返回非 0 表示失败 (trap/riscv/trap.cc:250)。",
+      "evidence": [
+        {
+          "path": "kernel/fs/lwext4/ext4_errno.hh",
+          "symbol_kind": "macro",
+          "symbol_name": "EPERM/ENOENT",
+          "excerpt": "ext4_errno.hh:11-36 定义 C 风格 errno 宏：#define EPERM 1, #define ENOENT 2, #define ENOMEM 12 等"
+        },
+        {
+          "path": "kernel/trap/riscv/trap.cc",
+          "symbol_kind": "function",
+          "symbol_name": "mmap_handler",
+          "excerpt": "mmap_handler 返回 int，非 0 表示失败 (trap.cc:250)"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_008",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 trace/perf/ftrace 等跟踪机制或 tracepoints？（必须三态）",
+      "value": "stub",
+      "evidence": [
+        {
+          "path": "kernel/fs/lwext4/misc/queue.hh",
+          "symbol_kind": "struct",
+          "symbol_name": "qm_trace",
+          "excerpt": "lwext4 的 queue.hh (82-89 行) 定义 qm_trace 结构体用于队列调试 (lastline/prevline/lastfile/prevfile)，但仅限于 lwext4 内部队列调试"
+        },
+        {
+          "path": "kernel/",
+          "symbol_kind": "search",
+          "symbol_name": "tracepoint_scan",
+          "excerpt": "grep 搜索 ftrace|perf|tracepoint，内核源码无命中，无系统级 trace 机制"
+        }
+      ]
+    }
+  ]
+}

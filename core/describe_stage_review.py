@@ -6,7 +6,7 @@ Describe 阶段无工具 LLM Review（仅 JSON-QA 且校验成功后）。
 
 不包含工具摘录；不覆盖 `01_overview` / `10_history`（由调用方跳过）。
 
-侧车：`_per_stage/<stage_id>_review.json`（含 `question_reviews` 逐题 `review`+`confidence`、`confidence` 总置信度、`summary_zh`）；环境变量 `DESCRIBE_STAGE_REVIEW=1` 开启。审计范围仅限题面/契约/证据自洽，不评价参赛 OS 设计优劣。
+侧车：`_per_stage/<stage_id>_review.json`（含 `question_reviews`、按方案 A 的 `confidence`、`report_quality_score`、`summary_zh`、`_meta.quality`）；`DESCRIBE_STAGE_REVIEW=1` 开启。审计范围限于题面/契约/证据与答案 JSON 的报告质量。文末由 `write_review_score_json` 在输出根目录写 `review_score.json`（02~09 各章 0~100 与总分校验）。
 """
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ import os
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from core.agent_builder import DESCRIBE_REVIEW_SYSTEM_PROMPT, build_chat_model, get_model_name
 
@@ -149,6 +149,192 @@ def coerce_review_payload(
     }
 
 
+# 与 describe_stage_qa 中 02–09 题库对应；用于 review_score.json 全库汇总。
+REVIEW_STAGES_02_09: tuple[str, ...] = (
+    "02_boot_trap",
+    "03_mem_mgmt",
+    "04_process_smp",
+    "05_fs_drivers",
+    "06_sync_ipc",
+    "07_security",
+    "08_network",
+    "09_debug_error",
+)
+
+
+def _load_review_quality_weights() -> dict[str, float]:
+    raw = (os.environ.get("REVIEW_QUALITY_WEIGHTS") or "").strip()
+    if raw:
+        try:
+            wj = json.loads(raw)
+            return {
+                "w_mean": float(wj.get("w_mean", 0.45)),
+                "w_excerpt": float(wj.get("w_excerpt", 0.25)),
+                "w_rich": float(wj.get("w_rich", 0.20)),
+                "w_dim": float(wj.get("w_dim", 0.10)),
+            }
+        except Exception:
+            pass
+    return {"w_mean": 0.45, "w_excerpt": 0.25, "w_rich": 0.20, "w_dim": 0.10}
+
+
+def _coerce_float_01(x: Any) -> Optional[float]:
+    if x is None:
+        return None
+    if isinstance(x, bool):
+        return None
+    if isinstance(x, (int, float)):
+        v = float(x)
+        if 0.0 <= v <= 1.0:
+            return v
+        if 1.0 < v <= 100.0:
+            return v / 100.0
+        return None
+    if isinstance(x, str):
+        s = x.strip()
+        if not s:
+            return None
+        try:
+            return _coerce_float_01(float(s))
+        except ValueError:
+            return None
+    return None
+
+
+def recompute_confidence_scheme_a(
+    question_reviews: list,
+    *,
+    fallback: Any = None,
+) -> Optional[float]:
+    """全阶段分：各题有数值的 confidence 的均值，若任一题 <0.7 则不超过 0.75。无数值时回退为 fallback。"""
+    confs: list[float] = []
+    for item in question_reviews or []:
+        if not isinstance(item, dict):
+            continue
+        c = _coerce_float_01(item.get("confidence"))
+        if c is not None:
+            confs.append(c)
+    if not confs:
+        return _coerce_float_01(fallback) if fallback is not None else None
+    m = sum(confs) / len(confs)
+    out = round(m, 2)
+    if any(c < 0.7 for c in confs):
+        out = min(out, 0.75)
+    return out
+
+
+def _expected_evidence_n(question_type: str) -> float:
+    t = (question_type or "").strip()
+    if t in ("short_answer", "multi_choice"):
+        return 1.5
+    return 1.0
+
+
+def compute_payload_quality_metrics(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """对覆写题面前的答案 JSON 做证据统计（excerpt 覆盖、丰富度等）。"""
+    answers = payload.get("answers")
+    if not isinstance(answers, list):
+        answers = []
+    total_ev = 0
+    nonempty = 0
+    per_q_rich: list[float] = []
+    for a in answers:
+        if not isinstance(a, dict):
+            continue
+        ev = a.get("evidence")
+        if not isinstance(ev, list):
+            ev = []
+        exp = _expected_evidence_n(str(a.get("question_type") or ""))
+        n_nonempty = 0
+        for it in ev:
+            if not isinstance(it, dict):
+                continue
+            total_ev += 1
+            ex = it.get("excerpt")
+            if isinstance(ex, str) and ex.strip():
+                nonempty += 1
+                n_nonempty += 1
+        if ev:
+            per_q_rich.append(min(1.0, float(n_nonempty) / max(exp, 0.5)))
+        else:
+            per_q_rich.append(0.0)
+    excerpt_coverage = (float(nonempty) / float(total_ev)) if total_ev else 0.0
+    evidence_richness = (sum(per_q_rich) / len(per_q_rich)) if per_q_rich else 0.0
+    return {
+        "excerpt_coverage": round(excerpt_coverage, 4),
+        "evidence_richness": round(evidence_richness, 4),
+        "total_evidence_items": total_ev,
+        "nonempty_excerpt_items": nonempty,
+    }
+
+
+def enrich_review_with_report_quality(
+    review: Dict[str, Any],
+    payload: Dict[str, Any],
+) -> Dict[str, Any]:
+    """在 LLM 评审后写入 report_quality_score、_meta.quality，并按方案 A 覆盖全阶段 confidence。"""
+    qrs = review.get("question_reviews")
+    if not isinstance(qrs, list):
+        qrs = []
+    new_conf = recompute_confidence_scheme_a(qrs, fallback=review.get("confidence"))
+    if new_conf is not None:
+        review["confidence"] = new_conf
+
+    mean_q = 0.0
+    nq = 0
+    for item in qrs:
+        if not isinstance(item, dict):
+            continue
+        c = _coerce_float_01(item.get("confidence"))
+        if c is not None:
+            mean_q += c
+            nq += 1
+    if nq:
+        mean_q = mean_q / nq
+    else:
+        mq = _coerce_float_01(review.get("confidence"))
+        mean_q = mq if mq is not None else 0.0
+
+    dims = review.get("dimensions") if isinstance(review.get("dimensions"), dict) else {}
+    dvals: list[float] = []
+    for k in ("evidence_supports_answers", "question_answer_consistency", "requirements_fit"):
+        dv = _coerce_float_01(dims.get(k)) if isinstance(dims, dict) else None
+        if dv is not None:
+            dvals.append(dv)
+    mean_d = sum(dvals) / len(dvals) if dvals else 0.0
+
+    metrics = compute_payload_quality_metrics(payload)
+    w = _load_review_quality_weights()
+    rqs = (
+        w["w_mean"] * mean_q
+        + w["w_excerpt"] * metrics["excerpt_coverage"]
+        + w["w_rich"] * metrics["evidence_richness"]
+        + w["w_dim"] * mean_d
+    )
+    rqs = max(0.0, min(1.0, float(rqs)))
+    rqs = round(rqs, 2)
+    review["report_quality_score"] = rqs
+
+    meta: Dict[str, Any] = dict(review.get("_meta")) if isinstance(review.get("_meta"), dict) else {}
+    meta["quality"] = {
+        **metrics,
+        "mean_question_confidence": round(mean_q, 4),
+        "mean_dimensions": round(mean_d, 4),
+        "weights": w,
+    }
+    review["_meta"] = meta
+    return review
+
+
+def _review_parse_max_attempts() -> int:
+    v = (os.environ.get("DESCRIBE_REVIEW_MAX_ATTEMPTS") or "3").strip()
+    try:
+        n = int(v)
+    except ValueError:
+        n = 3
+    return max(1, min(8, n))
+
+
 def run_describe_stage_review(
     *,
     stage_id: str,
@@ -158,7 +344,10 @@ def run_describe_stage_review(
     expected_question_ids: List[str],
 ) -> Tuple[Optional[Dict[str, Any]], str, Optional[str]]:
     """
-    无工具单次 invoke。材料 A=题单，B=覆写前 JSON 字符串。
+    无工具 invoke。材料 A=题单，B=覆写前 JSON 字符串。
+
+    若输出无法 JSON 解析或无法 `coerce_review_payload`，会按 `DESCRIBE_REVIEW_MAX_ATTEMPTS`（默认 3）
+    对同一审阅模型**追加修复轮**重试，直至成功或达到上限；失败时返回最后一次原文与错误信息。
     """
     id_line = ", ".join(expected_question_ids) if expected_question_ids else "(无)"
     user_parts = [
@@ -180,25 +369,160 @@ def run_describe_stage_review(
 
     model = os.environ.get("DESCRIBE_REVIEW_MODEL") or get_model_name()
     llm = build_chat_model(model=model, temperature=0, max_retries=0)
-    msg = llm.invoke(
-        [
-            SystemMessage(content=DESCRIBE_REVIEW_SYSTEM_PROMPT),
-            HumanMessage(content=user_text),
-        ]
-    )
-    raw_text = (getattr(msg, "content", None) or "").strip()
+    max_attempts = _review_parse_max_attempts()
+    messages: list = [
+        SystemMessage(content=DESCRIBE_REVIEW_SYSTEM_PROMPT),
+        HumanMessage(content=user_text),
+    ]
+    last_err: Optional[str] = None
+    raw_text = ""
+    for attempt in range(1, max_attempts + 1):
+        msg = llm.invoke(messages)
+        raw_text = (getattr(msg, "content", None) or "").strip()
+        try:
+            parsed = parse_review_llm_output(raw_text)
+            coerced = coerce_review_payload(
+                parsed,
+                stage_id=stage_id,
+                stage_title=stage_title,
+                expected_question_ids=list(expected_question_ids),
+            )
+            if attempt > 1:
+                logger.info("Describe review OK on attempt %s/%s", attempt, max_attempts)
+            return coerced, raw_text, None
+        except Exception as e:
+            last_err = f"{type(e).__name__}: {e}"
+            logger.warning("Describe review parse failed attempt %s/%s: %s", attempt, max_attempts, last_err)
+            if attempt >= max_attempts:
+                return None, raw_text, last_err
+            tail = (raw_text or "")[-6000:].replace("```", "`\u200b`")
+            repair = (
+                "你的上一段输出**无法**被解析为合法 JSON，或结构不符合 `describe_review_v1` 要求（必须含全部 question_id 的"
+                f" `question_reviews` 等）。\n\n**错误信息**：\n{last_err}\n\n"
+                f"**你上一次的完整输出**（可能含多余说明或围栏；请**仅**在本轮修正后重发 JSON）：\n```text\n{tail}\n```\n\n"
+                "请**只**重新输出**一个** JSON 对象，字段名与系统说明一致，可用 ```json 围栏。不要写任何其他解释或道歉。"
+            )
+            messages = list(messages) + [AIMessage(content=raw_text), HumanMessage(content=repair)]
+    return None, raw_text, last_err or "unknown"
+
+
+def _load_stage_title_from_qa(stage_id: str) -> str:
     try:
-        parsed = parse_review_llm_output(raw_text)
-        coerced = coerce_review_payload(
-            parsed,
-            stage_id=stage_id,
-            stage_title=stage_title,
-            expected_question_ids=list(expected_question_ids),
+        from core.describe_stage_qa import load_stage_qa
+
+        d = load_stage_qa(stage_id)
+        if isinstance(d, dict) and d.get("stage_title"):
+            return str(d.get("stage_title"))
+    except Exception:
+        pass
+    return stage_id
+
+
+def write_review_score_json(repo_output_dir: str) -> Dict[str, Any]:
+    """汇总 02~09 各章 review，写 `review_score.json`；仅对已存在且可解析的侧车计分。返回与落盘内容一致。"""
+    stages_out: list[dict[str, Any]] = []
+    scores_100: list[int] = []
+    for sid in REVIEW_STAGES_02_09:
+        title = _load_stage_title_from_qa(sid)
+        path = os.path.join(repo_output_dir, "_per_stage", f"{sid}_review.json")
+        if not os.path.isfile(path):
+            stages_out.append(
+                {
+                    "stage_id": sid,
+                    "stage_title": title,
+                    "score_0_100": None,
+                    "status": "missing",
+                }
+            )
+            continue
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception as e:
+            logger.warning("read %s: %s", path, e)
+            stages_out.append(
+                {
+                    "stage_id": sid,
+                    "stage_title": title,
+                    "score_0_100": None,
+                    "status": "read_error",
+                }
+            )
+            continue
+        if not isinstance(data, dict):
+            stages_out.append(
+                {
+                    "stage_id": sid,
+                    "stage_title": title,
+                    "score_0_100": None,
+                    "status": "invalid",
+                }
+            )
+            continue
+        rqs = data.get("report_quality_score")
+        src = "report_quality_score"
+        if rqs is None:
+            rqs = data.get("confidence")
+            src = "confidence"
+        f01 = _coerce_float_01(rqs)
+        if f01 is None:
+            stages_out.append(
+                {
+                    "stage_id": sid,
+                    "stage_title": title,
+                    "score_0_100": None,
+                    "source": src,
+                    "status": "no_score",
+                }
+            )
+            continue
+        s100 = int(round(f01 * 100.0))
+        scores_100.append(s100)
+        stages_out.append(
+            {
+                "stage_id": sid,
+                "stage_title": title,
+                "score_0_100": s100,
+                "source": src,
+                "status": "ok",
+            }
         )
-        return coerced, raw_text, None
-    except Exception as e:
-        logger.warning("Describe review JSON parse failed: %s", e)
-        return None, raw_text, f"{type(e).__name__}: {e}"
+
+    total: Optional[int] = None
+    if scores_100:
+        total = int(round(sum(scores_100) / len(scores_100)))
+
+    out: Dict[str, Any] = {
+        "schema_version": "review_score_v1",
+        "stages": stages_out,
+        "total_0_100": total,
+        "n_scored": len(scores_100),
+        "n_expected": len(REVIEW_STAGES_02_09),
+    }
+    out_path = os.path.join(repo_output_dir, "review_score.json")
+    try:
+        os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
+        with open(out_path, "w", encoding="utf-8") as f:
+            json.dump(out, f, ensure_ascii=False, indent=2)
+    except OSError as e:
+        logger.warning("write review_score.json failed: %s", e)
+    return out
+
+
+def load_total_report_quality_0_100(repo_output_dir: str) -> Optional[int]:
+    """读已写的 review_score.json 的总分，供总报告文首；无则 None。"""
+    p = os.path.join(repo_output_dir, "review_score.json")
+    if not os.path.isfile(p):
+        return None
+    try:
+        with open(p, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        t = data.get("total_0_100")
+        if t is None:
+            return None
+        return int(t)
+    except Exception:
+        return None
 
 
 def describe_stage_review_enabled() -> bool:

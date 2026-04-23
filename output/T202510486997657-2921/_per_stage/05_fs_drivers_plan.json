@@ -1,0 +1,122 @@
+{
+  "stage_id": "05_fs_drivers",
+  "goal": "分析文件系统与设备I/O模块：VFS抽象层、具体FS后端、FD表、缓存机制、mmap/pipe、驱动框架、中断处理、块/网卡驱动、DTB解析",
+  "must_cover": [
+    "[Q05_001] VFS接口形态：C风格file_operations/inode_operations结构体（kernel/fs/vfs/file.hh）",
+    "[Q05_002] 具体FS后端：lwext4（第三方库，kernel/fs/lwext4/）+ 自研FAT32（kernel/fs/fat32/）",
+    "[Q05_003] FAT32/Ext4来源：lwext4为第三方（BSD许可），FAT32为自研",
+    "[Q05_004] 文件打开路径：sys_openat→vfs_openat→vfs_ext_openat→ext4_open",
+    "[Q05_005] FD表实现：Pcb::_ofile[max_open_files]固定数组（kernel/proc/proc.hh:62）",
+    "[Q05_006] 块缓存：已实现bcache（kernel/fs/bio.cc）+ lwext4 ext4_bcache（kernel/fs/lwext4/ext4_bcache.cc）",
+    "[Q05_007] 驱逐策略：LRU（bcache链表排序，ext4_bcache使用lru_id红黑树）",
+    "[Q05_008] 页缓存：未实现独立page cache，使用bcache+VMA惰性分配",
+    "[Q05_009] mmap实现：已实现sys_mmap，支持MAP_ANONYMOUS/MAP_SHARED/MAP_PRIVATE，文件映射通过memfd处理",
+    "[Q05_010] poll/select/epoll：stub实现（sys_epoll_create1/ctl返回0）",
+    "[Q05_011] 路径解析：已实现namei/namex/ops.cc::get_absolute_path支持./..和绝对/相对路径",
+    "[Q05_012] symlink支持：已实现sys_readlinkat/symlinkat，ext4支持EXT4_DE_SYMLINK",
+    "[Q05_013] pipe实现：已实现sys_pipe2，proc::Pipe类（kernel/proc/pipe.hh），VFS中FT_PIPE类型",
+    "[Q05_014] socket支持：stub（FD_SOCKET枚举存在，vfs_utils.cc明确不支持）",
+    "[Q05_015] 伪文件系统：virtual_file机制实现/proc/self/exe等（ProcSysFsPipeUserPagesSoftProvider）",
+    "[Q05_016] FD表归属：每个进程Pcb独立持有_ofile数组",
+    "[Q05_001] VFS 抽象层 (Virtual File System, VFS)接口是什么形态？（Rust trait / C op 表；必须给接口定义证据）",
+    "[Q05_002] 具体文件系统后端 (Concrete File System Backend) 更接近哪种？",
+    "[Q05_003] 若支持 FAT32/Ext4：它是自研还是第三方库/crate？（必须引用 Cargo.toml/Cargo.lock 或 Makefile 引入证据）",
+    "[Q05_004] 文件打开路径：文件打开入口（sys_open 或等价）→ VFS 层 → 具体 FS open。列出 3-6 个关键节点并给证据。",
+    "[Q05_005] 文件描述符表 (File Descriptor Table, FD Table) 的实现形态是什么？（固定数组/Vec/BTreeMap 等；必须给结构体定义证据）",
+    "[Q05_006] 是否实现块缓存/缓冲缓存 (Block Cache / Buffer Cache, bcache)？（必须三态）"
+  ],
+  "evidence_targets": [
+    "VFS接口定义（file_operations/inode_operations）",
+    "lwext4第三方库证据（版权头/目录结构）",
+    "FD表结构（Pcb::_ofile）",
+    "bcache LRU实现（bio.cc链表）",
+    "ext4_bcache LRU红黑树",
+    "mmap系统调用实现",
+    "pipe2实现与Pipe类",
+    "epoll stub实现",
+    "namei/path_walk实现",
+    "symlink/readlink实现",
+    "DTB解析入口",
+    "驱动注册流程",
+    "VFS 设计",
+    "具体文件系统",
+    "fd table",
+    "pipe/mmap"
+  ],
+  "seed_paths": [
+    "kernel/fs/vfs/file.hh",
+    "kernel/fs/vfs/inode.hh",
+    "kernel/fs/vfs/file/file.hh",
+    "kernel/fs/bio.cc",
+    "kernel/fs/buf.hh",
+    "kernel/fs/lwext4/ext4_bcache.cc",
+    "kernel/proc/proc.hh",
+    "kernel/proc/pipe.hh",
+    "kernel/devs/device_manager.hh",
+    "kernel/devs/dtb.cc",
+    "kernel/devs/uart.hh",
+    "kernel/devs/loongarch/virtio_disk.cc",
+    "fs",
+    "vfs"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64",
+    "loongarch64"
+  ],
+  "entry_symbols": [
+    "sys_openat",
+    "vfs_openat",
+    "vfs_ext_openat",
+    "fdalloc",
+    "bget",
+    "ext4_bcache_init_dynamic",
+    "sys_mmap",
+    "sys_pipe2",
+    "virtio_probe",
+    "plic_mgr.init",
+    "sys_open",
+    "vfs_open"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "busybox",
+    "busybox/loongarch",
+    "busybox/riscv",
+    "docs",
+    "kernel",
+    "kernel/boot",
+    "kernel/devs",
+    "kernel/fs",
+    "kernel/hal"
+  ],
+  "preferred_tools": [
+    "read_code_segment",
+    "lsp_get_definition",
+    "lsp_get_references",
+    "lsp_get_call_graph",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "1. 读取kernel/fs/vfs/file.hh和inode.hh，提取file_operations/inode_operations结构体定义作为Q05_001证据",
+    "2. 读取kernel/proc/proc.hh第60-70行，确认Pcb::_ofile[max_open_files]固定数组实现（Q05_005/Q05_016）",
+    "3. 读取kernel/fs/bio.cc bget/brelse实现，确认LRU链表操作；读取ext4_bcache.cc lru_id比较函数（Q05_006/Q05_007）",
+    "4. 读取kernel/sys/syscall_handler.cc sys_mmap/sys_pipe2/sys_epoll_create1实现，确认mmap/pipe/epoll状态（Q05_009/Q05_010/Q05_013）",
+    "5. 读取kernel/fs/vfs/ops.cc namex/namei/get_absolute_path，确认路径解析支持./..和绝对/相对路径（Q05_011）",
+    "6. 读取kernel/sys/syscall_handler.cc sys_readlinkat和kernel/fs/lwext4/ext4.cc ext4_readlink，确认symlink支持（Q05_012）",
+    "7. 读取kernel/devs/dtb.cc DtbManager::get_initrd和kernel/devs/loongarch/pci.cc，确认DTB解析和PCI枚举（Q05_021/Q05_022/Q05_029）",
+    "8. 读取kernel/boot/riscv/main.cc和kernel/boot/loongarch/main.cc，追踪virtio_probe→virtio_disk_init→init_fs_table驱动初始化链（Q05_023/Q05_024）"
+  ]
+}

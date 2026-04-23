@@ -18,14 +18,12 @@ PLANNER_RECURSION_LIMIT = 80
 PLANNER_SYSTEM = """你是操作系统代码分析任务的「规划员」，只做两件事：
 1) 使用工具摸清本仓库与当前阶段相关的目录/模块/符号/调用关系（不要写正式分析报告）。
 2) 在信息足够后，输出**唯一**一段 Markdown 的 ```json ... ``` 围栏，其中为一个 JSON 对象，字段如下（均为选填，与启发式计划合并）：
-   - goal: string，本阶段一句话目标（≤120 字）
-   - must_cover: string[]，必须覆盖的要点（短句）
    - evidence_targets: string[]，应用代码证据回答的子主题
    - seed_paths: string[]，建议优先查看的相对路径或目录（≤12 条）
    - entry_symbols: string[]，值得追踪的符号名（≤10 条）
    - preferred_tools: string[]，推荐给**下一阶段执行 Agent** 的工具名（须为当前已挂载工具）
    - repo_structure_notes: string，仓库结构与本阶段相关性的简短说明（≤400 字）
-   - execution_steps: string[]，**必填**，4～8 条；按顺序写「执行 Agent 下一步该做什么」的短句（类似 Cursor 里锁定的 to-do），须覆盖：如何找入口、如何取证、如何对照 must_cover 收束；禁止泛泛的「分析代码」。
+   - execution_steps: string[]，**必填**，最多 32 条；按顺序写「执行 Agent 下一步该做什么」的短句（类似 Cursor 里锁定的 to-do），须覆盖：如何找入口、如何取证、如何收束；禁止泛泛的「分析代码」。鼓励细粒度规划，为每个核心子主题至少规划 1-2 步具体的工具调用路线。
 
 可用工具（按推荐顺序）：
 - 布局：`list_repo_structure`、`find_os_core_modules`、`grep_in_repo`
@@ -111,7 +109,7 @@ def run_llm_planning_agent(
 ## 近期已完成章节摘要
 {recent_txt}
 
-请先调用工具摸底与本阶段相关的目录与线索；JSON 里 **必须包含 execution_steps（4～8 条）**。最后**只输出** ```json 计划对象```。"""
+请先调用工具摸底与本阶段相关的目录与线索；JSON 里 **必须包含 execution_steps（最多 32 条）**。最后**只输出** ```json 计划对象```。"""
     messages = [
         SystemMessage(content=PLANNER_SYSTEM),
         HumanMessage(content=human),

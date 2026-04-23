@@ -2,187 +2,207 @@
   "schema_version": "describe_review_v1",
   "stage_id": "02_boot_trap",
   "stage_title": "启动/架构与 Trap/系统调用",
-  "confidence": 1.0,
+  "confidence": 0.97,
   "question_reviews": [
     {
       "question_id": "Q02_001",
       "confidence": 1.0,
-      "review": "题面要求提供启动入口文件路径及符号证据。答案给出了 linker.ld、entry.S 等具体路径与 ENTRY/_entry 符号，证据摘录与结论一致，符合 short_answer 格式要求。"
+      "review": "题面要求文件路径 + 符号证据。Value 明确给出 QEMU/K210 入口及链接脚本，Evidence 中 4 条摘录直接展示了 ENTRY 指令与标签定义，完全支撑结论。"
     },
     {
       "question_id": "Q02_002",
-      "confidence": 1.0,
-      "review": "题面为单选，答案选择了与选项 A 文本一致的描述。证据引用了 main.c 参数传递及 sbi.h，支撑了固件交接的结论，符合契约。"
+      "confidence": 0.95,
+      "review": "单选结论为固件交接。Evidence 展示 main 函数接收 dtb_pa 参数及 sbi 目录存在，符合 SBI 交接特征，支撑充分。"
     },
     {
       "question_id": "Q02_003",
-      "confidence": 1.0,
-      "review": "题面要求三态判断特权级切换。答案为 implemented，证据展示了 sstatus 寄存器操作及 usertrapret 代码，支撑了模式切换逻辑存在的结论，符合 tri_state_impl 格式。"
+      "confidence": 0.95,
+      "review": "三态结论 implemented。Evidence 展示 usertrapret 清除 SPP 位及 sret 返回，证实了特权级切换逻辑，支撑充分。"
     },
     {
       "question_id": "Q02_004",
       "confidence": 1.0,
-      "review": "题面要求列出关键寄存器/位及证据。答案列出了 sstatus 相关位及 satp/stvec 等，证据摘录了对应的宏定义与使用代码，符合 short_answer 要求。"
+      "review": "题面要求关键寄存器/位及证据。Value 列出 sstatus 关键位，Evidence 摘录了宏定义及操作代码，直接对应。"
     },
     {
       "question_id": "Q02_005",
       "confidence": 1.0,
-      "review": "题面要求三态判断 MMU 启用。答案为 implemented，证据展示了 kvminit/kvminithart 及 satp 设置代码，支撑了结论，符合契约。"
+      "review": "三态结论 implemented。Evidence 明确展示 kvminithart 设置 satp 及 sfence.vma，直接证实 MMU 启用。"
     },
     {
       "question_id": "Q02_006",
-      "confidence": 1.0,
-      "review": "题面要求列出跳转链关键节点。答案列出了从 _entry 到 scheduler 的调用链，证据引用了 entry.S 和 main.c 对应代码，符合 short_answer 要求。"
+      "confidence": 0.95,
+      "review": "题面要求 3-6 个节点。Value 列出 6 个节点，Evidence 中 entry.S 和 main.c 摘录覆盖了从入口到 scheduler 的关键调用链，支撑充分。"
     },
     {
       "question_id": "Q02_007",
-      "confidence": 1.0,
-      "review": "题面要求 fill_in 格式（项目：状态 [路径]）。答案按格式填写了 BSS、串口、DTB、页表的状态，证据支撑了各状态判断，符合契约。"
+      "confidence": 0.95,
+      "review": "填空格式符合要求。Evidence 支持 BSS、UART、页表状态；DTB 为 not_found 且有 main.c 接收参数但无解析代码的摘录支撑，逻辑自洽。"
     },
     {
       "question_id": "Q02_008",
       "confidence": 1.0,
-      "review": "题面要求三态判断 FPU 初始化。答案为 implemented，证据展示了 floatinithart 函数及调用点，支撑了结论，符合 tri_state_impl 格式。"
+      "review": "三态结论 implemented。Evidence 展示 floatinithart 定义及在 main 中调用，直接证实 FPU 初始化。"
     },
     {
       "question_id": "Q02_009",
       "confidence": 1.0,
-      "review": "题面要求三态判断 Trap 向量设置。答案为 implemented，证据展示了 trapinithart 中 w_stvec 操作，支撑了结论，符合契约。"
+      "review": "三态结论 implemented。Evidence 展示 trapinithart 写入 stvec 及 w_stvec 实现，直接证实向量表设置。"
     },
     {
       "question_id": "Q02_010",
-      "confidence": 1.0,
-      "review": "题面要求说明构建系统平台选择方式。答案描述了 Makefile 变量及条件编译，证据引用了 Makefile 和 main.c 配置，符合 short_answer 要求。"
+      "confidence": 0.9,
+      "review": "题面要求引用配置证据。Value 描述 Makefile 逻辑，但 Evidence 中 Makefile 摘录为总结性文本而非原始条件编译代码，支撑度略弱。"
     },
     {
       "question_id": "Q02_011",
-      "confidence": 1.0,
-      "review": "题面要求三态判断固件链。答案为 implemented，证据展示了 sbi.h 及 main.c 参数传递，支撑了 SBI 固件交接结论，符合 tri_state_impl 格式。"
+      "confidence": 0.95,
+      "review": "三态结论 implemented。Evidence 展示 sbi 二进制目录、源码及接口头文件，充分证实固件链存在。"
     },
     {
       "question_id": "Q02_012",
-      "confidence": 1.0,
-      "review": "题面要求三态判断 UART 地址切换。答案为 implemented，证据展示了 kvmmap 映射物理到虚拟地址的代码，支撑了结论，符合契约。"
+      "confidence": 0.95,
+      "review": "三态结论 implemented。Evidence 展示 kvmmap 映射 UART 及虚拟地址宏定义，证实地址切换逻辑。"
     },
     {
       "question_id": "Q02_013",
       "confidence": 1.0,
-      "review": "题面要求三态判断返回用户态路径。答案为 implemented，证据展示了 usertrapret 及 trampoline.S 中 sret 相关代码，支撑了结论，符合 tri_state_impl 格式。"
+      "review": "三态结论 implemented。Evidence 展示 usertrapret 设置 trampoline 及 userret 执行 sret，直接证实返回路径。"
     },
     {
       "question_id": "Q02_014",
       "confidence": 1.0,
-      "review": "题面要求说明多平台支持情况。答案明确了 QEMU/K210 支持及未发现其他平台，证据引用了条件编译及入口文件，符合 short_answer 要求。"
+      "review": "题面要求搜索特定关键词。Value 说明仅支持 K210/QEMU，Evidence 包含入口文件及搜索 0 命中结果，完全符合题面。"
     },
     {
       "question_id": "Q02_015",
       "confidence": 1.0,
-      "review": "题面要求指出 Trap 向量入口位置。答案指出了 kernelvec 和 uservec 标签，证据引用了设置 stvec 的代码及汇编标签，符合 short_answer 要求。"
+      "review": "题面要求向量入口位置。Evidence 摘录 kernelvec 和 uservec 标签及 stvec 设置，直接对应。"
     },
     {
       "question_id": "Q02_016",
       "confidence": 1.0,
-      "review": "题面为单选，答案选择了与选项 C 文本一致的描述。证据引用了 trap.h 注释及 trampoline.S 用法，支撑了结论，符合契约。"
+      "review": "单选结论为 C。Evidence 中 TRAPFRAME 宏、注释及 proc 结构体成员均指向用户页预留，支撑充分。"
     },
     {
       "question_id": "Q02_017",
-      "confidence": 1.0,
-      "review": "题面要求 TrapFrame 结构体定义及大小。答案给出了路径、寄存器数量及字节数，证据引用了结构体定义，符合 short_answer 要求。"
+      "confidence": 0.95,
+      "review": "题面要求结构体定义及大小。Evidence 展示 struct trapframe 及字段偏移注释，可推导字节数，支撑充分。"
     },
     {
       "question_id": "Q02_018",
       "confidence": 1.0,
-      "review": "题面要求三态判断系统调用分发表。答案为 implemented，证据展示了 syscalls 数组定义，支撑了结论，符合 tri_state_impl 格式。"
+      "review": "三态结论 implemented。Evidence 展示 syscalls 函数指针数组及调用逻辑，直接证实分发表。"
     },
     {
       "question_id": "Q02_019",
       "confidence": 1.0,
-      "review": "题面要求三态判断 syscall 号边界检查。答案为 implemented，证据展示了 syscall 函数中的数组越界检查逻辑，支撑了结论，符合契约。"
+      "review": "三态结论 implemented。Evidence 展示 syscall 函数中 num 边界检查及越界返回 -1，直接证实。"
     },
     {
       "question_id": "Q02_020",
-      "confidence": 1.0,
-      "review": "题面要求追踪具体 syscall 路径。答案列出了 sys_write 从 ecall 到实现的 6 个节点，证据引用了 trap.c、syscall.c 及 sysfile.c，符合 short_answer 要求。"
+      "confidence": 0.95,
+      "review": "题面要求 3-6 个节点。Value 列出 5 个节点，Evidence 覆盖 usertrap、syscall 分发及 sys_write 实现，支撑充分。"
     },
     {
       "question_id": "Q02_021",
-      "confidence": 1.0,
-      "review": "题面要求列出 5-10 个高价值 syscall 状态。答案列出了 10 个 syscall 及其实现状态，证据引用了对应实现文件，符合 short_answer 要求。"
+      "confidence": 0.8,
+      "review": "题面要求为每个列出的 syscall 给至少一条证据。Value 列出 10 个 syscall，但 Evidence 数组仅包含 4 条摘录，超过半数缺乏独立摘录支撑，不符合题面证据要求。"
     },
     {
       "question_id": "Q02_022",
       "confidence": 1.0,
-      "review": "题面要求三态判断用户指针安全检查。答案为 implemented，证据展示了 fetchaddr/copyin2 等检查函数，支撑了结论，符合 tri_state_impl 格式。"
+      "review": "三态结论 implemented。Evidence 展示 copyin2/copyout2 及 fetchaddr 调用，直接证实安全检查。"
     },
     {
       "question_id": "Q02_023",
       "confidence": 1.0,
-      "review": "题面要求三态判断时钟中断抢占。答案为 implemented，证据展示了 timer_tick 调用 yield 的逻辑，支撑了结论，符合契约。"
+      "review": "三态结论 implemented。Evidence 展示 timer_tick 及 yield 调用链，直接证实抢占调度。"
     },
     {
       "question_id": "Q02_024",
       "confidence": 1.0,
-      "review": "题面要求三态判断信号处理链路。答案为 implemented，证据展示了 sighandle 及 sigreturn 代码，支撑了结论，符合 tri_state_impl 格式。"
+      "review": "三态结论 implemented。Evidence 展示 sighandle 及 sigreturn 函数，直接证实信号处理链路。"
     },
     {
       "question_id": "Q02_025",
-      "confidence": 1.0,
-      "review": "题面要求说明缺页异常与内存特性联动。答案描述了 handle_page_fault 及 CoW 逻辑，证据引用了 trap.c 和 vm.c，符合 short_answer 要求。"
+      "confidence": 0.95,
+      "review": "题面要求缺页与 CoW 联动证据。Evidence 展示 handle_excp 调用 handle_page_fault 及 page_ref_table，支撑充分。"
     },
     {
       "question_id": "Q02_026",
-      "confidence": 1.0,
-      "review": "题面要求核对多核初始化一致性。答案描述了 hart0 与其他 hart 的初始化顺序，证据引用了 main.c 及 trap.c，符合 short_answer 要求。"
+      "confidence": 0.95,
+      "review": "题面要求多核一致性证据。Evidence 展示 main.c 中 hart 1 初始化流程，包含 trapinithart，支撑充分。"
     },
     {
       "question_id": "Q02_027",
-      "confidence": 1.0,
-      "review": "题面要求 fill_in 格式统计 Syscall 覆盖。答案按格式填写了分发表路径、实现数量及统计依据，证据支撑了统计数据，符合契约。"
+      "confidence": 0.95,
+      "review": "填空格式符合要求。Evidence 展示 syscalls 数组及 stub 函数示例，支撑统计结论。"
     },
     {
       "question_id": "Q02_028",
-      "confidence": 1.0,
-      "review": "题面要求对照 README 与代码。答案说明了 README 声称与代码实现的一致性，证据引用了 README 及 syscall.c，符合 short_answer 要求。"
+      "confidence": 0.95,
+      "review": "题面要求 README 与代码对照。Evidence 展示 README 内容片段及 syscalls 数组，支撑无冲突结论。"
     },
     {
       "question_id": "Q02_029",
       "confidence": 1.0,
-      "review": "题面要求搜索特定命名模式。答案给出了 0 命中的搜索结论，证据引用了搜索结果，符合 short_answer 要求。"
+      "review": "题面要求搜索结论。Evidence 展示搜索 0 命中结果，直接支撑未见该命名模式结论。"
     },
     {
       "question_id": "Q02_030",
       "confidence": 1.0,
-      "review": "题面要求三态判断外部中断分发。答案为 implemented，证据展示了 plic_claim/complete 及 handle_intr 逻辑，支撑了结论，符合 tri_state_impl 格式。"
+      "review": "三态结论 implemented。Evidence 展示 handle_intr 处理外部中断及 plic_claim，直接证实。"
     },
     {
       "question_id": "Q02_031",
       "confidence": 1.0,
-      "review": "题面要求三态判断 SIGSEGV 信号。答案为 not_found，证据展示了搜索 0 命中及 handle_excp 逻辑，支撑了结论，符合契约。"
+      "review": "三态结论 not_found。Evidence 展示搜索 0 命中及 trap.c 使用 SIGTERM，支撑充分。"
     },
     {
       "question_id": "Q02_032",
       "confidence": 1.0,
-      "review": "题面要求说明信号发送粒度。答案说明了仅支持进程级 sys_kill，证据引用了 syssignal.c 及搜索结果，符合 short_answer 要求。"
+      "review": "题面要求信号粒度证据。Evidence 展示 sys_kill 实现及 tkill/tgkill 搜索 0 命中，支撑充分。"
     },
     {
       "question_id": "Q02_033",
       "confidence": 1.0,
-      "review": "题面为单选，答案选择了与选项 A 文本一致的描述。证据展示了 scause 寄存器判断逻辑，支撑了结论，符合契约。"
+      "review": "单选结论为 A。Evidence 展示 r_scause 读取及中断标志宏定义，直接支撑硬件原因号区分机制。"
     },
     {
       "question_id": "Q02_034",
       "confidence": 1.0,
-      "review": "题面要求三态判断中断嵌套。答案为 not_found，证据展示了 kerneltrap 中断关闭断言及搜索结果，支撑了结论，符合 tri_state_impl 格式。"
+      "review": "三态结论 not_found。Evidence 展示 kernelvec 未重开中断及搜索 0 命中，支撑充分。"
     }
   ],
   "dimensions": {
-    "evidence_supports_answers": 1.0,
+    "evidence_supports_answers": 0.95,
     "question_answer_consistency": 1.0,
-    "requirements_fit": 1.0
+    "requirements_fit": 0.95
   },
-  "findings": [],
-  "summary_zh": "所有 34 道题目均已作答，答案内容紧扣题面要求（入口、寄存器、三态判断、路径追踪等）。JSON 契约符合，字段齐全，类型正确。每题的 evidence 摘录均能有效支撑其 value 结论，未发现题面与作答不符、证据缺失或矛盾的情况。全阶段置信度高。",
+  "findings": [
+    {
+      "severity": "warn",
+      "message": "Q02_021 题干明确要求为列出的每个 syscall 提供至少一条证据，但答案 JSON 的 evidence 数组仅包含 4 条摘录，无法支撑 Value 中列出的全部 10 个 syscall 状态，存在证据覆盖不足。"
+    }
+  ],
+  "summary_zh": "本报告整体质量较高，绝大多数题目（33/34）的 value 与 evidence 对齐良好，能够直接复核题面要求的关键事实（如入口、寄存器、向量表、系统调用分发等）。全阶段 confidence 按各题均值计算为 0.97。主要瑕疵在于 Q02_021，题干要求为列举的每个 syscall 提供证据，但实际 evidence 摘录仅覆盖了部分项（4/10），导致该项 confidence 降至 0.80 并触发 findings 警告。Q02_010 的 Makefile 证据为总结性文本而非原始代码，略影响证据强度。其余题目在题面相符、契约履行及证据支撑方面均表现优秀。",
+  "report_quality_score": 0.98,
   "_meta": {
+    "quality": {
+      "excerpt_coverage": 1.0,
+      "evidence_richness": 0.9706,
+      "total_evidence_items": 79,
+      "nonempty_excerpt_items": 79,
+      "mean_question_confidence": 0.9735,
+      "mean_dimensions": 0.9667,
+      "weights": {
+        "w_mean": 0.45,
+        "w_excerpt": 0.25,
+        "w_rich": 0.2,
+        "w_dim": 0.1
+      }
+    },
     "review_model": "qwen3.5-plus"
   }
 }

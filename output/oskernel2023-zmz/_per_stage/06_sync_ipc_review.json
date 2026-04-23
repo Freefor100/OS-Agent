@@ -2,117 +2,132 @@
   "schema_version": "describe_review_v1",
   "stage_id": "06_sync_ipc",
   "stage_title": "同步互斥与进程间通信",
-  "confidence": 1.0,
+  "confidence": 0.95,
   "question_reviews": [
     {
       "question_id": "Q06_001",
-      "confidence": 1.0,
-      "review": "题面要求列出同步原语及类型定义证据。回答涵盖 SpinLock/SleepLock/WaitQueue 并给出结构体 excerpt 证据，未实现项明确说明，符合题面约束。"
+      "confidence": 0.95,
+      "review": "题面要求列出同步原语及类型定义证据。答案 value 清晰列出 SpinLock/SleepLock/WaitQueue 并声明未发现其他。evidence 提供三个 struct 定义摘录，字段与 value 描述一致，证据充分支撑结论。"
     },
     {
       "question_id": "Q06_002",
-      "confidence": 1.0,
-      "review": "单选题，选择阻塞锁（Choice B）。证据展示 acquiresleep 中调用 sleep() 挂起，支撑结论，题答一致。"
+      "confidence": 0.95,
+      "review": "题面为单选。答案 value 选择阻塞锁。evidence 摘录 acquiresleep 函数，显示循环内调用 sleep，直接支撑阻塞行为结论，符合题面约束。"
     },
     {
       "question_id": "Q06_003",
-      "confidence": 1.0,
-      "review": "三态题，value 为 implemented。证据提供 wait_queue 结构体及 sleep/wakeup 函数实现，支撑充分。"
+      "confidence": 0.95,
+      "review": "题面要求三态判断。答案 value 为 implemented。evidence 提供 wait_queue 结构体及 sleep/wakeup 函数摘录，覆盖等待队列与睡眠唤醒机制，证据充分。"
     },
     {
       "question_id": "Q06_004",
-      "confidence": 1.0,
-      "review": "填空题，五项不变量分析均填写。证据对应 sleep/wakeup 代码逻辑及 pipe 调用场景，题答一致。"
+      "confidence": 0.95,
+      "review": "题面为填空分析。答案 value 详细填写了入口、锁、防丢机制等。evidence 摘录 sleep/wakeup 关键代码段，包含锁操作与调度调用，能对应 value 中的不变量分析。"
     },
     {
       "question_id": "Q06_005",
-      "confidence": 1.0,
-      "review": "三态题，value 为 implemented。证据提供 pipe 结构体、分配函数及 syscall 入口，支撑充分。"
+      "confidence": 0.95,
+      "review": "题面要求三态判断。答案 value 为 implemented。evidence 提供 pipealloc/piperead/sys_pipe 函数摘录，证明管道分配与读写实现，证据充分。"
     },
     {
       "question_id": "Q06_006",
-      "confidence": 1.0,
-      "review": "单选题，选择字节环形缓冲区（Choice A）。证据展示 PIPESIZE 宏及模运算索引，支撑结论。"
+      "confidence": 0.95,
+      "review": "题面为单选。答案 value 选择字节环形缓冲区。evidence 摘录 struct pipe 定义（含 data 数组）及 pipewrite 取模运算，直接支撑环形缓冲结论。"
     },
     {
       "question_id": "Q06_007",
-      "confidence": 1.0,
-      "review": "单选题，选择阻塞（Choice A）。证据展示 pipewritable/readable 中调用 sleep 挂起，支撑结论。"
+      "confidence": 0.95,
+      "review": "题面为单选。答案 value 选择阻塞。evidence 摘录 pipelock/pipewritable 中含 sleep 调用的代码，直接支撑阻塞语义结论。"
     },
     {
       "question_id": "Q06_008",
-      "confidence": 1.0,
-      "review": "三态题，value 为 not_found。证据展示 syscall 搜索无命中及目录扫描结果，支撑负面结论。"
+      "confidence": 0.95,
+      "review": "题面要求三态判断。答案 value 为 not_found。evidence 提供系统调用表及头文件搜索日志（0 命中），有效支撑未发现结论。"
     },
     {
       "question_id": "Q06_009",
-      "confidence": 1.0,
-      "review": "三态题，value 为 not_found。证据展示 futex 相关标识符搜索无命中，支撑负面结论。"
+      "confidence": 0.95,
+      "review": "题面要求三态判断。答案 value 为 not_found。evidence 提供全仓库及系统调用号搜索日志（0 命中），有效支撑未发现结论。"
     },
     {
       "question_id": "Q06_010",
-      "confidence": 1.0,
-      "review": "三态题，value 为 implemented。证据提供 sigaction 结构、处理函数及 trampoline 汇编，支撑充分。"
+      "confidence": 0.95,
+      "review": "题面要求三态判断。答案 value 为 implemented。evidence 提供 sigaction/kill/sigreturn/trampoline 相关函数及汇编标签摘录，覆盖信号机制关键组件，证据充分。"
     },
     {
       "question_id": "Q06_011",
-      "confidence": 1.0,
-      "review": "简答题，要求描述上下文构建与 sigreturn 恢复。回答分步描述流程并给出对应函数证据，符合题面。"
+      "confidence": 0.95,
+      "review": "题面要求简述上下文构建与恢复。答案 value 详细描述保存 trapframe 及 sigreturn 恢复过程。evidence 摘录 sighandle/sigreturn/trampoline 关键代码行，与 value 描述一致。"
     },
     {
       "question_id": "Q06_012",
-      "confidence": 1.0,
-      "review": "单选题，选择未发现/不支持（Choice C）。证据展示目录扫描及 grep 无命中，支撑结论。"
+      "confidence": 0.95,
+      "review": "题面为单选。答案 value 选择未发现。evidence 提供全仓库检索日志，说明仅用户态测试有引用，内核无实现，支撑结论。"
     },
     {
       "question_id": "Q06_013",
-      "confidence": 1.0,
-      "review": "单选题，选择自定义汇编（Choice B）。证据展示 GCC 原子内置函数生成 arch 指令，在 C 内核语境下符合选项定义。"
+      "confidence": 0.95,
+      "review": "题面为单选。答案 value 选择自定义汇编。evidence 摘录 spinlock.c 中原子操作函数及注释，说明底层映射到 RISC-V 原子指令，支撑非纯 Rust 标准库结论。"
     },
     {
       "question_id": "Q06_014",
-      "confidence": 1.0,
-      "review": "简答题，要求逐条分析 Coffman 四条件。回答覆盖四项并结合锁实现给出证据，符合题面。"
+      "confidence": 0.95,
+      "review": "题面要求逐条分析死锁条件。答案 value 逐条作答并结合实现。evidence 摘录 acquire/sleep/pipelock 代码，分别支撑互斥、持有并等待等条件的分析。"
     },
     {
       "question_id": "Q06_015",
-      "confidence": 1.0,
-      "review": "单选题，选择死锁预防（Choice A）。证据引用代码注释中的锁顺序意图，支撑预防策略结论。"
+      "confidence": 0.95,
+      "review": "题面为单选。答案 value 选择忽略策略。evidence 提供死锁检测/预防关键词搜索日志（0 命中），支撑无处理机制结论。"
     },
     {
       "question_id": "Q06_016",
-      "confidence": 1.0,
-      "review": "三态题，value 为 stub。证据展示仅有注释无代码规范，结论与证据一致（视为部分/存根状态）。"
+      "confidence": 0.95,
+      "review": "题面要求三态判断。答案 value 为 not_found。evidence 提供锁顺序关键词搜索及嵌套锁代码扫描，说明无规范注释，支撑结论。"
     },
     {
       "question_id": "Q06_017",
-      "confidence": 1.0,
-      "review": "三态题，value 为 not_found。证据展示 condvar/monitor 相关搜索无命中，支撑负面结论。"
+      "confidence": 0.95,
+      "review": "题面要求三态判断。答案 value 为 not_found。evidence 提供条件变量关键词搜索及 sync 模块扫描，说明无实现，支撑结论。"
     },
     {
       "question_id": "Q06_018",
-      "confidence": 1.0,
-      "review": "简答题，要求验证三个经典同步问题。回答逐项说明未找到或 Pipe 隐含实现，证据对应，符合题面。"
+      "confidence": 0.95,
+      "review": "题面要求验证经典同步问题。答案 value 区分机制与测试/示例。evidence 摘录 pipe 结构及用户态测试搜索，支撑无专门实现/测试的结论。"
     },
     {
       "question_id": "Q06_019",
-      "confidence": 1.0,
-      "review": "三态题，value 为 not_found。证据展示消息传递相关 syscall 及目录扫描无命中，支撑结论。"
+      "confidence": 0.95,
+      "review": "题面要求三态判断。答案 value 为 not_found。evidence 提供消息传递关键词及系统调用号搜索日志，支撑结论。"
     },
     {
       "question_id": "Q06_020",
-      "confidence": 1.0,
-      "review": "三态题，value 为 not_found。证据展示 barrier 相关搜索无命中，支撑负面结论。"
+      "confidence": 0.95,
+      "review": "题面要求三态判断。答案 value 为 not_found。evidence 提供 barrier 关键词搜索及头文件扫描，支撑结论。"
     }
   ],
   "dimensions": {
-    "evidence_supports_answers": 1.0,
-    "question_answer_consistency": 1.0,
-    "requirements_fit": 1.0
+    "evidence_supports_answers": 0.95,
+    "question_answer_consistency": 0.95,
+    "requirements_fit": 0.95
   },
   "findings": [],
-  "summary_zh": "所有 20 道题目均已完成作答。题面约束（如三态、单选、填空、简答）均被满足。各题 value 与提供的 evidence  excerpts 逻辑一致，无证据缺失或矛盾。JSON 契约字段齐全。未发现题答不符或格式违规。",
+  "summary_zh": "本报告题面落实度高，20 道题目均提供了非空证据摘录，且摘录内容能直接支撑 value 中的结论（如代码片段对应实现状态，搜索日志对应未发现状态）。JSON 契约符合度好，题型与 value 格式匹配。无显著证据缺失或逻辑矛盾。全阶段置信度按各题均值计算。",
+  "report_quality_score": 0.97,
   "_meta": {
+    "quality": {
+      "excerpt_coverage": 1.0,
+      "evidence_richness": 1.0,
+      "total_evidence_items": 45,
+      "nonempty_excerpt_items": 45,
+      "mean_question_confidence": 0.95,
+      "mean_dimensions": 0.95,
+      "weights": {
+        "w_mean": 0.45,
+        "w_excerpt": 0.25,
+        "w_rich": 0.2,
+        "w_dim": 0.1
+      }
+    },
     "review_model": "qwen3.5-plus"
   }
 }
