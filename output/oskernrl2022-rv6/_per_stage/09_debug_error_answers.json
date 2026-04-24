@@ -1,0 +1,192 @@
+{
+  "schema_version": "v1",
+  "stage_id": "09_debug_error",
+  "stage_title": "调试机制与错误处理",
+  "terminology_profile": "stallings_en_zh",
+  "answers": [
+    {
+      "question_id": "Q09_001",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在日志系统（log/printk/println 宏）与日志级别控制？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "src/printf.c",
+          "symbol_kind": "function",
+          "symbol_name": "__debug_info",
+          "excerpt": "__debug_info/__debug_warn/__debug_error 三个函数实现于 src/printf.c:163-344，通过#ifdef DEBUG/#ifdef WARNING/#ifdef ERROR 条件编译控制。__debug_info 输出普通调试信息，__debug_warn 前缀 [WARNING]，__debug_error 前缀 [ERROR] 并调用 backtrace() 后死循环。"
+        },
+        {
+          "path": "src/include/printf.h",
+          "symbol_kind": "declaration",
+          "symbol_name": "__debug_info",
+          "excerpt": "函数声明于 src/include/printf.h:24-26：void __debug_info(char *fmt, ...); void __debug_warn(char *fmt, ...); void __debug_error(char *fmt, ...);"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_002",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 panic/崩溃处理路径（panic_handler/oom/abort 等）？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "src/printf.c",
+          "symbol_kind": "function",
+          "symbol_name": "panic",
+          "excerpt": "panic() 实现于 src/printf.c:140-148：打印 panic 消息，调用 backtrace()，设置 panicked=1，然后进入 for(;;) 死循环停机。全局变量 panicked 定义于 src/printf.c:15。"
+        },
+        {
+          "path": "src/printf.c",
+          "symbol_kind": "function",
+          "symbol_name": "__debug_error",
+          "excerpt": "__debug_error 实现于 src/printf.c:303-344：打印 [ERROR] 前缀，输出错误信息，调用 backtrace()，设置 panicked=1，进入死循环。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_003",
+      "question_type": "short_answer",
+      "stem": "panic 路径会输出哪些诊断？（寄存器 dump/栈回溯/停机；必须引用实现证据）",
+      "value": "panic 路径输出：(1) panic 消息字符串 (src/printf.c:141-143)；(2) 栈回溯 (backtrace) 打印返回地址序列 (src/printf.c:145)；(3) 停机 (for(;;) 死循环，src/printf.c:147-148)。trap 路径中 usertrap/kerneltrap 还会打印 scause/sepc/stval 及 trapframe 寄存器 dump (src/trap.c:115-117, 190-195)，调用 trapframedump() 输出 a0-a7/t0-t6/s0-s11/sp/gp/tp/epc/ra 等寄存器 (src/trap.c:250-277)。",
+      "evidence": [
+        {
+          "path": "src/printf.c",
+          "symbol_kind": "function",
+          "symbol_name": "panic",
+          "excerpt": "panic(): printf(\"panic: \"); printf(s); printf(\"\\n\"); backtrace(); panicked = 1; for(;;) ;"
+        },
+        {
+          "path": "src/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "trapframedump",
+          "excerpt": "trapframedump() 实现于 src/trap.c:250-277，打印 trapframe 中所有通用寄存器 (a0-a7, t0-t6, s0-s11, sp, gp, tp, epc, ra)。"
+        },
+        {
+          "path": "src/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "usertrap",
+          "excerpt": "usertrap 中意外异常处理：printf(\"\\nusertrap(): unexpected scause %p pid=%d %s\\n\", r_scause(), p->pid, p->name); printf(\"sepc=%p stval=%p\\n\", r_sepc(), r_stval()); trapframedump(p->trapframe); (src/trap.c:115-117)"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_004",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现栈回溯 (backtrace/unwind/stack_trace)？（必须三态；仅打印 ra 不算）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "src/printf.c",
+          "symbol_kind": "function",
+          "symbol_name": "backtrace",
+          "excerpt": "backtrace() 实现于 src/printf.c:151-161：基于帧指针 (frame pointer) 的回溯算法。读取 r_fp() 获取当前帧指针，遍历栈帧，打印每个帧的返回地址 (ra-4)。使用 PGROUNDUP 确定栈底边界。"
+        },
+        {
+          "path": "src/printf.c",
+          "symbol_kind": "function",
+          "symbol_name": "backtrace",
+          "excerpt": "backtrace() 代码：uint64 *fp = (uint64 *)r_fp(); uint64 *bottom = (uint64 *)PGROUNDUP((uint64)fp); printf(\"backtrace:\\n\"); while (fp < bottom) { uint64 ra = *(fp - 1); printf(\"%p\\n\", ra - 4); fp = (uint64 *)*(fp - 2); }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_005",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 **内核驻留的交互式监视器（kernel monitor）**？（对齐 Stallings《操作系统：精髓与设计原理》语境：**在内核态上下文**接受命令、用于探查/操控系统的监视器；**不包括**仅在用户态运行的常规 shell，如 `xv6-user/sh.c`、`user/` 下用户程序等——除非题面另有定义。必须三态；若 `implemented`：须给出 3–10 个 **用户可键入的 monitor 命令名** 及对应 **内核内** 解析/分发入口的 `路径:行号` 证据；仅以用户态 shell 充当内核 monitor 视为 **未切题** 应判 `stub` 或 `not_found` 并说明理由。）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "src/",
+          "symbol_kind": "search",
+          "symbol_name": "grep_monitor_command_scan",
+          "excerpt": "在 src/ 目录搜索 'monitor|command|cmd_' 关键字，68 个命中均为 SD 卡命令 (SD_CMD_*) 或 SPI 驱动相关，未发现内核交互式监视器命令解析逻辑。grep 结果中无内核 monitor 命令分发入口。"
+        },
+        {
+          "path": "src/include/debug.h",
+          "symbol_kind": "declaration",
+          "symbol_name": "debugaddr",
+          "excerpt": "src/include/debug.h:9 声明 int debugaddr(struct proc* p); 但未在 .c 文件中找到实现 (grep debugaddr 仅 1 个命中为声明)。无 monitor 命令处理入口证据。"
+        },
+        {
+          "path": "src/trap.c",
+          "symbol_kind": "scan",
+          "symbol_name": "trap_handler_scan",
+          "excerpt": "检查 trap.c 中 usertrap/kerneltrap 处理逻辑，仅处理系统调用、设备中断、ebreak 异常，无 monitor 命令解析循环。ebreak 处理仅打印 trapframe 并继续执行 (src/trap.c:109-112)。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_006",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 GDB stub（需数据包解析循环，如 handle_gdb_packet）？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "src/",
+          "symbol_kind": "search",
+          "symbol_name": "grep_gdbstub_scan",
+          "excerpt": "在全部 111 个文件中搜索 'gdbstub|handle_gdb_packet|gdb_packet'，0 命中。未发现 GDB 数据包解析循环或 GDB stub 实现。"
+        },
+        {
+          "path": "Makefile",
+          "symbol_kind": "scan",
+          "symbol_name": "makefile_gdb_check",
+          "excerpt": "Makefile 中仅定义 GDBPORT 变量用于 QEMU -gdb 参数 (Makefile:143-147)，但这是 QEMU 内置 GDB stub，非内核实现的 GDB stub。内核源码中无 handle_gdb_packet 或类似数据包解析函数。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_007",
+      "question_type": "short_answer",
+      "stem": "错误码/错误类型体系是什么？（errno/Result/Error enum；给类型定义与传播点证据）",
+      "value": "C 语言 errno 宏定义体系。定义于 src/include/errno.h:1-107，包含 98+ 个错误码宏 (EPERM/ENOENT/ESRCH/EINTR/EIO/ENOMEM/EACCES/EFAULT/EINVAL/ENOSYS 等)。系统调用通过 return -1 或 return -ERRNO 传播错误，如 sysproc.c 中多个 syscall 返回 -1 表示失败 (src/sysproc.c:17,21,78,90)。文件操作返回 -1 表示错误 (src/file.c:218,221,246 等)。无 Rust 风格 Result/Error enum。",
+      "evidence": [
+        {
+          "path": "src/include/errno.h",
+          "symbol_kind": "header",
+          "symbol_name": "errno_definitions",
+          "excerpt": "src/include/errno.h 定义标准 errno 宏：#define EPERM 1, #define ENOENT 2, #define ENOSYS 38, #define EINVAL 22, #define EFAULT 14 等共 98+ 个错误码。"
+        },
+        {
+          "path": "src/sysproc.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_exit",
+          "excerpt": "系统调用通过 return -1 传播错误，如 src/sysproc.c:17: if(copyin(...) != 0) return -1; 多个 syscall 使用此模式。"
+        },
+        {
+          "path": "src/file.c",
+          "symbol_kind": "function",
+          "symbol_name": "filealloc",
+          "excerpt": "文件操作返回 -1 表示错误：src/file.c:218-221: if(...) return -1; 无统一 errno 设置机制，调用者需自行判断错误类型。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_008",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 trace/perf/ftrace 等跟踪机制或 tracepoints？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "src/",
+          "symbol_kind": "search",
+          "symbol_name": "grep_trace_perf_scan",
+          "excerpt": "搜索 'trace|perf|ftrace|tracepoint'，13 个命中均为无关内容：src/printf.c 的 backtrace 调用 (4 次)，src/include/proc.h 的 CLONE_PTRACE 标志 (3 次，仅定义未实现 ptrace)，src/sifive/encoding.h 的 MCONTROL_ACTION_TRACE_* (3 次，RISC-V 调试寄存器定义)，syscall/syscall.c:11 的注释 '// trace'。未发现 tracepoints 插入或 perf/ftrace 实现。"
+        },
+        {
+          "path": "src/include/proc.h",
+          "symbol_kind": "definition",
+          "symbol_name": "CLONE_PTRACE",
+          "excerpt": "src/include/proc.h:68,78 定义 CLONE_PTRACE/CLONE_UNTRACED 标志，但 grep 未发现 ptrace 系统调用实现，仅为预留标志位。"
+        },
+        {
+          "path": "syscall/syscall.c",
+          "symbol_kind": "comment",
+          "symbol_name": "trace_comment",
+          "excerpt": "syscall/syscall.c:11 仅有注释 '// trace'，无实际 trace 逻辑。未发现 tracepoints 插入到关键路径 (如 syscall/trap/sched)。"
+        }
+      ]
+    }
+  ]
+}

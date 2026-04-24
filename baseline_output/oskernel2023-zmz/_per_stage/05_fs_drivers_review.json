@@ -6,241 +6,227 @@
   "question_reviews": [
     {
       "question_id": "Q05_001",
-      "score_evidence": 1.0,
+      "score_evidence": 0.95,
       "score_consistency": 1.0,
-      "review": "证据直接给出 C 结构体定义及函数指针，完全支撑 VFS 接口形态结论，题面相符。"
+      "review": "题面要求给出接口定义证据。Value 正确指出 C 操作表形态。Evidence 提供了 struct 定义摘录，但摘录中包含省略号且似为摘要而非完整源码，略微影响证据直接性，故证据分微扣。"
     },
     {
       "question_id": "Q05_002",
       "score_evidence": 0.9,
       "score_consistency": 1.0,
-      "review": "证据摘录含描述性文本而非纯代码，但能支撑磁盘文件系统结论，选项符合题面。"
+      "review": "题面为单选，Value 选择 A 符合。Evidence 中第一条摘录似为代码注释或模型生成的描述性文本（'FAT32 filesystem implementation that...'），而非直接展示磁盘读写逻辑的源码片段，证据力度稍弱。"
     },
     {
       "question_id": "Q05_003",
       "score_evidence": 1.0,
       "score_consistency": 1.0,
-      "review": "证据引用 Makefile 源文件列表及 Cargo.toml 工作区，有效支撑自研结论。"
+      "review": "题面要求引用 Cargo.toml/Makefile。Value 结论清晰。Evidence 直接引用 Makefile 源文件列表及 Cargo.toml 工作区配置，有力支撑自研结论。"
     },
     {
       "question_id": "Q05_004",
       "score_evidence": 1.0,
       "score_consistency": 1.0,
-      "review": "证据覆盖 sys_openat 到具体 FS 查找的关键函数，支撑调用路径描述。"
+      "review": "题面要求 3-6 个节点。Value 列出 6 个。Evidence 对应提供了 sys_openat, lookup_path, fat_lookup_dir 等关键函数代码，路径清晰，证据充分。"
     },
     {
       "question_id": "Q05_005",
       "score_evidence": 1.0,
       "score_consistency": 1.0,
-      "review": "证据给出 fdtable 结构体定义及 NOFILE 宏，直接支撑固定数组结论。"
+      "review": "题面要求结构体定义证据。Value 指出固定数组。Evidence 展示了 fdtable 结构体及 NOFILE 宏定义，完全吻合。"
     },
     {
       "question_id": "Q05_006",
       "score_evidence": 1.0,
       "score_consistency": 1.0,
-      "review": "证据展示 bio.c 中 buf 结构及缓存数组，支撑块缓存实现结论。"
+      "review": "题面为三态。Value 选 implemented。Evidence 展示 bio.c 中 buf 结构体及缓存数组定义，证据确凿。"
     },
     {
       "question_id": "Q05_007",
-      "score_evidence": 1.0,
+      "score_evidence": 0.95,
       "score_consistency": 1.0,
-      "review": "证据展示链表操作代码及 LRU 移动逻辑，直接支撑驱逐策略结论。"
+      "review": "题面要求指出驱逐策略依据。Value 指出 LRU。Evidence 展示了链表操作代码，但摘录较密集，需结合上下文理解 bput 中的链表移动逻辑，证据分微扣。"
     },
     {
       "question_id": "Q05_008",
-      "score_evidence": 0.95,
+      "score_evidence": 1.0,
       "score_consistency": 1.0,
-      "review": "证据展示 mmap_page 结构及 inode 映射，支撑页缓存结论，略缺具体缓存管理代码。"
+      "review": "题面为三态。Value 选 implemented。Evidence 展示 mmap_page 结构体及 inode 中的 mapping 字段，支撑页缓存实现。"
     },
     {
       "question_id": "Q05_009",
       "score_evidence": 1.0,
       "score_consistency": 1.0,
-      "review": "证据展示 sys_mmap 及匿名/文件映射分支，支撑 mmap 实现结论。"
+      "review": "题面为三态。Value 选 implemented。Evidence 展示 sys_mmap 及 do_mmap 中对匿名/文件映射的分发逻辑，证据充分。"
     },
     {
       "question_id": "Q05_010",
       "score_evidence": 1.0,
       "score_consistency": 1.0,
-      "review": "证据展示 poll/select 函数实现及系统调用封装，支撑结论。"
+      "review": "题面为三态。Value 选 implemented。Evidence 展示 poll.c 中 ppoll/pselect 实现及系统调用封装，证据充分。"
     },
     {
       "question_id": "Q05_011",
       "score_evidence": 1.0,
       "score_consistency": 1.0,
-      "review": "证据展示 namei 及路径解析代码，包含绝对/相对及特殊目录处理，支撑结论。"
+      "review": "题面为三态。Value 选 implemented。Evidence 展示 namei 中对绝对/相对路径及 . .. 的处理逻辑，覆盖题面所有核对点。"
     },
     {
       "question_id": "Q05_012",
-      "score_evidence": 0.9,
+      "score_evidence": 1.0,
       "score_consistency": 1.0,
-      "review": "负向结论，证据为检索说明及宏定义，支撑未发现实现结论，非代码直引。"
+      "review": "题面为三态。Value 选 not_found。Evidence 指出仅定义宏而无实现代码，负向证据合理。"
     },
     {
       "question_id": "Q05_013",
       "score_evidence": 1.0,
       "score_consistency": 1.0,
-      "review": "证据展示 pipe 分配及 VFS 文件类型集成，支撑管道实现结论。"
+      "review": "题面为三态。Value 选 implemented。Evidence 展示 pipealloc 及 sys_pipe 实现，证据充分。"
     },
     {
       "question_id": "Q05_014",
-      "score_evidence": 0.9,
+      "score_evidence": 1.0,
       "score_consistency": 1.0,
-      "review": "负向结论，证据为检索说明及文件类型枚举，支撑未发现 socket 结论。"
+      "review": "题面为三态。Value 选 not_found。Evidence 指出 file_type_e 无 FD_SOCKET 且无相关系统调用，负向证据合理。"
     },
     {
       "question_id": "Q05_015",
       "score_evidence": 1.0,
       "score_consistency": 1.0,
-      "review": "证据展示 rootfs 初始化及伪文件系统挂载，支撑结论。"
+      "review": "题面为三态。Value 选 implemented。Evidence 展示 rootfs_init 中 devfs/procfs 的挂载逻辑，证据充分。"
     },
     {
       "question_id": "Q05_016",
       "score_evidence": 1.0,
       "score_consistency": 1.0,
-      "review": "证据展示 proc 结构含 fds 字段及复制逻辑，支撑 Per-Process 结论。"
+      "review": "题面为单选。Value 选 A。Evidence 展示 proc 结构体中包含 fds 字段及 copyfdtable 函数，支撑 Per-Process 结论。"
     },
     {
       "question_id": "Q05_017",
       "score_evidence": 0.95,
       "score_consistency": 1.0,
-      "review": "证据展示 FAT 链遍历逻辑，支撑链式分配结论，FAT 分类略有歧义但证据充分。"
+      "review": "题面为单选。Value 选 B。Evidence 中第一条摘录包含描述性文本，第二条展示簇表遍历，整体支撑链式分配，但部分证据非纯源码，微扣。"
     },
     {
       "question_id": "Q05_018",
       "score_evidence": 1.0,
       "score_consistency": 1.0,
-      "review": "证据展示 FAT 空闲簇管理字段及更新逻辑，支撑结论。"
+      "review": "题面为单选。Value 选 E。Evidence 展示 FAT 表中 next_free 字段及更新逻辑，符合 FAT32 特性。"
     },
     {
       "question_id": "Q05_019",
       "score_evidence": 1.0,
       "score_consistency": 1.0,
-      "review": "证据展示 dentry 父子指针及路径遍历，支撑树形目录结论。"
+      "review": "题面为单选。Value 选 C。Evidence 展示 dentry 结构体中 parent/child 指针及 lookup_path 遍历逻辑，支撑树形结构。"
     },
     {
       "question_id": "Q05_020",
       "score_evidence": 1.0,
       "score_consistency": 1.0,
-      "review": "证据展示字节 oriented 读写接口，支撑字节流结论。"
+      "review": "题面为单选。Value 选 A。Evidence 展示 fileread/filewrite 按字节读写，支撑字节流模型。"
     },
     {
       "question_id": "Q05_021",
       "score_evidence": 1.0,
       "score_consistency": 1.0,
-      "review": "证据展示内存布局宏及直接初始化，支撑硬编码结论。"
+      "review": "题面为单选。Value 选 C。Evidence 展示 memlayout.h 中固定地址宏及 main.c 直接初始化，支撑硬编码结论。"
     },
     {
       "question_id": "Q05_022",
-      "score_evidence": 0.9,
+      "score_evidence": 1.0,
       "score_consistency": 1.0,
-      "review": "负向结论，证据指出 dtb 参数未使用及检索结果，支撑未发现解析结论。"
+      "review": "题面为三态。Value 选 not_found。Evidence 指出 dtb_pa 参数未使用且无解析代码，负向证据合理。"
     },
     {
       "question_id": "Q05_023",
       "score_evidence": 1.0,
       "score_consistency": 1.0,
-      "review": "证据展示直接函数调用及头文件声明，支撑无统一接口结论。"
+      "review": "题面要求接口定义证据。Value 指出 C 函数接口无统一 ops 表。Evidence 展示直接函数调用及头文件声明，支撑结论。"
     },
     {
       "question_id": "Q05_024",
       "score_evidence": 1.0,
-      "score_consistency": 0.9,
-      "review": "证据支撑初始化顺序，但题面要求 3-6 个节点，回答列出 8 个，轻微超出约束。"
+      "score_consistency": 0.85,
+      "review": "题面要求列出 3-6 个关键节点。Value 列出了 8 个节点，超出题面数量约束。Evidence 充分展示了 main.c 中的初始化序列，但一致性因数量超标扣分。"
     },
     {
       "question_id": "Q05_025",
       "score_evidence": 1.0,
       "score_consistency": 1.0,
-      "review": "证据展示 console 初始化及 SBI UART 驱动，支撑早期输出结论。"
+      "review": "题面为三态。Value 选 implemented。Evidence 展示 consoleinit 及 SBI 层 UART 驱动，证据充分。"
     },
     {
       "question_id": "Q05_026",
       "score_evidence": 1.0,
       "score_consistency": 1.0,
-      "review": "证据展示 virtio 及 sdcard 驱动实现，支撑块设备结论。"
+      "review": "题面为三态。Value 选 implemented。Evidence 展示 virtio_disk 及 sdcard 驱动实现，证据充分。"
     },
     {
       "question_id": "Q05_027",
-      "score_evidence": 0.9,
+      "score_evidence": 1.0,
       "score_consistency": 1.0,
-      "review": "负向结论，证据为目录及 Makefile 检索说明，支撑未发现网络驱动结论。"
+      "review": "题面为三态。Value 选 not_found。Evidence 展示目录检索及 Makefile 确认无网络驱动，负向证据合理。"
     },
     {
       "question_id": "Q05_028",
       "score_evidence": 1.0,
       "score_consistency": 1.0,
-      "review": "证据展示 PLIC 初始化及中断分发处理，支撑中断控制器结论。"
+      "review": "题面为三态。Value 选 implemented。Evidence 展示 plic 驱动及 trap.c 中中断分发逻辑，支撑中断控制器实现。"
     },
     {
       "question_id": "Q05_029",
       "score_evidence": 1.0,
       "score_consistency": 1.0,
-      "review": "证据展示 memlayout.h 地址宏定义，支撑硬编码结论。"
+      "review": "题面要求 MMIO 地址来源证据。Value 指出常量硬编码。Evidence 展示 memlayout.h 中宏定义，证据直接。"
     },
     {
       "question_id": "Q05_030",
       "score_evidence": 1.0,
       "score_consistency": 1.0,
-      "review": "证据展示 Makefile 平台变量及代码条件编译，支撑多平台适配结论。"
+      "review": "题面要求构建/条件编译证据。Value 指出 Makefile 条件编译。Evidence 展示 Makefile 平台变量及源码中 #ifdef，证据充分。"
     },
     {
       "question_id": "Q05_031",
-      "score_evidence": 0.9,
+      "score_evidence": 1.0,
       "score_consistency": 1.0,
-      "review": "负向结论，证据说明使用 SBI 抽象及未发现切换逻辑，支撑结论。"
+      "review": "题面为三态。Value 选 not_found。Evidence 指出使用 SBI 调用抽象且无切换逻辑，负向证据合理。"
     },
     {
       "question_id": "Q05_032",
       "score_evidence": 1.0,
       "score_consistency": 1.0,
-      "review": "证据展示 buf 数组及 LRU 管理，支撑缓冲池结论。"
+      "review": "题面为单选。Value 选 D。Evidence 展示 bufs 数组及 LRU 管理逻辑，符合缓冲池特征。"
     },
     {
       "question_id": "Q05_033",
-      "score_evidence": 0.9,
+      "score_evidence": 1.0,
       "score_consistency": 1.0,
-      "review": "证据含描述性文本而非纯代码，但能支撑 FCFS 调度结论。"
+      "review": "题面为单选。Value 选 A。Evidence 指出请求按顺序处理无重排序，支撑 FCFS。"
     },
     {
       "question_id": "Q05_034",
-      "score_evidence": 1.0,
+      "score_evidence": 0.9,
       "score_consistency": 1.0,
-      "review": "证据展示中断处理及 DMA 控制器配置，支撑混合控制结论。"
+      "review": "题面为单选。Value 选 D（混合）。Evidence 展示了中断和 DMA 的存在，但摘录未明确展示'小传输用中断，大传输用 DMA'的具体分支逻辑，仅证明两者皆有，证据支撑度微扣。"
     },
     {
       "question_id": "Q05_035",
       "score_evidence": 1.0,
       "score_consistency": 1.0,
-      "review": "证据展示 DMA 控制器及 Virtio 描述符环，支撑 DMA 传输结论。"
+      "review": "题面为三态。Value 选 implemented。Evidence 展示 dmac 控制器及 virtio 描述符环，支撑 DMA 实现。"
     }
   ],
-  "findings": [
-    {
-      "severity": "info",
-      "message": "Q05_024 题面要求列出 3-6 个关键节点，回答列出 8 个，轻微超出数量约束。"
-    },
-    {
-      "severity": "info",
-      "message": "部分证据摘录为自然语言描述而非原始代码（Q05_002, Q05_033），支撑度略低于代码直引。"
-    },
-    {
-      "severity": "info",
-      "message": "负向结论题目（Q05_012/014/022/027/031）证据为检索报告描述，符合逻辑但非代码片段。"
-    }
-  ],
-  "summary_zh": "报告整体质量高，题面相符度好，绝大多数题目证据为直接代码定义或调用链。负向结论题目有检索说明支撑，逻辑自洽。存在少量节点数量超出要求及描述性证据替代代码摘录的情况，不影响整体结论可信度。全阶段分按各题均值方案 A 汇总。",
-  "report_quality_score": 0.79,
+  "findings": [],
+  "summary_zh": "本报告整体质量较高，题面相符度好，绝大多数题目证据摘录能直接支撑结论。主要扣分点在于个别题目证据摘录包含描述性文本而非纯源码（如 Q05_002、Q05_017），以及 Q05_024 列举节点数量超出题面约束（3-6 个 vs 8 个）。Q05_034 证据未完全展示混合策略的具体条件分支。全阶段置信度按各题均分计算，无严重失配项。",
+  "report_quality_score": 0.99,
   "_meta": {
     "quality": {
-      "mean_question_confidence": 0.9871,
-      "mean_dimensions": 0.0
+      "mean_question_confidence": 0.9929
     },
     "review_model": "qwen3.5-plus",
     "baseline": true,
-    "run_at": "2026-04-23T22:19:17",
-    "baseline_execute_tokens": 591309,
-    "baseline_review_tokens": 24863,
-    "baseline_stage_total_tokens": 616172
+    "run_at": "2026-04-24T08:11:09",
+    "baseline_execute_tokens": 0,
+    "baseline_review_tokens": 24615,
+    "baseline_stage_total_tokens": 24615
   }
 }

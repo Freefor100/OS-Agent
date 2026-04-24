@@ -11,6 +11,7 @@
 #
 # 续跑：JSON-QA 阶段若 `_per_stage/<stage_id>_answers.json` 已存在且仍能通过题库校验，
 #      则跳过 LLM，仅用 `render_answers_to_markdown` 重写 `sections/` 下本章 md，文末照常拼接总报告。
+#      若开启 DESCRIBE_STAGE_REVIEW 且 `_per_stage/<stage_id>_review.json` 缺失/无效，则仅补跑 ③ Review，不重跑 Plan/Execute。
 #      无题库阶段（如 01/10 内联 prompt）仍按「sections 下 md >200 字节则跳过」。
 #
 # API Key / MODEL_NAME 等仍从仓库根目录 .env 读取（load_dotenv）。
@@ -773,6 +774,65 @@ def _invoke_describe_stage_review(
         print("   " + "─" * 66 + "\n")
 
 
+def _load_validated_answers_payload_from_disk(
+    repo_output_dir: str,
+    stage_id: str,
+    title: str,
+    expected_question_ids: list[str],
+) -> dict | None:
+    """读取并校验 `_per_stage/<stage_id>_answers.json`；失败返回 None（与续跑 md 渲染共用同一套校验）。"""
+    if not expected_question_ids:
+        return None
+    json_path = os.path.join(repo_output_dir, "_per_stage", f"{stage_id}_answers.json")
+    if not os.path.isfile(json_path) or os.path.getsize(json_path) < 16:
+        return None
+    try:
+        with open(json_path, "r", encoding="utf-8") as f:
+            payload = json.load(f)
+        if not isinstance(payload, dict):
+            return None
+        stage_qa = load_stage_qa(stage_id)
+        payload = coerce_answers_payload_defaults(payload)
+        payload = coerce_answers_payload_by_stage_qa(payload, stage_qa=stage_qa)
+        issues = validate_answers_payload(
+            payload,
+            stage_id=stage_id,
+            stage_title=title,
+            expected_question_ids=expected_question_ids,
+        )
+        if issues:
+            return None
+        return payload
+    except Exception:
+        return None
+
+
+def _describe_review_sidecar_incomplete(
+    repo_output_dir: str,
+    stage_id: str,
+    expected_question_ids: list[str],
+    skip_in_report: bool,
+) -> bool:
+    """在应产出 Review 侧车的情况下，若 review.json 缺失或明显无效则返回 True（需补跑 Review）。"""
+    if skip_in_report or not expected_question_ids:
+        return False
+    if not describe_stage_review_enabled():
+        return False
+    if not describe_stage_review_applies(stage_id, expected_question_ids=expected_question_ids):
+        return False
+    review_out = os.path.join(repo_output_dir, "_per_stage", f"{stage_id}_review.json")
+    if not os.path.isfile(review_out) or os.path.getsize(review_out) < 16:
+        return True
+    try:
+        with open(review_out, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if not isinstance(data, dict):
+            return True
+    except Exception:
+        return True
+    return False
+
+
 def _resume_stage_from_answers_json(
     *,
     repo_output_dir: str,
@@ -793,31 +853,14 @@ def _resume_stage_from_answers_json(
     if skip_in_report or not expected_question_ids:
         return False
     json_path = os.path.join(repo_output_dir, "_per_stage", f"{stage_id}_answers.json")
-    if not os.path.isfile(json_path):
-        return False
-    if os.path.getsize(json_path) < 16:
-        return False
-    try:
-        with open(json_path, "r", encoding="utf-8") as f:
-            payload = json.load(f)
-        if not isinstance(payload, dict):
-            return False
-        stage_qa = load_stage_qa(stage_id)
-        payload = coerce_answers_payload_defaults(payload)
-        payload = coerce_answers_payload_by_stage_qa(payload, stage_qa=stage_qa)
-        issues = validate_answers_payload(
-            payload,
-            stage_id=stage_id,
-            stage_title=title,
-            expected_question_ids=expected_question_ids,
-        )
-        if issues:
+    payload = _load_validated_answers_payload_from_disk(
+        repo_output_dir, stage_id, title, expected_question_ids
+    )
+    if payload is None:
+        if os.path.isfile(json_path) and os.path.getsize(json_path) >= 16:
             print(
-                f"   ⚠️  发现 {json_path} 但校验未通过（{len(issues)} 条），本阶段将重新跑 LLM"
+                f"   ⚠️  发现 {json_path} 但校验未通过或无法解析，本阶段将重新跑 LLM"
             )
-            return False
-    except Exception as e:
-        print(f"   ⚠️  读取/校验 answers.json 失败 ({type(e).__name__}: {e})，本阶段将重新跑 LLM")
         return False
 
     clean_text = _strip_llm_preamble(render_answers_to_markdown(payload).strip())
@@ -843,6 +886,19 @@ def _resume_stage_from_answers_json(
             global_memory["mentioned_paths"] = list(dict.fromkeys(global_memory["mentioned_paths"]))[-100:]
         except Exception:
             pass
+
+    # 续跑：answers + md 已就绪但 Review 侧车缺失时，仅补跑 ③ Review
+    if _describe_review_sidecar_incomplete(
+        repo_output_dir, stage_id, expected_question_ids, skip_in_report
+    ):
+        _invoke_describe_stage_review(
+            repo_output_dir,
+            stage_id,
+            title,
+            expected_question_ids,
+            copy.deepcopy(payload),
+            skip_in_report,
+        )
     return True
 
 
@@ -1033,6 +1089,26 @@ def main():
                         global_memory["mentioned_paths"] = list(dict.fromkeys(global_memory["mentioned_paths"]))[-100:]
                     except Exception:
                         pass
+                # 断点续传：md 已在，但 Review 侧车缺失时仅补跑 ③ Review（依赖同阶段已校验的 answers.json）
+                if _describe_review_sidecar_incomplete(
+                    repo_output_dir, stage_id, expected_question_ids, skip_in_report
+                ):
+                    disk_payload = _load_validated_answers_payload_from_disk(
+                        repo_output_dir, stage_id, title, expected_question_ids
+                    )
+                    if disk_payload is not None:
+                        _invoke_describe_stage_review(
+                            repo_output_dir,
+                            stage_id,
+                            title,
+                            expected_question_ids,
+                            copy.deepcopy(disk_payload),
+                            skip_in_report,
+                        )
+                    else:
+                        print(
+                            f"   ⚠️  需补跑 Review 但无法加载/校验 `_per_stage/{stage_id}_answers.json`，跳过 Review 补跑"
+                        )
                 continue
             else:
                 print(f"♻️  检测到残留的失败文件 (Size: {os.path.getsize(section_path)} bytes)，将删除并重试: {section_name}")

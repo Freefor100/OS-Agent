@@ -1,0 +1,111 @@
+{
+  "stage_id": "10_history",
+  "evidence_targets": [
+    "作者贡献分布（Cty主导核心开发，sukuna负责文档）",
+    "项目生命周期（2022-08-01至2022-08-21，共25次提交）",
+    "重大里程碑提交（master初始化、devinit设备子系统、clone进程复制、lmbench性能测试）",
+    "模块演进轨迹（proc.c从301行扩展至793行，fat32.c成为最大模块）",
+    "文档建设（doc/目录下19个技术文档，覆盖系统调用/内存管理/文件系统等）",
+    "测试基础设施（sd/目录包含busybox/lmbench/lua测试套件）",
+    "作者贡献",
+    "重大提交",
+    "模块演进",
+    "当前缺口",
+    "CI/产物名/自测相关演进(有工具证据时)"
+  ],
+  "seed_paths": [
+    "README.md",
+    "Makefile",
+    "doc/",
+    "sd/lmbench_testcode.sh",
+    "sd/busybox_cmd.txt",
+    "src/main.c",
+    "src/proc.c",
+    "src/fat32.c",
+    "src/dev.c",
+    "src/exec.c",
+    "linker/kernel.ld",
+    ".gdbinit.tmpl-riscv",
+    "git",
+    "history"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "main",
+    "userinit",
+    "devinit",
+    "fs_init",
+    "proc_pagetable",
+    "sys_openat",
+    "exec",
+    "forkret",
+    "git"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "src",
+    "src/include",
+    "src/sifive",
+    "linker",
+    "syscall",
+    "bin",
+    "doc",
+    "usrinit",
+    "sd"
+  ],
+  "preferred_tools": [
+    "get_git_history_summary",
+    "analyze_authors_contribution",
+    "trace_file_evolution",
+    "get_commit_diff_summary",
+    "read_code_segment",
+    "list_repo_structure"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 4000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "读取README.md了解项目背景与构建说明",
+    "分析Makefile确认编译目标与QEMU启动参数",
+    "追踪src/main.c的7次变更，梳理内核初始化流程演进",
+    "追踪src/proc.c的10次变更，分析进程管理模块扩展（fork/exec/wait/clone）",
+    "读取commit c86178c9（master）的diff，确认初始代码规模与模块划分",
+    "读取commit 70596292（devinit）的diff，分析设备子系统引入",
+    "读取commit f77f17b5（fix_getdents64）的diff，了解文件系统修复",
+    "读取commit ae926f90（clone）的diff，分析进程复制实现",
+    "读取commit 1cfcc1de（lmbench_start）的diff，确认性能测试集成",
+    "浏览doc/目录下19个文档，提取关键技术设计说明",
+    "检查sd/lmbench_testcode.sh与sd/busybox_cmd.txt，确认测试覆盖范围",
+    "读取src/dev.c了解设备驱动框架（console/null/zero）",
+    "读取src/exec.c分析ELF加载与shell脚本支持",
+    "检查linker/kernel.ld确认内存布局（TRAMPOLINE/SIG_TRAMPOLINE页对齐）",
+    "分析src/fat32.c的fat32_init函数，了解文件系统初始化",
+    "追踪src/file.c的演进，分析文件抽象层（FD_ENTRY/FD_DEVICE/FD_PIPE）",
+    "检查src/include/proc.h中struct proc的字段变化",
+    "分析src/vma.c的VMA管理演进（从简单链表到复杂内存区域管理）",
+    "读取src/trap.c了解中断处理与系统调用入口",
+    "检查src/entry.S与src/trampoline.S的启动与用户返回路径",
+    "分析src/sysfile.c中sys_openat/sys_read/sys_write实现",
+    "检查src/kmalloc.c了解内核内存分配器",
+    "读取src/printf.c分析日志系统实现",
+    "检查src/spinlock.c与src/sleeplock.c确认同步原语",
+    "分析src/signal.c了解信号处理机制",
+    "检查src/timer.c与时钟中断处理",
+    "读取src/vm.c分析页表管理（kvmcreate/uvmalloc）",
+    "检查src/mmap.c了解内存映射实现",
+    "分析src/pipe.c确认管道机制",
+    "总结开发历史中的技术债务与未实现功能（如网络子系统仅为桩）"
+  ]
+}

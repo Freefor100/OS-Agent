@@ -2,71 +2,63 @@
   "schema_version": "describe_review_v1",
   "stage_id": "09_debug_error",
   "stage_title": "调试机制与错误处理",
-  "confidence": 0.95,
+  "confidence": 0.97,
   "question_reviews": [
     {
       "question_id": "Q09_001",
-      "confidence": 0.95,
-      "review": "题面要求三态，value 为 implemented。证据列出 debug 宏定义与 printf 实现，摘录内容虽为描述性总结但明确指出了日志级别控制（INFO/WARN/ERROR）及条件编译，能直接支撑存在日志系统结论，符合 JSON 契约。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "答案判定 implemented，证据提供了日志宏定义（含级别区分）及 printf 实现，直接支撑结论。题面三态要求满足，无跑题。"
     },
     {
       "question_id": "Q09_002",
-      "confidence": 0.95,
-      "review": "题面要求三态，value 为 implemented。证据覆盖 panic 宏、__panic 函数实现及锁错误调用点，摘录描述了输出位置、调用 backtrace 及死循环停机，支撑崩溃处理路径存在，符合契约。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "答案判定 implemented，证据链完整（宏->函数->调用点），清晰展示 panic 路径。符合三态契约，证据与结论一致。"
     },
     {
       "question_id": "Q09_003",
-      "confidence": 0.95,
-      "review": "题面要求 short_answer 并引用证据，value 详细列出了输出项（位置、消息、回溯、停机）及不包含项（寄存器 dump）。证据对应__panic 流程与 trapframedump 调用点区分，逻辑自洽，摘录支撑价值陈述，符合契约。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "短答案详细列出了输出内容并明确排除了寄存器 dump（引用 trap 路径证据），证据与结论逻辑自洽，符合引用实现证据的要求。"
     },
     {
       "question_id": "Q09_004",
-      "confidence": 0.95,
-      "review": "题面要求三态，value 为 implemented。证据描述 backtrace 基于帧指针遍历调用栈，明确提及获取 ra 与上一帧 fp，支撑实现栈回溯结论（非仅打印 ra），符合契约。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "证据展示了基于帧指针的遍历逻辑，证明非仅打印 ra，满足题干对栈回溯的严格定义。三态选择正确，无格式错误。"
     },
     {
       "question_id": "Q09_005",
-      "confidence": 0.95,
-      "review": "题面要求三态且对 implemented 状态有命令列表强制要求。value 为 not_found，故无需提供命令名。证据为目录搜索零命中记录，支撑不存在内核监视器结论，符合契约。"
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "针对内核监视器的严格定义，答案通过搜索内核目录无命中来支撑 not_found 结论，逻辑合理。虽为否定证据但符合题面排除用户态 shell 的要求。"
     },
     {
       "question_id": "Q09_006",
-      "confidence": 0.95,
-      "review": "题面要求三态，value 为 not_found。证据为全仓库关键字搜索零命中，支撑未实现 GDB stub 结论，符合契约。"
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "通过关键字搜索无命中支撑 GDB stub 不存在的结论，证据类型适合否定性回答。三态符合，无契约违例。"
     },
     {
       "question_id": "Q09_007",
-      "confidence": 0.95,
-      "review": "题面要求 short_answer 并给类型定义与传播点证据。value 描述 errno 风格体系，证据列出 errno.h 宏定义及内核函数返回负值示例，支撑错误码体系结论，符合契约。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "清晰描述了 errno 体系，证据涵盖定义头文件及多处传播点（返回值），满足短答案对类型定义与传播点的要求。"
     },
     {
       "question_id": "Q09_008",
-      "confidence": 0.95,
-      "review": "题面要求三态，value 为 stub。证据指出仅有 SYS_trace 接口声明与结构字段，明确说明未发现 tracepoints 或实现代码，支撑 stub 状态判定，符合契约。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "准确识别出仅有接口定义而无实际逻辑的状态，判定为 stub 而非 implemented/not_found，证据对比了声明与实现缺失，区分度高。"
     }
   ],
-  "dimensions": {
-    "evidence_supports_answers": 0.95,
-    "question_answer_consistency": 0.95,
-    "requirements_fit": 0.95
-  },
   "findings": [],
-  "summary_zh": "本报告整体质量高，8 道题均严格遵循题面约束与 JSON 契约。三态题状态判定清晰，short_answer 题叙述完整。证据摘录虽多为代码逻辑的描述性总结而非原始代码块，但内容具体（含路径、符号、行号或搜索结果），能直接支撑对应 value 结论，无跑题或证据缺失现象。全阶段 confidence 按各题均值计算。",
+  "summary_zh": "本报告整体质量较高，所有题目均严格遵循题面约束（三态/短答案）。证据引用具体（路径、符号、摘录），特别是 Q09_003/Q09_007 的短答案逻辑清晰，Q09_008 对 stub 状态的判定体现了对实现程度的准确评估。否定性题目（Q09_005/006）使用了搜索证据支撑，符合审计预期。全阶段分按各题均值方案 A 汇总。",
   "report_quality_score": 0.97,
   "_meta": {
     "quality": {
-      "excerpt_coverage": 1.0,
-      "evidence_richness": 1.0,
-      "total_evidence_items": 18,
-      "nonempty_excerpt_items": 18,
-      "mean_question_confidence": 0.95,
-      "mean_dimensions": 0.95,
-      "weights": {
-        "w_mean": 0.45,
-        "w_excerpt": 0.25,
-        "w_rich": 0.2,
-        "w_dim": 0.1
-      }
+      "mean_question_confidence": 0.9687
     },
     "review_model": "qwen3.5-plus"
   }

@@ -1,0 +1,238 @@
+{
+  "schema_version": "describe_review_v1",
+  "stage_id": "05_fs_drivers",
+  "stage_title": "文件系统与设备 I/O",
+  "confidence": 0.75,
+  "question_reviews": [
+    {
+      "question_id": "Q05_001",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "答案明确给出 C 操作表结论，evidence 中 struct fs 函数指针定义直接支撑该结论，符合题面要求。"
+    },
+    {
+      "question_id": "Q05_002",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "选项选择与题面 choices 一致，evidence 中 Makefile 与 disk.c 条件编译支撑混合挂载结论。"
+    },
+    {
+      "question_id": "Q05_003",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "正确识别 C 项目无 Cargo，evidence 引用 Makefile 与源码路径支撑自研结论。"
+    },
+    {
+      "question_id": "Q05_004",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "列出 6 个关键节点，evidence 覆盖 sys_openat、ename、filealloc 等关键函数，符合题面数量要求。"
+    },
+    {
+      "question_id": "Q05_005",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "evidence 中 proc.h 结构体定义与 allocproc 分配逻辑直接支撑 FD 表形态结论。"
+    },
+    {
+      "question_id": "Q05_006",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "evidence 展示 cache 结构体与 binit/bread 实现，充分支撑 implemented 结论。"
+    },
+    {
+      "question_id": "Q05_007",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "evidence 中 bget/brelse 代码片段清晰展示 LRU 链表操作逻辑，支撑驱逐策略结论。"
+    },
+    {
+      "question_id": "Q05_008",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "evidence 中搜索结果为空且 mmap 直接读取，支撑 stub 结论。"
+    },
+    {
+      "question_id": "Q05_009",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "evidence 展示 do_mmap 及 sys_mmap 实现，支撑 implemented 结论。"
+    },
+    {
+      "question_id": "Q05_010",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "evidence 中 sys_ppoll 返回 0 且 poll.c 为空，支撑 stub 结论。"
+    },
+    {
+      "question_id": "Q05_011",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "evidence 中 lookup_path 与 dirlookup 代码展示绝对/相对路径及 . .. 处理，支撑 implemented 结论。"
+    },
+    {
+      "question_id": "Q05_012",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "evidence 中搜索无结果且结构体无相关字段，支撑 not_found 结论。"
+    },
+    {
+      "question_id": "Q05_013",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "evidence 展示 pipealloc 及 FD_PIPE 类型定义，支撑 implemented 结论。"
+    },
+    {
+      "question_id": "Q05_014",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "evidence 显示 file 结构无 FD_SOCKET 且 syscall 缺失，支撑 stub 结论。"
+    },
+    {
+      "question_id": "Q05_015",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "evidence 展示 devinit 及 devsw 注册，支撑伪文件系统 implemented 结论。"
+    },
+    {
+      "question_id": "Q05_016",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "选项选择正确，evidence 中 proc 结构体及 clone 逻辑支撑 Per-Process 结论。"
+    },
+    {
+      "question_id": "Q05_017",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "evidence 展示 FAT 表链式遍历逻辑，支撑链式分配结论（符合 FAT 特性）。"
+    },
+    {
+      "question_id": "Q05_018",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "evidence 展示 FAT 表项置 0 表示空闲，支撑 FAT 内嵌空闲链结论。"
+    },
+    {
+      "question_id": "Q05_019",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "evidence 中 parent 指针及路径遍历逻辑支撑树形目录结论。"
+    },
+    {
+      "question_id": "Q05_020",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "evidence 展示字节读写及仅文件大小记录，支撑字节流结论。"
+    },
+    {
+      "question_id": "Q05_021",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "evidence 中 memlayout.h 宏定义及 main.c 未使用 dtb，支撑硬编码结论。"
+    },
+    {
+      "question_id": "Q05_022",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "evidence 显示 dtb_pa 未使用且搜索无解析代码，支撑 not_found 结论。"
+    },
+    {
+      "question_id": "Q05_023",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "evidence 展示 struct devsw 函数指针定义，支撑 C driver ops 结论。"
+    },
+    {
+      "question_id": "Q05_024",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "evidence 列出 main 函数中完整初始化序列，符合题面节点数量要求。"
+    },
+    {
+      "question_id": "Q05_025",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "evidence 展示 consolewrite 及 SBI 调用链，支撑 implemented 结论。"
+    },
+    {
+      "question_id": "Q05_026",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "evidence 展示 ramdisk 及 sd 驱动实现，支撑 implemented 结论。"
+    },
+    {
+      "question_id": "Q05_027",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "evidence 搜索无网络驱动源码且 Makefile 无对应对象，支撑 not_found 结论。"
+    },
+    {
+      "question_id": "Q05_028",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "evidence 显示 plic_claim 被注释且中断号硬编码，支撑 stub 结论。"
+    },
+    {
+      "question_id": "Q05_029",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "evidence 展示 memlayout.h 宏定义及 kvminit 映射，支撑硬编码结论。"
+    },
+    {
+      "question_id": "Q05_030",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "evidence 展示 Makefile 宏传递及源码 #ifdef 使用，支撑条件编译结论。"
+    },
+    {
+      "question_id": "Q05_031",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "evidence 显示早期输出用 SBI 且无切换逻辑，支撑 not_found 结论。"
+    },
+    {
+      "question_id": "Q05_032",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "evidence 展示 NBUF 缓冲池结构，支撑 Buffer Pool 结论。"
+    },
+    {
+      "question_id": "Q05_033",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "evidence 显示无调度逻辑直接提交，支撑 FCFS 结论。"
+    },
+    {
+      "question_id": "Q05_034",
+      "score_evidence": 0.3,
+      "score_consistency": 1.0,
+      "review": "答案 value 声称混合 DMA，但 evidence 中 sd.c 显示 PIO 轮询且 disk_intr 中 DMA 中断被注释，证据与结论明显矛盾。"
+    },
+    {
+      "question_id": "Q05_035",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "evidence 搜索无 DMA 实现且 sd.c 用 PIO，支撑 stub 结论。"
+    }
+  ],
+  "findings": [
+    {
+      "question_id": "Q05_034",
+      "severity": "warn",
+      "message": "答案 value 声称实现 DMA 混合模式，但 evidence 中 sd.c 显示 PIO 轮询且 disk_intr 中 DMA 中断被注释，证据与结论矛盾。"
+    }
+  ],
+  "summary_zh": "整体报告质量较高，大部分题目证据引用详实且与结论一致，题面约束遵守良好。唯独 Q05_034 存在证据与结论矛盾（声称 DMA 但证据显示 PIO），导致全阶段 confidence 按规则截断。其余题目在 VFS、缓存、驱动等模块的证据支撑度上表现稳定。",
+  "report_quality_score": 0.98,
+  "_meta": {
+    "quality": {
+      "mean_question_confidence": 0.985
+    },
+    "review_model": "qwen3.5-plus",
+    "baseline": true,
+    "run_at": "2026-04-24T09:21:34",
+    "baseline_execute_tokens": 199538,
+    "baseline_review_tokens": 26278,
+    "baseline_stage_total_tokens": 225816
+  }
+}

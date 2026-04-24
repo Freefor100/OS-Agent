@@ -1,0 +1,232 @@
+{
+  "schema_version": "describe_review_v1",
+  "stage_id": "05_fs_drivers",
+  "stage_title": "文件系统与设备 I/O",
+  "confidence": 0.98,
+  "question_reviews": [
+    {
+      "question_id": "Q05_001",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "答案准确指出 C op 表形态，证据 excerpts 直接展示了 struct 定义及函数指针成员，完全支撑结论。"
+    },
+    {
+      "question_id": "Q05_002",
+      "score_evidence": 0.8,
+      "score_consistency": 1.0,
+      "review": "选项选择正确。但证据中主要依赖代码注释（comment）来证明持久化存储，Makefile 证据较间接，证据力度稍弱。"
+    },
+    {
+      "question_id": "Q05_003",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "Makefile SRC 列表清晰证明为自研源文件，无外部 crate 依赖，证据充分且直接。"
+    },
+    {
+      "question_id": "Q05_004",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "列出了 5 个关键节点，符合 3-6 个要求。每个节点均有对应函数 excerpt 支撑调用关系，证据链完整。"
+    },
+    {
+      "question_id": "Q05_005",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "结构体定义 excerpt 清晰展示了数组与链表指针混合形态，完全支撑答案描述。"
+    },
+    {
+      "question_id": "Q05_006",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "binit 与 struct buf 证据明确展示了缓冲缓存结构及初始化，支撑 implemented 结论。"
+    },
+    {
+      "question_id": "Q05_007",
+      "score_evidence": 0.75,
+      "score_consistency": 1.0,
+      "review": "答案称 LRU 且引用 lrucnt 数组，但 bget 证据主要展示链表操作，lrucnt 出现在 fatcache 结构体中，存在块缓存与 FAT 缓存概念轻微混淆，证据支撑度扣分。"
+    },
+    {
+      "question_id": "Q05_008",
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "证据展示了 mmap_page 结构，支撑 mmap 缓存，但通用页缓存（Page Cache）证据略显间接，推断成分存在。"
+    },
+    {
+      "question_id": "Q05_009",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "sys_mmap 与 do_mmap 证据明确区分了 file 与 anonymous 路径，支撑 implemented 结论。"
+    },
+    {
+      "question_id": "Q05_010",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "ppoll 与 pselect 函数实现 excerpt 直接证明事件机制已实现。"
+    },
+    {
+      "question_id": "Q05_011",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "lookup_path 与 dirlookup 证据覆盖了绝对/相对路径及 . .. 处理逻辑，支撑充分。"
+    },
+    {
+      "question_id": "Q05_012",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "搜索证据表明仅定义宏而无实现逻辑，支撑 not_found 结论，但缺乏显式代码否定证据。"
+    },
+    {
+      "question_id": "Q05_013",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "pipealloc、file_type_e 及 sys_pipe 证据完整展示了管道作为文件对象的实现。"
+    },
+    {
+      "question_id": "Q05_014",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "搜索证据表明 file_type_e 无 socket 类型，支撑 not_found，属合理负向证据。"
+    },
+    {
+      "question_id": "Q05_015",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "rootfs_init 证据明确展示了 devfs/procfs 的初始化与挂载，支撑 implemented。"
+    },
+    {
+      "question_id": "Q05_016",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "proc 结构体包含 fds 且 clone 时复制，证据直接支撑 Per-Process 归属。"
+    },
+    {
+      "question_id": "Q05_017",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "FAT 表读取与簇重定位证据支持链式分配特征，逻辑清晰。"
+    },
+    {
+      "question_id": "Q05_018",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "fat32_sb 中 next_free 字段及更新函数证据直接支撑 FAT 特有空闲管理方式。"
+    },
+    {
+      "question_id": "Q05_019",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "dentry 结构含 parent/child 指针且 lookup_path 遍历，证据支撑树形目录结构。"
+    },
+    {
+      "question_id": "Q05_020",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "fat_read_file 按字节偏移读取，sys_read 按字节计数，证据支撑字节流组织。"
+    },
+    {
+      "question_id": "Q05_021",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "memlayout.h 硬编码地址及 main.c 直接初始化证据支撑硬编码设备表结论。"
+    },
+    {
+      "question_id": "Q05_022",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "SBI 解析 DTB 但内核 main 未使用，证据准确支撑 stub 状态描述。"
+    },
+    {
+      "question_id": "Q05_023",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "头文件函数声明证据直接支撑 C 函数接口且无统一框架的结论。"
+    },
+    {
+      "question_id": "Q05_024",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "main 函数 excerpt 清晰列出了 6 个初始化节点及顺序，完全符合题面要求。"
+    },
+    {
+      "question_id": "Q05_025",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "consoleinit 及 sbi_console_putchar 证据支撑早期输出实现。"
+    },
+    {
+      "question_id": "Q05_026",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "sdcard_init 与 virtio_disk_init 证据明确支撑块设备驱动实现。"
+    },
+    {
+      "question_id": "Q05_027",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "目录搜索未发现网络驱动文件，支撑 not_found 结论，属合理负向证据。"
+    },
+    {
+      "question_id": "Q05_028",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "plic_claim 与 handle_intr 证据展示了中断获取与分发逻辑，支撑 implemented。"
+    },
+    {
+      "question_id": "Q05_029",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "memlayout.h 宏定义及 VIRT_OFFSET 证据清晰支撑硬编码加虚实转换来源。"
+    },
+    {
+      "question_id": "Q05_030",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "Makefile platform 变量及 #ifdef QEMU 证据完整支撑多平台适配机制。"
+    },
+    {
+      "question_id": "Q05_031",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "搜索证据表明定义了虚地址但未发现切换逻辑，支撑 not_found 结论。"
+    },
+    {
+      "question_id": "Q05_032",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "bufs 数组及 binit 初始化证据直接支撑缓冲池（Buffer Pool）模式。"
+    },
+    {
+      "question_id": "Q05_033",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "搜索未发现调度算法且 bwrite 直接提交，支撑 FCFS 结论，证据合理。"
+    },
+    {
+      "question_id": "Q05_034",
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "证据展示了 DMA 与中断分别存在，但未直接展示大小传输决策逻辑，推断成分略多。"
+    },
+    {
+      "question_id": "Q05_035",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "dmac 初始化及 virtq_desc 证据明确支撑 DMA 传输路径实现。"
+    }
+  ],
+  "findings": [],
+  "summary_zh": "本报告整体质量较高，题面相符度普遍优秀。证据支撑方面，大部分题目提供了直接的代码摘录或结构体定义，但在部分题目（如 Q05_002、Q05_007、Q05_034）中，证据与结论的逻辑连接稍显间接或存在轻微概念混淆，导致证据分略有区分。负向证据（not_found）类题目均提供了搜索说明，符合契约。全阶段置信度按各题均值方案 A 汇总计算。",
+  "report_quality_score": 0.98,
+  "_meta": {
+    "quality": {
+      "mean_question_confidence": 0.9807
+    },
+    "review_model": "qwen3.5-plus",
+    "baseline": true,
+    "run_at": "2026-04-24T14:27:11",
+    "baseline_execute_tokens": 593503,
+    "baseline_review_tokens": 25140,
+    "baseline_stage_total_tokens": 618643
+  }
+}

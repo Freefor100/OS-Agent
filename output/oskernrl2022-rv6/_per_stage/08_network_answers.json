@@ -1,0 +1,166 @@
+{
+  "schema_version": "v1",
+  "stage_id": "08_network",
+  "stage_title": "网络子系统与协议栈",
+  "terminology_profile": "stallings_en_zh",
+  "answers": [
+    {
+      "question_id": "Q08_001",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在网络子系统实现（协议栈或 socket 层）？（必须三态）",
+      "value": "stub",
+      "evidence": [
+        {
+          "path": "src/include/socket.h",
+          "symbol_kind": "struct_specifier",
+          "symbol_name": "socket_connection",
+          "excerpt": "定义了 struct socket_connection 结构体及 socket_init/add_socket 函数声明，但在全仓库搜索 socket_init 和 add_socket 函数实现均为 0 命中，仅有接口声明无实现代码"
+        },
+        {
+          "path": "src/include/defs.h",
+          "symbol_kind": "search",
+          "symbol_name": "socket_function_scan",
+          "excerpt": "在 defs.h 中检索所有函数声明，未发现 socket 相关函数实现；grep 搜索 socket_init|add_socket 返回 0 匹配"
+        }
+      ]
+    },
+    {
+      "question_id": "Q08_002",
+      "question_type": "single_choice",
+      "stem": "协议栈来源更接近哪种？",
+      "value": "未发现",
+      "evidence": [
+        {
+          "path": "src/include/socket.h",
+          "symbol_kind": "search",
+          "symbol_name": "network_stack_scan",
+          "excerpt": "grep 搜索 smoltcp|lwip|tcpip|netif 均返回 0 命中；未找到第三方网络库集成证据，也未发现自研协议栈实现代码"
+        },
+        {
+          "path": "README.md",
+          "symbol_kind": "doc",
+          "symbol_name": "readme_claim_check",
+          "excerpt": "README 声称'完成了对本地回环地址的 Socket 支持'，但代码中未找到 loopback|127.0.0.1 相关实现，属于文档提及但未见代码"
+        }
+      ]
+    },
+    {
+      "question_id": "Q08_003",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 socket 系统调用接口（socket/bind/connect/sendto/recvfrom 等）？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "src/sysfile.c",
+          "symbol_kind": "search",
+          "symbol_name": "syscall_socket_scan",
+          "excerpt": "在 sysfile.c 中检索 sys_socket|sys_bind|sys_connect|sys_sendto|sys_recvfrom 等标识符，0 命中；仅找到 sys_sendfile 但与 socket 无关"
+        },
+        {
+          "path": "src/include/syscall.h",
+          "symbol_kind": "search",
+          "symbol_name": "syscall_table_scan",
+          "excerpt": "syscall.h 包含 sysnum.h 但该文件不存在于仓库中；grep 搜索 SYS_SOCKET|SYS_BIND 等系统调用号定义均为 0 命中"
+        },
+        {
+          "path": "src/include/file.h",
+          "symbol_kind": "struct_specifier",
+          "symbol_name": "file_struct",
+          "excerpt": "struct file 的 type 枚举仅包含 FD_NONE/FD_PIPE/FD_ENTRY/FD_DEVICE，无 FD_SOCKET 类型，表明文件子系统未集成 socket 支持"
+        }
+      ]
+    },
+    {
+      "question_id": "Q08_004",
+      "question_type": "short_answer",
+      "stem": "选择一个发送路径（优先 sys_sendto），追踪：syscall → 协议栈 → 网卡驱动。列 3-6 个关键节点并给证据。",
+      "value": "无法追踪：未发现 socket 系统调用实现。sys_sendto 等 socket 相关系统调用在代码库中不存在（grep 搜索 sys_socket|sys_sendto 返回 0 命中）。struct file 不支持 FD_SOCKET 类型，devsw 设备表仅注册 console/null/zero 设备，无网络相关设备。",
+      "evidence": [
+        {
+          "path": "src/sysfile.c",
+          "symbol_kind": "search",
+          "symbol_name": "sendto_syscall_scan",
+          "excerpt": "检索 sys_sendto|sys_socket|sys_bind 等标识符，0 命中；sysfile.c 中仅实现文件/管道/设备相关 syscall，无网络 syscall"
+        },
+        {
+          "path": "src/dev.c",
+          "symbol_kind": "function",
+          "symbol_name": "devinit",
+          "excerpt": "devinit() 仅调用 allocdev 注册 console/null/zero 三种设备，无网络设备安装；devsw[NDEV] 设备表无 socket 相关条目"
+        },
+        {
+          "path": "src/include/file.h",
+          "symbol_kind": "struct_specifier",
+          "symbol_name": "file_type_enum",
+          "excerpt": "enum { FD_NONE, FD_PIPE, FD_ENTRY, FD_DEVICE } 无 FD_SOCKET 分支，filewrite/fileread 无法处理 socket 类型"
+        }
+      ]
+    },
+    {
+      "question_id": "Q08_005",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现网卡驱动（virtio-net/e1000 等）与收包中断路径？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "src/include/virtio.h",
+          "symbol_kind": "macro_specifier",
+          "symbol_name": "VIRTIO_MMIO_DEVICE_ID",
+          "excerpt": "virtio.h 定义 VIRTIO_MMIO_DEVICE_ID 注释提到'device type; 1 is net, 2 is disk'，但仅实现 virtio_disk_init/virtio_disk_rw 磁盘驱动，无 virtio_net_init 或类似网卡驱动函数"
+        },
+        {
+          "path": "src/include/defs.h",
+          "symbol_kind": "search",
+          "symbol_name": "net_driver_scan",
+          "excerpt": "在 defs.h 中检索所有函数声明，仅发现 disk_init/virtio_disk_init 等块设备驱动，无 network/virtio-net/e1000 相关驱动函数"
+        },
+        {
+          "path": "src/trap.c",
+          "symbol_kind": "search",
+          "symbol_name": "network_intr_scan",
+          "excerpt": "检索网络相关中断处理函数（如 virtio_net_intr|network_intr|ethernet_intr），0 命中；仅有时钟中断/磁盘中断处理"
+        }
+      ]
+    },
+    {
+      "question_id": "Q08_006",
+      "question_type": "multi_choice",
+      "stem": "协议支持情况（多选；未发现则留空并在 notes 写 not_found）：",
+      "value": [],
+      "evidence": [
+        {
+          "path": "src/include/socket.h",
+          "symbol_kind": "search",
+          "symbol_name": "protocol_stack_scan",
+          "excerpt": "grep 搜索 tcp|udp|ip|ethernet|arp|icmp|dhcp|dns 等协议相关标识符，在.c/.h 文件中仅找到无关匹配（如 spi.h 中的 proto 位域与网络协议无关）；未发现任何网络协议栈实现代码"
+        },
+        {
+          "path": "src/",
+          "symbol_kind": "scan",
+          "symbol_name": "protocol_dir_scan",
+          "excerpt": "遍历 src/ 目录无 net/、tcp/、udp/、ip/ 等网络协议相关子目录；协议支持 not_found"
+        }
+      ]
+    },
+    {
+      "question_id": "Q08_007",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在零拷贝/共享缓冲/DMA 描述符等路径（zero-copy）？（必须三态；仅有名词不算 implemented）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "src/include/virtio.h",
+          "symbol_kind": "struct_specifier",
+          "symbol_name": "VRingDesc",
+          "excerpt": "virtio.h 定义 VRingDesc 结构体用于 VirtIO 描述符，但仅用于磁盘驱动（virtio_disk_rw），无网络相关的 DMA 描述符操作或 mbuf 传递引用机制"
+        },
+        {
+          "path": "src/",
+          "symbol_kind": "search",
+          "symbol_name": "zero_copy_scan",
+          "excerpt": "grep 搜索 DMA|zero.copy|shared.buffer|mbuf 等零拷贝相关标识符，0 命中；无网络零拷贝实现证据"
+        }
+      ]
+    }
+  ]
+}

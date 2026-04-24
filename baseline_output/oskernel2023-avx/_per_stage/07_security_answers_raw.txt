@@ -1,0 +1,338 @@
+```json
+{
+  "schema_version": "v1",
+  "stage_id": "07_security",
+  "stage_title": "安全机制与权限模型",
+  "terminology_profile": "stallings_en_zh",
+  "answers": [
+    {
+      "question_id": "Q07_001",
+      "question_type": "single_choice",
+      "stem": "特权级隔离形态更接近哪种？",
+      "value": "有用户态/内核态隔离（user mode/kernel mode）",
+      "evidence": [
+        {
+          "path": "kernel/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "usertrap",
+          "excerpt": "if ((r_sstatus() & SSTATUS_SPP) != 0) panic(\"usertrap: not from user mode\"); - 检查是否从用户态进入陷阱"
+        },
+        {
+          "path": "kernel/include/riscv.h",
+          "symbol_kind": "define",
+          "symbol_name": "SSTATUS_SPP",
+          "excerpt": "#define SSTATUS_SPP (1L << 8)  // Previous mode, 1=Supervisor, 0=User - RISC-V S 模式/U 模式隔离"
+        },
+        {
+          "path": "kernel/vm.c",
+          "symbol_kind": "function",
+          "symbol_name": "mappages",
+          "excerpt": "perm |= PTE_U; // PTE_U 标志用于标记用户可访问的页面"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_002",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在凭证/权限数据结构（UID/GID/Credential/Capability/ACL 等）？",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/include/proc.h",
+          "symbol_kind": "struct",
+          "symbol_name": "proc",
+          "excerpt": "struct proc { ... int uid; // Process User ID; int gid; // Process Group ID; int pgid; ... };"
+        },
+        {
+          "path": "kernel/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "allocproc",
+          "excerpt": "p->uid = 0; p->gid = 0; p->pgid = 0; - 进程创建时初始化 UID/GID"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_003",
+      "question_type": "tri_state_impl",
+      "stem": "是否能证实在 syscall 路径上真实执行了权限检查（open/exec/write 等）？",
+      "value": "stub",
+      "evidence": [
+        {
+          "path": "kernel/sysfile.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_open",
+          "excerpt": "uint64 sys_open(void) { ... return open(path, omode); } - open 系统调用没有 UID/GID 权限检查"
+        },
+        {
+          "path": "kernel/fat32.c",
+          "symbol_kind": "function",
+          "symbol_name": "kstat",
+          "excerpt": "kst->st_uid = 0; kst->st_gid = 0; - UID/GID 硬编码为 0，未实际使用"
+        },
+        {
+          "path": "kernel/sysproc.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_setuid",
+          "excerpt": "uint64 sys_setuid(void) { int uid; if (argint(0, &uid) < 0) return -1; myproc()->uid = uid; return 0; } - setuid 无权限验证"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_004",
+      "question_type": "short_answer",
+      "stem": "若存在权限检查：入口点与核心检查函数链路是什么？",
+      "value": "权限检查未实际实现。系统调用入口：sys_open/sys_exec/sys_write (kernel/sysfile.c) -> 直接调用底层函数，无 check_perm/inode_permission 等权限验证函数。UID/GID 字段仅存在于 proc 结构中但未用于访问控制决策。",
+      "evidence": [
+        {
+          "path": "kernel/sysfile.c",
+          "symbol_kind": "search",
+          "symbol_name": "permission_check",
+          "excerpt": "在附件源码中检索 check_perm/inode_permission/access_check 等权限检查函数，未找到实际执行 UID/GID 验证的代码"
+        },
+        {
+          "path": "kernel/sysfile.c",
+          "symbol_kind": "function",
+          "symbol_name": "open",
+          "excerpt": "uint64 open(char *path, int omode) { ... if ((ep = ename(path)) == NULL) { return -1; } ... } - 仅检查文件是否存在，无权限验证"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_005",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现用户指针验证（access_ok/verify_area/UserInPtr/copyin/copyout 等）？",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/vm.c",
+          "symbol_kind": "function",
+          "symbol_name": "copyin",
+          "excerpt": "int copyin(pagetable_t pagetable, char *dst, uint64 srcva, uint64 len) { ... pa0 = walkaddr(pagetable, va0); if (pa0 == NULL) { return -1; } ... } - 验证用户空间地址有效性"
+        },
+        {
+          "path": "kernel/vm.c",
+          "symbol_kind": "function",
+          "symbol_name": "copyout",
+          "excerpt": "int copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len) { ... pa0 = walkaddr(pagetable, va0); if (pa0 == NULL) return -1; ... } - 验证用户空间地址有效性"
+        },
+        {
+          "path": "kernel/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "either_copyin",
+          "excerpt": "int either_copyin(void *dst, int user_src, uint64 src, uint64 len) { if (user_src) { return copyin(p->pagetable, dst, src, len); } ... } - 统一的用户/内核拷贝接口"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_006",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 seccomp/prctl/sandbox 等系统调用过滤/沙箱？",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/syscall.c",
+          "symbol_kind": "search",
+          "symbol_name": "seccomp",
+          "excerpt": "在附件源码中检索 seccomp/prctl/sandbox/filter 等关键字，未找到系统调用过滤或沙箱机制实现"
+        },
+        {
+          "path": "kernel/include/sysnum.h",
+          "symbol_kind": "search",
+          "symbol_name": "SYS_seccomp",
+          "excerpt": "系统调用号定义中无 seccomp 相关系统调用"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_007",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在栈保护/溢出防护（stack canary/guard page）或等价机制？",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "Makefile",
+          "symbol_kind": "search",
+          "symbol_name": "stack-protector",
+          "excerpt": "CFLAGS += $(shell $(CC) -fno-stack-protector -E -x c /dev/null >/dev/null 2>&1 && echo -fno-stack-protector) - 显式禁用栈保护"
+        },
+        {
+          "path": "kernel/vm.c",
+          "symbol_kind": "search",
+          "symbol_name": "guard_page",
+          "excerpt": "在附件源码中检索 guard page/canary/stack_guard 等关键字，未找到栈溢出防护机制"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_008",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在审计/安全启动（audit/secure boot/signature）相关逻辑？",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/",
+          "symbol_kind": "search",
+          "symbol_name": "audit",
+          "excerpt": "在附件源码中检索 audit/secure_boot/signature/verify 等关键字，未找到审计或安全启动相关实现"
+        },
+        {
+          "path": "kernel/main.c",
+          "symbol_kind": "function",
+          "symbol_name": "main",
+          "excerpt": "内核初始化函数中无安全启动验证逻辑"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_009",
+      "question_type": "short_answer",
+      "stem": "本项目支持哪些架构（riscv64/aarch64/x86_64/loongarch64 等）？每种架构的安全相关初始化（特权级配置、PMP/MPU/SMEP 等）是否有代码证据？",
+      "value": "仅支持 riscv64 架构。证据：1) Makefile 中 TOOLPREFIX := riscv64-unknown-elf-；2) kernel/include/riscv.h 定义 RISC-V 特有寄存器操作；3) kernel/entry_visionfive.S 和 kernel/entry_qemu.S 为 RISC-V 入口代码。安全相关初始化：trapinithart() 设置 stvec/sie 寄存器启用中断，但未发现 PMP/SMEP 等高级保护机制配置代码。",
+      "evidence": [
+        {
+          "path": "Makefile",
+          "symbol_kind": "define",
+          "symbol_name": "TOOLPREFIX",
+          "excerpt": "TOOLPREFIX := riscv64-unknown-elf- - 仅支持 RISC-V 64 位工具链"
+        },
+        {
+          "path": "kernel/include/riscv.h",
+          "symbol_kind": "file",
+          "symbol_name": "riscv.h",
+          "excerpt": "定义 RISC-V 特有 CSR 寄存器操作：r_sstatus/w_sstatus/r_satp/w_satp 等"
+        },
+        {
+          "path": "kernel/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "trapinithart",
+          "excerpt": "w_stvec((uint64)kernelvec); w_sstatus(r_sstatus() | SSTATUS_SIE); - 设置陷阱向量和启用中断，无 PMP 配置"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_010",
+      "question_type": "tri_state_impl",
+      "stem": "若项目使用 Rust，是否存在 RAII/所有权/生命周期相关的内核安全机制（如不可 unsafe 直接访问用户内存、锁的 RAII 自动释放等）？",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/",
+          "symbol_kind": "search",
+          "symbol_name": "rust",
+          "excerpt": "项目为纯 C 语言实现，在附件源码中未发现任何 Rust 代码文件 (.rs)"
+        },
+        {
+          "path": "Makefile",
+          "symbol_kind": "search",
+          "symbol_name": "CC",
+          "excerpt": "CC = $(TOOLPREFIX)gcc - 使用 GCC 编译器，非 Rust 编译器"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_011",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现了内核/用户页表隔离 (Kernel/User Page Table Isolation, KPTI 或等价机制)？",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/vm.c",
+          "symbol_kind": "function",
+          "symbol_name": "proc_pagetable",
+          "excerpt": "创建用户页表时同时映射 trampoline 页面：mappages(pagetable, TRAMPOLINE, PGSIZE, (uint64)trampoline, PTE_R | PTE_X); - 内核代码映射到用户页表"
+        },
+        {
+          "path": "kernel/vm.c",
+          "symbol_kind": "search",
+          "symbol_name": "KPTI",
+          "excerpt": "在附件源码中检索 KPTI/CR3_switch/page_table_isolation 等关键字，未找到页表隔离机制"
+        },
+        {
+          "path": "kernel/include/memlayout.h",
+          "symbol_kind": "define",
+          "symbol_name": "TRAMPOLINE",
+          "excerpt": "#define TRAMPOLINE (MAXVA - PGSIZE) - _trampoline_ 页面在用户和内核页表中都映射，非隔离设计"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_012",
+      "question_type": "short_answer",
+      "stem": "UID/GID 字段是否在 syscall 路径上真实执行权限检查？",
+      "value": "字段存在但无检查链。proc 结构中有 uid/gid 字段 (kernel/include/proc.h)，sys_setuid/sys_setgid 可设置 (kernel/sysproc.c)，但 open/exec/write 等系统调用中未发现 check_perm/inode_permission 等权限验证函数调用。kstat 中 st_uid/st_gid 硬编码为 0 (kernel/fat32.c)。",
+      "evidence": [
+        {
+          "path": "kernel/include/proc.h",
+          "symbol_kind": "struct",
+          "symbol_name": "proc",
+          "excerpt": "struct proc { ... int uid; int gid; ... }; - UID/GID 字段定义"
+        },
+        {
+          "path": "kernel/fat32.c",
+          "symbol_kind": "function",
+          "symbol_name": "kstat",
+          "excerpt": "kst->st_uid = 0; kst->st_gid = 0; - UID/GID 硬编码为 0"
+        },
+        {
+          "path": "kernel/sysfile.c",
+          "symbol_kind": "search",
+          "symbol_name": "check_perm",
+          "excerpt": "在附件源码中检索 check_perm/inode_permission/access_check 等权限检查函数，在 open/write 等系统调用路径中未找到实际使用 UID/GID 进行访问控制的代码"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_013",
+      "question_type": "single_choice",
+      "stem": "访问控制模型 (Access Control Model, Stallings Ch15) 更接近哪种？",
+      "value": "仅有特权级隔离（ring0/ring3），无细粒度访问控制",
+      "evidence": [
+        {
+          "path": "kernel/sysfile.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_open",
+          "excerpt": "open 系统调用仅检查文件是否存在，无基于 UID/GID 的权限验证"
+        },
+        {
+          "path": "kernel/fat32.c",
+          "symbol_kind": "function",
+          "symbol_name": "kstat",
+          "excerpt": "kst->st_mode = 0; ... st->st_mode |= 0x1ff; - 权限位硬编码，无实际访问控制"
+        },
+        {
+          "path": "kernel/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "usertrap",
+          "excerpt": "仅通过 SSTATUS_SPP 位检查用户/内核模式切换，无细粒度访问控制机制"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_014",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现完整性策略 (Integrity Policy, Stallings Ch15)？",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/",
+          "symbol_kind": "search",
+          "symbol_name": "W^X",
+          "excerpt": "在附件源码中检索 W^X/biba/integrity/code_signing/readonly_kernel 等关键字，未找到完整性策略实现"
+        },
+        {
+          "path": "kernel/vm.c",
+          "symbol_kind": "function",
+          "symbol_name": "mappages",
+          "excerpt": "页面权限设置：perm |= PTE_R | PTE_W | PTE_X; - 未实现 W^X 保护，代码段可同时读写执行"
+        },
+        {
+          "path": "Makefile",
+          "symbol_kind": "search",
+          "symbol_name": "stack-protector",
+          "excerpt": "CFLAGS += ... -fno-stack-protector - 显式禁用栈保护，无完整性保护"
+        }
+      ]
+    }
+  ]
+}
+```

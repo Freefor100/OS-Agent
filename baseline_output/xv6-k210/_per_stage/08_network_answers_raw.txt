@@ -1,0 +1,180 @@
+```json
+{
+  "schema_version": "v1",
+  "stage_id": "08_network",
+  "stage_title": "网络子系统与协议栈",
+  "terminology_profile": "stallings_en_zh",
+  "answers": [
+    {
+      "question_id": "Q08_001",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在网络子系统实现（协议栈或 socket 层）？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "include/sysnum.h",
+          "symbol_kind": "search",
+          "symbol_name": "SYS_socket",
+          "excerpt": "在 sysnum.h 中搜索 socket 相关系统调用号，未发现 SYS_socket、SYS_bind、SYS_connect、SYS_sendto、SYS_recvfrom 等网络相关系统调用定义。"
+        },
+        {
+          "path": "kernel/syscall/syscall.c",
+          "symbol_kind": "search",
+          "symbol_name": "syscalls[]",
+          "excerpt": "在 syscall.c 的系统调用表中，未发现任何网络/ socket 相关的处理函数。系统调用表仅包含文件、进程、内存、信号等基础功能。"
+        },
+        {
+          "path": "kernel/hal/",
+          "symbol_kind": "list",
+          "symbol_name": "hal drivers",
+          "excerpt": "在 kernel/hal/ 目录下搜索网络设备驱动，仅发现 disk.c、sdcard.c、virtio_disk.c 等存储设备驱动，未发现 virtio_net.c 或其他网卡驱动实现。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q08_002",
+      "question_type": "single_choice",
+      "stem": "协议栈来源更接近哪种？",
+      "value": "未发现",
+      "evidence": [
+        {
+          "path": "kernel/",
+          "symbol_kind": "search",
+          "symbol_name": "network stack",
+          "excerpt": "在整个 kernel 目录中搜索网络协议栈相关代码（tcp、udp、ip、ethernet 等），未找到任何协议栈实现。xv6-k210 专注于文件系统、进程管理、内存管理等基础 OS 功能，未实现网络子系统。"
+        },
+        {
+          "path": "include/errno.h",
+          "symbol_kind": "read",
+          "symbol_name": "socket errors",
+          "excerpt": "errno.h 中定义了 ENOTSOCK、EDESTADDRREQ、EMSGSIZE、EPROTOTYPE 等 socket 相关错误码，但这只是错误码定义，不代表实际实现了 socket 功能。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q08_003",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 socket 系统调用接口（socket/bind/connect/sendto/recvfrom 等）？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "include/sysnum.h",
+          "symbol_kind": "read",
+          "symbol_name": "SYSNUM definitions",
+          "excerpt": "sysnum.h 中定义的系统调用号从 SYS_fork(1) 到 SYS_msync，包含文件操作、进程管理、内存管理、信号处理等，但完全没有 socket 相关的系统调用号定义。"
+        },
+        {
+          "path": "xv6-user/user.h",
+          "symbol_kind": "read",
+          "symbol_name": "user API",
+          "excerpt": "user.h 中声明的用户态 API 包含 fork、exec、open、read、write、mmap 等，但没有 socket、bind、connect、send、recv 等网络相关函数声明。"
+        },
+        {
+          "path": "kernel/syscall/sysfile.c",
+          "symbol_kind": "read",
+          "symbol_name": "file syscalls",
+          "excerpt": "sysfile.c 实现了文件相关的系统调用（open、read、write、close、dup 等），但没有实现任何网络 socket 相关的系统调用处理函数。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q08_004",
+      "question_type": "short_answer",
+      "stem": "选择一个发送路径（优先 sys_sendto），追踪：syscall → 协议栈 → 网卡驱动。列 3-6 个关键节点并给证据。",
+      "value": "not_found: 本项目未实现网络子系统，不存在 sendto 系统调用、协议栈或网卡驱动路径。xv6-k210 专注于基础 OS 功能（文件系统、进程管理、内存管理），网络功能未实现。",
+      "evidence": [
+        {
+          "path": "include/sysnum.h",
+          "symbol_kind": "search",
+          "symbol_name": "SYS_sendto",
+          "excerpt": "搜索 SYS_sendto 系统调用号，在 sysnum.h 中未找到定义。系统调用号最大到 SYS_msync，均为文件、进程、内存相关调用。"
+        },
+        {
+          "path": "kernel/hal/disk.c",
+          "symbol_kind": "read",
+          "symbol_name": "disk driver",
+          "excerpt": "disk.c 实现了存储设备的读写接口（disk_read、disk_write），但这是针对 SD 卡/ virtio 磁盘的驱动，不是网络网卡驱动。"
+        },
+        {
+          "path": "kernel/hal/virtio_disk.c",
+          "symbol_kind": "read",
+          "symbol_name": "virtio driver",
+          "excerpt": "virtio_disk.c 实现了 virtio 块设备驱动（磁盘），有 virtio_disk_init、virtio_disk_rw 等函数，但没有 virtio_net 或任何网络相关的 virtio 驱动实现。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q08_005",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现网卡驱动（virtio-net/e1000 等）与收包中断路径？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/hal/",
+          "symbol_kind": "list",
+          "symbol_name": "HAL drivers",
+          "excerpt": "kernel/hal/ 目录下包含 disk.c、sdcard.c、virtio_disk.c、spi.c、dmac.c、gpiohs.c 等驱动，但没有任何网卡驱动（如 virtio_net.c、e1000.c、eth.c 等）。"
+        },
+        {
+          "path": "kernel/trap/trap.c",
+          "symbol_kind": "read",
+          "symbol_name": "interrupt handling",
+          "excerpt": "trap.c 中的 handle_intr 函数处理时钟中断、软件中断、UART 中断、磁盘中断（DISK_IRQ），但没有处理网络中断的代码。中断源只有 UART_IRQ 和 DISK_IRQ。"
+        },
+        {
+          "path": "include/memlayout.h",
+          "symbol_kind": "read",
+          "symbol_name": "IRQ definitions",
+          "excerpt": "memlayout.h 中定义了 UART_IRQ 和 DISK_IRQ，但没有定义任何网络相关的中断号（如 NET_IRQ、ETH_IRQ 等）。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q08_006",
+      "question_type": "multi_choice",
+      "stem": "协议支持情况（多选；未发现则留空并在 notes 写 not_found）",
+      "value": [],
+      "evidence": [
+        {
+          "path": "kernel/",
+          "symbol_kind": "search",
+          "symbol_name": "protocol implementation",
+          "excerpt": "在整个 kernel 目录中搜索 Ethernet、ARP、IPv4、IPv6、ICMP、UDP、TCP、DHCP、DNS 等协议相关代码，均未找到任何实现。xv6-k210 未实现网络协议栈。"
+        },
+        {
+          "path": "include/",
+          "symbol_kind": "search",
+          "symbol_name": "network headers",
+          "excerpt": "在 include 目录中搜索网络相关的头文件（如 socket.h、netinet、arpa 等），未找到任何网络协议相关的头文件定义。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q08_007",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在零拷贝/共享缓冲/DMA 描述符等路径（zero-copy）？（必须三态；仅有名词不算 implemented）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/hal/dmac.c",
+          "symbol_kind": "read",
+          "symbol_name": "DMA controller",
+          "excerpt": "dmac.c 实现了 DMA 控制器驱动，但仅用于 SD 卡读写（sdcard_read_data_dma、sdcard_write_data_dma），没有用于网络数据传输的 DMA 描述符或零拷贝路径。"
+        },
+        {
+          "path": "kernel/fs/buf.c",
+          "symbol_kind": "read",
+          "symbol_name": "buffer cache",
+          "excerpt": "buf.c 实现了磁盘缓冲层（buffer cache），用于文件系统 I/O 优化，但这是针对存储设备的缓冲，不是网络零拷贝或共享缓冲机制。"
+        },
+        {
+          "path": "kernel/mm/vm.c",
+          "symbol_kind": "read",
+          "symbol_name": "memory management",
+          "excerpt": "vm.c 实现了内存管理和页表操作，包括 copy-on-write 和 lazy allocation，但这些是通用内存管理功能，没有专门针对网络 I/O 的零拷贝优化路径。"
+        }
+      ]
+    }
+  ]
+}
+```

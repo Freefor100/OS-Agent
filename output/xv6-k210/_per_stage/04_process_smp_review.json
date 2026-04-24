@@ -2,238 +2,262 @@
   "schema_version": "describe_review_v1",
   "stage_id": "04_process_smp",
   "stage_title": "进程/线程/调度与多核",
-  "confidence": 0.98,
+  "confidence": 0.95,
   "question_reviews": [
     {
       "question_id": "Q04_001",
-      "confidence": 1.0,
-      "review": "作答切题，顶层类型、结构体路径及关键字段均有明确代码证据支撑，PCB/TCB 区分结论合理。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "答案格式完全符合题面要求，提供了类型名、路径、字段及 PCB/TCB 区分结论。证据摘录了 struct proc 和 context 定义，直接支撑字段声明，证据充分。"
     },
     {
       "question_id": "Q04_002",
-      "confidence": 1.0,
-      "review": "状态枚举与流转点描述清晰，证据涵盖状态定义及 scheduler/exit/sleep 等关键函数调用，逻辑闭环。"
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "状态枚举与流转点描述详细。证据覆盖了状态定义及 scheduler/exit 中的状态变更，但部分流转逻辑（如 sleep/wakeup 内部细节）仅靠文字描述，证据摘录略少于价值陈述。"
     },
     {
       "question_id": "Q04_003",
-      "confidence": 1.0,
-      "review": "三态结论明确，汇编 swtch 与 C 语言调度函数证据确凿，支撑 implemented 结论。"
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "三态结论明确，证据直接展示了 swtch 汇编及调用点，完全支撑上下文切换实现的结论。"
     },
     {
       "question_id": "Q04_004",
-      "confidence": 1.0,
-      "review": "寄存器集合列表与汇编指令及结构体定义完全对应，证据充分。"
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "寄存器列表与汇编/结构体证据一一对应，摘录清晰展示了保存/恢复指令及结构体成员，证据极强。"
     },
     {
       "question_id": "Q04_005",
-      "confidence": 1.0,
-      "review": "调度算法分类准确，优先级队列定义、时间片字段及降级逻辑均有代码证据，符合 Priority 调度特征。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "算法分类及代码证据格式符合要求。证据展示了优先级宏、选择循环及时间片递减逻辑，有效支撑 Priority 调度结论。"
     },
     {
       "question_id": "Q04_006",
-      "confidence": 1.0,
-      "review": "核心入口函数列举准确，证据指向调度循环与进程选择逻辑，符合题意。"
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "列出了 3 个核心入口并附带对应函数证据，完全符合题面要求。"
     },
     {
       "question_id": "Q04_007",
-      "confidence": 1.0,
-      "review": "fork/clone 实现证据明确，包含内核函数与系统调用封装，支撑 implemented 结论。"
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "三态结论明确，clone 及 sys_fork 证据直接支撑 fork/clone 实现。"
     },
     {
       "question_id": "Q04_008",
-      "confidence": 1.0,
-      "review": "地址空间与文件表复制路径证据清晰，copysegs/copyfdtable 调用链明确。"
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "价值陈述列出了地址空间、文件表、目录、信号处理四项复制，证据摘录主要覆盖前两项，虽核心点已证实，但证据覆盖度略低于文字描述。"
     },
     {
       "question_id": "Q04_009",
-      "confidence": 1.0,
-      "review": "exec 实现证据充分，包含 ELF 加载与页表重建逻辑，支撑 implemented 结论。"
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "execve 及 syscall 证据充分，支撑 implemented 结论。"
     },
     {
       "question_id": "Q04_010",
-      "confidence": 1.0,
-      "review": "wait4 实现证据明确，包含状态检查、资源释放及睡眠唤醒逻辑。"
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "wait4 及 syscall 证据充分，支撑 implemented 结论。"
     },
     {
       "question_id": "Q04_011",
-      "confidence": 1.0,
-      "review": "阻塞机制证据支持 Wait Queue 模式（sleep/remove），与选项 A 吻合。"
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "选项选择正确，证据展示了 sleep 移除就绪队列及插入睡眠队列的逻辑，直接支撑真正阻塞的结论。"
     },
     {
       "question_id": "Q04_012",
-      "confidence": 1.0,
-      "review": "PID 分配器证据显示全局变量自增，无回收机制，结论与证据一致。"
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "证据展示了自增逻辑，价值中关于无回收的结论基于未发现 free_pid，证据虽未直接展示 absence，但分配逻辑清晰，整体可信。"
     },
     {
       "question_id": "Q04_013",
-      "confidence": 1.0,
-      "review": "进程树存储方式证据明确（child/sibling 指针），遍历逻辑有代码支撑。"
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "结构体字段证据直接展示了 child/parent/sibling 指针，遍历逻辑也有代码支撑，证据充分。"
     },
     {
       "question_id": "Q04_014",
-      "confidence": 1.0,
-      "review": "信号实现证据充分（sigaction/kill），futex 未提及但信号已实现，符合 implemented。"
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "信号实现证据充分，包含设置、处理及发送 kill 的代码。"
     },
     {
       "question_id": "Q04_015",
-      "confidence": 1.0,
-      "review": "多核一致性回答合理，全局队列与 IPI 唤醒证据支持，与第 9 章交叉验证逻辑自洽。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "全局队列与 IPI 证据清晰，支撑了无每核队列但有 IPI 唤醒的结论。"
     },
     {
       "question_id": "Q04_016",
-      "confidence": 1.0,
-      "review": "exit 调用链证据清晰，涵盖资源释放、状态变更及父进程唤醒，逻辑完整。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "调用链描述详细，证据摘录了 exit 函数中的关键资源释放调用序列，支撑度高。"
     },
     {
       "question_id": "Q04_017",
-      "confidence": 1.0,
-      "review": "进程组/会话未实现，证据为空符合 not_found，符合简单 OS 特征。"
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "结论为 not_found，证据为空。符合负面结论的举证习惯，但缺乏搜索路径说明，证据分受限。"
     },
     {
       "question_id": "Q04_018",
-      "confidence": 1.0,
-      "review": "rlimit 为 stub，证据显示注释说明，结论准确。"
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "stub 结论有代码注释直接支撑，证据质量高。"
     },
     {
       "question_id": "Q04_019",
-      "confidence": 1.0,
-      "review": "TCB/PCB 统一结构证据支持无区分结论，与 Q04_001 一致。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "选项选择与结构体证据一致，注释说明了无独立 thread 结构。"
     },
     {
       "question_id": "Q04_020",
-      "confidence": 1.0,
-      "review": "页表切换证据明确（w_satp/sfence_vma），支撑 implemented 结论。"
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "scheduler 中 w_satp/sfence 证据直接支撑页表切换实现。"
     },
     {
       "question_id": "Q04_021",
-      "confidence": 1.0,
-      "review": "线程映射模型证据支持仅内核线程，无用户态线程库证据。"
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "选项选择合理，证据基于 proc 结构推断无用户线程库，逻辑自洽。"
     },
     {
       "question_id": "Q04_022",
-      "confidence": 1.0,
-      "review": "TLS 未实现，证据为空符合 not_found。"
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "结论 not_found，证据为空。同 Q04_017，缺乏搜索关键词展示。"
     },
     {
       "question_id": "Q04_023",
-      "confidence": 0.9,
-      "review": "证据显示统计结构（tms/vswtch）及 getrusage，支持“追踪”，但“优化”一词略显牵强，主要为记账。"
+      "score_evidence": 0.6,
+      "score_consistency": 1.0,
+      "review": "价值声称追踪优化多项性能指标，但证据仅展示会计结构体 (tms) 和 getrusage，未展示调度器基于这些指标进行优化的逻辑，证据支撑力较弱。"
     },
     {
       "question_id": "Q04_024",
-      "confidence": 1.0,
-      "review": "老化机制未实现，证据为空符合 not_found，与优先级调度证据一致。"
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "结论 not_found，证据为空。缺乏搜索关键词展示。"
     },
     {
       "question_id": "Q04_025",
-      "confidence": 1.0,
-      "review": "公平份额未实现，证据为空符合 not_found。"
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "结论 not_found，证据为空。缺乏搜索关键词展示。"
     },
     {
       "question_id": "Q04_026",
-      "confidence": 1.0,
-      "review": "抢占模式证据支持完全抢占（时钟中断/kill 唤醒），逻辑合理。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "proc_tick 和 kill 证据展示了时间片和信号导致的抢占，支撑完全抢占结论。"
     },
     {
       "question_id": "Q04_027",
-      "confidence": 1.0,
-      "review": "SJF 未实现，证据为空符合 not_found。"
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "结论 not_found，证据为空。缺乏搜索关键词展示。"
     },
     {
       "question_id": "Q04_028",
-      "confidence": 1.0,
-      "review": "SMP 形态证据支持（NCPU/IPI），结论准确。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "NCPU 及多核启动证据支撑 SMP 结论。"
     },
     {
       "question_id": "Q04_029",
-      "confidence": 1.0,
-      "review": "AP 启动链证据明确（main 函数 hartid 判断），支撑 implemented。"
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "main 函数中 AP 启动逻辑证据充分。"
     },
     {
       "question_id": "Q04_030",
-      "confidence": 1.0,
-      "review": "IPI 实现证据明确（sbi_send_ipi），支撑 implemented。"
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "证据展示了 IPI 发送，但处理逻辑未在当前题证据中直接体现（依赖 trap 机制推断），证据略缺。"
     },
     {
       "question_id": "Q04_031",
-      "confidence": 1.0,
-      "review": "IPI 路径证据清晰，发送与处理逻辑对应，符合代码现状。"
+      "score_evidence": 0.6,
+      "score_consistency": 1.0,
+      "review": "价值描述了 IPI 处理路径（trap 机制），但证据仅展示了发送函数，未展示 trap 入口处理 IPI 的代码，证据与结论不完全匹配。"
     },
     {
       "question_id": "Q04_032",
-      "confidence": 1.0,
-      "review": "Per-CPU 变量证据明确（cpus 数组），支撑 implemented。"
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "cpus 数组及 mycpu 证据充分。"
     },
     {
       "question_id": "Q04_033",
-      "confidence": 1.0,
-      "review": "Per-CPU 实现方式证据支持数组索引+hartid，逻辑清晰。"
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "数组索引及 tp 寄存器初始化证据充分。"
     },
     {
       "question_id": "Q04_034",
-      "confidence": 1.0,
-      "review": "负载均衡未实现，证据为空符合 not_found，与全局队列一致。"
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "结论 not_found，证据为空。缺乏搜索关键词展示。"
     },
     {
       "question_id": "Q04_035",
-      "confidence": 1.0,
-      "review": "TLB shootdown 未实现，证据为空符合 not_found，存在多核一致性风险。"
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "结论 not_found，证据为空。缺乏搜索关键词展示。"
     },
     {
       "question_id": "Q04_036",
-      "confidence": 1.0,
-      "review": "交叉一致性回答详细，证据覆盖各章关键点，逻辑自洽。"
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "四项一致性回答完整，证据覆盖了 TLB 刷新和多核启动，但锁安全性部分依赖 Q04_037，本題证据略分散。"
     },
     {
       "question_id": "Q04_037",
-      "confidence": 0.9,
-      "review": "关中断证据主要为注释与锁使用上下文，未直接展示 acquire 实现，但基于 xv6 惯例逻辑合理。"
+      "score_evidence": 0.4,
+      "score_consistency": 1.0,
+      "review": "价值声称获取锁时关中断，但证据仅为 sched 中的检查注释和 sleep 中的宏调用，未展示 acquire 函数内部关中断的实现，证据无法直接支撑结论。"
     },
     {
       "question_id": "Q04_038",
-      "confidence": 1.0,
-      "review": "NCPU 与链接脚本对应证据充分，宏定义与内存布局一致。"
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "NCPU、链接脚本及栈布局证据充分，对应关系清晰。"
     },
     {
       "question_id": "Q04_039",
-      "confidence": 1.0,
-      "review": "原子变量未使用，证据支持全局变量自增（潜在竞态），结论准确反映代码现状。"
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "结论 not_found，证据为空。与 Q04_012 自洽，但缺乏搜索证据。"
     },
     {
       "question_id": "Q04_040",
-      "confidence": 1.0,
-      "review": "实时调度未实现，证据为空符合 not_found。"
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "结论 not_found，证据为空。缺乏搜索关键词展示。"
     },
     {
       "question_id": "Q04_041",
-      "confidence": 1.0,
-      "review": "NUMA 未实现，证据为空符合 not_found，符合嵌入式架构特征。"
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "结论 not_found，证据为空。缺乏搜索关键词展示。"
     }
   ],
-  "dimensions": {
-    "evidence_supports_answers": 0.98,
-    "question_answer_consistency": 1.0,
-    "requirements_fit": 1.0
-  },
-  "findings": [
-    {
-      "severity": "info",
-      "topic": "Q04_023 调度指标表述",
-      "detail": "证据主要展示资源记账（getrusage/tms），而非调度器主动优化指标，建议区分“统计”与“优化”。"
-    },
-    {
-      "severity": "warn",
-      "topic": "Q04_039 PID 分配竞态",
-      "detail": "多核环境下使用非原子全局变量自增分配 PID，存在竞态风险，但模型如实反映了代码现状。"
-    },
-    {
-      "severity": "warn",
-      "topic": "Q04_035 TLB 一致性",
-      "detail": "未实现 TLB shootdown，多核页表修改后可能存在 TLB 不一致风险，模型已正确标识为 not_found。"
-    }
-  ],
-  "summary_zh": "模型输出质量高，证据链完整，覆盖了进程、调度、多核核心机制。41 道题目全部作答，格式符合 JSON-QA 契约。主要风险点在于 SMP 下的 PID 分配非原子性（Q04_039）及缺乏 TLB Shootdown（Q04_035），这在多核环境下可能引发一致性或竞态问题，但模型如实反映了代码现状。Q04_023 对“优化”的表述略高于证据支持的“记账”范畴。整体置信度极高，可作为可靠的代码审计依据。",
+  "findings": [],
+  "summary_zh": "本报告整体题面相符度高，大部分实现类问题（如上下文切换、调度入口、多核启动）证据详实。主要不足在于：1. 部分负面结论（not_found）题目证据为空，缺乏搜索关键词或路径说明，证据支撑度受限；2. Q04_023 声称调度优化多项指标但仅展示会计结构，证据不足以支撑优化逻辑；3. Q04_031/Q04_037 关于 IPI 处理路径及自旋锁关中断实现的证据缺失关键代码片段。全阶段分按各题均值方案 A 汇总。",
+  "report_quality_score": 0.95,
   "_meta": {
+    "quality": {
+      "mean_question_confidence": 0.9518
+    },
     "review_model": "qwen3.5-plus"
   }
 }

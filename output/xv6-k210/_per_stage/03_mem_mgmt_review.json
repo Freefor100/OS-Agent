@@ -2,203 +2,220 @@
   "schema_version": "describe_review_v1",
   "stage_id": "03_mem_mgmt",
   "stage_title": "内存管理（物理/虚拟/分配器）",
-  "confidence": 0.98,
+  "confidence": 0.97,
   "question_reviews": [
     {
       "question_id": "Q03_001",
-      "confidence": 1.0,
-      "review": "作答切题，证据直接展示 C 语言结构体与文件路径，符合 xv6 风格特征，结论可信。"
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "答案选择符合题面选项约束。证据提供了文件路径及语言描述，能支撑 C 语言内核的结论，但 excerpt 为描述性文本而非代码片段，证据力度略减。"
     },
     {
       "question_id": "Q03_002",
-      "confidence": 1.0,
-      "review": "三态选择正确，证据列出分配器结构体与核心分配/释放函数，实现存在性确凿。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态值合法。证据列出了结构体定义及分配/释放函数签名，直接支撑 implemented 结论。"
     },
     {
       "question_id": "Q03_003",
-      "confidence": 1.0,
-      "review": "算法选择与证据一致，struct run 单链表及遍历函数明确指向空闲链表风格。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "选项匹配题面。证据展示了 struct run 链表结构及遍历函数，有效支撑空闲链表算法结论。"
     },
     {
       "question_id": "Q03_004",
-      "confidence": 1.0,
-      "review": "核心数据结构描述详细，证据包含结构体定义及全局变量实例，完全满足题目要求。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "简答内容完整。证据引用了核心结构体及全局变量定义，与 value 描述一致。"
     },
     {
       "question_id": "Q03_005",
-      "confidence": 1.0,
-      "review": "锁粒度描述清晰（分桶双锁），证据提供宏定义及持锁范围代码片段，支撑充分。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "简答明确了锁粒度。证据展示了锁获取宏及持锁范围代码，支撑分桶锁结论。"
     },
     {
       "question_id": "Q03_006",
-      "confidence": 1.0,
-      "review": "页表实现存在性确认，证据列出 walk/map/unmap 关键函数，符合三态要求。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态值合法。证据列出了 walk/map/unmap 关键函数签名，支撑页表实现结论。"
     },
     {
       "question_id": "Q03_007",
-      "confidence": 1.0,
-      "review": "API 列举准确，证据包含函数签名与行号，满足关键入口举证要求。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "列出了关键 API 及行号。证据与 value 中的函数名及路径完全对应。"
     },
     {
       "question_id": "Q03_008",
-      "confidence": 0.9,
-      "review": "并发控制结论合理（依赖中断关闭与地址空间隔离），证据引用 trap 返回路径与 TLB 刷新，虽无显式锁证据但符合 xv6 类设计逻辑。"
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "简答描述了并发控制机制。证据主要展示关中断指令，对“地址空间隔离”作为并发控制手段的证据支撑稍弱，需推断。"
     },
     {
       "question_id": "Q03_009",
-      "confidence": 1.0,
-      "review": "地址空间关系判断准确，TRAMPOLINE 宏与 uvmcopy 行为证据充分支持共享页表结论。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "选项匹配题面。证据展示了 TRAMPOLINE 宏及页表复制逻辑，支撑共享页表结论。"
     },
     {
       "question_id": "Q03_010",
-      "confidence": 1.0,
-      "review": "缺页处理实现确认，证据包含统一分发函数与 trap 入口调用，链路清晰。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态值合法。证据展示了缺页处理入口及异常分发调用，支撑 implemented 结论。"
     },
     {
       "question_id": "Q03_011",
-      "confidence": 1.0,
-      "review": "缺页链路追踪完整，从 trap 到 alloc/map 关键节点均有证据支撑，逻辑闭环。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "链路描述清晰。证据展示了调用链中的关键函数及参数传递，支撑链路追踪。"
     },
     {
       "question_id": "Q03_012",
-      "confidence": 1.0,
-      "review": "CoW 实现确认，证据展示 fork 时标记 COW 位及 fault 时处理逻辑，触发点明确。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态值合法。证据展示了 COW 位标记及缺页处理逻辑，支撑 implemented 结论。"
     },
     {
       "question_id": "Q03_013",
-      "confidence": 1.0,
-      "review": "惰性分配实现确认，证据指出 HEAP/STACK 段在 fault 中分配，符合 Lazy 定义。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态值合法。证据展示了惰性分配处理函数及分发逻辑，支撑 implemented 结论。"
     },
     {
       "question_id": "Q03_014",
-      "confidence": 1.0,
-      "review": "Swap 未找到结论可信，证据展示搜索关键字无匹配，符合无页面置换系统特征。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态值合法。证据展示了搜索结果“未发现”，支撑 not_found 结论。"
     },
     {
       "question_id": "Q03_015",
-      "confidence": 1.0,
-      "review": "mmap 实现确认，证据包含系统调用入口、核心处理函数及 fault 联动，功能完整。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态值合法。证据展示了 mmap 系统调用及处理函数，支撑 implemented 结论。"
     },
     {
       "question_id": "Q03_016",
-      "confidence": 1.0,
-      "review": "Page Cache 存在性确认，bio.c 及 LRU 链表证据充分，符合缓冲缓存实现。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态值合法。证据展示了 buffer cache 结构及 LRU 链表，支撑 implemented 结论。"
     },
     {
       "question_id": "Q03_017",
-      "confidence": 1.0,
-      "review": "脏页回写机制确认，证据指出异步提交机制及注释说明，满足题目要求。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态值合法。证据展示了异步写回函数及注释，支撑 implemented 结论。"
     },
     {
       "question_id": "Q03_018",
-      "confidence": 1.0,
-      "review": "TLB 射击未找到结论可信，证据展示搜索无匹配及 IPI 代码被注释，支撑充分。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态值合法。证据展示了搜索结果及被注释的 IPI 代码，支撑 not_found 结论。"
     },
     {
       "question_id": "Q03_019",
-      "confidence": 1.0,
-      "review": "TLB 刷新指令定位准确，sfence_vma 封装及调用点证据具体，符合 RISC-V 架构。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "简答明确指令。证据展示了内联汇编实现及调用点，支撑结论。"
     },
     {
       "question_id": "Q03_020",
-      "confidence": 1.0,
-      "review": "用户指针检查机制描述详尽，硬件 PTE 检查与软件段检查双重证据确凿。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "简答描述了双重保护。证据展示了页表检查及段检查函数，支撑结论。"
     },
     {
       "question_id": "Q03_021",
-      "confidence": 1.0,
-      "review": "页面置换算法未实现结论与 Q03_014 一致，搜索证据支撑充分。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "选项匹配题面。证据展示了搜索结果，支撑未实现结论。"
     },
     {
       "question_id": "Q03_022",
-      "confidence": 1.0,
-      "review": "工作集模型未找到结论可信，证据列出已搜关键字，符合简单内核特征。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态值合法。证据展示了关键字搜索结果，支撑 not_found 结论。"
     },
     {
       "question_id": "Q03_023",
-      "confidence": 0.95,
-      "review": "内存参数填写完整，证据引用宏定义常量；6MB 为近似计算值（0x5E0000），基本准确。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "填空内容完整。证据引用了内存布局宏定义，支撑数值计算。"
     },
     {
       "question_id": "Q03_024",
-      "confidence": 1.0,
-      "review": "内存保护机制结论与 Q03_020 一致，硬件 + 软件双重保护证据相互印证。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "选项匹配题面。证据展示了硬件检查及软件检查函数，支撑双重保护结论。"
     },
     {
       "question_id": "Q03_025",
-      "confidence": 1.0,
-      "review": "逻辑内存组织结构明确，struct seg 链表证据包含字段定义与进程结构引用。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "简答描述了管理结构。证据展示了 seg 结构体及 proc 字段，支撑结论。"
     },
     {
       "question_id": "Q03_026",
-      "confidence": 1.0,
-      "review": "硬件分段机制判断准确，证据区分软件 seg 结构与 RISC-V 纯分页架构。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "选项匹配题面。证据展示了架构头文件及软件段结构说明，支撑纯分页结论。"
     },
     {
       "question_id": "Q03_027",
-      "confidence": 1.0,
-      "review": "取页策略判断为按需调页，证据指向缺页处理函数，符合 Demand Paging 定义。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "选项匹配题面。证据展示了缺页分配逻辑，支撑按需调页结论。"
     },
     {
       "question_id": "Q03_028",
-      "confidence": 1.0,
-      "review": "放置策略描述为首次适配，证据展示链表遍历查找空闲间隙逻辑，支撑合理。"
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "简答描述了放置策略。证据 excerpt 为功能描述而非具体循环代码，需少量推断支撑 first-fit 结论。"
     },
     {
       "question_id": "Q03_029",
-      "confidence": 1.0,
-      "review": "驻留集管理未找到结论可信，证据列出搜索关键字，符合无复杂负载控制系统。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态值合法。证据展示了关键字搜索结果，支撑 not_found 结论。"
     },
     {
       "question_id": "Q03_030",
-      "confidence": 1.0,
-      "review": "内存主链路 Mermaid 图清晰，节点包含路径行号，证据链闭合且逻辑通顺。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "Mermaid 链路清晰。证据展示了链路中关键节点的调用关系，支撑主链路描述。"
     },
     {
       "question_id": "Q03_031",
-      "confidence": 0.95,
-      "review": "碎片类型判断为外部碎片，证据基于空闲链表分配器特性，推论合理。"
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "选项匹配题面。证据 excerpt 为代码逻辑推断（可能因碎片化失败），非直接错误日志，证据力度略减。"
     },
     {
       "question_id": "Q03_032",
-      "confidence": 1.0,
-      "review": "地址重定位时机判断为运行时，证据引用 SATP 寄存器与页表遍历，符合 MMU 机制。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "选项匹配题面。证据展示了 SATP 寄存器及页表遍历，支撑运行时绑定结论。"
     },
     {
       "question_id": "Q03_033",
-      "confidence": 1.0,
-      "review": "置换作用域结论与 Q03_014/021 一致，未实现置换证据充分。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "选项匹配题面。证据展示了搜索结果，支撑未实现结论。"
     },
     {
       "question_id": "Q03_034",
-      "confidence": 1.0,
-      "review": "清理策略实现确认，证据与 Q03_017 一致，异步写回机制描述准确。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态值合法。证据展示了异步写回函数及注释，支撑 implemented 结论。"
     }
   ],
-  "dimensions": {
-    "evidence_supports_answers": 1.0,
-    "question_answer_consistency": 1.0,
-    "requirements_fit": 1.0
-  },
-  "findings": [
-    {
-      "severity": "info",
-      "topic": "证据粒度高质量",
-      "detail": "大部分题目证据包含具体文件路径、符号名称及代码片段/行号，支撑力度强。"
-    },
-    {
-      "severity": "info",
-      "topic": "跨题一致性良好",
-      "detail": "关于 Swap、Page Replacement、Cleaning Policy 等关联题目的结论相互印证，无逻辑冲突。"
-    },
-    {
-      "severity": "info",
-      "topic": "Q03_023 数值近似",
-      "detail": "物理内存总量 6MB 为基于宏定义的近似计算，实际约为 5.87MB，但不影响整体可信度。"
-    }
-  ],
-  "summary_zh": "本阶段 34 道题目评审完成。模型输出整体质量极高，所有题目均提供了具体的代码证据（文件、符号、片段），且证据与结论逻辑一致。关键内存管理模块（物理分配器、页表、缺页处理、mmap、CoW）均有实现证据支撑；未实现功能（Swap、TLB Shootdown、Working Set）也提供了搜索负证据。跨题目结论（如置换策略、保护机制）高度自洽。仅 Q03_023 内存大小计算为近似值，Q03_008 并发控制证据略依赖 trap 上下文惯例，但不影响整体高置信度。全阶段无阻塞性问题，可直接采纳。",
+  "findings": [],
+  "summary_zh": "本报告整体题面相符度高，JSON 契约履行良好。绝大多数题目的 value 与 evidence 逻辑一致，证据引用具体（路径、符号、代码片段）。少数题目（如并发控制、放置策略、碎片分析）的证据 excerpt 偏向功能描述或逻辑推断，而非直接代码逻辑展示，导致证据支撑度略有保留。全阶段置信度按各题均值方案 A 汇总，无严重阻断项。",
+  "report_quality_score": 0.97,
   "_meta": {
+    "quality": {
+      "mean_question_confidence": 0.9706
+    },
     "review_model": "qwen3.5-plus"
   }
 }

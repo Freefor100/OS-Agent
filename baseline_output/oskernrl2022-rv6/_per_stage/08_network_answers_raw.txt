@@ -1,0 +1,168 @@
+```json
+{
+  "schema_version": "v1",
+  "stage_id": "08_network",
+  "stage_title": "网络子系统与协议栈",
+  "terminology_profile": "stallings_en_zh",
+  "answers": [
+    {
+      "question_id": "Q08_001",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在网络子系统实现（协议栈或 socket 层）？",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "src/include/socket.h",
+          "symbol_kind": "file",
+          "symbol_name": "socket.h",
+          "excerpt": "仅存在 socket.h 头文件定义 socket_connection 结构体，但未见实际实现文件。声明了 socket_init() 和 add_socket() 但无对应实现。"
+        },
+        {
+          "path": "syscall/sys.sh",
+          "symbol_kind": "search",
+          "symbol_name": "syscall_list",
+          "excerpt": "系统调用列表中未见 socket/bind/connect/sendto/recvfrom 等网络相关系统调用。最高 syscall 号为 276 (renameat2)，无网络 syscall。"
+        },
+        {
+          "path": "src/sysfile.c",
+          "symbol_kind": "read",
+          "symbol_name": "sys_sendfile",
+          "excerpt": "存在 sys_sendfile 但这是文件间数据传输，非网络 socket 发送。文件类型仅支持 FD_NONE/FD_PIPE/FD_ENTRY/FD_DEVICE，无 FD_SOCKET。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q08_002",
+      "question_type": "single_choice",
+      "stem": "协议栈来源更接近哪种？",
+      "value": "未发现",
+      "evidence": [
+        {
+          "path": "src/",
+          "symbol_kind": "search",
+          "symbol_name": "protocol_stack",
+          "excerpt": "在附件源码中检索 smoltcp/lwip/tcp/udp/ip/ethernet 等关键词，未发现任何协议栈实现。README 虽提及'Socket 支持'但代码中无实际实现。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q08_003",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 socket 系统调用接口（socket/bind/connect/sendto/recvfrom 等）？",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "syscall/sys.sh",
+          "symbol_kind": "search",
+          "symbol_name": "syscall_entries",
+          "excerpt": "系统调用生成脚本中 entry 列表从 getcwd(17) 到 renameat2(276)，无 socket/bind/connect/sendto/recvfrom/listen/accept 等网络 syscall。"
+        },
+        {
+          "path": "src/syscall.c",
+          "symbol_kind": "read",
+          "symbol_name": "syscalls_array",
+          "excerpt": "syscall 函数指针数组仅包含文件/进程/内存相关系统调用，无网络相关 syscall 处理函数。"
+        },
+        {
+          "path": "src/include/file.h",
+          "symbol_kind": "read",
+          "symbol_name": "file_type_enum",
+          "excerpt": "文件类型枚举仅包含 FD_NONE/FD_PIPE/FD_ENTRY/FD_DEVICE，无 FD_SOCKET 类型。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q08_004",
+      "question_type": "short_answer",
+      "stem": "选择一个发送路径（优先 sys_sendto），追踪：syscall → 协议栈 → 网卡驱动。列 3-6 个关键节点并给证据。",
+      "value": "未发现网络发送路径实现。代码中不存在 sys_sendto 或类似网络发送系统调用，无协议栈和网卡驱动实现。",
+      "evidence": [
+        {
+          "path": "syscall/sys.sh",
+          "symbol_kind": "search",
+          "symbol_name": "sendto_search",
+          "excerpt": "检索 syscall/sys.sh 中所有 entry 定义，未找到 sendto/sendmsg/socket 等网络发送相关系统调用。"
+        },
+        {
+          "path": "src/sysfile.c",
+          "symbol_kind": "read",
+          "symbol_name": "sys_sendfile",
+          "excerpt": "存在 sys_sendfile 但这是文件描述符间数据传输 (fin->fout)，非网络发送。实现为 filesend() 函数，在文件层操作。"
+        },
+        {
+          "path": "src/",
+          "symbol_kind": "search",
+          "symbol_name": "network_driver",
+          "excerpt": "检索 virtio-net/e1000/network/ethernet 等关键词，未发现网卡驱动实现。仅存在 disk.c/virtio_disk.c 等存储驱动。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q08_005",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现网卡驱动（virtio-net/e1000 等）与收包中断路径？",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "src/disk.c",
+          "symbol_kind": "read",
+          "symbol_name": "disk_intr",
+          "excerpt": "存在 disk_intr() 但这是磁盘中断处理，非网络收包中断。注释中 DISK_IRQ 相关代码被注释掉。"
+        },
+        {
+          "path": "src/trap.c",
+          "symbol_kind": "read",
+          "symbol_name": "devintr",
+          "excerpt": "devintr() 函数仅处理 timer_tick() 时钟中断和 UART0_IRQ 串口中断，无网络中断处理逻辑。"
+        },
+        {
+          "path": "src/",
+          "symbol_kind": "search",
+          "symbol_name": "virtio_net",
+          "excerpt": "检索 virtio_net/virtio-net/e1000/network_driver 等关键词，未发现任何网卡驱动实现文件。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q08_006",
+      "question_type": "multi_choice",
+      "stem": "协议支持情况（多选；未发现则留空并在 notes 写 not_found）",
+      "value": [],
+      "evidence": [
+        {
+          "path": "src/",
+          "symbol_kind": "search",
+          "symbol_name": "protocol_search",
+          "excerpt": "在附件源码中检索 TCP/UDP/IP/ARP/ICMP/DHCP/DNS/Ethernet 等协议相关关键词，未发现任何协议实现。代码中无网络协议栈。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q08_007",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在零拷贝/共享缓冲/DMA 描述符等路径（zero-copy）？",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "src/sysfile.c",
+          "symbol_kind": "read",
+          "symbol_name": "sys_sendfile",
+          "excerpt": "sys_sendfile 实现使用中间 buf[512] 缓冲区进行数据拷贝 (fileinput->buf->fileoutput)，非零拷贝实现。"
+        },
+        {
+          "path": "src/",
+          "symbol_kind": "search",
+          "symbol_name": "zero_copy",
+          "excerpt": "检索 zero_copy/zero-copy/DMA_descriptor/shared_buffer 等关键词，未发现网络零拷贝相关实现。仅存在常规内存拷贝 (copyin/copyout/memmove)。"
+        },
+        {
+          "path": "src/copy.c",
+          "symbol_kind": "read",
+          "symbol_name": "copy_functions",
+          "excerpt": "copyin/copyout/copyinstr 等函数均通过 walkaddr 找到物理地址后进行 memmove 拷贝，无零拷贝优化路径。"
+        }
+      ]
+    }
+  ]
+}
+```

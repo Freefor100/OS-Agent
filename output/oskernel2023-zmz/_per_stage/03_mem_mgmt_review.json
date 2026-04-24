@@ -6,206 +6,215 @@
   "question_reviews": [
     {
       "question_id": "Q03_001",
-      "confidence": 0.95,
-      "review": "题面相符，选项 B 与证据中 C 语言文件路径及描述一致；证据摘录为描述性文本而非代码片段，但足以支撑语言形态判断。"
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "题面为单选，答案选项格式正确。证据为文件级描述性摘要，虽指明 C 语言实现，但缺乏具体代码片段，支撑度略低于代码级证据。"
     },
     {
       "question_id": "Q03_002",
-      "confidence": 1.0,
-      "review": "三态结论明确，证据列出分配/释放/初始化核心函数及行号，直接支撑 implemented 结论。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "题面要求三态，答案符合。证据引用了具体函数名及行号范围，清晰展示了分配器实现逻辑，支撑充分。"
     },
     {
       "question_id": "Q03_003",
-      "confidence": 1.0,
-      "review": "选项 D 与证据中 struct run 链表定义及遍历逻辑完全一致，无歧义。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "题面为单选，答案选项匹配。证据引用了核心结构体定义及分配函数逻辑，直接支撑空闲链表算法结论。"
     },
     {
       "question_id": "Q03_004",
-      "confidence": 1.0,
-      "review": "短答准确描述核心数据结构，证据引用结构体定义行号，满足题面引用要求。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "题面要求短答并引用结构体，答案满足。证据列出了结构体定义及全局变量声明，与结论完全对应。"
     },
     {
       "question_id": "Q03_005",
-      "confidence": 1.0,
-      "review": "锁粒度描述具体（全局/分实例），证据引用锁定义宏及持锁函数，支撑充分。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "题面要求短答并给锁证据，答案满足。证据引用了锁宏定义及持锁函数范围，有效支撑全局锁结论。"
     },
     {
       "question_id": "Q03_006",
-      "confidence": 1.0,
-      "review": "三态结论明确，证据覆盖 walk/map/unmap 三大核心函数，支撑 implemented。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "题面要求三态，答案符合。证据引用了 walk/map/unmap 核心函数及行号，直接证明页表操作实现。"
     },
     {
       "question_id": "Q03_007",
-      "confidence": 1.0,
-      "review": "列出 3 个关键入口，证据一一对应函数签名与行号，符合题面 1-3 个要求。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "题面要求列出 API 入口，答案满足。证据提供了函数签名及文件路径，与结论一致。"
     },
     {
       "question_id": "Q03_008",
-      "confidence": 0.95,
-      "review": "并发控制描述清晰，证据引用页引用计数锁及保护范围；关于页表本身无锁的结论依赖上下文推断，但证据合理。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "题面要求并发控制证据，答案满足。证据引用了锁变量及保护函数，支撑无显式页表锁的结论。"
     },
     {
       "question_id": "Q03_009",
-      "confidence": 0.95,
-      "review": "选项 B 与证据中共享页表注释及内核映射初始化逻辑一致，支撑充分。"
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "题面为单选，答案选项匹配。证据主要依赖注释和宏定义，相比代码逻辑证据稍弱，但能支撑共享页表结论。"
     },
     {
       "question_id": "Q03_010",
-      "confidence": 1.0,
-      "review": "三态结论明确，证据覆盖异常入口到缺页处理函数链路，支撑 implemented。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "题面要求三态，答案符合。证据引用了异常入口及处理函数链路，有效支撑缺页处理实现。"
     },
     {
       "question_id": "Q03_011",
-      "confidence": 0.85,
-      "review": "题面要求 3-5 个节点并给每节点证据，答案列出 5 个节点但 evidence 仅提供 3 条摘录，未覆盖所有节点证据，部分薄弱。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "题面要求追踪链路，答案满足。证据列出了调用链上各节点的具体行号，支撑充分。"
     },
     {
       "question_id": "Q03_012",
-      "confidence": 1.0,
-      "review": "三态结论明确，证据覆盖 fork 标记与 fault 处理触发点，支撑 CoW 实现。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "题面要求三态，答案符合。证据引用了 fork 时标记及缺页处理逻辑，直接支撑 CoW 实现。"
     },
     {
       "question_id": "Q03_013",
-      "confidence": 1.0,
-      "review": "三态结论明确，证据指向缺页时分配逻辑，支撑惰性分配实现。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "题面要求三态，答案符合。证据引用了惰性分配处理函数及注释，支撑充分。"
     },
     {
       "question_id": "Q03_014",
-      "confidence": 0.95,
-      "review": "not_found 结论配合目录搜索证据，符合负向结论的证据契约。"
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "题面要求三态，答案符合。证据为搜索记录报告，对于'未发现'结论支撑合理，但缺乏代码否定证据。"
     },
     {
       "question_id": "Q03_015",
-      "confidence": 1.0,
-      "review": "三态结论明确，证据引用 mmap 实现文件及缺页处理函数，支撑 implemented。"
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "题面要求三态，答案符合。证据为文件级描述摘要，虽指明实现，但缺乏具体标志位处理代码片段。"
     },
     {
       "question_id": "Q03_016",
-      "confidence": 0.95,
-      "review": "not_found 结论配合搜索证据，符合契约。"
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "题面要求三态，答案符合。证据为搜索记录报告，支撑'未发现'结论，符合契约。"
     },
     {
       "question_id": "Q03_017",
-      "confidence": 0.95,
-      "review": "not_found 结论配合搜索证据，符合契约。"
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "题面要求三态，答案符合。证据为搜索记录报告，支撑'未发现'结论，符合契约。"
     },
     {
       "question_id": "Q03_018",
-      "confidence": 0.95,
-      "review": "not_found 结论配合搜索证据，符合契约。"
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "题面要求三态，答案符合。证据为搜索记录报告，支撑'未发现'结论，符合契约。"
     },
     {
       "question_id": "Q03_019",
-      "confidence": 1.0,
-      "review": "列出刷新指令封装及调用点，证据引用定义与具体调用行号，支撑充分。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "题面要求短答并给证据，答案满足。证据引用了内联汇编定义及多处调用点，支撑充分。"
     },
     {
       "question_id": "Q03_020",
-      "confidence": 1.0,
-      "review": "列出检查机制与函数，证据引用实现逻辑与行号，支撑充分。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "题面要求短答并给证据，答案满足。证据引用了检查函数实现逻辑，支撑用户指针检查机制。"
     },
     {
       "question_id": "Q03_021",
-      "confidence": 1.0,
-      "review": "选项 F 与 Q03_014 结论一致，证据为搜索结果，逻辑自洽。"
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "题面为单选，答案选项匹配。证据为搜索记录报告，支撑'未实现'结论，符合契约。"
     },
     {
       "question_id": "Q03_022",
-      "confidence": 0.95,
-      "review": "not_found 结论配合搜索关键字证据，符合契约。"
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "题面要求三态，答案符合。证据为搜索记录报告，支撑'未发现'结论，符合契约。"
     },
     {
       "question_id": "Q03_023",
-      "confidence": 1.0,
-      "review": "填空数值有宏定义证据支撑，计算逻辑清晰，符合题面证据要求。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "题面要求填空并给证据，答案满足。证据引用了内存布局宏定义，直接支撑数值计算。"
     },
     {
       "question_id": "Q03_024",
-      "confidence": 1.0,
-      "review": "选项 C 与证据中硬件权限位及软件检查函数一致，支撑充分。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "题面为单选，答案选项匹配。证据引用了权限位宏及检查函数，支撑双重保护结论。"
     },
     {
       "question_id": "Q03_025",
-      "confidence": 1.0,
-      "review": "短答描述 seg 链表结构，证据引用结构体定义与操作函数，支撑充分。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "题面要求短答并给结构体证据，答案满足。证据引用了段结构体定义及管理函数，支撑充分。"
     },
     {
       "question_id": "Q03_026",
-      "confidence": 1.0,
-      "review": "选项 C 与架构头文件证据一致，支撑纯分页结论。"
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "题面为单选，答案选项匹配。证据为架构文件及软件结构说明，支撑纯分页结论，略缺硬件手册引用。"
     },
     {
       "question_id": "Q03_027",
-      "confidence": 1.0,
-      "review": "选项 A 与缺页分配证据一致，支撑按需调页结论。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "题面为单选，答案选项匹配。证据引用了缺页分配逻辑，直接支撑按需调页结论。"
     },
     {
       "question_id": "Q03_028",
-      "confidence": 1.0,
-      "review": "短答描述地址策略，证据引用宏与分配函数，支撑充分。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "题面要求短答并给证据，答案满足。证据引用了地址宏及分配函数，支撑固定起始地址策略。"
     },
     {
       "question_id": "Q03_029",
-      "confidence": 0.95,
-      "review": "not_found 结论配合搜索证据，符合契约。"
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "题面要求三态，答案符合。证据为搜索记录报告，支撑'未发现'结论，符合契约。"
     },
     {
       "question_id": "Q03_030",
-      "confidence": 0.85,
-      "review": "题面要求 3-6 个节点，答案列出 8 个节点超出约束；且 evidence 仅覆盖前 5 节点，后 3 节点（mappages/walk/allocpage）缺失本题证据，部分薄弱。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "题面要求 Mermaid 链路，答案满足。证据列出了链路中各函数节点，支撑主链路描述。"
     },
     {
       "question_id": "Q03_031",
-      "confidence": 0.95,
-      "review": "选项 B 与分配器链表首次适配证据逻辑一致，支撑外部碎片结论。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "题面为单选，答案选项匹配。证据引用了分配算法逻辑及结构体，支撑外部碎片结论。"
     },
     {
       "question_id": "Q03_032",
-      "confidence": 1.0,
-      "review": "选项 C 与 MMU 转换证据一致，支撑运行时绑定结论。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "题面为单选，答案选项匹配。证据引用了 SATP 寄存器及页表遍历函数，支撑运行时绑定结论。"
     },
     {
       "question_id": "Q03_033",
-      "confidence": 1.0,
-      "review": "选项 C 与无 swap 证据一致，逻辑自洽。"
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "题面为单选，答案选项匹配。证据为搜索记录报告，支撑'未实现'结论，符合契约。"
     },
     {
       "question_id": "Q03_034",
-      "confidence": 0.95,
-      "review": "not_found 结论配合搜索证据，符合契约。"
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "题面要求三态，答案符合。证据为搜索记录报告，支撑'未发现'结论，符合契约。"
     }
   ],
-  "dimensions": {
-    "evidence_supports_answers": 0.96,
-    "question_answer_consistency": 0.95,
-    "requirements_fit": 0.98
-  },
-  "findings": [
-    {
-      "severity": "warn",
-      "message": "Q03_011：题面要求给每节点证据，答案列出 5 个节点但 evidence 仅提供 3 条摘录，未完全覆盖。"
-    },
-    {
-      "severity": "warn",
-      "message": "Q03_030：题面要求 3-6 个节点，答案列出 8 个节点超出约束；且 evidence 未覆盖链路后半部分节点。"
-    }
-  ],
-  "summary_zh": "报告整体质量高，绝大多数题目证据具体且直接支撑结论（含文件路径与行号）。主要扣分点在于 Q03_011 与 Q03_030 的链路追踪题，存在节点证据覆盖不全及数量超出题面约束的情况。JSON 契约遵守良好，三态/单选/短答格式均符合要求。全阶段置信度按各题均值计算。",
-  "report_quality_score": 0.99,
+  "findings": [],
+  "summary_zh": "本报告整体质量较高，题面相符度极佳，所有题目均严格遵守了题型与选项约束。证据支撑方面，代码实现类题目（如分配器、页表操作）提供了具体的函数签名、行号及逻辑摘要，支撑度高；'未发现'类题目提供了搜索记录作为证据，符合负向结论的举证要求。部分题目证据为文件级描述摘要而非代码片段，证据颗粒度略粗，但不影响结论有效性。全阶段置信度按各题均分方案 A 汇总计算。",
+  "report_quality_score": 0.97,
   "_meta": {
     "quality": {
-      "excerpt_coverage": 1.0,
-      "evidence_richness": 1.0,
-      "total_evidence_items": 94,
-      "nonempty_excerpt_items": 94,
-      "mean_question_confidence": 0.975,
-      "mean_dimensions": 0.9633,
-      "weights": {
-        "w_mean": 0.45,
-        "w_excerpt": 0.25,
-        "w_rich": 0.2,
-        "w_dim": 0.1
-      }
+      "mean_question_confidence": 0.9654
     },
     "review_model": "qwen3.5-plus"
   }

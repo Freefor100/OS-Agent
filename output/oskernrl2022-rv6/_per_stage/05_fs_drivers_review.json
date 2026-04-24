@@ -1,0 +1,217 @@
+{
+  "schema_version": "describe_review_v1",
+  "stage_id": "05_fs_drivers",
+  "stage_title": "文件系统与设备 I/O",
+  "confidence": 0.75,
+  "question_reviews": [
+    {
+      "question_id": "Q05_001",
+      "confidence": 0.95,
+      "review": "Value 明确回答接口形态为 C 函数指针表 + 结构体，evidence 提供了 struct file 定义及分发逻辑代码，直接支撑结论。"
+    },
+    {
+      "question_id": "Q05_002",
+      "confidence": 0.95,
+      "review": "Value 选择与题面 Choice A 一致，evidence 展示 FAT32 初始化及磁盘读写，支撑真实磁盘文件系统结论。"
+    },
+    {
+      "question_id": "Q05_003",
+      "confidence": 0.9,
+      "review": "Value 声明自研并引用 fat32.c，evidence 为文件级摘要而非具体代码行，但足以支撑自研结论，略扣分为摘录粒度。"
+    },
+    {
+      "question_id": "Q05_004",
+      "confidence": 0.95,
+      "review": "Value 列出 6 个关键节点，evidence 覆盖 sys_openat、ename、filealloc 等核心函数，满足 3-6 个节点要求。"
+    },
+    {
+      "question_id": "Q05_005",
+      "confidence": 0.95,
+      "review": "Value 描述 Per-Process 固定数组，evidence 提供 proc.h 结构体定义及分配代码，直接支撑。"
+    },
+    {
+      "question_id": "Q05_006",
+      "confidence": 1.0,
+      "review": "Value 为 implemented，evidence 展示 bcache 结构体及 bget/bread 逻辑，证据充分无歧义。"
+    },
+    {
+      "question_id": "Q05_007",
+      "confidence": 0.95,
+      "review": "Value 指出 LRU 策略，evidence 引用代码注释及 brelse 移动链表逻辑，判断依据充分。"
+    },
+    {
+      "question_id": "Q05_008",
+      "confidence": 0.95,
+      "review": "Value 为 not_found，evidence 为多文件检索结果（无 page_cache 结构），支撑结论。"
+    },
+    {
+      "question_id": "Q05_009",
+      "confidence": 0.95,
+      "review": "Value 为 implemented，evidence 展示 do_mmap 及 sys_mmap 实现，支撑结论。"
+    },
+    {
+      "question_id": "Q05_010",
+      "confidence": 0.95,
+      "review": "Value 为 not_found，evidence 为系统调用表检索 0 命中，支撑结论。"
+    },
+    {
+      "question_id": "Q05_011",
+      "confidence": 0.95,
+      "review": "Value 为 implemented，evidence 展示 lookup_path 及 skipelem 逻辑，支撑路径解析结论。"
+    },
+    {
+      "question_id": "Q05_012",
+      "confidence": 0.95,
+      "review": "Value 为 not_found，evidence 为 symlink 相关标识符检索 0 命中，支撑结论。"
+    },
+    {
+      "question_id": "Q05_013",
+      "confidence": 0.95,
+      "review": "Value 为 implemented，evidence 展示 pipealloc 及 file.type=FD_PIPE，支撑 VFS 集成结论。"
+    },
+    {
+      "question_id": "Q05_014",
+      "confidence": 0.95,
+      "review": "Value 为 not_found，evidence 指出 file.h 无 FD_SOCKET 且 sys_socket 未实现，支撑结论。"
+    },
+    {
+      "question_id": "Q05_015",
+      "confidence": 0.95,
+      "review": "Value 为 not_found，evidence 说明设备节点在 FAT32 中创建而非独立伪文件系统，支撑结论。"
+    },
+    {
+      "question_id": "Q05_016",
+      "confidence": 0.95,
+      "review": "Value 选择 Per-Process，evidence 展示 proc 结构含 ofile 数组，支撑结论。"
+    },
+    {
+      "question_id": "Q05_017",
+      "confidence": 0.6,
+      "review": "Value 文本 'FAT 表内嵌空闲链' 与题面 Choices (A-F) 均不匹配（实为 Q05_018 的 Choice E），single_choice 题型未遵循选项约束，存在明显题答不一致。"
+    },
+    {
+      "question_id": "Q05_018",
+      "confidence": 0.95,
+      "review": "Value 文本与题面 Choice E 完全一致，evidence 展示 FAT 表扫描分配逻辑，支撑结论。"
+    },
+    {
+      "question_id": "Q05_019",
+      "confidence": 0.95,
+      "review": "Value 选择树形层次目录，evidence 展示多级路径解析及 mkdir 实现，支撑结论。"
+    },
+    {
+      "question_id": "Q05_020",
+      "confidence": 0.95,
+      "review": "Value 选择字节流，evidence 展示 eread/ewrite 按字节偏移操作，支撑结论。"
+    },
+    {
+      "question_id": "Q05_021",
+      "confidence": 0.95,
+      "review": "Value 选择硬编码，evidence 展示 devinit 硬编码注册及 memlayout.h 宏定义，支撑结论。"
+    },
+    {
+      "question_id": "Q05_022",
+      "confidence": 0.95,
+      "review": "Value 为 not_found，evidence 展示 main.c 接收 dtb 但未使用，支撑结论。"
+    },
+    {
+      "question_id": "Q05_023",
+      "confidence": 0.95,
+      "review": "Value 描述 C 语言 devsw 注册表，evidence 提供 struct devsw 定义及 allocdev 实现，支撑结论。"
+    },
+    {
+      "question_id": "Q05_024",
+      "confidence": 0.95,
+      "review": "Value 列出 4 个初始化节点，evidence 展示 main.c 调用序列，满足 3-6 个节点要求。"
+    },
+    {
+      "question_id": "Q05_025",
+      "confidence": 0.95,
+      "review": "Value 为 implemented，evidence 展示 consoleread/write 及 SBI 调用，支撑结论。"
+    },
+    {
+      "question_id": "Q05_026",
+      "confidence": 0.95,
+      "review": "Value 为 implemented，evidence 展示 sd_init 及 disk_read 实现，支撑结论。"
+    },
+    {
+      "question_id": "Q05_027",
+      "confidence": 0.95,
+      "review": "Value 为 not_found，evidence 为网络驱动相关标识符检索 0 命中，支撑结论。"
+    },
+    {
+      "question_id": "Q05_028",
+      "confidence": 0.95,
+      "review": "Value 为 stub，evidence 展示 trap.c 中 PLIC 代码被注释，支撑 stub 结论。"
+    },
+    {
+      "question_id": "Q05_029",
+      "confidence": 0.95,
+      "review": "Value 指出常量硬编码，evidence 展示 memlayout.h 宏及 sd.c 直接使用地址，支撑结论。"
+    },
+    {
+      "question_id": "Q05_030",
+      "confidence": 0.95,
+      "review": "Value 指出条件编译，evidence 展示 #ifdef QEMU 及 Makefile 规则，支撑结论。"
+    },
+    {
+      "question_id": "Q05_031",
+      "confidence": 0.95,
+      "review": "Value 为 not_found，evidence 说明使用 SBI 调用无地址切换，支撑结论。"
+    },
+    {
+      "question_id": "Q05_032",
+      "confidence": 0.95,
+      "review": "Value 选择缓冲池，evidence 展示 bcache 结构及 NBUF 定义，支撑结论。"
+    },
+    {
+      "question_id": "Q05_033",
+      "confidence": 0.95,
+      "review": "Value 选择 FCFS，evidence 展示无调度逻辑直接提交，支撑结论。"
+    },
+    {
+      "question_id": "Q05_034",
+      "confidence": 0.7,
+      "review": "Value 选择中断驱动，但 evidence 摘录明确指出 '实际实现为轮询'，结论与证据存在张力，仅部分支撑。"
+    },
+    {
+      "question_id": "Q05_035",
+      "confidence": 0.95,
+      "review": "Value 为 not_found，evidence 为 DMA 相关标识符检索 0 命中，支撑结论。"
+    }
+  ],
+  "dimensions": {
+    "evidence_supports_answers": 0.9,
+    "question_answer_consistency": 0.85,
+    "requirements_fit": 0.95
+  },
+  "findings": [
+    {
+      "severity": "warn",
+      "description": "Q05_017 (single_choice) 的 value 文本未匹配题面提供的 A-F 选项，而是使用了 Q05_018 的选项文本，违反单选题契约。"
+    },
+    {
+      "severity": "warn",
+      "description": "Q05_034 的 value 结论（中断驱动）与 evidence 摘录（实际为轮询）存在明显矛盾，证据支撑力不足。"
+    }
+  ],
+  "summary_zh": "报告整体证据充分，多数题目摘录能直接支撑结论。主要问题在于 Q05_017 未遵循 single_choice 选项约束（题答不一致），以及 Q05_034 结论与证据存在张力。全阶段 confidence 按方案 A 计算后因存在低于 0.7 的单项分被截断至 0.75。",
+  "report_quality_score": 0.96,
+  "_meta": {
+    "quality": {
+      "excerpt_coverage": 1.0,
+      "evidence_richness": 1.0,
+      "total_evidence_items": 98,
+      "nonempty_excerpt_items": 98,
+      "mean_question_confidence": 0.9329,
+      "mean_dimensions": 0.9,
+      "weights": {
+        "w_mean": 0.45,
+        "w_excerpt": 0.25,
+        "w_rich": 0.2,
+        "w_dim": 0.1
+      }
+    },
+    "review_model": "qwen3.5-plus"
+  }
+}

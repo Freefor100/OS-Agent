@@ -8,262 +8,261 @@
       "question_id": "Q04_001",
       "score_evidence": 0.95,
       "score_consistency": 1.0,
-      "review": "答案严格遵循题面格式要求，列出了类型名、路径、字段及 PCB/TCB 区分情况。证据摘录直接展示了 struct proc 定义，有效支撑了 value 中的字段声明。"
+      "review": "题面格式完全符合，四项要素齐全。证据摘录清晰展示了 struct proc 定义及关键字段，支撑结论充分。"
     },
     {
       "question_id": "Q04_002",
       "score_evidence": 0.95,
       "score_consistency": 1.0,
-      "review": "状态枚举与流转点描述完整，符合 short_answer 要求。证据提供了 enum 定义及 scheduler/sleep/exit 等关键函数的代码片段，直接证明了状态流转逻辑。"
+      "review": "状态枚举与流转点描述完整。证据覆盖了 enum 定义及 scheduler/sleep/exit 关键函数，逻辑闭环。"
     },
     {
       "question_id": "Q04_003",
       "score_evidence": 0.95,
       "score_consistency": 1.0,
-      "review": "三态题回答 implemented，符合契约。证据给出了 swtch.S 汇编片段，清晰展示了上下文保存/恢复指令，支撑充分。"
+      "review": "三态结论明确。证据直接给出 swtch 汇编实现，保存/恢复寄存器指令清晰，支撑 implemented 结论。"
     },
     {
       "question_id": "Q04_004",
       "score_evidence": 1.0,
       "score_consistency": 1.0,
-      "review": "详细列出了保存的寄存器集合，完全响应题面。证据同时提供了汇编指令和 context 结构体定义，证据链非常完整，无推断缺口。"
+      "review": "寄存器列表详尽。证据同时提供汇编指令与 context 结构体定义，完全对应，证据质量极高。"
     },
     {
       "question_id": "Q04_005",
       "score_evidence": 0.95,
       "score_consistency": 1.0,
-      "review": "算法名称选择了规定枚举中的 Priority，格式合规。证据展示了优先级数组及遍历选择逻辑，直接支撑了优先级调度的结论。"
+      "review": "算法分类符合题面枚举。证据展示了优先级数组及遍历选择逻辑，有效支撑 Priority 调度结论。"
     },
     {
       "question_id": "Q04_006",
       "score_evidence": 0.95,
       "score_consistency": 1.0,
-      "review": "列出了核心入口与关键函数，符合数量要求。证据提供了 scheduler/sched/yield 的函数体摘录，有效证明了入口点。"
+      "review": "入口函数列举符合 1-3 个要求。证据摘录了 scheduler/sched/yield 核心代码，路径清晰。"
     },
     {
       "question_id": "Q04_007",
-      "score_evidence": 0.95,
+      "score_evidence": 0.9,
       "score_consistency": 1.0,
-      "review": "三态题回答 implemented。证据展示了 clone 函数及地址空间复制调用，支撑了创建执行实体的结论。"
+      "review": "三态结论明确。证据展示了 clone 函数及 allocproc 调用，虽摘录略短但关键路径可见。"
     },
     {
       "question_id": "Q04_008",
       "score_evidence": 0.95,
       "score_consistency": 1.0,
-      "review": "明确回答了地址空间与文件表的复制路径。证据分别给出了 copysegs 和 copyfdtable 的代码片段，与 value 描述一致。"
+      "review": "明确回答了地址空间与文件表复制。证据分别指向 copysegs 与 copyfdtable，路径与功能对应准确。"
     },
     {
       "question_id": "Q04_009",
       "score_evidence": 0.95,
       "score_consistency": 1.0,
-      "review": "三态题回答 implemented。证据展示了 execve 函数及 ELF 加载逻辑，支撑了 exec 实现的结论。"
+      "review": "三态结论明确。证据展示 execve 解析 ELF 及加载段逻辑，支撑 implemented 结论。"
     },
     {
       "question_id": "Q04_010",
-      "score_evidence": 0.95,
+      "score_evidence": 0.9,
       "score_consistency": 1.0,
-      "review": "三态题回答 implemented。证据展示了 wait4 函数及子进程状态检查逻辑，支撑了 wait 实现的结论。"
+      "review": "三态结论明确。证据展示 wait4 循环检查子进程状态，虽摘录截断但关键逻辑 ZOMBIE 判断可见。"
     },
     {
       "question_id": "Q04_011",
       "score_evidence": 0.95,
       "score_consistency": 1.0,
-      "review": "单选题选择了 A，符合题面选项。证据展示了 wait4 中调用 sleep 及 sleep 中移除就绪队列的逻辑，支撑了真正阻塞的结论。"
+      "review": "选项选择正确。证据展示 sleep 移除就绪队列及 sched 切换，符合真正阻塞定义。"
     },
     {
       "question_id": "Q04_012",
       "score_evidence": 0.95,
       "score_consistency": 1.0,
-      "review": "描述了 PID 分配器为自增计数器。证据展示了全局变量__pid 及 allocproc 中的递增操作，支撑充分。"
+      "review": "分配机制描述清晰。证据展示全局变量自增及临界区保护，支撑自增计数器结论。"
     },
     {
       "question_id": "Q04_013",
-      "score_evidence": 0.95,
+      "score_evidence": 1.0,
       "score_consistency": 1.0,
-      "review": "描述了父子进程树存储结构。证据展示了 proc 结构体中的 child/parent/sibling 字段，直接支撑了 value。"
+      "review": "树结构描述准确。证据直接列出 proc 结构体中 child/parent/sibling 字段，完全匹配题面要求。"
     },
     {
       "question_id": "Q04_014",
-      "score_evidence": 0.9,
+      "score_evidence": 0.85,
       "score_consistency": 1.0,
-      "review": "三态题回答 implemented（信号）。证据为文件级摘录及函数名列表，虽非具体逻辑代码，但足以证明信号模块存在，符合题面要求。"
+      "review": "三态结论明确。证据为文件级摘要而非代码片段，虽说明信号实现但代码细节支撑稍弱。"
     },
     {
       "question_id": "Q04_015",
       "score_evidence": 0.95,
       "score_consistency": 1.0,
-      "review": "回答了多核一致性相关问题。证据展示了全局队列数组及迁移搜索结果为空，支撑了无每核队列/迁移的结论。"
+      "review": "交叉一致性回答完整。证据指出全局数组及无迁移实现，与结论一致。"
     },
     {
       "question_id": "Q04_016",
       "score_evidence": 0.95,
       "score_consistency": 1.0,
-      "review": "描述了 exit 资源回收调用链。证据展示了 exit 和 freeproc 函数体，涵盖了资源释放和父进程通知，支撑充分。"
+      "review": "回收路径描述清晰。证据展示 exit 调用链及 freeproc 资源释放，支撑结论。"
     },
     {
       "question_id": "Q04_017",
       "score_evidence": 0.9,
       "score_consistency": 1.0,
-      "review": "三态题回答 not_found。证据为搜索结果说明，虽无代码否定，但在审计上下文中可接受作为未实现依据。"
+      "review": "三态结论明确。证据为搜索结果说明未找到，符合 not_found 判定逻辑。"
     },
     {
       "question_id": "Q04_018",
       "score_evidence": 0.9,
       "score_consistency": 1.0,
-      "review": "三态题回答 not_found。证据为搜索结果说明，符合未实现类问题的证据形态。"
+      "review": "三态结论明确。证据为搜索结果说明未找到，符合 not_found 判定逻辑。"
     },
     {
       "question_id": "Q04_019",
       "score_evidence": 0.9,
       "score_consistency": 1.0,
-      "review": "单选题选择了 B。证据指出仅定义 struct proc，无独立 TCB，支撑了统一结构的结论。"
+      "review": "选项选择正确。证据指出仅定义 struct proc，支撑统一 Task 结构结论。"
     },
     {
       "question_id": "Q04_020",
       "score_evidence": 0.95,
       "score_consistency": 1.0,
-      "review": "三态题回答 implemented。证据展示了 scheduler 中 w_satp 和 sfence_vma 调用，直接证明了页表切换。"
+      "review": "三态结论明确。证据展示 w_satp 及 sfence_vma 调用，直接证明页表切换存在。"
     },
     {
       "question_id": "Q04_021",
       "score_evidence": 0.9,
       "score_consistency": 1.0,
-      "review": "单选题选择了 D。证据为搜索结果说明无用户级线程库，支撑了仅内核线程的结论。"
+      "review": "选项选择正确。证据为搜索结果说明无用户级线程库，支撑仅内核线程结论。"
     },
     {
       "question_id": "Q04_022",
       "score_evidence": 0.9,
       "score_consistency": 1.0,
-      "review": "三态题回答 not_found。证据为关键词搜索结果说明，符合未实现类问题的证据形态。"
+      "review": "三态结论明确。证据为关键词搜索结果未找到，符合 not_found 判定逻辑。"
     },
     {
       "question_id": "Q04_023",
       "score_evidence": 0.95,
       "score_consistency": 1.0,
-      "review": "多选题选择了 F。证据展示了 proc 结构体中仅含基础计时字段，注释说明无性能统计，支撑充分。"
+      "review": "多选选项符合题面。证据列出结构体字段并说明缺乏统计项，支撑未发现结论。"
     },
     {
       "question_id": "Q04_024",
       "score_evidence": 0.9,
       "score_consistency": 1.0,
-      "review": "三态题回答 not_found。证据为关键词搜索结果说明，并指出饥饿风险，符合题面要求。"
+      "review": "三态结论明确。证据为搜索结果未找到老化机制，并说明饥饿风险，符合题面要求。"
     },
     {
       "question_id": "Q04_025",
       "score_evidence": 0.9,
       "score_consistency": 1.0,
-      "review": "三态题回答 not_found。证据为关键词搜索结果说明，符合未实现类问题的证据形态。"
+      "review": "三态结论明确。证据为搜索结果未找到公平份额相关实现，符合 not_found 判定逻辑。"
     },
     {
       "question_id": "Q04_026",
       "score_evidence": 0.95,
       "score_consistency": 1.0,
-      "review": "单选题选择了 A。证据展示了时钟中断处理及 proc_tick 中的抢占逻辑，支撑了完全抢占的结论。"
+      "review": "选项选择正确。证据展示时钟中断触发 yield，支撑完全抢占结论。"
     },
     {
       "question_id": "Q04_027",
       "score_evidence": 0.9,
       "score_consistency": 1.0,
-      "review": "三态题回答 not_found。证据为关键词搜索结果说明，符合未实现类问题的证据形态。"
+      "review": "三态结论明确。证据为搜索结果未找到 SJF 相关实现，符合 not_found 判定逻辑。"
     },
     {
       "question_id": "Q04_028",
       "score_evidence": 0.95,
       "score_consistency": 1.0,
-      "review": "单选题选择了 A。证据展示了 NCPU 宏定义及多核启动代码，支撑了 SMP 形态的结论。"
+      "review": "选项选择正确。证据展示 NCPU 定义及多核启动循环，支撑 SMP 结论。"
     },
     {
       "question_id": "Q04_029",
       "score_evidence": 0.95,
       "score_consistency": 1.0,
-      "review": "三态题回答 implemented。证据展示了 BSP 唤醒 AP 的代码逻辑，支撑了 AP 启动链的结论。"
+      "review": "三态结论明确。证据展示 BSP 唤醒 AP 及进入 scheduler 流程，支撑 implemented 结论。"
     },
     {
       "question_id": "Q04_030",
       "score_evidence": 0.95,
       "score_consistency": 1.0,
-      "review": "三态题回答 implemented。证据展示了 sbi_send_ipi 定义及调用，支撑了 IPI 实现的结论。"
+      "review": "三态结论明确。证据展示 sbi_send_ipi 定义及调用，支撑 IPI 实现结论。"
     },
     {
       "question_id": "Q04_031",
       "score_evidence": 0.95,
       "score_consistency": 1.0,
-      "review": "描述了 IPI 发送与处理路径。证据分别给出了发送函数和中断处理函数片段，支撑充分。"
+      "review": "路径描述清晰。证据分别给出发送与处理函数代码，支撑回答。"
     },
     {
       "question_id": "Q04_032",
       "score_evidence": 0.95,
       "score_consistency": 1.0,
-      "review": "三态题回答 implemented。证据展示了 cpus 数组及 cpu 结构体定义，支撑了 per-CPU 变量的结论。"
+      "review": "三态结论明确。证据展示 cpus 数组及 cpu 结构体，支撑 per-CPU 变量存在。"
     },
     {
       "question_id": "Q04_033",
-      "score_evidence": 0.95,
+      "score_evidence": 1.0,
       "score_consistency": 1.0,
-      "review": "描述了 per-CPU 实现方式。证据展示了 tp 寄存器读取及数组索引逻辑，支撑充分。"
+      "review": "实现方式描述准确。证据展示 tp 寄存器读取及数组索引逻辑，完全对应题面。"
     },
     {
       "question_id": "Q04_034",
       "score_evidence": 0.9,
       "score_consistency": 1.0,
-      "review": "三态题回答 not_found。证据为关键词搜索结果说明，符合未实现类问题的证据形态。"
+      "review": "三态结论明确。证据为搜索结果未找到负载均衡实现，符合 not_found 判定逻辑。"
     },
     {
       "question_id": "Q04_035",
       "score_evidence": 0.9,
       "score_consistency": 1.0,
-      "review": "三态题回答 not_found。证据为关键词搜索结果说明，符合未实现类问题的证据形态。"
+      "review": "三态结论明确。证据为搜索结果未找到 shootdown 实现，符合 not_found 判定逻辑。"
     },
     {
       "question_id": "Q04_036",
       "score_evidence": 0.95,
       "score_consistency": 1.0,
-      "review": "回答了四项交叉一致性问题。证据分别提供了 TLB 刷新、多核启动、锁保护的相关代码，覆盖全面。"
+      "review": "四项交叉一致性均作答。证据分别对应 TLB、调度、Trap、锁的相关代码，支撑充分。"
     },
     {
       "question_id": "Q04_037",
       "score_evidence": 0.95,
       "score_consistency": 1.0,
-      "review": "单选题选择了 A。证据展示了 acquire 中 push_off 及 release 中 pop_off，支撑了关中断保护的结论。"
+      "review": "选项选择正确。证据展示 acquire 中 push_off 关中断，支撑是结论。"
     },
     {
       "question_id": "Q04_038",
       "score_evidence": 0.95,
       "score_consistency": 1.0,
-      "review": "描述了 NCPU 与栈布局对应关系。证据提供了宏定义、汇编栈分配及主函数计算逻辑，支撑充分。"
+      "review": "宏与布局对应关系描述清晰。证据展示 NCPU 定义及栈空间分配计算，支撑结论。"
     },
     {
       "question_id": "Q04_039",
       "score_evidence": 0.95,
       "score_consistency": 1.0,
-      "review": "三态题回答 not_found。证据展示了普通变量递增代码，直接证明了无原子操作，支撑有力。"
+      "review": "三态结论明确。证据展示非原子自增代码，有效支撑 not_found 结论（反向证据）。"
     },
     {
       "question_id": "Q04_040",
       "score_evidence": 0.9,
       "score_consistency": 1.0,
-      "review": "三态题回答 not_found。证据为关键词搜索结果说明，符合未实现类问题的证据形态。"
+      "review": "三态结论明确。证据为搜索结果未找到实时调度关键词，符合 not_found 判定逻辑。"
     },
     {
       "question_id": "Q04_041",
       "score_evidence": 0.9,
       "score_consistency": 1.0,
-      "review": "三态题回答 not_found。证据为关键词搜索结果说明并补充架构背景，符合题面要求。"
+      "review": "三态结论明确。证据为搜索结果未找到 NUMA 相关实现并说明架构，符合 not_found 判定逻辑。"
     }
   ],
   "findings": [],
-  "summary_zh": "本报告整体质量较高，所有 41 题均严格遵循题面格式与契约要求（consistency 普遍为 1.00）。证据支撑度（evidence）方面，正实现类题目多提供了具体代码片段（0.95-1.00），未实现类题目多采用搜索结果说明（0.90），证据与结论逻辑自洽。全阶段 confidence 按各题均值计算，无低分短板。",
-  "report_quality_score": 0.77,
+  "summary_zh": "本报告整体质量较高，题面相符度极佳，所有题目均严格遵守格式与枚举约束。证据支撑方面，代码实现类题目摘录详实，能直接证明结论；未实现类题目（not_found）均提供了搜索证据或反向代码证据。部分文件级证据（如 Q04_014）略显概括，但整体不影响结论可信度。全阶段置信度按各题均值方案 A 汇总计算。",
+  "report_quality_score": 0.97,
   "_meta": {
     "quality": {
-      "mean_question_confidence": 0.9677,
-      "mean_dimensions": 0.0
+      "mean_question_confidence": 0.9671
     },
     "review_model": "qwen3.5-plus",
     "baseline": true,
-    "run_at": "2026-04-23T22:13:17",
-    "baseline_execute_tokens": 592028,
-    "baseline_review_tokens": 21075,
-    "baseline_stage_total_tokens": 613103
+    "run_at": "2026-04-24T08:08:03",
+    "baseline_execute_tokens": 0,
+    "baseline_review_tokens": 21968,
+    "baseline_stage_total_tokens": 21968
   }
 }

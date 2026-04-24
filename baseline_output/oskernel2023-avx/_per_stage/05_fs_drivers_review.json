@@ -1,0 +1,232 @@
+{
+  "schema_version": "describe_review_v1",
+  "stage_id": "05_fs_drivers",
+  "stage_title": "文件系统与设备 I/O",
+  "confidence": 0.97,
+  "question_reviews": [
+    {
+      "question_id": "Q05_001",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "答案明确指出 C 操作表形态，证据引用 devsw 结构体及函数指针定义，直接支撑结论，符合题面要求。"
+    },
+    {
+      "question_id": "Q05_002",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "单选选项 A 与证据中 FAT32 初始化及磁盘读写逻辑一致，证据充分。"
+    },
+    {
+      "question_id": "Q05_003",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "题面要求引用 Makefile/Cargo 证据，答案引用 Makefile OBJS 变量，证明为自研编译单元，符合要求。"
+    },
+    {
+      "question_id": "Q05_004",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "列出 5 个关键节点，证据覆盖 sys_open 到 filealloc 的调用链，路径清晰，符合 3-6 个节点要求。"
+    },
+    {
+      "question_id": "Q05_005",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "答案指出固定数组，证据引用 proc 结构体中 ofile 数组定义及 NOFILE 宏，完全符合题面证据要求。"
+    },
+    {
+      "question_id": "Q05_006",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态回答 implemented，证据展示 bcache 结构体及 bget 逻辑，支撑充分。"
+    },
+    {
+      "question_id": "Q05_007",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "答案指出 LRU，证据引用 brelse 移动节点至队头及 bget 从队尾回收逻辑，算法依据明确。"
+    },
+    {
+      "question_id": "Q05_008",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "三态回答 not_found，证据为搜索记录及 mmap 直接读取逻辑，虽为负面证据但逻辑自洽。"
+    },
+    {
+      "question_id": "Q05_009",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态回答 implemented，证据包含 mmap 函数及 MAP_ANONYMOUS 处理逻辑，支撑充分。"
+    },
+    {
+      "question_id": "Q05_010",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态回答 implemented，证据引用 sys_pselect6 及 fdset 结构，符合事件机制题面。"
+    },
+    {
+      "question_id": "Q05_011",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态回答 implemented，证据展示 lookup_path 对绝对/相对路径及 . .. 的处理代码，支撑有力。"
+    },
+    {
+      "question_id": "Q05_012",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "三态回答 not_found，证据为代码搜索记录，符合负面结论的举证方式。"
+    },
+    {
+      "question_id": "Q05_013",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态回答 implemented，证据包含 pipealloc 及 FD_PIPE 定义，明确展示 VFS 层集成。"
+    },
+    {
+      "question_id": "Q05_014",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态回答 implemented，证据展示 sys_socket 及 FD_SOCK 类型，符合 VFS 文件对象要求。"
+    },
+    {
+      "question_id": "Q05_015",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态回答 stub，证据说明仅有 /dev/null 等简单处理而无完整伪文件系统，结论与证据一致。"
+    },
+    {
+      "question_id": "Q05_016",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "单选选项 A，证据引用 proc 结构体及 fork 复制逻辑，证明 Per-Process 归属。"
+    },
+    {
+      "question_id": "Q05_017",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "单选选项 B，FAT32 本质为链式分配，证据展示 FAT 表读取及簇链跳转逻辑，准确。"
+    },
+    {
+      "question_id": "Q05_018",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "单选选项 E，证据展示 alloc_clus 扫描 FAT 表找 0 值，符合 FAT 内嵌空闲管理特征。"
+    },
+    {
+      "question_id": "Q05_019",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "单选选项 C，证据展示目录项 parent 指针及路径查找逻辑，符合树形层次结构。"
+    },
+    {
+      "question_id": "Q05_020",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "单选选项 A，证据展示 eread 按字节偏移读取，符合字节流组织形式。"
+    },
+    {
+      "question_id": "Q05_021",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "单选选项 C，证据引用 memlayout.h 中硬编码地址宏，符合硬编码设备表描述。"
+    },
+    {
+      "question_id": "Q05_022",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "三态回答 not_found，证据指出 dtb_pa 参数存在但无解析实现，逻辑合理。"
+    },
+    {
+      "question_id": "Q05_023",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "答案指出 C 驱动操作表，证据引用 devsw 结构体定义及注册赋值，符合题面证据要求。"
+    },
+    {
+      "question_id": "Q05_024",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "列出 4 个关键节点，证据展示 main 中调用顺序，符合 3-6 个节点要求。"
+    },
+    {
+      "question_id": "Q05_025",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态回答 implemented，证据包含 uart8250_init 及 putc 实现，支撑早期输出结论。"
+    },
+    {
+      "question_id": "Q05_026",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态回答 implemented，证据展示 virtio 及 ramdisk 初始化入口，覆盖块设备驱动。"
+    },
+    {
+      "question_id": "Q05_027",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "三态回答 not_found，证据说明 lwIP 存在但底层驱动未实现，负面证据充分。"
+    },
+    {
+      "question_id": "Q05_028",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态回答 implemented，证据展示 plic_claim 及 trap 分发逻辑，符合中断源到 handler 证据要求。"
+    },
+    {
+      "question_id": "Q05_029",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "答案指出常量硬编码，证据引用 memlayout.h 宏定义，符合题面证据要求。"
+    },
+    {
+      "question_id": "Q05_030",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "答案指出 Makefile 条件编译，证据展示 platform 变量及 ifdef 规则，符合多平台适配题面。"
+    },
+    {
+      "question_id": "Q05_031",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态回答 implemented，证据展示 kvminithart 中切换 UART 基地址为虚拟地址的逻辑，支撑有力。"
+    },
+    {
+      "question_id": "Q05_032",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "单选选项 D，证据展示 bcache 数组及 NBUF 定义，符合缓冲池形态。"
+    },
+    {
+      "question_id": "Q05_033",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "单选选项 A，证据为搜索无调度算法及顺序提交逻辑，负面证据支撑 FCFS 默认行为。"
+    },
+    {
+      "question_id": "Q05_034",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "单选选项 B，证据展示 devintr 中断处理及 wakeup，符合中断驱动 I/O 特征。"
+    },
+    {
+      "question_id": "Q05_035",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态回答 implemented，证据展示 virtio 描述符环及地址设置，符合 DMA 等价机制题面。"
+    }
+  ],
+  "findings": [],
+  "summary_zh": "本报告题面相符度极高，所有题目均严格遵守题型、选项及三态约束。证据支撑方面，正向实现类题目引用了具体的结构体定义、函数逻辑及构建配置，支撑充分；未实现类题目提供了搜索路径与代码现状说明，逻辑自洽。整体报告质量优秀，无明显契约违例或证据缺失，全阶段置信度按各题均值方案 A 汇总计算。",
+  "report_quality_score": 0.97,
+  "_meta": {
+    "quality": {
+      "mean_question_confidence": 0.9714
+    },
+    "review_model": "qwen3.5-plus",
+    "baseline": true,
+    "run_at": "2026-04-24T15:57:46",
+    "baseline_execute_tokens": 727366,
+    "baseline_review_tokens": 24898,
+    "baseline_stage_total_tokens": 752264
+  }
+}

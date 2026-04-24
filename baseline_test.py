@@ -3,6 +3,12 @@
 # 无工具 Baseline：将完整仓库源码 + 题单（已剔除 Agent 工具相关约束）一次性送入 LLM，
 # 对 02–09 题单各调用一次，不做 JSON 修复重试；然后走与主链路相同的 review，最终仅写
 # baseline_output/<repo_name>/{_per_stage/*, review_score.json}，不生成合并 md 报告。
+#
+# 断点续传：某章 `_per_stage/<stage_id>_answers.json` 存在且仍能通过题库校验则跳过该章 Execute；
+# 在「未在本轮重新跑 Execute」的前提下，若 `_per_stage/<stage_id>_review.json` 已存在且可解析则跳过 Review；
+# 仅有 answers、缺 review 时只补跑 Review。全部章节 answers 均已命中时可跳过仓库平铺收集。
+#
+# Execute 单次用户消息极大（整仓平铺），默认 HTTP 读超时易不足：见 `BASELINE_REQUEST_TIMEOUT`（秒，默认 3600）。
 
 from __future__ import annotations
 
@@ -59,6 +65,16 @@ def _max_user_chars() -> int:
     except ValueError:
         n = 2_400_000
     return max(100_000, n)
+
+
+def _baseline_request_timeout() -> int:
+    """整仓一次送入时模型推理时间很长，须大于 core.agent_builder 默认的 240s。"""
+    v = (os.environ.get("BASELINE_REQUEST_TIMEOUT") or "3600").strip()
+    try:
+        n = int(v)
+    except ValueError:
+        n = 3600
+    return max(120, n)
 
 
 # 与 os_agent 中 _build_json_qa_prompt 对齐，但去掉 stage_constraints_md（内多为工具指令），并弱化可能暗示工具的句式
@@ -344,6 +360,63 @@ def _save_json(path: str, obj: object) -> None:
         json.dump(obj, f, ensure_ascii=False, indent=2)
 
 
+def _load_validated_answers_json(
+    per_stage: str,
+    stage_id: str,
+    stage_title: str,
+    expected_question_ids: list[str],
+) -> dict | None:
+    """磁盘上 answers.json 存在且通过 coerce+validate 则返回覆写后的 payload，否则 None。"""
+    if not expected_question_ids:
+        return None
+    json_path = os.path.join(per_stage, f"{stage_id}_answers.json")
+    if not os.path.isfile(json_path) or os.path.getsize(json_path) < 16:
+        return None
+    try:
+        with open(json_path, "r", encoding="utf-8") as f:
+            payload = json.load(f)
+        if not isinstance(payload, dict):
+            return None
+        stage_qa = load_stage_qa(stage_id)
+        payload = coerce_answers_payload_defaults(payload)
+        payload2 = coerce_answers_payload_by_stage_qa(payload, stage_qa=stage_qa)
+        issues = validate_answers_payload(
+            payload2,
+            stage_id=stage_id,
+            stage_title=stage_title,
+            expected_question_ids=expected_question_ids,
+        )
+        if issues:
+            return None
+        return payload2
+    except Exception:
+        return None
+
+
+def _review_json_complete(review_path: str) -> bool:
+    if not os.path.isfile(review_path) or os.path.getsize(review_path) < 16:
+        return False
+    try:
+        with open(review_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return isinstance(data, dict)
+    except Exception:
+        return False
+
+
+def _baseline_any_stage_needs_repo_execute(per_stage: str) -> bool:
+    """任一章缺有效 answers.json 则需要拉平仓库文本并跑 Execute。"""
+    for stage_id in REVIEW_STAGES_02_09:
+        st_qa = load_stage_qa(stage_id)
+        title = (st_qa.get("stage_title") if isinstance(st_qa, dict) else None) or stage_id
+        _, expected_ids = build_baseline_json_qa_prompt(stage_id, str(title))
+        if not expected_ids:
+            continue
+        if _load_validated_answers_json(per_stage, stage_id, str(title), expected_ids) is None:
+            return True
+    return False
+
+
 def _material_b_for_review(
     *,
     ok: bool,
@@ -393,32 +466,42 @@ def main() -> None:
 
         print(clone_repository.invoke({"repo_url": repo_url}))
 
-    print("收集仓库文本…")
-    repo_blob = collect_repo_text(repo_local_path)
-    if not repo_blob.strip():
-        print("错误：未读到任何源文件，请检查仓库路径。", file=sys.stderr)
-        sys.exit(1)
-    # 为 Human 消息总长度预留题单+系统提示空间；超限时只保留平铺块的前缀
+    need_repo_execute = _baseline_any_stage_needs_repo_execute(per_stage)
     max_user = _max_user_chars()
     max_blob = max(100_000, max_user - 120_000)
-    repo_blob, repo_was_trunc = _truncate(repo_blob, max_blob)
-    if repo_was_trunc:
-        print(
-            f"仓库文本长度: {len(repo_blob):,} 字符  （已截断：单条用户消息总上限 {max_user:,}，"
-            f"平铺部分上限 max_blob={max_blob:,}，超出部分已丢弃，仅保开头）"
-        )
+    repo_blob = ""
+    repo_was_trunc = False
+    if need_repo_execute:
+        print("收集仓库文本…")
+        repo_blob = collect_repo_text(repo_local_path)
+        if not repo_blob.strip():
+            print("错误：未读到任何源文件，请检查仓库路径。", file=sys.stderr)
+            sys.exit(1)
+        repo_blob, repo_was_trunc = _truncate(repo_blob, max_blob)
+        if repo_was_trunc:
+            print(
+                f"仓库文本长度: {len(repo_blob):,} 字符  （已截断：单条用户消息总上限 {max_user:,}，"
+                f"平铺部分上限 max_blob={max_blob:,}，超出部分已丢弃，仅保开头）"
+            )
+        else:
+            print(
+                f"仓库文本长度: {len(repo_blob):,} 字符  （未截断；平铺上限 max_blob={max_blob:,}，"
+                f"单条用户消息总上限 {max_user:,}，可用环境变量 BASELINE_MAX_USER_CHARS 调大）"
+            )
     else:
         print(
-            f"仓库文本长度: {len(repo_blob):,} 字符  （未截断；平铺上限 max_blob={max_blob:,}，"
-            f"单条用户消息总上限 {max_user:,}，可用环境变量 BASELINE_MAX_USER_CHARS 调大）"
+            "⏭️  全部章节 answers.json 均已命中且校验通过：跳过仓库平铺收集（仅补跑缺失的 Review 等）"
         )
 
     execute_model_name = os.environ.get("MODEL_NAME") or get_model_name()
+    req_to = _baseline_request_timeout()
     llm = build_chat_model(
         model=execute_model_name,
         temperature=0,
         max_retries=0,
+        request_timeout=req_to,
     )
+    print(f"Baseline Execute HTTP 读超时: {req_to}s（环境变量 BASELINE_REQUEST_TIMEOUT）")
 
     total_tokens_used = 0
     token_rows: list[dict] = []
@@ -432,88 +515,116 @@ def main() -> None:
             print(f"跳过 {stage_id}：无题单", file=sys.stderr)
             continue
 
-        combined = (
-            f"{qa_user}\n\n"
-            f"---\n\n# 附：仓库 `{repo_name}` 根路径 `{repo_local_path}` 的源码平铺\n\n"
-            f"```text\n{repo_blob}\n```"
+        cached_payload = _load_validated_answers_json(
+            per_stage, stage_id, str(title), expected_ids
         )
-        if len(combined) > max_user:
-            # 题单+围栏头尾比预估更长时再砍仓库块
-            allow = max_user - (len(combined) - len(repo_blob)) - 10
-            blob2, _ = _truncate(repo_blob, max(0, allow))
-            combined = (
-                f"{qa_user}\n\n"
-                f"---\n\n# 附：仓库源码（因题单+围栏后总长度仍超单条上限 {max_user}，再次截断平铺，allow={max(0, allow)}）\n\n"
-                f"```text\n{blob2}\n```"
-            )
+        answers_from_cache = cached_payload is not None
 
-        print("=" * 60)
-        print(f"Baseline Execute: {stage_id} — {title}  (用户消息 ~{len(combined):,} 字)")
-        msg = [SystemMessage(content=BASELINE_ANSWER_SYSTEM), HumanMessage(content=combined)]
-        out = llm.invoke(msg)
-        execute_tokens = llm_message_total_tokens(out)
-        stage_text = (getattr(out, "content", None) or "").strip()
-        if not stage_text:
-            stage_text = ""
-
-        raw_path = os.path.join(per_stage, f"{stage_id}_answers_raw.txt")
-        with open(raw_path, "w", encoding="utf-8") as f:
-            f.write(stage_text + "\n")
-
+        execute_tokens = 0
+        stage_text = ""
         ok = False
         payload_before: dict | None = None
         err: str | None = None
         issues: list = []
-        try:
-            payload = parse_answers_json(stage_text)
-            payload = coerce_answers_payload_defaults(payload)
-            payload_before = copy.deepcopy(payload)
-            stage_qa = load_stage_qa(stage_id)
-            payload2 = coerce_answers_payload_by_stage_qa(payload, stage_qa=stage_qa)
-            issues = validate_answers_payload(
-                payload2,
+
+        if answers_from_cache:
+            print("=" * 60)
+            print(f"⏭️  {stage_id} — {title}：跳过 Execute（answers.json 已存在且校验通过）")
+            ok = True
+            payload_before = copy.deepcopy(cached_payload)
+        else:
+            if not repo_blob.strip():
+                print(
+                    f"错误：{stage_id} 需要 Execute 但未收集到仓库文本（不应发生）。",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+            combined = (
+                f"{qa_user}\n\n"
+                f"---\n\n# 附：仓库 `{repo_name}` 根路径 `{repo_local_path}` 的源码平铺\n\n"
+                f"```text\n{repo_blob}\n```"
+            )
+            if len(combined) > max_user:
+                allow = max_user - (len(combined) - len(repo_blob)) - 10
+                blob2, _ = _truncate(repo_blob, max(0, allow))
+                combined = (
+                    f"{qa_user}\n\n"
+                    f"---\n\n# 附：仓库源码（因题单+围栏后总长度仍超单条上限 {max_user}，再次截断平铺，allow={max(0, allow)}）\n\n"
+                    f"```text\n{blob2}\n```"
+                )
+
+            print("=" * 60)
+            print(f"Baseline Execute: {stage_id} — {title}  (用户消息 ~{len(combined):,} 字)")
+            msg = [SystemMessage(content=BASELINE_ANSWER_SYSTEM), HumanMessage(content=combined)]
+            out = llm.invoke(msg)
+            execute_tokens = llm_message_total_tokens(out)
+            stage_text = (getattr(out, "content", None) or "").strip()
+            if not stage_text:
+                stage_text = ""
+
+            raw_path = os.path.join(per_stage, f"{stage_id}_answers_raw.txt")
+            with open(raw_path, "w", encoding="utf-8") as f:
+                f.write(stage_text + "\n")
+
+            try:
+                payload = parse_answers_json(stage_text)
+                payload = coerce_answers_payload_defaults(payload)
+                payload_before = copy.deepcopy(payload)
+                stage_qa = load_stage_qa(stage_id)
+                payload2 = coerce_answers_payload_by_stage_qa(payload, stage_qa=stage_qa)
+                issues = validate_answers_payload(
+                    payload2,
+                    stage_id=stage_id,
+                    stage_title=str(title),
+                    expected_question_ids=expected_ids,
+                )
+                if not issues:
+                    ok = True
+                    _save_json(os.path.join(per_stage, f"{stage_id}_answers.json"), payload2)
+            except Exception as e:  # noqa: BLE001
+                err = f"{type(e).__name__}: {e}"
+                _save_json(
+                    os.path.join(per_stage, f"{stage_id}_answers_error.json"),
+                    {"error": err},
+                )
+            if issues and ok is False and err is None:
+                _save_json(
+                    os.path.join(per_stage, f"{stage_id}_answers_validate_issues.json"),
+                    {"issues": [{"path": x.path, "reason": x.reason} for x in issues]},
+                )
+                err = f"validate issues: {len(issues)}"
+
+        review_path = os.path.join(per_stage, f"{stage_id}_review.json")
+        skip_review = answers_from_cache and _review_json_complete(review_path)
+        review_tokens = 0
+        parsed_review = None
+        review_raw: str | None = None
+        review_err: str | None = None
+
+        if skip_review:
+            print(f"⏭️  {stage_id}：跳过 Review（review.json 已存在且可解析）")
+        else:
+            model_b = _material_b_for_review(
+                ok=ok,
+                stage_text=stage_text,
+                stage_id=stage_id,
+                payload_before=payload_before,
+                err=err,
+                issues=issues,
+            )
+            if len(model_b) > 190_000:
+                model_b = model_b[:190_000] + "\n... [material B hard truncated]"
+
+            question_sheet = build_stage_qa_question_sheet(stage_id, str(title))
+            print(f"Review: {stage_id} …")
+            parsed_review, review_raw, review_err, review_tokens = run_describe_stage_review(
                 stage_id=stage_id,
                 stage_title=str(title),
-                expected_question_ids=expected_ids,
+                question_sheet=question_sheet,
+                model_json_before_stage_qa_coerce=model_b,
+                expected_question_ids=list(expected_ids),
             )
-            if not issues:
-                ok = True
-                _save_json(os.path.join(per_stage, f"{stage_id}_answers.json"), payload2)
-        except Exception as e:  # noqa: BLE001
-            err = f"{type(e).__name__}: {e}"
-            _save_json(
-                os.path.join(per_stage, f"{stage_id}_answers_error.json"),
-                {"error": err},
-            )
-        if issues and ok is False and err is None:
-            _save_json(
-                os.path.join(per_stage, f"{stage_id}_answers_validate_issues.json"),
-                {"issues": [{"path": x.path, "reason": x.reason} for x in issues]},
-            )
-            err = f"validate issues: {len(issues)}"
 
-        model_b = _material_b_for_review(
-            ok=ok,
-            stage_text=stage_text,
-            stage_id=stage_id,
-            payload_before=payload_before,
-            err=err,
-            issues=issues,
-        )
-        if len(model_b) > 190_000:
-            # review 会硬截 200k；再裁 excerpt
-            model_b = model_b[:190_000] + "\n... [material B hard truncated]"
-
-        question_sheet = build_stage_qa_question_sheet(stage_id, str(title))
-        review_path = os.path.join(per_stage, f"{stage_id}_review.json")
-        print(f"Review: {stage_id} …")
-        parsed_review, review_raw, review_err, review_tokens = run_describe_stage_review(
-            stage_id=stage_id,
-            stage_title=str(title),
-            question_sheet=question_sheet,
-            model_json_before_stage_qa_coerce=model_b,
-            expected_question_ids=list(expected_ids),
-        )
         stage_total_tokens = execute_tokens + review_tokens
         total_tokens_used += stage_total_tokens
         print(
@@ -529,7 +640,9 @@ def main() -> None:
                 "stage_total_tokens": stage_total_tokens,
             }
         )
-        if parsed_review is not None:
+        if skip_review:
+            pass
+        elif parsed_review is not None:
             p = copy.deepcopy(payload_before) if ok and payload_before else {}
             if not isinstance(p, dict):
                 p = {}

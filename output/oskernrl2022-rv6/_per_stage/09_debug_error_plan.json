@@ -1,0 +1,98 @@
+{
+  "stage_id": "09_debug_error",
+  "evidence_targets": [
+    "panic 函数实现与调用点",
+    "backtrace 回溯机制",
+    "条件编译日志系统(DEBUG/WARNING/ERROR)",
+    "trap 路径中的错误处理",
+    "assert 机制现状",
+    "panic/debug",
+    "日志系统",
+    "回溯",
+    "错误处理"
+  ],
+  "seed_paths": [
+    "src/printf.c",
+    "src/include/printf.h",
+    "src/include/debug.h",
+    "src/trap.c",
+    "src/file.c",
+    "src/exec.c",
+    "src/vm.c",
+    "src/proc.c",
+    "Makefile",
+    "debug",
+    "log",
+    "panic",
+    "assert",
+    "backtrace"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "panic",
+    "backtrace",
+    "__debug_info",
+    "__debug_warn",
+    "__debug_error",
+    "trapframedump",
+    "usertrap",
+    "kerneltrap",
+    "panic_handler",
+    "log",
+    "assert",
+    "main"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "src",
+    "src/include",
+    "src/sifive",
+    "linker",
+    "syscall",
+    "bin",
+    "doc",
+    "usrinit",
+    "sd"
+  ],
+  "preferred_tools": [
+    "read_code_segment",
+    "lsp_get_call_graph",
+    "lsp_get_references",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "读取 src/printf.c 完整 panic() 和 backtrace() 实现，确认回溯算法细节",
+    "读取 __debug_info/__debug_warn/__debug_error 三个函数的完整实现，确认条件编译行为",
+    "使用 grep 统计 panic() 在所有 .c 文件中的调用点数量与分布",
+    "对 panic 符号执行 lsp_get_references 获取完整引用列表",
+    "对 panic 执行 lsp_get_call_graph(direction='incoming', max_depth=2) 分析调用链",
+    "读取 src/trap.c 中 usertrap() 和 kerneltrap() 的 panic 调用上下文",
+    "读取 src/trap.c 中 trapframedump() 实现，确认调试信息输出格式",
+    "检查 src/file.c 中 panic 调用点（filedup/fileclose/fileread/filewrite）",
+    "检查 src/exec.c 中 panic 和 __debug_warn 的使用场景",
+    "检查 src/vm.c 中 panic 调用点（kvmmap/vmunmap/walk 等）",
+    "检查 src/proc.c 中 allocproc/exit/sched 等关键路径的 panic 调用",
+    "确认 Makefile 中 CFLAGS 的 -DDEBUG/-DWARNING/-DERROR 编译选项",
+    "搜索是否存在 assert 宏定义或 KERNEL_ASSERT 实现",
+    "检查 src/include/debug.h 中 debugaddr 函数的实现与用途",
+    "分析 backtrace() 基于帧指针的实现是否适用于所有调用场景",
+    "整理 panic 调用点分类：内存错误/文件系统错误/进程错误/陷阱错误",
+    "确认日志系统是否支持动态开关或仅编译时控制",
+    "验证 __debug_error 是否在错误处理后调用 backtrace() 并死循环"
+  ]
+}

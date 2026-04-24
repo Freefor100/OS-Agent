@@ -1,0 +1,297 @@
+```json
+{
+  "schema_version": "v1",
+  "stage_id": "08_network",
+  "stage_title": "网络子系统与协议栈",
+  "terminology_profile": "stallings_en_zh",
+  "answers": [
+    {
+      "question_id": "Q08_001",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在网络子系统实现（协议栈或 socket 层）？",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/lwip/api/sockets.c",
+          "symbol_kind": "file",
+          "symbol_name": "sockets.c",
+          "excerpt": "完整的 socket API 实现文件，包含 lwip_socket, lwip_bind, lwip_connect, lwip_sendto, lwip_recvfrom 等函数"
+        },
+        {
+          "path": "kernel/lwip/core/tcp.c",
+          "symbol_kind": "file",
+          "symbol_name": "tcp.c",
+          "excerpt": "TCP 协议栈实现，包含 tcp_new, tcp_connect, tcp_write, tcp_output 等核心函数"
+        },
+        {
+          "path": "kernel/lwip/core/udp.c",
+          "symbol_kind": "file",
+          "symbol_name": "udp.c",
+          "excerpt": "UDP 协议栈实现，包含 udp_new, udp_send, udp_input 等函数"
+        },
+        {
+          "path": "kernel/syssocket.c",
+          "symbol_kind": "file",
+          "symbol_name": "syssocket.c",
+          "excerpt": "系统调用层 socket 接口实现，包含 sys_socket, sys_bind, sys_connect, sys_sendto, sys_recvfrom 等"
+        }
+      ]
+    },
+    {
+      "question_id": "Q08_002",
+      "question_type": "single_choice",
+      "stem": "协议栈来源更接近哪种？",
+      "value": "第三方库（如 smoltcp/lwip 等）",
+      "evidence": [
+        {
+          "path": "kernel/lwip/",
+          "symbol_kind": "directory",
+          "symbol_name": "lwip",
+          "excerpt": "完整的 lwIP TCP/IP 协议栈目录结构，包含 core/, api/, netif/, core/ipv4/, core/ipv6/等子目录"
+        },
+        {
+          "path": "kernel/lwip/include/lwip/opt.h",
+          "symbol_kind": "file",
+          "symbol_name": "opt.h",
+          "excerpt": "lwIP 配置文件，定义 LWIP_TCP, LWIP_UDP, LWIP_IPv4, LWIP_IPv6 等选项"
+        },
+        {
+          "path": "Makefile",
+          "symbol_kind": "file",
+          "symbol_name": "Makefile",
+          "excerpt": "LWIP_SRCFILES 和 LWIP_INCLUDES 显示 lwIP 作为外部库集成到内核中"
+        }
+      ]
+    },
+    {
+      "question_id": "Q08_003",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 socket 系统调用接口（socket/bind/connect/sendto/recvfrom 等）？",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/syssocket.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_socket",
+          "excerpt": "line ~100: uint64 sys_socket(void) - 创建 socket 系统调用"
+        },
+        {
+          "path": "kernel/syssocket.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_bind",
+          "excerpt": "line ~150: uint64 sys_bind(void) - 绑定 socket 系统调用"
+        },
+        {
+          "path": "kernel/syssocket.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_connect",
+          "excerpt": "line ~200: uint64 sys_connect(void) - 连接 socket 系统调用"
+        },
+        {
+          "path": "kernel/syssocket.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_sendto",
+          "excerpt": "line ~300: uint64 sys_sendto(void) - 发送数据系统调用"
+        },
+        {
+          "path": "kernel/syssocket.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_recvfrom",
+          "excerpt": "line ~350: uint64 sys_recvfrom(void) - 接收数据系统调用"
+        },
+        {
+          "path": "kernel/include/sysnum.h",
+          "symbol_kind": "macro",
+          "symbol_name": "SYS_socket",
+          "excerpt": "定义 SYS_socket(198), SYS_bind(200), SYS_connect(203), SYS_sendto(206), SYS_recvfrom(207) 等系统调用号"
+        }
+      ]
+    },
+    {
+      "question_id": "Q08_004",
+      "question_type": "short_answer",
+      "stem": "选择一个发送路径（优先 sys_sendto），追踪：syscall → 协议栈 → 网卡驱动。列 3-6 个关键节点并给证据。",
+      "value": "发送路径关键节点：\n1. sys_sendto() [kernel/syssocket.c] - 系统调用入口，获取 socket 文件描述符和参数\n2. do_sendto() [kernel/lwip/api/sockets.c] - socket 层处理，调用 lwip_sendto\n3. lwip_sendto() [kernel/lwip/api/sockets.c] - lwIP API 层，路由到 UDP/TCP 发送\n4. udp_sendto()/tcp_write() [kernel/lwip/core/] - 协议层处理，构建协议头\n5. netif->output_ip6()/ethip6_output() [kernel/lwip/core/ipv6/] - 网络接口层输出\n6. 底层通过 loopback 或虚拟网络接口发送（tcpip_init_with_loopback 初始化）",
+      "evidence": [
+        {
+          "path": "kernel/syssocket.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_sendto",
+          "excerpt": "系统调用入口，调用 do_sendto(f->socketnum, buf, len, flags, ...)"
+        },
+        {
+          "path": "kernel/lwip/api/sockets.c",
+          "symbol_kind": "function",
+          "symbol_name": "lwip_sendto",
+          "excerpt": "socket API 层，根据 socket 类型调用 udp_sendto 或 tcp_write"
+        },
+        {
+          "path": "kernel/lwip/core/udp.c",
+          "symbol_kind": "function",
+          "symbol_name": "udp_sendto",
+          "excerpt": "UDP 协议层发送函数，构建 UDP 头并调用 ip_output"
+        },
+        {
+          "path": "kernel/lwip/core/ipv6/ethip6.c",
+          "symbol_kind": "function",
+          "symbol_name": "ethip6_output",
+          "excerpt": "以太网 IPv6 输出函数，处理链路层封装"
+        },
+        {
+          "path": "kernel/lwip/api/tcpip.c",
+          "symbol_kind": "function",
+          "symbol_name": "tcpip_init_with_loopback",
+          "excerpt": "初始化 lwIP 协议栈，使用 loopback 模式进行网络通信"
+        }
+      ]
+    },
+    {
+      "question_id": "Q08_005",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现网卡驱动（virtio-net/e1000 等）与收包中断路径？",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/",
+          "symbol_kind": "search",
+          "symbol_name": "virtio_net",
+          "excerpt": "在提供的源码中搜索 virtio_net, e1000, netif 驱动相关文件，未找到具体的网卡驱动实现"
+        },
+        {
+          "path": "kernel/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "devintr",
+          "excerpt": "设备中断处理函数，但未发现明确的网络收包中断处理路径"
+        },
+        {
+          "path": "kernel/lwip/netif/",
+          "symbol_kind": "directory",
+          "symbol_name": "netif",
+          "excerpt": "lwIP 的 netif 目录存在，但主要是通用网络接口抽象，未见具体硬件网卡驱动实现"
+        },
+        {
+          "path": "kernel/main.c",
+          "symbol_kind": "function",
+          "symbol_name": "tcpip_init_with_loopback",
+          "excerpt": "使用 loopback 模式初始化网络，表明可能未实现真实网卡驱动"
+        }
+      ]
+    },
+    {
+      "question_id": "Q08_006",
+      "question_type": "multi_choice",
+      "stem": "协议支持情况（多选；未发现则留空并在 notes 写 not_found）",
+      "value": [
+        "Ethernet",
+        "ARP",
+        "IPv4/IPv6",
+        "ICMP",
+        "UDP",
+        "TCP",
+        "DHCP",
+        "DNS"
+      ],
+      "evidence": [
+        {
+          "path": "kernel/lwip/include/lwip/opt.h",
+          "symbol_kind": "file",
+          "symbol_name": "opt.h",
+          "excerpt": "lwIP 配置文件，定义 LWIP_ETHERNET, LWIP_ARP, LWIP_IPV4, LWIP_IPV6, LWIP_ICMP, LWIP_ICMP6, LWIP_UDP, LWIP_TCP, LWIP_DHCP, LWIP_DHCP6, LWIP_DNS 等协议支持选项"
+        },
+        {
+          "path": "kernel/lwip/core/etharp.c",
+          "symbol_kind": "file",
+          "symbol_name": "etharp.c",
+          "excerpt": "ARP 协议实现文件"
+        },
+        {
+          "path": "kernel/lwip/core/ipv4/ip4.c",
+          "symbol_kind": "file",
+          "symbol_name": "ip4.c",
+          "excerpt": "IPv4 协议实现"
+        },
+        {
+          "path": "kernel/lwip/core/ipv6/ip6.c",
+          "symbol_kind": "file",
+          "symbol_name": "ip6.c",
+          "excerpt": "IPv6 协议实现"
+        },
+        {
+          "path": "kernel/lwip/core/icmp.c",
+          "symbol_kind": "file",
+          "symbol_name": "icmp.c",
+          "excerpt": "ICMPv4 协议实现"
+        },
+        {
+          "path": "kernel/lwip/core/ipv6/icmp6.c",
+          "symbol_kind": "file",
+          "symbol_name": "icmp6.c",
+          "excerpt": "ICMPv6 协议实现"
+        },
+        {
+          "path": "kernel/lwip/core/udp.c",
+          "symbol_kind": "file",
+          "symbol_name": "udp.c",
+          "excerpt": "UDP 协议实现"
+        },
+        {
+          "path": "kernel/lwip/core/tcp.c",
+          "symbol_kind": "file",
+          "symbol_name": "tcp.c",
+          "excerpt": "TCP 协议实现"
+        },
+        {
+          "path": "kernel/lwip/core/ipv4/dhcp.c",
+          "symbol_kind": "file",
+          "symbol_name": "dhcp.c",
+          "excerpt": "DHCPv4 客户端实现"
+        },
+        {
+          "path": "kernel/lwip/core/ipv6/dhcp6.c",
+          "symbol_kind": "file",
+          "symbol_name": "dhcp6.c",
+          "excerpt": "DHCPv6 客户端实现"
+        },
+        {
+          "path": "kernel/lwip/core/dns.c",
+          "symbol_kind": "file",
+          "symbol_name": "dns.c",
+          "excerpt": "DNS 解析器实现"
+        }
+      ]
+    },
+    {
+      "question_id": "Q08_007",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在零拷贝/共享缓冲/DMA 描述符等路径（zero-copy）？",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/lwip/core/pbuf.c",
+          "symbol_kind": "file",
+          "symbol_name": "pbuf.c",
+          "excerpt": "pbuf 包缓冲区管理，主要使用 PBUF_RAM 和 PBUF_POOL 类型，数据需要复制"
+        },
+        {
+          "path": "kernel/lwip/api/sockets.c",
+          "symbol_kind": "function",
+          "symbol_name": "lwip_sendto",
+          "excerpt": "发送数据时通过 pbuf_alloc 分配新缓冲区并复制数据，未见零拷贝优化"
+        },
+        {
+          "path": "kernel/",
+          "symbol_kind": "search",
+          "symbol_name": "DMA",
+          "excerpt": "搜索 DMA 描述符、零拷贝相关实现，在提供的源码中未发现明确的 zero-copy 或 DMA 描述符路径实现"
+        },
+        {
+          "path": "kernel/lwip/core/pbuf.c",
+          "symbol_kind": "function",
+          "symbol_name": "pbuf_alloc",
+          "excerpt": "pbuf 分配函数，主要分配 PBUF_RAM 类型，数据需要复制到新分配的缓冲区"
+        }
+      ]
+    }
+  ]
+}
+```

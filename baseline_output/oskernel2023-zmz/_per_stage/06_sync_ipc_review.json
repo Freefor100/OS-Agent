@@ -6,144 +6,143 @@
   "question_reviews": [
     {
       "question_id": "Q06_001",
-      "score_evidence": 0.95,
+      "score_evidence": 1.0,
       "score_consistency": 1.0,
-      "review": "答案列出了具体的同步原语类型定义，证据中的 struct 摘录直接支撑了 value 中的声明，题面相符度高。"
+      "review": "题面要求列出同步原语及类型定义证据。答案清晰列出 SpinLock/SleepLock/WaitQueue 并附带 struct 定义摘录，未发现的项也明确说明。证据与结论完全对应，无跑题。"
     },
     {
       "question_id": "Q06_002",
       "score_evidence": 0.95,
       "score_consistency": 1.0,
-      "review": "证据展示了 acquiresleep 中调用 sleep 函数，有效支撑了阻塞锁（Blocking Mutex）的结论，选项选择符合题面。"
+      "review": "单选题选择 B（阻塞锁）。证据摘录 acquiresleep 函数中调用 sleep 的代码，直接支撑阻塞行为结论。选项符合题面约束。"
     },
     {
       "question_id": "Q06_003",
       "score_evidence": 1.0,
       "score_consistency": 1.0,
-      "review": "三态结论为 implemented，证据覆盖了 wait_queue 结构体及 sleep/wakeup 函数实现，支撑充分。"
+      "review": "三态题选择 implemented。证据包含 wait_queue 结构体及 sleep/wakeup 函数实现，覆盖题面要求的等待队列与睡眠唤醒机制，证据充分。"
     },
     {
       "question_id": "Q06_004",
       "score_evidence": 0.9,
       "score_consistency": 1.0,
-      "review": "填空内容完整，证据中的代码片段展示了锁的获取与释放逻辑，能支撑防丢 wakeup 机制的分析。"
+      "review": "填空题按格式填写了 5 个字段。证据提供了 sleep/wakeup 代码片段，能支撑锁持有与释放顺序的分析，但部分不变量细节（如防丢机制）需结合代码逻辑推断，证据直接性略低于定义类题目。"
     },
     {
       "question_id": "Q06_005",
       "score_evidence": 1.0,
       "score_consistency": 1.0,
-      "review": "Pipe 实现结论明确，证据提供了结构体定义与分配函数，完全符合题面要求。"
+      "review": "三态题选择 implemented。证据提供 pipe 结构体与分配函数，直接证明管道实现存在，符合题面。"
     },
     {
       "question_id": "Q06_006",
       "score_evidence": 1.0,
       "score_consistency": 1.0,
-      "review": "证据中的取模运算 (nwrite % PIPESIZE) 直接证明了环形缓冲区形态，与选项 A 一致。"
+      "review": "单选题选择 A（环形缓冲）。证据显示 data 数组及取模运算 (nwrite % PIPESIZE)，直接支撑环形缓冲结论。"
     },
     {
       "question_id": "Q06_007",
       "score_evidence": 1.0,
       "score_consistency": 1.0,
-      "review": "证据显示在缓冲满/空时调用 sleep，直接支撑阻塞语义的结论，题面相符。"
+      "review": "单选题选择 A（阻塞）。证据显示 pipewritable/pipereadable 中调用 sleep，直接支撑阻塞语义结论。"
     },
     {
       "question_id": "Q06_008",
-      "score_evidence": 0.9,
+      "score_evidence": 0.85,
       "score_consistency": 1.0,
-      "review": "结论为 not_found，证据提供了系统调用号的检索结果作为否定证据，符合逻辑。"
+      "review": "三态题选择 not_found。证据为系统调用号与 syscall 表的检索结果（未找到），作为负面证据可接受，但相比正代码据验证性稍弱。"
     },
     {
       "question_id": "Q06_009",
-      "score_evidence": 0.9,
+      "score_evidence": 0.85,
       "score_consistency": 1.0,
-      "review": "结论为 not_found，证据展示了相关 syscall 检索缺失，支撑充分。"
+      "review": "三态题选择 not_found。证据为 futex 相关符号检索缺失，逻辑同 Q06_008，符合题面要求。"
     },
     {
       "question_id": "Q06_010",
       "score_evidence": 1.0,
       "score_consistency": 1.0,
-      "review": "信号机制实现证据链完整（结构体、syscall 号、汇编桩），完全支撑 implemented 结论。"
+      "review": "三态题选择 implemented。证据涵盖信号结构体定义、系统调用号及 trampoline 汇编，完整支撑信号机制存在的结论。"
     },
     {
       "question_id": "Q06_011",
       "score_evidence": 1.0,
       "score_consistency": 1.0,
-      "review": "详细描述了上下文构建与恢复过程，证据中的代码片段直接对应 value 中的逻辑描述。"
+      "review": "简答题要求描述上下文构建与 sigreturn 恢复。答案详细描述流程，证据提供 sighandle 与 sigreturn 函数代码，直接对应题面要求的两个关键点。"
     },
     {
       "question_id": "Q06_012",
-      "score_evidence": 0.9,
+      "score_evidence": 0.85,
       "score_consistency": 1.0,
-      "review": "结论为未发现，证据提供了目录搜索记录，符合 not_found 的举证要求。"
+      "review": "单选题选择 C（未发现）。证据为目录搜索未找到 rwlock 相关文件，作为负面证据可接受，符合题面约束。"
     },
     {
       "question_id": "Q06_013",
       "score_evidence": 0.3,
       "score_consistency": 1.0,
-      "review": "严重矛盾：value 声称使用 Rust 标准库原子操作，但 evidence 显示文件后缀为.c 且使用 GCC 内置函数 (__sync_...)，证据无法支撑结论且存在事实冲突。"
+      "review": "单选题选择 A（Rust 标准库原子操作）。但证据摘录的是 kernel/sync/spinlock.c 文件中的 GCC 内置函数 (__sync_lock_test_and_set)。**结论声称 Rust 标准库，证据却是 C 语言实现，存在明显的结论与证据矛盾**，严重削弱证据支撑度。"
     },
     {
       "question_id": "Q06_014",
       "score_evidence": 0.9,
       "score_consistency": 1.0,
-      "review": "逐条分析了死锁条件，证据引用了锁获取与 sleep 逻辑，支撑了关于循环等待可能性的分析。"
+      "review": "简答题要求分析死锁四条件。答案逐条作答并结合代码。证据提供 acquire/sleep/pipelock 片段，能支撑互斥与持有等待的分析，循环等待部分基于代码缺失的推断，证据整体充分。"
     },
     {
       "question_id": "Q06_015",
-      "score_evidence": 0.9,
+      "score_evidence": 0.85,
       "score_consistency": 1.0,
-      "review": "结论为忽略策略，证据显示未找到死锁处理机制代码，逻辑自洽。"
+      "review": "单选题选择 D（忽略）。证据为死锁相关关键字检索缺失，支撑“未发现机制”的结论，符合题面。"
     },
     {
       "question_id": "Q06_016",
-      "score_evidence": 0.9,
+      "score_evidence": 0.85,
       "score_consistency": 1.0,
-      "review": "结论为 not_found，证据展示了锁顺序规范检索结果为空，符合题面要求。"
+      "review": "三态题选择 not_found。证据为锁顺序规范检索缺失，逻辑同 Q06_015，符合题面。"
     },
     {
       "question_id": "Q06_017",
-      "score_evidence": 0.95,
+      "score_evidence": 0.9,
       "score_consistency": 1.0,
-      "review": "结论为 implemented (Mesa 语义)，证据中 sleep 返回前重新获取锁的逻辑支撑了 Mesa 语义判断。"
+      "review": "三态题选择 implemented。证据展示 sleep/wakeup 模式及唤醒后重新竞争锁的逻辑，支撑 Mesa 语义的结论，符合题面。"
     },
     {
       "question_id": "Q06_018",
       "score_evidence": 0.9,
       "score_consistency": 1.0,
-      "review": "对三个经典问题分别给出了状态，Pipe 作为生产者 - 消费者证据充分，其余未找到证据合理。"
+      "review": "简答题要求验证三个经典问题。答案区分了实现与未发现。证据提供 pipe 代码支撑生产者 - 消费者，搜索结果为其他两项支撑未发现，符合题面。"
     },
     {
       "question_id": "Q06_019",
-      "score_evidence": 0.9,
+      "score_evidence": 0.85,
       "score_consistency": 1.0,
-      "review": "结论为 not_found，证据提供了消息队列相关 syscall 检索结果，支撑充分。"
+      "review": "三态题选择 not_found。证据为消息队列系统调用检索缺失，符合题面。"
     },
     {
       "question_id": "Q06_020",
-      "score_evidence": 0.9,
+      "score_evidence": 0.85,
       "score_consistency": 1.0,
-      "review": "结论为 not_found，证据展示了 barrier 相关关键字检索结果为空，符合题面要求。"
+      "review": "三态题选择 not_found。证据为屏障同步相关符号检索缺失，符合题面。"
     }
   ],
   "findings": [
     {
-      "question_id": "Q06_013",
       "severity": "warn",
-      "message": "证据与结论严重矛盾：Value 声称 Rust 原子操作，Evidence 显示为 C 语言实现 (__sync 内置函数)。"
+      "question_id": "Q06_013",
+      "message": "答案 value 声称使用 Rust core::sync::atomic，但 evidence 摘录的是 C 语言文件 (.c) 中的 GCC 内置原子指令，结论与证据存在直接矛盾。"
     }
   ],
-  "summary_zh": "整体报告质量较高，大部分题目证据详实且题面相符。但 Q06_013 存在严重证据与结论矛盾（语言实现不匹配），导致该题证据分极低并触发全阶段置信度截断（方案 A）。其余题目在契约遵循与证据支撑上表现良好。",
-  "report_quality_score": 0.76,
+  "summary_zh": "本报告整体格式规范，绝大多数题目（19/20）的题面相符度良好，证据能支撑结论。主要问题集中在 Q06_013，其结论（Rust 原子库）与提供的代码证据（C 语言 GCC 内置指令）严重不符，导致该题证据分显著降低并触发全阶段置信度截断。其余负面结论题目（如 not_found）证据形式统一，虽验证性略低于正代码据但符合契约。",
+  "report_quality_score": 0.95,
   "_meta": {
     "quality": {
-      "mean_question_confidence": 0.9537,
-      "mean_dimensions": 0.0
+      "mean_question_confidence": 0.945
     },
     "review_model": "qwen3.5-plus",
     "baseline": true,
-    "run_at": "2026-04-23T22:23:31",
-    "baseline_execute_tokens": 585061,
-    "baseline_review_tokens": 16151,
-    "baseline_stage_total_tokens": 601212
+    "run_at": "2026-04-24T08:13:14",
+    "baseline_execute_tokens": 0,
+    "baseline_review_tokens": 16210,
+    "baseline_stage_total_tokens": 16210
   }
 }

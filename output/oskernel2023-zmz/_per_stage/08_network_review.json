@@ -2,72 +2,70 @@
   "schema_version": "describe_review_v1",
   "stage_id": "08_network",
   "stage_title": "网络子系统与协议栈",
-  "confidence": 0.94,
+  "confidence": 0.75,
   "question_reviews": [
     {
       "question_id": "Q08_001",
-      "confidence": 0.95,
-      "review": "题面要求三态，value 为 not_found。证据提供目录结构扫描、syscall 定义缺失及 virtio 头文件检查，三条 excerpt 均直接支撑‘未发现网络子系统’的结论，题答一致且证据充分。"
+      "score_evidence": 0.95,
+      "score_consistency": 0.95,
+      "review": "三态结论明确，证据通过目录扫描、系统调用表、驱动头文件三方面交叉验证，支撑充分。"
     },
     {
       "question_id": "Q08_002",
-      "confidence": 0.95,
-      "review": "题面为单选，value‘未发现’对应选项 D。证据通过 Cargo.toml 依赖扫描和 kernel 目录协议文件缺失检查，支撑‘未发现协议栈’结论，符合题面约束。"
+      "score_evidence": 0.95,
+      "score_consistency": 0.85,
+      "review": "证据能支撑未发现协议栈的结论；但单选题 value 建议使用选项键（D），当前使用选项文本，规范性稍欠。"
     },
     {
       "question_id": "Q08_003",
-      "confidence": 0.95,
-      "review": "题面要求三态，value 为 not_found。证据列举 sysnum.h 缺失定义、syscall 实现文件 grep 无命中及 stat.h 占位宏检查，直接支撑无 socket 系统调用接口的结论。"
+      "score_evidence": 0.95,
+      "score_consistency": 0.95,
+      "review": "三态结论明确，证据引用 sysnum.h 及 syscall 实现文件，grep 结果直接支撑无 socket 系统调用的结论。"
     },
     {
       "question_id": "Q08_004",
-      "confidence": 0.9,
-      "review": "题面要求追踪发送路径并列 3-6 节点。value 说明未发现 sys_sendto 并转而描述 poll 路径（4 个节点）。证据支撑 poll 路径节点及‘无网络 syscall'的陈述，但主任务（发送路径追踪）因系统状态无法完成，证据对‘无发送路径’的支撑主要依赖 excerpt 中的文本断言而非代码缺失的直接证明，略降分。"
+      "score_evidence": 0.5,
+      "score_consistency": 0.7,
+      "review": "题干要求追踪发送路径，答案称未发现但证据追踪的是 poll/pipe 路径，无法直接支撑“发送路径不存在”的结论（应提供搜索未果证据），且追踪对象与题面要求不符。"
     },
     {
       "question_id": "Q08_005",
-      "confidence": 0.95,
-      "review": "题面要求三态，value 为 not_found。证据检查 virtio 头文件注释与实际驱动文件差异、中断处理扫描，直接支撑无网卡驱动及收包中断路径的结论。"
+      "score_evidence": 0.95,
+      "score_consistency": 0.95,
+      "review": "三态结论明确，证据覆盖驱动实现文件与中断处理扫描，支撑充分。"
     },
     {
       "question_id": "Q08_006",
-      "confidence": 0.9,
-      "review": "题面为多选，要求未发现则 value 留空并在 notes 写 not_found。value 为空列表符合，但答案 JSON 对象中缺失 notes 字段，未完全落实题面关于 notes 的约束，证据支撑协议未发现的结论。"
+      "score_evidence": 0.95,
+      "score_consistency": 0.75,
+      "review": "证据支撑无协议实现；但题干要求未发现时在 notes 字段注明，答案 JSON 缺少 notes 字段，契约落实不全。"
     },
     {
       "question_id": "Q08_007",
-      "confidence": 0.95,
-      "review": "题面要求三态，value 为 not_found。证据扫描 DMA 控制器定义、hal 目录及文件 IO 路径，确认无网络专用零拷贝结构，支撑充分。"
+      "score_evidence": 0.95,
+      "score_consistency": 0.95,
+      "review": "三态结论明确，证据覆盖 DMA 控制器定义及数据拷贝路径，支撑充分。"
     }
   ],
-  "dimensions": {
-    "evidence_supports_answers": 0.95,
-    "question_answer_consistency": 0.9,
-    "requirements_fit": 0.95
-  },
   "findings": [
     {
       "severity": "warn",
-      "question_id": "Q08_006",
-      "message": "题面明确要求‘未发现则...在 notes 写 not_found'，但答案 JSON 中缺失 notes 字段，存在题面约束未落实。"
+      "message": "Q08_004 证据与结论逻辑不匹配：结论为“无发送路径”，证据却展示“轮询路径存在”，未提供否定性搜索证据。"
+    },
+    {
+      "severity": "warn",
+      "message": "Q08_006 违反题面契约：题干要求未找到时填写 notes 字段，实际输出缺失该字段。"
+    },
+    {
+      "severity": "info",
+      "message": "Q08_002 单选题 value 使用文本而非选项键，虽语义正确但建议规范化。"
     }
   ],
-  "summary_zh": "本报告整体质量较高，各题 value 与题面类型匹配，证据摘录具体（含路径、符号、grep 结果），能有效支撑‘未发现’类结论。主要扣分点在于 Q08_006 未遵循题面关于 notes 字段的约束，以及 Q08_004 因系统功能缺失导致主任务转为替代路径描述，证据对负面结论的支撑略依赖文本断言。全阶段置信度按各题均值计算。",
-  "report_quality_score": 0.96,
+  "summary_zh": "本报告在三态实现类题目（Q08_001/003/005/007）上证据扎实，能利用 grep/扫描结果有效支撑“未发现”结论。但在追踪类题目（Q08_004）上证据偏离题面要求（追踪了非目标路径），且部分题目（Q08_002/006）存在选项键值规范及字段缺失的契约落实问题。因 Q08_004 证据支撑度不足，全阶段置信度按规则截断。",
+  "report_quality_score": 0.88,
   "_meta": {
     "quality": {
-      "excerpt_coverage": 1.0,
-      "evidence_richness": 1.0,
-      "total_evidence_items": 20,
-      "nonempty_excerpt_items": 20,
-      "mean_question_confidence": 0.9357,
-      "mean_dimensions": 0.9333,
-      "weights": {
-        "w_mean": 0.45,
-        "w_excerpt": 0.25,
-        "w_rich": 0.2,
-        "w_dim": 0.1
-      }
+      "mean_question_confidence": 0.8786
     },
     "review_model": "qwen3.5-plus"
   }

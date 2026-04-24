@@ -1,0 +1,194 @@
+```json
+{
+  "schema_version": "v1",
+  "stage_id": "09_debug_error",
+  "stage_title": "调试机制与错误处理",
+  "terminology_profile": "stallings_en_zh",
+  "answers": [
+    {
+      "question_id": "Q09_001",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在日志系统（log/printk/println 宏）与日志级别控制？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "src/printf.c",
+          "symbol_kind": "function",
+          "symbol_name": "printf/__debug_info/__debug_warn/__debug_error",
+          "excerpt": "Found printf() function and debug macros __debug_info, __debug_warn, __debug_error controlled by #ifdef DEBUG, #ifdef WARNING, #ifdef ERROR preprocessor directives."
+        },
+        {
+          "path": "Makefile",
+          "symbol_kind": "build_config",
+          "symbol_name": "CFLAGS",
+          "excerpt": "CFLAGS = -Wall -Werror -O -fno-omit-frame-pointer -ggdb -DDEBUG -DWARNING -DERROR -D$(FS) -D$(MAC) - log level control via compile-time defines."
+        },
+        {
+          "path": "src/include/printf.h",
+          "symbol_kind": "header",
+          "symbol_name": "printf declarations",
+          "excerpt": "void printf(char *fmt, ...); void __debug_info(char *fmt, ...); void __debug_warn(char *fmt, ...); void __debug_error(char *fmt, ...);"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_002",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 panic/崩溃处理路径（panic_handler/oom/abort 等）？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "src/printf.c",
+          "symbol_kind": "function",
+          "symbol_name": "panic",
+          "excerpt": "void panic(char *s) { printf(\"panic: \"); printf(s); printf(\"\\n\"); backtrace(); panicked = 1; for(;;) ; } - panic handler with infinite loop halt."
+        },
+        {
+          "path": "src/printf.c",
+          "symbol_kind": "variable",
+          "symbol_name": "panicked",
+          "excerpt": "volatile int panicked = 0; - global flag set when panic occurs to freeze uart output from other CPUs."
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_003",
+      "question_type": "short_answer",
+      "stem": "panic 路径会输出哪些诊断？（寄存器 dump/栈回溯/停机；必须引用实现证据）",
+      "value": "panic 路径输出：1) \"panic: \"前缀消息 2) 用户提供的错误字符串 3) 换行 4) 栈回溯 (backtrace) 5) 进入无限循环停机。不直接输出寄存器 dump，但 trapframedump() 可用于 trapframe 寄存器转储。",
+      "evidence": [
+        {
+          "path": "src/printf.c",
+          "symbol_kind": "function",
+          "symbol_name": "panic",
+          "excerpt": "void panic(char *s) { printf(\"panic: \"); printf(s); printf(\"\\n\"); backtrace(); panicked = 1; for(;;) ; }"
+        },
+        {
+          "path": "src/printf.c",
+          "symbol_kind": "function",
+          "symbol_name": "backtrace",
+          "excerpt": "void backtrace() { uint64 *fp = (uint64 *)r_fp(); uint64 *bottom = (uint64 *)PGROUNDUP((uint64)fp); printf(\"backtrace:\\n\"); while (fp < bottom) { uint64 ra = *(fp - 1); printf(\"%p\\n\", ra - 4); fp = (uint64 *)*(fp - 2); } }"
+        },
+        {
+          "path": "src/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "trapframedump",
+          "excerpt": "void trapframedump(struct trapframe *tf) - prints all registers (a0-a7, t0-t6, s0-s11, ra, sp, gp, tp, epc) from trapframe."
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_004",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现栈回溯 (backtrace/unwind/stack_trace)？（必须三态；仅打印 ra 不算）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "src/printf.c",
+          "symbol_kind": "function",
+          "symbol_name": "backtrace",
+          "excerpt": "void backtrace() { uint64 *fp = (uint64 *)r_fp(); uint64 *bottom = (uint64 *)PGROUNDUP((uint64)fp); printf(\"backtrace:\\n\"); while (fp < bottom) { uint64 ra = *(fp - 1); printf(\"%p\\n\", ra - 4); fp = (uint64 *)*(fp - 2); } } - walks frame pointer chain, prints multiple return addresses."
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_005",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在内核驻留的交互式监视器（kernel monitor）？（对齐 Stallings《操作系统：精髓与设计原理》语境：在内核态上下文接受命令、用于探查/操控系统的监视器；不包括仅在用户态运行的常规 shell）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "usrinit/initcode.S",
+          "symbol_kind": "file",
+          "symbol_name": "initcode",
+          "excerpt": "User-space init process that execs /mytest.sh - runs in user mode, not kernel monitor."
+        },
+        {
+          "path": "src/dev.c",
+          "symbol_kind": "file",
+          "symbol_name": "devinit/consoleread/consolewrite",
+          "excerpt": "Console device drivers for input/output - no kernel command parser or monitor interface found."
+        },
+        {
+          "path": "src/main.c",
+          "symbol_kind": "file",
+          "symbol_name": "main",
+          "excerpt": "Kernel main() initializes subsystems and calls scheduler() - no kernel monitor command loop. All shell functionality (busybox, etc.) runs in user space."
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_006",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 GDB stub（需数据包解析循环，如 handle_gdb_packet）？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "Makefile",
+          "symbol_kind": "build_target",
+          "symbol_name": "qemu-gdb",
+          "excerpt": "qemu-gdb target uses QEMU's built-in GDB stub (-gdb tcp::$(GDBPORT)) - no internal kernel GDB stub implementation."
+        },
+        {
+          "path": "src/",
+          "symbol_kind": "search",
+          "symbol_name": "gdb_stub/handle_gdb_packet",
+          "excerpt": "Searched for gdb_stub, handle_gdb_packet, gdb_packet, remote_debug symbols - none found in kernel source. External QEMU GDB stub only."
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_007",
+      "question_type": "short_answer",
+      "stem": "错误码/错误类型体系是什么？（errno/Result/Error enum；给类型定义与传播点证据）",
+      "value": "Unix errno 风格错误码体系：使用正整数错误码定义于 src/include/errno.h，系统调用失败时返回 -errno（负值）。无 Result/Error enum 类型。",
+      "evidence": [
+        {
+          "path": "src/include/errno.h",
+          "symbol_kind": "header",
+          "symbol_name": "errno definitions",
+          "excerpt": "#define EPERM 1, #define ENOENT 2, #define ESRCH 3, #define EINTR 4, #define EIO 5, ... #define EMFILE 24, #define ENOSYS 38 - standard Unix errno values."
+        },
+        {
+          "path": "src/sysfile.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_openat",
+          "excerpt": "Returns -1 on error, specific errno like -EMFILE for file descriptor exhaustion: if((f = filealloc()) == NULL || (fd = fdalloc(f)) < 0) return -EMFILE;"
+        },
+        {
+          "path": "src/sysproc.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_clone",
+          "excerpt": "Returns -1 on failure: if((np = allocproc(p, 1)) == NULL) return -1; - error propagates as negative return value."
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_008",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 trace/perf/ftrace 等跟踪机制或 tracepoints？（必须三态）",
+      "value": "stub",
+      "evidence": [
+        {
+          "path": "src/include/proc.h",
+          "symbol_kind": "struct_field",
+          "symbol_name": "tmask",
+          "excerpt": "struct proc { ... int tmask; ... }; - trace mask field in process structure for per-process syscall tracing."
+        },
+        {
+          "path": "syscall/syscall.c",
+          "symbol_kind": "function",
+          "symbol_name": "syscall",
+          "excerpt": "if ((p->tmask & (1 << num)) != 0) { printf(\"pid %d: %s -> %d\\n\", p->pid, sysnames[num], p->trapframe->a0); } - basic syscall tracing when trace mask bit is set."
+        },
+        {
+          "path": "src/",
+          "symbol_kind": "search",
+          "symbol_name": "tracepoint/ftrace/perf",
+          "excerpt": "Searched for tracepoint, ftrace, perf, trace_buffer symbols - no comprehensive tracing infrastructure found. Only basic syscall trace mask exists."
+        }
+      ]
+    }
+  ]
+}
+```

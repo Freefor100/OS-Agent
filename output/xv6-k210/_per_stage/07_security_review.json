@@ -2,98 +2,105 @@
   "schema_version": "describe_review_v1",
   "stage_id": "07_security",
   "stage_title": "安全机制与权限模型",
-  "confidence": 0.88,
+  "confidence": 0.94,
   "question_reviews": [
     {
       "question_id": "Q07_001",
-      "confidence": 0.95,
-      "review": "回答切题，证据充分。SSTATUS_SPP 宏定义及 usertrap/usertrapret 中对 SPP 位的读写操作，明确证实了 RISC-V 架构下用户态/内核态的特权级隔离机制。"
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "答案值完全匹配选项 A。证据摘录直接展示了 SSTATUS_SPP 位定义及内核态/用户态切换代码，支撑充分。"
     },
     {
       "question_id": "Q07_002",
-      "confidence": 0.9,
-      "review": "回答为 stub，证据支撑合理。kstat 结构体含 uid/gid 但 proc 结构体无，且 execve 中硬编码为 0，表明凭证结构仅部分存在且未实际用于进程上下文，符合 stub 特征。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态值 'stub' 合理。证据展示了结构体定义与硬编码初始化，有效证明了凭证机制不完整。"
     },
     {
       "question_id": "Q07_003",
-      "confidence": 0.95,
-      "review": "回答为 not_found，证据有力。sys_getuid 直接返回 0，execve 中无检查逻辑，证实 syscall 路径上无真实权限检查。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态值 'not_found' 合理。证据展示了 syscall 返回硬编码值，直接证明无权限检查逻辑。"
     },
     {
       "question_id": "Q07_004",
-      "confidence": 0.95,
-      "review": "短回答清晰，与 Q07_003 结论一致。明确指出搜索关键字无结果且关键函数为桩，证据引用具体代码行，可信度高。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "短答案明确说明未发现检查链，并给出了搜索关键字和反证代码，符合题干对不存在情况的作答要求。"
     },
     {
       "question_id": "Q07_005",
-      "confidence": 0.9,
-      "review": "回答为 implemented，证据链完整。permit_usr_mem/protect_usr_mem 配合 SSTATUS_PUM 位操作，以及 safememmove/copyin2 等封装，构成了用户指针验证机制。"
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "三态值 'implemented' 证据详实。摘录了用户内存保护开关函数及 copyin/out 调用链，直接支撑结论。"
     },
     {
       "question_id": "Q07_006",
-      "confidence": 0.8,
-      "review": "回答为 not_found，但证据列表为空。虽逻辑自洽（未找到即无证据），但若能提供搜索关键字或文件范围会更严谨。"
+      "score_evidence": 0.5,
+      "score_consistency": 1.0,
+      "review": "三态值合法，但 evidence 数组为空。对于 'not_found' 结论，缺乏搜索关键字或 grep 结果作为证据，验证性不足。"
     },
     {
       "question_id": "Q07_007",
-      "confidence": 0.75,
-      "review": "回答为 stub，证据仅为注释。注释提及 guard page 但未展示实际分配或保护逻辑代码，仅凭注释判定为 stub 略显薄弱，但尚可接受。"
+      "score_evidence": 0.8,
+      "score_consistency": 1.0,
+      "review": "三态值 'stub' 合理。证据仅为注释，虽能说明设计意图，但缺乏实际保护代码（如 canary 逻辑），支撑度中等。"
     },
     {
       "question_id": "Q07_008",
-      "confidence": 0.8,
-      "review": "回答为 not_found，证据列表为空。同 Q07_006，负面结论缺乏搜索过程佐证，但基于现有材料无法反驳。"
+      "score_evidence": 0.5,
+      "score_consistency": 1.0,
+      "review": "三态值合法，但 evidence 数组为空。同 Q07_006，负面结论缺乏搜索过程证据，影响报告可信度。"
     },
     {
       "question_id": "Q07_009",
-      "confidence": 0.9,
-      "review": "回答详细，证据确凿。通过 Makefile 和 cargo 配置证实 riscv64 架构，并正确指出未发现 PMP/MPU 配置，符合材料内容。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "短答案清晰列出支持架构及证据。Makefile 和配置文件的摘录有效证明了 riscv64 支持及特权级配置。"
     },
     {
       "question_id": "Q07_010",
-      "confidence": 0.95,
-      "review": "回答为 not_found，证据表明内核为 C 语言编写。既然非 Rust 项目，自然不存在 Rust 特有的安全机制，逻辑正确。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态值 'not_found' 合理。证据通过编译配置证明内核为 C 语言，逻辑上支撑了无 Rust 安全机制的结论。"
     },
     {
       "question_id": "Q07_011",
-      "confidence": 0.9,
-      "review": "回答为 implemented，证据充分。TRAMPOLINE 页映射、satp 寄存器切换及 SSTATUS_PUM 的使用，构成了页表隔离（KPTI 等价机制）的完整证据链。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态值 'implemented' 证据充分。展示了 Trampoline 页映射、satp 切换及 PUM 位，符合 KPTI/隔离机制特征。"
     },
     {
       "question_id": "Q07_012",
-      "confidence": 0.95,
-      "review": "短回答准确，与 Q07_002/003 高度一致。明确指出字段存在但无检查链，并标注桩函数，证据引用具体结构体和函数，可信。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "短答案准确区分了字段定义与执行检查。证据链展示了结构体定义与硬编码使用，支撑「无检查链」结论。"
     },
     {
       "question_id": "Q07_013",
-      "confidence": 0.9,
-      "review": "选择项合理，证据支撑结论。基于前序题目中权限检查缺失的结论，判定为仅有特权级隔离而无细粒度访问控制，逻辑连贯。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "答案值完全匹配选项 D。证据展示了特权级隔离存在但权限检查缺失，与选项描述一致。"
     },
     {
       "question_id": "Q07_014",
-      "confidence": 0.85,
-      "review": "回答为 stub，证据展示页表权限位设置。ELF 加载时设置 PTE_X/PTE_W 是基础保护，但是否严格执行 W^X 未完全展示，判定为 stub 合理。"
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "三态值 'stub' 合理。证据展示了页表权限位设置，但未展示更高级完整性策略（如签名验证），支撑度良好。"
     }
   ],
-  "dimensions": {
-    "evidence_supports_answers": 0.9,
-    "question_answer_consistency": 0.95,
-    "requirements_fit": 1.0
-  },
   "findings": [
     {
-      "severity": "info",
-      "topic": "负面证据缺失",
-      "detail": "Q07_006 和 Q07_008 的 not_found 结论未提供搜索关键字或遍历范围，建议补充以增强可信度。"
-    },
-    {
-      "severity": "info",
-      "topic": "注释作为证据",
-      "detail": "Q07_007 仅依赖代码注释判定栈保护机制，若有实际初始化代码引用会更佳。"
+      "severity": "warn",
+      "message": "Q07_006 与 Q07_008 的 evidence 数组为空。对于 'not_found' 类结论，建议提供搜索关键字或空结果截图以增强证据充分性。"
     }
   ],
-  "summary_zh": "本阶段模型作答整体质量较高，逻辑连贯且证据充分。模型准确识别了 RISC-V 架构下的特权级隔离（SSTATUS_SPP）和页表隔离机制（TRAMPOLINE/satp 切换），并一致地指出权限管理（UID/GID 检查）目前仅为桩实现或未发现。大部分肯定性结论均有具体代码片段支撑，负面结论虽部分缺乏搜索过程展示，但与项目整体安全机制较弱的现状相符。主要风险在于部分“未发现”类题目证据链为空，以及栈保护仅凭注释判定，但不影响整体结论的可靠性。",
+  "summary_zh": "本报告整体题面相符度高，三态与选项约束遵守良好。正面实现类题目（如 Q07_005, Q07_011）证据详实。主要不足在于部分负面结论题目（Q07_006, Q07_008）缺乏搜索过程证据，导致证据支撑度下降。全阶段分按各题均值方案 A 汇总。",
+  "report_quality_score": 0.94,
   "_meta": {
+    "quality": {
+      "mean_question_confidence": 0.9375
+    },
     "review_model": "qwen3.5-plus"
   }
 }

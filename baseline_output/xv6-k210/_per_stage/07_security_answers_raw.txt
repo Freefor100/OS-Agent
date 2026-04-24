@@ -1,0 +1,410 @@
+```json
+{
+  "schema_version": "v1",
+  "stage_id": "07_security",
+  "stage_title": "安全机制与权限模型",
+  "terminology_profile": "stallings_en_zh",
+  "answers": [
+    {
+      "question_id": "Q07_001",
+      "question_type": "single_choice",
+      "stem": "特权级隔离形态更接近哪种？",
+      "value": "有用户态/内核态隔离（user mode/kernel mode）",
+      "evidence": [
+        {
+          "path": "include/hal/riscv.h",
+          "symbol_kind": "define",
+          "symbol_name": "SSTATUS_SPP",
+          "excerpt": "#define SSTATUS_SPP (1L << 8)  // Previous mode, 1=Supervisor, 0=User - RISC-V S-mode/U-mode privilege separation"
+        },
+        {
+          "path": "kernel/trap/trampoline.S",
+          "symbol_kind": "assembly",
+          "symbol_name": "uservec/userret",
+          "excerpt": "uservec saves user registers in TRAPFRAME, switches to kernel stack and page table. userret restores user registers and switches back to user page table with sret instruction"
+        },
+        {
+          "path": "doc/内核设计 - 页表映射.md",
+          "symbol_kind": "documentation",
+          "symbol_name": "page_table_design",
+          "excerpt": "xv6-k210 使用 RISC-V 的 S 态（监管者模式）和 U 态（用户模式）进行特权级隔离，用户程序运行在 U 态，内核运行在 S 态"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_002",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在凭证/权限数据结构（UID/GID/Credential/Capability/ACL 等）？",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "include/fs/stat.h",
+          "symbol_kind": "struct",
+          "symbol_name": "kstat",
+          "excerpt": "struct kstat { uint32 uid; uint32 gid; ... } - UID/GID fields exist in file stat structure"
+        },
+        {
+          "path": "include/fs/fs.h",
+          "symbol_kind": "struct",
+          "symbol_name": "inode",
+          "excerpt": "struct inode contains mode field for file permissions (S_IFMT, S_IFDIR, S_IFREG, etc.)"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_003",
+      "question_type": "tri_state_impl",
+      "stem": "是否能证实在 syscall 路径上真实执行了权限检查（open/exec/write 等）？",
+      "value": "stub",
+      "evidence": [
+        {
+          "path": "kernel/syscall/sysfile.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_faccessat",
+          "excerpt": "sys_faccessat checks file existence and mode bits but returns 0 for root user without actual permission enforcement - assumes user as root"
+        },
+        {
+          "path": "kernel/syscall/sysfile.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_openat",
+          "excerpt": "openat checks file type (directory vs regular file) but no UID/GID based permission checking implemented"
+        },
+        {
+          "path": "kernel/fs/fs.c",
+          "symbol_kind": "function",
+          "symbol_name": "create",
+          "excerpt": "File creation uses mode parameter but no actual owner/permission enforcement in FAT32 implementation"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_004",
+      "question_type": "short_answer",
+      "stem": "若存在权限检查：入口点与核心检查函数链路是什么？",
+      "value": "Permission check chain (limited): sys_faccessat() -> nameifrom() -> dirlookup() -> fat_lookup_dir_ent() - but actual permission enforcement is stubbed (returns success for root)",
+      "evidence": [
+        {
+          "path": "kernel/syscall/sysfile.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_faccessat",
+          "excerpt": "int sys_faccessat(void) { ... ip = nameifrom(ip, path); ... ilock(ip); ip->op->getattr(ip, &st); ... if ((imode & mode) != mode) return -1; } - checks mode bits but assumes root"
+        },
+        {
+          "path": "kernel/fs/fs.c",
+          "symbol_kind": "function",
+          "symbol_name": "nameifrom",
+          "excerpt": "struct inode *nameifrom(struct inode *ip, char *path) - traverses directory tree to find inode"
+        },
+        {
+          "path": "kernel/fs/fat32/dirent.c",
+          "symbol_kind": "function",
+          "symbol_name": "fat_lookup_dir_ent",
+          "excerpt": "Looks up directory entry in FAT32 filesystem, returns inode with mode information"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_005",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现用户指针验证（access_ok/verify_area/UserInPtr/copyin/copyout 等）？",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/mm/vm.c",
+          "symbol_kind": "function",
+          "symbol_name": "copyout/copyin",
+          "excerpt": "int copyout(pagetable_t, uint64 dstva, char *src, uint64 len) - copies from kernel to user space with address validation. int copyin(pagetable_t, char *dst, uint64 srcva, uint64 len) - copies from user to kernel"
+        },
+        {
+          "path": "kernel/mm/vm.c",
+          "symbol_kind": "function",
+          "symbol_name": "safememmove",
+          "excerpt": "static uint64 safememmove(char *dst, char *src, uint64 len, int srcinc) - safe memory copy with page fault handling for COW and lazy allocation"
+        },
+        {
+          "path": "kernel/syscall/syscall.c",
+          "symbol_kind": "function",
+          "symbol_name": "fetchaddr/fetchstr",
+          "excerpt": "int fetchaddr(uint64 addr, uint64 *ip) - fetches uint64 from user address. int fetchstr(uint64 addr, char *buf, int max) - fetches null-terminated string from user"
+        },
+        {
+          "path": "include/mm/vm.h",
+          "symbol_kind": "function",
+          "symbol_name": "copyout2/copyin2",
+          "excerpt": "int copyout2(uint64 dstva, char *src, uint64 len) - wrapper that checks segment validity before copyout"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_006",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 seccomp/prctl/sandbox 等系统调用过滤/沙箱？",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "include/sysnum.h",
+          "symbol_kind": "search",
+          "symbol_name": "seccomp_prctl_search",
+          "excerpt": "Searched for SYS_seccomp, SYS_prctl, SYS_ptrace - none found in syscall number definitions"
+        },
+        {
+          "path": "kernel/syscall/",
+          "symbol_kind": "search",
+          "symbol_name": "syscall_filtering",
+          "excerpt": "No syscall filtering, sandboxing, or process isolation mechanisms found in syscall implementation files"
+        },
+        {
+          "path": "kernel/sched/proc.c",
+          "symbol_kind": "search",
+          "symbol_name": "namespace_isolation",
+          "excerpt": "No process namespace isolation, capability bounding sets, or security contexts implemented"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_007",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在栈保护/溢出防护（stack canary/guard page）或等价机制？",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "Makefile",
+          "symbol_kind": "build_config",
+          "symbol_name": "stack_protector",
+          "excerpt": "CFLAGS += $(shell $(CC) -fno-stack-protector -E -x c /dev/null >/dev/null 2>&1 && echo -fno-stack-protector) - stack protector explicitly disabled but..."
+        },
+        {
+          "path": "include/memlayout.h",
+          "symbol_kind": "define",
+          "symbol_name": "KSTACK",
+          "excerpt": "// map kernel stacks beneath the trampoline, each surrounded by invalid guard pages. 保护页的 PTE 无效（即，PTE_V 置 0），因此，如果内核溢出内核堆栈，则很可能会导致异常"
+        },
+        {
+          "path": "doc/内核原理 - 内存管理.md",
+          "symbol_kind": "documentation",
+          "symbol_name": "stack_protection",
+          "excerpt": "内核堆栈页面。每个进程都有自己的内核堆栈，该堆栈被映射到较高的位置，因此 xv6 在其下方可以留下未映射的保护页。保护页的 PTE 无效，如果内核溢出内核堆栈，则很可能会导致异常"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_008",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在审计/安全启动（audit/secure boot/signature）相关逻辑？",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/",
+          "symbol_kind": "search",
+          "symbol_name": "audit_logging",
+          "excerpt": "No audit logging, security event recording, or syscall tracing for security purposes found"
+        },
+        {
+          "path": "bootloader/",
+          "symbol_kind": "search",
+          "symbol_name": "secure_boot",
+          "excerpt": "RustSBI bootloader has no secure boot, signature verification, or measured boot implementation"
+        },
+        {
+          "path": "kernel/exec.c",
+          "symbol_kind": "search",
+          "symbol_name": "binary_verification",
+          "excerpt": "exec() only checks ELF magic number (ELF_MAGIC 0x464C457FU), no code signing or integrity verification"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_009",
+      "question_type": "short_answer",
+      "stem": "本项目支持哪些架构（riscv64/aarch64/x86_64/loongarch64 等）？每种架构的安全相关初始化（特权级配置、PMP/MPU/SMEP 等）是否有代码证据？",
+      "value": "仅支持 riscv64 架构。安全初始化证据：1) RISC-V S-mode/U-mode 特权级分离（include/hal/riscv.h 的 SSTATUS_SPP）；2) 页表权限位 PTE_U 控制用户访问（include/hal/riscv.h 的 PTE_U）；3) K210 使用 RISC-V 1.9.1 规范，通过 RustSBI 处理 sfence.vma 异常来设置分页（doc/构建调试 - 外部中断 v2.md）；4) QEMU 和 K210 平台都有 trap 初始化（kernel/trap/trap.c 的 trapinithart）",
+      "evidence": [
+        {
+          "path": "Makefile",
+          "symbol_kind": "build_config",
+          "symbol_name": "toolchain",
+          "excerpt": "TOOLPREFIX := riscv64-unknown-elf- | CFLAGS += -march=rv64imafdc - RISC-V 64-bit architecture only"
+        },
+        {
+          "path": "include/hal/riscv.h",
+          "symbol_kind": "define",
+          "symbol_name": "privilege_bits",
+          "excerpt": "#define SSTATUS_SPP (1L << 8) // Previous mode, 1=Supervisor, 0=User | #define PTE_U (1L << 4) // 1 -> user can access"
+        },
+        {
+          "path": "doc/构建调试 - 外部中断 v2.md",
+          "symbol_kind": "documentation",
+          "symbol_name": "k210_riscv_version",
+          "excerpt": "K210 采用 1.9 版本的 RISC-V 标准，不存在 sfence.vma 这条指令，只有旧版指令 sfence.vm...RustSBI 捕获 sfence.vma 异常，设置 mstatus.vm 位开启分页"
+        },
+        {
+          "path": "kernel/trap/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "trapinithart",
+          "excerpt": "void trapinithart(void) { w_stvec((uint64)kernelvec); w_sstatus(r_sstatus() | SSTATUS_SIE); w_sie(r_sie() | SIE_SEIE | SIE_SSIE | SIE_STIE); } - sets up trap vector and enables interrupts"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_010",
+      "question_type": "tri_state_impl",
+      "stem": "若项目使用 Rust，是否存在 RAII/所有权/生命周期相关的内核安全机制（如不可 unsafe 直接访问用户内存、锁的 RAII 自动释放等）？",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/",
+          "symbol_kind": "search",
+          "symbol_name": "rust_code",
+          "excerpt": "Kernel is written in C, not Rust. Only bootloader (RustSBI) uses Rust but it's a separate project"
+        },
+        {
+          "path": "bootloader/SBI/rustsbi-k210/",
+          "symbol_kind": "search",
+          "symbol_name": "rust_sbi",
+          "excerpt": "RustSBI is Rust-based but it's the bootloader/firmware layer, not the kernel. Kernel security mechanisms are C-based"
+        },
+        {
+          "path": "kernel/sync/spinlock.c",
+          "symbol_kind": "function",
+          "symbol_name": "acquire/release",
+          "excerpt": "Manual lock acquire/release in C - no RAII automatic release mechanism"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_011",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现了内核/用户页表隔离 (Kernel/User Page Table Isolation, KPTI 或等价机制)？",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "doc/内核设计 - 页表映射.md",
+          "symbol_kind": "documentation",
+          "symbol_name": "page_table_design",
+          "excerpt": "在 xv6-k210 这个较为简单的内核上，为了提高效率，我们取消了原本的用户、内核页表分离的规则，将用户空间与内核空间合并在一个页表中 - KPTI explicitly NOT implemented"
+        },
+        {
+          "path": "kernel/mm/vm.c",
+          "symbol_kind": "function",
+          "symbol_name": "kvmcreate",
+          "excerpt": "pagetable_t kvmcreate() creates kernel page table that is copied for each process - user and kernel share same page table structure"
+        },
+        {
+          "path": "include/memlayout.h",
+          "symbol_kind": "define",
+          "symbol_name": "address_layout",
+          "excerpt": "User space: 0x1000 to 0x80000000, Kernel space: 0x80000000 and above - both mapped in same page table with PTE_U flag controlling access"
+        },
+        {
+          "path": "include/hal/riscv.h",
+          "symbol_kind": "search",
+          "symbol_name": "kpti_keywords",
+          "excerpt": "Searched for KPTI, CR3 switch, SMEP, SMAP, TTBR0/TTBR1 - none found. Only PTE_U flag for user/kernel separation"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_012",
+      "question_type": "short_answer",
+      "stem": "UID/GID 字段是否在 syscall 路径上真实执行权限检查？",
+      "value": "字段存在但无检查链 - UID/GID 字段定义在 struct kstat 中（include/fs/stat.h），但在 syscall 路径上没有基于 UID/GID 的实际权限强制执行。sys_faccessat 仅检查 mode 位且假设用户为 root（kernel/syscall/sysfile.c 注释：// assume user as root）",
+      "evidence": [
+        {
+          "path": "include/fs/stat.h",
+          "symbol_kind": "struct",
+          "symbol_name": "kstat",
+          "excerpt": "struct kstat { uint32 uid; uint32 gid; ... } - UID/GID fields defined"
+        },
+        {
+          "path": "kernel/syscall/sysfile.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_faccessat",
+          "excerpt": "int sys_faccessat(void) { ... // assume user as root ... if ((imode & mode) != mode) return -1; } - comment explicitly states 'assume user as root', no actual UID/GID checking"
+        },
+        {
+          "path": "kernel/sched/proc.h",
+          "symbol_kind": "search",
+          "symbol_name": "proc_credentials",
+          "excerpt": "struct proc does not contain uid/gid fields - no per-process credential tracking"
+        },
+        {
+          "path": "kernel/fs/fs.c",
+          "symbol_kind": "search",
+          "symbol_name": "inode_permissions",
+          "excerpt": "inode structure has mode field but no owner uid/gid storage or enforcement in FAT32 implementation"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_013",
+      "question_type": "single_choice",
+      "stem": "访问控制模型 (Access Control Model, Stallings Ch15) 更接近哪种？",
+      "value": "自主访问控制 DAC (Discretionary Access Control)：所有者自主设置权限（Unix 权限位）",
+      "evidence": [
+        {
+          "path": "include/fs/stat.h",
+          "symbol_kind": "define",
+          "symbol_name": "permission_bits",
+          "excerpt": "#define S_IFMT 0170000 #define S_IFDIR 0040000 #define S_IFREG 0100000 - Unix-style file type and permission bits"
+        },
+        {
+          "path": "kernel/syscall/sysfile.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_faccessat",
+          "excerpt": "Checks file mode bits (read/write/execute) against requested access - classic DAC model"
+        },
+        {
+          "path": "kernel/fs/fat32/fat32.c",
+          "symbol_kind": "function",
+          "symbol_name": "fat_alloc_entry",
+          "excerpt": "File creation uses mode parameter (S_IFDIR, S_IFREG) but FAT32 doesn't store Unix permissions - permissions are virtual/in-memory only"
+        },
+        {
+          "path": "doc/内核设计 - 文件系统 v2.md",
+          "symbol_kind": "documentation",
+          "symbol_name": "vfs_design",
+          "excerpt": "简单虚拟文件系统实现，基于 Linux VFS 概念但简化，支持 Unix-style operations like mount, but FAT32 underlying filesystem doesn't support full Unix permissions"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_014",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现完整性策略 (Integrity Policy, Stallings Ch15)？（如 Biba 模型、只读内核段、代码签名验证、W^X 内存保护等；必须三态）",
+      "value": "stub",
+      "evidence": [
+        {
+          "path": "include/hal/riscv.h",
+          "symbol_kind": "define",
+          "symbol_name": "pte_flags",
+          "excerpt": "#define PTE_R (1L << 1) #define PTE_W (1L << 2) #define PTE_X (1L << 3) - Read/Write/Execute flags exist but W^X not enforced"
+        },
+        {
+          "path": "kernel/mm/vm.c",
+          "symbol_kind": "function",
+          "symbol_name": "mappages",
+          "excerpt": "mappages() can map pages with any combination of PTE_R/PTE_W/PTE_X - no W^X enforcement"
+        },
+        {
+          "path": "kernel/exec.c",
+          "symbol_kind": "function",
+          "symbol_name": "execve",
+          "excerpt": "ELF loading sets permissions based on ELF program headers (ELF_PROG_FLAG_EXEC, ELF_PROG_FLAG_WRITE, ELF_PROG_FLAG_READ) - no signature verification"
+        },
+        {
+          "path": "doc/内核设计 - 页表映射.md",
+          "symbol_kind": "documentation",
+          "symbol_name": "kernel_protection",
+          "excerpt": "内核通过置标志位 PTE_R 和 PTE_X 映射 trampoline 的页面和内核文本。内核从这些页面读取并执行指令 - kernel text is R+X, not W^X protected"
+        },
+        {
+          "path": "include/elf.h",
+          "symbol_kind": "define",
+          "symbol_name": "ELF_MAGIC",
+          "excerpt": "#define ELF_MAGIC 0x464C457FU - Only ELF magic number check, no code signing or integrity verification"
+        }
+      ]
+    }
+  ]
+}
+```

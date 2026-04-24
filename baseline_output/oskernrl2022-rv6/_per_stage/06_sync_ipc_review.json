@@ -1,0 +1,148 @@
+{
+  "schema_version": "describe_review_v1",
+  "stage_id": "06_sync_ipc",
+  "stage_title": "同步互斥与进程间通信",
+  "confidence": 0.96,
+  "question_reviews": [
+    {
+      "question_id": "Q06_001",
+      "score_evidence": 0.9,
+      "score_consistency": 0.95,
+      "review": "Value 列出了主要同步原语，Evidence 提供了对应的 struct 定义摘录，支撑充分。SleepLock 作为 Mutex 等价物符合题意。"
+    },
+    {
+      "question_id": "Q06_002",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "Value 选择 B，Evidence 中 acquiresleep 调用 sleep 证明阻塞行为，完全符合单选要求。"
+    },
+    {
+      "question_id": "Q06_003",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "Value 为 implemented，Evidence 展示 sleep/wakeup 及 queue 结构，三态合规，证据直接。"
+    },
+    {
+      "question_id": "Q06_004",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "Value 按格式填写了五个字段，Evidence 摘录了 sleep/wakeup 关键逻辑支撑锁持有与唤醒顺序分析。"
+    },
+    {
+      "question_id": "Q06_005",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "Value 为 implemented，Evidence 提供 pipealloc 及读写函数，证明管道实现，三态合规。"
+    },
+    {
+      "question_id": "Q06_006",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "Value 选择 A，Evidence 中 PIPESIZE 宏及取模运算直接证明环形缓冲区结构，证据极强。"
+    },
+    {
+      "question_id": "Q06_007",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "Value 选择 A，Evidence 中 piperead/write 内的 sleep 调用直接证明阻塞语义，证据极强。"
+    },
+    {
+      "question_id": "Q06_008",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "Value 为 not_found，Evidence 通过搜索系统调用表证明缺失，负向证据合理。"
+    },
+    {
+      "question_id": "Q06_009",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "Value 为 not_found，Evidence 说明虽有文档但未注册 syscall，结论清晰。"
+    },
+    {
+      "question_id": "Q06_010",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "Value 为 implemented，Evidence 涵盖 sigaction/sigreturn/trampoline 关键组件，支撑充分。"
+    },
+    {
+      "question_id": "Q06_011",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "Value 描述了上下文构建与恢复，Evidence 对应 sighandle/sigreturn 代码，符合必须给证据的要求。"
+    },
+    {
+      "question_id": "Q06_012",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "Value 选择 C，Evidence 为搜索无结果的说明，符合单选约束。"
+    },
+    {
+      "question_id": "Q06_013",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "Value 选择 D，Evidence 指出使用 GCC builtin 而非 Rust 或手写汇编，选项匹配合理。"
+    },
+    {
+      "question_id": "Q06_014",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "Value 逐条分析了四个条件，Evidence 引用 acquire/release/sleeplock 代码支撑，落实良好。"
+    },
+    {
+      "question_id": "Q06_015",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "Value 选择 D，Evidence 为搜索无死锁处理机制，负向证据充分。"
+    },
+    {
+      "question_id": "Q06_016",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "Value 为 not_found，Evidence 说明无全局锁顺序规范，三态合规。"
+    },
+    {
+      "question_id": "Q06_017",
+      "score_evidence": 0.95,
+      "score_consistency": 0.8,
+      "review": "Value 仅填 implemented，题干要求若实现需区分 Hoare/Mesa 语义（Value 中未显式体现，仅证据提及），存在轻微题面落实缺失。"
+    },
+    {
+      "question_id": "Q06_018",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "Value 回答了三个经典问题状态，Evidence 对应 pipe 实现及搜索结果，符合 short_answer 要求。"
+    },
+    {
+      "question_id": "Q06_019",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "Value 为 not_found，Evidence 区分了 pipe 与消息传递，三态合规。"
+    },
+    {
+      "question_id": "Q06_020",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "Value 为 implemented，Evidence 提供 barrier 结构体与等待函数，证据详实。"
+    }
+  ],
+  "findings": [
+    {
+      "question_id": "Q06_017",
+      "severity": "warn",
+      "message": "题干要求若实现需区分 Hoare/Mesa 语义，但 value 字段仅填写 implemented，未显式包含语义类型（证据中已提及 Mesa）。"
+    }
+  ],
+  "summary_zh": "本报告整体质量较高，绝大多数题目证据摘录详实且直接支撑结论，题面约束（如三态、单选选项）遵守良好。仅 Q06_017 在 value 字段未完全落实题干关于语义区分的填写要求，但不影响证据有效性。全阶段置信度按各题均值方案 A 汇总。",
+  "report_quality_score": 0.96,
+  "_meta": {
+    "quality": {
+      "mean_question_confidence": 0.965
+    },
+    "review_model": "qwen3.5-plus",
+    "baseline": true,
+    "run_at": "2026-04-24T09:24:36",
+    "baseline_execute_tokens": 191896,
+    "baseline_review_tokens": 15920,
+    "baseline_stage_total_tokens": 207816
+  }
+}

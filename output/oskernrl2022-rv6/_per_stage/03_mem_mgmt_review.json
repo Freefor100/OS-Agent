@@ -1,0 +1,203 @@
+{
+  "schema_version": "describe_review_v1",
+  "stage_id": "03_mem_mgmt",
+  "stage_title": "内存管理（物理/虚拟/分配器）",
+  "confidence": 0.95,
+  "question_reviews": [
+    {
+      "question_id": "Q03_001",
+      "confidence": 0.95,
+      "review": "题答一致，证据充分展示 C 语言源文件、Makefile 构建系统及 xv6 风格函数，支撑 Choice B 结论。"
+    },
+    {
+      "question_id": "Q03_002",
+      "confidence": 0.95,
+      "review": "三态结论 implemented 明确，证据覆盖初始化 kpminit 及分配/释放函数，符合真实实现定义。"
+    },
+    {
+      "question_id": "Q03_003",
+      "confidence": 0.95,
+      "review": "选项匹配（空闲链表），证据展示 struct run 及头插法代码，直接支撑算法形态。"
+    },
+    {
+      "question_id": "Q03_004",
+      "confidence": 0.95,
+      "review": "核心数据结构描述准确，证据直接引用 struct run 与 kmem 定义，符合题面要求。"
+    },
+    {
+      "question_id": "Q03_005",
+      "confidence": 0.95,
+      "review": "锁粒度描述为全局大锁，证据展示 kmem.lock 及 acquire/release 包裹临界区，含关中断细节。"
+    },
+    {
+      "question_id": "Q03_006",
+      "confidence": 0.95,
+      "review": "三态结论 implemented 明确，证据覆盖 walk/mappages/vmunmap 关键函数，符合页表操作实现。"
+    },
+    {
+      "question_id": "Q03_007",
+      "confidence": 0.95,
+      "review": "列出 3 个关键入口，证据对应函数签名与核心逻辑，满足题面要求。"
+    },
+    {
+      "question_id": "Q03_008",
+      "confidence": 0.95,
+      "review": "结论指出无显式页表锁，证据展示上层调用无锁而底层分配有锁，逻辑自洽且证据支撑。"
+    },
+    {
+      "question_id": "Q03_009",
+      "confidence": 0.95,
+      "review": "选项匹配（独立页表），证据展示 kernel_pagetable 与 proc.pagetable 分离，支撑 Choice A。"
+    },
+    {
+      "question_id": "Q03_010",
+      "confidence": 0.95,
+      "review": "三态结论 stub 准确，证据展示 trap 处理分支被注释及头文件仅声明，符合 stub 定义。"
+    },
+    {
+      "question_id": "Q03_011",
+      "confidence": 0.95,
+      "review": "链路描述符合代码现状（未完整实现），证据支撑各节点状态（注释/声明/实现）。"
+    },
+    {
+      "question_id": "Q03_012",
+      "confidence": 0.95,
+      "review": "三态结论 not_found 准确，证据展示 fork 时深拷贝而非 CoW，且 fault 处理缺失。"
+    },
+    {
+      "question_id": "Q03_013",
+      "confidence": 0.95,
+      "review": "三态结论 stub 合理，证据展示 eager 分配及 fault 处理缺失，支撑惰性分配未真正生效。"
+    },
+    {
+      "question_id": "Q03_014",
+      "confidence": 0.95,
+      "review": "三态结论 not_found 明确，grep 搜索 0 命中证据充分，支撑无 swap 实现。"
+    },
+    {
+      "question_id": "Q03_015",
+      "confidence": 0.95,
+      "review": "三态结论 implemented 明确，证据展示 do_mmap 处理标志位及 VMA 建立，符合实现定义。"
+    },
+    {
+      "question_id": "Q03_016",
+      "confidence": 0.95,
+      "review": "三态结论 not_found 明确，grep 搜索 0 命中证据充分，支撑无页缓存管理。"
+    },
+    {
+      "question_id": "Q03_017",
+      "confidence": 0.95,
+      "review": "三态结论 stub 准确，证据展示仅 munmap 时同步回写，无后台机制，符合 stub 定义。"
+    },
+    {
+      "question_id": "Q03_018",
+      "confidence": 0.95,
+      "review": "三态结论 not_found 明确，grep 搜索 0 命中及仅本地刷新证据充分，支撑无 TLB 射击。"
+    },
+    {
+      "question_id": "Q03_019",
+      "confidence": 0.95,
+      "review": "TLB 刷新指令与函数点证据明确，引用 riscv.h 定义及调用点，符合题面要求。"
+    },
+    {
+      "question_id": "Q03_020",
+      "confidence": 0.95,
+      "review": "用户指针检查机制描述准确，证据展示 walkaddr 校验逻辑及 copyin/out 调用，支撑结论。"
+    },
+    {
+      "question_id": "Q03_021",
+      "confidence": 0.95,
+      "review": "选项匹配（未实现），证据展示无置换算法关键字，与 Q03_014 结论一致。"
+    },
+    {
+      "question_id": "Q03_022",
+      "confidence": 0.95,
+      "review": "三态结论 not_found 明确，grep 搜索 0 命中及文档证据支撑无工作集模型。"
+    },
+    {
+      "question_id": "Q03_023",
+      "confidence": 0.95,
+      "review": "填空数值与代码宏定义证据一致（PHYSTOP/PGSIZE/MAXVA），满足题面证据要求。"
+    },
+    {
+      "question_id": "Q03_024",
+      "confidence": 0.95,
+      "review": "选项匹配（双重保护），证据展示硬件 PTE 位及软件 walkaddr 检查，支撑 Choice C。"
+    },
+    {
+      "question_id": "Q03_025",
+      "confidence": 0.95,
+      "review": "逻辑内存组织描述准确，证据展示 VMA 结构体及链表初始化/插入逻辑，支撑统一维护结论。"
+    },
+    {
+      "question_id": "Q03_026",
+      "confidence": 0.95,
+      "review": "选项匹配（纯分页），证据展示 RISC-V Sv39 机制及无段描述符，支撑 Choice C。"
+    },
+    {
+      "question_id": "Q03_027",
+      "confidence": 0.95,
+      "review": "选项匹配（预分配），证据展示 alloc_vma 立即调用 uvmalloc，支撑 Choice D。"
+    },
+    {
+      "question_id": "Q03_028",
+      "confidence": 0.95,
+      "review": "放置策略描述为首次适配，证据展示 alloc_vma 遍历查找空隙逻辑，支撑结论。"
+    },
+    {
+      "question_id": "Q03_029",
+      "confidence": 0.95,
+      "review": "三态结论 not_found 明确，grep 搜索 0 命中及结构体无相关字段证据充分。"
+    },
+    {
+      "question_id": "Q03_030",
+      "confidence": 0.85,
+      "review": "链路节点清晰，但题面要求“给每节点证据”，证据数组仅覆盖前 4 个节点，allocpage/walk 等节点通过 uvmalloc 摘录间接支撑，未完全逐点对应。"
+    },
+    {
+      "question_id": "Q03_031",
+      "confidence": 0.95,
+      "review": "选项匹配（外部碎片），证据展示空闲链表管理且无伙伴系统，支撑碎片类型结论。"
+    },
+    {
+      "question_id": "Q03_032",
+      "confidence": 0.95,
+      "review": "选项匹配（运行时动态绑定），证据展示页表遍历及 satp 设置，支撑 MMU 转换结论。"
+    },
+    {
+      "question_id": "Q03_033",
+      "confidence": 0.95,
+      "review": "选项匹配（未实现置换），证据与 Q03_014/021 一致，支撑 Choice C。"
+    },
+    {
+      "question_id": "Q03_034",
+      "confidence": 0.95,
+      "review": "三态结论 not_found 明确，grep 搜索 0 命中及仅同步回写证据充分，支撑无清理策略。"
+    }
+  ],
+  "dimensions": {
+    "evidence_supports_answers": 0.94,
+    "question_answer_consistency": 0.95,
+    "requirements_fit": 0.95
+  },
+  "findings": [],
+  "summary_zh": "本报告整体质量高，题答一致性好，JSON 契约符合度高。绝大多数题目证据摘录具体且直接支撑结论（如结构体定义、函数逻辑、grep 结果）。仅 Q03_030 在“每节点证据”要求上略有欠缺（部分节点通过上游函数摘录间接支撑），但不影响整体结论可信度。全阶段置信度按各题均值计算，无严重缺陷。",
+  "report_quality_score": 0.97,
+  "_meta": {
+    "quality": {
+      "excerpt_coverage": 1.0,
+      "evidence_richness": 1.0,
+      "total_evidence_items": 88,
+      "nonempty_excerpt_items": 88,
+      "mean_question_confidence": 0.9471,
+      "mean_dimensions": 0.9467,
+      "weights": {
+        "w_mean": 0.45,
+        "w_excerpt": 0.25,
+        "w_rich": 0.2,
+        "w_dim": 0.1
+      }
+    },
+    "review_model": "qwen3.5-plus"
+  }
+}

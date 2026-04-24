@@ -1,0 +1,102 @@
+{
+  "stage_id": "06_sync_ipc",
+  "evidence_targets": [
+    "SpinLock 实现 (acquire/release/holding)",
+    "SleepLock 实现 (acquiresleep/releasesleep)",
+    "Pipe IPC (pipealloc/piperead/pipewrite)",
+    "Signal 机制 (sigaction/sigprocmask/sighandle)",
+    "Futex 定义与 syscall 映射",
+    "sleep/wakeup 等待队列机制",
+    "锁与同步原语",
+    "IPC",
+    "Futex",
+    "管道/信号"
+  ],
+  "seed_paths": [
+    "src/spinlock.c",
+    "src/sleeplock.c",
+    "src/pipe.c",
+    "src/signal.c",
+    "src/syssig.c",
+    "src/proc.c",
+    "src/include/spinlock.h",
+    "src/include/sleeplock.h",
+    "src/include/pipe.h",
+    "src/include/signal.h",
+    "src/include/proc.h",
+    "doc/内核实现--Futex.md",
+    "sync",
+    "lock"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "acquire",
+    "release",
+    "acquiresleep",
+    "releasesleep",
+    "pipealloc",
+    "piperead",
+    "pipewrite",
+    "set_sigaction",
+    "sigprocmask",
+    "do_futex",
+    "Mutex",
+    "SpinLock"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "src",
+    "src/include",
+    "src/sifive",
+    "linker",
+    "syscall",
+    "bin",
+    "doc",
+    "usrinit",
+    "sd"
+  ],
+  "preferred_tools": [
+    "lsp_get_definition",
+    "lsp_get_references",
+    "lsp_get_call_graph",
+    "read_code_segment",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "使用 lsp_get_definition 定位 acquire 和 release 函数的完整实现（src/spinlock.c）",
+    "使用 lsp_get_definition 定位 acquiresleep 和 releasesleep 函数（src/sleeplock.c）",
+    "使用 lsp_get_call_graph 分析 acquire 的调用者（incoming），max_depth=2，了解哪些模块使用自旋锁",
+    "使用 lsp_get_call_graph 分析 acquiresleep 的调用者（incoming），max_depth=2，了解哪些模块使用睡眠锁",
+    "使用 read_code_segment 精读 src/spinlock.c:24-75，取证 acquire/release 的 RISC-V 原子指令使用",
+    "使用 read_code_segment 精读 src/sleeplock.c:25-45，取证 acquiresleep/releasesleep 如何调用 sleep/wakeup",
+    "使用 lsp_get_definition 定位 pipealloc 函数（src/pipe.c）",
+    "使用 lsp_get_call_graph 分析 pipealloc 的调用者（incoming），max_depth=2",
+    "使用 read_code_segment 精读 src/pipe.c:69-120，取证 piperead/pipewrite 的阻塞逻辑",
+    "使用 lsp_get_definition 定位 set_sigaction 和 sigprocmask 函数（src/signal.c）",
+    "使用 read_code_segment 精读 src/signal.c:46-118，取证信号掩码和动作设置逻辑",
+    "使用 lsp_get_definition 定位 sys_rt_sigaction 和 sys_rt_sigprocmask（src/syssig.c）",
+    "使用 grep_in_repo 搜索 'do_futex' 在 .c 文件中的实现，确认是否存在",
+    "使用 read_code_segment 精读 src/include/proc.h:18-50，取证 FUTEX 操作码定义",
+    "使用 lsp_get_references 查找 sleep 和 wakeup 在 proc.c 中的引用，理解等待队列机制",
+    "使用 read_code_segment 精读 src/proc.c:542-592，取证 sleep/wakeup 的实现细节",
+    "使用 lsp_get_call_graph 分析 wakeup 的调用者（incoming），max_depth=2，了解哪些场景会唤醒进程",
+    "使用 grep_in_repo 搜索 'SYS_futex' 在 syscall 表中的注册情况",
+    "使用 read_code_segment 精读 src/sysproc.c 或相关 syscall 分发文件，确认 futex syscall 是否注册",
+    "汇总证据：SpinLock/SleepLock/Pipe/Signal 的实现状态，Futex 是否完整实现"
+  ]
+}

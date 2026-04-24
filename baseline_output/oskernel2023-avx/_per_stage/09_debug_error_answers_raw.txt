@@ -1,0 +1,176 @@
+```json
+{
+  "schema_version": "v1",
+  "stage_id": "09_debug_error",
+  "stage_title": "调试机制与错误处理",
+  "terminology_profile": "stallings_en_zh",
+  "answers": [
+    {
+      "question_id": "Q09_001",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在日志系统（log/printk/println 宏）与日志级别控制？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/printf.c",
+          "symbol_kind": "function",
+          "symbol_name": "debug_print",
+          "excerpt": "void debug_print(char *fmt, ...) { #ifdef DEBUG ... }"
+        },
+        {
+          "path": "kernel/printf.c",
+          "symbol_kind": "function",
+          "symbol_name": "serious_print",
+          "excerpt": "void serious_print(char *fmt, ...) { #ifndef EXAM ... }"
+        },
+        {
+          "path": "kernel/include/printf.h",
+          "symbol_kind": "header",
+          "symbol_name": "printf.h",
+          "excerpt": "void debug_print(char *fmt, ...); void serious_print(char *fmt, ...); void printf(char *fmt, ...);"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_002",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 panic/崩溃处理路径（panic_handler/oom/abort 等）？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/printf.c",
+          "symbol_kind": "function",
+          "symbol_name": "panic",
+          "excerpt": "void panic(char *s) { ... serious_print(\"panic: \"); serious_print(s); serious_print(\"\\n\"); backtrace(); panicked = 1; for (;;) ; }"
+        },
+        {
+          "path": "kernel/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "usertrap",
+          "excerpt": "else { ... p->killed = SIGTERM; }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_003",
+      "question_type": "short_answer",
+      "stem": "panic 路径会输出哪些诊断？（寄存器 dump/栈回溯/停机；必须引用实现证据）",
+      "value": "Panic message, Stack trace (via backtrace), Halt (infinite loop). Register dump is not explicitly in panic() but backtrace prints return addresses.",
+      "evidence": [
+        {
+          "path": "kernel/printf.c",
+          "symbol_kind": "function",
+          "symbol_name": "panic",
+          "excerpt": "void panic(char *s) { ... serious_print(\"panic: \"); serious_print(s); serious_print(\"\\n\"); backtrace(); panicked = 1; for (;;) ; }"
+        },
+        {
+          "path": "kernel/printf.c",
+          "symbol_kind": "function",
+          "symbol_name": "backtrace",
+          "excerpt": "void backtrace() { ... while (fp < bottom) { uint64 ra = *(fp - 1); serious_print(\"%p\\n\", ra - 4); fp = (uint64 *)*(fp - 2); } }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_004",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现栈回溯 (backtrace/unwind/stack_trace)？（必须三态；仅打印 ra 不算）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/printf.c",
+          "symbol_kind": "function",
+          "symbol_name": "backtrace",
+          "excerpt": "void backtrace() { uint64 *fp = (uint64 *)r_fp(); ... while (fp < bottom) { uint64 ra = *(fp - 1); serious_print(\"%p\\n\", ra - 4); fp = (uint64 *)*(fp - 2); } }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_005",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在内核驻留的交互式监视器（kernel monitor）？（对齐 Stallings《操作系统：精髓与设计原理》语境：在内核态上下文接受命令、用于探查/操控系统的监视器；不包括仅在用户态运行的常规 shell，如 xv6-user/sh.c、user/下用户程序等——除非题面另有定义。必须三态；若 implemented：须给出 3–10 个用户可键入的 monitor 命令名及对应内核内解析/分发入口的路径：行号证据；仅以用户态 shell 充当内核 monitor 视为未切题应判 stub 或 not_found 并说明理由。）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/console.c",
+          "symbol_kind": "function",
+          "symbol_name": "consoleintr",
+          "excerpt": "void consoleintr(int c) { ... switch (c) { case C('P'): procdump(); break; ... default: ... cons.buf[cons.e++ % INPUT_BUF] = c; ... } }"
+        },
+        {
+          "path": "kernel/console.c",
+          "symbol_kind": "comment",
+          "symbol_name": "consoleintr",
+          "excerpt": "Only Ctrl-P triggers procdump(). Other input is buffered for user-space shell (consoleread). No command parsing loop or multiple monitor commands found in kernel."
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_006",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 GDB stub（需数据包解析循环，如 handle_gdb_packet）？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "Makefile",
+          "symbol_kind": "make_target",
+          "symbol_name": "gdb-server",
+          "excerpt": "gdb-server: ... @$(QEMU) $(QEMUOPTS) -s -S"
+        },
+        {
+          "path": "kernel/",
+          "symbol_kind": "search",
+          "symbol_name": "gdb_stub",
+          "excerpt": "No source files implementing GDB packet parsing (e.g. handle_gdb_packet) found in kernel source. QEMU provides external stub."
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_007",
+      "question_type": "short_answer",
+      "stem": "错误码/错误类型体系是什么？（errno/Result/Error enum；给类型定义与传播点证据）",
+      "value": "Kernel uses global 'errno' (int) defined in errno.h. lwIP subsystem uses 'err_t' (enum). Syscalls return -1 on error.",
+      "evidence": [
+        {
+          "path": "kernel/include/errno.h",
+          "symbol_kind": "header",
+          "symbol_name": "errno.h",
+          "excerpt": "#define EPERM 1 ... extern int errno;"
+        },
+        {
+          "path": "kernel/lwip/include/lwip/err.h",
+          "symbol_kind": "header",
+          "symbol_name": "err.h",
+          "excerpt": "typedef enum { ERR_OK = 0, ERR_MEM = -1, ... } err_enum_t; typedef s8_t err_t;"
+        },
+        {
+          "path": "kernel/sysfile.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_open",
+          "excerpt": "if (argstr(0, path, FAT32_MAX_PATH) < 0 || argint(1, &omode) < 0) return -1;"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_008",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 trace/perf/ftrace 等跟踪机制或 tracepoints？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/syscall.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_trace",
+          "excerpt": "uint64 sys_trace(void) { int mask; if (argint(0, &mask) < 0) return -1; myproc()->tmask = mask; return 0; }"
+        },
+        {
+          "path": "kernel/syscall.c",
+          "symbol_kind": "function",
+          "symbol_name": "syscall",
+          "excerpt": "if ((p->tmask & (1 << num)) != 0) { printf(\"pid %d: %s -> %d\\n\", p->pid, sysnames[num], p->trapframe->a0); }"
+        }
+      ]
+    }
+  ]
+}
+```

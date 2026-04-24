@@ -1,0 +1,204 @@
+{
+  "schema_version": "v1",
+  "stage_id": "09_debug_error",
+  "stage_title": "调试机制与错误处理",
+  "terminology_profile": "stallings_en_zh",
+  "answers": [
+    {
+      "question_id": "Q09_001",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在日志系统（log/printk/println 宏）与日志级别控制？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "include/utils/debug.h",
+          "symbol_kind": "header",
+          "symbol_name": "debug_macros",
+          "excerpt": "Defines debug macros: __INFO(str), __WARN(str), __ERROR(str) with color codes, and __debug_info(func,...), __debug_warn(func,...), __debug_error(func,...) for different log levels. DEBUG conditional compilation controls output."
+        },
+        {
+          "path": "include/printf.h",
+          "symbol_kind": "header",
+          "symbol_name": "printf_panic",
+          "excerpt": "Declares printf() function and panic(s) macro that prints error message with module name, file, line number before calling __panic()."
+        },
+        {
+          "path": "Makefile",
+          "symbol_kind": "build_config",
+          "symbol_name": "debug_flags",
+          "excerpt": "DEBUG mode enabled via 'mode=debug' flag, with module-specific __DEBUG_* defines for selective debug output control."
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_002",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 panic/崩溃处理路径（panic_handler/oom/abort 等）？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/printf.c",
+          "symbol_kind": "function",
+          "symbol_name": "__panic",
+          "excerpt": "__panic(char *s) prints panic message, calls backtrace(), sets panicked=1, disables interrupts, and enters infinite loop."
+        },
+        {
+          "path": "kernel/trap/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "kerneltrap_usertrap",
+          "excerpt": "Handles traps from kernel and user mode. On unhandled exceptions, prints scause/sepc/stval and calls panic(). Sets p->killed=SIGTERM on faults."
+        },
+        {
+          "path": "bootloader/SBI/rustsbi-k210/src/main.rs",
+          "symbol_kind": "function",
+          "symbol_name": "panic_handler",
+          "excerpt": "Rust panic handler in SBI: #[panic_handler] fn panic(info: &PanicInfo) -> ! { println!(\"[rustsbi] {}\", info); loop {} }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_003",
+      "question_type": "short_answer",
+      "stem": "panic 路径会输出哪些诊断？（寄存器 dump/栈回溯/停机；必须引用实现证据）",
+      "value": "Panic path outputs: panic message with module/file/line, stack backtrace via frame pointer walking, then halts in infinite loop. Register dump not implemented in kernel panic (only in trap handling prints scause/sepc/stval).",
+      "evidence": [
+        {
+          "path": "kernel/printf.c",
+          "symbol_kind": "function",
+          "symbol_name": "__panic_backtrace",
+          "excerpt": "__panic() calls printf() with error message including cpuid(), __FILE__, __LINE__, then calls backtrace(). backtrace() walks frame pointers: while(fp < bottom) { printf(\"%p\\n\", ra-4); fp = *(fp-2); }. Then intr_off() and infinite loop."
+        },
+        {
+          "path": "kernel/trap/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "kerneltrap",
+          "excerpt": "On unhandled trap: printf(\"\\nscause %p\\n\", scause); printf(\"sepc=%p stval=%p hart=%d\\n\", r_sepc(), r_stval(), r_tp()); then panic(\"kerneltrap\")."
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_004",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现栈回溯 (backtrace/unwind/stack_trace)？（必须三态；仅打印 ra 不算）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/printf.c",
+          "symbol_kind": "function",
+          "symbol_name": "backtrace",
+          "excerpt": "backtrace() function walks stack frame pointers: uint64 *fp = (uint64 *)r_fp(); uint64 *bottom = (uint64 *)PGROUNDUP((uint64)fp); while(fp < bottom) { uint64 ra = *(fp-1); printf(\"%p\\n\", ra-4); fp = (uint64 *)*(fp-2); }. Called from __panic()."
+        },
+        {
+          "path": "doc/构建调试 - 调试指南.md",
+          "symbol_kind": "documentation",
+          "symbol_name": "backtrace_usage",
+          "excerpt": "Documents backtrace: kernel panic prints address series (kernel function call stack). Can use addr2line -e target/kernel to convert addresses to source code locations."
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_005",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 **内核驻留的交互式监视器（kernel monitor）**？（对齐 Stallings《操作系统：精髓与设计原理》语境：**在内核态上下文**接受命令、用于探查/操控系统的监视器；**不包括**仅在用户态运行的常规 shell，如 `xv6-user/sh.c`、`user/` 下用户程序等——除非题面另有定义。必须三态；若 `implemented`：须给出 3–10 个 **用户可键入的 monitor 命令名** 及对应 **内核内** 解析/分发入口的 `路径:行号` 证据；仅以用户态 shell 充当内核 monitor 视为 **未切题** 应判 `stub` 或 `not_found` 并说明理由。）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "xv6-user/sh.c",
+          "symbol_kind": "user_program",
+          "symbol_name": "shell",
+          "excerpt": "User-space shell implementation. Runs in user mode, parses commands like cd, export, exec. Not a kernel-resident monitor."
+        },
+        {
+          "path": "kernel/console.c",
+          "symbol_kind": "kernel_driver",
+          "symbol_name": "consoleintr",
+          "excerpt": "Console input handler processes special keys (Ctrl-P prints process list, Ctrl-E prints file-entry list, Ctrl-K prints mem-alloc list, Ctrl-B prints buffer cache, Ctrl-Q prints physical memory). These are debug triggers, not interactive monitor commands with command parsing/dispatch."
+        },
+        {
+          "path": "kernel/trap/trap.c",
+          "symbol_kind": "kernel_trap_handler",
+          "symbol_name": "usertrap",
+          "excerpt": "No kernel monitor command parsing. Trap handling is for exceptions/interrupts/syscalls, not interactive command interpretation in kernel context."
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_006",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 GDB stub（需数据包解析循环，如 handle_gdb_packet）？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "Makefile",
+          "symbol_kind": "build_config",
+          "symbol_name": "qemu_gdb",
+          "excerpt": "QEMU can run with -gdb tcp::1234 flag for external GDB debugging, but this is QEMU's GDB server, not a kernel GDB stub."
+        },
+        {
+          "path": "kernel/",
+          "symbol_kind": "search",
+          "symbol_name": "gdb_stub_search",
+          "excerpt": "No GDB stub implementation found in kernel source. No handle_gdb_packet(), no RSP (Remote Serial Protocol) packet parsing, no breakpoint/watchpoint handling in kernel code."
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_007",
+      "question_type": "short_answer",
+      "stem": "错误码/错误类型体系是什么？（errno/Result/Error enum；给类型定义与传播点证据）",
+      "value": "Uses POSIX-style errno constants defined in include/errno.h. System calls return negative errno values on error (e.g., -ENOENT, -EINVAL, -ENOMEM). Error propagation through syscall return values checked in user space.",
+      "evidence": [
+        {
+          "path": "include/errno.h",
+          "symbol_kind": "header",
+          "symbol_name": "errno_definitions",
+          "excerpt": "Defines errno constants: EPERM=1, ENOENT=2, ESRCH=3, EINTR=4, EIO=5, ENOMEM=12, EACCES=13, EFAULT=14, EINVAL=22, etc. up to EADDRINUSE=98."
+        },
+        {
+          "path": "kernel/syscall/sysfile.c",
+          "symbol_kind": "syscall_impl",
+          "symbol_name": "sys_openat",
+          "excerpt": "Returns -ENAMETOOLONG, -EBADF, -ENOENT, -EISDIR, -ENOMEM on various error conditions. Example: if((ip = nameifrom(dp, path)) == NULL) return -ENOENT;"
+        },
+        {
+          "path": "kernel/syscall/sysmem.c",
+          "symbol_kind": "syscall_impl",
+          "symbol_name": "sys_mmap",
+          "excerpt": "Returns -EINVAL, -EBADF, -EPERM on error. Example: if(off % PGSIZE || len == 0) return -EINVAL; if((int64)addr < 0) return -ENOMEM;"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_008",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 trace/perf/ftrace 等跟踪机制或 tracepoints？（必须三态）",
+      "value": "stub",
+      "evidence": [
+        {
+          "path": "include/sysnum.h",
+          "symbol_kind": "header",
+          "symbol_name": "SYS_trace",
+          "excerpt": "SYS_trace syscall number defined (value 18)."
+        },
+        {
+          "path": "kernel/syscall/sysproc.c",
+          "symbol_kind": "syscall_impl",
+          "symbol_name": "sys_trace",
+          "excerpt": "sys_trace() sets myproc()->tmask = 1. Enables syscall tracing for the process."
+        },
+        {
+          "path": "kernel/syscall/syscall.c",
+          "symbol_kind": "syscall_handler",
+          "symbol_name": "syscall",
+          "excerpt": "If p->tmask is set, prints syscall name and arguments before execution, and return value after. Basic syscall tracing, not full ftrace/perf infrastructure with tracepoints."
+        },
+        {
+          "path": "xv6-user/strace.c",
+          "symbol_kind": "user_program",
+          "symbol_name": "strace",
+          "excerpt": "User-space strace utility that calls trace() syscall and execs target program. Traces syscalls of child process."
+        }
+      ]
+    }
+  ]
+}

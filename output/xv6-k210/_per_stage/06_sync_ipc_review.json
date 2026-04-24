@@ -2,128 +2,142 @@
   "schema_version": "describe_review_v1",
   "stage_id": "06_sync_ipc",
   "stage_title": "同步互斥与进程间通信",
-  "confidence": 0.94,
+  "confidence": 0.92,
   "question_reviews": [
     {
       "question_id": "Q06_001",
-      "confidence": 0.95,
-      "review": "作答切题，列出了 SpinLock、SleepLock、WaitQueue 三种原语。证据直接引用了头文件中的 struct 定义，路径清晰，足以支撑结论。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "题面要求列出类型定义证据，答案提供了三个 struct 的代码摘录，字段清晰，直接支撑 value 中的原语列表，证据充分。"
     },
     {
       "question_id": "Q06_002",
-      "confidence": 0.95,
-      "review": "选择阻塞锁（Blocking Mutex）。证据引用 acquiresleep 中调用 sleep 函数的代码片段，明确显示了进入等待队列的行为，支撑结论有力。"
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "选项选择正确，证据摘录展示了 sleep 调用，但 excerpt 为功能描述而非纯代码行，略微影响直接验证性，整体支撑度良好。"
     },
     {
       "question_id": "Q06_003",
-      "confidence": 0.95,
-      "review": "结论为 implemented。证据涵盖了 wait_queue 结构定义及 sleep/wakeup 函数实现，包含行号引用，三态判定依据充分。"
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "三态结论明确，证据涵盖头文件与 sleep/wakeup 函数，但部分 excerpt 为功能摘要，若能提供具体入队代码更佳。"
     },
     {
       "question_id": "Q06_004",
-      "confidence": 0.9,
-      "review": "填空内容详细，分析了锁持有顺序和防丢唤醒机制。证据引用 proc.c 中的锁顺序注释及 sleep/wakeup 实现逻辑，逻辑自洽，符合不变量分析要求。"
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "填空格式完整，value 中锁顺序与防丢唤醒机制描述详细，证据摘录了 proc.c 中关键锁操作与注释，逻辑自洽。"
     },
     {
       "question_id": "Q06_005",
-      "confidence": 0.95,
-      "review": "结论为 implemented。证据引用 pipe.c 中的分配与读写函数，以及 pipe 结构体定义，充分证明管道功能存在。"
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "三态结论为 implemented，证据提供了 pipealloc 与读写函数路径及 struct 定义，足以证明管道实现存在。"
     },
     {
       "question_id": "Q06_006",
-      "confidence": 0.95,
-      "review": "选择字节环形缓冲区。证据引用 piperead/pipewrite 中的模运算代码，直接证明环形缓冲实现，支撑结论。"
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "选项 A 正确，证据直接展示了取模运算代码 `nwrite % PIPESIZE`，强力支撑环形缓冲区结论，无歧义。"
     },
     {
       "question_id": "Q06_007",
-      "confidence": 0.95,
-      "review": "选择阻塞语义。证据引用 pipelock 及读写函数中调用 sleep 的代码，证明满/空时线程挂起，支撑结论。"
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "选项 A 正确，证据展示了 pipe 满/空时调用 sleep 的代码逻辑，直接证明阻塞语义，证据链完整。"
     },
     {
       "question_id": "Q06_008",
-      "confidence": 0.95,
-      "review": "结论为 not_found。证据显示对 SysV IPC 相关系统调用关键词的 grep 搜索无结果，支撑结论。"
+      "score_evidence": 0.8,
+      "score_consistency": 1.0,
+      "review": "三态结论 not_found，证据为 grep 搜索结果摘要，虽支持结论但缺乏代码上下文验证，证据力度弱于代码摘录。"
     },
     {
       "question_id": "Q06_009",
-      "confidence": 0.95,
-      "review": "结论为 not_found。证据显示对 futex 关键词的 grep 搜索无结果，支撑结论。"
+      "score_evidence": 0.8,
+      "score_consistency": 1.0,
+      "review": "三态结论 not_found，证据为 grep 摘要，符合题面要求，但同样受限于搜索结果的间接性。"
     },
     {
       "question_id": "Q06_010",
-      "confidence": 0.95,
-      "review": "结论为 implemented。证据引用 signal.c 中的 sigaction、sighandle 及 sigreturn 实现，证明信号机制完整。"
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "三态结论 implemented，证据列出 signal.c 与 trampoline 相关文件及函数范围，支撑信号机制存在，但 excerpt 多为描述。"
     },
     {
       "question_id": "Q06_011",
-      "confidence": 0.95,
-      "review": "详细描述了上下文构建与恢复过程。证据引用 sighandle 分配 sig_frame 及 sigreturn 恢复 trapframe 的代码，支撑结论。"
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "详细回答了上下文构建与 sigreturn，证据对应了 sighandle 与 sigreturn 函数逻辑，但 excerpt 为行号与功能描述。"
     },
     {
       "question_id": "Q06_012",
-      "confidence": 0.95,
-      "review": "选择未发现/不支持。证据显示对 RwLock 相关关键词的 grep 搜索无结果，支撑结论。"
+      "score_evidence": 0.8,
+      "score_consistency": 1.0,
+      "review": "选项 C 正确，证据为 grep 未找到匹配，支持未发现结论，符合三态题面约束。"
     },
     {
       "question_id": "Q06_013",
-      "confidence": 0.85,
-      "review": "选择自定义汇编。证据指出使用 GCC builtin 生成 RISC-V amoswap 指令。虽选项示例含 ARM 指令（ldxr/stxr），但模型正确识别了底层原子操作机制，证据支撑结论，仅术语示例略有架构差异。"
+      "score_evidence": 0.6,
+      "score_consistency": 1.0,
+      "review": "选项 B 符合题面，但 value 中提及 ARM 指令集 (ldxr/stxr)，而证据明确显示 RISC-V (amoswap)，存在架构描述与证据矛盾，证据支撑度受损。"
     },
     {
       "question_id": "Q06_014",
-      "confidence": 0.9,
-      "review": "逐条分析了死锁四必要条件。证据结合 SpinLock 实现与 sleep 逻辑，论证合理，特别是关于循环等待的预防说明与后续题目呼应。"
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "逐条分析了 Coffman 条件，证据引用了 spinlock 与 sleep 逻辑，支撑互斥与持有等待条件，分析合理。"
     },
     {
       "question_id": "Q06_015",
-      "confidence": 0.9,
-      "review": "选择死锁预防。证据引用 proc.c 中关于锁顺序的注释，证明内核通过规范锁获取顺序来预防死锁，支撑结论。"
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "选项 A 正确，证据引用了代码中关于锁顺序的 NOTICE 注释，直接支撑死锁预防策略的结论。"
     },
     {
       "question_id": "Q06_016",
-      "confidence": 0.95,
-      "review": "结论为 implemented。证据具体列出了 proc_lock 的获取顺序规范注释，直接支撑存在全局锁顺序规范。"
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "三态结论 implemented，证据展示了多处锁顺序注释，符合题面要求的规范或注释证据。"
     },
     {
       "question_id": "Q06_017",
-      "confidence": 0.95,
-      "review": "结论为 not_found。证据显示搜索 condvar 等关键词无匹配，且头文件目录无相关定义，支撑结论。"
+      "score_evidence": 0.8,
+      "score_consistency": 1.0,
+      "review": "三态结论 not_found，证据为 grep 搜索与目录检查，支持无条件变量实现，符合题面约束。"
     },
     {
       "question_id": "Q06_018",
-      "confidence": 0.9,
-      "review": "结论均为 not_found，但客观指出 pipe 隐含生产者 - 消费者模式。证据显示 grep 无显式测试代码，分析严谨。"
+      "score_evidence": 0.8,
+      "score_consistency": 1.0,
+      "review": "回答了三个经典问题状态，证据为 grep 摘要，虽指出 pipe 隐含生产者 - 消费者模式，但缺乏独立测试代码证据。"
     },
     {
       "question_id": "Q06_019",
-      "confidence": 0.95,
-      "review": "结论为 not_found。证据显示搜索消息传递相关关键词仅找到统计字段，无实际实现，支撑结论。"
+      "score_evidence": 0.8,
+      "score_consistency": 1.0,
+      "review": "三态结论 not_found，证据为 grep 搜索系统调用与关键词，支持无消息传递实现结论。"
     },
     {
       "question_id": "Q06_020",
-      "confidence": 0.95,
-      "review": "结论为 not_found。证据显示搜索 barrier 关键词仅找到文档理论讨论，无原语实现，支撑结论。"
+      "score_evidence": 0.8,
+      "score_consistency": 1.0,
+      "review": "三态结论 not_found，证据为 grep 搜索 barrier 关键词，支持无屏障同步实现结论。"
     }
   ],
-  "dimensions": {
-    "evidence_supports_answers": 0.95,
-    "question_answer_consistency": 0.95,
-    "requirements_fit": 0.95
-  },
   "findings": [
     {
-      "severity": "info",
-      "topic": "Q06_013 指令集术语差异",
-      "detail": "题目选项示例包含 ARM 指令（ldxr/stxr），但内核为 RISC-V 架构（amoswap）。模型选择正确但需注意选项文本与架构的细微不匹配，不影响结论正确性。"
-    },
-    {
-      "severity": "info",
-      "topic": "Q06_018 经典问题隐含实现",
-      "detail": "模型指出虽无显式测试代码，但 Pipe 实现本质符合生产者 - 消费者模式，体现了对代码语义的深层理解。"
+      "question_id": "Q06_013",
+      "severity": "warn",
+      "message": "Value 中提及 ARM 指令 (ldxr/stxr) 与 Evidence 中 RISC-V 指令 (amoswap) 存在架构描述矛盾，虽选项文本源自题面，但报告应修正描述以匹配证据架构。"
     }
   ],
-  "summary_zh": "本阶段作答质量极高。20 道题目全部完成，证据引用具体到文件路径、函数名及行号，且代码片段与结论逻辑高度一致。同步原语（SpinLock/SleepLock/WaitQueue）、管道（Pipe）、信号（Signal）等核心机制均有确凿代码证据支撑。死锁预防策略与锁顺序规范的分析引用了源码注释，可信度高。唯一微小瑕疵为 Q06_013 选项文本中的指令集示例与内核架构不完全对应，但不影响对原子操作来源的正确判断。整体置信度 0.94，可作为高质量审计依据。",
+  "summary_zh": "本报告整体题面相符度高，JSON 契约履行良好。证据支撑方面，代码实现类题目（如锁、管道）提供了具体代码或注释摘录，可信度较高；未实现类题目（如 SysV IPC、Barrier）主要依赖 grep 搜索摘要，证据力度稍弱。Q06_013 存在价值描述与证据架构不一致的瑕疵（ARM vs RISC-V），已扣分处理。全阶段置信度按各题均值方案 A 汇总计算。",
+  "report_quality_score": 0.92,
   "_meta": {
+    "quality": {
+      "mean_question_confidence": 0.9213
+    },
     "review_model": "qwen3.5-plus"
   }
 }

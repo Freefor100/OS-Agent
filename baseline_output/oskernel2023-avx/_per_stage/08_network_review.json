@@ -1,0 +1,64 @@
+{
+  "schema_version": "describe_review_v1",
+  "stage_id": "08_network",
+  "stage_title": "网络子系统与协议栈",
+  "confidence": 0.9,
+  "question_reviews": [
+    {
+      "question_id": "Q08_001",
+      "score_evidence": 0.7,
+      "score_consistency": 1.0,
+      "review": "题面相符，三态选择合法。证据均为文件级文字描述（如“完整的...实现文件”），非代码片段摘录，虽能支撑存在性结论，但直接证明力较弱。"
+    },
+    {
+      "question_id": "Q08_002",
+      "score_evidence": 0.8,
+      "score_consistency": 1.0,
+      "review": "单选选项与题面一致。证据列出目录结构与配置文件，能较好支撑第三方库集成的结论，但 excerpt 仍为描述性文本。"
+    },
+    {
+      "question_id": "Q08_003",
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "题面相符。证据包含具体函数签名与系统调用号定义，比纯文件描述更具体，有效支撑接口实现结论。"
+    },
+    {
+      "question_id": "Q08_004",
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "短回答节点数量符合要求（6 个）。证据覆盖调用链关键函数，路径逻辑清晰，能支撑追踪结论。"
+    },
+    {
+      "question_id": "Q08_005",
+      "score_evidence": 0.75,
+      "score_consistency": 1.0,
+      "review": "题面相符。负面结论证据（搜索无果）本身证明力有限，但结合 loopback 初始化证据，逻辑自洽。"
+    },
+    {
+      "question_id": "Q08_006",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "多选选项与题面一致。证据详尽列出各协议对应源文件，覆盖所有选中项，支撑度最高。"
+    },
+    {
+      "question_id": "Q08_007",
+      "score_evidence": 0.8,
+      "score_consistency": 1.0,
+      "review": "题面相符。证据通过分析缓冲管理机制（pbuf 复制）支撑无零拷贝结论，逻辑合理但依赖描述性摘录。"
+    }
+  ],
+  "findings": [],
+  "summary_zh": "本阶段报告题面相符度良好，所有题目类型与选项约束均被严格遵守。证据支撑度整体中等偏上，主要扣分点在于多数 evidence.excerpt 为文字描述而非代码片段，削弱了直接证明力；其中协议支持情况（Q08_006）证据最详实，存在性检查（Q08_001）证据较泛。全阶段分按各题均值的方案 A 汇总。",
+  "report_quality_score": 0.9,
+  "_meta": {
+    "quality": {
+      "mean_question_confidence": 0.9036
+    },
+    "review_model": "qwen3.5-plus",
+    "baseline": true,
+    "run_at": "2026-04-24T16:12:29",
+    "baseline_execute_tokens": 716761,
+    "baseline_review_tokens": 11269,
+    "baseline_stage_total_tokens": 728030
+  }
+}

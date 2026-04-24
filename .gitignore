@@ -24,13 +24,13 @@ __pycache__/
 # Output
 # output/
 output/_lsp_sidecar/
-repos/*
-!repos/xv6-k210/
-!repos/xv6-k210/**
+repos/
+# !repos/xv6-k210/
+# !repos/xv6-k210/**
 # xv6-k210 完整 Git 历史（bundle），需随仓库分发
-!repos/xv6-k210.git.bundle
+# !repos/xv6-k210.git.bundle
 # 嵌套仓库的 .git 对象库勿纳入 OS-Agent（体量与嵌套语义原因；本地开发保留 .git 不影响）
-repos/xv6-k210/.git/
+# repos/xv6-k210/.git/
 #
 # ---------- xv6-k210：从 bundle 恢复嵌套 Git（analyze_git_history / git_ops 依赖 repos/xv6-k210/.git）----------
 # OS-Agent 不提交 xv6-k210/.git；完整历史放在 repos/xv6-k210.git.bundle（勿删）。下游 clone 后若无 .git：
