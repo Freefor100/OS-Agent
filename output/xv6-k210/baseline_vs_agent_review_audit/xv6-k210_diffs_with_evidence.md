@@ -753,4 +753,3 @@
 | --- | --- | --- |
 | **答案** | implemented | stub |
 | **证据** | [1] `kernel/syscall/sysproc.c` · sys_trace<br><code>sys_trace(void) { myproc()->tmask = 1; return 0; }</code><br>[2] `xv6-user/strace.c` · main<br><code>strace 用户工具：调用 trace() 系统调用后 execve 执行目标程序</code> | [1] `include/sysnum.h` · SYS_trace<br><code>SYS_trace syscall number defined (value 18).</code><br>[2] `kernel/syscall/sysproc.c` · sys_trace<br><code>sys_trace() sets myproc()->tmask = 1. Enables syscall tracing for the process.</code><br>[3] `kernel/syscall/syscall.c` · syscall<br><code>If p->tmask is set, prints syscall name and arguments before execution, and return value after. Basic syscall tracing, not full ftrace/perf infrastructure with tracepoints.</code><br>[4] `xv6-user/strace.c` · strace<br><code>User-space strace utility that calls trace() syscall and execs target program. Traces syscalls of child process.</code> |
-

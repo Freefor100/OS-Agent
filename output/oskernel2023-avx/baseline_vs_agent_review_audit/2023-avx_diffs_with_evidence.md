@@ -443,4 +443,3 @@
 | --- | --- | --- |
 | **答案** | not_found | implemented |
 | **证据** | [1] `kernel/` · tracepoint_scan<br><code>全局搜索 tracepoint\|ftrace\|perf_event\|trace_ 关键字，0 命中 (已搜索 416 个文件)</code><br>[2] `kernel/printf.c:72-125` · debug_print<br><code>debug_print 为条件编译的调试日志宏 (#ifdef DEBUG)，非 tracepoint 机制，无动态启用/禁用或事件过滤功能</code><br>[3] `kernel/trap.c:51-100` · usertrap<br><code>usertrap 处理异常但无性能计数/事件采样逻辑，无 perf_event_open 或类似系统调用</code> | [1] `kernel/syscall.c` · sys_trace<br><code>uint64 sys_trace(void) { int mask; if (argint(0, &mask) < 0) return -1; myproc()->tmask = mask; return 0; }</code><br>[2] `kernel/syscall.c` · syscall<br><code>if ((p->tmask & (1 << num)) != 0) { printf("pid %d: %s -> %d\n", p->pid, sysnames[num], p->trapframe->a0); }</code> |
-
