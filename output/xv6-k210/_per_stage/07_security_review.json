@@ -6,101 +6,96 @@
   "question_reviews": [
     {
       "question_id": "Q07_001",
-      "score_evidence": 1.0,
+      "score_evidence": 0.95,
       "score_consistency": 1.0,
-      "review": "答案值完全匹配选项 A。证据摘录直接展示了 SSTATUS_SPP 位定义及内核态/用户态切换代码，支撑充分。"
+      "review": "题面相符：选择了 A 选项，与 stem 及 choices 一致。证据充分：摘录了 usertrap/kerneltrap 中 SSTATUS_SPP 断言及宏定义，直接证明存在用户态/内核态隔离。"
     },
     {
       "question_id": "Q07_002",
       "score_evidence": 0.95,
       "score_consistency": 1.0,
-      "review": "三态值 'stub' 合理。证据展示了结构体定义与硬编码初始化，有效证明了凭证机制不完整。"
+      "review": "题面相符：三态回答 stub，并说明了 stub 形态（恒返回 0）。证据充分：提供了 sys_getuid 返回 0、syscall 表映射、auxvec 硬编码 0、proc 结构无字段等多处证据，完整支撑 stub 结论。"
     },
     {
       "question_id": "Q07_003",
       "score_evidence": 0.95,
       "score_consistency": 1.0,
-      "review": "三态值 'not_found' 合理。证据展示了 syscall 返回硬编码值，直接证明无权限检查逻辑。"
+      "review": "题面相符：三态回答 implemented，符合要求。证据充分：提供了 fileread/filewrite 的 readable/writable 检查、sys_faccessat 的 inode mode 检查、do_mmap 的权限匹配检查，均直接证明 syscall 路径上存在权限检查。"
     },
     {
       "question_id": "Q07_004",
-      "score_evidence": 0.95,
-      "score_consistency": 1.0,
-      "review": "短答案明确说明未发现检查链，并给出了搜索关键字和反证代码，符合题干对不存在情况的作答要求。"
+      "score_evidence": 0.9,
+      "score_consistency": 0.95,
+      "review": "题面相符：列出了 5 个节点，符合 2-5 个的要求。证据基本充分：摘录了 fileread、filewrite、sys_faccessat 的关键检查代码。但链路中 usertrap→syscall→sys_read/sys_write 部分未提供对应证据摘录，仅文字描述，证据覆盖稍欠。"
     },
     {
       "question_id": "Q07_005",
-      "score_evidence": 1.0,
+      "score_evidence": 0.95,
       "score_consistency": 1.0,
-      "review": "三态值 'implemented' 证据详实。摘录了用户内存保护开关函数及 copyin/out 调用链，直接支撑结论。"
+      "review": "题面相符：三态回答 implemented。证据充分：提供了 fetchaddr/fetchstr 的 copyin2/copyinstr2 验证、safememmove 的 SUM/PUM 切换、fileread 的 rangeinseg 检查等多处证据，覆盖了用户指针验证的多个层面。"
     },
     {
       "question_id": "Q07_006",
-      "score_evidence": 0.5,
+      "score_evidence": 0.85,
       "score_consistency": 1.0,
-      "review": "三态值合法，但 evidence 数组为空。对于 'not_found' 结论，缺乏搜索关键字或 grep 结果作为证据，验证性不足。"
+      "review": "题面相符：三态回答 not_found，符合要求。证据合理：提供了仓库搜索 0 命中及 syscall 表无相关条目的说明。但证据为搜索类（无具体代码摘录），略显单薄，不过对于 not_found 结论可接受。"
     },
     {
       "question_id": "Q07_007",
-      "score_evidence": 0.8,
+      "score_evidence": 0.85,
       "score_consistency": 1.0,
-      "review": "三态值 'stub' 合理。证据仅为注释，虽能说明设计意图，但缺乏实际保护代码（如 canary 逻辑），支撑度中等。"
+      "review": "题面相符：三态回答 stub，并说明了 stub 形态（注释声称有但实际未启用）。证据合理：提供了 guard page 注释、uvmclear 被注释掉、stack canary 搜索无命中。证据链清晰，但均为注释/搜索类，无运行时机制代码。"
     },
     {
       "question_id": "Q07_008",
-      "score_evidence": 0.5,
+      "score_evidence": 0.8,
       "score_consistency": 1.0,
-      "review": "三态值合法，但 evidence 数组为空。同 Q07_006，负面结论缺乏搜索过程证据，影响报告可信度。"
+      "review": "题面相符：三态回答 not_found。证据为仓库搜索 0 命中，对于 not_found 结论可接受，但证据较单一，无更多排除性说明。"
     },
     {
       "question_id": "Q07_009",
-      "score_evidence": 0.95,
-      "score_consistency": 1.0,
-      "review": "短答案清晰列出支持架构及证据。Makefile 和配置文件的摘录有效证明了 riscv64 支持及特权级配置。"
+      "score_evidence": 0.9,
+      "score_consistency": 0.95,
+      "review": "题面相符：逐架构作答，riscv64 有详细安全初始化证据，其他架构标注「未发现」。证据基本充分：riscv64 部分提供了 SSTATUS 位定义、permit/protect_usr_mem、PTE 位等证据。但 PMP 和 KPTI 在 riscv64 下标注未发现，与题面要求「安全相关初始化」的覆盖略有不足（PMP 是 RISC-V 安全初始化重要部分，应更明确说明搜索情况）。"
     },
     {
       "question_id": "Q07_010",
-      "score_evidence": 0.95,
+      "score_evidence": 0.85,
       "score_consistency": 1.0,
-      "review": "三态值 'not_found' 合理。证据通过编译配置证明内核为 C 语言，逻辑上支撑了无 Rust 安全机制的结论。"
+      "review": "题面相符：三态回答 not_found，并说明了原因（内核为 C 编写，Rust 仅在 bootloader/SBI 层）。证据合理：提供了目录结构扫描说明，但证据为描述性而非具体代码摘录，对于 not_found 结论可接受。"
     },
     {
       "question_id": "Q07_011",
-      "score_evidence": 0.95,
+      "score_evidence": 0.9,
       "score_consistency": 1.0,
-      "review": "三态值 'implemented' 证据充分。展示了 Trampoline 页映射、satp 切换及 PUM 位，符合 KPTI/隔离机制特征。"
+      "review": "题面相符：三态回答 not_found，列出了已搜关键字。证据充分：提供了搜索 0 命中及 kvminit 直接恒等映射的代码摘录，有效支撑未实现 KPTI 的结论。"
     },
     {
       "question_id": "Q07_012",
       "score_evidence": 0.95,
       "score_consistency": 1.0,
-      "review": "短答案准确区分了字段定义与执行检查。证据链展示了结构体定义与硬编码使用，支撑「无检查链」结论。"
+      "review": "题面相符：明确标注「仅有定义但未强制执行 🔸」，并给出了检查链证据（实际无检查链）。证据充分：提供了 sys_getuid 返回 0、auxvec 硬编码 0、check_perm 搜索 0 命中，完整支撑结论。"
     },
     {
       "question_id": "Q07_013",
       "score_evidence": 0.95,
       "score_consistency": 1.0,
-      "review": "答案值完全匹配选项 D。证据展示了特权级隔离存在但权限检查缺失，与选项描述一致。"
+      "review": "题面相符：选择了 D 选项「仅有特权级隔离，无细粒度访问控制」。证据充分：提供了 file 标志检查、assume user as root 注释、无 UID/GID 系统、capability/ACL 搜索无安全相关命中，多角度支撑结论。"
     },
     {
       "question_id": "Q07_014",
       "score_evidence": 0.85,
-      "score_consistency": 1.0,
-      "review": "三态值 'stub' 合理。证据展示了页表权限位设置，但未展示更高级完整性策略（如签名验证），支撑度良好。"
+      "score_consistency": 0.9,
+      "review": "题面相符：三态回答 stub。证据基本合理：提供了内核代码段 R+X（W^X）的 kvmmap 证据、mprotect/uvmprotect 权限位支持、签名/审计搜索无命中。但 value 为 stub 而证据显示内核代码段确实实现了 W^X，用户态也有 mprotect 权限控制，stub 的判定与证据中「W^X 仅在内核代码段部分实现」的表述略有张力——部分实现更接近 implemented 的雏形。不过整体无全局强制执行策略，stub 可接受。"
     }
   ],
-  "findings": [
-    {
-      "severity": "warn",
-      "message": "Q07_006 与 Q07_008 的 evidence 数组为空。对于 'not_found' 类结论，建议提供搜索关键字或空结果截图以增强证据充分性。"
-    }
-  ],
-  "summary_zh": "本报告整体题面相符度高，三态与选项约束遵守良好。正面实现类题目（如 Q07_005, Q07_011）证据详实。主要不足在于部分负面结论题目（Q07_006, Q07_008）缺乏搜索过程证据，导致证据支撑度下降。全阶段分按各题均值方案 A 汇总。",
+  "findings": [],
+  "summary_zh": "本阶段报告整体质量良好。题面相符度较高，所有三态题均正确使用三态值，单选题选项匹配，简答题数量符合要求。证据支撑方面，大部分题目提供了具体代码摘录且与结论直接对应，Q07_001/Q07_003/Q07_005/Q07_012/Q07_013 证据尤为详实。薄弱环节集中在 not_found 类题目（Q07_006/Q07_008）证据多为搜索描述，缺乏排除性代码分析；Q07_007/Q07_014 的 stub 判定与证据间的界限可进一步厘清。全阶段置信度按各题均值方案 A 汇总为 0.88。",
   "report_quality_score": 0.94,
   "_meta": {
     "quality": {
-      "mean_question_confidence": 0.9375
+      "mean_question_confidence": 0.9429
     },
-    "review_model": "qwen3.5-plus"
+    "review_model": "deepseek-v4-pro"
   }
 }

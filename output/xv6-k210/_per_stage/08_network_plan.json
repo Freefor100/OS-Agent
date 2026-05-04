@@ -1,57 +1,32 @@
 {
   "stage_id": "08_network",
-  "goal": "确认 xv6-k210 网络子系统实现状态：经全面搜索，未发现任何网络协议栈、socket 系统调用、网卡驱动或相关协议实现，需明确标注「未实现网络功能」。",
-  "must_cover": [
-    "[Q08_001] 不存在网络子系统实现（❌ 未实现）",
-    "[Q08_002] 协议栈来源：D. 未发现",
-    "[Q08_003] 无 socket 系统调用接口（❌ 未实现）",
-    "[Q08_004] 无发送路径可追踪（因无网络实现）",
-    "[Q08_005] 无网卡驱动实现（❌ 未实现）",
-    "[Q08_006] 协议支持：全部不支持",
-    "[Q08_007] 零拷贝/共享缓冲：未发现",
-    "功能限制声明：本项目仅支持 SD 卡文件系统与基础进程/同步/文件系统功能，无网络支持",
-    "[Q08_001] 是否存在网络子系统实现（协议栈或 socket 层）？（必须三态）",
-    "[Q08_002] 协议栈来源更接近哪种？",
-    "[Q08_003] 是否实现 socket 系统调用接口（socket/bind/connect/sendto/recvfrom 等）？（必须三态）",
-    "[Q08_004] 选择一个发送路径（优先 sys_sendto），追踪：syscall → 协议栈 → 网卡驱动。列 3-6 个关键节点并给证据。",
-    "[Q08_005] 是否实现网卡驱动（virtio-net/e1000 等）与收包中断路径？（必须三态）",
-    "[Q08_006] 协议支持情况（多选；未发现则留空并在 notes 写 not_found）：",
-    "[Q08_007] 是否存在零拷贝/共享缓冲/DMA 描述符等路径（zero-copy）？（必须三态；仅有名词不算 implemented）",
-    "若仅回环/仅 QEMU：写明**限制**；若多网卡：列**各自入口文件**与 feature 开关。",
-    "若无网络实现：单列一节说明依据即可。",
-    "网络协议栈架构：自实现还是使用 `smoltcp`/`lwip` 等库？（**检查 Cargo.toml 依赖**）**如果完全没有网络支持，明确写“未实现网络功能（❌ 未实现）”**。",
-    "Socket 接口实现：是否有 `socket`/`bind`/`connect` 等 syscall？还是仅有 Loopback？",
-    "**功能限制声明（必须）**：分析项目是否已在真实物理网卡上测试过网络功能。如果仅在 QEMU 环境测试或仅支持本地回环通信，必须明确写出该限制。搜索 `loopback|LOOPBACK|127.0.0.1` 确认是否仅有回环设备。",
-    "**网卡驱动细节**：",
-    "搜索 `drivers/net/`, `virtio-drivers`, `ixgbe` 等。"
-  ],
   "evidence_targets": [
-    "sysnum.h 中无 SYS_socket/SYS_bind/SYS_connect 等定义",
-    "Cargo.toml 无 smoltcp/lwip 等网络库依赖",
-    "kernel/hal/ 仅有 virtio_disk.c（磁盘驱动），无 virtio-net 或任何网卡驱动",
-    "include/errno.h 虽有 ENOTSOCK 等宏但仅为 POSIX 兼容占位，无实际实现",
-    "全仓库 grep 未发现 loopback/ethernet/tcp/udp/dhcp/dns/arp/icmp 等网络关键词",
-    "README 与文档仅提及 SD 卡、文件系统、进程管理，无网络相关说明",
+    "poll/pselect 实现与 waitqueue 集成",
+    "ppoll 桩实现与缺失的协议栈",
+    "file 结构 poll 函数指针预留接口",
+    "virtio 框架与缺失的网络驱动",
+    "syscall 表中网络相关系统调用的缺失",
+    "errno.h 中 socket 错误码的兼容性定义",
     "协议栈",
     "socket API",
     "poll/epoll",
     "驱动接入"
   ],
   "seed_paths": [
-    "include/sysnum.h",
-    "include/errno.h",
-    "kernel/hal/virtio_disk.c",
-    "kernel/syscall/sysfile.c",
-    "Cargo.toml",
-    "README.md",
-    "include/hal/virtio.h",
     "kernel/fs/poll.c",
+    "include/fs/poll.h",
+    "kernel/syscall/sysfile.c",
+    "include/fs/file.h",
+    "kernel/fs/file.c",
+    "include/hal/virtio.h",
+    "kernel/hal/virtio_disk.c",
+    "include/sysnum.h",
+    "kernel/syscall/syscall.c",
+    "include/errno.h",
+    "include/sync/waitqueue.h",
+    "xv6-user/user.h",
     "net",
-    "tcp",
-    "udp",
-    "socket",
-    "lwip",
-    "smoltcp"
+    "tcp"
   ],
   "framework_guess": [
     "xv6"
@@ -60,16 +35,20 @@
     "riscv64"
   ],
   "entry_symbols": [
+    "ppoll",
+    "pselect",
+    "sys_pselect",
+    "sys_ppoll",
+    "file_poll",
+    "poll_wait",
+    "__poll_func",
+    "poll_sched_timeout",
+    "poll_init",
+    "poll_end",
     "sys_socket",
-    "tcp",
-    "udp",
-    "poll",
-    "epoll",
-    "_start",
-    "start"
+    "tcp"
   ],
   "repo_hotspots": [
-    "Cargo.toml",
     "Makefile",
     "bootloader",
     "bootloader/SBI",
@@ -78,12 +57,16 @@
     "debug/openocd_cfg",
     "doc",
     "doc/img",
-    "include"
+    "include",
+    "include/fs"
   ],
   "preferred_tools": [
-    "grep_in_repo",
     "read_code_segment",
-    "list_repo_structure"
+    "lsp_get_document_outline",
+    "lsp_get_definition",
+    "lsp_get_references",
+    "grep_in_repo",
+    "rag_search_code"
   ],
   "avoid_tools": [
     "blind_read_large_files",
@@ -96,13 +79,25 @@
     "max_memory_items": 8
   },
   "execution_steps": [
-    "1. 确认 sysnum.h 中无 SYS_socket/SYS_bind/SYS_connect/SYS_sendto/SYS_recvfrom 等网络系统调用编号",
-    "2. 检查 Cargo.toml 确认无 smoltcp/lwip/embassy-net 等第三方网络协议栈依赖",
-    "3. 搜索全仓库验证无 loopback/ethernet/tcp/udp/dhcp/dns/arp/icmp 等网络协议关键词实现",
-    "4. 检查 kernel/hal/ 目录确认仅有 virtio_disk.c（磁盘）而无 virtio-net 或其他网卡驱动",
-    "5. 验证 include/errno.h 中 ENOTSOCK 等宏仅为 POSIX 兼容占位符，无对应实现代码",
-    "6. 查阅 README.md 与文档确认项目功能范围仅包含文件系统/进程管理/中断处理，无网络声明",
-    "7. 汇总证据并明确标注「未实现网络功能（❌ 未实现）」，所有网络相关子题均填「未发现/不支持」",
-    "8. 在最终报告中添加功能限制声明：本项目仅在 QEMU/K210 上测试过 SD 卡文件系统与基础内核功能，无真实网卡或回环网络测试"
+    "【协议栈存在性确认】grep 搜索 socket/connect/bind/listen/accept/send/recv 等 syscall 符号，确认全部缺失",
+    "【协议栈存在性确认】grep 搜索 lwip/smoltcp/tcp/udp/ethernet/net 目录与文件名，确认无协议栈目录",
+    "【syscall 表审查】读取 kernel/syscall/syscall.c 中 syscalls[] 数组，列出所有已注册 syscall，确认无网络相关条目",
+    "【sysnum 审查】读取 include/sysnum.h，确认 SYS_socket/SYS_connect 等宏定义全部缺失",
+    "【poll 框架分析】lsp_get_document_outline 查看 kernel/fs/poll.c 和 include/fs/poll.h 的完整符号大纲",
+    "【poll 核心实现】read_code_segment 精读 kernel/fs/poll.c 中 ppoll() (行91-105) 确认桩实现：对所有 fd 直接返回 POLLIN|POLLOUT",
+    "【poll 核心实现】read_code_segment 精读 kernel/fs/poll.c 中 pselect() (行127-243) 分析完整 poll 循环、waitqueue 集成、超时机制",
+    "【poll 辅助函数】read_code_segment 精读 __poll_func (行19-31)、poll_init (行33-40)、poll_end (行42-56)、file_poll (行58-64)、poll_sched_timeout (行66-89)",
+    "【file 结构 poll 接口】read_code_segment 读取 include/fs/file.h 中 struct file 定义，确认 poll 函数指针字段",
+    "【file 分配】read_code_segment 读取 kernel/fs/file.c 中 filealloc() 确认 poll 字段初始化为 NULL",
+    "【syscall 入口】read_code_segment 读取 kernel/syscall/sysfile.c 中 sys_pselect (行680-732) 和 sys_ppoll (行740-780)，分析参数拷贝与调用路径",
+    "【waitqueue 机制】read_code_segment 读取 include/sync/waitqueue.h 完整内容，理解 poll 依赖的等待队列原语",
+    "【virtio 框架】read_code_segment 读取 include/hal/virtio.h，确认 VIRTIO_MMIO_DEVICE_ID 定义（1=net, 2=disk）但无 net 驱动实现",
+    "【virtio 磁盘驱动】lsp_get_document_outline 查看 kernel/hal/virtio_disk.c 确认仅有磁盘驱动、无网络驱动",
+    "【errno 兼容性】read_code_segment 读取 include/errno.h 中 ENOTSOCK/EPROTOTYPE/ESOCKTNOSUPPORT 等定义，确认仅为兼容性预留",
+    "【用户态 API】read_code_segment 读取 xv6-user/user.h 和 xv6-user/usys.pl，确认无 socket/bind/connect 等用户态 API",
+    "【stat.h 预留】grep 确认 include/fs/stat.h 中 S_IFSOCK 宏定义仅为文件类型常量预留",
+    "【Makefile 确认】grep Makefile 确认编译目标中无网络相关源文件",
+    "【交叉引用验证】lsp_get_references 查 ppoll 和 pselect 的所有引用点，确认调用链仅限 syscall 入口",
+    "【收束：判定网络子系统状态】综合以上证据，判定该仓库网络子系统为「框架预留、协议栈缺失」状态，输出证据摘要"
   ]
 }

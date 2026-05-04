@@ -1,30 +1,5 @@
 {
   "stage_id": "02_boot_trap",
-  "goal": "完成 xv6-k210 启动/Trap/系统调用分析，覆盖启动入口、模式切换、MMU 初始化、trap 向量、syscall 分发等 26 个子问题",
-  "must_cover": [
-    "[Q02_001] 启动入口：linker64.ld ENTRY(_entry)，entry_k210.S/_start 或 entry_qemu.S/_entry",
-    "[Q02_002] 启动链：RustSBI/OpenSBI 固件 → _start/_entry → main() C 入口",
-    "[Q02_003] 模式切换：RISC-V M→S 通过 medeleg/mideleg 委托，sstatus.SPP 位证实",
-    "[Q02_004] 关键寄存器：sstatus(SPP/SPIE/SIE)、satp(SV39)、stvec、sepc、scause",
-    "[Q02_005] MMU 启用：kvminit() 创建页表 → kvminithart() 写 satp 开启分页",
-    "[Q02_006] 跳转链：_start → main → cpuinit/floatinithart/consoleinit → kvminit/kvminithart → trapinithart → scheduler",
-    "[Q02_007] 早期初始化：BSS 清零(linker.ld .bss 段)、串口(consoleinit/sbi_console_putchar)、DTB(未显式解析)、页表(kvminit 在 MMU 前)",
-    "[Q02_008] FPU 启用：floatinithart() 设置 sstatus.fs 位",
-    "[Q02_009] Trap 向量：trapinithart() 写 stvec=kernelvec，usertrapret() 设 stvec=uservec",
-    "[Q02_010] 构建系统：Makefile 平台选择(k210/qemu)、CFLAGS -D QEMU、SBI 路径选择",
-    "[Q02_011] SBI 固件链：sbi.h 中 sbi_send_ipi/sbi_console_getchar，main.c 中 sbi_send_ipi 调用",
-    "[Q02_012] UART 地址切换：memlayout.h UART/VIRT_OFFSET，kvminit() kvmmap 映射",
-    "[Q02_013] 用户态返回：usertrapret() → trampoline.S userret → sret",
-    "[Q02_014] 多平台：仅 k210/qemu，无 visionfive/loongarch",
-    "[Q02_015] Trap 入口：trampoline.S uservec/kernelvec.S kernelvec",
-    "[Q02_016] TrapFrame 位置：TRAPFRAME 宏定义在 VKSTACK+2*PGSIZE",
-    "[Q02_001] 启动入口在哪里？（例如 linker.ld 的 ENTRY、`_start`/`start`/`head`/`entry` 标签；必须给文件路径+符号证据）",
-    "[Q02_002] 启动链更接近哪种交接方式？",
-    "[Q02_003] 是否能在代码中证实发生了 CPU 特权级/模式切换？（RISC-V M→S、x86 实→保→长等；必须三态）",
-    "[Q02_004] 模式切换涉及的关键寄存器/位是什么？（例如 RISC-V mstatus/sstatus、x86 cr0/cr4/eflags；必须给证据摘录）",
-    "[Q02_005] 是否启用/初始化了 MMU（设置 SATP/CR3 等并建立页表）？（必须三态）",
-    "[Q02_006] 从入口汇编/固件交接到 C/Rust 主入口函数的跳转链是什么？（列出 3-6 个关键节点并给证据）"
-  ],
   "evidence_targets": [
     "启动入口",
     "模式切换",
@@ -38,20 +13,18 @@
     "RTC/virtio 早期初始化线索"
   ],
   "seed_paths": [
-    "linker/linker64.ld",
-    "kernel/entry.S",
-    "kernel/entry_k210.S",
-    "kernel/entry_qemu.S",
-    "kernel/main.c",
-    "kernel/trap/trap.c",
-    "kernel/trap/trampoline.S",
-    "kernel/trap/kernelvec.S",
-    "kernel/syscall/syscall.c",
-    "include/trap.h",
-    "include/hal/riscv.h",
-    "include/memlayout.h",
     "arch",
-    "boot"
+    "boot",
+    "platform",
+    "trap",
+    "syscall",
+    "interrupt",
+    "exception",
+    "kernel/trap",
+    "README.md",
+    "Makefile",
+    "entry.S",
+    "start.S"
   ],
   "framework_guess": [
     "xv6"
@@ -60,21 +33,16 @@
     "riscv64"
   ],
   "entry_symbols": [
-    "_entry",
     "_start",
-    "main",
-    "trapinithart",
-    "usertrap",
-    "usertrapret",
-    "syscall",
-    "kernelvec",
-    "uservec",
-    "kvminit",
     "start",
-    "rust_main"
+    "rust_main",
+    "kernel_main",
+    "trap_handler",
+    "syscall",
+    "syscall_dispatch",
+    "TrapFrame"
   ],
   "repo_hotspots": [
-    "Cargo.toml",
     "Makefile",
     "bootloader",
     "bootloader/SBI",
@@ -83,15 +51,14 @@
     "debug/openocd_cfg",
     "doc",
     "doc/img",
-    "include"
+    "include",
+    "include/fs"
   ],
   "preferred_tools": [
-    "read_code_segment",
-    "lsp_get_definition",
-    "lsp_get_references",
+    "rag_search_code",
     "lsp_get_call_graph",
-    "grep_in_repo",
-    "rag_search_code"
+    "lsp_get_definition",
+    "read_code_segment"
   ],
   "avoid_tools": [
     "blind_read_large_files",
@@ -104,13 +71,8 @@
     "max_memory_items": 8
   },
   "execution_steps": [
-    "1. 确认启动入口：读取 linker64.ld 确认 ENTRY(_entry)，对比 entry_k210.S(_start) 和 entry_qemu.S(_entry) 差异",
-    "2. 追踪启动链：从 entry.S call main 跳转到 main.c，记录 main() 中初始化顺序(cpuinit→kvminit→kvminithart→trapinithart→scheduler)",
-    "3. 取证模式切换：读取 riscv.h 中 medeleg/mideleg 读写函数，main.c 无显式设置但 RustSBI 已配置委托；确认 sstatus.SPP 位在 usertrapret() 清除",
-    "4. 分析 MMU 启用：读取 vm.c kvminit() 和 kvminithart()，确认 kvmmap() 映射关键设备、w_satp() 开启分页的时机",
-    "5. 定位 trap 向量：读取 trap.c trapinithart() 设置 stvec=kernelvec，trampoline.S uservec 保存寄存器，usertrapret() 恢复并设 stvec=uservec",
-    "6. 分析 syscall 分发：读取 syscall.c syscall() 函数，确认 num 边界检查、syscalls[] 表索引调用、SYS_rt_sigreturn 特殊处理",
-    "7. 追踪 sys_write 路径：从 usertrap() EXCP_ENV_CALL 分支 → syscall() → syscalls[SYS_write] → sysfile.c sys_write()，记录关键节点",
-    "8. 收集早期初始化证据：确认 BSS 段(linker.ld)、串口(consoleinit+sbi_console_putchar)、FPU(floatinithart)、页表初始化时机(kvminit 在 kvminithart 之前)"
+    "对照 seed_paths、entry_symbols，用 rag_search_code / list_repo_structure / LSP 锁定与本阶段相关的关键文件与符号。",
+    "对核心入口使用 lsp_get_document_outline → lsp_get_call_graph（单入口、浅深度）→ 必要时 read_code_segment 精读。",
+    "按题单逐项输出结论，每条附反引号源码路径；无实现则显式写「未发现/桩函数」等，勿臆测。"
   ]
 }

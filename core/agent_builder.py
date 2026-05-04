@@ -3,6 +3,8 @@ import os
 
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
+from copy import deepcopy
+from core.deepseek_thinking_patch import apply_deepseek_reasoning_content_patch
 try:
     # LangGraph v1+ 提示：create_react_agent 迁移到 langchain.agents
     from langchain.agents import create_agent as create_react_agent
@@ -201,6 +203,48 @@ def get_model_name() -> str:
     return os.environ.get("MODEL_NAME", DEFAULT_MODEL)
 
 
+def _is_deepseek_backend(model_name: str) -> bool:
+    base_url = (os.environ.get("OPENAI_API_BASE") or os.environ.get("OPENAI_BASE_URL") or "").strip()
+    model_l = (model_name or "").strip().lower()
+    return ("deepseek" in base_url.lower()) or model_l.startswith("deepseek-") or model_l.startswith("deepseek/")
+
+
+def _apply_deepseek_thinking_defaults(model_name: str, model_kwargs: dict | None) -> dict:
+    """
+    DeepSeek V4 Thinking Mode 兼容处理（OpenAI 兼容接口）：
+
+    - 当启用 thinking 且发生 tool-calls 时，DeepSeek 要求后续请求回传历史 assistant message 中的 `reasoning_content`。
+      但 LangChain 的消息序列化/反序列化链路通常不会稳定保留该字段，易触发 400：
+      `The reasoning_content in the thinking mode must be passed back to the API.`
+
+    因此：在 LangChain 路径下默认 **禁用** DeepSeek thinking（可用环境变量开启）。
+    """
+    mk = deepcopy(model_kwargs or {})
+    if not _is_deepseek_backend(model_name):
+        return mk
+
+    thinking = (os.environ.get("OS_AGENT_DEEPSEEK_THINKING") or "").strip().lower()
+    extra_body = dict(mk.get("extra_body") or {})
+
+    # thinking 开关：
+    # - 默认禁用：保证 tool-call agent 稳定运行
+    # - 若用户开启：启用兼容补丁，确保 reasoning_content 能被保留并回传，避免 400
+    if thinking in ("", "0", "false", "no", "off", "disabled"):
+        extra_body.setdefault("thinking", {"type": "disabled"})
+    else:
+        # 确保在开启 thinking 时，消息序列化会携带 reasoning_content
+        apply_deepseek_reasoning_content_patch()
+        extra_body.setdefault("thinking", {"type": "enabled"})
+
+        # 可选：reasoning_effort（DeepSeek 支持 high/max 等）
+        effort = (os.environ.get("OS_AGENT_DEEPSEEK_REASONING_EFFORT") or "").strip().lower()
+        if effort:
+            mk.setdefault("reasoning_effort", effort)
+
+    mk["extra_body"] = extra_body
+    return mk
+
+
 def build_chat_model(
     model: str = None,
     *,
@@ -210,12 +254,18 @@ def build_chat_model(
     model_kwargs: dict | None = None,
 ):
     model_name = model or get_model_name()
+    merged_kwargs = _apply_deepseek_thinking_defaults(model_name, model_kwargs)
+    # langchain-openai 对部分参数（如 extra_body）要求显式传递，否则会给出 UserWarning
+    extra_body = None
+    if isinstance(merged_kwargs, dict) and "extra_body" in merged_kwargs:
+        extra_body = merged_kwargs.pop("extra_body")
     return ChatOpenAI(
         model=model_name,
         temperature=temperature,
         request_timeout=request_timeout,
         max_retries=max_retries,
-        model_kwargs=model_kwargs or {},
+        extra_body=extra_body,
+        model_kwargs=merged_kwargs,
     )
 
 

@@ -2,64 +2,64 @@
   "schema_version": "describe_review_v1",
   "stage_id": "08_network",
   "stage_title": "网络子系统与协议栈",
-  "confidence": 0.75,
+  "confidence": 0.95,
   "question_reviews": [
     {
       "question_id": "Q08_001",
       "score_evidence": 0.95,
       "score_consistency": 1.0,
-      "review": "题面要求三态，回答 not_found 符合。证据列举了 sysnum、目录结构、驱动文件缺失，虽为文本描述但能有效支撑“未发现”结论。"
+      "review": "题面要求三态回答，答案给出 not_found 符合契约。证据从系统调用表、宏定义、目录结构三个维度交叉验证，充分支撑‘未发现网络子系统’的结论。"
     },
     {
       "question_id": "Q08_002",
-      "score_evidence": 0.95,
-      "score_consistency": 1.0,
-      "review": "单选题，选择“未发现”与选项 D 一致。证据通过 Cargo.toml 依赖检查支撑结论，逻辑闭环。"
+      "score_evidence": 0.9,
+      "score_consistency": 0.85,
+      "review": "题面为单选题，选项为 A/B/C/D，但答案 value 为‘未发现’，未使用选项字母，与题面契约存在轻微偏差。证据通过 RAG 和 grep 搜索确认无协议栈代码，能支撑结论。"
     },
     {
       "question_id": "Q08_003",
       "score_evidence": 0.95,
       "score_consistency": 1.0,
-      "review": "题面要求三态，回答 not_found 符合。证据引用 sysnum 定义及 syscall 处理文件，证明无相关实现，支撑充分。"
+      "review": "三态回答 not_found 符合契约。证据覆盖了内核 syscall 表、宏定义、用户态头文件、桩生成脚本四个层面，非常详实，完全支撑结论。"
     },
     {
       "question_id": "Q08_004",
-      "score_evidence": 0.4,
-      "score_consistency": 0.9,
-      "review": "题面明确要求“列 3-6 个关键节点并给证据”。虽然 value 文本解释了未实现原因并提及文件路径，但 evidence 数组为空，未将引用路径结构化填入，违反证据提交契约。"
+      "score_evidence": 0.9,
+      "score_consistency": 0.95,
+      "review": "题面要求追踪发送路径并列出 3-6 个关键节点。答案如实说明无法追踪，并给出了 syscall 缺失、virtio 仅注释、无驱动实现等证据。虽未列出节点，但原因明确且证据充分，符合‘无法追踪’的实际情况。"
     },
     {
       "question_id": "Q08_005",
       "score_evidence": 0.95,
       "score_consistency": 1.0,
-      "review": "题面要求三态，回答 not_found 符合。证据详细对比了 virtio 设备 ID 及目录文件，有效证明无网卡驱动实现。"
+      "review": "三态回答 not_found 符合契约。证据从 virtio 头文件声明、磁盘驱动文件内容、网卡关键词搜索三个角度确认无网卡驱动，充分支撑结论。"
     },
     {
       "question_id": "Q08_006",
-      "score_evidence": 0.8,
+      "score_evidence": 0.9,
       "score_consistency": 1.0,
-      "review": "多选题，未发现时留空并写 notes，符合题面约束。但 evidence 数组为空，仅依赖 notes 文本说明，结构化证据稍弱。"
+      "review": "题面要求多选，未发现则留空。答案 value 为空数组，符合契约。证据通过 RAG 和 grep 搜索确认无任何协议实现，能支撑结论。"
     },
     {
       "question_id": "Q08_007",
-      "score_evidence": 0.95,
+      "score_evidence": 0.9,
       "score_consistency": 1.0,
-      "review": "题面要求三态，回答 not_found 符合。证据指出 DMA 描述符仅用于磁盘，无网络零拷贝路径，支撑有力。"
+      "review": "三态回答 not_found 符合契约。证据指出 DMA 仅用于 SD 卡磁盘 I/O，且无网络相关零拷贝机制，逻辑清晰，能支撑结论。"
     }
   ],
   "findings": [
     {
-      "question_id": "Q08_004",
+      "question_id": "Q08_002",
       "severity": "warn",
-      "description": "evidence 数组为空，但 value 文本中引用了具体文件路径（如 include/sysnum.h），未将证据结构化填入 evidence 字段，不符合“并给证据”的题面要求及输出契约预期。"
+      "message": "单选题 value 为‘未发现’，未使用题面定义的 A/B/C/D 选项字母，与契约存在偏差。"
     }
   ],
-  "summary_zh": "本阶段报告在“未发现”类结论上普遍提供了合理的负面证据（如配置缺失、目录缺失），题面相符度较高。主要缺陷在于 Q08_004，题面明确要求追踪路径并提供证据，但 evidence 字段为空，仅在文本中描述，导致证据支撑度显著降低。全阶段置信度因该题均值低于 0.7 触发截断机制。",
-  "report_quality_score": 0.92,
+  "summary_zh": "本阶段报告整体质量较高，所有题目均如实反映了仓库无网络子系统实现的现状。证据覆盖了系统调用表、宏定义、目录结构、驱动文件等多个维度，交叉验证充分。Q08_002 存在轻微契约偏差，value 未使用选项字母。其余题目在题面相符度和证据支撑度上表现良好。",
+  "report_quality_score": 0.95,
   "_meta": {
     "quality": {
-      "mean_question_confidence": 0.9179
+      "mean_question_confidence": 0.9464
     },
-    "review_model": "qwen3.5-plus"
+    "review_model": "deepseek-v4-pro"
   }
 }
