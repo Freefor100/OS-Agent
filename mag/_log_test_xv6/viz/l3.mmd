@@ -1,0 +1,20 @@
+flowchart LR
+    titleNode["L3 ArchitectureGraph"]
+    L3_KernelStyle_d74b31b94e["KernelStyle: KernelStyle"]
+    L3_MemoryModel_f8f2b06d9d["MemoryModel: MemoryModel"]
+    L3_SyscallABI_b84c45c829["SyscallABI: SyscallABI"]
+    L3_SchedulingPolicy_fd0b10a007["SchedulingPolicy: SchedulingPolicy"]
+    L3_SMPModel_ab09453550["SMPModel: SMPModel"]
+    L3_IsolationBoundary_a250bb2998["IsolationBoundary: IsolationBoundary"]
+    L3_SecurityModel_fc1b3214fc["SecurityModel: SecurityModel"]
+    L3_NetModel_da75497949["NetModel: NetModel"]
+    L3_BuildSystem_b5313ce839["BuildSystem: BuildSystem"]
+    L3_TargetPlatform_654f356ab0["TargetPlatform: TargetPlatform"]
+    L3_TargetPlatform_654f356ab0 -->|"configures"| L3_KernelStyle_d74b31b94e
+    L3_KernelStyle_d74b31b94e -->|"configures"| L3_MemoryModel_f8f2b06d9d
+    L3_KernelStyle_d74b31b94e -->|"configures"| L3_SyscallABI_b84c45c829
+    L3_KernelStyle_d74b31b94e -->|"configures"| L3_SchedulingPolicy_fd0b10a007
+    L3_KernelStyle_d74b31b94e -->|"configures"| L3_SecurityModel_fc1b3214fc
+    L3_KernelStyle_d74b31b94e -->|"configures"| L3_SMPModel_ab09453550
+    L3_IsolationBoundary_a250bb2998 -->|"configures"| L3_SyscallABI_b84c45c829
+    L3_SchedulingPolicy_fd0b10a007 -->|"configures"| L3_SMPModel_ab09453550
