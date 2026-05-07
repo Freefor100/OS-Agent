@@ -1,8 +1,7 @@
 """
 公共工具函数模块
 
-从 os_agent_d_describe.py 和 os_agent_d_evaluate.py 中提取的共享函数，
-合并为超集版本，兼容两者的工具名称映射。
+由 os_agent_d_describe.py 等入口使用的共享函数（含工具名映射与终端摘要格式化）。
 """
 import ast
 import os
@@ -149,7 +148,7 @@ def parse_env_repo_list(var_name: str, dotenv_path: str = ".env") -> list:
 
 
 def format_tool_call_summary(tool_name: str, tool_args: dict) -> str:
-    """格式化工具调用为简洁摘要（合并 describe + evaluate 两个版本的超集）"""
+    """格式化工具调用为简洁摘要"""
 
     # OS-Agent C：调用图对比（避免只显示第一个参数）
     if tool_name == "compare_call_graphs":
@@ -262,7 +261,7 @@ def format_tool_call_summary(tool_name: str, tool_args: dict) -> str:
 
 
 def format_tool_result_summary(tool_name: str, content: str) -> str:
-    """格式化工具返回结果为简洁摘要（合并 describe + evaluate 两个版本的超集）"""
+    """格式化工具返回结果为简洁摘要"""
     content_len = len(content)
     line_count = len(content.split("\n")) if content else 0
 

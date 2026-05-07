@@ -255,6 +255,10 @@ def build_chat_model(
 ):
     model_name = model or get_model_name()
     merged_kwargs = _apply_deepseek_thinking_defaults(model_name, model_kwargs)
+    # 长 JSON-QA / 大章节：提高单次 completion 上限，避免 `_per_stage/*_answers_raw.txt` 在末尾被截断
+    _mot = (os.environ.get("DESCRIBE_MAX_OUTPUT_TOKENS") or "").strip()
+    if _mot.isdigit():
+        merged_kwargs["max_tokens"] = int(_mot)
     # langchain-openai 对部分参数（如 extra_body）要求显式传递，否则会给出 UserWarning
     extra_body = None
     if isinstance(merged_kwargs, dict) and "extra_body" in merged_kwargs:

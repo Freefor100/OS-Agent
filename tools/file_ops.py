@@ -6,7 +6,7 @@ import os
 import re
 
 # 允许访问的根目录（相对于工作目录）
-ALLOWED_ROOTS = ["./repos", "./output", "./evaluation", "repos", "output", "evaluation"]
+ALLOWED_ROOTS = ["./repos", "./output", "repos", "output"]
 
 # 最大读取字符数
 MAX_FILE_CHARS = 100000
@@ -29,7 +29,7 @@ def read_code_segment(file_path: str, start_line: int = None, end_line: int = No
     """
     读取代码文件的指定片段。
     
-    安全限制：只能访问 repos/、output/、evaluation/ 目录下的文件。
+    安全限制：只能访问 repos/、output/ 目录下的文件。
     
     Args:
         file_path: 文件路径（相对于工作目录或绝对路径）

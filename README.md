@@ -78,11 +78,7 @@
 
 ---
 
-### 2. OS-Agent D：自动报告评估 (`os_agent_d_evaluate.py`) ✨ **增强版**
-
-使用 Agent 将自动生成的报告与仓库内人类撰写的文档进行对比评估。
-
-### 3. OS-Agent C：智能查重与比对 (`os_agent_c_coarse.py` / `os_agent_c_fine.py`)
+### 2. OS-Agent C：智能查重与比对 (`os_agent_c_coarse.py` / `os_agent_c_fine.py`)
 
 面向小型操作系统的分析比对，系统分为两阶段架构，快速在新旧作品间进行查重与创新点分析：
 
@@ -97,17 +93,11 @@
   - **Call Graph Jaccard 相似度**（`compare_call_graphs`）：对比两项目调用图的节点集合，输出节点 Jaccard = |交集| / |并集|，量化调用拓扑结构的相似程度。
   - **综合评分锚定**：Agent 被强制要求对 5 个核心函数分别获取 Token Jaccard 与 CG Jaccard，以 `综合相似度 = Token Jaccard 均值 × 0.5 + CG Jaccard 均值 × 0.5` 为锚，结合 4 档评级区间（高度相似 / 改进版 / 受启发 / 独立）输出 0-100 最终评分，确保结论有量化依据可追溯。
 
-### 4. 本地工具安全与沙盒限制
+### 3. 本地工具安全与沙盒限制
 
-为防止 Token 溢出与确保本地系统安全，各底座工具有严格的使用边界：
+为防止 Token 溢出与确保本地系统安全，工具仅能访问白名单目录（如 `repos/`、`output/`），具体额度与行为见下文「工具限制说明」。
 
-- **5 维度客观评分**: 覆盖度、准确性、技术深度、引用规范、亮点发现
-- **独立源码验真**: 冲突时永远以源码为准，利用工具确保证据链闭环
-- **重构脉络提取**: 完全自主翻阅并提取大型架构的历史合并节点
-- **创新亮点锚定**: 发现比人类原生文档更详细的地方，以及遗漏的关键缺陷
-- **沙盒安全边界**: 大模型仅能访问指定的仓库源内文件以及受限的外部沙盒输出目录
-
-### 5. 本地代码 RAG 语义搜索引擎
+### 4. 本地代码 RAG 语义搜索引擎
 
 OS-Agent 内置了一套专为操作系统内核代码优化的**本地 RAG（Retrieval-Augmented Generation）引擎**，在分析每个 OS 仓库前自动完成代码向量化，使 LLM Agent 可以用自然语言"查找功能实现"而非死记函数名。
 
@@ -345,138 +335,6 @@ output/
 
 ---
 
-## 📊 评估报告（os_agent_d_evaluate.py）✨ **增强版 v2.5**
-
-> **v2.0 更新**（2025-02-14）：新增智能重试、完整错误追溯、鲁棒性大幅提升！评估过程更稳定，失败可追溯。
-
-### 功能说明
-
-评估程序使用独立 Agent 对每个章节进行评估，自主探索仓库，查找人类撰写的文档（README、设计文档、PDF 等），与 Agent 生成的报告进行深度对比。**冲突时以源码为准**。
-
-**核心特点**：
-- 🔍 Agent 自主选择要读取的文档
-- 🔒 安全限制：只能访问仓库目录和 output 目录
-- 📊 5 维度评分体系（覆盖度、准确性、深度、引用、亮点）
-- ✨ 自动发现 Agent 报告的亮点和不足
-- 🔄 智能重试机制（指数退避、错误分类）
-- 📋 完整错误追溯（日志、报告、堆栈）
-- 🛡️ 高鲁棒性（输入验证、超时控制、优雅降级）
-
-### 使用方法
-
-```bash
-# 基本用法（使用 .env 中的 REPO_URL）
-python os_agent_d_evaluate.py
-
-# 指定仓库 URL
-python os_agent_d_evaluate.py --repo-url https://gitlab.educg.net/xxx/os-project.git
-
-# 指定仓库路径和输出目录
-python os_agent_d_evaluate.py --repo-path repos/my-os --output-dir output/my-os
-
-# 使用不同的 LLM 模型
-python os_agent_d_evaluate.py --model gpt-4o
-```
-
-### 命令行参数
-
-| 参数 | 说明 |
-|------|------|
-| `--repo-url` | OS 仓库 URL（覆盖 .env 中的 REPO_URL） |
-| `--repo-path` | 仓库本地路径（默认从 REPO_URL 解析） |
-| `--output-dir` | 生成报告目录（默认 output/<repo_name>） |
-| `--model` | LLM 模型名称（覆盖 .env 中的 EVAL_MODEL_NAME） |
-
-### 评估维度
-
-| 维度 | 权重 | 说明 |
-|------|------|------|
-| **coverage** | 25% | 内容覆盖度 - Agent 覆盖了人类文档多少关键技术点 |
-| **accuracy** | 35% | 准确性 - Agent 描述与人类文档/代码是否一致，捏造严重扣分 |
-| **depth** | 20% | 技术深度 - 是否深入到代码实现层面 |
-| **citations** | 10% | 证据引用 - 是否引用具体文件路径、代码片段 |
-| **highlights** | 10% | 亮点发现 - Agent 超越人类文档的源码级洞察 |
-
-### 输出文件（增强版）
-
-评估完成后，在 `evaluation/<repo_name>/` 目录下生成：
-
-```
-evaluation/
-└── <repo_name>/
-    ├── evaluation.log          # 📋 详细日志（DEBUG 级别，包含完整堆栈）
-    ├── error_report.json        # 🆕 错误报告（错误分类、统计、堆栈）
-    ├── summary.json            # 📊 汇总结果（包含成功率、统计信息）
-    ├── evaluation_report.md    # 📄 Markdown 报告（包含错误摘要）
-    └── sections/               # 📂 各章节评估结果
-        ├── 01_项目概览与技术栈.json
-        ├── 02_内存管理.json
-        └── ...
-```
-
-### 示例输出
-
-```
-============================================================
-🚀 OS-Agent D 评估开始（增强版）
-   仓库: my-os
-   repo_path: C:\...\repos\my-os
-   output_dir: C:\...\output\my-os
-   评估输出: C:\...\evaluation\my-os
-   模型: deepseek/deepseek-v3.2
-   章节总数: 11
-   日志文件: C:\...\evaluation\my-os\evaluation.log
-   重试配置: 最大3次, 退避2-60秒
-============================================================
-
-📌 评估章节: 01_项目概览与技术栈.md
-
-【步骤 1/500】🔧 调用工具:
-   find_human_docs(my-os/ "os kernel design")
-   ✅ find_human_docs: 找到 3 个文档
-
-【步骤 2/500】🔧 调用工具:
-   read_human_doc(README.md)
-   ✅ read_human_doc: 返回 150 行 (5000 字符)
-
-【步骤 3/500】🔧 调用工具:
-   verify_claim_in_source(repo_path, "使用 Buddy System", "buddy|BuddyAllocator")
-   ✅ verify_claim_in_source: ✓ 源码有匹配
-
-   ...
-
-   ✅ 01_项目概览与技术栈.md: 85.3 分 - 覆盖较好，准确性高...
-   📄 已保存: C:\...\evaluation\my-os\sections\01_项目概览与技术栈.json
-
-📌 评估章节: 02_内存管理.md
-   ❌ 网络错误: ConnectionError: Connection refused
-   🔄 正在重试 (1/3)...
-   ⏱️  等待 2 秒后重试（网络错误）...
-
-【步骤 15/500】🔧 调用工具:
-   find_human_docs(my-os/ "mm memory paging")
-   ✅ find_human_docs: 找到 2 个文档
-
-   ...
-
-   ✅ 02_内存管理.md: 78.1 分 - 深度分析到位，但缺少 Slab 分配器...
-
-============================================================
-✅ 评估任务完成
-   📊 统计:
-      - 总章节数: 11
-      - 成功: 12
-      - 失败: 1
-      - 跳过: 2
-   🎯 综合评分: 82.5 / 100
-   ⏱️  耗时: 256.3 秒 (4.3 分钟)
-   📋 日志: C:\...\evaluation\my-os\evaluation.log
-   ⚠️  错误数: 2 (详见错误报告)
-============================================================
-```
-
----
-
 ## 📜 核心演进史 (Key Version History)
 
 > 从最早期的基础描述模块，本作在各个子版本的演进中不断填补了 LLM 的认知短板，并建立起牢不可破的沙盒机制。
@@ -530,7 +388,7 @@ evaluation/
 - 纯 LLM 语义化历史推演，全面弃用传统统计 Python 图表。
 - 严格限定大模型的工具生命周期（Stage-Based Tool Provisioning），彻底切断环境外溢与污染，在特定领域精准限制探索边界。
 
-#### 🆕 **v2.7/v2.6 评估全链路监控防断连优化**（2026-03-01）
+#### 🆕 **v2.7/v2.6 全链路监控防断连优化**（2026-03-01）
 - 新增 **`ErrorTracker`** 与指数退避阻断：网络/API/超时自动断点重试。
 - 本地克隆增强（防 Windows NTFS 截断），并在 Conda 环境下深度解决底层 Rust 与 Clang 语言服务器安装检测与修复。
 
@@ -548,7 +406,6 @@ evaluation/
 ```
 OS-Agent/
 ├── os_agent_d_describe.py          # Agent D：OS 源码深度描述（10 个 LLM 阶段 + 仓库准备/RAG 预索引）
-├── os_agent_d_evaluate.py          # Agent D：报告自动评估
 ├── os_agent_c_coarse.py            # Agent C：粗筛（pre-plan + 向量相似度检索）
 ├── os_agent_c_fine.py              # Agent C：精比（阶段级 Plan→Execute）
 ├── check_env.py                    # 环境检查脚本（含依赖预检与 LSP 自动安装）
@@ -577,7 +434,6 @@ OS-Agent/
 │   ├── git_ops.py                  # Git 操作（历史分析、作者贡献、Diff 透视）
 │   ├── compare_ops.py              # 项目比对工具（Agent C 精比辅助，含 Token/CG Jaccard）
 │   ├── describe_ops.py             # 描述模块专用工具
-│   ├── eval_ops.py                 # 评估专用工具（人类文档搜索、声明验证）
 │   └── web_search.py               # v4.0：受限外部背景搜索（默认关闭）
 ├── repos/                          # 克隆的 OS 仓库（运行时自动克隆，.gitignore 忽略）
 ├── output/                         # 描述模块输出（按项目名划分）
@@ -586,13 +442,6 @@ OS-Agent/
 │       ├── _per_stage/             # v4.0：侧车（repo_profile、各阶段 *_plan.json）
 │       ├── OS技术分析报告_<os-name>.md
 │       └── describe_error_report.json  # 错误报告（如有）
-└── evaluation/                     # 评估模块输出（按项目名划分）
-    └── <os-name>/
-        ├── evaluation.log          # 详细日志
-        ├── error_report.json       # 错误报告
-        ├── summary.json            # 汇总评分
-        ├── evaluation_report.md    # Markdown 评估报告
-        └── sections/               # 各章节评估 JSON
 ```
 
 
@@ -639,9 +488,8 @@ OS-Agent/
 
 | 工具 | 限制 | 说明 |
 |------|------|------|
-| `read_code_segment` | 最大 100,000 字符 | 只能访问 `repos/`、`output/`、`evaluation/` 目录 |
+| `read_code_segment` | 最大 100,000 字符 | 只能访问 `repos/`、`output/` 目录 |
 | `grep_in_repo` | 最多 20 条匹配 | 在源码中搜索关键词/正则，验证技术声明 |
-| `read_file` (评估) | 最大 50,000 字符 | 只能访问仓库和 output 目录 |
 | `list_repo_structure` | 默认 4 层深度 | 可通过 `max_depth` 调整 |
 | `lsp_get_definition` / `lsp_get_references` | 本地化跨文件追踪 | 不受文件切片截断影响，提供 AST 真实函数映射与依赖拓扑 |
 | `lsp_get_document_outline` | 文件大纲提取 | 快速获取文件中所有函数/结构体/枚举的名称与行号 |
@@ -659,7 +507,7 @@ OS-Agent/
 - **项目级 RAG 索引锁**：保护 `output/<proj>/_vector_db/chunks.json` 与 `vectors.npy` 的构建和落盘，避免同项目被重复建索引或写坏索引文件。
 - **仓库级 clone 锁**：只串行同一个 `repos/<name>` 目录的克隆，其他仓库仍可并行。
 - **目标路径写锁**：`write_file()` 与 `convert_md_to_pdf()` 仅在写入同一路径时串行，避免覆盖。
-- **只读工具不受影响**：源码读取、grep/RAG 查询、评估文档读取、受限 `web_search` 等不因上述保护被整体串行化。
+- **只读工具不受影响**：源码读取、grep/RAG 查询、受限 `web_search` 等不因上述保护被整体串行化。
 
 **截断提示**：所有工具在输出被截断时会明确告知 LLM，例如：
 ```
@@ -705,43 +553,6 @@ OS-Agent/
 - 替代源码证据
 
 如果不配置 `ENABLE_WEB_SEARCH=true` 和 provider 密钥，系统会自动保持关闭。
-
-### Q: 如何评估已有的报告？
-
-使用 `os_agent_d_evaluate.py` 直接评估：
-
-```bash
-# 使用 .env 中的 REPO_URL
-python os_agent_d_evaluate.py
-
-# 或指定仓库 URL
-python os_agent_d_evaluate.py --repo-url https://gitlab.educg.net/xxx/os-project.git
-```
-
-### Q: 评估失败怎么办？
-
-**v2.0 增强版**提供了完整的错误追溯：
-
-1. **查看日志**：`evaluation/<repo_name>/evaluation.log`
-   - 包含详细的错误信息和堆栈跟踪
-
-2. **查看错误报告**：`evaluation/<repo_name>/error_report.json`
-   - 错误分类统计
-   - 每个错误的完整上下文
-
-3. **常见问题**：
-   - **网络错误**：检查网络连接，程序会自动重试 3 次
-   - **API 错误**：检查 API 密钥和配额，增加退避时间
-   - **超时错误**：在 `.env` 中增加 `EVAL_REQUEST_TIMEOUT=600`
-   - **解析错误**：程序会自动追问 Agent 重新生成 JSON
-
-4. **配置重试**：
-   ```bash
-   # 在 .env 中配置（未来版本支持）
-   EVAL_MAX_RETRIES=5
-   EVAL_INITIAL_BACKOFF=3
-   EVAL_MAX_BACKOFF=120
-   ```
 
 ### Q: 如何获取更详细的调试信息？
 
