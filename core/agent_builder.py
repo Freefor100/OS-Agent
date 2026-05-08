@@ -259,11 +259,14 @@ def build_chat_model(
     _mot = (os.environ.get("DESCRIBE_MAX_OUTPUT_TOKENS") or "").strip()
     if _mot.isdigit():
         merged_kwargs["max_tokens"] = int(_mot)
-    # langchain-openai 对部分参数（如 extra_body）要求显式传递，否则会给出 UserWarning
+    # langchain-openai 对部分参数（如 extra_body、max_tokens）要求显式传递，否则会给出 UserWarning
     extra_body = None
     if isinstance(merged_kwargs, dict) and "extra_body" in merged_kwargs:
         extra_body = merged_kwargs.pop("extra_body")
-    return ChatOpenAI(
+    max_tokens = None
+    if isinstance(merged_kwargs, dict) and "max_tokens" in merged_kwargs:
+        max_tokens = merged_kwargs.pop("max_tokens")
+    llm_kwargs: dict = dict(
         model=model_name,
         temperature=temperature,
         request_timeout=request_timeout,
@@ -271,6 +274,9 @@ def build_chat_model(
         extra_body=extra_body,
         model_kwargs=merged_kwargs,
     )
+    if max_tokens is not None:
+        llm_kwargs["max_tokens"] = max_tokens
+    return ChatOpenAI(**llm_kwargs)
 
 
 def get_describe_tools(stage_id: str = ""):

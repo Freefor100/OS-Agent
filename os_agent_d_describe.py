@@ -980,6 +980,10 @@ def main():
     print("=" * 80)
     if os.path.exists(repo_local_path) and os.path.isdir(repo_local_path) and os.listdir(repo_local_path):
         print(f"⏭️  仓库已存在，跳过克隆。 路径: {repo_local_path}")
+        from tools.git_ops import restore_git_tracked_worktree_if_needed
+
+        _restore_msg = restore_git_tracked_worktree_if_needed(repo_local_path)
+        print(f"   🔍 本地仓库完整性：{_restore_msg}")
     else:
         print(f"🚀 正在克隆仓库: {repo_url} ...")
         from tools.git_ops import clone_repository

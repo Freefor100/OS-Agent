@@ -1,4 +1,5 @@
 import os
+import subprocess
 from collections import defaultdict
 from typing import Optional
 import threading
@@ -26,6 +27,66 @@ def _get_clone_lock(local_path: str):
         if key not in _clone_repo_locks:
             _clone_repo_locks[key] = threading.RLock()
         return _clone_repo_locks[key]
+
+
+def restore_git_tracked_worktree_if_needed(repo_path: str, *, timeout_sec: int = 600) -> str:
+    """
+    跳过克隆后校验本地是否为 Git 仓库且**跟踪文件**是否完整。
+
+    使用 `git status --porcelain`（忽略未跟踪文件）：若有删改则认为不完整，依次执行
+    `git restore --staged .` 与 `git restore .`，使跟踪内容与 HEAD 一致。不删除未跟踪文件。
+    """
+    abs_path = os.path.abspath(repo_path)
+    git_dir = os.path.join(abs_path, ".git")
+    if not os.path.isdir(abs_path) or not (os.path.isdir(git_dir) or os.path.isfile(git_dir)):
+        return "非 Git 仓库或缺少 .git，跳过跟踪文件完整性检查"
+
+    try:
+        st = subprocess.run(
+            ["git", "-C", abs_path, "status", "--porcelain=v1", "--untracked-files=no"],
+            capture_output=True,
+            text=True,
+            timeout=min(timeout_sec, 180),
+            check=False,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired) as e:
+        return f"git status 失败（{e!s}），跳过自动恢复"
+
+    if st.returncode != 0:
+        tail = (st.stderr or st.stdout or "").strip()
+        return f"git status 退出码 {st.returncode}，跳过自动恢复" + (f": {tail[:300]}" if tail else "")
+
+    dirty = (st.stdout or "").strip()
+    if not dirty:
+        return "跟踪文件相对 HEAD 无删改，无需恢复"
+
+    nlines = len(dirty.splitlines())
+    try:
+        r1 = subprocess.run(
+            ["git", "-C", abs_path, "restore", "--staged", "."],
+            capture_output=True,
+            text=True,
+            timeout=timeout_sec,
+            check=False,
+        )
+        r2 = subprocess.run(
+            ["git", "-C", abs_path, "restore", "."],
+            capture_output=True,
+            text=True,
+            timeout=timeout_sec,
+            check=False,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired) as e:
+        return f"git restore 失败（{e!s}）"
+
+    if r1.returncode != 0 or r2.returncode != 0:
+        err = ((r1.stderr or r1.stdout or "") + (r2.stderr or r2.stdout or "")).strip()
+        return (
+            f"git restore 未完全成功（--staged 退出 {r1.returncode}，工作区退出 {r2.returncode}）"
+            + (f": {err[:400]}" if err else "")
+        )
+
+    return f"检测到跟踪文件不完整（{nlines} 处变更），已执行 git restore --staged . 与 git restore . 恢复"
 
 
 def _module_from_path(path: str) -> Optional[str]:
