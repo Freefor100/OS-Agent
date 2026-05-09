@@ -247,7 +247,15 @@ class CodeRAGEngine:
             if self.model:
                 logger.info("正在生成代码向量...")
                 texts = [f"Name: {c.name}\nPath: {c.file_path}\nType: {c.node_type}\nCode:\n{c.code[:2000]}" for c in self.chunks]
-                self.vectors = self.model.encode(texts, normalize_embeddings=True)
+                # 长文本 + 默认大批量 encode 易在消费级显卡上 OOM；可通过环境变量收紧 batch
+                bs = int(os.environ.get("CODE_EMBEDDING_ENCODE_BATCH", "8"))
+                bs = max(1, bs)
+                self.vectors = self.model.encode(
+                    texts,
+                    normalize_embeddings=True,
+                    batch_size=bs,
+                    show_progress_bar=False,
+                )
                 self.vectors = np.array(self.vectors, dtype=np.float32)
                 self.save()
                 logger.info("代码向量生成完毕并保存。")
@@ -274,7 +282,13 @@ class CodeRAGEngine:
             
         if self.vectors is not None:
             self._load_model()
-            q_vec = self.model.encode([query], normalize_embeddings=True)[0]
+            # 部分开源 embedding（如 Qwen3-Embedding）建议 query 侧使用 prompts["query"]；
+            # 文档/代码块侧仍使用默认 encode。通过环境变量开启，不写死模型名。
+            q_prompt = os.environ.get("CODE_EMBEDDING_QUERY_PROMPT_NAME", "").strip()
+            q_kw: Dict[str, Any] = {"normalize_embeddings": True}
+            if q_prompt:
+                q_kw["prompt_name"] = q_prompt
+            q_vec = self.model.encode([query], **q_kw)[0]
             scores = np.dot(self.vectors, q_vec)
             top_indices = np.argsort(scores)[-top_k:][::-1]
             
