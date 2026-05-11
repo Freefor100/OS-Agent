@@ -699,6 +699,421 @@ def _save_json(path: str, payload: dict):
         print(f"  ⚠️  无法写入 JSON 文件 {path}: {e}")
 
 
+def _json_safe(value):
+    try:
+        json.dumps(value, ensure_ascii=False)
+        return value
+    except TypeError:
+        if isinstance(value, dict):
+            return {str(k): _json_safe(v) for k, v in value.items()}
+        if isinstance(value, (list, tuple)):
+            return [_json_safe(v) for v in value]
+        return str(value)
+
+
+def _ai_message_meta_payload(msg, *, stage_id: str, phase: str, content_length: int) -> dict:
+    metadata = getattr(msg, "response_metadata", {}) or {} if msg is not None else {}
+    usage_metadata = getattr(msg, "usage_metadata", None) if msg is not None else None
+    token_usage = metadata.get("token_usage") if isinstance(metadata, dict) else None
+    finish_reason = metadata.get("finish_reason") if isinstance(metadata, dict) else None
+    return {
+        "stage_id": stage_id,
+        "model": os.getenv("MODEL_NAME", ""),
+        "phase": phase,
+        "content_length": content_length,
+        "finish_reason": finish_reason,
+        "token_usage": _json_safe(token_usage or {}),
+        "response_metadata": _json_safe(metadata),
+        "usage_metadata": _json_safe(usage_metadata),
+    }
+
+
+def _print_ai_response_metadata(msg, *, prefix: str) -> None:
+    metadata = getattr(msg, "response_metadata", {}) or {} if msg is not None else {}
+    usage = metadata.get("token_usage", {}) if isinstance(metadata, dict) else {}
+    finish_reason = metadata.get("finish_reason") if isinstance(metadata, dict) else None
+    completion = usage.get("completion_tokens", 0) if isinstance(usage, dict) else 0
+    total = usage.get("total_tokens", 0) if isinstance(usage, dict) else 0
+    if finish_reason or completion or total:
+        print(
+            f"   {prefix} metadata: finish_reason={finish_reason!r}, "
+            f"completion_tokens={completion}, total_tokens={total}"
+        )
+
+
+def _append_repair_attempt_meta(meta_path: str, attempt_payload: dict) -> None:
+    meta = {}
+    try:
+        if os.path.isfile(meta_path):
+            with open(meta_path, "r", encoding="utf-8") as f:
+                meta = json.load(f)
+    except Exception:
+        meta = {}
+    if not isinstance(meta, dict):
+        meta = {}
+    attempts = meta.get("repair_attempts")
+    if not isinstance(attempts, list):
+        attempts = []
+    attempts.append(attempt_payload)
+    meta["repair_attempts"] = attempts
+    _save_json(meta_path, meta)
+
+
+def _validation_issues_json(issues: list) -> list[dict]:
+    return [{"path": x.path, "reason": x.reason} for x in issues or []]
+
+
+def _extract_ai_usage(msg) -> dict:
+    metadata = getattr(msg, "response_metadata", {}) or {} if msg is not None else {}
+    usage = metadata.get("token_usage", {}) if isinstance(metadata, dict) else {}
+    return {
+        "finish_reason": metadata.get("finish_reason") if isinstance(metadata, dict) else None,
+        "completion_tokens": usage.get("completion_tokens", 0) if isinstance(usage, dict) else 0,
+        "content_length": len((getattr(msg, "content", "") or "")) if msg is not None else 0,
+    }
+
+
+def _question_id_stats_from_payload(payload: dict | None, expected_question_ids: list[str]) -> dict:
+    answers = payload.get("answers") if isinstance(payload, dict) else None
+    seen: list[str] = []
+    duplicates: list[str] = []
+    if isinstance(answers, list):
+        for a in answers:
+            if not isinstance(a, dict):
+                continue
+            qid = str(a.get("question_id", "")).strip()
+            if not qid:
+                continue
+            if qid in seen and qid not in duplicates:
+                duplicates.append(qid)
+            seen.append(qid)
+    expected = list(expected_question_ids or [])
+    return {
+        "seen": seen,
+        "missing": [qid for qid in expected if qid not in seen],
+        "extra": [qid for qid in seen if qid not in expected],
+        "duplicate": duplicates,
+    }
+
+
+def _last_detected_question_id(raw_text: str, expected_question_ids: list[str]) -> str | None:
+    ids = re.findall(r'"question_id"\s*:\s*"([^"]+)"', raw_text or "")
+    if not ids:
+        return None
+    expected = list(expected_question_ids or [])
+    for qid in reversed(ids):
+        if qid in expected:
+            return qid
+    return ids[-1]
+
+
+def _raw_looks_truncated(raw_text: str, expected_question_ids: list[str]) -> bool:
+    s = (raw_text or "").strip()
+    if not s:
+        return False
+    if s.startswith("```"):
+        s = re.sub(r"^```(?:json)?\s*", "", s, flags=re.IGNORECASE).strip()
+        s = re.sub(r"\s*```$", "", s).strip()
+
+    start = s.find("{")
+    if start >= 0:
+        in_string = False
+        escaped = False
+        depth_obj = 0
+        depth_arr = 0
+        for ch in s[start:]:
+            if in_string:
+                if escaped:
+                    escaped = False
+                elif ch == "\\":
+                    escaped = True
+                elif ch == '"':
+                    in_string = False
+                continue
+            if ch == '"':
+                in_string = True
+            elif ch == "{":
+                depth_obj += 1
+            elif ch == "}":
+                depth_obj -= 1
+            elif ch == "[":
+                depth_arr += 1
+            elif ch == "]":
+                depth_arr -= 1
+            if depth_obj < 0 or depth_arr < 0:
+                break
+        if in_string or depth_obj > 0 or depth_arr > 0:
+            return True
+        if depth_obj == 0 and depth_arr == 0:
+            return False
+
+    if s.endswith("]}") or s.endswith("}"):
+        return False
+    last_qid = _last_detected_question_id(s, expected_question_ids)
+    expected_last = expected_question_ids[-1] if expected_question_ids else None
+    if last_qid and expected_last and last_qid != expected_last:
+        return True
+    return "{" in s and not re.search(r"}\s*$", s)
+
+
+def _json_excerpt_around_error(raw_text: str, exc: Exception | None, radius: int = 1500) -> str:
+    text = raw_text or ""
+    cause = getattr(exc, "__cause__", None)
+    pos = getattr(cause, "pos", None)
+    if not isinstance(pos, int):
+        pos = len(text) // 2
+    start = max(0, pos - radius)
+    end = min(len(text), pos + radius)
+    return text[start:end]
+
+
+def _trim_text_head_tail(text: str, limit: int = 12000) -> str:
+    s = text or ""
+    if len(s) <= limit:
+        return s
+    half = max(1000, limit // 2)
+    return s[:half] + "\n\n...[中间省略]...\n\n" + s[-half:]
+
+
+def _stage_qa_entries(stage_qa: dict, qids: list[str]) -> list[dict]:
+    want = set(qids or [])
+    out = []
+    for q in stage_qa.get("questions", []) if isinstance(stage_qa, dict) else []:
+        if isinstance(q, dict) and str(q.get("question_id", "")).strip() in want:
+            out.append(q)
+    return out
+
+
+def _choice_value_issues(payload: dict, stage_qa: dict) -> list[dict]:
+    questions = stage_qa.get("questions", []) if isinstance(stage_qa, dict) else []
+    qmap = {
+        str(q.get("question_id", "")).strip(): q
+        for q in questions
+        if isinstance(q, dict) and str(q.get("question_id", "")).strip()
+    }
+    issues: list[dict] = []
+    answers = payload.get("answers") if isinstance(payload, dict) else None
+    if not isinstance(answers, list):
+        return issues
+    for idx, a in enumerate(answers):
+        if not isinstance(a, dict):
+            continue
+        qid = str(a.get("question_id", "")).strip()
+        q = qmap.get(qid)
+        if not q:
+            continue
+        qtype = str(q.get("question_type", "")).strip()
+        choices_raw = q.get("choices")
+        choices = [str(x).strip() for x in choices_raw] if isinstance(choices_raw, list) else []
+        if qtype == "single_choice" and choices and a.get("value") not in choices:
+            issues.append({"path": f"answers[{idx}].value", "question_id": qid, "reason": "single_choice value must exactly match one choices[] item"})
+        elif qtype == "multi_choice" and choices:
+            val = a.get("value")
+            if not isinstance(val, list) or any(x not in choices for x in val):
+                issues.append({"path": f"answers[{idx}].value", "question_id": qid, "reason": "multi_choice value must be an array of exact choices[] items"})
+    return issues
+
+
+def _repair_common_rules() -> str:
+    return (
+        "\n\n硬性输出要求：\n"
+        "1. 最终回复只能包含一个 JSON 对象，可用 ```json 围栏，但围栏外不得有文字。\n"
+        "2. JSON 必须能被 Python json.loads 直接解析。\n"
+        "3. 字符串内部真实换行必须写成 \\\\n。\n"
+        "4. 字符串内部双引号必须写成 \\\\\\\"。\n"
+        "5. answers 必须按题库顺序输出。\n"
+        "6. 不得编造文件路径或符号名。\n"
+    )
+
+
+def _classify_repair_strategy(
+    *,
+    stage_text: str,
+    stage_id: str,
+    stage_title: str,
+    expected_question_ids: list[str],
+    stage_qa: dict,
+    qa_prompt: str,
+    source_ai_message,
+    parse_error: Exception | None,
+    parsed_payload: dict | None,
+    validate_issues: list,
+    choice_issues: list[dict],
+) -> dict:
+    usage = _extract_ai_usage(source_ai_message)
+    stats = _question_id_stats_from_payload(parsed_payload, expected_question_ids)
+    last_qid = _last_detected_question_id(stage_text, expected_question_ids)
+    expected_last = expected_question_ids[-1] if expected_question_ids else None
+    finish_reason = usage.get("finish_reason")
+
+    if finish_reason == "length" or _raw_looks_truncated(stage_text, expected_question_ids):
+        error_class = "llm_truncated"
+    elif parse_error is not None:
+        msg = str(parse_error)
+        if msg in {"empty_response", "no_json_object_found"} or "empty_response" in msg or "no_json_object_found" in msg:
+            error_class = "extract_failed"
+        else:
+            error_class = "syntax_unrepairable"
+    elif stats["missing"] or stats["extra"] or stats["duplicate"]:
+        error_class = "semantic_incomplete"
+    elif choice_issues:
+        error_class = "choice_value_invalid"
+    else:
+        error_class = "schema_invalid"
+
+    strategy = {
+        "error_class": error_class,
+        "prompt_variant": error_class,
+        "finish_reason": finish_reason,
+        "completion_tokens": usage.get("completion_tokens", 0),
+        "content_length": len(stage_text or ""),
+        "parse_error": str(parse_error) if parse_error else None,
+        "validate_issues": _validation_issues_json(validate_issues),
+        "choice_issues": choice_issues,
+        "missing": stats["missing"],
+        "extra": stats["extra"],
+        "duplicate": stats["duplicate"],
+        "last_detected_question_id": last_qid,
+        "expected_last_question_id": expected_last,
+    }
+
+    expected_ids_json = json.dumps(expected_question_ids, ensure_ascii=False)
+    validate_issues_json = json.dumps(_validation_issues_json(validate_issues), ensure_ascii=False, indent=2)
+    payload_json = json.dumps(parsed_payload or {}, ensure_ascii=False, separators=(",", ":"))
+    payload_pretty = json.dumps(parsed_payload or {}, ensure_ascii=False, indent=2)
+    rules = _repair_common_rules()
+
+    if error_class == "llm_truncated":
+        prompt = (
+            "上一次最终 JSON 输出被截断，不能做局部补丁。\n"
+            "截断诊断：\n"
+            f"- stage_id: {stage_id}\n"
+            f"- stage_title: {stage_title}\n"
+            f"- finish_reason: {finish_reason}\n"
+            f"- completion_tokens: {usage.get('completion_tokens', 0)}\n"
+            f"- content_length: {len(stage_text or '')}\n"
+            f"- last_detected_question_id: {last_qid}\n"
+            f"- expected_last_question_id: {expected_last}\n\n"
+            f"expected_question_ids:\n{expected_ids_json}\n\n"
+            "请基于上文工具证据重新生成一个完整 JSON 对象。\n"
+            "不要复用截断尾部，不要输出 diff，不要解释。\n"
+            "必须覆盖全部 question_id，顺序与题库一致。\n\n"
+            "这是题库与输出契约：\n\n"
+            f"{qa_prompt}\n\n"
+            "上次 raw 尾部片段（仅用于诊断，不要续写它）：\n\n"
+            "```text\n"
+            f"{(stage_text or '')[-4000:]}\n"
+            "```"
+            + rules
+        )
+    elif error_class == "syntax_unrepairable":
+        prompt = (
+            "上一次输出没有被截断，但 JSON 语法非法。\n"
+            f"错误：\n{str(parse_error)}\n\n"
+            "错误附近片段：\n```text\n"
+            f"{_json_excerpt_around_error(stage_text, parse_error)}\n"
+            "```\n\n"
+            "请只修复 JSON 语法，使其能被 json.loads 解析。\n"
+            "不要改变答案含义，不要删除 question_id，不要新增解释。\n\n"
+            "这是题库与输出契约：\n\n"
+            f"{qa_prompt}\n\n"
+            "上一次原始输出：\n```text\n"
+            f"{_trim_text_head_tail(stage_text, 18000)}\n"
+            "```"
+            + rules
+        )
+    elif error_class == "schema_invalid":
+        bad_qids = []
+        for it in _validation_issues_json(validate_issues):
+            m = re.search(r"answers\[(\d+)\]", it.get("path", ""))
+            if m and isinstance(parsed_payload, dict):
+                answers = parsed_payload.get("answers")
+                idx = int(m.group(1))
+                if isinstance(answers, list) and 0 <= idx < len(answers) and isinstance(answers[idx], dict):
+                    qid = str(answers[idx].get("question_id", "")).strip()
+                    if qid and qid not in bad_qids:
+                        bad_qids.append(qid)
+        prompt = (
+            "上一次 JSON 已能解析，但不符合 schema。\n"
+            "校验问题如下：\n"
+            f"{validate_issues_json}\n\n"
+            "请在不改变已有有效答案和证据的前提下，只修正这些结构问题。\n"
+            "必须保持 schema_version/stage_id/stage_title 正确。\n\n"
+            "相关题库条目：\n"
+            f"{json.dumps(_stage_qa_entries(stage_qa, bad_qids), ensure_ascii=False, indent=2)}\n\n"
+            "这是题库与输出契约：\n\n"
+            f"{qa_prompt}\n\n"
+            "已解析 JSON（紧凑）：\n```json\n"
+            f"{payload_json}\n"
+            "```"
+            + rules
+        )
+    elif error_class == "semantic_incomplete":
+        missing = stats["missing"]
+        context_qids = missing if 0 < len(missing) <= 6 else expected_question_ids
+        prompt = (
+            "上一次 JSON 题号集合不正确。\n"
+            f"expected_question_ids:\n{expected_ids_json}\n\n"
+            f"missing:\n{json.dumps(stats['missing'], ensure_ascii=False)}\n\n"
+            f"unexpected:\n{json.dumps(stats['extra'], ensure_ascii=False)}\n\n"
+            f"duplicate:\n{json.dumps(stats['duplicate'], ensure_ascii=False)}\n\n"
+            "请输出完整修正后的 JSON：\n"
+            "- answers 必须不多不少覆盖 expected_question_ids\n"
+            "- 顺序必须与 expected_question_ids 一致\n"
+            "- 删除 unexpected\n"
+            "- 合并或重写 duplicate\n"
+            "- 缺失题必须基于上文证据补齐，证据不足时按题型输出 not_found/未发现类选项\n\n"
+            "相关题库条目：\n"
+            f"{json.dumps(_stage_qa_entries(stage_qa, context_qids), ensure_ascii=False, indent=2)}\n\n"
+            "这是题库与输出契约：\n\n"
+            f"{qa_prompt}\n\n"
+            "当前已解析 JSON：\n```json\n"
+            f"{_trim_text_head_tail(payload_pretty, 20000)}\n"
+            "```"
+            + rules
+        )
+    elif error_class == "choice_value_invalid":
+        qids = [x.get("question_id") for x in choice_issues if x.get("question_id")]
+        relevant_answers = []
+        if isinstance(parsed_payload, dict) and isinstance(parsed_payload.get("answers"), list):
+            for a in parsed_payload["answers"]:
+                if isinstance(a, dict) and str(a.get("question_id", "")).strip() in qids:
+                    relevant_answers.append(a)
+        prompt = (
+            "以下选择题 value 不符合题库 choices 原文匹配要求。\n"
+            "请只修正这些题的 value，其他字段尽量保持不变。\n\n"
+            "问题与 choices：\n"
+            f"{json.dumps(_stage_qa_entries(stage_qa, qids), ensure_ascii=False, indent=2)}\n\n"
+            "当前相关 answer：\n"
+            f"{json.dumps(relevant_answers, ensure_ascii=False, indent=2)}\n\n"
+            "validate issues:\n"
+            f"{json.dumps(choice_issues, ensure_ascii=False, indent=2)}\n\n"
+            "规则：\n"
+            "- single_choice 的 value 必须等于 choices[] 中某一项完整原文\n"
+            "- multi_choice 的 value 必须是数组，元素必须来自 choices[] 完整原文\n"
+            "- 禁止 A/B/C/D、A. 前缀、同义改写\n\n"
+            "最终输出完整 JSON 对象。\n\n"
+            "完整当前 JSON：\n```json\n"
+            f"{_trim_text_head_tail(payload_pretty, 20000)}\n"
+            "```"
+            + rules
+        )
+    else:
+        prompt = (
+            "上一次没有输出可解析的 JSON 对象，而是输出了非契约内容。\n"
+            "请忽略上一次输出格式，基于上文工具证据重新生成本阶段 JSON-QA 答案。\n"
+            "最终只能输出唯一 JSON 对象，不要 Markdown 报告，不要解释。\n\n"
+            "这是题库与输出契约：\n\n"
+            f"{qa_prompt}\n\n"
+            "原始 raw 的前后片段：\n```text\n"
+            f"{_trim_text_head_tail(stage_text, 8000)}\n"
+            "```"
+            + rules
+        )
+    strategy["prompt"] = prompt
+    return strategy
+
+
 def _invoke_describe_stage_review(
     repo_output_dir: str,
     stage_id: str,
@@ -1347,6 +1762,8 @@ def main():
         stage_text = ""
         is_complete = False
         all_ai_content = []  # 收集所有 AI 回复内容
+        all_ai_messages = []
+        selected_final_ai_message = None
         execution_messages = []
         
         if final_state and final_state.get("messages"):
@@ -1359,6 +1776,7 @@ def main():
                         content = (m.content or "").strip()
                         if content and len(content) > 20:
                             all_ai_content.append(content)
+                            all_ai_messages.append(m)
                 
                 # 优先查找：最后一条包含实际内容且没有工具调用的 AIMessage
                 for m in reversed(messages):
@@ -1370,6 +1788,8 @@ def main():
                         if content and not tool_calls and len(content) > 200:
                             print(f"\n✅ 找到有效 AI 回复（无工具调用，长度: {len(content)} 字符）")
                             stage_text = content
+                            selected_final_ai_message = m
+                            _print_ai_response_metadata(m, prefix="最终回复")
                             is_complete = True
                             break
                 
@@ -1377,10 +1797,19 @@ def main():
                 if not is_complete and all_ai_content:
                     print(f"\n⚠️  未找到独立最终回复，合并 {len(all_ai_content)} 条 AI 回复内容")
                     # 取最长的那条
-                    stage_text = max(all_ai_content, key=len)
+                    if all_ai_messages:
+                        selected_final_ai_message = max(
+                            all_ai_messages,
+                            key=lambda mm: len((mm.content or "").strip()),
+                        )
+                        stage_text = (selected_final_ai_message.content or "").strip()
+                        _print_ai_response_metadata(selected_final_ai_message, prefix="最长候选回复")
+                    else:
+                        stage_text = max(all_ai_content, key=len)
                     # 如果最长的不够长，合并所有内容
                     if len(stage_text) < 500 and len(all_ai_content) > 1:
                         stage_text = "\n\n---\n\n".join(all_ai_content)
+                        selected_final_ai_message = None
                 
                 # 如果仍然没有内容，且该阶段需要生成报告，则发送追问消息
                 if (not stage_text or len(stage_text) < 100) and not skip_in_report:
@@ -1423,6 +1852,8 @@ def main():
                                             if content and not tool_calls and len(content) > 100:
                                                 print(f"\n✅ 追问后获得有效回复（长度: {len(content)} 字符）")
                                                 stage_text = content
+                                                selected_final_ai_message = m
+                                                _print_ai_response_metadata(m, prefix="追问回复")
                                                 is_complete = True
                                                 break
                                     if is_complete:
@@ -1451,29 +1882,41 @@ def main():
             os.makedirs(sidecar_dir, exist_ok=True)
             raw_path = os.path.join(sidecar_dir, f"{stage_id}_answers_raw.txt")
             json_path = os.path.join(sidecar_dir, f"{stage_id}_answers.json")
+            meta_path = os.path.join(sidecar_dir, f"{stage_id}_answers_llm_meta.json")
             try:
                 with open(raw_path, "w", encoding="utf-8") as f:
                     f.write(stage_text.strip() + "\n")
             except Exception:
                 pass
+            _save_json(
+                meta_path,
+                _ai_message_meta_payload(
+                    selected_final_ai_message,
+                    stage_id=stage_id,
+                    phase="final_no_tool_message",
+                    content_length=len(stage_text or ""),
+                ),
+            )
 
             try:
                 stage_qa = load_stage_qa(stage_id)
-                payload = parse_answers_json(stage_text)
-                payload = coerce_answers_payload_defaults(payload)
-                payload_before_stage_qa = copy.deepcopy(payload)
-                payload = coerce_answers_payload_by_stage_qa(payload, stage_qa=stage_qa)
+                payload_raw = parse_answers_json(stage_text)
+                payload_raw = coerce_answers_payload_defaults(payload_raw)
+                payload_before_stage_qa = copy.deepcopy(payload_raw)
+                payload = coerce_answers_payload_by_stage_qa(payload_raw, stage_qa=stage_qa)
                 issues = validate_answers_payload(
                     payload,
                     stage_id=stage_id,
                     stage_title=title,
                     expected_question_ids=expected_question_ids,
                 )
-                if issues:
+                choice_issues = _choice_value_issues(payload, stage_qa)
+                if issues or choice_issues:
                     _save_json(
                         os.path.join(sidecar_dir, f"{stage_id}_answers_validate_issues.json"),
-                        {"issues": [{"path": x.path, "reason": x.reason} for x in issues]},
+                        {"issues": _validation_issues_json(issues), "choice_issues": choice_issues},
                     )
+                    raise ValueError(f"answers validation failed: schema={len(issues)}, choice={len(choice_issues)}")
                 else:
                     _save_json(json_path, payload)
                     stage_text = render_answers_to_markdown(payload).strip()
@@ -1486,7 +1929,7 @@ def main():
                         skip_in_report,
                     )
             except Exception as e:
-                # JSON 解析/校验失败：将“输出 JSON 前的全部对话 + 原输出”重发给模型，要求仅返回合法 JSON 进行修复重生成。
+                # JSON 解析/校验失败：先本地分类，再发最小必要上下文给模型修复。
                 # 注意：这一步必须禁止工具调用，否则会变成“继续探索”而不是“修复 JSON”。
                 stage_qa = load_stage_qa(stage_id)
 
@@ -1506,31 +1949,91 @@ def main():
                     # 最多重试 3 次修复重生成
                     repair_llm = build_chat_model(temperature=0, max_retries=0)
                     last_repair_exc: Exception | None = None
+                    current_text = stage_text or ""
+                    current_ai_message = selected_final_ai_message
                     for attempt in range(1, 4):
+                        repaired_text = current_text
+                        attempt_meta = None
                         try:
+                            parsed_for_strategy = None
+                            parse_exc_for_strategy = None
+                            issues_for_strategy = []
+                            choice_issues_for_strategy: list[dict] = []
+                            try:
+                                parsed_raw = parse_answers_json(current_text)
+                                parsed_raw = coerce_answers_payload_defaults(parsed_raw)
+                                parsed_for_strategy = coerce_answers_payload_by_stage_qa(parsed_raw, stage_qa=stage_qa)
+                                issues_for_strategy = validate_answers_payload(
+                                    parsed_for_strategy,
+                                    stage_id=stage_id,
+                                    stage_title=title,
+                                    expected_question_ids=expected_question_ids,
+                                )
+                                choice_issues_for_strategy = _choice_value_issues(parsed_for_strategy, stage_qa)
+                            except Exception as e_parse:
+                                parse_exc_for_strategy = e_parse
+
+                            strategy = _classify_repair_strategy(
+                                stage_text=current_text,
+                                stage_id=stage_id,
+                                stage_title=title,
+                                expected_question_ids=expected_question_ids,
+                                stage_qa=stage_qa,
+                                qa_prompt=qa_prompt,
+                                source_ai_message=current_ai_message,
+                                parse_error=parse_exc_for_strategy,
+                                parsed_payload=parsed_for_strategy,
+                                validate_issues=issues_for_strategy,
+                                choice_issues=choice_issues_for_strategy,
+                            )
+                            strategy_meta = {k: v for k, v in strategy.items() if k != "prompt"}
+                            strategy_meta["attempt"] = attempt
+                            _append_repair_attempt_meta(
+                                meta_path,
+                                {
+                                    "stage_id": stage_id,
+                                    "phase": f"repair_strategy_{attempt}",
+                                    "repair_strategy": strategy_meta,
+                                },
+                            )
                             repair_instructions = (
-                                "上一次你生成的 JSON 无法被解析或无法通过校验。\n"
-                                f"错误：{repair_error}\n"
                                 f"修复重试次数：{attempt}/3\n\n"
-                                "请你基于上文所有对话与工具证据，重新输出**唯一一个 JSON 对象**（允许 ```json 围栏），不要输出任何额外解释。\n"
-                                "严格遵守题库的 question_id / question_type / stem。\n"
-                                "- single_choice 的 value 必须是 choices 中的完整选项文本（禁止 A/B/C/D）。\n"
-                                "- multi_choice 的 value 必须是数组，元素为 choices 中完整选项文本（禁止字母代号）。\n\n"
-                                "这是题库与输出契约（必须按此修复）：\n\n"
-                                + qa_prompt
-                                + "\n\n"
-                                "这是你上一次的原始输出（供你修复，可能包含多余文字/围栏/不完整 JSON）：\n\n"
-                                "```text\n"
-                                + (stage_text or "")
-                                + "\n```\n"
+                                + strategy["prompt"]
                             )
 
                             repaired = repair_llm.invoke(safe_msgs + [HumanMessage(content=repair_instructions)])
                             repaired_text = (getattr(repaired, "content", "") or "").strip()
+                            _print_ai_response_metadata(repaired, prefix=f"修复回复 {attempt}/3")
+                            attempt_meta = _ai_message_meta_payload(
+                                repaired,
+                                stage_id=stage_id,
+                                phase=f"repair_attempt_{attempt}",
+                                content_length=len(repaired_text or ""),
+                            )
+                            attempt_meta["repair_strategy"] = strategy_meta
+                            attempt_meta["raw_repaired_text"] = repaired_text
 
                             with open(raw_path, "a", encoding="utf-8") as f:
                                 f.write(f"\n\n---\n# repair_attempt {attempt}/3\n")
                                 f.write(repaired_text + "\n")
+
+                            repaired_usage = _extract_ai_usage(repaired)
+                            if strategy["error_class"] == "llm_truncated" and repaired_usage.get("finish_reason") == "length":
+                                attempt_meta["retry_result"] = {
+                                    "ok": False,
+                                    "error": "llm_truncated repair also returned finish_reason='length'",
+                                }
+                                _append_repair_attempt_meta(meta_path, attempt_meta)
+                                _save_json(
+                                    os.path.join(sidecar_dir, f"{stage_id}_answers_repair_error.json"),
+                                    {
+                                        "error": "llm_truncated repair also returned finish_reason='length'",
+                                        "hint": "请提高 DESCRIBE_MAX_OUTPUT_TOKENS 或拆分题单。",
+                                        "repair_strategy": strategy_meta,
+                                    },
+                                )
+                                last_repair_exc = None
+                                break
 
                             payload = parse_answers_json(repaired_text)
                             payload = coerce_answers_payload_defaults(payload)
@@ -1542,7 +2045,14 @@ def main():
                                 stage_title=title,
                                 expected_question_ids=expected_question_ids,
                             )
-                            if not issues:
+                            choice_issues = _choice_value_issues(payload, stage_qa)
+                            attempt_meta["retry_result"] = {
+                                "ok": not issues and not choice_issues,
+                                "validate_issues": _validation_issues_json(issues),
+                                "choice_issues": choice_issues,
+                            }
+                            _append_repair_attempt_meta(meta_path, attempt_meta)
+                            if not issues and not choice_issues:
                                 _save_json(json_path, payload)
                                 stage_text = render_answers_to_markdown(payload).strip()
                                 _invoke_describe_stage_review(
@@ -1557,10 +2067,29 @@ def main():
                                 break
                             _save_json(
                                 os.path.join(sidecar_dir, f"{stage_id}_answers_validate_issues.json"),
-                                {"issues": [{"path": x.path, "reason": x.reason} for x in issues]},
+                                {"issues": _validation_issues_json(issues), "choice_issues": choice_issues},
                             )
+                            current_text = repaired_text
+                            current_ai_message = repaired
                         except Exception as e_attempt:
                             last_repair_exc = e_attempt
+                            retry_result = {
+                                "ok": False,
+                                "error": f"{type(e_attempt).__name__}: {e_attempt}",
+                            }
+                            if isinstance(attempt_meta, dict):
+                                attempt_meta["retry_result"] = retry_result
+                                _append_repair_attempt_meta(meta_path, attempt_meta)
+                            else:
+                                _append_repair_attempt_meta(
+                                    meta_path,
+                                    {
+                                        "stage_id": stage_id,
+                                        "phase": f"repair_attempt_{attempt}",
+                                        "retry_result": retry_result,
+                                    },
+                                )
+                            current_text = repaired_text
 
                     if last_repair_exc is not None:
                         raise last_repair_exc

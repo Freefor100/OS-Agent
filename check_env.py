@@ -90,6 +90,15 @@ def _find_build_tool(tool_name):
                 return p
     return None
 
+
+def _find_any_build_tool(tool_names):
+    """Find the first available tool from an alias list without importing project deps."""
+    for name in tool_names:
+        path = _find_build_tool(name)
+        if path:
+            return path
+    return None
+
 def get_git_usr_bin():
     if platform.system() != "Windows":
         return None
@@ -236,30 +245,50 @@ def main():
         sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
         from tools.lsp_ops import _resolve_lsp_binary
         use_resolve = True
-    except ImportError:
+    except Exception:
         use_resolve = False
 
     # --- Cross Compilers ---
     print("\n🌍 Cross Compilers (多架构支持):")
-    linux_riscv = {"apt": "sudo apt install gcc-riscv64-linux-gnu", "pacman": "sudo pacman -S riscv64-linux-gnu-gcc",
-                   "dnf": "sudo dnf install gcc-riscv64-linux-gnu"}.get(pkg_mgr, "apt 系: sudo apt install gcc-riscv64-linux-gnu")
+    linux_riscv = {
+        "apt": "sudo apt install gcc-riscv64-linux-gnu（可用 fallback）或安装 riscv-none-elf-gcc",
+        "pacman": "sudo pacman -S riscv64-linux-gnu-gcc 或 riscv64-elf-gcc",
+        "dnf": "sudo dnf install gcc-riscv64-linux-gnu 或安装 riscv-none-elf-gcc",
+    }.get(pkg_mgr, "安装 riscv-none-elf-gcc；若发行版无包，可用 riscv64-linux-gnu-gcc fallback")
     linux_arm = {"apt": "sudo apt install gcc-arm-none-eabi", "pacman": "sudo pacman -S arm-none-eabi-gcc",
                  "dnf": "sudo dnf install arm-none-eabi-gcc"}.get(pkg_mgr, "apt 系: sudo apt install gcc-arm-none-eabi")
     cross_compilers = {
-        "riscv64-linux-musl-cc": {
-            "label": "RISC-V CC",
+        "riscv-none-elf-gcc": {
+            "label": "RISC-V Bare-metal CC",
+            "aliases": [
+                "riscv-none-elf-gcc",
+                "riscv64-unknown-elf-gcc",
+                "riscv64-linux-musl-cc",
+                "riscv64-linux-gnu-gcc",
+            ],
             "hint": {"Windows": "请前往 https://github.com/xpack-dev-tools/riscv-none-elf-gcc-xpack/releases",
                     "Linux": linux_riscv,
                     "Darwin": "brew install riscv-none-elf-gcc"}
         },
         "loongarch64-unknown-elf-gcc": {
-            "label": "LoongArch CC",
+            "label": "LoongArch Bare-metal CC",
+            "aliases": [
+                "loongarch64-unknown-elf-gcc",
+                "loongarch64-linux-gnu-gcc",
+                "loongarch64-unknown-linux-gnu-gcc",
+            ],
             "hint": {"Windows": "请从龙芯社区 https://github.com/loongson/build-tools 下载",
                     "Linux": "请从 https://github.com/loongson/build-tools 下载或使用发行版包",
                     "Darwin": "请从龙芯社区下载"}
         },
         "arm-none-eabi-gcc": {
             "label": "ARM CC",
+            "aliases": [
+                "arm-none-eabi-gcc",
+                "aarch64-linux-gnu-gcc",
+                "arm-linux-gnueabi-gcc",
+                "arm-linux-gnueabihf-gcc",
+            ],
             "hint": {"Windows": "winget install Arm.GnuArmEmbeddedToolchain",
                     "Linux": linux_arm,
                     "Darwin": "brew install arm-none-eabi-gcc"}
@@ -267,7 +296,11 @@ def main():
     }
     
     for base_name, info in cross_compilers.items():
-        found_path = _resolve_lsp_binary(base_name) if use_resolve else shutil.which(base_name)
+        found_path = (
+            _resolve_lsp_binary(base_name)
+            if use_resolve
+            else _find_any_build_tool(info.get("aliases", [base_name]))
+        )
         hint_val = info["hint"]
         hint_str = hint_val.get(sys_name, hint_val.get("Linux", str(hint_val))) if isinstance(hint_val, dict) else hint_val
         if found_path and found_path != base_name:

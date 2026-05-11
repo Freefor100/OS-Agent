@@ -255,17 +255,30 @@ def build_chat_model(
 ):
     model_name = model or get_model_name()
     merged_kwargs = _apply_deepseek_thinking_defaults(model_name, model_kwargs)
+    is_deepseek = _is_deepseek_backend(model_name)
     # 长 JSON-QA / 大章节：提高单次 completion 上限，避免 `_per_stage/*_answers_raw.txt` 在末尾被截断
     _mot = (os.environ.get("DESCRIBE_MAX_OUTPUT_TOKENS") or "").strip()
+    configured_max_tokens = None
     if _mot.isdigit():
-        merged_kwargs["max_tokens"] = int(_mot)
+        configured_max_tokens = int(_mot)
+    elif isinstance(merged_kwargs, dict) and "max_tokens" in merged_kwargs:
+        configured_max_tokens = merged_kwargs.get("max_tokens")
     # langchain-openai 对部分参数（如 extra_body、max_tokens）要求显式传递，否则会给出 UserWarning
     extra_body = None
     if isinstance(merged_kwargs, dict) and "extra_body" in merged_kwargs:
         extra_body = merged_kwargs.pop("extra_body")
     max_tokens = None
     if isinstance(merged_kwargs, dict) and "max_tokens" in merged_kwargs:
-        max_tokens = merged_kwargs.pop("max_tokens")
+        merged_kwargs.pop("max_tokens")
+    if configured_max_tokens is not None:
+        if is_deepseek:
+            # langchain-openai 1.x rewrites top-level max_tokens to max_completion_tokens,
+            # but DeepSeek Chat Completions expects max_tokens. Put it in extra_body so it
+            # is passed through unrenamed.
+            extra_body = dict(extra_body or {})
+            extra_body["max_tokens"] = int(configured_max_tokens)
+        else:
+            max_tokens = int(configured_max_tokens)
     llm_kwargs: dict = dict(
         model=model_name,
         temperature=temperature,
@@ -380,4 +393,3 @@ def build_sub_agent(model: str = None, stage_id: str = "", tool_names=None):
 def build_agent(model: str = None, stage_id: str = ""):
     """兼容旧接口，默认构建 describe 执行 Agent。"""
     return build_executor_agent(model=model, stage_id=stage_id)
-

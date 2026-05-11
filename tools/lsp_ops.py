@@ -366,8 +366,8 @@ class LSPClient:
             target_arch = detect_target_arch(self.cwd)
             # 定义架构到编译器的映射
             arch_to_cc = {
-                "riscv64": "riscv64-linux-musl-cc",
-                "riscv32": "riscv64-linux-musl-cc",
+                "riscv64": "riscv-none-elf-gcc",
+                "riscv32": "riscv-none-elf-gcc",
                 "aarch64": "arm-none-eabi-gcc",
                 "arm": "arm-none-eabi-gcc",
                 "loongarch64": "loongarch64-unknown-elf-gcc",
@@ -637,18 +637,18 @@ def _resolve_lsp_binary(base_name: str, cwd: Optional[str] = None) -> str:
     
     # 别名映射：允许一个工具对应多个可能的名称（比如在不同系统或分发版下）
     aliases = {
-        # Arch/Debian 常见为 riscv64-linux-gnu-gcc（pacman/apt），而非 musl-cc / bare-metal 名
+        # OS 比赛内核优先裸机工具链；Linux 发行版常只有 riscv64-linux-gnu-gcc，作为可用 fallback。
         "riscv64-linux-musl-cc": [
-            "riscv64-linux-musl-cc",
-            "riscv64-linux-gnu-gcc",
             "riscv-none-elf-gcc",
             "riscv64-unknown-elf-gcc",
+            "riscv64-linux-musl-cc",
+            "riscv64-linux-gnu-gcc",
         ],
         "riscv64-linux-musl-ld": [
-            "riscv64-linux-musl-ld",
-            "riscv64-linux-gnu-ld",
             "riscv-none-elf-ld",
             "riscv64-unknown-elf-ld",
+            "riscv64-linux-musl-ld",
+            "riscv64-linux-gnu-ld",
         ],
         "arm-none-eabi-gcc": [
             "arm-none-eabi-gcc",
@@ -665,7 +665,18 @@ def _resolve_lsp_binary(base_name: str, cwd: Optional[str] = None) -> str:
         ],
         "loongarch64-unknown-elf-gcc": ["loongarch64-unknown-elf-gcc", "loongarch64-linux-gnu-gcc", "loongarch64-unknown-linux-gnu-gcc"],
         # xpack RISC-V 工具链别名（Windows 安装的实际可执行文件名）
-        "riscv-none-elf-gcc": ["riscv-none-elf-gcc", "riscv64-unknown-elf-gcc", "riscv64-linux-musl-cc"],
+        "riscv-none-elf-gcc": [
+            "riscv-none-elf-gcc",
+            "riscv64-unknown-elf-gcc",
+            "riscv64-linux-musl-cc",
+            "riscv64-linux-gnu-gcc",
+        ],
+        "riscv-none-elf-ld": [
+            "riscv-none-elf-ld",
+            "riscv64-unknown-elf-ld",
+            "riscv64-linux-musl-ld",
+            "riscv64-linux-gnu-ld",
+        ],
     }
     
     search_names = aliases.get(base_name, [base_name])
@@ -2434,7 +2445,7 @@ def lsp_get_call_graph(repo_path: str, file_path: str, symbol: str,
 
 
 async def _async_lsp_set_target_arch(repo_path: str, target: str) -> str:
-    """内部异步实现：保存架构标记并强制重启 rust-analyzer。"""
+    """内部异步实现：保存架构标记并强制重启受 target 影响的 LSP。"""
     repo_path = _abspath(repo_path)
     marker = os.path.join(repo_path, ".os_agent_lsp_target")
 
@@ -2447,7 +2458,9 @@ async def _async_lsp_set_target_arch(repo_path: str, target: str) -> str:
             # 必须避免在这里先拿 _lsp_global_lock 再去调用 force_restart_client，
             # 否则会与 get_client 的锁顺序相反，形成潜在死锁。
             await _gateway.force_restart_client(repo_path, "rust")
-        return f"Successfully set LSP target to '{target}' and restarted rust-analyzer for {repo_path}."
+            await _gateway.force_restart_client(repo_path, "c")
+            await _gateway.force_restart_client(repo_path, "cpp")
+        return f"Successfully set LSP target to '{target}' and restarted LSP clients for {repo_path}."
     except Exception as e:
         return f"Error setting target arch: {e}"
 
@@ -2461,7 +2474,8 @@ def lsp_set_target_arch(repo_path: str, target: str) -> str:
     2. 你在源码中读到了明确的架构要求（如 target_arch = "..."），但 LSP 却返回了空结果或大量错误。
     3. 代码块由于 #[cfg] 显式被 LSP 灰化。
 
-    调用后，系统会保存设置并【强制重启】LSP 服务端，以确保所有语义分析能够基于正确的架构进行重算。
+    调用后，系统会保存设置并【强制重启】rust-analyzer / clangd 服务端，
+    以确保所有语义分析能够基于正确的架构进行重算。
 
     常见 Target Triples:
     - riscv64gc-unknown-none-elf (RISC-V 64)

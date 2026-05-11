@@ -213,12 +213,14 @@ python check_env.py
 `check_env.py` 特性：
 - **智能预检**：先运行 `pip --dry-run` 判断依赖是否已满足，已满足则跳过安装，秒速完成检查
 - **自动安装 LSP**：缺失 `clangd`、`gopls`、`rust-analyzer` 时自动安装
-- **多架构 Cross Compiler 检测**：自动扫描 RISC-V、ARM、LoongArch 交叉编译器
+- **多架构 Cross Compiler 检测**：自动扫描 RISC-V、ARM、LoongArch 交叉编译器，并识别常见别名/fallback（如 `riscv-none-elf-gcc`、`riscv64-unknown-elf-gcc`、`riscv64-linux-gnu-gcc`、`loongarch64-linux-gnu-gcc`、`aarch64-linux-gnu-gcc`）
 - **路径自动修复**：通过 `_resolve_lsp_binary` 探测 `~/go/bin/`、`~/.cargo/bin/`、WinGet 等非标准安装目录，无需手动配置 PATH
 
 ### 2. 安装 Language Servers（LSP 工具依赖）
 
 > LSP 工具（`lsp_get_definition`、`lsp_get_references`、`lsp_get_document_outline`）需要本地安装对应语言的 Language Server。未安装或超时时会**首选 Tree-sitter AST 解析**（C/C++/Rust/Go/Zig），再走语言感知正则、通用 Grep；仅在汇编或最终兜底场景才使用 ASM 正则。
+
+LSP 目标架构推断会优先读取仓库内显式标记 `.os_agent_lsp_target`，也会从 `rust-toolchain.toml`、`.cargo/config(.toml)`、`Cargo.toml`、`Makefile`、`CMakeLists.txt`、`build.zig`、`linker/*.ld(s)` 等构建配置中识别 target triple / 工具链前缀 / QEMU 与 linker `OUTPUT_ARCH` 线索。对 OS 内核场景，`riscv64-linux-gnu`、`loongarch64-linux-gnu`、`aarch64-linux-gnu` 这类 hosted 工具链会在非用户态上下文中映射为更适合 clangd 裸机解析的 target（如 `riscv64-unknown-elf`、`loongarch64-unknown-elf`、`aarch64-unknown-none-elf`）。手动调用 `lsp_set_target_arch(repo_path, target)` 后，会强制重启受 target 影响的 `rust-analyzer` 与 `clangd` 客户端，避免 Rust/C/C++ 混合仓库继续使用旧架构索引。
 
 ### 2.1 降级结果元数据
 
@@ -353,6 +355,9 @@ output/
 - **阶段级 Plan-Execute**：`os_agent_d_describe.py` 与 `os_agent_c_fine.py` 使用 `StageState` / `PlanSpec`；Describe 在 Plan 中锁定 **`execution_steps`**，Execute 提示词注入 **`STAGE_EXECUTION_CONTRACT`**（证据路径、文风与粒度等）。
 - **动态上下文**：`repo_profile`、`evidence_cache`、`external_background` 等经 `render_plan_context` 注入 Execute。
 - **证据账本 (`evidence_index`)**：可从工具轨迹抽取，供 Execute 与内存侧逻辑参考；**不**写入 `_per_stage`。
+- **JSON-QA Repair 分流**：Describe 的 02~09 题单 JSON 后处理不再用同一段“大而全”修复提示。主阶段会先本地分类失败类型，再向 LLM 发送最小必要上下文：`llm_truncated`（服务端截断/JSON 未闭合/最后题号未到 expected 末题）要求完整重生；`syntax_unrepairable` 只修 JSON 语法；`schema_invalid` 只修字段/类型；`semantic_incomplete` 修缺失、重复、多余题号；`choice_value_invalid` 修选择题 value 与 choices 原文匹配；`extract_failed` 则基于已有工具证据重新生成契约 JSON。每次 repair 会写入 `_per_stage/<stage_id>_answers_llm_meta.json` 的 `repair_attempts[]`，包含 `repair_strategy`、模型 metadata、raw repaired text 与重试 parse/validate 结果。若截断类 repair 再次返回 `finish_reason="length"`，阶段会直接落 `_per_stage/<stage_id>_answers_repair_error.json`，提示提高 `DESCRIBE_MAX_OUTPUT_TOKENS` 或拆分题单。
+- **LSP target 与工具链推断增强**：`tools/compile_context.py` 现在从 Cargo/Make/CMake/Zig/linker script/QEMU 线索推断 target triple，并区分裸机内核与 hosted userland；`tools/lsp_ops.py` 优先使用裸机 RISC-V 工具链（`riscv-none-elf-gcc` / `riscv64-unknown-elf-gcc`），同时保留发行版常见 `riscv64-linux-gnu-gcc` fallback。`lsp_set_target_arch` 写入 `.os_agent_lsp_target` 后会重启 Rust 与 C/C++ LSP 客户端，避免混合语言仓库的 clangd 继续沿用旧 target。
+- **模型输出上限兼容**：`DESCRIBE_MAX_OUTPUT_TOKENS` 继续用于降低长 JSON-QA 截断风险；对 DeepSeek 兼容接口，`max_tokens` 会通过 `extra_body` 透传，避免 langchain-openai 将其改写成 DeepSeek 不接受的参数名。
 - **粗筛链路保持轻量**：`os_agent_c_coarse.py` 没有硬套完整 PE，而是新增 `coarse_preplan` 与 `validate_coarse_output()`，继续保持“预侦察 + 指纹构建 + 向量检索”的确定性流水线。
 - **受限 `web_search`**：新增 `tools/web_search.py`，默认关闭，只允许用于“全国大学生操作系统比赛”背景、赛道定位、目标要求和技术概览；禁止作为源码实现证据或查重依据。
 - **细粒度并发保护而非降并发**：保留多 tool call / 多阶段并行能力，只对共享状态热点加最小粒度保护。当前已覆盖同仓库 LSP polyfill/目标架构切换、同项目 RAG 向量索引落盘、同仓库 clone，以及同目标文件写入/导出 PDF，避免把正常的只读检索也串行化。
@@ -528,6 +533,8 @@ OS-Agent/
 - 运行结束时输出错误摘要，并生成 `output/<os-name>/describe_error_report.json`
 
 **v4.0** 可结合 `_per_stage/*_plan.json` 与 `repo_profile.json` 对照各章锁定步骤与 must_cover；章节正文以 `sections/*.md` 为准。
+
+**Describe JSON-QA 修复侧车**：02~09 题单阶段会先把最终 JSON 写入 `_per_stage/<stage_id>_answers_raw.txt`，解析/校验成功后写 `_per_stage/<stage_id>_answers.json` 并渲染章节 Markdown。若初次输出失败，主链路会按失败类型分流 LLM repair（截断、语法、schema、题号集合、choices value、无 JSON），并在 `_per_stage/<stage_id>_answers_llm_meta.json` 记录 `repair_strategy`、模型返回 metadata、raw repaired text 与重试校验结果。校验问题见 `_per_stage/<stage_id>_answers_validate_issues.json`；修复仍失败见 `_per_stage/<stage_id>_answers_repair_error.json`。其中截断类二次修复若仍因 `finish_reason="length"` 结束，会直接停止该阶段，优先调大 `DESCRIBE_MAX_OUTPUT_TOKENS` 或拆分题单。
 
 **Describe 无工具 Review（可选）**：`DESCRIBE_STAGE_REVIEW=1` 时，仅对 **JSON-QA 且校验成功** 的阶段在落盘前送审：材料为 **`core/describe_stage_qa` 题单** + **`coerce_answers_payload_by_stage_qa` 覆写题面前的答案 JSON**（证据以答案 JSON 内 `evidence` 为准，**不含**工具回传摘录）。`01_overview`、`10_history` 不审。结果 `_per_stage/<stage_id>_review.json`：细粒度规则见系统提示**详细分档（0.95+ 为优秀，<0.80 为证据单薄，<0.50 为严重问题）**；后处理会写入 **`report_quality_score`（0~1，完全由 LLM 逐题置信度与维度分合成，摒弃纯代码统计）**、**`_meta.quality`**，并按**方案 A** 重算全阶段 **`confidence`（与各题 `confidence` 一致）**；另含逐题 `question_reviews[]`、`summary_zh` 等。默认可选 `DESCRIBE_REVIEW_MODEL`。合并总报告时，会在 **`output/<os-name>/review_score.json`** 汇总 **02~09 题库各章**（8 个 `stage_id`）的 0~100 分与 **总分校验（有分章的算术平均）**，并在 **最终报告** `OS技术分析报告_<name>.md` 文首元数据区写引用行（示例：`> **报告质量打分**: 84/100`）；若各章无可用 review 则写“未统计”类占位。
 
