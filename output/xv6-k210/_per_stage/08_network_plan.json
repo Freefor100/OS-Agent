@@ -1,0 +1,108 @@
+{
+  "stage_id": "08_network",
+  "evidence_targets": [
+    "poll/ppoll/pselect 多路复用机制的存在性与完整性",
+    "socket API 的缺失证据（无 sys_socket/sys_bind 等）",
+    "网络协议栈的缺失证据（无 TCP/UDP/IP 栈代码）",
+    "网络设备驱动的缺失证据（仅 virtio-disk，无 net 驱动）",
+    "S_IFSOCK 与 socket errno 的占位性质",
+    "协议栈",
+    "socket API",
+    "poll/epoll",
+    "驱动接入"
+  ],
+  "seed_paths": [
+    "include/fs/poll.h",
+    "kernel/fs/poll.c",
+    "include/fs/file.h",
+    "include/sysnum.h",
+    "kernel/syscall/syscall.c",
+    "kernel/syscall/sysfile.c",
+    "include/fs/stat.h",
+    "include/errno.h",
+    "include/hal/virtio.h",
+    "kernel/hal/virtio_disk.c",
+    "net",
+    "tcp",
+    "udp",
+    "socket"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "ppoll",
+    "pselect",
+    "sys_ppoll",
+    "sys_pselect",
+    "file_poll",
+    "poll_wait",
+    "struct poll_table",
+    "struct pollfd",
+    "struct file",
+    "struct poll_wait_queue",
+    "sys_socket",
+    "tcp"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "bootloader",
+    "bootloader/SBI",
+    "debug",
+    "debug/kendryte_openocd",
+    "debug/openocd_cfg",
+    "doc",
+    "doc/img",
+    "include",
+    "include/fs"
+  ],
+  "preferred_tools": [
+    "read_code_segment",
+    "lsp_get_document_outline",
+    "lsp_get_definition",
+    "lsp_get_references",
+    "grep_in_repo",
+    "rag_search_code"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "【取证-协议栈缺失】grep 搜索 'tcp|udp|ipv4|ipv6|arp|icmp|dns|dhcp' 等协议关键词，确认全仓库无协议栈实现",
+    "【取证-socket缺失】grep 搜索 'sys_socket|sys_bind|sys_connect|sys_listen|sys_accept|sys_send|sys_recv' 确认无 socket 系统调用",
+    "【取证-socket缺失】检查 include/sysnum.h 全文，列出所有系统调用号，确认无 SYS_socket 系列",
+    "【取证-socket缺失】检查 kernel/syscall/syscall.c 中的 syscall 分发表，确认无 socket 相关条目",
+    "【取证-占位符】读取 include/fs/stat.h 中 S_IFSOCK/S_ISSOCK 宏，确认仅为模式位定义无实际使用",
+    "【取证-占位符】grep 搜索 S_ISSOCK 的引用，确认无任何代码路径创建 socket 类型 inode",
+    "【取证-占位符】读取 include/errno.h 中 ENOTSOCK/ESOCKTNOSUPPORT/EPROTOTYPE 定义，确认仅为兼容占位",
+    "【取证-驱动缺失】读取 include/hal/virtio.h，确认 VIRTIO_MMIO_DEVICE_ID 注释提到 net=1 但仅实现 disk",
+    "【取证-驱动缺失】检查 kernel/hal/ 目录下所有 .c 文件，确认无网络设备驱动（无 ethernet/net/wlan 相关）",
+    "【分析-poll机制】lsp_get_document_outline 查看 kernel/fs/poll.c 完整函数列表",
+    "【分析-poll机制】读取 include/fs/poll.h 全文，分析 pollfd/poll_table/poll_wait_queue 结构体定义",
+    "【分析-poll机制】读取 kernel/fs/poll.c 中 __poll_func (行19-31)，分析 poll_wait 回调如何将 wait_node 加入等待队列",
+    "【分析-poll机制】读取 kernel/fs/poll.c 中 poll_init/poll_end (行33-56)，分析 poll 会话生命周期管理",
+    "【分析-poll机制】读取 kernel/fs/poll.c 中 file_poll (行58-64)，分析如何通过 file->poll 函数指针分发",
+    "【分析-poll机制】读取 kernel/fs/poll.c 中 poll_sched_timeout (行66-89)，分析超时睡眠/唤醒机制",
+    "【分析-ppoll】读取 kernel/fs/poll.c 中 ppoll (行91-105)，分析其当前为桩实现（直接返回 POLLIN|POLLOUT）",
+    "【分析-pselect】读取 kernel/fs/poll.c 中 pselect (行127-243)，分析完整的 fdset 遍历与事件检测循环",
+    "【分析-pselect】追踪 pselect 中 fdset_work_init 和位图遍历逻辑，理解多 fd 批量轮询机制",
+    "【分析-file.poll】lsp_get_references 查找 file->poll 函数指针的所有赋值点，确认哪些文件类型实现了 poll",
+    "【分析-file.poll】读取 include/fs/file.h 中 struct file 定义，分析 poll 函数指针在 VFS 中的位置",
+    "【分析-syscall入口】读取 kernel/syscall/sysfile.c 中 sys_ppoll (行740-760)，分析参数拷贝与调用路径",
+    "【分析-syscall入口】读取 kernel/syscall/sysfile.c 中 sys_pselect (行680-730)，分析完整的参数验证与结果回拷",
+    "【分析-waitqueue】读取 include/sync/waitqueue.h，分析 poll 依赖的等待队列数据结构",
+    "【收束-总结】汇总证据：网络协议栈/socket API 完全缺失，poll/pselect 是唯一 I/O 多路复用机制",
+    "【收束-总结】评估 ppoll 的桩实现状态（直接返回所有 fd 可读写）对实际可用性的影响",
+    "【收束-总结】评估 pselect 实现的完整性（含超时、信号掩码、fdset 遍历）"
+  ]
+}

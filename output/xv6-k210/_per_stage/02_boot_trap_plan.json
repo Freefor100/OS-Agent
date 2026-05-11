@@ -1,0 +1,122 @@
+{
+  "stage_id": "02_boot_trap",
+  "evidence_targets": [
+    "启动入口（_start vs _entry，K210 vs QEMU 双平台差异）",
+    "模式切换（M-mode SBI → S-mode kernel，stvec 设置）",
+    "页表/MMU（Sv39 内核页表 kvminit/kvminithart，TRAMPOLINE 映射）",
+    "trap 向量（kernelvec 与 uservec 两条路径）",
+    "trap 入口（usertrap / kerneltrap 的 C 处理逻辑）",
+    "syscall 分发（syscall() 函数，syscalls[] 跳转表，参数提取 argraw/argint/argstr）",
+    "TrapFrame 结构体（寄存器布局，浮点扩展，与 trampoline.S 的对应关系）",
+    "用户指针校验（copyin2/copyout2 的 seg 合法性检查 + safememmove 缺页逃生机制）",
+    "QEMU/K210 板型差异（plic 中断号、SSTATUS_PUM/SUM、sfence.vma 编码、页错误异常号）",
+    "RTC/定时器早期初始化（CLINT_MTIME 读取、sbi_set_timer、timer_tick）",
+    "启动入口",
+    "模式切换",
+    "页表/MMU",
+    "trap 向量",
+    "trap 入口",
+    "syscall 分发"
+  ],
+  "seed_paths": [
+    "kernel/entry.S",
+    "kernel/entry_k210.S",
+    "kernel/entry_qemu.S",
+    "kernel/main.c",
+    "kernel/trap/trap.c",
+    "kernel/trap/trampoline.S",
+    "kernel/trap/kernelvec.S",
+    "kernel/syscall/syscall.c",
+    "include/trap.h",
+    "include/memlayout.h",
+    "kernel/mm/vm.c",
+    "Makefile",
+    "arch",
+    "boot"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "_entry",
+    "_start",
+    "main",
+    "kvminit",
+    "kvminithart",
+    "trapinithart",
+    "usertrap",
+    "kerneltrap",
+    "uservec",
+    "kernelvec",
+    "start",
+    "rust_main"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "bootloader",
+    "bootloader/SBI",
+    "debug",
+    "debug/kendryte_openocd",
+    "debug/openocd_cfg",
+    "doc",
+    "doc/img",
+    "include",
+    "include/fs"
+  ],
+  "preferred_tools": [
+    "lsp_get_document_outline",
+    "lsp_get_definition",
+    "lsp_get_references",
+    "lsp_get_call_graph",
+    "read_code_segment",
+    "rag_search_code",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "1. 用 lsp_get_document_outline 鸟瞰 kernel/main.c，确认 main() 的初始化调用序列全貌",
+    "2. 用 lsp_get_definition 查 main 符号，确认其签名 `void main(unsigned long hartid, unsigned long dtb_pa)`",
+    "3. 用 lsp_get_call_graph 对 main 做 outgoing、max_depth=2，获取启动初始化调用链",
+    "4. 精读 kernel/main.c 中 hart0 初始化序列（cpuinit→consoleinit→kpminit→kvminit→kvminithart→kmallocinit→trapinithart→procinit→plicinit→plicinithart→disk_init→binit→userinit），逐行标注每个 init 函数的作用",
+    "5. 用 lsp_get_definition 查 kvminit，定位 kernel/mm/vm.c 中的实现，精读其 MMIO 映射（UART/CLINT/PLIC/VIRTIO/GPIOHS/SPI/FPIOA/SYSCTL）和 TRAMPOLINE 映射",
+    "6. 用 lsp_get_definition 查 kvminithart，确认 satp 写入方式（SATP_SV39 与 K210 的差异）和 sfence.vma 调用",
+    "7. 用 lsp_get_document_outline 鸟瞰 kernel/mm/vm.c，定位 walk/mappages/kvmmap/uvmalloc/uvmcopy/uvmdealloc/freewalk 等核心函数行号",
+    "8. 精读 walk() 函数（Sv39 三级页表遍历），标注 PX 宏和递归查找逻辑",
+    "9. 精读 mappages() 函数，标注 PTE 创建、COW 标记、page_ref 引用计数逻辑",
+    "10. 用 lsp_get_definition 查 trapinithart，确认 stvec 写入 kernelvec、sstatus/sie 配置",
+    "11. 用 lsp_get_document_outline 鸟瞰 kernel/trap/trap.c，获取 usertrap/usertrapret/kerneltrap/handle_intr/handle_excp 行号",
+    "12. 精读 usertrap() 函数：stvec 切换→protect_usr_mem→保存 sepc→判断 scause（ECALL/中断/异常）→syscall() 或 handle_intr/handle_excp→usertrapret()",
+    "13. 精读 usertrapret() 函数：intr_off→w_stvec(TRAMPOLINE+uservec)→填充 trapframe 的 kernel_satp/kernel_sp/kernel_trap/kernel_hartid→设置 sstatus SPP=0→permit_usr_mem→跳转 userret",
+    "14. 精读 kerneltrap() 函数：保存 sepc/sstatus/scause→protect_usr_mem→handle_intr/handle_excp→缺页逃生 kern_pgfault_escape→恢复 sepc/sstatus",
+    "15. 用 lsp_get_document_outline 鸟瞰 kernel/trap/trampoline.S，确认 uservec 和 userret 的汇编结构",
+    "16. 逐段精读 uservec：csrrw 交换 a0/sscratch→保存 32 个通用寄存器到 trapframe→恢复 kernel_sp/tp→加载 kernel_trap 地址→jr 跳入 usertrap()",
+    "17. 逐段精读 userret：从 trapframe 恢复 32 个寄存器→csrrw 恢复 a0 并保存 TRAPFRAME 到 sscratch→sret 返回用户态",
+    "18. 用 lsp_get_document_outline 鸟瞰 kernel/trap/kernelvec.S，确认 kernelvec 的保存/恢复序列和 call kerneltrap",
+    "19. 用 lsp_get_definition 查 syscall，定位 kernel/syscall/syscall.c，精读 syscall() 函数：从 trapframe->a7 取系统调用号→查 syscalls[] 跳转表→调用→返回值写入 trapframe->a0",
+    "20. 精读 argraw/argint/argaddr/argstr 参数提取函数，标注从 trapframe 寄存器取参的方式",
+    "21. 用 lsp_get_document_outline 鸟瞰 kernel/syscall/syscall.c，确认 syscalls[] 跳转表覆盖的系统调用列表（约 60+ 个）",
+    "22. 用 lsp_get_definition 查 TrapFrame 结构体（include/trap.h），逐字段标注偏移量与 trampoline.S 中 sd/ld 偏移的对应关系",
+    "23. 精读 include/trap.h 中 trapframe 的浮点寄存器区域（ft0-ft11, fs0-fs11, fa0-fa7, fcsr），标注与 floatstore/floatload 的关系",
+    "24. 用 lsp_get_definition 查 copyin2/copyout2（kernel/mm/vm.c），精读用户指针校验流程：partofseg 合法性检查→safememmove 逐字节拷贝→缺页时 kern_pgfault_escape 逃生",
+    "25. 精读 safememmove 函数：permit_usr_mem→逐字节循环→缺页时通过 save_point 跳回→protect_usr_mem 恢复",
+    "26. 精读 handle_page_fault 函数：locateseg 定位 segment→walk 查 PTE→COW 处理→lazy allocation→elf load→mmap 分发",
+    "27. 用 grep_in_repo 搜索 `#ifdef QEMU` 和 `#ifndef QEMU`，汇总 K210 vs QEMU 的所有条件编译差异点（plic 中断号、SSTATUS_PUM/SUM、sfence.vma 编码、页错误异常号、virtio vs sdcard）",
+    "28. 精读 kernel/hal/plic.c 的 plicinit/plicinithart/plic_claim/plic_complete，标注 K210 用 M-mode PLIC、QEMU 用 S-mode PLIC 的差异",
+    "29. 精读 kernel/timer.c 的 set_next_timeout/timer_tick，标注 CLINT_MTIME 读取和 sbi_set_timer 调用",
+    "30. 用 lsp_get_definition 查 handle_intr（kernel/trap/trap.c），精读中断分发：INTR_TIMER→timer_tick+proc_tick；INTR_EXTERNAL/INTR_SOFTWARE→plic_claim→UART_IRQ/DISK_IRQ 分支",
+    "31. 用 lsp_get_document_outline 鸟瞰 kernel/sched/proc.c，确认 userinit/scheduler 与启动流程的衔接",
+    "32. 汇总证据：整理启动全路径（_entry→main→各 init→userinit→scheduler）、trap 全路径（uservec→usertrap→syscall/usertrapret→userret 和 kernelvec→kerneltrap）、syscall 分发路径、用户指针校验路径，形成完整闭环"
+  ]
+}

@@ -1,0 +1,122 @@
+{
+  "stage_id": "04_process_smp",
+  "evidence_targets": [
+    "任务模型 (proc 结构体与进程状态)",
+    "调度器 (多优先级轮转 + 定时器驱动)",
+    "上下文切换 (swtch.S + sched() + scheduler())",
+    "信号机制 (sigaction / sigpending / sighandle / sigreturn)",
+    "多核启动 (main.c hart0/hart1 分支 + IPI 唤醒)",
+    "CPU 本地状态 (struct cpu + mycpu + push_off/pop_off)",
+    "IPI 机制 (sbi_send_ipi + wakeup 跨核唤醒)",
+    "并发保护 (spinlock + proc_lock + hash_lock + 关中断嵌套)",
+    "任务模型",
+    "调度器",
+    "上下文切换",
+    "信号/Futex",
+    "多核启动",
+    "CPU 本地状态",
+    "IPI",
+    "并发保护"
+  ],
+  "seed_paths": [
+    "kernel/sched/proc.c",
+    "kernel/sched/swtch.S",
+    "kernel/sched/signal.c",
+    "kernel/trap/trap.c",
+    "kernel/trap/kernelvec.S",
+    "kernel/trap/trampoline.S",
+    "kernel/main.c",
+    "kernel/sync/spinlock.c",
+    "kernel/intr.c",
+    "include/sched/proc.h",
+    "include/sched/signal.h",
+    "include/sync/spinlock.h",
+    "task",
+    "proc"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "scheduler",
+    "sched",
+    "swtch",
+    "clone",
+    "exit",
+    "yield",
+    "sleep",
+    "wakeup",
+    "proc_tick",
+    "userinit",
+    "schedule",
+    "sys_fork"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "bootloader",
+    "bootloader/SBI",
+    "debug",
+    "debug/kendryte_openocd",
+    "debug/openocd_cfg",
+    "doc",
+    "doc/img",
+    "include",
+    "include/fs"
+  ],
+  "preferred_tools": [
+    "lsp_get_document_outline",
+    "lsp_get_definition",
+    "lsp_get_references",
+    "lsp_get_call_graph",
+    "read_code_segment",
+    "rag_search_code",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "1. 用 lsp_get_document_outline 获取 kernel/sched/proc.c 全貌，确认所有函数/变量位置",
+    "2. 用 read_code_segment 精读 proc 结构体定义 (include/sched/proc.h:51-104)，记录所有字段及用途",
+    "3. 用 read_code_segment 精读 enum procstate 和 struct cpu (include/sched/proc.h:38-41, 158-163)",
+    "4. 用 read_code_segment 精读 allocproc() (kernel/sched/proc.c:166-244)，分析 PCB 分配与初始化流程",
+    "5. 用 read_code_segment 精读 userinit() (kernel/sched/proc.c:1028-1070)，分析首个用户进程创建",
+    "6. 用 read_code_segment 精读 clone() (kernel/sched/proc.c:291-372)，分析 fork 语义实现",
+    "7. 用 read_code_segment 精读 exit() (kernel/sched/proc.c:405-475)，分析进程退出与子进程 re-parent",
+    "8. 用 read_code_segment 精读 wait4() (kernel/sched/proc.c:477-540)，分析父进程等待子进程",
+    "9. 用 read_code_segment 精读 kill() (kernel/sched/proc.c:541-580)，分析信号发送与睡眠进程唤醒",
+    "10. 用 read_code_segment 精读 sleep() 和 wakeup() (kernel/sched/proc.c:582-608, 373-403)，分析睡眠/唤醒机制",
+    "11. 用 read_code_segment 精读 __get_runnable_no_lock() (kernel/sched/proc.c:609-627)，分析调度选进程逻辑",
+    "12. 用 read_code_segment 精读 yield() (kernel/sched/proc.c:629-652)，分析主动让出 CPU",
+    "13. 用 read_code_segment 精读 scheduler() (kernel/sched/proc.c:671-712)，分析调度主循环与 swtch 调用",
+    "14. 用 read_code_segment 精读 sched() (kernel/sched/proc.c:714-751)，分析进程切出到调度器的路径",
+    "15. 用 read_code_segment 精读 proc_tick() (kernel/sched/proc.c:753-792)，分析时钟驱动的优先级降级与超时唤醒",
+    "16. 用 read_code_segment 精读 swtch.S 全部 41 行，分析上下文切换的寄存器保存/恢复序列",
+    "17. 用 lsp_get_call_graph 对 scheduler 做 outgoing 方向 max_depth=3，追踪调度器调用链",
+    "18. 用 lsp_get_call_graph 对 sched 做 incoming 方向 max_depth=2，追踪谁调用了 sched()",
+    "19. 用 read_code_segment 精读 kernel/trap/trap.c 中 usertrap() (行74-145)，分析用户态 trap 入口与调度触发",
+    "20. 用 read_code_segment 精读 kerneltrap() (kernel/trap/trap.c:197-245)，分析内核态 trap 处理",
+    "21. 用 read_code_segment 精读 handle_intr() (kernel/trap/trap.c:246-325)，分析时钟中断/软件中断/IPI 处理",
+    "22. 用 read_code_segment 精读 kernel/trap/kernelvec.S 全部，分析内核 trap 的寄存器保存/恢复",
+    "23. 用 read_code_segment 精读 kernel/trap/trampoline.S 全部，分析 uservec/userret 的用户-内核切换",
+    "24. 用 read_code_segment 精读 kernel/main.c 全部，分析 hart0/hart1 启动分支与 IPI 唤醒流程",
+    "25. 用 read_code_segment 精读 kernel/sched/signal.c 中 sighandle() 和 sigreturn()，分析信号分发与返回",
+    "26. 用 read_code_segment 精读 kernel/sched/signal.c 中 set_sigaction() 和 sigprocmask()，分析信号注册与屏蔽",
+    "27. 用 read_code_segment 精读 kernel/sync/spinlock.c 全部，分析自旋锁 acquire/release 实现",
+    "28. 用 read_code_segment 精读 kernel/intr.c 全部，分析 push_off/pop_off 关中断嵌套机制",
+    "29. 用 grep_in_repo 搜索 proc_lock / hash_lock 的所有引用，分析锁的持有范围与死锁避免策略",
+    "30. 用 grep_in_repo 搜索 sbi_send_ipi 的所有调用点，分析 IPI 发送场景 (main.c 启动 + wakeup 跨核)",
+    "31. 用 read_code_segment 精读 kernel/syscall/sysproc.c 中 sys_fork/sys_clone/sys_wait/sys_exit/sys_sleep，分析系统调用到内核函数的映射",
+    "32. 用 read_code_segment 精读 kernel/syscall/syssignal.c 全部，分析信号相关系统调用入口"
+  ]
+}

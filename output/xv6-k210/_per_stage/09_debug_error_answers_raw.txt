@@ -1,0 +1,268 @@
+Now I have all the evidence needed. Let me compile the final JSON answer.
+
+Let me verify one more thing - the `trapframedump` function is defined but commented out in `usertrap`:
+
+Looking at `kernel/trap/trap.c:128`:
+```c
+// trapframedump(p->trapframe);
+```
+
+So `trapframedump` exists as a function but is NOT called in the panic path. The panic path in `__panic` calls `backtrace()` but not `trapframedump`.
+
+Now let me also verify the `consoleintr` control-key commands more carefully - these are the kernel monitor commands:
+
+From `kernel/console.c:237-259`:
+- `C('P')` → `procdump()` — print process list
+- `C('E')` → `rootfs_print()` — print file tree
+- `C('K')` → `kmview()` — print mem-alloc list
+- `C('B')` → `bprint()` — print buffer cache
+- `C('Q')` → `pm_dump()` — print physical memory status
+- `C('U')` → kill line
+- `C('H')` / `\x7f` → backspace
+
+These are control-key sequences processed in `consoleintr()` which runs in kernel context (called from interrupt handler). This is a kernel-resident interactive monitor in the Stallings sense.
+
+Now let me construct the final JSON:
+
+```json
+{
+  "schema_version": "v1",
+  "stage_id": "09_debug_error",
+  "stage_title": "调试机制与错误处理",
+  "terminology_profile": "stallings_en_zh",
+  "answers": [
+    {
+      "question_id": "Q09_001",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在日志系统（log/printk/println 宏）与日志级别控制？",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "include/utils/debug.h",
+          "symbol_kind": "macro",
+          "symbol_name": "__debug_info / __debug_warn / __debug_error",
+          "excerpt": "三级日志宏：__debug_info (绿色INFO)、__debug_warn (黄色WARN)、__debug_error (红色ERROR)。通过 #ifdef DEBUG 条件编译控制是否输出。模块级调试通过 __DEBUG_module 宏控制，Makefile 支持 make module=xxx 按模块启用。"
+        },
+        {
+          "path": "include/printf.h",
+          "symbol_kind": "macro",
+          "symbol_name": "panic",
+          "excerpt": "#define panic(s) do { printf(__ERROR(__module_name__)\": hart %d at %s: %d\\n\", cpuid(), __FILE__, __LINE__); __panic(s); } while (0)"
+        },
+        {
+          "path": "kernel/printf.c",
+          "symbol_kind": "function",
+          "symbol_name": "printf",
+          "excerpt": "void printf(char *fmt, ...) — 内核格式化输出函数，支持 %d/%x/%p/%s，通过自旋锁保护并发输出，最终调用 consputc → sbi_console_putchar。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_002",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 panic/崩溃处理路径（panic_handler/oom/abort 等）？",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/printf.c:122-133",
+          "symbol_kind": "function",
+          "symbol_name": "__panic",
+          "excerpt": "void __panic(char *s) { printf(__ERROR(\"panic\")\": \"); printf(s); printf(\"\\n\"); backtrace(); panicked = 1; intr_off(); for(;;) ; } — 输出 panic 信息、调用 backtrace()、设置 panicked 标志、关中断、无限循环停机。"
+        },
+        {
+          "path": "include/printf.h:13-18",
+          "symbol_kind": "macro",
+          "symbol_name": "panic",
+          "excerpt": "#define panic(s) do { printf(__ERROR(__module_name__)\": hart %d at %s: %d\\n\", cpuid(), __FILE__, __LINE__); __panic(s); } while (0) — 宏封装，先输出 hart/文件/行号，再调用 __panic。"
+        },
+        {
+          "path": "kernel/trap/trap.c:230-234",
+          "symbol_kind": "call_site",
+          "symbol_name": "kerneltrap → panic",
+          "excerpt": "kerneltrap() 中未处理 trap 时：printf(\"\\nscause %p\\n\", scause); printf(\"sepc=%p stval=%p hart=%d\\n\", ...); panic(\"kerneltrap\");"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_003",
+      "question_type": "short_answer",
+      "stem": "panic 路径会输出哪些诊断？（寄存器 dump/栈回溯/停机；必须引用实现证据）",
+      "value": "panic 路径输出：(1) 模块名/hart ID/文件名/行号（panic 宏，include/printf.h:13-18）；(2) panic 消息字符串（__panic，kernel/printf.c:124-126）；(3) 基于帧指针 (Frame Pointer) 的栈回溯——逐帧打印返回地址 ra（backtrace()，kernel/printf.c:135-143）；(4) 设置 panicked=1 冻结其他 CPU 的 UART 输出；(5) 关中断 (intr_off()) 后无限循环停机。注意：panic 路径不输出通用寄存器 dump（trapframedump 函数存在但被注释掉，kernel/trap/trap.c:128 处 // trapframedump(p->trapframe)），也不输出 sepc/scause/stval（这些仅在 kerneltrap 的 panic 前单独 printf 输出）。",
+      "evidence": [
+        {
+          "path": "kernel/printf.c:122-133",
+          "symbol_kind": "function",
+          "symbol_name": "__panic",
+          "excerpt": "printf(__ERROR(\"panic\")\": \"); printf(s); printf(\"\\n\"); backtrace(); panicked = 1; intr_off(); for(;;) ;"
+        },
+        {
+          "path": "kernel/printf.c:135-143",
+          "symbol_kind": "function",
+          "symbol_name": "backtrace",
+          "excerpt": "void backtrace() { uint64 *fp = (uint64 *)r_fp(); uint64 *bottom = (uint64 *)PGROUNDUP((uint64)fp); printf(\"backtrace:\\n\"); while (fp < bottom) { uint64 ra = *(fp - 1); printf(\"%p\\n\", ra - 4); fp = (uint64 *)*(fp - 2); } } — 基于 RISC-V s0/fp 帧指针链遍历栈帧，打印返回地址。"
+        },
+        {
+          "path": "kernel/trap/trap.c:128",
+          "symbol_kind": "call_site",
+          "symbol_name": "trapframedump (commented out)",
+          "excerpt": "// trapframedump(p->trapframe); — trapframedump 函数已定义（trap.c:345-370）可 dump 全部通用寄存器，但在 usertrap 异常路径中被注释掉，panic 路径也不调用。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_004",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现栈回溯 (backtrace/unwind/stack_trace)？（必须三态；仅打印 ra 不算）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/printf.c:135-143",
+          "symbol_kind": "function",
+          "symbol_name": "backtrace",
+          "excerpt": "void backtrace() { uint64 *fp = (uint64 *)r_fp(); uint64 *bottom = (uint64 *)PGROUNDUP((uint64)fp); printf(\"backtrace:\\n\"); while (fp < bottom) { uint64 ra = *(fp - 1); printf(\"%p\\n\", ra - 4); fp = (uint64 *)*(fp - 2); } } — 基于 RISC-V Frame Pointer (s0/fp) 的栈回溯：从当前 fp 开始，沿帧指针链逐帧读取返回地址 ra（fp-1）并打印，直到栈顶 PGROUNDUP(fp)。非仅打印 ra，而是完整遍历调用链。"
+        },
+        {
+          "path": "include/hal/riscv.h:353-358",
+          "symbol_kind": "inline_function",
+          "symbol_name": "r_fp",
+          "excerpt": "static inline uint64 r_fp() { uint64 x; asm volatile(\"mv %0, s0\" : \"=r\" (x)); return x; } — 读取 RISC-V s0 寄存器（帧指针）。"
+        },
+        {
+          "path": "doc/构建调试-调试指南.md",
+          "symbol_kind": "doc",
+          "symbol_name": "backtrace_info",
+          "excerpt": "文档说明 panic 时打印的地址序列可通过 addr2line -e target/kernel 转换为源码位置。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_005",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在内核驻留的交互式监视器（kernel monitor）？",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/console.c:237-259",
+          "symbol_kind": "function",
+          "symbol_name": "consoleintr",
+          "excerpt": "consoleintr() 在内核态中断上下文中处理控制键：C('P')→procdump() 打印进程列表；C('E')→rootfs_print() 打印文件树；C('K')→kmview() 打印内核内存分配器状态；C('B')→bprint() 打印缓冲区缓存；C('Q')→pm_dump() 打印物理页帧分配器状态；C('U') 清除输入行；C('H')/0x7f 退格。这些命令在内核态执行，直接探查内核数据结构。"
+        },
+        {
+          "path": "kernel/sched/proc.c:901-910",
+          "symbol_kind": "function",
+          "symbol_name": "procdump",
+          "excerpt": "void procdump(void) — 打印所有进程的 PID/PPID/STATE/KILLED/NAME/MEM_LOAD/MEM_HEAP，遍历 pid_hash 哈希表。"
+        },
+        {
+          "path": "kernel/mm/pm.c:283-296",
+          "symbol_kind": "function",
+          "symbol_name": "pm_dump",
+          "excerpt": "void pm_dump(void) — 打印物理页帧分配器的 freelist 状态（multiple 和 single 可用页数及链表）。"
+        },
+        {
+          "path": "kernel/mm/kmalloc.c:320-338",
+          "symbol_kind": "function",
+          "symbol_name": "kmview",
+          "excerpt": "void kmview(void) — 遍历 kmem_table 打印所有内核内存分配器状态。"
+        },
+        {
+          "path": "kernel/fs/bio.c:285-300",
+          "symbol_kind": "function",
+          "symbol_name": "bprint",
+          "excerpt": "void bprint() — 打印缓冲区缓存哈希表各桶的扇区号分布。"
+        },
+        {
+          "path": "kernel/fs/fs.c:297-303",
+          "symbol_kind": "function",
+          "symbol_name": "rootfs_print",
+          "excerpt": "void rootfs_print() — 递归打印根文件系统目录树（含挂载点）。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_006",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 GDB stub（需数据包解析循环，如 handle_gdb_packet）？",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/xv6-k210",
+          "symbol_kind": "search",
+          "symbol_name": "gdbstub_grep",
+          "excerpt": "全仓库搜索 gdbstub|handle_gdb_packet|gdb_packet|gdb_stub，0 命中。不存在 GDB 远程串行协议数据包解析循环。"
+        },
+        {
+          "path": "debug/.gdbinit.tmpl-riscv",
+          "symbol_kind": "config",
+          "symbol_name": "gdbinit_template",
+          "excerpt": "仅提供 GDB 客户端配置模板（target remote 127.0.0.1:1234），依赖外部 OpenOCD/JTAG 硬件调试器，非内核内 GDB stub。"
+        },
+        {
+          "path": "debug/openocd_cfg/k210.cfg",
+          "symbol_kind": "config",
+          "symbol_name": "openocd_config",
+          "excerpt": "OpenOCD 配置文件用于 K210 板级 JTAG 调试，GDB 通过 OpenOCD 连接硬件，非内核内 stub。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_007",
+      "question_type": "short_answer",
+      "stem": "错误码/错误类型体系是什么？（errno/Result/Error enum；给类型定义与传播点证据）",
+      "value": "采用 POSIX errno 风格的 C 宏定义体系。错误码定义于 include/errno.h（107 行），涵盖 EPERM(1) 到 EAFNOSUPPORT(97) 共约 90+ 个标准 errno 宏。系统调用通过返回负 errno 值传播错误（如 return -EINVAL），用户态通过 trapframe->a0 获取返回值。典型传播点：syscall.c:syscall() 中 p->trapframe->a0 = syscalls[num]()，各 sys_* 函数返回负 errno；usertrap() 中 p->killed = SIGTERM 终止异常进程。",
+      "evidence": [
+        {
+          "path": "include/errno.h",
+          "symbol_kind": "macro_definitions",
+          "symbol_name": "EPERM/ENOENT/ENOMEM/EINVAL/...",
+          "excerpt": "#define EPERM 1, #define ENOENT 2, #define ENOMEM 12, #define EACCES 13, #define EINVAL 22, #define ENOSYS 38 ... 共约 90+ 个标准 POSIX errno 宏。"
+        },
+        {
+          "path": "kernel/syscall/syscall.c:351-358",
+          "symbol_kind": "call_site",
+          "symbol_name": "syscall dispatch",
+          "excerpt": "p->trapframe->a0 = syscalls[num](); — 系统调用返回值写入 trapframe->a0，负值表示 errno。"
+        },
+        {
+          "path": "kernel/syscall/sysproc.c:295",
+          "symbol_kind": "call_site",
+          "symbol_name": "return -EINVAL",
+          "excerpt": "sys_getrusage() 中 default: return -EINVAL; — 典型 errno 传播模式。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_008",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 trace/perf/ftrace 等跟踪机制或 tracepoints？",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/syscall/syscall.c:351-358",
+          "symbol_kind": "inline_trace",
+          "symbol_name": "syscall trace (tmask)",
+          "excerpt": "int trace = p->tmask; if (trace) { printf(\"pid %d: %s(\", p->pid, sysnames[num]); } ... if (trace) { printf(\") -> %d\\n\", p->trapframe->a0); } — 基于进程 tmask 字段的系统调用追踪，输出系统调用名、参数和返回值。"
+        },
+        {
+          "path": "kernel/syscall/sysproc.c:255-263",
+          "symbol_kind": "function",
+          "symbol_name": "sys_trace",
+          "excerpt": "uint64 sys_trace(void) { myproc()->tmask = 1; return 0; } — SYS_trace 系统调用（号 18），设置当前进程的 trace mask 为 1 以启用追踪。"
+        },
+        {
+          "path": "kernel/syscall/syscall.c:78-95",
+          "symbol_kind": "inline_trace",
+          "symbol_name": "argint/argaddr/argstr trace",
+          "excerpt": "argint()/argaddr()/argstr() 中检查 p->tmask，若启用则打印每个系统调用参数的值。"
+        },
+        {
+          "path": "xv6-user/strace.c",
+          "symbol_kind": "user_program",
+          "symbol_name": "strace",
+          "excerpt": "用户态 strace 程序调用 trace() 系统调用启用追踪，然后 execve 目标程序。内核直接输出追踪信息。"
+        }
+      ]
+    }
+  ]
+}
+```

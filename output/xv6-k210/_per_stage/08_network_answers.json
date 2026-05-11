@@ -1,0 +1,172 @@
+{
+  "schema_version": "v1",
+  "stage_id": "08_network",
+  "stage_title": "网络子系统与协议栈",
+  "terminology_profile": "stallings_en_zh",
+  "answers": [
+    {
+      "question_id": "Q08_001",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在网络子系统实现（协议栈或 socket 层）？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "include/sysnum.h",
+          "symbol_kind": "search",
+          "symbol_name": "syscall_table_scan",
+          "excerpt": "全文列出所有系统调用号（SYS_fork=1 至 SYS_renameat2=276），无 SYS_socket、SYS_bind、SYS_connect、SYS_listen、SYS_accept、SYS_sendto、SYS_recvfrom 等 socket 系列定义。"
+        },
+        {
+          "path": "kernel/syscall/syscall.c",
+          "symbol_kind": "search",
+          "symbol_name": "syscall_dispatch_table_scan",
+          "excerpt": "syscalls[] 分发表包含约 60 个条目，无任何 socket 相关函数指针；sysnames[] 同理。"
+        },
+        {
+          "path": "repos/xv6-k210",
+          "symbol_kind": "search",
+          "symbol_name": "grep_protocol_keywords",
+          "excerpt": "全仓库 grep 'tcp|udp|ipv4|ipv6|arp|icmp|dns|dhcp' 仅命中 doc/ 文档和 tools/kflash.py 中的 'udpate' 拼写，无协议栈实现代码。grep 'smoltcp|lwip|netstack|tcp_stack' 0 命中。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q08_002",
+      "question_type": "single_choice",
+      "stem": "协议栈来源更接近哪种？",
+      "value": "未发现",
+      "evidence": [
+        {
+          "path": "repos/xv6-k210",
+          "symbol_kind": "search",
+          "symbol_name": "grep_smoltcp_lwip_netstack",
+          "excerpt": "全仓库 grep 'smoltcp|lwip|netstack|tcp_stack' 0 命中。无任何第三方网络协议栈库依赖或自研协议栈代码。"
+        },
+        {
+          "path": "repos/xv6-k210",
+          "symbol_kind": "search",
+          "symbol_name": "grep_tcp_udp_ip_arp",
+          "excerpt": "grep 'tcp|udp|ipv4|ipv6|arp|icmp|dns|dhcp' 仅命中 doc/ 文档和 tools/kflash.py 中 'udpate' 拼写错误，无协议栈实现。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q08_003",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 socket 系统调用接口（socket/bind/connect/sendto/recvfrom 等）？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "include/sysnum.h",
+          "symbol_kind": "search",
+          "symbol_name": "sysnum_scan",
+          "excerpt": "全文 79 行，定义 SYS_fork(1) 至 SYS_renameat2(276)，无 SYS_socket/SYS_bind/SYS_connect/SYS_listen/SYS_accept/SYS_sendto/SYS_recvfrom 等。"
+        },
+        {
+          "path": "kernel/syscall/syscall.c",
+          "symbol_kind": "search",
+          "symbol_name": "syscall_table_scan",
+          "excerpt": "syscalls[] 分发表约 60 条目，无 socket 相关条目。grep 'sys_socket|sys_bind|sys_connect|sys_listen|sys_accept|sys_send|sys_recv' 全仓库 0 命中。"
+        },
+        {
+          "path": "include/fs/stat.h",
+          "symbol_kind": "macro",
+          "symbol_name": "S_IFSOCK",
+          "excerpt": "第 10 行定义 S_IFSOCK 0140000（socket 模式位），第 26 行定义 S_ISSOCK 宏，但 grep S_ISSOCK 全仓库仅 1 处引用（定义本身），无任何代码路径创建 socket 类型 inode。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q08_004",
+      "question_type": "short_answer",
+      "stem": "选择一个发送路径（优先 sys_sendto），追踪：syscall → 协议栈 → 网卡驱动。列 3-6 个关键节点并给证据。",
+      "value": "无法追踪：该仓库不存在 sys_sendto 系统调用、无 TCP/UDP/IP 协议栈代码、无网络设备驱动。唯一存在的网络相关系统调用为 sys_ppoll (SYS_ppoll=73) 和 sys_pselect (SYS_pselect6=72)，但 ppoll 为桩实现（直接返回 POLLIN|POLLOUT），pselect 仅对已打开的文件描述符（pipe/inode/device）进行事件轮询，不涉及任何网络语义。",
+      "evidence": [
+        {
+          "path": "include/sysnum.h",
+          "symbol_kind": "search",
+          "symbol_name": "sysnum_no_sendto",
+          "excerpt": "系统调用号列表无 SYS_sendto/SYS_send/SYS_sendmsg 等发送相关调用。"
+        },
+        {
+          "path": "kernel/syscall/syscall.c",
+          "symbol_kind": "search",
+          "symbol_name": "syscall_table_no_send",
+          "excerpt": "syscalls[] 分发表无任何 send/sendto/sendmsg 条目。"
+        },
+        {
+          "path": "repos/xv6-k210",
+          "symbol_kind": "search",
+          "symbol_name": "grep_no_protocol_stack",
+          "excerpt": "grep 'tcp|udp|ipv4|ipv6|arp|icmp' 全仓库无协议栈实现代码。"
+        },
+        {
+          "path": "kernel/hal/virtio_disk.c",
+          "symbol_kind": "function",
+          "symbol_name": "virtio_disk_init",
+          "excerpt": "virtio_disk.c 仅实现 virtio 块设备驱动（device ID=2），virtio.h:21 注释 '1 is net, 2 is disk' 但无 virtio_net_init 等网络驱动函数。grep 'virtio_net' 全仓库 0 命中。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q08_005",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现网卡驱动（virtio-net/e1000 等）与收包中断路径？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "include/hal/virtio.h",
+          "symbol_kind": "macro",
+          "symbol_name": "VIRTIO_MMIO_DEVICE_ID",
+          "excerpt": "第 21 行注释 'device type; 1 is net, 2 is disk'，但仅定义了 virtio_disk_init/virtio_disk_intr 等磁盘相关函数声明（第 103-109 行），无 virtio_net_init/virtio_net_intr 等。"
+        },
+        {
+          "path": "kernel/hal/",
+          "symbol_kind": "search",
+          "symbol_name": "hal_dir_scan",
+          "excerpt": "kernel/hal/ 目录下所有 .c 文件：disk.c、dmac.c、fpioa.c、gpiohs.c、plic.c、sdcard.c、spi.c、sysctl.c、virtio_disk.c。无任何 ethernet/net/wlan 相关驱动文件。grep 'virtio_net' 全仓库 0 命中。"
+        },
+        {
+          "path": "kernel/hal/virtio_disk.c",
+          "symbol_kind": "function",
+          "symbol_name": "virtio_disk_init",
+          "excerpt": "第 106 行注释掉的检查 '// *R(VIRTIO_MMIO_DEVICE_ID) != 2' 表明仅检查磁盘设备 ID=2，未处理 net 设备 ID=1。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q08_006",
+      "question_type": "multi_choice",
+      "stem": "协议支持情况（多选；未发现则留空并在 notes 写 not_found）：",
+      "value": [],
+      "evidence": [
+        {
+          "path": "repos/xv6-k210",
+          "symbol_kind": "search",
+          "symbol_name": "grep_all_protocols",
+          "excerpt": "全仓库 grep 'tcp|udp|ipv4|ipv6|arp|icmp|dns|dhcp|ethernet' 仅命中 doc/ 文档和 errno.h 中的 ENONET/ENOTUNIQ 宏定义，无任何协议实现代码。not_found: Ethernet, ARP, IPv4/IPv6, ICMP, UDP, TCP, DHCP, DNS 均未实现。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q08_007",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在零拷贝/共享缓冲/DMA 描述符等路径（zero-copy）？（必须三态；仅有名词不算 implemented）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/hal/virtio_disk.c",
+          "symbol_kind": "struct",
+          "symbol_name": "virtq_desc",
+          "excerpt": "virtio_disk.c 中存在 DMA 描述符结构（virtq_desc，第 44-48 行 virtio.h），但仅用于块设备 I/O（virtio-blk），不涉及网络数据路径。无网络协议栈，故不存在网络零拷贝路径。"
+        },
+        {
+          "path": "include/hal/dmac.h",
+          "symbol_kind": "header",
+          "symbol_name": "DMAC definitions",
+          "excerpt": "include/hal/dmac.h 定义了 K210 平台 DMAC 寄存器（用于外设间 DMA 传输），但无证据表明其用于网络数据路径（因无网络子系统）。grep 'zero.copy|zerocopy|shared.buffer' 全仓库 0 命中。"
+        }
+      ]
+    }
+  ]
+}

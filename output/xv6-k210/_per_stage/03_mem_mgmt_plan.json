@@ -1,0 +1,120 @@
+{
+  "stage_id": "03_mem_mgmt",
+  "evidence_targets": [
+    "物理页分配器（pm.c：双分配器架构 multiple/single）",
+    "页表映射（vm.c：walk/mappages/unmappages/kvmmap）",
+    "页故障处理（handle_page_fault 及其 COW/lazy/loadelf/mmap 子处理）",
+    "堆分配器（kmalloc.c：基于 slab 的 kmalloc/kfree）",
+    "用户内存段管理（usrmm.c：seg 链表管理）",
+    "mmap 子系统（mmap.c：匿名/文件映射、COW 共享）",
+    "内核页表初始化与直接映射（kvminit/kvminithart）",
+    "用户页表生命周期（uvmcreate/uvmalloc/uvmdealloc/uvmfree/uvmcopy）",
+    "内核-用户安全拷贝（safememmove/copyout2/copyin2 与 kern_pgfault_escape）",
+    "内存布局常量（memlayout.h：KERNBASE/PHYSTOP/TRAMPOLINE 等）",
+    "物理页分配",
+    "页表映射",
+    "页故障处理",
+    "堆分配器"
+  ],
+  "seed_paths": [
+    "kernel/mm/pm.c",
+    "kernel/mm/vm.c",
+    "kernel/mm/kmalloc.c",
+    "kernel/mm/mmap.c",
+    "kernel/mm/usrmm.c",
+    "include/mm/pm.h",
+    "include/mm/vm.h",
+    "include/mm/kmalloc.h",
+    "include/mm/usrmm.h",
+    "include/mm/mmap.h",
+    "include/memlayout.h",
+    "kernel/trap/trap.c",
+    "mm",
+    "memory"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "kpminit",
+    "kvminit",
+    "kvminithart",
+    "kmallocinit",
+    "handle_page_fault",
+    "handle_excp",
+    "walk",
+    "mappages",
+    "unmappages",
+    "uvmalloc",
+    "alloc_frame",
+    "map_page"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "bootloader",
+    "bootloader/SBI",
+    "debug",
+    "debug/kendryte_openocd",
+    "debug/openocd_cfg",
+    "doc",
+    "doc/img",
+    "include",
+    "include/fs"
+  ],
+  "preferred_tools": [
+    "lsp_get_document_outline",
+    "lsp_get_definition",
+    "lsp_get_references",
+    "lsp_get_call_graph",
+    "read_code_segment",
+    "rag_search_code",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "1. 用 lsp_get_document_outline 获取 kernel/mm/pm.c 全貌，确认双分配器结构（multiple/single）及所有函数",
+    "2. 用 read_code_segment 精读 pm.c 的 kpminit()（179-199行），理解物理内存如何从 boot_stack_top 到 PHYSTOP 被划分为 multiple 和 single 两个区域",
+    "3. 用 read_code_segment 精读 pm.c 的 __mul_alloc_no_lock（54-85行）和 __mul_free_no_lock（86-138行），理解多页分配器的伙伴式合并算法",
+    "4. 用 read_code_segment 精读 pm.c 的 __sin_alloc_no_lock（149-158行）和 _allocpage（232-255行），理解单页分配及从 multiple 借页的 fallback 逻辑",
+    "5. 用 lsp_get_document_outline 获取 kernel/mm/vm.c 全貌，确认所有函数及其行号分布",
+    "6. 用 read_code_segment 精读 vm.c 的 kvminit()（41-119行），理解内核页表如何建立 UART/CLINT/PLIC/外设/KERNBASE/TRAMPOLINE 的直接映射",
+    "7. 用 read_code_segment 精读 vm.c 的 walk()（211-233行），理解 Sv39 三级页表遍历及按需分配中间页表页的逻辑",
+    "8. 用 read_code_segment 精读 vm.c 的 mappages()（298-337行）和 unmappages()（335-375行），理解页表项填充/清除及 COW 引用计数交互",
+    "9. 用 read_code_segment 精读 vm.c 的 uvmcreate/uvminit/uvmalloc/uvmdealloc（376-469行），理解用户页表生命周期",
+    "10. 用 read_code_segment 精读 vm.c 的 uvmcopy()（556-619行），理解 COW fork 时如何复制页表并标记 PTE_COW、取消 PTE_W",
+    "11. 用 read_code_segment 精读 vm.c 的 pagereg/pagedup/pageput/monopolizepage（154-210行），理解基于哈希表的页引用计数与 COW 独占机制",
+    "12. 用 read_code_segment 精读 vm.c 的 handle_page_fault()（1039-1105行），理解四种段类型（LOAD/HEAP/STACK/MMAP）的分发逻辑",
+    "13. 用 read_code_segment 精读 vm.c 的 handle_store_page_fault_cow()（975-1000行），理解 COW 写时复制：独占则恢复 PTE_W，否则分配新页拷贝",
+    "14. 用 read_code_segment 精读 vm.c 的 handle_page_fault_lazy()（1002-1016行），理解惰性分配如何按需调用 uvmalloc",
+    "15. 用 read_code_segment 精读 vm.c 的 handle_page_fault_loadelf()（1018-1031行），理解 ELF 加载的按需读盘机制",
+    "16. 用 read_code_segment 精读 vm.c 的 safememmove()（719-755行），理解内核访问用户内存时的安全拷贝与 save_point 逃逸机制",
+    "17. 用 read_code_segment 精读 vm.c 的 kern_pgfault_escape()（713-717行），理解内核触发页故障时的安全回退",
+    "18. 用 lsp_get_document_outline 获取 kernel/mm/kmalloc.c 全貌，确认 kmem_node/kmem_allocator 结构及所有函数",
+    "19. 用 read_code_segment 精读 kmalloc.c 的 kmallocinit()（70-111行）和 get_allocator()（112-155行），理解哈希表分桶与按需创建分配器",
+    "20. 用 read_code_segment 精读 kmalloc.c 的 kmalloc()（157-226行），理解从 kmem_node 的 table 数组中取空闲槽位、节点满时从链表摘除",
+    "21. 用 read_code_segment 精读 kmalloc.c 的 kfree()（228-287行），理解归还槽位、节点全空时释放整页回物理分配器",
+    "22. 用 lsp_get_document_outline 获取 kernel/mm/usrmm.c 全貌，确认 seg 链表管理函数",
+    "23. 用 read_code_segment 精读 usrmm.c 的 newseg/locateseg/partofseg/delseg/copysegs（16-190行），理解用户虚拟地址空间的段管理",
+    "24. 用 lsp_get_document_outline 获取 kernel/mm/mmap.c 全貌，确认 mmap 子系统函数",
+    "25. 用 read_code_segment 精读 mmap.c 的 do_mmap/do_munmap（710-818行），理解 mmap 的固定/非固定映射查找与段拆分",
+    "26. 用 read_code_segment 精读 mmap.c 的 handle_page_fault_mmap()（1126-1159行），理解 mmap 页故障的匿名私有/匿名共享/文件映射三分支",
+    "27. 用 read_code_segment 精读 kernel/trap/trap.c 的 handle_excp()（328-350行），确认 Store/Load/Inst page fault 如何路由到 handle_page_fault",
+    "28. 用 read_code_segment 精读 kernel/main.c 的 main()（全98行），确认内存管理初始化顺序：kpminit→kvminit→kvminithart→kmallocinit",
+    "29. 用 read_code_segment 精读 include/memlayout.h（全132行），确认 KERNBASE/PHYSTOP/TRAMPOLINE/VKSTACK/VUMMAP 等关键常量",
+    "30. 用 lsp_get_references 查 handle_page_fault 的所有调用点，确认只有 trap.c 的 handle_excp 调用它",
+    "31. 用 lsp_get_call_graph 对 handle_page_fault 做 outgoing 方向 max_depth=2，确认其调用的四个子处理函数",
+    "32. 用 grep_in_repo 搜索 PTE_COW/PTE_RSW1 确认 COW 标记位的定义和使用范围"
+  ]
+}

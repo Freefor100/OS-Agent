@@ -1,0 +1,930 @@
+Now I have all the evidence. Let me produce the final JSON.
+
+```json
+{
+  "schema_version": "v1",
+  "stage_id": "04_process_smp",
+  "stage_title": "进程/线程/调度与多核",
+  "terminology_profile": "stallings_en_zh",
+  "answers": [
+    {
+      "question_id": "Q04_001",
+      "question_type": "short_answer",
+      "stem": "执行实体 (Execution Entity) 抽象是什么？",
+      "value": "- 顶层类型名: Process (struct proc)\n- 结构体路径: include/sched/proc.h:51-104\n- 关键字段（至少列 3 个）: Context=struct context context (include/sched/proc.h:97), State=enum procstate state (include/sched/proc.h:62), PID=int pid (include/sched/proc.h:54), TrapFrame=struct trapframe *trapframe (include/sched/proc.h:87)\n- 是否区分 PCB 与 TCB: 否（仅有统一 struct proc，无独立线程结构体）",
+      "evidence": [
+        {
+          "path": "include/sched/proc.h",
+          "symbol_kind": "struct",
+          "symbol_name": "proc",
+          "excerpt": "struct proc { int xstate; int pid; struct proc *hash_next; struct proc **hash_pprev; struct proc *sched_next; struct proc **sched_pprev; int timer; enum procstate state; void *chan; uint64 sleep_expire; ... struct context context; ... struct trapframe *trapframe; ... };"
+        },
+        {
+          "path": "include/sched/proc.h",
+          "symbol_kind": "struct",
+          "symbol_name": "context",
+          "excerpt": "struct context { uint64 ra; uint64 sp; uint64 s0; uint64 s1; ... uint64 s11; };"
+        },
+        {
+          "path": "include/sched/proc.h",
+          "symbol_kind": "enum",
+          "symbol_name": "procstate",
+          "excerpt": "enum procstate { RUNNABLE, RUNNING, SLEEPING, ZOMBIE, };"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_002",
+      "question_type": "short_answer",
+      "stem": "任务/进程的生命周期状态机有哪些状态与流转点？",
+      "value": "状态枚举 enum procstate (include/sched/proc.h:38-41): RUNNABLE (就绪), RUNNING (运行), SLEEPING (阻塞/睡眠), ZOMBIE (僵尸/已退出)。\n\n流转路径:\n1. allocproc() (kernel/sched/proc.c:166-244): 新进程创建后通过 __insert_runnable(PRIORITY_NORMAL, p) 进入 RUNNABLE。\n2. scheduler() (kernel/sched/proc.c:671-712): 从 RUNNABLE 选进程，设 state=RUNNING，swtch 切入。\n3. yield() (kernel/sched/proc.c:629-652): RUNNING→RUNNABLE (主动让出)，调用 sched() 切出。\n4. sleep() (kernel/sched/proc.c:582-608): RUNNING→SLEEPING，通过 __insert_sleep(p) 移入睡眠链表，调用 sched()。\n5. wakeup() (kernel/sched/proc.c:392-404): SLEEPING→RUNNABLE (通过 __wakeup_no_lock 移回就绪队列)。\n6. exit() (kernel/sched/proc.c:405-475): RUNNING→ZOMBIE，释放资源后调用 sched() 切出。\n7. wait4() (kernel/sched/proc.c:477-540): 父进程回收 ZOMBIE 子进程，调用 freeproc() 彻底释放。\n8. kill() (kernel/sched/proc.c:541-580): 若目标在 SLEEPING，强制移回 RUNNABLE (PRIORITY_IRQ)。",
+      "evidence": [
+        {
+          "path": "include/sched/proc.h",
+          "symbol_kind": "enum",
+          "symbol_name": "procstate",
+          "excerpt": "enum procstate { RUNNABLE, RUNNING, SLEEPING, ZOMBIE, };"
+        },
+        {
+          "path": "kernel/sched/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "allocproc",
+          "excerpt": "Line 166-244: allocates proc, sets context.ra=forkret, inserted into runnable via __insert_runnable"
+        },
+        {
+          "path": "kernel/sched/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "scheduler",
+          "excerpt": "Line 671-712: picks RUNNABLE proc, sets state=RUNNING, calls swtch"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_003",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在上下文切换 (Context Switch) 实现？",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/sched/swtch.S",
+          "symbol_kind": "function",
+          "symbol_name": "swtch",
+          "excerpt": "swtch: sd ra, 0(a0); sd sp, 8(a0); sd s0, 16(a0); ... sd s11, 104(a0); ld ra, 0(a1); ld sp, 8(a1); ... ld s11, 104(a1); ret"
+        },
+        {
+          "path": "kernel/sched/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "sched",
+          "excerpt": "Line 714-751: swtch(&p->context, &mycpu()->context); — switches from proc to cpu scheduler context"
+        },
+        {
+          "path": "kernel/sched/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "scheduler",
+          "excerpt": "Line 671-712: swtch(&c->context, &tmp->context); — switches from cpu scheduler to chosen proc"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_004",
+      "question_type": "short_answer",
+      "stem": "上下文切换保存/恢复了哪些寄存器集合？",
+      "value": "swtch.S (kernel/sched/swtch.S:1-41) 保存/恢复 RISC-V callee-saved 寄存器集合：ra (返回地址), sp (栈指针), s0-s11 (12个被调用者保存寄存器)。共 14 个寄存器。\n\n注意：这是内核线程间切换（sched→scheduler 路径），仅保存 callee-saved 寄存器。用户态完整寄存器（包括 caller-saved t0-t6, a0-a7, gp, tp 等）由 uservec (kernel/trap/trampoline.S:17-80) 在用户→内核陷入时保存到 trapframe 中。",
+      "evidence": [
+        {
+          "path": "kernel/sched/swtch.S",
+          "symbol_kind": "function",
+          "symbol_name": "swtch",
+          "excerpt": "sd ra, 0(a0); sd sp, 8(a0); sd s0, 16(a0); sd s1, 24(a0); sd s2, 32(a0); sd s3, 40(a0); sd s4, 48(a0); sd s5, 56(a0); sd s6, 64(a0); sd s7, 72(a0); sd s8, 80(a0); sd s9, 88(a0); sd s10, 96(a0); sd s11, 104(a0); ... ld ra, 0(a1); ld sp, 8(a1); ld s0, 16(a1); ... ld s11, 104(a1); ret"
+        },
+        {
+          "path": "include/sched/proc.h",
+          "symbol_kind": "struct",
+          "symbol_name": "context",
+          "excerpt": "struct context { uint64 ra; uint64 sp; uint64 s0; uint64 s1; uint64 s2; uint64 s3; uint64 s4; uint64 s5; uint64 s6; uint64 s7; uint64 s8; uint64 s9; uint64 s10; uint64 s11; };"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_005",
+      "question_type": "short_answer",
+      "stem": "调度算法 (Scheduling Algorithm) 属于哪类？",
+      "value": "- 算法名称: Priority (三级优先级轮转，含定时器驱动的优先级降级)\n- 代码证据（关键字段/函数）: kernel/sched/proc.c:245-248 定义 proc_runnable[PRIORITY_NUMBER] 三级链表数组 (PRIORITY_TIMEOUT=0, PRIORITY_IRQ=1, PRIORITY_NORMAL=2)；__get_runnable_no_lock() (kernel/sched/proc.c:609-627) 按优先级从高到低遍历三级链表选进程；proc_tick() (kernel/sched/proc.c:753-792) 每时钟滴答递减 timer 字段，超时后降级到 PRIORITY_TIMEOUT 队列。\n  - RR: timeslice/slice 字段位置=timer 字段 (include/sched/proc.h:61, int timer)，初始值 TIMER_NORMAL=10 (kernel/sched/proc.c:239)，proc_tick() 中递减\n  - Stride: stride 字段与比较逻辑位置=未发现\n  - MLFQ: 多级队列 VecDeque/数组层级证据=proc_runnable[3] 三级优先级数组 (kernel/sched/proc.c:245)，但无多级反馈队列的动态升降级机制（仅超时降级到最低优先级）\n  - Priority: priority 字段参与 pick_next 排序证据=__get_runnable_no_lock() 按 PRIORITY_TIMEOUT→PRIORITY_IRQ→PRIORITY_NORMAL 顺序遍历 (kernel/sched/proc.c:611-622)",
+      "evidence": [
+        {
+          "path": "kernel/sched/proc.c",
+          "symbol_kind": "variable",
+          "symbol_name": "proc_runnable",
+          "excerpt": "Line 245: struct proc *proc_runnable[PRIORITY_NUMBER]; — three priority levels: PRIORITY_TIMEOUT=0, PRIORITY_IRQ=1, PRIORITY_NORMAL=2"
+        },
+        {
+          "path": "kernel/sched/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "__get_runnable_no_lock",
+          "excerpt": "Line 609-627: for (int i = 0; i < PRIORITY_NUMBER; i++) { tmp = proc_runnable[i]; while (NULL != tmp) { if (RUNNABLE == tmp->state) return tmp; ... } } — strict priority order"
+        },
+        {
+          "path": "kernel/sched/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "proc_tick",
+          "excerpt": "Line 753-792: decrements p->timer each tick; on timeout (timer==0), moves proc to PRIORITY_TIMEOUT queue"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_006",
+      "question_type": "short_answer",
+      "stem": "调度器 (Scheduler)核心入口/关键函数有哪些？",
+      "value": "1. scheduler() (kernel/sched/proc.c:671-712): 调度主循环，调用 __get_runnable_no_lock() 选进程，swtch() 切入。\n2. sched() (kernel/sched/proc.c:714-751): 当前进程切出到调度器的唯一路径，保存浮点寄存器，swtch(&p->context, &mycpu()->context)。\n3. __get_runnable_no_lock() (kernel/sched/proc.c:609-627): 按三级优先级遍历 proc_runnable[] 选第一个 RUNNABLE 进程。",
+      "evidence": [
+        {
+          "path": "kernel/sched/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "scheduler",
+          "excerpt": "Line 671: void scheduler(void) { ... while(1) { tmp = __get_runnable_no_lock(); if(tmp) { tmp->state = RUNNING; c->proc = tmp; swtch(&c->context, &tmp->context); } } }"
+        },
+        {
+          "path": "kernel/sched/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "sched",
+          "excerpt": "Line 714: void sched(void) { ... swtch(&p->context, &mycpu()->context); ... }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_007",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 fork/clone（创建新执行实体）？",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/sched/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "clone",
+          "excerpt": "Line 291-372: int clone(uint64 flag, uint64 stack) — allocates new proc via allocproc(), copies parent's memory segments, signal actions, file descriptor table, cwd, trapframe; inserts child into parent's child list; sets timer=TIMER_NORMAL and inserts into PRIORITY_NORMAL runnable queue"
+        },
+        {
+          "path": "kernel/syscall/sysproc.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_fork",
+          "excerpt": "Line 82-84: uint64 sys_fork(void) { return clone(0, NULL); }"
+        },
+        {
+          "path": "kernel/syscall/sysproc.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_clone",
+          "excerpt": "Line 87-94: uint64 sys_clone(void) { ... return clone(flag, stack); }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_008",
+      "question_type": "short_answer",
+      "stem": "fork/clone 是否复制地址空间与文件表？",
+      "value": "是。clone() (kernel/sched/proc.c:291-372) 中：\n- 地址空间复制: Line 303 np->segment = copysegs(p->pagetable, p->segment, np->pagetable); 复制父进程全部内存段 (LOAD/HEAP/STACK)。\n- 文件表复制: Line 326 copyfdtable(&p->fds, &np->fds) 复制文件描述符表。\n- 当前目录复制: Line 330 np->cwd = idup(p->cwd) 增加 inode 引用计数。\n- ELF 文件引用: Line 331 np->elf = p->elf ? idup(p->elf) : NULL。\n- 信号配置复制: Line 309 sigaction_copy(&np->sig_act, p->sig_act) 和 sig_set 逐元素复制。\n- trapframe 复制: Line 336 *(np->trapframe) = *(p->trapframe); 完整复制陷入帧，子进程 a0 设为 0。",
+      "evidence": [
+        {
+          "path": "kernel/sched/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "clone",
+          "excerpt": "Line 303: np->segment = copysegs(p->pagetable, p->segment, np->pagetable); Line 326: copyfdtable(&p->fds, &np->fds); Line 330: np->cwd = idup(p->cwd); Line 336: *(np->trapframe) = *(p->trapframe); np->trapframe->a0 = 0;"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_009",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 exec（装载 ELF/重建地址空间）？",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/exec.c",
+          "symbol_kind": "function",
+          "symbol_name": "execve",
+          "excerpt": "Line 96-280: int execve(char *path, char **argv, char **envp) — opens ELF file via namei(), creates new pagetable, parses ELF header and program headers, creates LOAD/HEAP/STACK segments via newseg(), loads segments via loadseg(), pushes argv/envp/auxvec onto user stack, commits new pagetable and segments to proc"
+        },
+        {
+          "path": "kernel/syscall/sysproc.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_execve",
+          "excerpt": "Line 42-50: uint64 sys_execve(void) { ... return execve(path, (char **)argv, (char **)envp); }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_010",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 wait/waitpid（父子回收同步）？",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/sched/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "wait4",
+          "excerpt": "Line 477-540: int wait4(int pid, uint64 status, uint64 options) — traverses child list via sibling_next, finds ZOMBIE child, removes from child list, accumulates child's tms times, copies out xstate, calls freeproc(np); if no zombie child and WNOHANG not set, calls sleep(p, &p->lk) to block"
+        },
+        {
+          "path": "kernel/syscall/sysproc.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_wait4",
+          "excerpt": "Line 107-127: uint64 sys_wait4(void) { ... return wait4(pid, status, options); }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_011",
+      "question_type": "single_choice",
+      "stem": "waitpid / wait4 的阻塞实现 (Blocking Implementation) 更接近哪种？",
+      "value": "真正阻塞：移出就绪队列 + WaitQueue/条件变量唤醒 (Wait Queue or Condition Variable)",
+      "evidence": [
+        {
+          "path": "kernel/sched/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "wait4",
+          "excerpt": "Line 527: sleep(p, &p->lk); — parent calls sleep() which removes itself from runnable queue (__remove(p)), inserts into proc_sleep list (__insert_sleep(p)), then calls sched() to switch out"
+        },
+        {
+          "path": "kernel/sched/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "exit",
+          "excerpt": "Line 460: __wakeup_no_lock(p->parent); — child's exit() wakes up parent sleeping on p (the parent proc pointer as chan)"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_012",
+      "question_type": "short_answer",
+      "stem": "PID 分配器实现是什么？",
+      "value": "单调自增 (monotonic increment)，只分配不回收。\n- 全局变量 __pid (kernel/sched/proc.c:38)，初始值在 procinit() (kernel/sched/proc.c:1070-1086) 中设为 1。\n- allocproc() (kernel/sched/proc.c:166-244) 中: p->pid = __pid++; 自增分配，无回收逻辑。\n- freeproc() (kernel/sched/proc.c:139-165) 仅从 hash 表移除，不回收 PID。\n- 无 bitmap、空闲栈或队列复用机制。",
+      "evidence": [
+        {
+          "path": "kernel/sched/proc.c",
+          "symbol_kind": "variable",
+          "symbol_name": "__pid",
+          "excerpt": "Line 38: int __pid; — global PID counter"
+        },
+        {
+          "path": "kernel/sched/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "allocproc",
+          "excerpt": "Line 233-235: __enter_hash_cs; p->pid = __pid++; hash_insert_no_lock(p); __leave_hash_cs"
+        },
+        {
+          "path": "kernel/sched/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "procinit",
+          "excerpt": "Line 1073: __pid = 1; — initializes PID counter to 1"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_013",
+      "question_type": "short_answer",
+      "stem": "父子进程树如何存储？",
+      "value": "使用 parent + child + sibling_next 指针构成单向链表树。\n- struct proc 中 (include/sched/proc.h:78-82): struct proc *child (指向第一个子进程), struct proc *parent (指向父进程), struct proc *sibling_next (指向下一个兄弟), struct proc **sibling_pprev (指向前一个兄弟的 sibling_next 指针地址，用于 O(1) 删除)。\n- clone() (kernel/sched/proc.c:340-348): 将新子进程插入父进程 child 链表头部。\n- wait4() (kernel/sched/proc.c:477-540): 通过 sibling_next 遍历子进程链表。\n- exit() (kernel/sched/proc.c:418-435): 将所有子进程 re-parent 到 init 进程。",
+      "evidence": [
+        {
+          "path": "include/sched/proc.h",
+          "symbol_kind": "struct",
+          "symbol_name": "proc",
+          "excerpt": "Line 78-82: struct proc *child; struct proc *parent; struct proc *sibling_next; struct proc **sibling_pprev;"
+        },
+        {
+          "path": "kernel/sched/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "clone",
+          "excerpt": "Line 340-348: np->parent = p; np->sibling_pprev = &(p->child); np->sibling_next = p->child; if (p->child) p->child->sibling_pprev = &(np->sibling_next); p->child = np;"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_014",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现信号 (signal) 或 futex？",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/sched/signal.c",
+          "symbol_kind": "function",
+          "symbol_name": "sighandle",
+          "excerpt": "Line 170-260: void sighandle(void) — processes pending signals (p->killed), searches for sigaction handler, allocates sig_frame, saves old trapframe, sets up new trapframe with handler address and signum in a0/a1"
+        },
+        {
+          "path": "kernel/sched/signal.c",
+          "symbol_kind": "function",
+          "symbol_name": "sigreturn",
+          "excerpt": "Line 262-283: void sigreturn(void) — restores previous trapframe from sig_frame list, frees signal frame"
+        },
+        {
+          "path": "kernel/sched/signal.c",
+          "symbol_kind": "function",
+          "symbol_name": "set_sigaction",
+          "excerpt": "Line 42-90: int set_sigaction(int signum, struct sigaction const *act, struct sigaction *oldact, int len) — registers signal handler in proc's sig_act linked list"
+        },
+        {
+          "path": "kernel/sched/signal.c",
+          "symbol_kind": "function",
+          "symbol_name": "sigprocmask",
+          "excerpt": "Line 92-130: int sigprocmask(int how, __sigset_t *set, __sigset_t *oldset, int len) — supports SIG_BLOCK, SIG_UNBLOCK, SIG_SETMASK"
+        },
+        {
+          "path": "kernel/sched/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "kill",
+          "excerpt": "Line 541-580: int kill(int pid, int sig) — sets sig_pending bit, sets killed field, wakes up SLEEPING target"
+        },
+        {
+          "path": "repos/xv6-k210",
+          "symbol_kind": "search",
+          "symbol_name": "futex_grep",
+          "excerpt": "grep_in_repo for 'futex|FUTEX' across 207 files: 0 hits. Futex not implemented."
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_015",
+      "question_type": "short_answer",
+      "stem": "与 09 多核的交叉一致性：是否存在每核队列/任务迁移/IPI resched？",
+      "value": "不存在每核运行队列、任务迁移或 IPI resched。\n- 运行队列: proc_runnable[3] 和 proc_sleep 均为全局链表 (kernel/sched/proc.c:245-246)，所有 CPU 共享同一队列，由 proc_lock 保护。\n- 任务迁移: 未发现任何负载均衡或迁移代码 (grep load_balance/migration/affinity: 0 hits)。\n- IPI resched: 未发现调度器通过 IPI 触发其他核重新调度的代码。IPI 仅用于: (1) main.c 中 hart0 唤醒 hart1 启动; (2) wakeup() 中当另一核空闲时发送 IPI 通知 (kernel/sched/proc.c:392-404)。\n- 每核状态: struct cpu (include/sched/proc.h:158-163) 仅记录当前运行进程指针、调度器上下文、关中断嵌套深度，不包含独立运行队列。",
+      "evidence": [
+        {
+          "path": "kernel/sched/proc.c",
+          "symbol_kind": "variable",
+          "symbol_name": "proc_runnable",
+          "excerpt": "Line 245-246: struct proc *proc_runnable[PRIORITY_NUMBER]; struct proc *proc_sleep; — global shared lists, not per-CPU"
+        },
+        {
+          "path": "kernel/sched/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "wakeup",
+          "excerpt": "Line 392-404: if (flag && avail) { sbi_send_ipi(1 << id, 0); } — IPI only to wake idle hart, not for resched"
+        },
+        {
+          "path": "include/sched/proc.h",
+          "symbol_kind": "struct",
+          "symbol_name": "cpu",
+          "excerpt": "Line 158-163: struct cpu { struct proc *proc; struct context context; int noff; int intena; }; — no per-CPU runqueue"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_016",
+      "question_type": "short_answer",
+      "stem": "exit() 资源回收路径：调用链是什么？是否真正回收地址空间/文件表/通知父进程？",
+      "value": "调用链: usertrap() (kernel/trap/trap.c:74-145) 检测 p->killed==SIGTERM → exit(-1) (kernel/sched/proc.c:405-475)。\n\nexit() 内部回收路径:\n1. 地址空间: delsegs(p->pagetable, p->segment) 释放所有内存段，uvmfree(p->pagetable) 释放用户页表物理页 (Line 411-413)。\n2. 文件表: dropfdtable(&p->fds) 关闭所有打开文件 (Line 416)。\n3. 当前目录/ELF: iput(p->cwd); iput(p->elf) 释放 inode 引用 (Line 417-418)。\n4. 子进程 re-parent: 将所有子进程的 parent 改为 init 进程 (Line 421-435)。\n5. 通知父进程: 设置父进程的 SIGCHLD 信号 (Line 438-441)，然后 __wakeup_no_lock(p->parent) 唤醒可能在 wait4() 中睡眠的父进程 (Line 460)。\n6. 状态切换: p->state = ZOMBIE (Line 456)，调用 sched() 切出 (Line 467)。\n7. 最终释放: 父进程 wait4() 中调用 freeproc(np) (kernel/sched/proc.c:139-165)，释放页表、trapframe、内核栈、信号结构、从 hash 表移除、kfree proc 结构体。",
+      "evidence": [
+        {
+          "path": "kernel/sched/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "exit",
+          "excerpt": "Line 405-475: delsegs(p->pagetable, p->segment); uvmfree(p->pagetable); dropfdtable(&p->fds); iput(p->cwd); iput(p->elf); re-parent children to init; SIGCHLD to parent; __wakeup_no_lock(p->parent); p->state = ZOMBIE; sched();"
+        },
+        {
+          "path": "kernel/sched/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "freeproc",
+          "excerpt": "Line 139-165: proc_freepagetable(p->pagetable, p->segment); kfree(p->trapframe); freepage(p->kstack); sigaction_free(p->sig_act); sigframefree(p->sig_frame); hash_remove_no_lock(p); kfree(p);"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_017",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现进程组/会话（Process Group / Session，pgid/session/set_sid/setpgid）？",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/xv6-k210",
+          "symbol_kind": "search",
+          "symbol_name": "pgid_session_grep",
+          "excerpt": "grep_in_repo for 'pgid|session|set_sid|setpgid|ProcessGroup' across 207 files: 0 hits. No process group or session management found in struct proc or any source file."
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_018",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 POSIX 资源限制（rlimit/RLIMIT/getrlimit/setrlimit）？",
+      "value": "stub",
+      "evidence": [
+        {
+          "path": "kernel/syscall/sysproc.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_prlimit64",
+          "excerpt": "Line 273-277: uint64 sys_prlimit64(void) { // for now it's not very necessary to implement this syscall // may be implemented later return 0; } — stub, always returns 0 with no actual resource limit logic"
+        },
+        {
+          "path": "include/sysnum.h",
+          "symbol_kind": "macro",
+          "symbol_name": "SYS_prlimit64",
+          "excerpt": "Line 76: #define SYS_prlimit64 261 — syscall number defined but implementation is empty stub"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_019",
+      "question_type": "single_choice",
+      "stem": "该 OS 是否区分了 TCB（线程控制块）与 PCB（进程控制块）？",
+      "value": "仅有统一 Task 结构（无区分）",
+      "evidence": [
+        {
+          "path": "include/sched/proc.h",
+          "symbol_kind": "struct",
+          "symbol_name": "proc",
+          "excerpt": "Line 51-104: single struct proc contains all fields: pid, state, context, trapframe, pagetable, fds, cwd, parent/child/sibling pointers, signal fields — no separate thread struct exists"
+        },
+        {
+          "path": "repos/xv6-k210",
+          "symbol_kind": "search",
+          "symbol_name": "thread_struct_grep",
+          "excerpt": "grep_in_repo for 'struct thread|struct task_struct|TCB|ThreadControlBlock': no separate thread structure found. clone() creates a full copy of struct proc with its own pagetable, not a thread sharing address space."
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_020",
+      "question_type": "tri_state_impl",
+      "stem": "调度切换路径上是否存在页表切换（w_satp/sfence.vma/写 CR3/TTBR 等）？",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/sched/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "scheduler",
+          "excerpt": "Line 685-691: w_satp(MAKE_SATP(tmp->pagetable)); sfence_vma(); // switch to user pagetable ... swtch(&c->context, &tmp->context); ... w_satp(MAKE_SATP(kernel_pagetable)); sfence_vma(); // switch back to kernel pagetable"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_021",
+      "question_type": "single_choice",
+      "stem": "用户线程与内核线程的映射模型 (User-Level Thread to Kernel-Level Thread Mapping) 更接近哪种？",
+      "value": "无线程（仅进程/Task 不可再分）",
+      "evidence": [
+        {
+          "path": "include/sched/proc.h",
+          "symbol_kind": "struct",
+          "symbol_name": "proc",
+          "excerpt": "Single struct proc with no thread abstraction. clone() creates a full process copy with separate pagetable, not a thread sharing address space. No pthread library or user-level thread support found."
+        },
+        {
+          "path": "kernel/sched/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "clone",
+          "excerpt": "Line 291-372: clone() always copies pagetable via copysegs() — no CLONE_VM/CLONE_THREAD flag handling to share address space between threads"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_022",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现线程局部存储 (Thread-Local Storage, TLS)？",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/xv6-k210",
+          "symbol_kind": "search",
+          "symbol_name": "TLS_grep",
+          "excerpt": "grep_in_repo for 'thread_local|TLS|__thread|#[thread_local]' across 207 files: 0 hits. No TLS support found. The tp register is used for hartid (cpuid) only, not for TLS."
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_023",
+      "question_type": "multi_choice",
+      "stem": "调度器是否追踪/优化以下哪些性能指标 (Scheduling Criteria, Stallings Ch9)？",
+      "value": [
+        "未发现调度性能统计"
+      ],
+      "evidence": [
+        {
+          "path": "include/sched/proc.h",
+          "symbol_kind": "struct",
+          "symbol_name": "proc",
+          "excerpt": "Line 68-73: struct tms proc_tms (utime, stime, cutime, cstime) and vswtch/ivswtch counters exist for process accounting (getrusage), but no scheduler-level statistics tracking CPU utilization, throughput, turnaround time, waiting time, or response time"
+        },
+        {
+          "path": "kernel/sched/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "scheduler",
+          "excerpt": "Line 671-712: scheduler loop has no statistics collection — no counters for scheduling criteria metrics"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_024",
+      "question_type": "tri_state_impl",
+      "stem": "优先级调度是否实现老化 (Aging, Stallings Ch9) 以防止低优先级进程饥饿 (Starvation)？",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/sched/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "proc_tick",
+          "excerpt": "Line 753-792: proc_tick() only decrements timer and demotes to PRIORITY_TIMEOUT on timeout — no priority boosting or aging mechanism. Processes in PRIORITY_NORMAL could starve if PRIORITY_IRQ queue always has runnable procs."
+        },
+        {
+          "path": "repos/xv6-k210",
+          "symbol_kind": "search",
+          "symbol_name": "aging_grep",
+          "excerpt": "grep_in_repo for 'age|aging|boost_priority|starvation' in .c/.h files: no aging/priority boosting logic found. The strict priority order in __get_runnable_no_lock() means lower-priority queues may experience starvation."
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_025",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现公平份额调度 (Fair-Share Scheduling, Stallings Ch9) 或 CPU 配额 (CPU Quota/cgroup)？",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/xv6-k210",
+          "symbol_kind": "search",
+          "symbol_name": "fair_share_grep",
+          "excerpt": "grep_in_repo for 'fair_share|cgroup|cpu_quota|weight' across 207 files: 0 hits. No fair-share scheduling or CPU quota mechanism found."
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_026",
+      "question_type": "single_choice",
+      "stem": "调度器的抢占模式 (Preemption Mode, Stallings Ch9) 更接近哪种？",
+      "value": "完全抢占 (Fully Preemptive)：时钟中断可随时抢占运行进程",
+      "evidence": [
+        {
+          "path": "kernel/trap/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "usertrap",
+          "excerpt": "Line 113-116: else if (0 == handle_intr(cause)) { if (yield()) { p->ivswtch += 1; } } — timer interrupt in usertrap triggers yield(), which calls sched() to switch to another process"
+        },
+        {
+          "path": "kernel/trap/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "handle_intr",
+          "excerpt": "Line 256-262: if (INTR_TIMER == scause) { timer_tick(); proc_tick(); return 0; } — clock interrupt handler calls proc_tick() to decrement timer, then usertrap calls yield()"
+        },
+        {
+          "path": "kernel/sched/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "yield",
+          "excerpt": "Line 629-652: yield() removes current proc from runnable, re-inserts at PRIORITY_NORMAL, calls sched() — voluntary yield triggered by timer interrupt = preemption"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_027",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现最短作业优先调度 (Shortest Job First / SJF 或 SRTF, Stallings Ch9)？",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/sched/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "__get_runnable_no_lock",
+          "excerpt": "Line 609-627: selection is purely based on priority level order (PRIORITY_TIMEOUT → PRIORITY_IRQ → PRIORITY_NORMAL) and FIFO within each level — no burst time prediction or SJF logic"
+        },
+        {
+          "path": "repos/xv6-k210",
+          "symbol_kind": "search",
+          "symbol_name": "sjf_grep",
+          "excerpt": "No burst time estimation, no shortest-job-first or SRTF logic found in scheduler code"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_028",
+      "question_type": "single_choice",
+      "stem": "该 OS 的多核形态更接近哪种？",
+      "value": "SMP（对称多处理）",
+      "evidence": [
+        {
+          "path": "include/param.h",
+          "symbol_kind": "macro",
+          "symbol_name": "NCPU",
+          "excerpt": "Line 5: #define NCPU 2 — maximum number of CPUs"
+        },
+        {
+          "path": "kernel/main.c",
+          "symbol_kind": "function",
+          "symbol_name": "main",
+          "excerpt": "Line 38-97: hart0 initializes all subsystems (cpuinit, kpminit, kvminit, procinit, plicinit, disk_init, userinit), then sends IPI to hart1; hart1 spins on 'started' flag, then initializes kvminithart/trapinithart; both harts enter scheduler() — symmetric: both run the same scheduler loop"
+        },
+        {
+          "path": "kernel/sched/proc.c",
+          "symbol_kind": "variable",
+          "symbol_name": "cpus",
+          "excerpt": "Line 94: struct cpu cpus[NCPU]; — per-CPU state array for both harts"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_029",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 Secondary CPU / AP 启动链（BSP 唤醒 AP，上线后进入 idle/调度）？",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/main.c",
+          "symbol_kind": "function",
+          "symbol_name": "main",
+          "excerpt": "Line 38-97: hart0 (BSP): initializes all subsystems, then for(i=1;i<NCPU;i++) sbi_send_ipi(mask,0); __sync_synchronize(); started=1; — wakes hart1 via IPI. hart1 (AP): while(started==0); __sync_synchronize(); floatinithart(); kvminithart(); trapinithart(); — spins until started flag, then initializes per-hart state. Both harts then call scheduler()"
+        },
+        {
+          "path": "kernel/sched/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "scheduler",
+          "excerpt": "Line 671-712: both harts enter the same scheduler() infinite loop; if no runnable proc found, executes 'wfi' (wait for interrupt) — idle behavior"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_030",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 IPI（核间中断）发送与处理？",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/main.c",
+          "symbol_kind": "function",
+          "symbol_name": "main",
+          "excerpt": "Line 66-71: for (int i = 1; i < NCPU; i++) { unsigned long mask = 1 << i; sbi_send_ipi(mask, 0); } — BSP sends IPI to wake AP"
+        },
+        {
+          "path": "kernel/sched/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "wakeup",
+          "excerpt": "Line 392-404: if (flag && avail) { sbi_send_ipi(1 << id, 0); } — sends IPI to idle hart when waking a proc"
+        },
+        {
+          "path": "kernel/trap/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "handle_intr",
+          "excerpt": "Line 312-316: else if (INTR_SOFTWARE == scause) { sbi_clear_ipi(); return 0; } — handles software interrupt (IPI) by clearing it"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_031",
+      "question_type": "short_answer",
+      "stem": "若存在 IPI：发送与处理路径分别在哪些函数/文件？",
+      "value": "发送路径:\n1. kernel/main.c:69 — main() 中 hart0 启动时: sbi_send_ipi(1 << i, 0) 唤醒 hart1。\n2. kernel/sched/proc.c:401 — wakeup() 中: sbi_send_ipi(1 << id, 0) 当另一核空闲时通知。\n\n处理路径:\n1. kernel/trap/trap.c:312-316 — handle_intr() 中: if (INTR_SOFTWARE == scause) { sbi_clear_ipi(); return 0; } 清除 IPI 并返回。\n\nIPI 通过 RISC-V SBI 的 sbi_send_ipi (include/sbi.h:98) 发送，触发目标核的 Machine-mode 软件中断，经 SBI 转发为 Supervisor-mode 软件中断 (INTR_SOFTWARE)。",
+      "evidence": [
+        {
+          "path": "kernel/main.c",
+          "symbol_kind": "function",
+          "symbol_name": "main",
+          "excerpt": "Line 69: sbi_send_ipi(mask, 0); — BSP wakes AP"
+        },
+        {
+          "path": "kernel/sched/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "wakeup",
+          "excerpt": "Line 401: sbi_send_ipi(1 << id, 0); — wakeup notification to idle hart"
+        },
+        {
+          "path": "kernel/trap/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "handle_intr",
+          "excerpt": "Line 312-316: else if (INTR_SOFTWARE == scause) { sbi_clear_ipi(); return 0; } — IPI handler"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_032",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 per-CPU 变量/结构（PerCpu、CPU-local storage 等）？",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "include/sched/proc.h",
+          "symbol_kind": "struct",
+          "symbol_name": "cpu",
+          "excerpt": "Line 158-163: struct cpu { struct proc *proc; struct context context; int noff; int intena; }; — per-CPU state structure"
+        },
+        {
+          "path": "kernel/sched/proc.c",
+          "symbol_kind": "variable",
+          "symbol_name": "cpus",
+          "excerpt": "Line 94: struct cpu cpus[NCPU]; — global array indexed by hartid"
+        },
+        {
+          "path": "kernel/sched/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "mycpu",
+          "excerpt": "Line 98-101: struct cpu *mycpu(void) { int id = cpuid(); return &cpus[id]; } — returns per-CPU struct via hartid index"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_033",
+      "question_type": "short_answer",
+      "stem": "per-CPU 的实现方式是什么？",
+      "value": "数组索引 hartid。\n- 全局数组: struct cpu cpus[NCPU] (kernel/sched/proc.c:94)，NCPU=2 (include/param.h:5)。\n- 获取方式: mycpu() (kernel/sched/proc.c:98-101) 通过 cpuid()→r_tp() 读取 tp 寄存器获取当前 hartid，然后以 hartid 为索引访问 cpus[id]。\n- hartid 初始化: main() 中 inithartid(hartid) (kernel/main.c:28-30) 执行 asm volatile(\"mv tp, %0\" : : \"r\" (hartid & 0x1))，将 hartid 写入 tp 寄存器。\n- tp 寄存器仅用于 hartid，不用于 TLS。",
+      "evidence": [
+        {
+          "path": "kernel/sched/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "mycpu",
+          "excerpt": "Line 98-101: struct cpu *mycpu(void) { int id = cpuid(); return &cpus[id]; }"
+        },
+        {
+          "path": "kernel/main.c",
+          "symbol_kind": "function",
+          "symbol_name": "inithartid",
+          "excerpt": "Line 28-30: static inline void inithartid(unsigned long hartid) { asm volatile(\"mv tp, %0\" : : \"r\" (hartid & 0x1)); }"
+        },
+        {
+          "path": "include/sched/proc.h",
+          "symbol_kind": "function",
+          "symbol_name": "cpuid",
+          "excerpt": "Line 165-167: static inline int cpuid(void) { return r_tp(); }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_034",
+      "question_type": "tri_state_impl",
+      "stem": "调度是否存在跨核负载均衡/迁移/亲和性？",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/sched/proc.c",
+          "symbol_kind": "variable",
+          "symbol_name": "proc_runnable",
+          "excerpt": "Line 245-246: global shared runqueues (proc_runnable[3], proc_sleep) — no per-CPU queues, so no load balancing needed; all CPUs compete for the same global lists under proc_lock"
+        },
+        {
+          "path": "repos/xv6-k210",
+          "symbol_kind": "search",
+          "symbol_name": "load_balance_grep",
+          "excerpt": "grep_in_repo for 'load_balance|migration|affinity|cpu_set' across 207 files: only 1 hit (sysctl_cpu_set_freq in hal/sysctl.h, unrelated to scheduling). No task migration or CPU affinity mechanism found."
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_035",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 TLB shootdown（跨核页表一致性刷新）？",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/xv6-k210",
+          "symbol_kind": "search",
+          "symbol_name": "tlb_shootdown_grep",
+          "excerpt": "grep_in_repo for 'TLB shootdown|tlb_shootdown|sfence_vma.*ipi' across 207 files: 0 hits. sfence_vma is called locally in scheduler() (kernel/sched/proc.c:687,691) and growproc() (kernel/sched/proc.c:813) but never broadcast to other harts via IPI."
+        },
+        {
+          "path": "kernel/sched/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "scheduler",
+          "excerpt": "Line 687-691: w_satp(MAKE_SATP(tmp->pagetable)); sfence_vma(); ... w_satp(MAKE_SATP(kernel_pagetable)); sfence_vma(); — local TLB flush only, no IPI to other harts"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_036",
+      "question_type": "short_answer",
+      "stem": "与 03/04/05/08 章的交叉一致性 (Cross-Chapter Consistency)",
+      "value": "- 03 TLB: 多核页表修改后 TLB 刷新策略=仅本地 sfence_vma()，无 TLB shootdown (kernel/sched/proc.c:687,691; kernel/sched/proc.c:813)。多核场景下若一核修改页表而另一核的 TLB 中缓存了旧映射，存在不一致风险。\n- 04 调度: 每核运行队列/负载均衡/IPI resched=全局共享运行队列 proc_runnable[3] (kernel/sched/proc.c:245)，无每核队列、无负载均衡、无 IPI resched。IPI 仅用于启动 (kernel/main.c:69) 和空闲核唤醒通知 (kernel/sched/proc.c:401)。\n- 05 Trap: per-CPU trap 栈/时钟中断初始化与 AP 上线顺序=hart0 先完成 trapinithart() (kernel/main.c:52)，hart1 自旋等待 started 标志后执行 trapinithart() (kernel/main.c:83)。每核有独立的内核栈: boot_stack + hartid * 4 * PGSIZE (kernel/main.c:91)。时钟中断由 PLIC 统一分发，每核独立接收。\n- 08 锁: SpinLock 关中断行为在多核下是否安全=是。acquire() 调用 push_off() 关中断 (kernel/sync/spinlock.c:28)，使用 __sync_lock_test_and_set 原子操作 (kernel/sync/spinlock.c:35)，配合 __sync_synchronize() 内存屏障 (kernel/sync/spinlock.c:40)。关中断仅影响本地核，多核间通过原子 swap 互斥。push_off/pop_off 支持嵌套 (kernel/intr.c:7-41)。",
+      "evidence": [
+        {
+          "path": "kernel/sched/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "scheduler",
+          "excerpt": "Line 687-691: local sfence_vma() only"
+        },
+        {
+          "path": "kernel/sched/proc.c",
+          "symbol_kind": "variable",
+          "symbol_name": "proc_runnable",
+          "excerpt": "Line 245: global shared runqueue"
+        },
+        {
+          "path": "kernel/main.c",
+          "symbol_kind": "function",
+          "symbol_name": "main",
+          "excerpt": "Line 52,83: hart0 trapinithart() before hart1; Line 91: per-hart boot_stack"
+        },
+        {
+          "path": "kernel/sync/spinlock.c",
+          "symbol_kind": "function",
+          "symbol_name": "acquire",
+          "excerpt": "Line 28-41: push_off(); __sync_lock_test_and_set(); __sync_synchronize();"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_037",
+      "question_type": "single_choice",
+      "stem": "SpinLock 在获取锁时是否禁用中断（关中断保护临界区）？",
+      "value": "是，获取时关中断、释放时恢复",
+      "evidence": [
+        {
+          "path": "kernel/sync/spinlock.c",
+          "symbol_kind": "function",
+          "symbol_name": "acquire",
+          "excerpt": "Line 28: push_off(); // disable interrupts to avoid deadlock."
+        },
+        {
+          "path": "kernel/sync/spinlock.c",
+          "symbol_kind": "function",
+          "symbol_name": "release",
+          "excerpt": "Line 76: pop_off(); — re-enables interrupts on release"
+        },
+        {
+          "path": "kernel/intr.c",
+          "symbol_kind": "function",
+          "symbol_name": "push_off",
+          "excerpt": "Line 10-19: int old = intr_get(); intr_off(); if (c->noff == 0) c->intena = old; c->noff += 1; — nested disable with save/restore"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_038",
+      "question_type": "short_answer",
+      "stem": "NCPU/MAXCPU（或等价宏）与链接脚本中的每 hart 栈/入口布局是否对应？",
+      "value": "NCPU=2 (include/param.h:5)。链接脚本 linker/k210.ld 中无 _max_hart_id 定义（该符号在 bootloader 的 rustsbi-k210/link-k210.ld:7 中定义为 1，即最多 2 个 hart）。内核栈布局: main() 中 boot_stack + hartid * 4 * PGSIZE (kernel/main.c:91)，每 hart 4 页内核栈。NCPU=2 与 K210 双核硬件匹配，也与 main() 中 hart0/hart1 分支逻辑一致。",
+      "evidence": [
+        {
+          "path": "include/param.h",
+          "symbol_kind": "macro",
+          "symbol_name": "NCPU",
+          "excerpt": "Line 5: #define NCPU 2"
+        },
+        {
+          "path": "kernel/main.c",
+          "symbol_kind": "function",
+          "symbol_name": "main",
+          "excerpt": "Line 91: uint64 kstack = (uint64)boot_stack + hartid * 4 * PGSIZE; — per-hart stack: 4 pages each"
+        },
+        {
+          "path": "bootloader/SBI/rustsbi-k210/link-k210.ld",
+          "symbol_kind": "variable",
+          "symbol_name": "_max_hart_id",
+          "excerpt": "Line 7: _max_hart_id = 1; — bootloader defines max hart id as 1 (harts 0 and 1)"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_039",
+      "question_type": "tri_state_impl",
+      "stem": "是否使用 AtomicUsize/原子变量分配 PID/TID（全局唯一 ID 池）？",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/sched/proc.c",
+          "symbol_kind": "variable",
+          "symbol_name": "__pid",
+          "excerpt": "Line 38: int __pid; — plain int, not atomic"
+        },
+        {
+          "path": "kernel/sched/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "allocproc",
+          "excerpt": "Line 233-235: __enter_hash_cs; p->pid = __pid++; hash_insert_no_lock(p); __leave_hash_cs — PID increment protected by hash_lock spinlock, not atomic operation"
+        },
+        {
+          "path": "repos/xv6-k210",
+          "symbol_kind": "search",
+          "symbol_name": "atomic_pid_grep",
+          "excerpt": "grep_in_repo for 'AtomicUsize|atomic.*pid|__sync.*pid': 0 hits. No atomic PID allocation found."
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_040",
+      "question_type": "tri_state_impl",
+      "stem": "是否支持实时调度 (Real-Time Scheduling, Stallings Ch10)？",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/xv6-k210",
+          "symbol_kind": "search",
+          "symbol_name": "realtime_grep",
+          "excerpt": "grep_in_repo for 'SCHED_FIFO|SCHED_RR|realtime|deadline|RT priority' across 207 files: only CLOCK_REALTIME hits in time.h and systime.c (clock type, not scheduling policy). No real-time scheduling class, no SCHED_FIFO/SCHED_RR, no deadline scheduling found."
+        },
+        {
+          "path": "kernel/sched/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "__get_runnable_no_lock",
+          "excerpt": "Line 609-627: strict priority order with no preemption by higher-priority arrival during execution — not real-time semantics"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_041",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 NUMA (Non-Uniform Memory Access) 感知的内存分配或调度策略？",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/xv6-k210",
+          "symbol_kind": "search",
+          "symbol_name": "numa_grep",
+          "excerpt": "grep_in_repo for 'numa|node_id|local_memory' across 207 files: 0 hits. K210 is a dual-core RISC-V SoC with unified memory — NUMA is not applicable to this hardware architecture."
+        }
+      ]
+    }
+  ]
+}
+```

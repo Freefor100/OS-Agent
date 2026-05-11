@@ -1,0 +1,814 @@
+Now I have all the evidence needed. Let me compile the final JSON answer.
+
+```json
+{
+  "schema_version": "v1",
+  "stage_id": "05_fs_drivers",
+  "stage_title": "文件系统与设备 I/O",
+  "terminology_profile": "stallings_en_zh",
+  "answers": [
+    {
+      "question_id": "Q05_001",
+      "question_type": "short_answer",
+      "stem": "VFS 抽象层 (Virtual File System, VFS)接口是什么形态？",
+      "value": "C 函数指针操作表 (op table)。VFS 定义了四层抽象结构体 (superblock/inode/dentry/file)，每层通过嵌入的函数指针表 (struct fs_op / inode_op / dentry_op / file_op) 实现多态分派。例如 superblock 包含 `struct fs_op op` (include/fs/fs.h:90)，inode 包含 `struct inode_op *op` 和 `struct file_op *fop` (include/fs/fs.h:116-117)，dentry 包含 `struct dentry_op *op` (include/fs/fs.h:135)。具体文件系统 (FAT32) 通过填充静态操作表实例 (如 fat32_inode_op / fat32_file_op) 注册到 VFS。",
+      "evidence": [
+        {
+          "path": "include/fs/fs.h",
+          "symbol_kind": "struct",
+          "symbol_name": "fs_op",
+          "excerpt": "struct fs_op { struct inode *(*alloc_inode)(struct superblock *sb); void (*destroy_inode)(struct inode *ip); int (*write)(...); int (*read)(...); int (*clear)(...); int (*statfs)(...); void (*sync)(...); }; (L45-L52)"
+        },
+        {
+          "path": "include/fs/fs.h",
+          "symbol_kind": "struct",
+          "symbol_name": "inode_op",
+          "excerpt": "struct inode_op { struct inode *(*create)(...); struct inode *(*lookup)(...); int (*truncate)(...); int (*unlink)(...); int (*update)(...); int (*getattr)(...); int (*setattr)(...); int (*rename)(...); }; (L55-L63)"
+        },
+        {
+          "path": "include/fs/fs.h",
+          "symbol_kind": "struct",
+          "symbol_name": "file_op",
+          "excerpt": "struct file_op { int (*read)(...); int (*write)(...); int (*readdir)(...); int (*readv)(...); int (*writev)(...); }; (L71-L76)"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_002",
+      "question_type": "single_choice",
+      "stem": "具体文件系统后端 (Concrete File System Backend) 更接近哪种？",
+      "value": "混合挂载（磁盘 FS + 内存 FS 均支持）",
+      "evidence": [
+        {
+          "path": "kernel/fs/rootfs.c",
+          "symbol_kind": "function",
+          "symbol_name": "rootfs_init",
+          "excerpt": "rootfs_init() (L230-L313) 初始化 rootfs/procfs/devfs 三个内存虚拟文件系统，然后通过 do_mount(vda->inode, rootfs.root->inode, \"fat32\", 0, 0) 挂载 FAT32 磁盘文件系统，再通过 mountsysfs 将 devfs 和 procfs 挂载到 /dev 和 /proc。"
+        },
+        {
+          "path": "kernel/fs/blkdev.c",
+          "symbol_kind": "function",
+          "symbol_name": "fs_install",
+          "excerpt": "fs_install() (L169-L245) 根据 dev->mode 判断 S_IFBLK (块设备) 或 S_IFREG (普通文件)，分别绑定 disk_* 或 img_* 操作，并调用 fat32_init() 初始化 FAT32 超级块。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_003",
+      "question_type": "short_answer",
+      "stem": "若支持 FAT32/Ext4：它是自研还是第三方库/crate？",
+      "value": "自研实现。FAT32 文件系统完全由本仓库自行编写，位于 kernel/fs/fat32/ 目录下，包含 fat32.c、fat.c、cluster.c、dirent.c 等源文件。Makefile (L86-L89) 直接编译这些 .c 文件，无任何第三方 FAT32 库或 crate 依赖。",
+      "evidence": [
+        {
+          "path": "Makefile",
+          "symbol_kind": "build_rule",
+          "symbol_name": "SRC fat32",
+          "excerpt": "SRC += ... $K/fs/fat32/cluster.c $K/fs/fat32/dirent.c $K/fs/fat32/fat.c $K/fs/fat32/fat32.c ... (L86-L89)"
+        },
+        {
+          "path": "kernel/fs/fat32/fat32.c",
+          "symbol_kind": "function",
+          "symbol_name": "fat32_init",
+          "excerpt": "fat32_init() (L47-L140) 自研解析 FAT32 BPB (BIOS Parameter Block)，读取超级块、FS Info Sector，初始化根目录 inode。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_004",
+      "question_type": "short_answer",
+      "stem": "文件打开路径：文件打开入口（sys_open 或等价）→ VFS 层 → 具体 FS open。列出 3-6 个关键节点并给证据。",
+      "value": "1. sys_openat() (kernel/syscall/sysfile.c:194) — 系统调用入口，解析 dirfd/path/omode/fmode 参数。\n2. create() 或 nameifrom() (kernel/fs/fs.c:24 / kernel/fs/fs.c:474) — 路径解析：若 O_CREATE 则调用 create()→nameiparentfrom()→lookup_path()；否则 nameifrom()→lookup_path()。\n3. lookup_path() (kernel/fs/fs.c:413) — 核心路径遍历：处理绝对/相对路径，逐级调用 skipelem() 分割路径分量，对每级调用 dirlookup()。\n4. dirlookup() (kernel/fs/fs.c:320) — 目录项查找：先查 dentry cache，未命中则调用 inode_op->lookup() (即 fat_lookup_dir)。\n5. filealloc() + fdalloc() (kernel/fs/file.c:30 / kernel/fs/file.c:411) — 分配 struct file 和文件描述符，设置 f->type/f->ip/f->readable/f->writable。\n6. 返回 fd 给用户态。",
+      "evidence": [
+        {
+          "path": "kernel/syscall/sysfile.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_openat",
+          "excerpt": "sys_openat() (L194-L268): 解析参数 → create()/nameifrom() → filealloc() → fdalloc() → 设置 f->type/f->ip/f->readable/f->writable → 返回 fd"
+        },
+        {
+          "path": "kernel/fs/fs.c",
+          "symbol_kind": "function",
+          "symbol_name": "lookup_path",
+          "excerpt": "lookup_path() (L413-L462): 处理 '/' 开头绝对路径从 rootfs.root 开始，否则从 cwd 开始；while 循环调用 skipelem() 分割路径，逐级 dirlookup()"
+        },
+        {
+          "path": "kernel/fs/fs.c",
+          "symbol_kind": "function",
+          "symbol_name": "dirlookup",
+          "excerpt": "dirlookup() (L320-L388): 处理 '.' 和 '..'，先查 dentry cache (de->op->cache)，未命中则调用 dir->op->lookup() (即 fat_lookup_dir)"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_005",
+      "question_type": "short_answer",
+      "stem": "文件描述符表 (File Descriptor Table, FD Table) 的实现形态是什么？",
+      "value": "链式扩展的固定大小数组。struct fdtable (include/fs/file.h:32-L41) 包含 `struct file *arr[NOFILE]` 固定数组 (NOFILE=16)，以及 `struct fdtable *next` 指针形成链表。当一张表满时，fdalloc() (kernel/fs/file.c:411-L445) 通过 newfdtable() 分配新表并链接。basefd 字段记录每张表的起始 fd 偏移，支持动态扩展。",
+      "evidence": [
+        {
+          "path": "include/fs/file.h",
+          "symbol_kind": "struct",
+          "symbol_name": "fdtable",
+          "excerpt": "struct fdtable { uint16 basefd; uint16 nextfd; uint16 used; uint16 exec_close; struct file *arr[NOFILE]; struct fdtable *next; }; (L32-L41)"
+        },
+        {
+          "path": "kernel/fs/file.c",
+          "symbol_kind": "function",
+          "symbol_name": "fdalloc",
+          "excerpt": "fdalloc() (L411-L445): while (fdt->nextfd == NOFILE) 检查表满，若满则 newfdtable() 分配新表并链接；在表中找最小空闲 fd，设置 exec_close 位掩码"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_006",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现块缓存/缓冲缓存 (Block Cache / Buffer Cache, bcache)？",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/fs/bio.c",
+          "symbol_kind": "function",
+          "symbol_name": "binit",
+          "excerpt": "binit() (L84-L106): 初始化 bcache 哈希表 (BCACHE_TABLE_SIZE 个桶) 和 lru_head 双向链表，预分配 BNUM=2500 个 struct buf"
+        },
+        {
+          "path": "kernel/fs/bio.c",
+          "symbol_kind": "function",
+          "symbol_name": "bget",
+          "excerpt": "bget() (L108-L183): 先查哈希表 (bcache[idx])，命中则 refcnt++ 并从 LRU 链表移除；未命中则从 lru_head 尾部取最久未使用 buf，可能触发驱逐"
+        },
+        {
+          "path": "include/fs/buf.h",
+          "symbol_kind": "struct",
+          "symbol_name": "buf",
+          "excerpt": "struct buf { uint32 dev; uint32 sectorno; uint32 refcnt; uint16 valid; uint8 dirty; uint8 disk; struct d_list list; list_node_t hash; struct sleeplock lock; uchar data[BSIZE]; }; (L13-L32)"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_007",
+      "question_type": "short_answer",
+      "stem": "若存在缓存：驱逐策略是什么（LRU/Clock/FIFO/无驱逐）？必须指出判断依据（字段/算法分支）证据。",
+      "value": "LRU (Least Recently Used) 驱逐策略。bget() (kernel/fs/bio.c:108-L183) 中：缓存命中时将 buf 从 LRU 链表移除 (dlist_del)，使用完毕后 brelse()→bput() 将其插回 lru_head 头部 (dlist_add_after)。缓存未命中时从 lru_head.prev (即链表尾部，最久未使用) 取 buf 复用。lru_head 是全局双向链表 (include/fs/buf.h:27 的 `struct d_list list` 字段)，按最近使用时间排序。",
+      "evidence": [
+        {
+          "path": "kernel/fs/bio.c",
+          "symbol_kind": "function",
+          "symbol_name": "bget",
+          "excerpt": "bget() (L108-L183): 命中时 dlist_del(&b->list) 移出 LRU；未命中时 struct d_list *dl = lru_head.prev 取尾部 (最久未使用) 复用"
+        },
+        {
+          "path": "kernel/fs/bio.c",
+          "symbol_kind": "function",
+          "symbol_name": "bput",
+          "excerpt": "bput() (L270-L282): refcnt==0 时 dlist_add_after(&lru_head, &b->list) 插回 LRU 头部 (最近使用)"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_008",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现页缓存 (Page Cache)或与 mmap/文件映射共享缓存页？",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "include/utils/rbtree.h",
+          "symbol_kind": "search",
+          "symbol_name": "rb_page_cache_scan",
+          "excerpt": "在 include/utils/rbtree.h 中发现 rb_search_page_cache / rb_insert_page_cache 内联函数引用 inode->i_rb_page_cache 字段，但该字段在 include/fs/fs.h 的 struct inode 定义中不存在 (仅有 struct rb_root mapping 字段 L120)。在全部 .c 文件中搜索 rb_page_cache / rb_insert_page_cache / rb_search_page_cache 调用，0 命中。该红黑树辅助函数仅为预留接口，未被任何代码调用。"
+        },
+        {
+          "path": "kernel/fs/bio.c",
+          "symbol_kind": "search",
+          "symbol_name": "page_cache_grep",
+          "excerpt": "搜索 page_cache / PageCache / pagecache 关键词，仅在 rbtree.h 中有静态内联函数定义，无实际调用。块缓存 (bio.c) 以扇区为单位缓存，不涉及页粒度文件数据缓存。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_009",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 mmap 的文件映射或匿名映射？",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/syscall/sysmem.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_mmap",
+          "excerpt": "sys_mmap() (L80-L115): 解析 start/len/prot/flags/fd/off 参数，支持 MAP_ANONYMOUS 和 MAP_SHARED/MAP_PRIVATE，调用 do_mmap()"
+        },
+        {
+          "path": "kernel/mm/mmap.c",
+          "symbol_kind": "function",
+          "symbol_name": "do_mmap",
+          "excerpt": "do_mmap() (L710-L780): 检查文件权限与 prot 匹配，调用 lookup_segment() 找空闲地址段，根据是否有文件分别调用 mmap_file() 或 mmap_anonymous()，插入进程 segment 链表"
+        },
+        {
+          "path": "include/mm/mmap.h",
+          "symbol_kind": "macro",
+          "symbol_name": "MAP_ANONYMOUS",
+          "excerpt": "#define MAP_ANONYMOUS 0x20 (L20); #define MAP_SHARED 0x01 (L17); #define MAP_PRIVATE 0x02 (L18); struct mmap_page 含 f_off/f_len/pa/ref/valid/rb 字段 (L48-L56)"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_010",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 poll/select/epoll（或等价事件机制）？",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/syscall/sysfile.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_pselect",
+          "excerpt": "sys_pselect() (L679-L736): 系统调用入口，解析 nfds 和 fd_set，调用 pselect() 内核函数"
+        },
+        {
+          "path": "kernel/syscall/sysfile.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_ppoll",
+          "excerpt": "sys_ppoll() (L739-L790): 系统调用入口，解析 pollfd 数组，调用 ppoll() 内核函数"
+        },
+        {
+          "path": "kernel/fs/poll.c",
+          "symbol_kind": "function",
+          "symbol_name": "pselect",
+          "excerpt": "pselect() (L127-L243): 完整实现，遍历 fd_set 中每个 fd，调用 file_poll() 检查状态，支持超时 (expire) 和 poll_wait_queue 睡眠等待机制"
+        },
+        {
+          "path": "kernel/fs/poll.c",
+          "symbol_kind": "function",
+          "symbol_name": "ppoll",
+          "excerpt": "ppoll() (L91-L103): 当前为简化实现，对所有 pfds 直接设置 revents = POLLIN|POLLOUT 并返回 nfds (未真正检查文件状态)"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_011",
+      "question_type": "tri_state_impl",
+      "stem": "路径解析 (namei/path_walk/lookup) 是否实现并支持绝对/相对路径与 . ..？",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/fs/fs.c",
+          "symbol_kind": "function",
+          "symbol_name": "lookup_path",
+          "excerpt": "lookup_path() (L413-L462): 若 path 以 '/' 开头则从 rootfs.root 开始 (绝对路径)；否则从 ip (或 cwd) 开始 (相对路径)。while 循环调用 skipelem() 逐级分割路径分量"
+        },
+        {
+          "path": "kernel/fs/fs.c",
+          "symbol_kind": "function",
+          "symbol_name": "dirlookup",
+          "excerpt": "dirlookup() (L320-L388): 显式处理 '.' (返回当前目录 inode) 和 '..' (通过 de->parent 回溯，并处理挂载点穿越 de_mnt_in())"
+        },
+        {
+          "path": "kernel/fs/fs.c",
+          "symbol_kind": "function",
+          "symbol_name": "skipelem",
+          "excerpt": "skipelem() (L389-L411): 跳过连续 '/'，提取下一个路径分量到 name，返回剩余路径"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_012",
+      "question_type": "tri_state_impl",
+      "stem": "是否支持符号链接 (symlink) 的解析/跟随？",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/syscall/sysfile.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_readlinkat",
+          "excerpt": "sys_readlinkat() (L616-L655): 实现了 readlinkat 系统调用，但仅通过 namepath() 返回 inode 的完整路径字符串，并非解析符号链接。未发现 symlink 创建 (symlink/symlinkat) 系统调用，也未在路径解析 (lookup_path) 中发现符号链接跟随逻辑。"
+        },
+        {
+          "path": "kernel/syscall/syscall.c",
+          "symbol_kind": "search",
+          "symbol_name": "syscall_table_scan",
+          "excerpt": "扫描 syscall.c 系统调用表 (L158-L330)，未发现 SYS_symlinkat / SYS_symlink 条目。搜索 'symlink' 关键词，仅在 errno.h 和 stat.h 中有宏定义，无实现代码。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_013",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现管道 (pipe/pipe2) 并在 VFS 层作为文件对象？",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/syscall/sysfile.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_pipe",
+          "excerpt": "sys_pipe() (L317-L353): 调用 pipealloc() 创建读写两个 struct file，通过 fdalloc() 分配两个 fd，copyout2 返回给用户态"
+        },
+        {
+          "path": "kernel/fs/pipe.c",
+          "symbol_kind": "function",
+          "symbol_name": "pipealloc",
+          "excerpt": "pipealloc() (L39-L95): 分配 struct pipe (环形缓冲区)，创建两个 struct file (f0 读端 FD_PIPE readable, f1 写端 FD_PIPE writable)，初始化 wait_queue (wqueue/rqueue)"
+        },
+        {
+          "path": "kernel/fs/file.c",
+          "symbol_kind": "function",
+          "symbol_name": "fileread",
+          "excerpt": "fileread() (L113-L155): switch(f->type) case FD_PIPE: r = piperead(f->pipe, addr, n) — pipe 作为 VFS 文件对象通过 FD_PIPE 类型分派"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_014",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现网络 socket（作为 VFS 文件对象）？",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/syscall/syscall.c",
+          "symbol_kind": "search",
+          "symbol_name": "socket_syscall_scan",
+          "excerpt": "在 syscall.c 系统调用表中搜索 socket/bind/listen/accept/connect 相关条目，0 命中。搜索 'AF_INET' / 'SOCK_STREAM' 关键词，仅在 errno.h 中有 ENOTSOCK/EPROTOTYPE/ESOCKTNOSUPPORT 错误码定义和 stat.h 中 S_IFSOCK 宏，无任何实现代码。"
+        },
+        {
+          "path": "include/fs/file.h",
+          "symbol_kind": "search",
+          "symbol_name": "file_type_e_scan",
+          "excerpt": "file_type_e 枚举仅包含 FD_NONE/FD_PIPE/FD_INODE/FD_DEVICE 四种类型 (L9-L13)，无 FD_SOCKET 类型。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_015",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现伪文件系统（devfs/procfs/sysfs）？",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/fs/rootfs.c",
+          "symbol_kind": "function",
+          "symbol_name": "rootfs_init",
+          "excerpt": "rootfs_init() (L230-L313): 初始化三个虚拟文件系统 — rootfs (根)、devfs (设备，含 console/vda2/zero/null)、procfs (进程信息，含 mounts/meminfo)。devfs 通过 mountsysfs 挂载到 /dev，procfs 挂载到 /proc。"
+        },
+        {
+          "path": "kernel/fs/rootfs.c",
+          "symbol_kind": "variable",
+          "symbol_name": "rootfs_inode_op",
+          "excerpt": "rootfs_inode_op (L156) 使用 dummy_create/dummy_lookup/dummy_setattr/dummy_rename 等桩函数；rootfs_file_op (L148) 使用 dummy_file_rw/dummy_file_readdir 等桩函数"
+        },
+        {
+          "path": "kernel/fs/rootfs.c",
+          "symbol_kind": "variable",
+          "symbol_name": "zero_op",
+          "excerpt": "zero_op (L167): zero_read() 返回 0 填充，zero_write() 丢弃数据；null_op (L175): null_read() 返回 0 (EOF)"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_016",
+      "question_type": "single_choice",
+      "stem": "文件描述符表的归属是哪种？",
+      "value": "Per-Process（每进程独立 fd 表，fork 时复制/共享）",
+      "evidence": [
+        {
+          "path": "kernel/fs/file.c",
+          "symbol_kind": "function",
+          "symbol_name": "fdalloc",
+          "excerpt": "fdalloc() (L411): struct proc *p = myproc(); struct fdtable *fdt = &p->fds; — fd 表嵌入在 struct proc 中，每进程独立"
+        },
+        {
+          "path": "kernel/fs/file.c",
+          "symbol_kind": "function",
+          "symbol_name": "copyfdtable",
+          "excerpt": "copyfdtable() (L313-L345): fork 时逐表复制，对每个有效 fd 调用 filedup() 增加 file 引用计数，exec_close 位掩码一并复制"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_017",
+      "question_type": "single_choice",
+      "stem": "文件数据块分配方式 (File Allocation Method, Stallings Ch12) 更接近哪种？",
+      "value": "链式分配 (Chained/Linked Allocation)：块通过指针链接",
+      "evidence": [
+        {
+          "path": "kernel/fs/fat32/fat32.h",
+          "symbol_kind": "struct",
+          "symbol_name": "fat32_entry",
+          "excerpt": "struct fat32_entry { ... uint32 first_clus; ... uint32 cur_clus; struct rb_root rb_clus; ... } (L89-L103): 文件通过 first_clus 指向首簇，FAT 表中每个簇条目存储下一簇号 (链式链接)"
+        },
+        {
+          "path": "kernel/fs/fat32/fat32.h",
+          "symbol_kind": "function",
+          "symbol_name": "alloc_clus",
+          "excerpt": "alloc_clus() / free_clus() / reloc_clus() (L132-L134): 簇分配/释放/重定位函数，操作 FAT 表中的簇链"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_018",
+      "question_type": "single_choice",
+      "stem": "磁盘/存储空闲空间管理 (Free Space Management, Stallings Ch12) 更接近哪种？",
+      "value": "FAT 表内嵌空闲链（FAT32 特有）",
+      "evidence": [
+        {
+          "path": "kernel/fs/fat32/fat32.h",
+          "symbol_kind": "field",
+          "symbol_name": "free_count",
+          "excerpt": "struct fat32_sb { ... uint32 free_count; uint32 next_free; ... } (L59-L60): 从 FS Info Sector 读取空闲簇计数和下一个空闲簇提示"
+        },
+        {
+          "path": "kernel/fs/fat32/fat32.c",
+          "symbol_kind": "function",
+          "symbol_name": "fat32_init",
+          "excerpt": "fat32_init() (L108-L113): 读取 FS Info Sector，解析 free_count 和 next_free 字段。FAT32 的空闲空间通过 FAT 表中值为 0 的条目表示，空闲簇链内嵌在 FAT 表自身中。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_019",
+      "question_type": "single_choice",
+      "stem": "目录结构 (Directory Structure, Stallings Ch12) 更接近哪种？",
+      "value": "树形层次目录 (Tree-Structured Hierarchy)（最常见）",
+      "evidence": [
+        {
+          "path": "kernel/fs/fs.c",
+          "symbol_kind": "function",
+          "symbol_name": "dirlookup",
+          "excerpt": "dirlookup() (L320-L388): 支持 '.' 和 '..' 导航，通过 de->parent 回溯父目录，通过 de->child 遍历子目录。dentry 结构体 (include/fs/fs.h:128-L136) 含 parent/next/child 指针形成树形层次。"
+        },
+        {
+          "path": "kernel/fs/fs.c",
+          "symbol_kind": "function",
+          "symbol_name": "lookup_path",
+          "excerpt": "lookup_path() (L413-L462): 从根或 cwd 开始逐级向下查找，典型的树形目录遍历。未发现硬链接支持 (inode->nlink 注释为 'useless on FAT')。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_020",
+      "question_type": "single_choice",
+      "stem": "文件内部记录组织 (File Record Organization, Stallings Ch12) 更接近哪种？",
+      "value": "字节流 (Byte Stream / Unstructured)：无固定记录结构",
+      "evidence": [
+        {
+          "path": "kernel/fs/file.c",
+          "symbol_kind": "function",
+          "symbol_name": "fileread",
+          "excerpt": "fileread() (L113-L155): 接受任意 n 字节读取请求，通过 f->off 维护文件偏移，无记录边界概念。filewrite() 同理。"
+        },
+        {
+          "path": "include/fs/file.h",
+          "symbol_kind": "field",
+          "symbol_name": "off",
+          "excerpt": "struct file { ... uint off; ... } (L25): 仅维护字节偏移量，无记录长度/记录号等字段"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_021",
+      "question_type": "single_choice",
+      "stem": "设备发现/枚举机制更接近哪种？",
+      "value": "硬编码设备表/固定 MMIO 地址",
+      "evidence": [
+        {
+          "path": "include/memlayout.h",
+          "symbol_kind": "macro",
+          "symbol_name": "UART",
+          "excerpt": "#ifdef QEMU: #define UART 0x10000000L; #else: #define UART 0x38000000L (L38-L42)。所有设备地址 (VIRTIO0/CLINT/PLIC/GPIOHS/DMAC/SPI0-2/FPIOA/SYSCTL) 均为硬编码常量。"
+        },
+        {
+          "path": "kernel/main.c",
+          "symbol_kind": "function",
+          "symbol_name": "main",
+          "excerpt": "main() (L35): 接收 dtb_pa 参数但未使用。搜索 'fdt_' / 'device_tree' / 'dtb' 关键词，仅在 main() 签名中出现 dtb_pa，无任何解析代码。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_022",
+      "question_type": "tri_state_impl",
+      "stem": "是否能在代码中证实解析了 `.dtb`/DeviceTree？",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/main.c",
+          "symbol_kind": "parameter",
+          "symbol_name": "dtb_pa",
+          "excerpt": "main(unsigned long hartid, unsigned long dtb_pa) (L35): dtb_pa 参数被接收但从未使用。搜索 'fdt_' / 'device_tree' / 'dtb' / 'libfdt' 关键词，0 命中任何解析代码。"
+        },
+        {
+          "path": "include/memlayout.h",
+          "symbol_kind": "search",
+          "symbol_name": "mmio_hardcoded",
+          "excerpt": "所有 MMIO 地址均为硬编码宏 (UART/VIRTIO0/CLINT/PLIC 等)，无任何从 DTB 动态获取地址的逻辑。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_023",
+      "question_type": "short_answer",
+      "stem": "驱动框架接口是什么？",
+      "value": "C 函数指针操作表 + 编译时条件切换。块设备驱动通过 disk.h 抽象接口 (disk_init/disk_read/disk_write/disk_submit/disk_intr) 在编译时 #ifdef QEMU 切换 virtio_disk_* 与 sdcard_* 实现。字符设备 (console) 通过 struct file_op console_op (kernel/console.c:325) 接入 VFS。无统一的 Driver trait 或驱动注册表，驱动通过硬编码初始化序列 (main.c) 直接调用。",
+      "evidence": [
+        {
+          "path": "kernel/hal/disk.c",
+          "symbol_kind": "function",
+          "symbol_name": "disk_init",
+          "excerpt": "disk_init() (L22-L32): #ifdef QEMU virtio_disk_init(); #else sdcard_init(); #endif — 编译时条件编译切换驱动"
+        },
+        {
+          "path": "kernel/console.c",
+          "symbol_kind": "variable",
+          "symbol_name": "console_op",
+          "excerpt": "struct file_op console_op = { .read = __consoleread, .write = __consolewrite, .readdir = dummy_file_readdir, .readv = consolereadv, .writev = consolewritev } (L325-L330)"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_024",
+      "question_type": "short_answer",
+      "stem": "驱动注册与初始化顺序是什么？",
+      "value": "1. consoleinit() (kernel/main.c:43) — 初始化控制台锁和环形缓冲区\n2. plicinit() + plicinithart() (kernel/main.c:54-55) — 初始化 PLIC 中断控制器，使能 UART_IRQ 和 DISK_IRQ\n3. fpioa_pin_init() + dmac_init() (kernel/main.c:57-58, 仅 K210) — 初始化 FPIOA 引脚复用和 DMA 控制器\n4. disk_init() (kernel/main.c:60) — 根据平台初始化块设备驱动 (virtio_disk_init 或 sdcard_init)\n5. binit() (kernel/main.c:61) — 初始化块缓存 (bio 层)\n6. rootfs_init() (由 userinit 间接触发) — 初始化 rootfs/devfs/procfs，挂载 FAT32，注册 console/zero/null 设备",
+      "evidence": [
+        {
+          "path": "kernel/main.c",
+          "symbol_kind": "function",
+          "symbol_name": "main",
+          "excerpt": "main() (L34-L98): consoleinit()→kpminit()→kvminit()→kvminithart()→kmallocinit()→trapinithart()→procinit()→plicinit()→plicinithart()→[K210: fpioa_pin_init()+dmac_init()]→disk_init()→binit()→userinit()"
+        },
+        {
+          "path": "kernel/fs/rootfs.c",
+          "symbol_kind": "function",
+          "symbol_name": "rootfs_init",
+          "excerpt": "rootfs_init() (L230-L313): 初始化 rootfs/devfs/procfs，注册 console_op/zero_op/null_op，do_mount() 挂载 FAT32，mountsysfs() 挂载 devfs/procfs"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_025",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 UART/Console 驱动用于早期输出？",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/console.c",
+          "symbol_kind": "function",
+          "symbol_name": "consoleinit",
+          "excerpt": "consoleinit() (L299-L308): 初始化 cons 结构体 (锁 + 环形缓冲区 r/w/e 索引)"
+        },
+        {
+          "path": "kernel/console.c",
+          "symbol_kind": "variable",
+          "symbol_name": "console_op",
+          "excerpt": "struct file_op console_op (L325-L330): 提供 read/write/readv/writev 操作，通过 rootfs_init() 注册到 /dev/console"
+        },
+        {
+          "path": "kernel/trap/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "handle_intr",
+          "excerpt": "handle_intr() (L281-L285): case UART_IRQ: c = sbi_console_getchar(); if (-1 != c) consoleintr(c) — UART 中断路由到控制台输入处理"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_026",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现块设备驱动（virtio-blk/ramdisk/其他）？",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/hal/virtio_disk.c",
+          "symbol_kind": "function",
+          "symbol_name": "virtio_disk_init",
+          "excerpt": "virtio_disk_init() (L94-L164): 初始化 virtio MMIO 接口，配置 virtq_desc/virtq_avail/virtq_used 描述符环，识别磁盘容量"
+        },
+        {
+          "path": "kernel/hal/sdcard.c",
+          "symbol_kind": "function",
+          "symbol_name": "sdcard_init",
+          "excerpt": "sdcard_init() (L441-L608): K210 平台 SD 卡 SPI 模式初始化，包含 sd_init()→check_sdcard_size() 等完整初始化序列"
+        },
+        {
+          "path": "kernel/hal/disk.c",
+          "symbol_kind": "function",
+          "symbol_name": "disk_init",
+          "excerpt": "disk_init() (L22-L32): #ifdef QEMU virtio_disk_init(); #else sdcard_init(); #endif — 编译时选择块设备驱动"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_027",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现网络设备驱动（virtio-net/e1000/rtl8139 等）？",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/hal",
+          "symbol_kind": "search",
+          "symbol_name": "net_driver_scan",
+          "excerpt": "搜索 virtio_net/e1000/rtl8139/net_init/network 关键词，仅在 errno.h 中有 ENONET/ENOTUNIQ 错误码定义。hal 目录下仅有 virtio_disk.c (块设备) 和 sdcard.c (SD卡)，无任何网络设备驱动文件。"
+        },
+        {
+          "path": "Makefile",
+          "symbol_kind": "search",
+          "symbol_name": "net_src_scan",
+          "excerpt": "Makefile SRC 列表中无任何网络驱动源文件。QEMUOPTS 仅配置了 virtio-blk-device，无 virtio-net-device。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_028",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现中断控制器驱动（PLIC/CLINT/APIC 等）？",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/hal/plic.c",
+          "symbol_kind": "function",
+          "symbol_name": "plicinit",
+          "excerpt": "plicinit() (L24-L28): 设置 DISK_IRQ 和 UART_IRQ 的优先级为 1"
+        },
+        {
+          "path": "kernel/hal/plic.c",
+          "symbol_kind": "function",
+          "symbol_name": "plicinithart",
+          "excerpt": "plicinithart() (L34-L63): 为每个 hart 使能 S-mode (QEMU) 或 M-mode (K210) 的外部中断，设置优先级阈值为 0"
+        },
+        {
+          "path": "kernel/trap/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "handle_intr",
+          "excerpt": "handle_intr() (L278-L297): int irq = plic_claim(); switch(irq) { case UART_IRQ: consoleintr(c); break; case DISK_IRQ: disk_intr(); break; } if (irq) plic_complete(irq) — 完整的中断分发路径"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_029",
+      "question_type": "short_answer",
+      "stem": "MMIO 地址来源是什么？",
+      "value": "常量硬编码。所有设备 MMIO 物理地址在 include/memlayout.h 中以 #define 宏定义 (如 UART=0x10000000L QEMU / 0x38000000L K210)，虚拟地址通过 VIRT_OFFSET (0x3F00000000L) 转换 (如 UART_V = UART + VIRT_OFFSET)。kvminit() 在 kernel/mm/vm.c:60-95 通过 kvmmap() 建立物理→虚拟的直接映射。",
+      "evidence": [
+        {
+          "path": "include/memlayout.h",
+          "symbol_kind": "macro",
+          "symbol_name": "UART",
+          "excerpt": "#ifdef QEMU: #define UART 0x10000000L; #else: #define UART 0x38000000L (L38-L42); #define VIRT_OFFSET 0x3F00000000L (L36); #define UART_V (UART + VIRT_OFFSET) (L45)"
+        },
+        {
+          "path": "kernel/mm/vm.c",
+          "symbol_kind": "function",
+          "symbol_name": "kvminit",
+          "excerpt": "kvminit() (L60): kvmmap(UART_V, UART, PGSIZE, PTE_R | PTE_W) — 建立 UART 物理地址到虚拟地址的映射"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_030",
+      "question_type": "short_answer",
+      "stem": "多平台适配是如何通过构建/条件编译选择驱动的？",
+      "value": "通过 Makefile 变量 `platform` (k210 或 qemu) 控制。Makefile (L1-L2) 设置 `platform := k210` (默认)，通过 `ifeq ($(platform), qemu)` 添加 `-D QEMU` CFLAGS 宏 (L33-L35)。内核代码使用 `#ifdef QEMU` / `#ifndef QEMU` 条件编译选择不同驱动实现：disk.c 切换 virtio_disk_* 与 sdcard_*；plic.c 切换 S-mode 与 M-mode PLIC 访问；memlayout.h 切换 UART 基址和 IRQ 号；Makefile SRC 列表根据平台添加不同源文件 (K210: spi.c/gpiohs.c/fpioa.c/sdcard.c/dmac.c/sysctl.c/utils.c; QEMU: virtio_disk.c)。",
+      "evidence": [
+        {
+          "path": "Makefile",
+          "symbol_kind": "variable",
+          "symbol_name": "platform",
+          "excerpt": "platform := k210 (L1); ifeq ($(platform), qemu) CFLAGS += -D QEMU (L33-L35); ifeq ($(platform), k210) SRC += ... sdcard.c dmac.c ... else SRC += ... virtio_disk.c (L122-L131)"
+        },
+        {
+          "path": "kernel/hal/disk.c",
+          "symbol_kind": "preprocessor",
+          "symbol_name": "QEMU_ifdef",
+          "excerpt": "#ifdef QEMU virtio_disk_init(); #else sdcard_init(); #endif (L27-L31) — 所有 disk_* 函数均使用此模式"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_031",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 MMU 启用前后串口地址切换（phys/virt 切换）逻辑？",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "include/memlayout.h",
+          "symbol_kind": "macro",
+          "symbol_name": "UART_V",
+          "excerpt": "#define UART 0x10000000L (QEMU) / 0x38000000L (K210) (L38-L42); #define VIRT_OFFSET 0x3F00000000L (L36); #define UART_V (UART + VIRT_OFFSET) (L45) — 物理地址和虚拟地址分别定义"
+        },
+        {
+          "path": "kernel/mm/vm.c",
+          "symbol_kind": "function",
+          "symbol_name": "kvminit",
+          "excerpt": "kvminit() (L60): kvmmap(UART_V, UART, PGSIZE, PTE_R | PTE_W) — MMU 启用后建立 UART 物理地址到虚拟地址的恒等映射偏移"
+        },
+        {
+          "path": "kernel/main.c",
+          "symbol_kind": "function",
+          "symbol_name": "main",
+          "excerpt": "main() (L47-L48): kvminit() 创建内核页表 → kvminithart() 启用分页 (turn on paging)。consoleinit() 在 kvminit 之前调用 (L43)，使用物理地址；kvminithart 之后所有代码使用虚拟地址 (UART_V)。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_032",
+      "question_type": "single_choice",
+      "stem": "I/O 缓冲模式 (I/O Buffering) 最接近哪种？",
+      "value": "缓冲池 (Buffer Pool)",
+      "evidence": [
+        {
+          "path": "kernel/fs/bio.c",
+          "symbol_kind": "variable",
+          "symbol_name": "bufs",
+          "excerpt": "static struct buf bufs[BNUM] (L81): BNUM=2500 个预分配 buf 结构体形成缓冲池。bget() 从池中分配，brelse()/bput() 归还到 LRU 链表。"
+        },
+        {
+          "path": "kernel/console.c",
+          "symbol_kind": "struct",
+          "symbol_name": "cons",
+          "excerpt": "console 使用 128 字节环形缓冲区 (circular buffer) 用于输入。但块设备 I/O 的主体缓冲机制是 bio 层的缓冲池。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_033",
+      "question_type": "single_choice",
+      "stem": "块设备（磁盘/eMMC/NVMe）I/O 请求调度算法 (Scheduling Algorithm) (Disk Scheduling Algorithm) 更接近哪种？",
+      "value": "基于 virtio 环（queue 顺序提交，无显式磁盘调度）",
+      "evidence": [
+        {
+          "path": "kernel/hal/virtio_disk.c",
+          "symbol_kind": "function",
+          "symbol_name": "virtio_disk_rw",
+          "excerpt": "virtio_disk_rw() (L241-L340): 将请求填入 virtq_desc 描述符环，按 avail ring 顺序提交。无 SSTF/SCAN 等寻道优化逻辑。"
+        },
+        {
+          "path": "kernel/hal/sdcard.c",
+          "symbol_kind": "function",
+          "symbol_name": "sdcard_submit",
+          "excerpt": "sdcard_submit() (L939-L961): 将 buf 加入 sd_wqueue 等待队列，按提交顺序处理。无显式磁盘调度算法。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_034",
+      "question_type": "single_choice",
+      "stem": "I/O 控制技术 (I/O Control Techniques, Stallings Ch11) 更接近哪种？",
+      "value": "混合（小传输用中断，大传输用 DMA）",
+      "evidence": [
+        {
+          "path": "kernel/trap/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "handle_intr",
+          "excerpt": "handle_intr() (L287-L290): case DISK_IRQ: disk_intr() — 磁盘 I/O 完成后通过 PLIC 中断通知 CPU (中断驱动)"
+        },
+        {
+          "path": "kernel/hal/sdcard.c",
+          "symbol_kind": "function",
+          "symbol_name": "sd_read_data_dma",
+          "excerpt": "sd_read_data_dma() (L72-L85): K210 平台使用 DMAC (DMA 控制器) 进行 SD 卡数据传输"
+        },
+        {
+          "path": "kernel/hal/dmac.c",
+          "symbol_kind": "function",
+          "symbol_name": "dmac_init",
+          "excerpt": "dmac_init() (L258): K210 平台初始化 DMA 控制器，用于 SD 卡块数据传输"
+        },
+        {
+          "path": "kernel/hal/virtio_disk.c",
+          "symbol_kind": "struct",
+          "symbol_name": "virtq_desc",
+          "excerpt": "virtq_desc (include/hal/virtio.h:57-L61): addr/len/flags/next 字段 — virtio 描述符环本质是 DMA 等价机制，设备直接通过描述符中的物理地址访问内存"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_035",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 DMA (Direct Memory Access, Stallings Ch11) 传输路径？",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/hal/dmac.c",
+          "symbol_kind": "function",
+          "symbol_name": "dmac_init",
+          "excerpt": "dmac_init() (L258-L268): K210 平台 DMAC (DMA Controller) 初始化，配置 DMA 通道时钟"
+        },
+        {
+          "path": "kernel/hal/sdcard.c",
+          "symbol_kind": "function",
+          "symbol_name": "sd_read_data_dma",
+          "excerpt": "sd_read_data_dma() (L72-L85): 使用 DMAC 进行 SD 卡数据读取的 DMA 传输"
+        },
+        {
+          "path": "include/hal/virtio.h",
+          "symbol_kind": "struct",
+          "symbol_name": "virtq_desc",
+          "excerpt": "struct virtq_desc { uint64 addr; uint32 len; uint16 flags; uint16 next; } (L57-L61): virtio 描述符环 — 设备通过描述符中的物理地址直接访问内存，属于 DMA 等价机制"
+        },
+        {
+          "path": "kernel/main.c",
+          "symbol_kind": "function",
+          "symbol_name": "main",
+          "excerpt": "main() (L57): #ifndef QEMU dmac_init() — K210 平台在 disk_init() 之前初始化 DMA 控制器"
+        }
+      ]
+    }
+  ]
+}
+```

@@ -1,0 +1,122 @@
+{
+  "stage_id": "05_fs_drivers",
+  "evidence_targets": [
+    "VFS 设计 (superblock/inode/dentry/file 四层抽象 + 操作表)",
+    "具体文件系统 FAT32 实现",
+    "fd table 与文件描述符分配",
+    "pipe 实现",
+    "块设备驱动框架 (bio 缓存层 + blkdev + disk 抽象)",
+    "中断注册与 PLIC 路由 (UART_IRQ / DISK_IRQ)",
+    "virtio 块设备驱动 (QEMU)",
+    "SD 卡 SPI 驱动 (K210)",
+    "平台适配 (QEMU vs K210 编译时切换)",
+    "mount/umount 与 sysfs 挂载机制",
+    "console 设备 (UART 字符设备)",
+    "poll/select 多路复用",
+    "VFS 设计",
+    "具体文件系统",
+    "fd table",
+    "pipe/mmap"
+  ],
+  "seed_paths": [
+    "include/fs/fs.h",
+    "include/fs/file.h",
+    "include/fs/pipe.h",
+    "include/fs/buf.h",
+    "include/hal/disk.h",
+    "include/hal/virtio.h",
+    "kernel/fs/fs.c",
+    "kernel/fs/file.c",
+    "kernel/fs/blkdev.c",
+    "kernel/fs/mount.c",
+    "kernel/syscall/sysfile.c",
+    "kernel/main.c",
+    "fs",
+    "vfs"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "sys_openat",
+    "sys_read",
+    "sys_write",
+    "sys_mount",
+    "sys_pipe",
+    "filealloc",
+    "fdalloc",
+    "namei",
+    "create",
+    "do_mount",
+    "sys_open",
+    "vfs_open"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "bootloader",
+    "bootloader/SBI",
+    "debug",
+    "debug/kendryte_openocd",
+    "debug/openocd_cfg",
+    "doc",
+    "doc/img",
+    "include",
+    "include/fs"
+  ],
+  "preferred_tools": [
+    "lsp_get_document_outline",
+    "lsp_get_definition",
+    "lsp_get_references",
+    "lsp_get_call_graph",
+    "read_code_segment",
+    "rag_search_code",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "1. 用 lsp_get_document_outline 鸟瞰 include/fs/fs.h，确认 VFS 核心结构体 (superblock/inode/dentry/fs_op/inode_op/dentry_op/file_op) 的完整字段",
+    "2. 用 read_code_segment 精读 include/fs/fs.h 中 superblock 结构体 (约 L80-L95) 和 inode 结构体 (约 L105-L125)，记录关键字段与注释",
+    "3. 用 lsp_get_document_outline 鸟瞰 include/fs/file.h，确认 file/fdtable/iovec 结构体及 file_type_e 枚举",
+    "4. 用 read_code_segment 精读 include/fs/file.h 中 file 结构体 (L18-L29) 和 fdtable 结构体 (L32-L41)，记录 type 枚举值 FD_NONE/FD_PIPE/FD_INODE/FD_DEVICE",
+    "5. 用 lsp_get_document_outline 鸟瞰 kernel/fs/fs.c，确认 VFS 核心函数 (create/unlink/namei/nameiparent/idup/iput/ilock/iunlock/syncfs 等)",
+    "6. 用 read_code_segment 精读 kernel/fs/fs.c 中 create() (L24-L110) 和 namei() (L463-L468)，理解路径解析与 inode 创建流程",
+    "7. 用 lsp_get_document_outline 鸟瞰 kernel/fs/file.c，确认文件操作函数 (filealloc/filedup/fileclose/fileread/filewrite/fdalloc/fdalloc3 等)",
+    "8. 用 read_code_segment 精读 kernel/fs/file.c 中 filealloc() (L30-L44) 和 fdalloc() (L411-L445)，理解文件结构分配与 fd 分配算法",
+    "9. 用 read_code_segment 精读 kernel/fs/file.c 中 fileread() (L113-L155) 和 filewrite() (L157-L192)，理解按 type 分派到 pipe/device/inode 的读写路径",
+    "10. 用 read_code_segment 精读 kernel/fs/file.c 中 copyfdtable() (L313-L345) 和 fdcloexec() (L497-L530)，理解 fork 时 fd table 复制与 exec 时 close-on-exec 处理",
+    "11. 用 lsp_get_document_outline 鸟瞰 kernel/syscall/sysfile.c，确认所有文件系统相关系统调用 (sys_openat/sys_read/sys_write/sys_close/sys_pipe/sys_mount 等约 30 个)",
+    "12. 用 read_code_segment 精读 kernel/syscall/sysfile.c 中 sys_openat() (L194-L268)，追踪从路径解析到 filealloc/fdalloc 的完整 open 流程",
+    "13. 用 read_code_segment 精读 kernel/syscall/sysfile.c 中 sys_mount() (L492-L538) 和 sys_umount() (L539-L566)，理解挂载系统调用入口",
+    "14. 用 read_code_segment 精读 kernel/syscall/sysfile.c 中 sys_pipe() (L317-L353)，理解 pipe 创建与两个 fd 返回",
+    "15. 用 lsp_get_document_outline 鸟瞰 kernel/fs/blkdev.c，确认块设备操作函数 (img_read_block/img_write_block/disk_read_block/disk_write_block/fs_install/fs_uninstall)",
+    "16. 用 read_code_segment 精读 kernel/fs/blkdev.c 中 fs_install() (L169-L245)，理解如何根据 dev 类型 (块设备 vs 普通文件) 选择 disk_* 或 img_* 操作并绑定 FAT32",
+    "17. 用 lsp_get_document_outline 鸟瞰 kernel/fs/mount.c，确认 do_mount/do_umount/mountsysfs 函数",
+    "18. 用 read_code_segment 精读 kernel/fs/mount.c 中 do_mount() (L93-L147)，理解 superblock 链管理、dentry 挂载点绑定",
+    "19. 用 lsp_get_document_outline 鸟瞰 kernel/fs/rootfs.c，确认 rootfs/procfs/devfs 三个虚拟文件系统及其 dummy 操作",
+    "20. 用 read_code_segment 精读 kernel/fs/rootfs.c 中 rootfs_init() (L230-L313)，理解 /dev /proc 虚拟目录的初始化与 console/zero/null 设备注册",
+    "21. 用 lsp_get_document_outline 鸟瞰 kernel/fs/fat32/fat32.c 和 kernel/fs/fat32/fat32.h，确认 FAT32 的 inode_op/file_op 实现及 fat32_init/fat_alloc_inode 等",
+    "22. 用 read_code_segment 精读 kernel/fs/fat32/fat32.c 中 fat32_init() (L47-L140)，理解 FAT32 超级块读取与根目录 inode 初始化",
+    "23. 用 lsp_get_document_outline 鸟瞰 kernel/fs/pipe.c 和 include/fs/pipe.h，确认 pipe 结构体字段与 pipealloc/pipewrite/piperead 函数",
+    "24. 用 read_code_segment 精读 kernel/fs/pipe.c 中 pipealloc() (L39-L95) 和 pipewrite() (L240-L300)，理解环形缓冲区与 wait_queue 同步机制",
+    "25. 用 lsp_get_document_outline 鸟瞰 kernel/fs/bio.c 和 include/fs/buf.h，确认 buf 结构体与 bget/bread/bwrite/brelse 缓存接口",
+    "26. 用 read_code_segment 精读 kernel/fs/bio.c 中 binit() (L84-L106) 和 bread() (L185-L196)，理解块缓存初始化与读取流程",
+    "27. 用 lsp_get_document_outline 鸟瞰 kernel/hal/disk.c 和 include/hal/disk.h，确认 disk_init/disk_read/disk_write 等抽象接口",
+    "28. 用 read_code_segment 精读 kernel/hal/disk.c 全部 (L1-L173)，理解编译时 #ifdef QEMU 切换 virtio_disk_* 与 sdcard_* 的机制",
+    "29. 用 lsp_get_document_outline 鸟瞰 kernel/hal/virtio_disk.c 和 include/hal/virtio.h，确认 virtio 队列结构 (virtq_desc/virtq_avail/virtq_used) 与 virtio_disk_rw",
+    "30. 用 lsp_get_document_outline 鸟瞰 kernel/hal/sdcard.c，确认 SD 卡 SPI 初始化与读写 (sd_init/sdcard_read/sdcard_write/sdcard_intr)",
+    "31. 用 read_code_segment 精读 kernel/trap/trap.c 中 handle_intr() (L246-L330)，理解 UART_IRQ→consoleintr 和 DISK_IRQ→disk_intr 的中断路由",
+    "32. 用 read_code_segment 精读 kernel/main.c 中 main() (L34-L98)，确认启动初始化顺序：disk_init()→binit()→userinit()，以及 plicinit()/plicinithart() 的调用时机"
+  ]
+}

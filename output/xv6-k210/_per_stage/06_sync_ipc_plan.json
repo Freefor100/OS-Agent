@@ -1,0 +1,117 @@
+{
+  "stage_id": "06_sync_ipc",
+  "evidence_targets": [
+    "自旋锁 (SpinLock) 实现与 acquire/release 机制",
+    "睡眠锁 (SleepLock) 实现与 sleep/wakeup 协作",
+    "等待队列 (WaitQueue) 数据结构与管道中的应用",
+    "管道 (Pipe) 的读写同步、阻塞/唤醒与 poll 支持",
+    "信号 (Signal) 的发送、递送、处理与 sigreturn 机制",
+    "sleep/wakeup 原语与进程调度器的交互",
+    "系统调用层：pipe2 / kill / rt_sigaction / rt_sigprocmask 路由",
+    "锁与同步原语",
+    "IPC",
+    "Futex",
+    "管道/信号"
+  ],
+  "seed_paths": [
+    "include/sync/spinlock.h",
+    "include/sync/sleeplock.h",
+    "include/sync/waitqueue.h",
+    "include/fs/pipe.h",
+    "include/sched/signal.h",
+    "kernel/sync/spinlock.c",
+    "kernel/sync/sleeplock.c",
+    "kernel/fs/pipe.c",
+    "kernel/sched/signal.c",
+    "kernel/sched/proc.c",
+    "kernel/syscall/syssignal.c",
+    "kernel/syscall/sysfile.c",
+    "sync",
+    "lock"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "acquire",
+    "release",
+    "initlock",
+    "acquiresleep",
+    "releasesleep",
+    "sleep",
+    "wakeup",
+    "pipealloc",
+    "pipewrite",
+    "piperead",
+    "Mutex",
+    "SpinLock"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "bootloader",
+    "bootloader/SBI",
+    "debug",
+    "debug/kendryte_openocd",
+    "debug/openocd_cfg",
+    "doc",
+    "doc/img",
+    "include",
+    "include/fs"
+  ],
+  "preferred_tools": [
+    "lsp_get_document_outline",
+    "lsp_get_definition",
+    "lsp_get_references",
+    "lsp_get_call_graph",
+    "read_code_segment",
+    "rag_search_code",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "1. 用 lsp_get_document_outline 鸟瞰 kernel/sync/spinlock.c 和 include/sync/spinlock.h，确认 spinlock 结构体字段与 API 签名",
+    "2. 用 read_code_segment 精读 kernel/sync/spinlock.c 的 acquire() 函数（约第 25-45 行），取证 __sync_lock_test_and_set 原子操作 + push_off 关中断 + __sync_synchronize 内存屏障",
+    "3. 用 read_code_segment 精读 kernel/sync/spinlock.c 的 release() 函数（约第 48-70 行），取证 __sync_lock_release + __sync_synchronize + pop_off 开中断",
+    "4. 用 lsp_get_definition 查 push_off / pop_off 的定义，确认中断禁用/恢复机制与嵌套深度计数",
+    "5. 用 lsp_get_document_outline 鸟瞰 kernel/sync/sleeplock.c，再用 read_code_segment 精读 acquiresleep() 和 releasesleep()，取证 sleeplock 如何用 spinlock 保护 + sleep/wakeup 实现阻塞",
+    "6. 用 lsp_get_definition 查 sleep 和 wakeup 的定义（在 kernel/sched/proc.c），精读 sleep() 函数（约第 582-608 行）：取证原子释放锁 + 设置 chan + __insert_sleep + sched() 切换",
+    "7. 精读 wakeup() 函数（约第 392-403 行）：取证遍历 proc_sleep 链表 + __wakeup_no_lock + IPI 通知其他 hart",
+    "8. 用 lsp_get_document_outline 鸟瞰 include/sync/waitqueue.h，确认 wait_queue / wait_node 结构体与内联操作函数",
+    "9. 用 lsp_get_document_outline 鸟瞰 include/fs/pipe.h 和 kernel/fs/pipe.c，确认 pipe 结构体字段（lock/wqueue/rqueue/nread/nwrite 等）",
+    "10. 用 read_code_segment 精读 pipealloc()（约第 38-80 行），取证管道创建时如何初始化 spinlock + 两个 wait_queue + 设置 file 的 poll 回调",
+    "11. 用 read_code_segment 精读 pipelock() 和 pipeunlock()（约第 85-120 行），取证等待队列的排队/出队 + sleep/wakeup 协作实现 FIFO 互斥",
+    "12. 用 read_code_segment 精读 pipewrite()（约第 230-290 行），取证写端如何通过 pipewritable() 检查满管 → sleep 阻塞 → 被读端 wakeup 唤醒的完整流程",
+    "13. 用 read_code_segment 精读 piperead()（约第 292-340 行），取证读端如何通过 pipereadable() 检查空管 → sleep 阻塞 → 被写端 wakeup 唤醒",
+    "14. 用 read_code_segment 精读 pipeclose()（约第 145-165 行），取证关闭管道时如何设置 readopen/writeopen=0 + pipewakeup 唤醒对端",
+    "15. 用 lsp_get_document_outline 鸟瞰 kernel/fs/poll.c 和 include/fs/poll.h，精读 pipepoll()（约 pipe.c 第 430-476 行），取证 poll 如何与 wait_queue 集成",
+    "16. 用 lsp_get_document_outline 鸟瞰 include/sched/signal.h，确认 sigaction / ksigaction_t / sig_frame / __sigset_t 等信号相关结构体",
+    "17. 用 read_code_segment 精读 kernel/sched/signal.c 的 set_sigaction()（约第 43-88 行），取证信号处理函数的注册与 ksigaction_t 链表管理",
+    "18. 用 read_code_segment 精读 kernel/sched/signal.c 的 sighandle()（约第 177-260 行），取证信号递送时如何构造 sig_frame + 修改 trapframe 跳转到 sig_trampoline",
+    "19. 用 read_code_segment 精读 kernel/sched/signal.c 的 sigreturn()（约第 263-283 行），取证信号处理返回时如何恢复原 trapframe",
+    "20. 用 read_code_segment 精读 kernel/sched/proc.c 的 kill()（约第 541-580 行），取证信号发送：设置 sig_pending 位图 + 若目标 SLEEPING 则唤醒",
+    "21. 用 read_code_segment 精读 kernel/trap/trap.c 的 usertrap()（约第 70-130 行），取证从用户态陷入内核后如何检查 p->killed 并调用 sighandle()",
+    "22. 用 lsp_get_document_outline 鸟瞰 kernel/syscall/syssignal.c，精读 sys_rt_sigaction() / sys_rt_sigprocmask() / sys_kill()，取证系统调用层参数传递",
+    "23. 用 read_code_segment 精读 kernel/syscall/sysfile.c 的 sys_pipe()（约第 317-355 行），取证 pipe2 系统调用如何分配两个 fd 并返回给用户态",
+    "24. 用 lsp_get_call_graph 对 sleep 做 incoming 方向（max_depth=2），确认哪些同步原语依赖 sleep（sleeplock/pipe/wait4 等）",
+    "25. 用 lsp_get_call_graph 对 wakeup 做 incoming 方向（max_depth=2），确认哪些场景会唤醒进程（releasesleep/pipeclose/pipewrite/piperead/kill/exit 等）",
+    "26. 用 lsp_get_references 查 sighandle 的调用点，确认信号递送仅在 usertrap() 返回用户态前触发",
+    "27. 用 grep_in_repo 搜索 'proc_lock' 的 acquire/release 宏使用，取证调度器锁的加锁顺序约定（proc_lock 必须最后获取以避免死锁）",
+    "28. 用 read_code_segment 精读 kernel/sched/proc.c 的 scheduler()（约第 671-713 行），取证调度循环如何与 sleep/wakeup 协作（ZOMBIE 时释放 parent->lk）",
+    "29. 用 read_code_segment 精读 kernel/sched/proc.c 的 proc_tick()（约第 753-790 行），取证定时器如何驱动 sleep_expire 超时唤醒（poll 超时依赖此机制）",
+    "30. 用 lsp_get_document_outline 鸟瞰 kernel/trap/sig_trampoline.S，确认信号 trampoline 的汇编入口与 sigreturn 系统调用的触发路径",
+    "31. 用 grep_in_repo 搜索 'PIPE_SIZE' 和 'PIPESIZE' 宏，确认管道容量定义与动态扩展逻辑（size_shift 字段）",
+    "32. 汇总证据：整理 spinlock/sleeplock/waitqueue/pipe/signal/sleep-wakeup 六条线的代码证据，形成同步互斥与 IPC 的完整分析报告"
+  ]
+}
