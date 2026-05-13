@@ -1359,6 +1359,26 @@ def main():
         print("   export REPO_URL=\"https://github.com/example/os-project.git\"")
         sys.exit(1)
 
+    multi_agent_flag = "--multi-agent" in sys.argv
+    multi_agent_env = (os.environ.get("OS_AGENT_D_MULTI_AGENT") or "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+        "enabled",
+    }
+    if multi_agent_flag or multi_agent_env:
+        # Keep the legacy serial pipeline untouched. The new graph path is opt-in
+        # via CLI or .env so existing experiments keep their exact behavior.
+        try:
+            from core.describe_graph import run_describe_graph
+
+            run_describe_graph(repo_url=repo_url, stages=STAGES, output_dir=OUTPUT_DIR)
+            return
+        except KeyboardInterrupt:
+            print("\n\n⚠️  用户中断 Multi-Agent 执行")
+            sys.exit(1)
+
     repo_name = repo_name_from_url(repo_url)
     
     # 按 OS 名称创建独立的输出目录

@@ -1,0 +1,57 @@
+{
+  "schema_version": "v1",
+  "stage_id": "08_network",
+  "stage_title": "网络子系统与协议栈",
+  "terminology_profile": "stallings_en_zh",
+  "answers": [
+    {
+      "question_id": "Q08_001",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在网络子系统实现（协议栈或 socket 层）？（必须三态）",
+      "value": "stub",
+      "evidence": []
+    },
+    {
+      "question_id": "Q08_002",
+      "question_type": "single_choice",
+      "stem": "协议栈来源更接近哪种？",
+      "value": "未发现",
+      "evidence": []
+    },
+    {
+      "question_id": "Q08_003",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 socket 系统调用接口（socket/bind/connect/sendto/recvfrom 等）？（必须三态）",
+      "value": "not_found",
+      "evidence": []
+    },
+    {
+      "question_id": "Q08_004",
+      "question_type": "short_answer",
+      "stem": "选择一个发送路径（优先 sys_sendto），追踪：syscall → 协议栈 → 网卡驱动。列 3-6 个关键节点并给证据。",
+      "value": "not_found",
+      "evidence": []
+    },
+    {
+      "question_id": "Q08_005",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现网卡驱动（virtio-net/e1000 等）与收包中断路径？（必须三态）",
+      "value": "not_found",
+      "evidence": []
+    },
+    {
+      "question_id": "Q08_006",
+      "question_type": "multi_choice",
+      "stem": "协议支持情况（多选；未发现则留空并在 notes 写 not_found）：",
+      "value": [],
+      "evidence": []
+    },
+    {
+      "question_id": "Q08_007",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在零拷贝/共享缓冲/DMA 描述符等路径（zero-copy）？（必须三态；仅有名词不算 implemented）",
+      "value": "not_found",
+      "evidence": []
+    }
+  ]
+}

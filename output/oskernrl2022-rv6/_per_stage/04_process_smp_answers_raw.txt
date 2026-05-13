@@ -1,0 +1,616 @@
+```json
+{
+  "schema_version": "1.0",
+  "stage_id": "04_process_smp",
+  "stage_title": "进程/线程/调度与多核",
+  "terminology_profile": {
+    "execution_entity": "struct proc",
+    "scheduling_algorithm": "FCFS (readyq_pop)",
+    "context_switch": "swtch",
+    "ipc_mechanism": "signal (partial)"
+  },
+  "answers": [
+    {
+      "question_id": "Q04_001",
+      "question_type": "short_answer",
+      "stem": "执行实体 (Execution Entity) 抽象是什么？\n请按以下格式作答（每项必须有代码证据）：\n- 顶层类型名: ___（如 Process / Task / Thread / TaskControlBlock）\n- 结构体路径: ___\n- 关键字段（至少列 3 个）: Context=___, State=___, PID=___, TrapFrame=___\n- 是否区分 PCB 与 TCB: ___（是 / 否 / 待核实）",
+      "value": "- 顶层类型名: Process\n- 结构体路径: repos/oskernrl2022-rv6/src/include/proc.h:128-167\n- 关键字段: Context=struct context (repos/oskernrl2022-rv6/src/proc.c:24), State=enum procstate (repos/oskernrl2022-rv6/src/include/proc.h:128-167), PID=int pid (repos/oskernrl2022-rv6/src/include/proc.h:128-167), TrapFrame=struct trapframe *trapframe (repos/oskernrl2022-rv6/src/include/proc.h:128-167)\n- 是否区分 PCB 与 TCB: 否",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_04_process_smp_Q04_001_discovery_d6834ecc",
+          "path": "repos/oskernrl2022-rv6/src/include/proc.h:128-167",
+          "excerpt": "struct proc { int magic; struct spinlock lock; enum procstate state; struct proc *parent; void *chan; int killed; int xstate; int pid; ... struct trapframe *trapframe; ... struct context context; ... }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_002",
+      "question_type": "short_answer",
+      "stem": "任务/进程的生命周期状态机有哪些状态与流转点？（Ready/Running/Blocked/Exited 等；需状态枚举/字段证据）",
+      "value": "状态枚举: enum procstate (UNUSED, SLEEPING, RUNNABLE, RUNNING, ZOMBIE)。流转点: scheduler() 中 RUNNABLE -> RUNNING; sched() 中 RUNNING -> RUNNABLE; sleep() 中 RUNNING -> SLEEPING; wakeup() 中 SLEEPING -> RUNNABLE; exit() 中 RUNNING -> ZOMBIE。",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_04_process_smp_Q04_002_discovery_f422e1e7",
+          "path": "repos/oskernrl2022-rv6/src/proc.c:119-152",
+          "excerpt": "void scheduler(){ ... if(p->state == RUNNABLE) { p->state = RUNNING; ... } }"
+        },
+        {
+          "evidence_id": "ev_task_04_process_smp_Q04_016_discovery_b2517574",
+          "path": "repos/oskernrl2022-rv6/src/proc.c:719-752",
+          "excerpt": "void exit(int n) { ... p->state = ZOMBIE; ... }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_003",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在上下文切换 (Context Switch) 实现（switch.S/__switch/swtch/context_switch）？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_04_process_smp_Q04_003_discovery_baed7eb5",
+          "path": "repos/oskernrl2022-rv6/src/proc.c:520-538",
+          "excerpt": "void sched(void) { ... swtch(&p->context, &mycpu()->context); ... }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_004",
+      "question_type": "short_answer",
+      "stem": "上下文切换保存/恢复了哪些寄存器集合？（例如 RISC-V s0-s11；必须引用汇编/结构体证据）",
+      "value": "保存/恢复 callee-saved 寄存器: ra, sp, s0-s11。证据来自 struct context 定义。",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_04_process_smp_Q04_022_discovery_f38d70f5",
+          "path": "repos/oskernrl2022-rv6/src/include/cpu.h:10-27",
+          "excerpt": "struct context { uint64 ra; uint64 sp; uint64 s0; uint64 s1; uint64 s2; uint64 s3; uint64 s4; uint64 s5; uint64 s6; uint64 s7; uint64 s8; uint64 s9; uint64 s10; uint64 s11; };"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_005",
+      "question_type": "short_answer",
+      "stem": "调度算法 (Scheduling Algorithm) 属于哪类？\n请按格式作答：\n- 算法名称: ___（必须是以下之一：FCFS / Round-Robin (RR) / Stride/Proportional-Share / MLFQ / CFS / Priority / 其他）\n- 代码证据（关键字段/函数）: ___\n  - RR: timeslice/slice 字段位置=___\n  - Stride: stride 字段与比较逻辑位置=___\n  - MLFQ: 多级队列 VecDeque/数组层级证据=___\n  - Priority: priority 字段参与 pick_next 排序证据=___",
+      "value": "- 算法名称: FCFS\n- 代码证据: scheduler() 调用 readyq_pop() 从就绪队列中取出下一个进程，无优先级或时间片检查。\n  - RR: timeslice/slice 字段位置=未发现\n  - Stride: stride 字段与比较逻辑位置=未发现\n  - MLFQ: 多级队列 VecDeque/数组层级证据=未发现\n  - Priority: priority 字段参与 pick_next 排序证据=未发现",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_04_process_smp_Q04_005_discovery_1d4d86a0",
+          "path": "repos/oskernrl2022-rv6/src/proc.c:119-152",
+          "excerpt": "void scheduler(){ ... struct proc* p = readyq_pop(); ... }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_006",
+      "question_type": "short_answer",
+      "stem": "调度器 (Scheduler)核心入口/关键函数有哪些？（schedule/pick_next 等；给 1-3 个入口与证据）",
+      "value": "1. scheduler() (repos/oskernrl2022-rv6/src/proc.c:119-152): 主调度循环，调用 readyq_pop() 选择进程并切换。\n2. sched() (repos/oskernrl2022-rv6/src/proc.c:520-538): 主动让出 CPU，调用 swtch() 切换到调度器上下文。",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_04_process_smp_Q04_006_discovery_2e35036b",
+          "path": "repos/oskernrl2022-rv6/src/proc.c:119-152",
+          "excerpt": "void scheduler(){ ... }"
+        },
+        {
+          "evidence_id": "ev_task_04_process_smp_Q04_003_discovery_baed7eb5",
+          "path": "repos/oskernrl2022-rv6/src/proc.c:520-538",
+          "excerpt": "void sched(void) { ... swtch(&p->context, &mycpu()->context); ... }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_007",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 fork/clone（创建新执行实体）？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_04_process_smp_Q04_007_discovery_82d3f759",
+          "path": "repos/oskernrl2022-rv6/src/proc.c:408-490",
+          "excerpt": "int clone(uint64 flag, uint64 stack, uint64 ptid, uint64 tls, uint64 ctid) { ... }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_008",
+      "question_type": "short_answer",
+      "stem": "fork/clone 是否复制地址空间与文件表？（必须给复制路径证据；若 stub 需说明形态）",
+      "value": "clone() 在非 CLONE_VM 分支中复制地址空间 (uvmcopy) 和文件表 (filedup)。",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_04_process_smp_Q04_008_discovery_65c739db",
+          "path": "repos/oskernrl2022-rv6/src/proc.c:408-490",
+          "excerpt": "int clone(...) { ... if((flag & CLONE_THREAD) && (flag & CLONE_VM)) { ... } else { ... // copy address space uvmcopy(p->pagetable, np->pagetable, p->sz); // copy file table filedup(p, np); ... } }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_009",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 exec（装载 ELF/重建地址空间）？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_04_process_smp_Q04_009_discovery_cb0e7b51",
+          "path": "repos/oskernrl2022-rv6/src/exec.c:185-378",
+          "excerpt": "int exec(char *path, char **argv, char **env) { ... struct elfhdr elf; ... proc_pagetable(np, 0, 0); ... }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_010",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 wait/waitpid（父子回收同步）？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_04_process_smp_Q04_010_discovery_3fc801da",
+          "path": "repos/oskernrl2022-rv6/src/proc.c:675-717",
+          "excerpt": "int wait4pid(int pid,uint64 addr) { ... }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_011",
+      "question_type": "single_choice",
+      "stem": "waitpid / wait4 的阻塞实现 (Blocking Implementation) 更接近哪种？",
+      "choices": [
+        "真正阻塞：移出就绪队列 + WaitQueue/条件变量唤醒 (Wait Queue or Condition Variable)",
+        "真正阻塞：使用 channel/future/async 等异步机制",
+        "忙等/轮询（yield 循环检查，Busy-Polling）",
+        "未发现/不支持"
+      ],
+      "value": "真正阻塞：移出就绪队列 + WaitQueue/条件变量唤醒 (Wait Queue or Condition Variable)",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_04_process_smp_Q04_011_discovery_f28628a8",
+          "path": "repos/oskernrl2022-rv6/src/proc.c:675-717",
+          "excerpt": "int wait4pid(...) { ... acquire(&p->lock); while(1){ ... if(child != NULL){ ... } sleep(p, &p->lock); } ... }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_012",
+      "question_type": "short_answer",
+      "stem": "PID 分配器实现是什么？（自增/bitmap/空闲栈复用/只分配不回收；必须给证据）",
+      "value": "自增 (只分配不回收)。",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_04_process_smp_Q04_012_discovery_228173e4",
+          "path": "repos/oskernrl2022-rv6/src/proc.c:154-162",
+          "excerpt": "int allocpid() { int pid; acquire(&pid_lock); pid = nextpid; nextpid = nextpid + 1; release(&pid_lock); return pid; }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_013",
+      "question_type": "short_answer",
+      "stem": "父子进程树如何存储？（children Vec/链表/parent+sibling 指针；必须给结构体字段证据）",
+      "value": "仅通过 parent 指针存储。struct proc 中有 struct proc *parent 字段，通过 findchild() 遍历 proc 数组查找子进程。",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_04_process_smp_Q04_013_discovery_a3cab44f",
+          "path": "repos/oskernrl2022-rv6/src/proc.c:596-599",
+          "excerpt": "void allocparent(struct proc* parent,struct proc* child){ child->parent = parent; }"
+        },
+        {
+          "evidence_id": "ev_task_04_process_smp_Q04_013_discovery_a3cab44f",
+          "path": "repos/oskernrl2022-rv6/src/proc.c:610-629",
+          "excerpt": "struct proc* findchild(struct proc* p,int (*cond)(struct proc*,int),int pid,struct proc** child){ ... for(struct proc* np = proc; np < &proc[NPROC]; np++){ ... } }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_014",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现信号 (signal) 或 futex？（若二者都无则 not_found；若只实现其一需说明并给证据）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_04_process_smp_Q04_014_discovery_b9fc39a3",
+          "path": "repos/oskernrl2022-rv6/src/signal.c:20-20",
+          "excerpt": "struct proc (contains signal-related fields)"
+        },
+        {
+          "evidence_id": "ev_task_04_process_smp_Q04_014_discovery_b9fc39a3",
+          "path": "repos/oskernrl2022-rv6/src/include/signal.h:42-50",
+          "excerpt": "struct sigaction { ... }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_015",
+      "question_type": "short_answer",
+      "stem": "与 09 多核的交叉一致性：是否存在每核队列/任务迁移/IPI resched？（需与第 9 章互指证据或写不适用）",
+      "value": "未发现每核队列/任务迁移/IPI resched。调度器使用全局就绪队列 readyq_pop()。",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_04_process_smp_Q04_015_discovery_799110e5",
+          "path": "repos/oskernrl2022-rv6/src/proc.c:119-152",
+          "excerpt": "void scheduler(){ ... struct proc* p = readyq_pop(); ... }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_016",
+      "question_type": "short_answer",
+      "stem": "exit() 资源回收路径：调用链是什么？是否真正回收地址空间/文件表/通知父进程？（必须给调用链证据；桩则说明）",
+      "value": "调用链: exit() -> 关闭文件 (fileclose) -> 释放 cwd (eput) -> 唤醒父进程 (wakeup(getparent(p))) -> 子进程托孤 (reparent) -> 状态置为 ZOMBIE -> sched()。真正回收了文件表和通知了父进程，地址空间回收在 wait4pid 中由 freeproc 完成。",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_04_process_smp_Q04_016_discovery_b2517574",
+          "path": "repos/oskernrl2022-rv6/src/proc.c:719-752",
+          "excerpt": "void exit(int n) { ... for(int fd = 0; fd < NOFILE; fd++){ if(p->ofile[fd]){ fileclose(f); p->ofile[fd] = 0; } } eput(p->cwd); wakeup(p); acquire(&p->lock); wakeup(getparent(p)); reparent(p); p->xstate = n; p->state = ZOMBIE; sched(); ... }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_017",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现进程组/会话（Process Group / Session，pgid/session/set_sid/setpgid）？（必须三态；有则区分真实检查链 vs 仅占位字段）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_04_process_smp_Q04_017_discovery_c5e4cee5",
+          "path": "repos/oskernrl2022-rv6/src/include/proc.h:128-167",
+          "excerpt": "struct proc { ... int uid; int gid; ... } (no pgid/session fields found)"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_018",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 POSIX 资源限制（rlimit/RLIMIT/getrlimit/setrlimit）？（必须三态；若 implemented 需说明支持的资源类型数量及软/硬限制机制）",
+      "value": "stub",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_04_process_smp_Q04_018_discovery_5aafc26b",
+          "path": "repos/oskernrl2022-rv6/src/include/proc.h:111-114",
+          "excerpt": "struct rlimit { rlim_t rlim_cur; rlim_t rlim_max; } (struct defined but no getrlimit/setrlimit syscall implementation found)"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_019",
+      "question_type": "single_choice",
+      "stem": "该 OS 是否区分了 TCB（线程控制块）与 PCB（进程控制块）？",
+      "choices": [
+        "区分 TCB 与 PCB（不同结构体，独立字段）",
+        "仅有统一 Task 结构（无区分）",
+        "未发现/待核实"
+      ],
+      "value": "仅有统一 Task 结构（无区分）",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_04_process_smp_Q04_001_discovery_d6834ecc",
+          "path": "repos/oskernrl2022-rv6/src/include/proc.h:128-167",
+          "excerpt": "struct proc { ... } (single structure for both process and thread)"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_020",
+      "question_type": "tri_state_impl",
+      "stem": "调度切换路径上是否存在页表切换（w_satp/sfence.vma/写 CR3/TTBR 等）？（必须三态；给调用点 路径 证据）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_04_process_smp_Q04_020_discovery_8fad2a49",
+          "path": "repos/oskernrl2022-rv6/src/proc.c:119-152",
+          "excerpt": "void scheduler(){ ... w_satp(MAKE_SATP(p->pagetable)); sfence_vma(); swtch(&c->context, &p->context); w_satp(MAKE_SATP(kernel_pagetable)); sfence_vma(); ... }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_021",
+      "question_type": "single_choice",
+      "stem": "用户线程与内核线程的映射模型 (User-Level Thread to Kernel-Level Thread Mapping) 更接近哪种？（Stallings Ch4）",
+      "choices": [
+        "1:1（每个用户线程对应一个内核线程，如 Linux pthread）",
+        "N:1（多个用户线程复用一个内核线程，用户态调度）",
+        "M:N（混合映射，M 用户线程映射到 N 内核线程）",
+        "仅内核线程（无独立用户线程库）",
+        "无线程（仅进程/Task 不可再分）"
+      ],
+      "value": "1:1（每个用户线程对应一个内核线程，如 Linux pthread）",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_04_process_smp_Q04_007_discovery_82d3f759",
+          "path": "repos/oskernrl2022-rv6/src/proc.c:408-490",
+          "excerpt": "int clone(...) { if((flag & CLONE_THREAD) && (flag & CLONE_VM)) { ... } } (supports CLONE_THREAD flag for creating threads)"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_022",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现线程局部存储 (Thread-Local Storage, TLS)？（必须三态；搜索 thread_local|TLS|__thread|#[thread_local]；若 implemented 需说明 TLS 的访问方式：tp 寄存器/段寄存器/其他）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_04_process_smp_Q04_007_discovery_82d3f759",
+          "path": "repos/oskernrl2022-rv6/src/proc.c:408-490",
+          "excerpt": "int clone(...) { ... np->trapframe->tp = tls; ... } (sets tp register for TLS)"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_023",
+      "question_type": "multi_choice",
+      "stem": "调度器是否追踪/优化以下哪些性能指标 (Scheduling Criteria, Stallings Ch9)？（多选；未发现则留空并在 notes 写 not_found）",
+      "choices": [
+        "CPU 利用率 (CPU Utilization)",
+        "吞吐量 (Throughput)",
+        "周转时间 (Turnaround Time)",
+        "等待时间 (Waiting Time)",
+        "响应时间 (Response Time)",
+        "未发现调度性能统计"
+      ],
+      "value": ["未发现调度性能统计"],
+      "evidence": [
+        {
+          "evidence_id": "ev_task_04_process_smp_Q04_023_discovery_4bfeee1c",
+          "path": "repos/oskernrl2022-rv6/src/proc.c",
+          "excerpt": "No scheduling statistics tracking found in scheduler() or sched()."
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_024",
+      "question_type": "tri_state_impl",
+      "stem": "优先级调度是否实现老化 (Aging, Stallings Ch9) 以防止低优先级进程饥饿 (Starvation)？（必须三态；搜索 age/aging/boost_priority 或等价；若 not_found 需说明是否存在饥饿风险）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_04_process_smp_Q04_024_discovery_40f16cad",
+          "path": "repos/oskernrl2022-rv6/src/proc.c",
+          "excerpt": "No aging mechanism found. FCFS scheduler has no priority, so no starvation risk from priority inversion, but long-running processes can block others."
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_025",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现公平份额调度 (Fair-Share Scheduling, Stallings Ch9) 或 CPU 配额 (CPU Quota/cgroup)？（必须三态；搜索 fair_share/cgroup/cpu_quota/weight 等）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_04_process_smp_Q04_025_discovery_bcb46649",
+          "path": "repos/oskernrl2022-rv6/src/proc.c",
+          "excerpt": "No fair_share, cgroup, cpu_quota, or weight fields found in scheduler or proc structure."
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_026",
+      "question_type": "single_choice",
+      "stem": "调度器的抢占模式 (Preemption Mode, Stallings Ch9) 更接近哪种？",
+      "choices": [
+        "完全抢占 (Fully Preemptive)：时钟中断可随时抢占运行进程",
+        "非抢占 (Non-Preemptive / Run-to-completion)：进程主动让出才切换",
+        "部分抢占（内核路径不可抢占，用户路径可抢占）",
+        "未发现"
+      ],
+      "value": "完全抢占 (Fully Preemptive)：时钟中断可随时抢占运行进程",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_04_process_smp_Q04_026_discovery_70d5b74b",
+          "path": "repos/oskernrl2022-rv6/src/proc.c:520-538",
+          "excerpt": "void sched(void) { ... if(intr_get()) panic(\"sched interruptible\"); ... } (sched() checks if interrupts are enabled, implying timer interrupts can trigger rescheduling)"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_027",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现最短作业优先调度 (Shortest Job First / SJF 或 SRTF, Stallings Ch9)？（必须三态；或等价的基于预测 burst 时间的调度）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_04_process_smp_Q04_027_discovery_7f43d98f",
+          "path": "repos/oskernrl2022-rv6/src/proc.c",
+          "excerpt": "No SJF/SRTF or burst time prediction logic found in scheduler."
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_028",
+      "question_type": "single_choice",
+      "stem": "该 OS 的多核形态更接近哪种？",
+      "choices": [
+        "SMP（对称多处理）",
+        "ASMP（非对称多处理 Asymmetric Multiprocessing）",
+        "仅单核",
+        "未发现/待核实"
+      ],
+      "value": "SMP（对称多处理）",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_04_process_smp_Q04_028_discovery_fd4bf396",
+          "path": "repos/oskernrl2022-rv6/src/include/cpu.h:30-35",
+          "excerpt": "struct cpu { struct proc *proc; struct context context; ... } (per-CPU structure suggests SMP support)"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_029",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 Secondary CPU / AP 启动链（BSP 唤醒 AP，上线后进入 idle/调度）？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_04_process_smp_Q04_029_discovery_5e6b262a",
+          "path": "repos/oskernrl2022-rv6/src/proc.c",
+          "excerpt": "No AP startup sequence or secondary CPU boot chain found in scheduler or main initialization code."
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_030",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 IPI（核间中断）发送与处理？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_04_process_smp_Q04_030_discovery_518d0c61",
+          "path": "repos/oskernrl2022-rv6/src/include/sbi.h:86-88",
+          "excerpt": "static inline void send_ipi(uint64 mask) { a_sbi_ecall(0x735049, 0, mask,0,0,0,0,0); }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_031",
+      "question_type": "short_answer",
+      "stem": "若存在 IPI：发送与处理路径分别在哪些函数/文件？（给关键入口与证据）",
+      "value": "发送: send_ipi() in repos/oskernrl2022-rv6/src/include/sbi.h:86-88。处理路径未在提供的证据中明确显示。",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_04_process_smp_Q04_031_discovery_89717692",
+          "path": "repos/oskernrl2022-rv6/src/include/sbi.h:86-88",
+          "excerpt": "static inline void send_ipi(uint64 mask) { a_sbi_ecall(0x735049, 0, mask,0,0,0,0,0); }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_032",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 per-CPU 变量/结构（PerCpu、CPU-local storage 等）？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_04_process_smp_Q04_032_discovery_d9a97c45",
+          "path": "repos/oskernrl2022-rv6/src/include/cpu.h:30-35",
+          "excerpt": "struct cpu { struct proc *proc; struct context context; int noff; int intena; }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_033",
+      "question_type": "short_answer",
+      "stem": "per-CPU 的实现方式是什么？（例如 TLS/tp 寄存器/gsbase/数组索引 hartid；需证据）",
+      "value": "数组索引 hartid。通过 mycpu() 函数访问当前 CPU 的结构体，该函数可能基于 hartid 索引 cpus 数组。",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_04_process_smp_Q04_033_discovery_d6d8ed8b",
+          "path": "repos/oskernrl2022-rv6/src/include/cpu.h:30-35",
+          "excerpt": "struct cpu { ... } (accessed via mycpu() which likely uses hartid to index into cpus array)"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_034",
+      "question_type": "tri_state_impl",
+      "stem": "调度是否存在跨核负载均衡/迁移/亲和性？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_04_process_smp_Q04_034_discovery_860678a0",
+          "path": "repos/oskernrl2022-rv6/src/proc.c",
+          "excerpt": "No load balancing, task migration, or CPU affinity logic found in scheduler."
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_035",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 TLB shootdown（跨核页表一致性刷新）？（必须三态；需与 03 互指）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_04_process_smp_Q04_035_discovery_1e7375d2",
+          "path": "repos/oskernrl2022-rv6/src/intr.c",
+          "excerpt": "No TLB shootdown mechanism found. sfence_vma() is called locally in scheduler() but no IPI-based cross-core TLB invalidation."
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_036",
+      "question_type": "short_answer",
+      "stem": "与 03/04/05/08 章的交叉一致性 (Cross-Chapter Consistency)，按以下四项分别作答（每项须给证据路径或写「单核不适用」）：\n- 03 TLB: 多核页表修改后 TLB 刷新策略=___\n- 04 调度: 每核运行队列/负载均衡/IPI resched=___\n- 05 Trap: per-CPU trap 栈/时钟中断初始化与 AP 上线顺序=___\n- 08 锁: SpinLock 关中断行为在多核下是否安全=___",
+      "value": "- 03 TLB: 多核页表修改后 TLB 刷新策略=未发现跨核 TLB shootdown，仅本地 sfence_vma() (repos/oskernrl2022-rv6/src/proc.c:119-152)\n- 04 调度: 每核运行队列/负载均衡/IPI resched=全局就绪队列 readyq_pop()，无每核队列/负载均衡 (repos/oskernrl2022-rv6/src/proc.c:119-152)\n- 05 Trap: per-CPU trap 栈/时钟中断初始化与 AP 上线顺序=未发现 AP 上线链，无法确认顺序\n- 08 锁: SpinLock 关中断行为在多核下是否安全=是，acquire() 调用 push_off() 禁用中断，防止死锁 (repos/oskernrl2022-rv6/src/spinlock.c:24-46)",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_04_process_smp_Q04_036_discovery_d7fb23cf",
+          "path": "repos/oskernrl2022-rv6/src/proc.c:119-152",
+          "excerpt": "void scheduler(){ ... w_satp(MAKE_SATP(p->pagetable)); sfence_vma(); ... }"
+        },
+        {
+          "evidence_id": "ev_task_04_process_smp_Q04_037_discovery_20a370a6",
+          "path": "repos/oskernrl2022-rv6/src/spinlock.c:24-46",
+          "excerpt": "void acquire(struct spinlock *lk) { push_off(); ... }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_037",
+      "question_type": "single_choice",
+      "stem": "SpinLock 在获取锁时是否禁用中断（关中断保护临界区）？",
+      "choices": [
+        "是，获取时关中断、释放时恢复",
+        "否，纯自旋不关中断",
+        "未发现/待核实"
+      ],
+      "value": "是，获取时关中断、释放时恢复",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_04_process_smp_Q04_037_discovery_20a370a6",
+          "path": "repos/oskernrl2022-rv6/src/spinlock.c:24-46",
+          "excerpt": "void acquire(struct spinlock *lk) { push_off(); // disable interrupts to avoid deadlock. ... }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_038",
+      "question_type": "short_answer",
+      "stem": "NCPU/MAXCPU（或等价宏）与链接脚本中的每 hart 栈/入口布局是否对应？（搜索 _max_hart_id 等；给宏定义与链接脚本对应证据，或写未发现）",
+      "value": "未发现",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_04_process_smp_Q04_038_discovery_2a89c3f7",
+          "path": "repos/oskernrl2022-rv6/src/include/cpu.h",
+          "excerpt": "No NCPU/MAXCPU macro or _max_hart_id found in provided evidence."
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_039",
+      "question_type": "tri_state_impl",
+      "stem": "是否使用 AtomicUsize/原子变量分配 PID/TID（全局唯一 ID 池）？（必须三态；给实现证据）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_04_process_smp_Q04_039_discovery_1000ab2d",
+          "path": "repos/oskernrl2022-rv6/src/proc.c:154-162",
+          "excerpt": "int allocpid() { int pid; acquire(&pid_lock); pid = nextpid; nextpid = nextpid + 1; release(&pid_lock); return pid; } (uses spinlock, not atomic variables)"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_040",
+      "question_type": "tri_state_impl",
+      "stem": "是否支持实时调度 (Real-Time Scheduling, Stallings Ch10)？（必须三态；搜索 SCHED_FIFO / SCHED_RR / realtime / RT priority / deadline 等）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_04_process_smp_Q04_040_discovery_bbb3fe60",
+          "path": "repos/oskernrl2022-rv6/src/proc.c",
+          "excerpt": "No SCHED_FIFO, SCHED_RR, realtime, RT priority, or deadline scheduling policies found."
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_041",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 NUMA (Non-Uniform Memory Access) 感知的内存分配或调度策略？（必须三态；搜索 numa / node_id / local_memory 等；嵌入式单 SoC 可写 not_found 并说明架构）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_04_process_smp_Q04_041_discovery_fdf3ef67",
+          "path": "repos/oskernrl2022-rv6/src/pm.c",
+          "excerpt": "No NUMA-aware memory allocation or scheduling policy found. Architecture appears to be single SoC (RISC-V)."
+        }
+      ]
+    }
+  ]
+}
+```

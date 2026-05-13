@@ -1,0 +1,211 @@
+```json
+{
+  "schema_version": "1.0",
+  "stage_id": "07_security",
+  "stage_title": "安全机制与权限模型",
+  "terminology_profile": {
+    "project_type": "C-based RISC-V kernel (oskernrl2022-rv6)",
+    "key_concepts": [
+      "RISC-V privilege levels (M-mode/S-mode/U-mode)",
+      "Page table permissions (PTE_U, PTE_V)",
+      "copyin/copyout user memory access",
+      "syscall dispatch",
+      "spinlock synchronization"
+    ]
+  },
+  "answers": [
+    {
+      "question_id": "Q07_001",
+      "question_type": "single_choice",
+      "stem": "特权级隔离形态更接近哪种？",
+      "value": "有用户态/内核态隔离（user mode/kernel mode）",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_07_security_Q07_001_discovery_bac1761c",
+          "path": "repos/oskernrl2022-rv6/src/vm.c",
+          "excerpt": "函数 experm 检查 PTE_U 标志位，表明存在用户态页表权限控制。"
+        },
+        {
+          "evidence_id": "ev_task_07_security_Q07_009_build_platform_f003d1a0",
+          "path": "LINKER=linker/kernel.ld",
+          "excerpt": "构建配置和链接脚本明确指向 RISC-V 架构，使用 SBI (sbi/fw_jump.elf)，表明存在 M-mode/S-mode 特权级支持。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_002",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在凭证/权限数据结构（UID/GID/Credential/Capability/ACL 等）？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_07_security_Q07_002_implementation_state_0c5707b7",
+          "path": "repos/oskernrl2022-rv6/src/sd.c",
+          "excerpt": "语义搜索 UID, GID, Credential, Capability, ACL 等关键词，未发现相关数据结构定义。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_003",
+      "question_type": "tri_state_impl",
+      "stem": "是否能证实在 syscall 路径上真实执行了权限检查（open/exec/write 等）？（必须三态；仅有字段不算 implemented）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_07_security_Q07_003_discovery_966cfa7b",
+          "path": "repos/oskernrl2022-rv6/src/sysfile.c",
+          "excerpt": "sys_faccessat 函数存在，但未发现其内部调用基于 UID/GID 或 ACL 的权限检查逻辑。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_004",
+      "question_type": "short_answer",
+      "stem": "若存在权限检查：入口点与核心检查函数链路是什么？（列 2-5 个节点并给证据）",
+      "value": "未发现基于凭证的权限检查链路。",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_07_security_Q07_004_discovery_1a395823",
+          "path": "repos/oskernrl2022-rv6/src/vm.c",
+          "excerpt": "语义搜索未发现 check_perm, inode_permission 等典型权限检查函数。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_005",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现用户指针验证（access_ok/verify_area/UserInPtr/copyin/copyout 等）？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_07_security_Q07_005_discovery_7a38ab96",
+          "path": "repos/oskernrl2022-rv6/src/copy.c",
+          "excerpt": "发现 either_copyin 函数，该函数根据 user_src 参数调用 copyin，表明存在用户态到内核态的内存拷贝机制。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_006",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 seccomp/prctl/sandbox 等系统调用过滤/沙箱？（必须三态；stub 需说明形态：ENOSYS/return 0）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_07_security_Q07_006_discovery_7a07aa10",
+          "path": "repos/oskernrl2022-rv6/syscall/syscall.c",
+          "excerpt": "syscall 函数仅根据系统调用号进行分发，未发现 seccomp/prctl/sandbox 相关的过滤或沙箱逻辑。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_007",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在栈保护/溢出防护（stack canary/guard page）或等价机制？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_07_security_Q07_007_discovery_37564d0d",
+          "path": "repos/oskernrl2022-rv6/src/vm.c",
+          "excerpt": "语义搜索 stack canary, guard page 等关键词，未发现相关实现。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_008",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在审计/安全启动（audit/secure boot/signature）相关逻辑？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_07_security_Q07_008_discovery_5b65d346",
+          "path": "repos/oskernrl2022-rv6/src/sd.c",
+          "excerpt": "语义搜索 audit, secure boot, signature 等关键词，未发现相关逻辑。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_009",
+      "question_type": "short_answer",
+      "stem": "本项目支持哪些架构（riscv64/aarch64/x86_64/loongarch64 等）？每种架构的安全相关初始化（特权级配置、PMP/MPU/SMEP 等）是否有代码证据？（必须逐架构作答，无证据写「未发现」）",
+      "value": "riscv64: 未发现 PMP/MPU 等安全初始化代码证据。\naarch64: 未发现。\nx86_64: 未发现。\nloongarch64: 未发现。",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_07_security_Q07_009_build_platform_f003d1a0",
+          "path": "LINKER=linker/kernel.ld",
+          "excerpt": "构建配置和链接脚本明确指向 RISC-V 架构。"
+        },
+        {
+          "evidence_id": "ev_task_07_security_Q07_009_discovery_535a7a5b",
+          "path": "repos/oskernrl2022-rv6/src/include/riscv.h",
+          "excerpt": "语义搜索 PMP, MPU, SMEP 等关键词，未发现相关配置代码。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_010",
+      "question_type": "tri_state_impl",
+      "stem": "若项目使用 Rust，是否存在 RAII/所有权/生命周期相关的内核安全机制（如不可 unsafe 直接访问用户内存、锁的 RAII 自动释放等）？（必须三态；给具体模式证据）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_07_security_Q07_010_discovery_121fb170",
+          "path": "repos/oskernrl2022-rv6/src/spinlock.c",
+          "excerpt": "项目为 C 语言实现，不涉及 Rust 的 RAII/所有权/生命周期等安全机制。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_011",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现了内核/用户页表隔离 (Kernel/User Page Table Isolation, KPTI 或等价机制)？\n（x86: CR3 KPTI / SMEP / SMAP；RISC-V: PMP / S-mode 分离；AArch64: TTBR0/TTBR1 隔离；\n必须三态；无则写未发现并列出已搜关键字）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_07_security_Q07_011_discovery_95988266",
+          "path": "repos/oskernrl2022-rv6/src/vm.c",
+          "excerpt": "语义搜索 KPTI, SMEP, SMAP, PMP, TTBR0, TTBR1 等关键词，未发现相关实现。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_012",
+      "question_type": "short_answer",
+      "stem": "UID/GID 字段是否在 syscall 路径上真实执行权限检查？（搜索 check_perm/inode_permission；若只有字段无检查链须标注「仅有定义但未强制执行 🔸」；给检查链证据或写「字段存在但无检查链」）",
+      "value": "字段存在但无检查链",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_07_security_Q07_012_discovery_5aafbcf9",
+          "path": "repos/oskernrl2022-rv6/src/sysfile.c",
+          "excerpt": "语义搜索 check_perm, inode_permission 等关键词，未发现基于 UID/GID 的权限检查函数。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_013",
+      "question_type": "single_choice",
+      "stem": "访问控制模型 (Access Control Model, Stallings Ch15) 更接近哪种？",
+      "value": "仅有特权级隔离（ring0/ring3），无细粒度访问控制",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_07_security_Q07_013_discovery_6aee6fa2",
+          "path": "repos/oskernrl2022-rv6/src/vm.c",
+          "excerpt": "代码中存在基于页表权限位（如 PTE_U）的特权级隔离，但未发现 DAC/MAC/RBAC 等细粒度访问控制模型的实现。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_014",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现完整性策略 (Integrity Policy, Stallings Ch15)？（如 Biba 模型、只读内核段、代码签名验证、W^X 内存保护等；必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_07_security_Q07_014_discovery_32832a61",
+          "path": "repos/oskernrl2022-rv6/src/sd.c",
+          "excerpt": "语义搜索 Biba, Integrity, W^X, 只读内核段, 代码签名 等关键词，未发现相关实现。"
+        }
+      ]
+    }
+  ]
+}
+```

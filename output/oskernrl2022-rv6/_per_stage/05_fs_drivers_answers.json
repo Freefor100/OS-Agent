@@ -1,0 +1,690 @@
+{
+  "schema_version": "v1",
+  "stage_id": "05_fs_drivers",
+  "stage_title": "文件系统与设备 I/O",
+  "terminology_profile": "stallings_en_zh",
+  "answers": [
+    {
+      "question_id": "Q05_001",
+      "question_type": "short_answer",
+      "stem": "VFS 抽象层 (Virtual File System, VFS)接口是什么形态？（Rust trait / C op 表；必须给接口定义证据）",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "definition",
+          "symbol_name": "lsp_get_definition",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "definition",
+          "symbol_name": "lsp_get_definition",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/include/file.h",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '文件系统与设备 I/O / Q05_001: VFS 抽象层 (Virtual File System, VFS)接口是什么形态？（Rust trait / C op 表；必须给接口定义证据）\n关键词: VFS, Virtual, File, System, Rust, trait' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6410 | 文件: repos\\oskernrl2022-rv6\\src\\include\\file.h:8-11 | 类型: struct_specifier | 符号名: \n```\nstruct iovec {\n  void  *iov_base;    /* Starting address */\n  uint iov_len;     /* Number of bytes to transfer */\n}\n```\n\n[2] 相似度: 0.6389 | 文件: repos\\oskernrl2022-rv6\\src\\include\\syscall.h:26-26 | 类型: struct_specifier | 符号名: \n``"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_002",
+      "question_type": "single_choice",
+      "stem": "具体文件系统后端 (Concrete File System Backend) 更接近哪种？",
+      "value": "未发现",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/file.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '文件系统与设备 I/O / Q05_002: 具体文件系统后端 (Concrete File System Backend) 更接近哪种？\n关键词: Concrete, File, System, Backend, 文件系统' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6140 | 文件: repos\\oskernrl2022-rv6\\src\\file.c:417-440 | 类型: function_definition | 符号名: \n```\nstruct file*\nfindfile(char* path)\n{\n  int dev;\n  struct dirent* ep = ename(NULL,path,&dev);\n  struct proc* p = myproc();\n  if(ep == NULL)return NULL;\n  elock(ep);\n  for(int i = 0;i<NOFILEMAX(p);i++){\n    if(p->ofile[i]->type==FD_ENTRY&&p->ofile[i]->ep==ep){\n"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_003",
+      "question_type": "short_answer",
+      "stem": "若支持 FAT32/Ext4：它是自研还是第三方库/crate？（必须引用 Cargo.toml/Cargo.lock 或 Makefile 引入证据）",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
+      "evidence": [
+        {
+          "path": "Cargo.toml",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '文件系统与设备 I/O / Q05_003: 若支持 FAT32/Ext4：它是自研还是第三方库/crate？（必须引用 Cargo.toml/Cargo.lock 或 Makefile 引入证据）\n关键词: FAT32, Ext4, crate, Cargo, toml, lock, Makefile' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6968 | 文件: repos\\oskernrl2022-rv6\\src\\fat32.c:64-64 | 类型: struct_specifier | 符号名: \n```\nstruct fs\n```\n\n[2] 相似度: 0.6968 | 文件: repos\\oskernrl2022-rv6\\src\\fat32.c:65-65 | 类型: struct_specifier | 符号名: \n```\nstruct fs\n```\n\n[3] 相似度: 0.6947 | 文件: repos\\oskernrl2022-rv6\\src\\include\\fat32.h:101-111 | 类型: struct_specifie"
+        },
+        {
+          "path": "LINKER=linker/kernel.ld",
+          "symbol_kind": "build_config",
+          "symbol_name": "parse_build_config",
+          "excerpt": "## Build Config Summary\n- Makefile markers=[qemu-system, -machine, riscv, ENTRY, disk.img]\n  excerpt: K=src U=usrinit SBI=sbi/fw_jump.elf LINKER=linker/kernel.ld  FS?=FAT MAC?=SIFIVE_U  ifeq ($(MAC),SIFIVE_U) DISK:=$K/link_null.o endif  ifeq ($(MAC),QEMU) DISK:=$K/link_disk.o endif  OBJS += \\ \t$K/entry.o \\ \t$K/bio.o \\ \t$(DISK) \\ \t$K/ramdisk.o \\ \t$K/spi.o \\ \t$K/sd.o \\ \t$K/diskio.o \\ \t$K/disk.o \\ \t$K/\n- linker/kernel.ld markers=[riscv, ENTRY]\n  excerpt: OUTPUT_ARCH(riscv) ENTRY(_entry)  BASE_ADDRE"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_004",
+      "question_type": "short_answer",
+      "stem": "文件打开路径：文件打开入口（sys_open 或等价）→ VFS 层 → 具体 FS open。列出 3-6 个关键节点并给证据。",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/sysfile.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '文件系统与设备 I/O / Q05_004: 文件打开路径：文件打开入口（sys_open 或等价）→ VFS 层 → 具体 FS open。列出 3-6 个关键节点并给证据。\n关键词: sys_open, VFS, open' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6963 | 文件: repos\\oskernrl2022-rv6\\src\\sysfile.c:38-142 | 类型: function_definition | 符号名: sys_openat\n```\nuint64\nsys_openat()\n{\n  char path[FAT32_MAX_PATH];\n  int dirfd, flags,mode;\n  int fd ,devno = -1;\n  struct file *f;\n  struct file *dirf;\n  struct dirent *dp = NULL;\n  struct dirent *ep;\n  struct proc* p = myproc();\n  argfd(0,&dirfd,&dirf);\n  if("
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_005",
+      "question_type": "short_answer",
+      "stem": "文件描述符表 (File Descriptor Table, FD Table) 的实现形态是什么？（固定数组/Vec/BTreeMap 等；必须给结构体定义证据）",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "definition",
+          "symbol_name": "lsp_get_definition",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "definition",
+          "symbol_name": "lsp_get_definition",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/include/file.h",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '文件系统与设备 I/O / Q05_005: 文件描述符表 (File Descriptor Table, FD Table) 的实现形态是什么？（固定数组/Vec/BTreeMap 等；必须给结构体定义证据）\n关键词: File, Descriptor, Table, Vec, BTreeMap' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6299 | 文件: repos\\oskernrl2022-rv6\\src\\include\\file.h:14-28 | 类型: struct_specifier | 符号名: \n```\nstruct file {\n  enum { FD_NONE, FD_PIPE, FD_ENTRY, FD_DEVICE } type;\n  int ref; // reference count\n  char readable;\n  char writable;\n  struct pipe *pipe; // FD_PIPE\n  struct dirent *ep;\n  uint64 off;          // FD_ENT"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_006",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现块缓存/缓冲缓存 (Block Cache / Buffer Cache, bcache)？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/bio.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '文件系统与设备 I/O / Q05_006: 是否实现块缓存/缓冲缓存 (Block Cache / Buffer Cache, bcache)？（必须三态）\n关键词: Block, Cache, Buffer, bcache' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6400 | 文件: repos\\oskernrl2022-rv6\\src\\bio.c:70-100 | 类型: function_definition | 符号名: \n```\nstatic struct buf*\nbget(uint dev, uint sectorno)\n{\n  struct buf *b;\n\n  acquire(&bcache.lock);\n  // Is the block already cached?\n  for(b = bcache.head.next; b != &bcache.head; b = b->next){\n    if(b->dev == dev && b->sectorno == sectorno){\n      b->refcnt++;\n "
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/bio.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '文件系统与设备 I/O / Q05_006: 是否实现块缓存/缓冲缓存 (Block Cache / Buffer Cache, bcache)？（必须三态）\n关键词: Block, Cache, Buffer, bcache' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6400 | 文件: repos\\oskernrl2022-rv6\\src\\bio.c:70-100 | 类型: function_definition | 符号名: \n```\nstatic struct buf*\nbget(uint dev, uint sectorno)\n{\n  struct buf *b;\n\n  acquire(&bcache.lock);\n  // Is the block already cached?\n  for(b = bcache.head.next; b != &bcache.head; b = b->next){\n    if(b->dev == dev && b->sectorno == sectorno){\n      b->refcnt++;\n "
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_007",
+      "question_type": "short_answer",
+      "stem": "若存在缓存：驱逐策略是什么（LRU/Clock/FIFO/无驱逐）？必须指出判断依据（字段/算法分支）证据。",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "definition",
+          "symbol_name": "lsp_get_definition",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "definition",
+          "symbol_name": "lsp_get_definition",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/bio.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '文件系统与设备 I/O / Q05_007: 若存在缓存：驱逐策略是什么（LRU/Clock/FIFO/无驱逐）？必须指出判断依据（字段/算法分支）证据。\n关键词: LRU, Clock, FIFO' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5354 | 文件: repos\\oskernrl2022-rv6\\src\\bio.c:27-35 | 类型: struct_specifier | 符号名: \n```\nstruct cache{\n  struct spinlock lock;\n  struct buf buf[NBUF];\n\n  // Linked list of all buffers, through prev/next.\n  // Sorted by how recently the buffer was used.\n  // head.next is most recent, head.prev is least.\n  struct buf head;\n}\n```\n\n[2] 相似度: 0.5348 | 文件: repos\\oskernrl"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_008",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现页缓存 (Page Cache)或与 mmap/文件映射共享缓存页？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/mmap.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '文件系统与设备 I/O / Q05_008: 是否实现页缓存 (Page Cache)或与 mmap/文件映射共享缓存页？（必须三态）\n关键词: Page, Cache, mmap' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5085 | 文件: repos\\oskernrl2022-rv6\\src\\mmap.c:30-136 | 类型: function_definition | 符号名: do_mmap\n```\nuint64 do_mmap(uint64 start, uint64 len, int prot, int flags, int fd, off_t offset)\n{\n    struct proc *p = myproc();\n\n    if(flags & MAP_ANONYMOUS)\n    {\n        fd = -1;\n        goto ignore_fd;\n    }\n\n    if(fd < 0)\n    {\n        __debug_warn(\"[do_mmap] fd illegal, fd = %d"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/mmap.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '文件系统与设备 I/O / Q05_008: 是否实现页缓存 (Page Cache)或与 mmap/文件映射共享缓存页？（必须三态）\n关键词: Page, Cache, mmap' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5085 | 文件: repos\\oskernrl2022-rv6\\src\\mmap.c:30-136 | 类型: function_definition | 符号名: do_mmap\n```\nuint64 do_mmap(uint64 start, uint64 len, int prot, int flags, int fd, off_t offset)\n{\n    struct proc *p = myproc();\n\n    if(flags & MAP_ANONYMOUS)\n    {\n        fd = -1;\n        goto ignore_fd;\n    }\n\n    if(fd < 0)\n    {\n        __debug_warn(\"[do_mmap] fd illegal, fd = %d"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_009",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 mmap 的文件映射或匿名映射？（必须三态；若 stub 说明形态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/sysfile.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '文件系统与设备 I/O / Q05_009: 是否实现 mmap 的文件映射或匿名映射？（必须三态；若 stub 说明形态）\n关键词: mmap, stub' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6716 | 文件: repos\\oskernrl2022-rv6\\src\\sysfile.c:894-921 | 类型: function_definition | 符号名: sys_mmap\n```\nuint64\nsys_mmap(void)\n{\n  uint64 start;\n  uint64 len;\n  int prot;\n  int flags;\n  int fd;\n  int off;\n  if(argaddr(0, &start) < 0)\n    return -1;\n  if(argaddr(1, &len) < 0)\n    return -1;\n  if(argint(2, &prot) < 0)\n    return -1;\n  if(argint(3, &flags) < 0)\n    return -1;\n  if(argfd"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/sysfile.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '文件系统与设备 I/O / Q05_009: 是否实现 mmap 的文件映射或匿名映射？（必须三态；若 stub 说明形态）\n关键词: mmap, stub' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6716 | 文件: repos\\oskernrl2022-rv6\\src\\sysfile.c:894-921 | 类型: function_definition | 符号名: sys_mmap\n```\nuint64\nsys_mmap(void)\n{\n  uint64 start;\n  uint64 len;\n  int prot;\n  int flags;\n  int fd;\n  int off;\n  if(argaddr(0, &start) < 0)\n    return -1;\n  if(argaddr(1, &len) < 0)\n    return -1;\n  if(argint(2, &prot) < 0)\n    return -1;\n  if(argint(3, &flags) < 0)\n    return -1;\n  if(argfd"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_010",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 poll/select/epoll（或等价事件机制）？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/include/poll.h",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '文件系统与设备 I/O / Q05_010: 是否实现 poll/select/epoll（或等价事件机制）？（必须三态）\n关键词: poll, select, epoll' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6522 | 文件: repos\\oskernrl2022-rv6\\src\\include\\poll.h:26-30 | 类型: struct_specifier | 符号名: \n```\nstruct pollfd {\n\tint32 fd;         /* file descriptor */\n\tint16 events;     /* requested events */\n\tint16 revents;    /* returned events */\n}\n```\n\n[2] 相似度: 0.4628 | 文件: repos\\oskernrl2022-rv6\\src\\sysfile.c:704-772 | 类型: function_definition | 符号名: sys_ioctl\n```\nuint64\nsys_ioctl(voi"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/include/poll.h",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '文件系统与设备 I/O / Q05_010: 是否实现 poll/select/epoll（或等价事件机制）？（必须三态）\n关键词: poll, select, epoll' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6522 | 文件: repos\\oskernrl2022-rv6\\src\\include\\poll.h:26-30 | 类型: struct_specifier | 符号名: \n```\nstruct pollfd {\n\tint32 fd;         /* file descriptor */\n\tint16 events;     /* requested events */\n\tint16 revents;    /* returned events */\n}\n```\n\n[2] 相似度: 0.4628 | 文件: repos\\oskernrl2022-rv6\\src\\sysfile.c:704-772 | 类型: function_definition | 符号名: sys_ioctl\n```\nuint64\nsys_ioctl(voi"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_011",
+      "question_type": "tri_state_impl",
+      "stem": "路径解析 (namei/path_walk/lookup) 是否实现并支持绝对/相对路径与 . ..？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/fat32.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '文件系统与设备 I/O / Q05_011: 路径解析 (namei/path_walk/lookup) 是否实现并支持绝对/相对路径与 . ..？（必须三态）\n关键词: namei, path_walk, lookup' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4947 | 文件: repos\\oskernrl2022-rv6\\src\\fat32.c:778-803 | 类型: function_definition | 符号名: read_entry_name\n```\nstatic void read_entry_name(char *buffer, union dentry *d)\n{\n    if (d->lne.attr == ATTR_LONG_NAME) {                       // long entry branch\n        wchar temp[NELEM(d->lne.name1)];\n        memmove(temp, d->lne.name1, sizeof(temp));\n       "
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_012",
+      "question_type": "tri_state_impl",
+      "stem": "是否支持符号链接 (symlink) 的解析/跟随？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/sysfile.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '文件系统与设备 I/O / Q05_012: 是否支持符号链接 (symlink) 的解析/跟随？（必须三态）\n关键词: symlink' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4370 | 文件: repos\\oskernrl2022-rv6\\src\\sysfile.c:493-568 | 类型: function_definition | 符号名: sys_faccessat\n```\nuint64\nsys_faccessat(void)\n{\n  int dirfd;\n  struct file *fp;\n  char path[FAT32_MAX_FILENAME];\n  int mode;\n  int flags;\n  struct dirent *dp, *ep;\n  struct proc *p = myproc();\n  int devno = -1;\n  int emode = R_OK | W_OK | X_OK;\n\n  if(argfd(0, &dirfd, &fp) < 0 && dirfd != AT_FDCWD)\n  {\n  "
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_013",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现管道 (pipe/pipe2) 并在 VFS 层作为文件对象？（必须三态；与 08 章 pipe 实现互指）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/sysfile.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '文件系统与设备 I/O / Q05_013: 是否实现管道 (pipe/pipe2) 并在 VFS 层作为文件对象？（必须三态；与 08 章 pipe 实现互指）\n关键词: pipe, pipe2, VFS' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6260 | 文件: repos\\oskernrl2022-rv6\\src\\sysfile.c:829-861 | 类型: function_definition | 符号名: sys_pipe2\n```\nuint64\nsys_pipe2(void)\n{\n  uint64 fdarray; // user pointer to array of two integers\n  struct file *rf, *wf;\n  int fd0, fd1;\n  struct proc *p = myproc();\n\n  if(argaddr(0, &fdarray) < 0)\n    return -1;\n  if(pipealloc(&rf, &wf) < 0)\n    return -1;\n  fd0 = -1"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/sysfile.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '文件系统与设备 I/O / Q05_013: 是否实现管道 (pipe/pipe2) 并在 VFS 层作为文件对象？（必须三态；与 08 章 pipe 实现互指）\n关键词: pipe, pipe2, VFS' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6260 | 文件: repos\\oskernrl2022-rv6\\src\\sysfile.c:829-861 | 类型: function_definition | 符号名: sys_pipe2\n```\nuint64\nsys_pipe2(void)\n{\n  uint64 fdarray; // user pointer to array of two integers\n  struct file *rf, *wf;\n  int fd0, fd1;\n  struct proc *p = myproc();\n\n  if(argaddr(0, &fdarray) < 0)\n    return -1;\n  if(pipealloc(&rf, &wf) < 0)\n    return -1;\n  fd0 = -1"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_014",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现网络 socket（作为 VFS 文件对象）？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/include/socket.h",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '文件系统与设备 I/O / Q05_014: 是否实现网络 socket（作为 VFS 文件对象）？（必须三态）\n关键词: socket, VFS, 网络' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5155 | 文件: repos\\oskernrl2022-rv6\\src\\include\\socket.h:4-10 | 类型: struct_specifier | 符号名: \n```\nstruct socket_connection{\n    int IP;\n    int sock_opt;\n    uint64 sock_addr;\n    int passive_socket;\n    char temp[MAX_LENGTH_OF_SOCKET];\n}\n```\n\n[2] 相似度: 0.4977 | 文件: repos\\oskernrl2022-rv6\\src\\sysfile.c:864-892 | 类型: function_definition | 符号名: sys_sendfile\n```\nuint64 \nsys_sendfile(void)"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/include/socket.h",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '文件系统与设备 I/O / Q05_014: 是否实现网络 socket（作为 VFS 文件对象）？（必须三态）\n关键词: socket, VFS, 网络' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5155 | 文件: repos\\oskernrl2022-rv6\\src\\include\\socket.h:4-10 | 类型: struct_specifier | 符号名: \n```\nstruct socket_connection{\n    int IP;\n    int sock_opt;\n    uint64 sock_addr;\n    int passive_socket;\n    char temp[MAX_LENGTH_OF_SOCKET];\n}\n```\n\n[2] 相似度: 0.4977 | 文件: repos\\oskernrl2022-rv6\\src\\sysfile.c:864-892 | 类型: function_definition | 符号名: sys_sendfile\n```\nuint64 \nsys_sendfile(void)"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_015",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现伪文件系统（devfs/procfs/sysfs）？（必须三态；若 implemented 需说明实现形态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/sysfile.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '文件系统与设备 I/O / Q05_015: 是否实现伪文件系统（devfs/procfs/sysfs）？（必须三态；若 implemented 需说明实现形态）\n关键词: devfs, procfs, sysfs, implemented, 文件系统' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6175 | 文件: repos\\oskernrl2022-rv6\\src\\sysfile.c:38-142 | 类型: function_definition | 符号名: sys_openat\n```\nuint64\nsys_openat()\n{\n  char path[FAT32_MAX_PATH];\n  int dirfd, flags,mode;\n  int fd ,devno = -1;\n  struct file *f;\n  struct file *dirf;\n  struct dirent *dp = NULL;\n  struct dirent *ep;\n  struct proc* p = myproc();\n  argfd(0,&dirfd,"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/sysfile.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '文件系统与设备 I/O / Q05_015: 是否实现伪文件系统（devfs/procfs/sysfs）？（必须三态；若 implemented 需说明实现形态）\n关键词: devfs, procfs, sysfs, implemented, 文件系统' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6175 | 文件: repos\\oskernrl2022-rv6\\src\\sysfile.c:38-142 | 类型: function_definition | 符号名: sys_openat\n```\nuint64\nsys_openat()\n{\n  char path[FAT32_MAX_PATH];\n  int dirfd, flags,mode;\n  int fd ,devno = -1;\n  struct file *f;\n  struct file *dirf;\n  struct dirent *dp = NULL;\n  struct dirent *ep;\n  struct proc* p = myproc();\n  argfd(0,&dirfd,"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_016",
+      "question_type": "single_choice",
+      "stem": "文件描述符表的归属是哪种？",
+      "value": "未发现/待核实",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/file.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '文件系统与设备 I/O / Q05_016: 文件描述符表的归属是哪种？\n关键词: ' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5621 | 文件: repos\\oskernrl2022-rv6\\src\\file.c:417-440 | 类型: function_definition | 符号名: \n```\nstruct file*\nfindfile(char* path)\n{\n  int dev;\n  struct dirent* ep = ename(NULL,path,&dev);\n  struct proc* p = myproc();\n  if(ep == NULL)return NULL;\n  elock(ep);\n  for(int i = 0;i<NOFILEMAX(p);i++){\n    if(p->ofile[i]->type==FD_ENTRY&&p->ofile[i]->ep==ep){\n      eunlock(ep);\n      eput(ep);\n      return p->ofile[i];\n    }\n   "
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_017",
+      "question_type": "single_choice",
+      "stem": "文件数据块分配方式 (File Allocation Method, Stallings Ch12) 更接近哪种？",
+      "value": "未发现/不适用（内存FS无磁盘分配）",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/bio.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '文件系统与设备 I/O / Q05_017: 文件数据块分配方式 (File Allocation Method, Stallings Ch12) 更接近哪种？\n关键词: File, Allocation, Method, Stallings, Ch12' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6239 | 文件: repos\\oskernrl2022-rv6\\src\\bio.c:37-37 | 类型: struct_specifier | 符号名: \n```\nstruct fs\n```\n\n[2] 相似度: 0.6184 | 文件: repos\\oskernrl2022-rv6\\src\\sysfile.c:13-26 | 类型: function_definition | 符号名: fdallocfrom\n```\nstatic int\nfdallocfrom(struct file *f,int start)\n{\n  int fd;\n  struct proc *p = myproc();\n  //printf(\"[fdalloc]filelimit"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_018",
+      "question_type": "single_choice",
+      "stem": "磁盘/存储空闲空间管理 (Free Space Management, Stallings Ch12) 更接近哪种？",
+      "value": "未发现/不适用（内存FS）",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/diskio.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '文件系统与设备 I/O / Q05_018: 磁盘/存储空闲空间管理 (Free Space Management, Stallings Ch12) 更接近哪种？\n关键词: Free, Space, Management, Stallings, Ch12' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5652 | 文件: repos\\oskernrl2022-rv6\\src\\diskio.c:123-161 | 类型: function_definition | 符号名: disk_ioctl\n```\nDRESULT disk_ioctl (\n\tBYTE pdrv,\t\t/* Physical drive nmuber (0..) */\n\tBYTE cmd,\t\t/* Control code */\n\tvoid *buff\t\t/* Buffer to send/receive control data */\n)\n{\n    DRESULT res;\n\n    if (pdrv != DEV_MMC){\n        return RES_PARERR;\n  "
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_019",
+      "question_type": "single_choice",
+      "stem": "目录结构 (Directory Structure, Stallings Ch12) 更接近哪种？",
+      "value": "未发现",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/include/fat32.h",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '文件系统与设备 I/O / Q05_019: 目录结构 (Directory Structure, Stallings Ch12) 更接近哪种？\n关键词: Directory, Structure, Stallings, Ch12' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6679 | 文件: repos\\oskernrl2022-rv6\\src\\include\\fat32.h:41-67 | 类型: struct_specifier | 符号名: \n```\nstruct dirent {\n    char  filename[FAT32_MAX_FILENAME + 1];\n    uint8   attribute;\n    // uint8   create_time_tenth;\n    // uint16  create_time;\n    // uint16  create_date;\n    // uint16  last_access_date;\n    uint32  first_clus;\n    // uint16  last_w"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_020",
+      "question_type": "single_choice",
+      "stem": "文件内部记录组织 (File Record Organization, Stallings Ch12) 更接近哪种？",
+      "value": "未发现（不涉及记录层）",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/file.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '文件系统与设备 I/O / Q05_020: 文件内部记录组织 (File Record Organization, Stallings Ch12) 更接近哪种？\n关键词: File, Record, Organization, Stallings, Ch12' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5611 | 文件: repos\\oskernrl2022-rv6\\src\\file.c:114-130 | 类型: function_definition | 符号名: print_f_info\n```\nvoid print_f_info(struct file* f){\n  switch (f->type) {\n    case FD_PIPE:\n        printf(\"[file]PIPE\\n\");\n        break;\n    case FD_DEVICE:\n        printf(\"[file]DEVICE name:%d\\n\",devsw[f->major].name);\n        break;\n    case "
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_021",
+      "question_type": "single_choice",
+      "stem": "设备发现/枚举机制更接近哪种？",
+      "value": "未发现/待核实",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/disk.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '文件系统与设备 I/O / Q05_021: 设备发现/枚举机制更接近哪种？\n关键词: ' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5540 | 文件: repos\\oskernrl2022-rv6\\src\\disk.c:27-34 | 类型: function_definition | 符号名: vdisk_read\n```\nvoid vdisk_read(struct buf *b)\n{\n    #ifdef RAM    \n\tramdisk_rw(b, 0);\n    #else \n\tdisk_read(0,b->data, b->sectorno,1);\n    #endif\n}\n```\n\n[2] 相似度: 0.5481 | 文件: repos\\oskernrl2022-rv6\\src\\file.c:417-440 | 类型: function_definition | 符号名: \n```\nstruct file*\nfindfile(char* path)\n{\n  int dev;\n  struct dirent* ep = ename(NUL"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_022",
+      "question_type": "tri_state_impl",
+      "stem": "是否能在代码中证实解析了 `.dtb`/DeviceTree？（必须三态；若 implemented 必须指出解析入口）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/include/fat32.h",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '文件系统与设备 I/O / Q05_022: 是否能在代码中证实解析了 `.dtb`/DeviceTree？（必须三态；若 implemented 必须指出解析入口）\n关键词: dtb, DeviceTree, implemented' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5740 | 文件: repos\\oskernrl2022-rv6\\src\\include\\fat32.h:101-111 | 类型: struct_specifier | 符号名: \n```\nstruct fs{\n    uint devno;\n    int  valid;\n    struct dirent* image;\n    struct Fat fat;\n    struct entry_cache ecache;\n    struct dirent root;\n    void (*disk_init)(struct dirent*image);\n    void (*disk_read)(struct buf* b,struct dirent* image);\n"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_023",
+      "question_type": "short_answer",
+      "stem": "驱动框架接口是什么？（Rust Driver trait / C driver ops / 注册表；必须引用接口定义证据）",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "definition",
+          "symbol_name": "lsp_get_definition",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "definition",
+          "symbol_name": "lsp_get_definition",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/include/dev.h",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '文件系统与设备 I/O / Q05_023: 驱动框架接口是什么？（Rust Driver trait / C driver ops / 注册表；必须引用接口定义证据）\n关键词: Rust, Driver, trait, ops' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6317 | 文件: repos\\oskernrl2022-rv6\\src\\include\\dev.h:16-21 | 类型: struct_specifier | 符号名: \n```\nstruct devsw {\n  char name[DEV_NAME_MAX+1];\n  struct spinlock lk;\n  int (*read)(int, uint64, int);\n  int (*write)(int, uint64, int);\n}\n```\n\n[2] 相似度: 0.5873 | 文件: repos\\oskernrl2022-rv6\\src\\include\\syscall.h:26-26 | 类型: struct_specifier | 符号名: \n```\nstruct"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_024",
+      "question_type": "short_answer",
+      "stem": "驱动注册与初始化顺序是什么？（init_drivers/probe/driver_manager 等；列出 3-6 个关键节点并给证据）",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/fat32.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '文件系统与设备 I/O / Q05_024: 驱动注册与初始化顺序是什么？（init_drivers/probe/driver_manager 等；列出 3-6 个关键节点并给证据）\n关键词: init_drivers, probe, driver_manager' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5295 | 文件: repos\\oskernrl2022-rv6\\src\\fat32.c:68-83 | 类型: function_definition | 符号名: fs_init\n```\nint fs_init()\n{\n    debug_output = 0;\n    for(int i=0;i<FSNUM;i++){\n      FatFs[i].valid = 0;\n      FatFs[i].devno = i;\n      FatFs[i].image = NULL;\n    }\n    rootfs = FatFs;\n    FatFs[0].image = NULL;\n    FatFs[0].disk_init = (void"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_025",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 UART/Console 驱动用于早期输出？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/dev.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '文件系统与设备 I/O / Q05_025: 是否实现 UART/Console 驱动用于早期输出？（必须三态）\n关键词: UART, Console' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5611 | 文件: repos\\oskernrl2022-rv6\\src\\dev.c:131-148 | 类型: function_definition | 符号名: consolewrite\n```\nint\nconsolewrite(int user_dst,uint64 addr,int n){\n  char writebuf[CONSOLE_BUF_LEN];\n  int ret = 0;\n  while(n){\n    int len = MIN(n,CONSOLE_BUF_LEN);\n    if(either_copyin(user_dst,writebuf,addr,len)<0){\n      return ret;\n    }\n    for(int i=0;i<len;i++){\n      consputc(writebuf[i]);\n "
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/dev.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '文件系统与设备 I/O / Q05_025: 是否实现 UART/Console 驱动用于早期输出？（必须三态）\n关键词: UART, Console' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5611 | 文件: repos\\oskernrl2022-rv6\\src\\dev.c:131-148 | 类型: function_definition | 符号名: consolewrite\n```\nint\nconsolewrite(int user_dst,uint64 addr,int n){\n  char writebuf[CONSOLE_BUF_LEN];\n  int ret = 0;\n  while(n){\n    int len = MIN(n,CONSOLE_BUF_LEN);\n    if(either_copyin(user_dst,writebuf,addr,len)<0){\n      return ret;\n    }\n    for(int i=0;i<len;i++){\n      consputc(writebuf[i]);\n "
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_026",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现块设备驱动（virtio-blk/ramdisk/其他）？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/disk.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '文件系统与设备 I/O / Q05_026: 是否实现块设备驱动（virtio-blk/ramdisk/其他）？（必须三态）\n关键词: virtio, blk, ramdisk' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6413 | 文件: repos\\oskernrl2022-rv6\\src\\disk.c:27-34 | 类型: function_definition | 符号名: vdisk_read\n```\nvoid vdisk_read(struct buf *b)\n{\n    #ifdef RAM    \n\tramdisk_rw(b, 0);\n    #else \n\tdisk_read(0,b->data, b->sectorno,1);\n    #endif\n}\n```\n\n[2] 相似度: 0.6331 | 文件: repos\\oskernrl2022-rv6\\src\\disk.c:36-43 | 类型: function_definition | 符号名: vdisk_write\n```\nvoid vdisk_write(struct b"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/disk.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '文件系统与设备 I/O / Q05_026: 是否实现块设备驱动（virtio-blk/ramdisk/其他）？（必须三态）\n关键词: virtio, blk, ramdisk' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6413 | 文件: repos\\oskernrl2022-rv6\\src\\disk.c:27-34 | 类型: function_definition | 符号名: vdisk_read\n```\nvoid vdisk_read(struct buf *b)\n{\n    #ifdef RAM    \n\tramdisk_rw(b, 0);\n    #else \n\tdisk_read(0,b->data, b->sectorno,1);\n    #endif\n}\n```\n\n[2] 相似度: 0.6331 | 文件: repos\\oskernrl2022-rv6\\src\\disk.c:36-43 | 类型: function_definition | 符号名: vdisk_write\n```\nvoid vdisk_write(struct b"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_027",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现网络设备驱动（virtio-net/e1000/rtl8139 等）？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/disk.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '文件系统与设备 I/O / Q05_027: 是否实现网络设备驱动（virtio-net/e1000/rtl8139 等）？（必须三态）\n关键词: virtio, net, e1000, rtl8139, 网络' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4693 | 文件: repos\\oskernrl2022-rv6\\src\\disk.c:27-34 | 类型: function_definition | 符号名: vdisk_read\n```\nvoid vdisk_read(struct buf *b)\n{\n    #ifdef RAM    \n\tramdisk_rw(b, 0);\n    #else \n\tdisk_read(0,b->data, b->sectorno,1);\n    #endif\n}\n```\n\n[2] 相似度: 0.4546 | 文件: repos\\oskernrl2022-rv6\\src\\disk.c:36-43 | 类型: function_definition | 符号名: vdisk_write\n```\nvoid vdi"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/disk.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '文件系统与设备 I/O / Q05_027: 是否实现网络设备驱动（virtio-net/e1000/rtl8139 等）？（必须三态）\n关键词: virtio, net, e1000, rtl8139, 网络' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4693 | 文件: repos\\oskernrl2022-rv6\\src\\disk.c:27-34 | 类型: function_definition | 符号名: vdisk_read\n```\nvoid vdisk_read(struct buf *b)\n{\n    #ifdef RAM    \n\tramdisk_rw(b, 0);\n    #else \n\tdisk_read(0,b->data, b->sectorno,1);\n    #endif\n}\n```\n\n[2] 相似度: 0.4546 | 文件: repos\\oskernrl2022-rv6\\src\\disk.c:36-43 | 类型: function_definition | 符号名: vdisk_write\n```\nvoid vdi"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_028",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现中断控制器驱动（PLIC/CLINT/APIC 等）？（必须三态；需指出中断源到 handler 的分发证据）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/include/riscv.h",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '文件系统与设备 I/O / Q05_028: 是否实现中断控制器驱动（PLIC/CLINT/APIC 等）？（必须三态；需指出中断源到 handler 的分发证据）\n关键词: PLIC, CLINT, APIC, handler' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5626 | 文件: repos\\oskernrl2022-rv6\\src\\include\\riscv.h:273-277 | 类型: function_definition | 符号名: intr_off\n```\nstatic inline void\nintr_off()\n{\n  w_sstatus(r_sstatus() & ~SSTATUS_SIE);\n}\n```\n\n[2] 相似度: 0.5580 | 文件: repos\\oskernrl2022-rv6\\src\\trap.c:216-260 | 类型: function_definition | 符号名: devintr\n```\nint devintr(void) {\n\tuint64 scause = r_scause();\n\t"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/include/riscv.h",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '文件系统与设备 I/O / Q05_028: 是否实现中断控制器驱动（PLIC/CLINT/APIC 等）？（必须三态；需指出中断源到 handler 的分发证据）\n关键词: PLIC, CLINT, APIC, handler' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5626 | 文件: repos\\oskernrl2022-rv6\\src\\include\\riscv.h:273-277 | 类型: function_definition | 符号名: intr_off\n```\nstatic inline void\nintr_off()\n{\n  w_sstatus(r_sstatus() & ~SSTATUS_SIE);\n}\n```\n\n[2] 相似度: 0.5580 | 文件: repos\\oskernrl2022-rv6\\src\\trap.c:216-260 | 类型: function_definition | 符号名: devintr\n```\nint devintr(void) {\n\tuint64 scause = r_scause();\n\t"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_029",
+      "question_type": "short_answer",
+      "stem": "MMIO 地址来源是什么？（DTB 提供 / 常量硬编码 / 物理→虚拟转换；必须给证据）",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/bio.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '文件系统与设备 I/O / Q05_029: MMIO 地址来源是什么？（DTB 提供 / 常量硬编码 / 物理→虚拟转换；必须给证据）\n关键词: MMIO, DTB' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4347 | 文件: repos\\oskernrl2022-rv6\\src\\bio.c:37-37 | 类型: struct_specifier | 符号名: \n```\nstruct fs\n```\n\n[2] 相似度: 0.4326 | 文件: repos\\oskernrl2022-rv6\\src\\dev.c:78-81 | 类型: function_definition | 符号名: nullread\n```\nint\nnullread(int user_dst,uint64 addr,int n){\n  return 0;\n}\n```\n\n[3] 相似度: 0.4246 | 文件: repos\\oskernrl2022-rv6\\src\\diskio.c:123-161 | 类型: function_definition | 符号名: disk_io"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_030",
+      "question_type": "short_answer",
+      "stem": "多平台适配是如何通过构建/条件编译选择驱动的？（features/Kconfig/Makefile 规则；必须给证据）",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
+      "evidence": [
+        {
+          "path": "LINKER=linker/kernel.ld",
+          "symbol_kind": "build_config",
+          "symbol_name": "parse_build_config",
+          "excerpt": "## Build Config Summary\n- Makefile markers=[qemu-system, -machine, riscv, ENTRY, disk.img]\n  excerpt: K=src U=usrinit SBI=sbi/fw_jump.elf LINKER=linker/kernel.ld  FS?=FAT MAC?=SIFIVE_U  ifeq ($(MAC),SIFIVE_U) DISK:=$K/link_null.o endif  ifeq ($(MAC),QEMU) DISK:=$K/link_disk.o endif  OBJS += \\ \t$K/entry.o \\ \t$K/bio.o \\ \t$(DISK) \\ \t$K/ramdisk.o \\ \t$K/spi.o \\ \t$K/sd.o \\ \t$K/diskio.o \\ \t$K/disk.o \\ \t$K/\n- linker/kernel.ld markers=[riscv, ENTRY]\n  excerpt: OUTPUT_ARCH(riscv) ENTRY(_entry)  BASE_ADDRE"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/dev.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '文件系统与设备 I/O / Q05_030: 多平台适配是如何通过构建/条件编译选择驱动的？（features/Kconfig/Makefile 规则；必须给证据）\n关键词: features, Kconfig, Makefile' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5059 | 文件: repos\\oskernrl2022-rv6\\src\\dev.c:67-76 | 类型: function_definition | 符号名: devlookup\n```\nint \ndevlookup(char *name)\n{\n  for(int i = 0;i < NDEV;i++){\n    if(strncmp(name,devsw[i].name,DEV_NAME_MAX+1)==0){\n      return i;\n    }\n  }\n  return -1;\n}\n```\n\n[2] 相似度: 0.5041 | 文件: repos\\oskernrl2022-rv6\\src\\include\\dev.h:16-21 | 类型: struct_specif"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_031",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 MMU 启用前后串口地址切换（phys/virt 切换）逻辑？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/ramdisk.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '文件系统与设备 I/O / Q05_031: 是否存在 MMU 启用前后串口地址切换（phys/virt 切换）逻辑？（必须三态）\n关键词: MMU, phys, virt' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5417 | 文件: repos\\oskernrl2022-rv6\\src\\ramdisk.c:18-29 | 类型: function_definition | 符号名: ramdisk_init\n```\nvoid\nramdisk_init(void)\n{\n#ifdef QEMU\n  ramdisk = fs_img_start;\n#endif\n#ifdef SIFIVE_U\n  ramdisk = (char*)RAMDISK;\n#endif\n  initlock(&ramdisklock, \"ramdisk lock\");\n  __debug_info(\"ramdiskinit ram start:%p\\n\",ramdisk);\n}\n```\n\n[2] 相似度: 0.5277 | 文件: repos\\oskernrl2022-rv6\\s"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/ramdisk.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '文件系统与设备 I/O / Q05_031: 是否存在 MMU 启用前后串口地址切换（phys/virt 切换）逻辑？（必须三态）\n关键词: MMU, phys, virt' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5417 | 文件: repos\\oskernrl2022-rv6\\src\\ramdisk.c:18-29 | 类型: function_definition | 符号名: ramdisk_init\n```\nvoid\nramdisk_init(void)\n{\n#ifdef QEMU\n  ramdisk = fs_img_start;\n#endif\n#ifdef SIFIVE_U\n  ramdisk = (char*)RAMDISK;\n#endif\n  initlock(&ramdisklock, \"ramdisk lock\");\n  __debug_info(\"ramdiskinit ram start:%p\\n\",ramdisk);\n}\n```\n\n[2] 相似度: 0.5277 | 文件: repos\\oskernrl2022-rv6\\s"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_032",
+      "question_type": "single_choice",
+      "stem": "I/O 缓冲模式 (I/O Buffering) 最接近哪种？（Stallings Ch11：单缓冲 Single Buffer / 双缓冲 Double Buffer / 循环缓冲 Circular Buffer / 缓冲池 Buffer Pool / 无缓冲 No Buffer）",
+      "value": "未发现缓冲机制",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/bio.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '文件系统与设备 I/O / Q05_032: I/O 缓冲模式 (I/O Buffering) 最接近哪种？（Stallings Ch11：单缓冲 Single Buffer / 双缓冲 Double Buffer / 循环缓冲 Circular Buffer / 缓冲池 Buffer Pool / 无缓冲 No Buffer）\n关键词: Buffering, Stallings, Ch11, Single, Buffer, Double, Circular, Pool' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5650 | 文件: repos\\oskernrl2022-rv6\\src\\bio.c:27-35 | 类型: struct_specifier | 符号名: \n```\nstruct cache{\n  struct spinlock lock;\n  struct buf buf[NBUF];\n\n  // Linked list of all buffers, through prev/next.\n  // Sorted by how recen"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_033",
+      "question_type": "single_choice",
+      "stem": "块设备（磁盘/eMMC/NVMe）I/O 请求调度算法 (Scheduling Algorithm) (Disk Scheduling Algorithm) 更接近哪种？（Stallings Ch11；若无显式调度则选「FCFS 顺序提交」）",
+      "value": "未发现",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/diskio.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '文件系统与设备 I/O / Q05_033: 块设备（磁盘/eMMC/NVMe）I/O 请求调度算法 (Scheduling Algorithm) (Disk Scheduling Algorithm) 更接近哪种？（Stallings Ch11；若无显式调度则选「FCFS 顺序提交」）\n关键词: eMMC, NVMe, Scheduling, Algorithm, Disk, Stallings, Ch11, FCFS' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6286 | 文件: repos\\oskernrl2022-rv6\\src\\diskio.c:123-161 | 类型: function_definition | 符号名: disk_ioctl\n```\nDRESULT disk_ioctl (\n\tBYTE pdrv,\t\t/* Physical drive nmuber (0..) */\n\tBYTE cmd,\t\t/* Control code */\n\tvoid *buff\t\t/* Buffer to send/receive control "
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_034",
+      "question_type": "single_choice",
+      "stem": "I/O 控制技术 (I/O Control Techniques, Stallings Ch11) 更接近哪种？",
+      "value": "未发现",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/sysfile.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '文件系统与设备 I/O / Q05_034: I/O 控制技术 (I/O Control Techniques, Stallings Ch11) 更接近哪种？\n关键词: Control, Techniques, Stallings, Ch11' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5704 | 文件: repos\\oskernrl2022-rv6\\src\\sysfile.c:704-772 | 类型: function_definition | 符号名: sys_ioctl\n```\nuint64\nsys_ioctl(void)\n{\n\t#define TIOCGWINSZ\t0x5413\n\t#define TCGETS\t\t0x5401\n\n\tstruct winsize {\n\t\tuint16 ws_row;\t\t/* rows， in character */\n\t\tuint16 ws_col; \t\t/* columns, in characters */\n\t\tuint16 ws_xpixel;\t/* horizontal size, pixels (unu"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_035",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 DMA (Direct Memory Access, Stallings Ch11) 传输路径？（必须三态；搜索 dma_alloc / dma_map / dma_buf / virtio 描述符环等；virtio 的描述符环也算 DMA 等价机制）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/diskio.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '文件系统与设备 I/O / Q05_035: 是否实现 DMA (Direct Memory Access, Stallings Ch11) 传输路径？（必须三态；搜索 dma_alloc / dma_map / dma_buf / virtio 描述符环等；virtio 的描述符环也算 DMA 等价机制）\n关键词: DMA, Direct, Memory, Access, Stallings, Ch11, dma_alloc, dma_map' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5362 | 文件: repos\\oskernrl2022-rv6\\src\\diskio.c:123-161 | 类型: function_definition | 符号名: disk_ioctl\n```\nDRESULT disk_ioctl (\n\tBYTE pdrv,\t\t/* Physical drive nmuber (0..) */\n\tBYTE cmd,\t\t/* Control code */\n\tvoid *buff\t\t/* Buffer to send/rece"
+        }
+      ]
+    }
+  ]
+}

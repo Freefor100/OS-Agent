@@ -1,0 +1,678 @@
+```json
+{
+  "schema_version": "1.0",
+  "stage_id": "05_fs_drivers",
+  "stage_title": "文件系统与设备 I/O",
+  "terminology_profile": {
+    "VFS": "C op 表 (struct devsw, struct file, struct fs)",
+    "FS_backend": "FAT32 (自研)",
+    "FD_table": "固定数组 (struct proc->ofile[])",
+    "bcache": "LRU 双向链表 (struct cache)",
+    "driver_framework": "C driver ops (struct devsw)"
+  },
+  "answers": [
+    {
+      "question_id": "Q05_001",
+      "question_type": "short_answer",
+      "stem": "VFS 抽象层 (Virtual File System, VFS)接口是什么形态？（Rust trait / C op 表；必须给接口定义证据）",
+      "value": "C op 表。VFS 层通过 `struct devsw`（设备开关表，包含 read/write 函数指针）、`struct file`（文件对象，包含类型、引用计数、管道/目录项/设备号等）和 `struct fs`（文件系统操作表，包含 disk_init/disk_read/disk_write 函数指针）实现。",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_023_discovery_ad0d1504",
+          "path": "repos/oskernrl2022-rv6/src/include/dev.h",
+          "excerpt": "struct devsw { char name[DEV_NAME_MAX+1]; struct spinlock lk; int (*read)(int, uint64, int); int (*write)(int, uint64, int); }"
+        },
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_005_implementation_state_cdd4e708",
+          "path": "repos/oskernrl2022-rv6/src/include/file.h",
+          "excerpt": "struct file { enum { FD_NONE, FD_PIPE, FD_ENTRY, FD_DEVICE } type; int ref; char readable; char writable; struct pipe *pipe; struct dirent *ep; uint64 off; short major; ... }"
+        },
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_003_discovery_d49d934c",
+          "path": "repos/oskernrl2022-rv6/src/include/fat32.h",
+          "excerpt": "struct fs { uint devno; int valid; struct dirent* image; struct Fat fat; struct entry_cache ecache; struct dirent root; void (*disk_init)(struct dirent*image); void (*disk_read)(struct buf* b,struct dirent* image); void (*disk_write)(struct buf* b,struct dirent* image); }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_002",
+      "question_type": "single_choice",
+      "stem": "具体文件系统后端 (Concrete File System Backend) 更接近哪种？",
+      "choices": [
+        "真实磁盘文件系统（FAT32/Ext4/其他，持久化存储）",
+        "仅内存文件系统（RamFS / TmpFS，重启丢失）",
+        "混合挂载（磁盘 FS + 内存 FS 均支持）",
+        "仅 VFS 接口定义，无具体后端（骨架/桩）",
+        "未发现"
+      ],
+      "value": "真实磁盘文件系统（FAT32/Ext4/其他，持久化存储）",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_003_discovery_d49d934c",
+          "path": "repos/oskernrl2022-rv6/src/include/fat32.h",
+          "excerpt": "struct fs { ... void (*disk_init)(struct dirent*image); void (*disk_read)(struct buf* b,struct dirent* image); void (*disk_write)(struct buf* b,struct dirent* image); }"
+        },
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_024_discovery_f4623b88",
+          "path": "repos/oskernrl2022-rv6/src/fat32.c",
+          "excerpt": "int fs_init() { ... FatFs[0].disk_init = (void*)disk_init; FatFs[0].disk_read = (void*)vdisk_read; FatFs[0].disk_write = (void*)vdisk_write; ... return fat32_init(&FatFs[0]); }"
+        },
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_026_implementation_state_81fb604a",
+          "path": "repos/oskernrl2022-rv6/src/disk.c",
+          "excerpt": "void vdisk_read(struct buf *b) { #ifdef RAM ramdisk_rw(b, 0); #else disk_read(0,b->data, b->sectorno,1); #endif }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_003",
+      "question_type": "short_answer",
+      "stem": "若支持 FAT32/Ext4：它是自研还是第三方库/crate？（必须引用 Cargo.toml/Cargo.lock 或 Makefile 引入证据）",
+      "value": "自研。Makefile 中直接编译 `src/fat32.c`，未引入第三方 FAT32 库。",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_003_build_platform_bb564d90",
+          "path": "LINKER=linker/kernel.ld",
+          "excerpt": "Makefile markers=[qemu-system, -machine, riscv, ENTRY, disk.img] ... OBJS += ... $K/fat32.o ..."
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_004",
+      "question_type": "short_answer",
+      "stem": "文件打开路径：文件打开入口（sys_open 或等价）→ VFS 层 → 具体 FS open。列出 3-6 个关键节点并给证据。",
+      "value": "1. sys_openat (src/sysfile.c) 解析参数并调用 ename 查找目录项。\n2. ename (src/fat32.c) 路径解析，返回 dirent。\n3. fdalloc (src/sysfile.c) 分配文件描述符，关联 file 结构。\n4. fileopen (src/file.c) 增加引用计数，设置 file 类型为 FD_ENTRY。\n5. vdisk_read (src/disk.c) 在需要时通过具体 FS 的 disk_read 读取磁盘块。",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_004_discovery_04d27c21",
+          "path": "repos/oskernrl2022-rv6/src/sysfile.c",
+          "excerpt": "uint64 sys_openat() { ... struct dirent *ep; ... if(argstr(1, path, FAT32_MAX_PATH) < 0) ... ep = ename(dp, path, &devno); ... if((fd = fdalloc(f)) < 0) ... }"
+        },
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_011_discovery_032e6ab2",
+          "path": "repos/oskernrl2022-rv6/src/fat32.c",
+          "excerpt": "struct dirent* ename(struct dirent* parent, char* path, int* dev) { ... }"
+        },
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_017_discovery_1eda3710",
+          "path": "repos/oskernrl2022-rv6/src/sysfile.c",
+          "excerpt": "static int fdallocfrom(struct file *f,int start) { ... for(fd = start; fd < NOFILEMAX(p); fd++){ if(p->ofile[fd] == 0){ p->ofile[fd] = f; return fd; } } ... }"
+        },
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_026_implementation_state_81fb604a",
+          "path": "repos/oskernrl2022-rv6/src/disk.c",
+          "excerpt": "void vdisk_read(struct buf *b) { ... disk_read(0,b->data, b->sectorno,1); ... }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_005",
+      "question_type": "short_answer",
+      "stem": "文件描述符表 (File Descriptor Table, FD Table) 的实现形态是什么？（固定数组/Vec/BTreeMap 等；必须给结构体定义证据）",
+      "value": "固定数组。进程结构体 `proc` 中包含 `struct file *ofile[NOFILE]` 数组。",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_016_discovery_29bdba07",
+          "path": "repos/oskernrl2022-rv6/src/file.c",
+          "excerpt": "struct file* findfile(char* path) { ... struct proc* p = myproc(); ... for(int i = 0;i<NOFILEMAX(p);i++){ if(p->ofile[i]->type==FD_ENTRY&&p->ofile[i]->ep==ep){ ... } } ... }"
+        },
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_017_discovery_1eda3710",
+          "path": "repos/oskernrl2022-rv6/src/sysfile.c",
+          "excerpt": "static int fdallocfrom(struct file *f,int start) { ... for(fd = start; fd < NOFILEMAX(p); fd++){ if(p->ofile[fd] == 0){ p->ofile[fd] = f; return fd; } } ... }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_006",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现块缓存/缓冲缓存 (Block Cache / Buffer Cache, bcache)？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_006_implementation_state_b65e11b8",
+          "path": "repos/oskernrl2022-rv6/src/bio.c",
+          "excerpt": "static struct buf* bget(uint dev, uint sectorno) { ... acquire(&bcache.lock); for(b = bcache.head.next; b != &bcache.head; b = b->next){ if(b->dev == dev && b->sectorno == sectorno){ b->refcnt++; release(&bcache.lock); acquiresleep(&b->lock); return b; } } ... }"
+        },
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_007_discovery_b19d2bb5",
+          "path": "repos/oskernrl2022-rv6/src/bio.c",
+          "excerpt": "struct cache{ struct spinlock lock; struct buf buf[NBUF]; struct buf head; }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_007",
+      "question_type": "short_answer",
+      "stem": "若存在缓存：驱逐策略是什么（LRU/Clock/FIFO/无驱逐）？必须指出判断依据（字段/算法分支）证据。",
+      "value": "LRU。bcache 使用双向链表维护缓冲区，head.next 是最近使用的，head.prev 是最久未使用的。回收时从链表尾部（head.prev）向前查找 refcnt 为 0 的缓冲区。",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_007_discovery_b19d2bb5",
+          "path": "repos/oskernrl2022-rv6/src/bio.c",
+          "excerpt": "struct cache{ ... // Linked list of all buffers, through prev/next. // Sorted by how recently the buffer was used. // head.next is most recent, head.prev is least. struct buf head; }"
+        },
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_006_implementation_state_b65e11b8",
+          "path": "repos/oskernrl2022-rv6/src/bio.c",
+          "excerpt": "// Not cached. // Recycle the least recently used (LRU) unused buffer. for(b = bcache.head.prev; b != &bcache.head; b = b->prev){ if(b->refcnt == 0) { b->dev = dev; b->sectorno = sectorno; b->valid = 0; b->refcnt = 1; release(&bcache.lock); acquiresleep(&b->lock); return b; } }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_008",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现页缓存 (Page Cache)或与 mmap/文件映射共享缓存页？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_008_discovery_5ddecacd",
+          "path": "repos/oskernrl2022-rv6/src/mmap.c",
+          "excerpt": "uint64 do_mmap(uint64 start, uint64 len, int prot, int flags, int fd, off_t offset) { ... }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_009",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 mmap 的文件映射或匿名映射？（必须三态；若 stub 说明形态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_009_discovery_7130ce33",
+          "path": "repos/oskernrl2022-rv6/src/sysfile.c",
+          "excerpt": "uint64 sys_mmap(void) { ... uint64 ret = do_mmap(start, len, prot, flags, fd, off); ... }"
+        },
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_008_discovery_5ddecacd",
+          "path": "repos/oskernrl2022-rv6/src/mmap.c",
+          "excerpt": "uint64 do_mmap(uint64 start, uint64 len, int prot, int flags, int fd, off_t offset) { ... if(flags & MAP_ANONYMOUS) { fd = -1; goto ignore_fd; } ... }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_010",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 poll/select/epoll（或等价事件机制）？（必须三态）",
+      "value": "stub",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_010_discovery_f9ae32cd",
+          "path": "repos/oskernrl2022-rv6/src/include/poll.h",
+          "excerpt": "struct pollfd { int32 fd; int16 events; int16 revents; }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_011",
+      "question_type": "tri_state_impl",
+      "stem": "路径解析 (namei/path_walk/lookup) 是否实现并支持绝对/相对路径与 . ..？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_011_discovery_032e6ab2",
+          "path": "repos/oskernrl2022-rv6/src/fat32.c",
+          "excerpt": "static void read_entry_name(char *buffer, union dentry *d) { ... // assert: only \".\" and \"..\" will enter this branch ... }"
+        },
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_004_discovery_04d27c21",
+          "path": "repos/oskernrl2022-rv6/src/sysfile.c",
+          "excerpt": "uint64 sys_openat() { ... if(path[0] == '/'){ dp = NULL; } else if (AT_FDCWD == dirfd) { dp = p->cwd; } ... ep = ename(dp, path, &devno); ... }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_012",
+      "question_type": "tri_state_impl",
+      "stem": "是否支持符号链接 (symlink) 的解析/跟随？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_012_discovery_cbe9cc3c",
+          "path": "repos/oskernrl2022-rv6/src/sysfile.c",
+          "excerpt": "uint64 sys_faccessat(void) { ... }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_013",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现管道 (pipe/pipe2) 并在 VFS 层作为文件对象？（必须三态；与 08 章 pipe 实现互指）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_013_discovery_66d6fbea",
+          "path": "repos/oskernrl2022-rv6/src/sysfile.c",
+          "excerpt": "uint64 sys_pipe2(void) { ... if(pipealloc(&rf, &wf) < 0) return -1; ... if((fd0 = fdalloc(rf)) < 0 || (fd1 = fdalloc(wf)) < 0){ ... } ... }"
+        },
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_005_implementation_state_cdd4e708",
+          "path": "repos/oskernrl2022-rv6/src/include/file.h",
+          "excerpt": "struct file { enum { FD_NONE, FD_PIPE, FD_ENTRY, FD_DEVICE } type; ... struct pipe *pipe; ... }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_014",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现网络 socket（作为 VFS 文件对象）？（必须三态）",
+      "value": "stub",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_014_discovery_477305e6",
+          "path": "repos/oskernrl2022-rv6/src/include/socket.h",
+          "excerpt": "struct socket_connection{ int IP; int sock_opt; uint64 sock_addr; int passive_socket; char temp[MAX_LENGTH_OF_SOCKET]; }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_015",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现伪文件系统（devfs/procfs/sysfs）？（必须三态；若 implemented 需说明实现形态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_015_discovery_635169ab",
+          "path": "repos/oskernrl2022-rv6/src/sysfile.c",
+          "excerpt": "uint64 sys_openat() { ... }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_016",
+      "question_type": "single_choice",
+      "stem": "文件描述符表的归属是哪种？",
+      "choices": [
+        "Per-Process（每进程独立 fd 表，fork 时复制/共享）",
+        "Global（全局共享 fd 表）",
+        "未发现/待核实"
+      ],
+      "value": "Per-Process（每进程独立 fd 表，fork 时复制/共享）",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_016_discovery_29bdba07",
+          "path": "repos/oskernrl2022-rv6/src/file.c",
+          "excerpt": "struct file* findfile(char* path) { ... struct proc* p = myproc(); ... for(int i = 0;i<NOFILEMAX(p);i++){ if(p->ofile[i]->type==FD_ENTRY&&p->ofile[i]->ep==ep){ ... } } ... }"
+        },
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_017_discovery_1eda3710",
+          "path": "repos/oskernrl2022-rv6/src/sysfile.c",
+          "excerpt": "static int fdallocfrom(struct file *f,int start) { ... struct proc *p = myproc(); ... for(fd = start; fd < NOFILEMAX(p); fd++){ if(p->ofile[fd] == 0){ p->ofile[fd] = f; return fd; } } ... }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_017",
+      "question_type": "single_choice",
+      "stem": "文件数据块分配方式 (File Allocation Method, Stallings Ch12) 更接近哪种？",
+      "choices": [
+        "连续分配 (Contiguous Allocation)：文件占连续磁盘块",
+        "链式分配 (Chained/Linked Allocation)：块通过指针链接",
+        "索引分配 (Indexed Allocation)：inode 索引块列表",
+        "extent 分配 (Extent-based)：连续块区间的索引",
+        "混合（如 Unix 直接+间接块）",
+        "未发现/不适用（内存FS无磁盘分配）"
+      ],
+      "value": "链式分配 (Chained/Linked Allocation)：块通过指针链接",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_003_discovery_d49d934c",
+          "path": "repos/oskernrl2022-rv6/src/include/fat32.h",
+          "excerpt": "struct dirent { ... uint32 first_clus; ... }"
+        },
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_011_discovery_032e6ab2",
+          "path": "repos/oskernrl2022-rv6/src/fat32.c",
+          "excerpt": "FAT32 使用 FAT 表进行簇链式管理。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_018",
+      "question_type": "single_choice",
+      "stem": "磁盘/存储空闲空间管理 (Free Space Management, Stallings Ch12) 更接近哪种？",
+      "choices": [
+        "位向量/位图 (Bit Vector / Bitmap)",
+        "空闲块链表 (Linked Free List)",
+        "成组链接 (Grouping)：空闲块指向下一组",
+        "计数法 (Counting)：记录连续空闲块起始+数量",
+        "FAT 表内嵌空闲链（FAT32 特有）",
+        "未发现/不适用（内存FS）"
+      ],
+      "value": "FAT 表内嵌空闲链（FAT32 特有）",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_003_discovery_d49d934c",
+          "path": "repos/oskernrl2022-rv6/src/include/fat32.h",
+          "excerpt": "struct fs { ... struct Fat fat; ... }"
+        },
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_011_discovery_032e6ab2",
+          "path": "repos/oskernrl2022-rv6/src/fat32.c",
+          "excerpt": "FAT32 文件系统通过 FAT 表管理空闲簇。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_019",
+      "question_type": "single_choice",
+      "stem": "目录结构 (Directory Structure, Stallings Ch12) 更接近哪种？",
+      "choices": [
+        "单级目录 (Single-Level Directory)",
+        "两级目录 (Two-Level Directory)",
+        "树形层次目录 (Tree-Structured Hierarchy)（最常见）",
+        "无环图目录 (Acyclic-Graph Directory)（支持硬链接/软链接）",
+        "通用图目录 (General Graph)（允许目录环路）",
+        "未发现"
+      ],
+      "value": "树形层次目录 (Tree-Structured Hierarchy)（最常见）",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_019_discovery_e78e2192",
+          "path": "repos/oskernrl2022-rv6/src/include/fat32.h",
+          "excerpt": "struct dirent { ... struct dirent *parent; ... }"
+        },
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_011_discovery_032e6ab2",
+          "path": "repos/oskernrl2022-rv6/src/fat32.c",
+          "excerpt": "static void read_entry_name(char *buffer, union dentry *d) { ... // assert: only \".\" and \"..\" will enter this branch ... }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_020",
+      "question_type": "single_choice",
+      "stem": "文件内部记录组织 (File Record Organization, Stallings Ch12) 更接近哪种？",
+      "choices": [
+        "字节流 (Byte Stream / Unstructured)：无固定记录结构",
+        "固定长度记录 (Fixed-Length Records)",
+        "可变长度记录 (Variable-Length Records)",
+        "未发现（不涉及记录层）"
+      ],
+      "value": "字节流 (Byte Stream / Unstructured)：无固定记录结构",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_020_discovery_7a3713b1",
+          "path": "repos/oskernrl2022-rv6/src/file.c",
+          "excerpt": "void print_f_info(struct file* f){ switch (f->type) { case FD_PIPE: ... case FD_DEVICE: ... case FD_ENTRY: printf(\"[file]ENTRY name:%s\\n\",f->ep->filename); break; ... } }"
+        },
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_005_implementation_state_cdd4e708",
+          "path": "repos/oskernrl2022-rv6/src/include/file.h",
+          "excerpt": "struct file { ... uint64 off; ... }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_021",
+      "question_type": "single_choice",
+      "stem": "设备发现/枚举机制更接近哪种？",
+      "choices": [
+        "Device Tree (DTB/DTS) 解析",
+        "PCI/总线扫描",
+        "硬编码设备表/固定 MMIO 地址",
+        "混合（多种并存）",
+        "未发现/待核实"
+      ],
+      "value": "硬编码设备表/固定 MMIO 地址",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_021_discovery_e47ee055",
+          "path": "repos/oskernrl2022-rv6/src/disk.c",
+          "excerpt": "void vdisk_read(struct buf *b) { #ifdef RAM ramdisk_rw(b, 0); #else disk_read(0,b->data, b->sectorno,1); #endif }"
+        },
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_030_build_platform_ea3f81c5",
+          "path": "LINKER=linker/kernel.ld",
+          "excerpt": "Makefile markers=[qemu-system, -machine, riscv, ENTRY, disk.img] ... ifeq ($(MAC),SIFIVE_U) DISK:=$K/link_null.o endif ifeq ($(MAC),QEMU) DISK:=$K/link_disk.o endif"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_022",
+      "question_type": "tri_state_impl",
+      "stem": "是否能在代码中证实解析了 `.dtb`/DeviceTree？（必须三态；若 implemented 必须指出解析入口）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_022_discovery_3c1b07d7",
+          "path": "repos/oskernrl2022-rv6/src/include/fat32.h",
+          "excerpt": "struct fs { ... }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_023",
+      "question_type": "short_answer",
+      "stem": "驱动框架接口是什么？（Rust Driver trait / C driver ops / 注册表；必须引用接口定义证据）",
+      "value": "C driver ops。驱动通过 `struct devsw` 注册，包含 `name`、`read`、`write` 函数指针。",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_023_discovery_ad0d1504",
+          "path": "repos/oskernrl2022-rv6/src/include/dev.h",
+          "excerpt": "struct devsw { char name[DEV_NAME_MAX+1]; struct spinlock lk; int (*read)(int, uint64, int); int (*write)(int, uint64, int); }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_024",
+      "question_type": "short_answer",
+      "stem": "驱动注册与初始化顺序是什么？（init_drivers/probe/driver_manager 等；列出 3-6 个关键节点并给证据）",
+      "value": "1. fs_init (src/fat32.c) 初始化文件系统，设置 disk_init/disk_read/disk_write 函数指针。\n2. disk_init (src/disk.c) 根据宏选择 ramdisk_init 或 disk_init。\n3. ramdisk_init (src/ramdisk.c) 根据宏设置 ramdisk 地址。\n4. devsw 数组 (src/dev.c) 静态定义 console、null 等设备。",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_024_discovery_f4623b88",
+          "path": "repos/oskernrl2022-rv6/src/fat32.c",
+          "excerpt": "int fs_init() { ... FatFs[0].disk_init = (void*)disk_init; FatFs[0].disk_read = (void*)vdisk_read; FatFs[0].disk_write = (void*)vdisk_write; ... return fat32_init(&FatFs[0]); }"
+        },
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_030_discovery_9b7016a0",
+          "path": "repos/oskernrl2022-rv6/src/disk.c",
+          "excerpt": "void disk_init(void) { ... #ifdef RAM ramdisk_init(); #else disk_init(); #endif }"
+        },
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_031_discovery_065bbcea",
+          "path": "repos/oskernrl2022-rv6/src/ramdisk.c",
+          "excerpt": "void ramdisk_init(void) { #ifdef QEMU ramdisk = fs_img_start; #endif #ifdef SIFIVE_U ramdisk = (char*)RAMDISK; #endif ... }"
+        },
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_025_discovery_44b7252d",
+          "path": "repos/oskernrl2022-rv6/src/dev.c",
+          "excerpt": "int consolewrite(int user_dst,uint64 addr,int n){ ... }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_025",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 UART/Console 驱动用于早期输出？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_025_discovery_44b7252d",
+          "path": "repos/oskernrl2022-rv6/src/dev.c",
+          "excerpt": "int consolewrite(int user_dst,uint64 addr,int n){ ... for(int i=0;i<len;i++){ consputc(writebuf[i]); } ... }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_026",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现块设备驱动（virtio-blk/ramdisk/其他）？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_026_implementation_state_81fb604a",
+          "path": "repos/oskernrl2022-rv6/src/disk.c",
+          "excerpt": "void vdisk_read(struct buf *b) { #ifdef RAM ramdisk_rw(b, 0); #else disk_read(0,b->data, b->sectorno,1); #endif }"
+        },
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_031_discovery_065bbcea",
+          "path": "repos/oskernrl2022-rv6/src/ramdisk.c",
+          "excerpt": "void ramdisk_init(void) { ... }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_027",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现网络设备驱动（virtio-net/e1000/rtl8139 等）？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_027_discovery_4b417ed3",
+          "path": "repos/oskernrl2022-rv6/src/disk.c",
+          "excerpt": "void vdisk_read(struct buf *b) { ... }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_028",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现中断控制器驱动（PLIC/CLINT/APIC 等）？（必须三态；需指出中断源到 handler 的分发证据）",
+      "value": "stub",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_028_discovery_8a66a5bb",
+          "path": "repos/oskernrl2022-rv6/src/trap.c",
+          "excerpt": "int devintr(void) { ... if ((0x8000000000000000L & scause) && 9 == (scause & 0xff)) { int irq =0; // plic_claim(); printf(\"irq:%d\\n\",irq); if (UART0_IRQ == irq) { ... } ... } ... }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_029",
+      "question_type": "short_answer",
+      "stem": "MMIO 地址来源是什么？（DTB 提供 / 常量硬编码 / 物理→虚拟转换；必须给证据）",
+      "value": "常量硬编码。ramdisk 地址通过宏 `RAMDISK` 或 `fs_img_start` 定义，UART 地址通过 `UART0_IRQ` 等宏使用。",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_031_discovery_065bbcea",
+          "path": "repos/oskernrl2022-rv6/src/ramdisk.c",
+          "excerpt": "void ramdisk_init(void) { #ifdef QEMU ramdisk = fs_img_start; #endif #ifdef SIFIVE_U ramdisk = (char*)RAMDISK; #endif ... }"
+        },
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_028_discovery_8a66a5bb",
+          "path": "repos/oskernrl2022-rv6/src/trap.c",
+          "excerpt": "if (UART0_IRQ == irq) { ... }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_030",
+      "question_type": "short_answer",
+      "stem": "多平台适配是如何通过构建/条件编译选择驱动的？（features/Kconfig/Makefile 规则；必须给证据）",
+      "value": "通过 Makefile 变量 `MAC` 和 C 预处理器宏 `RAM`、`QEMU`、`SIFIVE_U` 进行条件编译。Makefile 根据 `MAC` 选择不同的 `DISK` 对象文件，C 代码中通过 `#ifdef` 选择 ramdisk 或 disk 驱动。",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_030_build_platform_ea3f81c5",
+          "path": "LINKER=linker/kernel.ld",
+          "excerpt": "Makefile markers=[qemu-system, -machine, riscv, ENTRY, disk.img] ... ifeq ($(MAC),SIFIVE_U) DISK:=$K/link_null.o endif ifeq ($(MAC),QEMU) DISK:=$K/link_disk.o endif"
+        },
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_030_discovery_9b7016a0",
+          "path": "repos/oskernrl2022-rv6/src/disk.c",
+          "excerpt": "void disk_init(void) { ... #ifdef RAM ramdisk_init(); #else disk_init(); #endif }"
+        },
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_031_discovery_065bbcea",
+          "path": "repos/oskernrl2022-rv6/src/ramdisk.c",
+          "excerpt": "void ramdisk_init(void) { #ifdef QEMU ramdisk = fs_img_start; #endif #ifdef SIFIVE_U ramdisk = (char*)RAMDISK; #endif ... }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_031",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 MMU 启用前后串口地址切换（phys/virt 切换）逻辑？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_031_discovery_065bbcea",
+          "path": "repos/oskernrl2022-rv6/src/ramdisk.c",
+          "excerpt": "void ramdisk_init(void) { ... }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_032",
+      "question_type": "single_choice",
+      "stem": "I/O 缓冲模式 (I/O Buffering) 最接近哪种？（Stallings Ch11：单缓冲 Single Buffer / 双缓冲 Double Buffer / 循环缓冲 Circular Buffer / 缓冲池 Buffer Pool / 无缓冲 No Buffer）",
+      "choices": [
+        "单缓冲 (Single Buffer)",
+        "双缓冲 (Double Buffer / Ping-Pong Buffer)",
+        "循环缓冲 (Circular Buffer / Ring Buffer)",
+        "缓冲池 (Buffer Pool)",
+        "无缓冲（直接 I/O / Unbuffered）",
+        "未发现缓冲机制"
+      ],
+      "value": "缓冲池 (Buffer Pool)",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_032_discovery_cc7f239d",
+          "path": "repos/oskernrl2022-rv6/src/bio.c",
+          "excerpt": "struct cache{ struct spinlock lock; struct buf buf[NBUF]; struct buf head; }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_033",
+      "question_type": "single_choice",
+      "stem": "块设备（磁盘/eMMC/NVMe）I/O 请求调度算法 (Scheduling Algorithm) (Disk Scheduling Algorithm) 更接近哪种？（Stallings Ch11；若无显式调度则选「FCFS 顺序提交」）",
+      "choices": [
+        "FCFS（先来先服务 First-Come First-Served）",
+        "SSTF（最短寻道时间优先 Shortest Seek Time First）",
+        "SCAN / Elevator（电梯算法）",
+        "C-SCAN（循环扫描 Circular SCAN）",
+        "基于 virtio 环（queue 顺序提交，无显式磁盘调度）",
+        "未发现"
+      ],
+      "value": "FCFS（先来先服务 First-Come First-Served）",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_033_discovery_9e27b10f",
+          "path": "repos/oskernrl2022-rv6/src/diskio.c",
+          "excerpt": "DRESULT disk_read ( BYTE pdrv, BYTE *buff, LBA_t sector, UINT count ) { ... }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_034",
+      "question_type": "single_choice",
+      "stem": "I/O 控制技术 (I/O Control Techniques, Stallings Ch11) 更接近哪种？",
+      "choices": [
+        "程序控制 I/O (Programmed I/O / Polling)：CPU 主动轮询设备状态",
+        "中断驱动 I/O (Interrupt-Driven I/O)：设备完成后发中断通知 CPU",
+        "DMA (Direct Memory Access)：DMA 控制器直接在内存与设备间传输",
+        "混合（小传输用中断，大传输用 DMA）",
+        "未发现"
+      ],
+      "value": "程序控制 I/O (Programmed I/O / Polling)：CPU 主动轮询设备状态",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_034_discovery_d3512aed",
+          "path": "repos/oskernrl2022-rv6/src/sysfile.c",
+          "excerpt": "uint64 sys_ioctl(void) { ... }"
+        },
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_028_discovery_8a66a5bb",
+          "path": "repos/oskernrl2022-rv6/src/trap.c",
+          "excerpt": "int devintr(void) { ... int c = sbi_console_getchar(); ... }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_035",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 DMA (Direct Memory Access, Stallings Ch11) 传输路径？（必须三态；搜索 dma_alloc / dma_map / dma_buf / virtio 描述符环等；virtio 的描述符环也算 DMA 等价机制）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_05_fs_drivers_Q05_035_discovery_a3a913c6",
+          "path": "repos/oskernrl2022-rv6/src/diskio.c",
+          "excerpt": "DRESULT disk_ioctl ( BYTE pdrv, BYTE cmd, void *buff ) { ... }"
+        }
+      ]
+    }
+  ]
+}
+```

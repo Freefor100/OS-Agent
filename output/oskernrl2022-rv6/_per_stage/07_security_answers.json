@@ -1,0 +1,306 @@
+{
+  "schema_version": "v1",
+  "stage_id": "07_security",
+  "stage_title": "安全机制与权限模型",
+  "terminology_profile": "stallings_en_zh",
+  "answers": [
+    {
+      "question_id": "Q07_001",
+      "question_type": "single_choice",
+      "stem": "特权级隔离形态更接近哪种？",
+      "value": "未发现/待核实",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/vm.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '安全机制与权限模型 / Q07_001: 特权级隔离形态更接近哪种？\n关键词: ' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.3435 | 文件: repos\\oskernrl2022-rv6\\src\\vm.c:188-207 | 类型: function_definition | 符号名: experm\n```\nuint64\nexperm(pagetable_t pagetable, uint64 va,uint64 perm)\n{\n  pte_t *pte;\n  uint64 pa;\n\n  if(va >= MAXVA)\n    return NULL;\n\n  pte = walk(pagetable, va, 0);\n  if(pte == 0)\n    return NULL;\n  if((*pte & PTE_V) == 0)\n    return NULL;\n  if((*pte & PTE_U) == 0)\n    return NULL;\n  *pte |= perm;\n  pa = PTE2PA(*pte);\n  return pa;\n"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_002",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在凭证/权限数据结构（UID/GID/Credential/Capability/ACL 等）？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/sd.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '安全机制与权限模型 / Q07_002: 是否存在凭证/权限数据结构（UID/GID/Credential/Capability/ACL 等）？（必须三态）\n关键词: UID, GID, Credential, Capability, ACL, 权限' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.3423 | 文件: repos\\oskernrl2022-rv6\\src\\sd.c:165-174 | 类型: function_definition | 符号名: sd_acmd41\n```\nstatic int sd_acmd41(spi_ctrl* spi)\n{\n  uint8_t r;\n  do {\n    sd_cmd55(spi);\n    r = sd_cmd(spi, SD_CMD(SD_CMD_APP_SEND_OP_COND), 0x40000000, 0x77); /* HCS = 1 */\n    sd_cmd_end(spi);\n  } while (r == SD_RESPONSE_IDLE);\n  return (r != 0x00"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/sd.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '安全机制与权限模型 / Q07_002: 是否存在凭证/权限数据结构（UID/GID/Credential/Capability/ACL 等）？（必须三态）\n关键词: UID, GID, Credential, Capability, ACL, 权限' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.3423 | 文件: repos\\oskernrl2022-rv6\\src\\sd.c:165-174 | 类型: function_definition | 符号名: sd_acmd41\n```\nstatic int sd_acmd41(spi_ctrl* spi)\n{\n  uint8_t r;\n  do {\n    sd_cmd55(spi);\n    r = sd_cmd(spi, SD_CMD(SD_CMD_APP_SEND_OP_COND), 0x40000000, 0x77); /* HCS = 1 */\n    sd_cmd_end(spi);\n  } while (r == SD_RESPONSE_IDLE);\n  return (r != 0x00"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_003",
+      "question_type": "tri_state_impl",
+      "stem": "是否能证实在 syscall 路径上真实执行了权限检查（open/exec/write 等）？（必须三态；仅有字段不算 implemented）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "definition",
+          "symbol_name": "lsp_get_definition",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_004",
+      "question_type": "short_answer",
+      "stem": "若存在权限检查：入口点与核心检查函数链路是什么？（列 2-5 个节点并给证据）",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/vm.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '安全机制与权限模型 / Q07_004: 若存在权限检查：入口点与核心检查函数链路是什么？（列 2-5 个节点并给证据）\n关键词: 权限' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4484 | 文件: repos\\oskernrl2022-rv6\\src\\vm.c:188-207 | 类型: function_definition | 符号名: experm\n```\nuint64\nexperm(pagetable_t pagetable, uint64 va,uint64 perm)\n{\n  pte_t *pte;\n  uint64 pa;\n\n  if(va >= MAXVA)\n    return NULL;\n\n  pte = walk(pagetable, va, 0);\n  if(pte == 0)\n    return NULL;\n  if((*pte & PTE_V) == 0)\n    return NULL;\n  if((*pte & PTE_U) == 0)\n    return NULL;\n  *pte |= perm;\n  pa ="
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_005",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现用户指针验证（access_ok/verify_area/UserInPtr/copyin/copyout 等）？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/vm.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '安全机制与权限模型 / Q07_005: 是否实现用户指针验证（access_ok/verify_area/UserInPtr/copyin/copyout 等）？（必须三态）\n关键词: access_ok, verify_area, UserInPtr, copyin, copyout' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.3834 | 文件: repos\\oskernrl2022-rv6\\src\\vm.c:188-207 | 类型: function_definition | 符号名: experm\n```\nuint64\nexperm(pagetable_t pagetable, uint64 va,uint64 perm)\n{\n  pte_t *pte;\n  uint64 pa;\n\n  if(va >= MAXVA)\n    return NULL;\n\n  pte = walk(pagetable, va, 0);\n  if(pte == 0)\n    return NULL;\n  if((*pte & PTE_V) == 0)\n    re"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/vm.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '安全机制与权限模型 / Q07_005: 是否实现用户指针验证（access_ok/verify_area/UserInPtr/copyin/copyout 等）？（必须三态）\n关键词: access_ok, verify_area, UserInPtr, copyin, copyout' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.3834 | 文件: repos\\oskernrl2022-rv6\\src\\vm.c:188-207 | 类型: function_definition | 符号名: experm\n```\nuint64\nexperm(pagetable_t pagetable, uint64 va,uint64 perm)\n{\n  pte_t *pte;\n  uint64 pa;\n\n  if(va >= MAXVA)\n    return NULL;\n\n  pte = walk(pagetable, va, 0);\n  if(pte == 0)\n    return NULL;\n  if((*pte & PTE_V) == 0)\n    re"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_006",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 seccomp/prctl/sandbox 等系统调用过滤/沙箱？（必须三态；stub 需说明形态：ENOSYS/return 0）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/syscall/syscall.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '安全机制与权限模型 / Q07_006: 是否实现 seccomp/prctl/sandbox 等系统调用过滤/沙箱？（必须三态；stub 需说明形态：ENOSYS/return 0）\n关键词: seccomp, prctl, sandbox, stub, ENOSYS, return, 系统调用' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5461 | 文件: repos\\oskernrl2022-rv6\\syscall\\syscall.c:1-20 | 类型: function_definition | 符号名: syscall\n```\nvoid\nsyscall(void)\n{\n  int num;\n  struct proc *p = myproc();\n\n  num = p->trapframe->a7;\n  if(num > 0 && num < NELEM(syscalls) && syscalls[num]) {\n    //printf(\"syscall %d\\n\",num);\n    p->trapframe->a0 = syscall"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_007",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在栈保护/溢出防护（stack canary/guard page）或等价机制？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/vm.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '安全机制与权限模型 / Q07_007: 是否存在栈保护/溢出防护（stack canary/guard page）或等价机制？（必须三态）\n关键词: stack, canary, guard, page' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.3808 | 文件: repos\\oskernrl2022-rv6\\src\\vm.c:188-207 | 类型: function_definition | 符号名: experm\n```\nuint64\nexperm(pagetable_t pagetable, uint64 va,uint64 perm)\n{\n  pte_t *pte;\n  uint64 pa;\n\n  if(va >= MAXVA)\n    return NULL;\n\n  pte = walk(pagetable, va, 0);\n  if(pte == 0)\n    return NULL;\n  if((*pte & PTE_V) == 0)\n    return NULL;\n  if((*pte & PTE_U) == 0)\n    r"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/vm.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '安全机制与权限模型 / Q07_007: 是否存在栈保护/溢出防护（stack canary/guard page）或等价机制？（必须三态）\n关键词: stack, canary, guard, page' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.3808 | 文件: repos\\oskernrl2022-rv6\\src\\vm.c:188-207 | 类型: function_definition | 符号名: experm\n```\nuint64\nexperm(pagetable_t pagetable, uint64 va,uint64 perm)\n{\n  pte_t *pte;\n  uint64 pa;\n\n  if(va >= MAXVA)\n    return NULL;\n\n  pte = walk(pagetable, va, 0);\n  if(pte == 0)\n    return NULL;\n  if((*pte & PTE_V) == 0)\n    return NULL;\n  if((*pte & PTE_U) == 0)\n    r"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_008",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在审计/安全启动（audit/secure boot/signature）相关逻辑？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/sd.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '安全机制与权限模型 / Q07_008: 是否存在审计/安全启动（audit/secure boot/signature）相关逻辑？（必须三态）\n关键词: audit, secure, boot, signature' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4480 | 文件: repos\\oskernrl2022-rv6\\src\\sd.c:165-174 | 类型: function_definition | 符号名: sd_acmd41\n```\nstatic int sd_acmd41(spi_ctrl* spi)\n{\n  uint8_t r;\n  do {\n    sd_cmd55(spi);\n    r = sd_cmd(spi, SD_CMD(SD_CMD_APP_SEND_OP_COND), 0x40000000, 0x77); /* HCS = 1 */\n    sd_cmd_end(spi);\n  } while (r == SD_RESPONSE_IDLE);\n  return (r != 0x00);\n}\n```\n\n[2] 相似度"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/sd.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '安全机制与权限模型 / Q07_008: 是否存在审计/安全启动（audit/secure boot/signature）相关逻辑？（必须三态）\n关键词: audit, secure, boot, signature' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4480 | 文件: repos\\oskernrl2022-rv6\\src\\sd.c:165-174 | 类型: function_definition | 符号名: sd_acmd41\n```\nstatic int sd_acmd41(spi_ctrl* spi)\n{\n  uint8_t r;\n  do {\n    sd_cmd55(spi);\n    r = sd_cmd(spi, SD_CMD(SD_CMD_APP_SEND_OP_COND), 0x40000000, 0x77); /* HCS = 1 */\n    sd_cmd_end(spi);\n  } while (r == SD_RESPONSE_IDLE);\n  return (r != 0x00);\n}\n```\n\n[2] 相似度"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_009",
+      "question_type": "short_answer",
+      "stem": "本项目支持哪些架构（riscv64/aarch64/x86_64/loongarch64 等）？每种架构的安全相关初始化（特权级配置、PMP/MPU/SMEP 等）是否有代码证据？（必须逐架构作答，无证据写「未发现」）",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
+      "evidence": [
+        {
+          "path": "LINKER=linker/kernel.ld",
+          "symbol_kind": "build_config",
+          "symbol_name": "parse_build_config",
+          "excerpt": "## Build Config Summary\n- Makefile markers=[qemu-system, -machine, riscv, ENTRY, disk.img]\n  excerpt: K=src U=usrinit SBI=sbi/fw_jump.elf LINKER=linker/kernel.ld  FS?=FAT MAC?=SIFIVE_U  ifeq ($(MAC),SIFIVE_U) DISK:=$K/link_null.o endif  ifeq ($(MAC),QEMU) DISK:=$K/link_disk.o endif  OBJS += \\ \t$K/entry.o \\ \t$K/bio.o \\ \t$(DISK) \\ \t$K/ramdisk.o \\ \t$K/spi.o \\ \t$K/sd.o \\ \t$K/diskio.o \\ \t$K/disk.o \\ \t$K/\n- linker/kernel.ld markers=[riscv, ENTRY]\n  excerpt: OUTPUT_ARCH(riscv) ENTRY(_entry)  BASE_ADDRE"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/include/riscv.h",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '安全机制与权限模型 / Q07_009: 本项目支持哪些架构（riscv64/aarch64/x86_64/loongarch64 等）？每种架构的安全相关初始化（特权级配置、PMP/MPU/SMEP 等）是否有代码证据？（必须逐架构作答，无证据写「未发现」）\n关键词: riscv64, aarch64, x86_64, loongarch64, PMP, MPU, SMEP' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4815 | 文件: repos\\oskernrl2022-rv6\\src\\include\\riscv.h:126-132 | 类型: function_definition | 符号名: r_sepc\n```\nstatic inline uint64\nr_sepc()\n{\n  uint64 x;\n  asm volatile(\"csrr %0, sepc\" : \"=r\" (x) );\n  return x;\n}\n```\n\n[2] 相似度: 0.4760 | 文件: repos\\oskernrl2022-rv6\\src\\include\\r"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/include/riscv.h",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '安全机制与权限模型 / Q07_009: 本项目支持哪些架构（riscv64/aarch64/x86_64/loongarch64 等）？每种架构的安全相关初始化（特权级配置、PMP/MPU/SMEP 等）是否有代码证据？（必须逐架构作答，无证据写「未发现」）\n关键词: riscv64, aarch64, x86_64, loongarch64, PMP, MPU, SMEP' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4815 | 文件: repos\\oskernrl2022-rv6\\src\\include\\riscv.h:126-132 | 类型: function_definition | 符号名: r_sepc\n```\nstatic inline uint64\nr_sepc()\n{\n  uint64 x;\n  asm volatile(\"csrr %0, sepc\" : \"=r\" (x) );\n  return x;\n}\n```\n\n[2] 相似度: 0.4760 | 文件: repos\\oskernrl2022-rv6\\src\\include\\r"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_010",
+      "question_type": "tri_state_impl",
+      "stem": "若项目使用 Rust，是否存在 RAII/所有权/生命周期相关的内核安全机制（如不可 unsafe 直接访问用户内存、锁的 RAII 自动释放等）？（必须三态；给具体模式证据）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/spinlock.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '安全机制与权限模型 / Q07_010: 若项目使用 Rust，是否存在 RAII/所有权/生命周期相关的内核安全机制（如不可 unsafe 直接访问用户内存、锁的 RAII 自动释放等）？（必须三态；给具体模式证据）\n关键词: Rust, RAII, unsafe, 锁' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4328 | 文件: repos\\oskernrl2022-rv6\\src\\spinlock.c:79-85 | 类型: function_definition | 符号名: holding\n```\nint\nholding(struct spinlock *lk)\n{\n  int r;\n  r = (lk->locked && lk->cpu == mycpu());\n  return r;\n}\n```\n\n[2] 相似度: 0.4262 | 文件: repos\\oskernrl2022-rv6\\src\\spinlock.c:24-46 | 类型: function_definition | 符号名: acquire\n```\nvoid\nacqu"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/spinlock.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '安全机制与权限模型 / Q07_010: 若项目使用 Rust，是否存在 RAII/所有权/生命周期相关的内核安全机制（如不可 unsafe 直接访问用户内存、锁的 RAII 自动释放等）？（必须三态；给具体模式证据）\n关键词: Rust, RAII, unsafe, 锁' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4328 | 文件: repos\\oskernrl2022-rv6\\src\\spinlock.c:79-85 | 类型: function_definition | 符号名: holding\n```\nint\nholding(struct spinlock *lk)\n{\n  int r;\n  r = (lk->locked && lk->cpu == mycpu());\n  return r;\n}\n```\n\n[2] 相似度: 0.4262 | 文件: repos\\oskernrl2022-rv6\\src\\spinlock.c:24-46 | 类型: function_definition | 符号名: acquire\n```\nvoid\nacqu"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_011",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现了内核/用户页表隔离 (Kernel/User Page Table Isolation, KPTI 或等价机制)？\n（x86: CR3 KPTI / SMEP / SMAP；RISC-V: PMP / S-mode 分离；AArch64: TTBR0/TTBR1 隔离；\n必须三态；无则写未发现并列出已搜关键字）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/vm.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '安全机制与权限模型 / Q07_011: 是否实现了内核/用户页表隔离 (Kernel/User Page Table Isolation, KPTI 或等价机制)？\n（x86: CR3 KPTI / SMEP / SMAP；RISC-V: PMP / S-mode 分离；AArch64: TTBR0/TTBR1 隔离；\n必须三态；无则写未发现并列出已搜关键字）\n关键词: Kernel, User, Page, Table, Isolation, KPTI, x86, CR3' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4547 | 文件: repos\\oskernrl2022-rv6\\src\\vm.c:188-207 | 类型: function_definition | 符号名: experm\n```\nuint64\nexperm(pagetable_t pagetable, uint64 va,uint64 perm)\n{\n  pte_t *pte;\n  uint64 pa;\n\n  if(va >= MAXVA)\n    return NULL;\n\n"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/vm.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '安全机制与权限模型 / Q07_011: 是否实现了内核/用户页表隔离 (Kernel/User Page Table Isolation, KPTI 或等价机制)？\n（x86: CR3 KPTI / SMEP / SMAP；RISC-V: PMP / S-mode 分离；AArch64: TTBR0/TTBR1 隔离；\n必须三态；无则写未发现并列出已搜关键字）\n关键词: Kernel, User, Page, Table, Isolation, KPTI, x86, CR3' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4547 | 文件: repos\\oskernrl2022-rv6\\src\\vm.c:188-207 | 类型: function_definition | 符号名: experm\n```\nuint64\nexperm(pagetable_t pagetable, uint64 va,uint64 perm)\n{\n  pte_t *pte;\n  uint64 pa;\n\n  if(va >= MAXVA)\n    return NULL;\n\n"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_012",
+      "question_type": "short_answer",
+      "stem": "UID/GID 字段是否在 syscall 路径上真实执行权限检查？（搜索 check_perm/inode_permission；若只有字段无检查链须标注「仅有定义但未强制执行 🔸」；给检查链证据或写「字段存在但无检查链」）",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/sysfile.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '安全机制与权限模型 / Q07_012: UID/GID 字段是否在 syscall 路径上真实执行权限检查？（搜索 check_perm/inode_permission；若只有字段无检查链须标注「仅有定义但未强制执行 🔸」；给检查链证据或写「字段存在但无检查链」）\n关键词: UID, GID, syscall, check_perm, inode_permission, 权限' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4567 | 文件: repos\\oskernrl2022-rv6\\src\\sysfile.c:493-568 | 类型: function_definition | 符号名: sys_faccessat\n```\nuint64\nsys_faccessat(void)\n{\n  int dirfd;\n  struct file *fp;\n  char path[FAT32_MAX_FILENAME];\n  int mode;\n  int flags;\n  struct dirent *dp, *ep;\n  struct proc *p ="
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_013",
+      "question_type": "single_choice",
+      "stem": "访问控制模型 (Access Control Model, Stallings Ch15) 更接近哪种？",
+      "value": "未发现访问控制机制",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/vm.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '安全机制与权限模型 / Q07_013: 访问控制模型 (Access Control Model, Stallings Ch15) 更接近哪种？\n关键词: Access, Control, Model, Stallings, Ch15' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.3763 | 文件: repos\\oskernrl2022-rv6\\src\\vm.c:188-207 | 类型: function_definition | 符号名: experm\n```\nuint64\nexperm(pagetable_t pagetable, uint64 va,uint64 perm)\n{\n  pte_t *pte;\n  uint64 pa;\n\n  if(va >= MAXVA)\n    return NULL;\n\n  pte = walk(pagetable, va, 0);\n  if(pte == 0)\n    return NULL;\n  if((*pte & PTE_V) == 0)\n    return NULL;\n  if((*pte & PT"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_014",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现完整性策略 (Integrity Policy, Stallings Ch15)？（如 Biba 模型、只读内核段、代码签名验证、W^X 内存保护等；必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/sd.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '安全机制与权限模型 / Q07_014: 是否实现完整性策略 (Integrity Policy, Stallings Ch15)？（如 Biba 模型、只读内核段、代码签名验证、W^X 内存保护等；必须三态）\n关键词: Integrity, Policy, Stallings, Ch15, Biba' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.3360 | 文件: repos\\oskernrl2022-rv6\\src\\sd.c:165-174 | 类型: function_definition | 符号名: sd_acmd41\n```\nstatic int sd_acmd41(spi_ctrl* spi)\n{\n  uint8_t r;\n  do {\n    sd_cmd55(spi);\n    r = sd_cmd(spi, SD_CMD(SD_CMD_APP_SEND_OP_COND), 0x40000000, 0x77); /* HCS = 1 */\n    sd_cmd_end(spi);\n  } while (r == SD_RESPONSE_"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/sd.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '安全机制与权限模型 / Q07_014: 是否实现完整性策略 (Integrity Policy, Stallings Ch15)？（如 Biba 模型、只读内核段、代码签名验证、W^X 内存保护等；必须三态）\n关键词: Integrity, Policy, Stallings, Ch15, Biba' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.3360 | 文件: repos\\oskernrl2022-rv6\\src\\sd.c:165-174 | 类型: function_definition | 符号名: sd_acmd41\n```\nstatic int sd_acmd41(spi_ctrl* spi)\n{\n  uint8_t r;\n  do {\n    sd_cmd55(spi);\n    r = sd_cmd(spi, SD_CMD(SD_CMD_APP_SEND_OP_COND), 0x40000000, 0x77); /* HCS = 1 */\n    sd_cmd_end(spi);\n  } while (r == SD_RESPONSE_"
+        }
+      ]
+    }
+  ]
+}

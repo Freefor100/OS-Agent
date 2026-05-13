@@ -1,0 +1,70 @@
+{
+  "stage_id": "01_overview",
+  "evidence_targets": [
+    "语言与框架来源",
+    "支持架构",
+    "入口函数",
+    "关键目录",
+    "README 构建与运行命令",
+    "评测/交付产物信号(kernel-rv等)"
+  ],
+  "seed_paths": [
+    "README.md",
+    "docs",
+    "Cargo.toml",
+    "Makefile",
+    "build.rs",
+    ".cargo",
+    "scripts",
+    ".github",
+    "arch",
+    "platform",
+    "kernel",
+    "os"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "main",
+    "kernel_main",
+    "rust_main",
+    "_start"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "bin",
+    "doc",
+    "linker",
+    "sbi",
+    "sd",
+    "src",
+    "src/include",
+    "src/sifive",
+    "syscall"
+  ],
+  "preferred_tools": [
+    "rag_search_code",
+    "lsp_get_call_graph",
+    "lsp_get_definition",
+    "read_code_segment"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 12000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 18,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "对照 seed_paths、entry_symbols，用 rag_search_code / list_repo_structure / LSP 锁定与本阶段相关的关键文件与符号。",
+    "对核心入口使用 lsp_get_document_outline → lsp_get_call_graph（单入口、浅深度）→ 必要时 read_code_segment 精读。",
+    "按题单逐项输出结论，每条附反引号源码路径；无实现则显式写「未发现/桩函数」等，勿臆测。"
+  ]
+}

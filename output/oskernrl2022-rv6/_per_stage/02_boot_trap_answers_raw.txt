@@ -1,0 +1,532 @@
+{
+  "schema_version": "1.0",
+  "stage_id": "02_boot_trap",
+  "stage_title": "启动/架构与 Trap/系统调用",
+  "terminology_profile": {
+    "arch": "riscv64",
+    "platform": "qemu/sifive_u",
+    "kernel_type": "monolithic",
+    "language": "C"
+  },
+  "answers": [
+    {
+      "question_id": "Q02_001",
+      "question_type": "short_answer",
+      "stem": "启动入口在哪里？（例如 linker.ld 的 ENTRY、`_start`/`start`/`head`/`entry` 标签；必须给文件路径+符号证据）",
+      "value": "linker/kernel.ld 中 ENTRY(_entry)，入口符号为 _entry。",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_02_boot_trap_Q02_010_build_platform_8be69b20",
+          "path": "linker/kernel.ld",
+          "excerpt": "OUTPUT_ARCH(riscv) ENTRY(_entry)  BASE_ADDRESS = 0x80200000;"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_002",
+      "question_type": "single_choice",
+      "stem": "启动链更接近哪种交接方式？",
+      "choices": [
+        "固件/引导加载器 → 内核入口（如 SBI/OpenSBI/U-Boot/BIOS/UEFI）",
+        "自带 bootloader（内核内含加载逻辑）",
+        "未知/未发现"
+      ],
+      "value": "固件/引导加载器 → 内核入口（如 SBI/OpenSBI/U-Boot/BIOS/UEFI）",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_02_boot_trap_Q02_011_build_platform_3e125dc6",
+          "path": "Makefile",
+          "excerpt": "SBI=sbi/fw_jump.elf"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_003",
+      "question_type": "tri_state_impl",
+      "stem": "是否能在代码中证实发生了 CPU 特权级/模式切换？（RISC-V M→S、x86 实→保→长等；必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_02_boot_trap_Q02_009_discovery_65291d3b",
+          "path": "src/trap.c",
+          "excerpt": "void trapinithart(void) { w_stvec((uint64)kernelvec); w_sstatus(r_sstatus() | SSTATUS_SIE); ... }"
+        },
+        {
+          "evidence_id": "ev_task_02_boot_trap_Q02_013_discovery_ae054233",
+          "path": "src/trap.c",
+          "excerpt": "void usertrapret(){ ... w_stvec(TRAMPOLINE + (uservec - trampoline)); ... }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_004",
+      "question_type": "short_answer",
+      "stem": "模式切换涉及的关键寄存器/位是什么？（例如 RISC-V mstatus/sstatus、x86 cr0/cr4/eflags；必须给证据摘录）",
+      "value": "sstatus (SSTATUS_SIE, SSTATUS_SPP), stvec, sepc, scause, satp。",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_02_boot_trap_Q02_004_discovery_a74f58dd",
+          "path": "src/include/riscv.h",
+          "excerpt": "static inline uint64 r_sstatus() { uint64 x; asm volatile(\"csrr %0, sstatus\" : \"=r\" (x) ); return x; }"
+        },
+        {
+          "evidence_id": "ev_task_02_boot_trap_Q02_009_discovery_65291d3b",
+          "path": "src/trap.c",
+          "excerpt": "w_stvec((uint64)kernelvec); w_sstatus(r_sstatus() | SSTATUS_SIE);"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_005",
+      "question_type": "tri_state_impl",
+      "stem": "是否启用/初始化了 MMU（设置 SATP/CR3 等并建立页表）？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_02_boot_trap_Q02_012_discovery_18dd7448",
+          "path": "src/vm.c",
+          "excerpt": "void kvminithart() { w_satp(MAKE_SATP(kernel_pagetable)); sfence_vma(); ... }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_006",
+      "question_type": "short_answer",
+      "stem": "从入口汇编/固件交接到 C/Rust 主入口函数的跳转链是什么？（列出 3-6 个关键节点并给证据）",
+      "value": "1. _entry (linker/kernel.ld) → 2. main() (src/main.c) → 3. cpuinit() → 4. trapinithart() → 5. kvminithart() → 6. userinit()",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_02_boot_trap_Q02_010_build_platform_8be69b20",
+          "path": "linker/kernel.ld",
+          "excerpt": "ENTRY(_entry)"
+        },
+        {
+          "evidence_id": "ev_task_02_boot_trap_Q02_001_discovery_2238b2fc",
+          "path": "src/main.c",
+          "excerpt": "void main(unsigned long hartid, unsigned long dtb_pa) { ... cpuinit(); printfinit(); ... }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_007",
+      "question_type": "fill_in",
+      "stem": "早期初始化 (Early Initialization) 各项状态（每项必须 implemented / stub / not_found + 证据路径，格式：`项目: 状态 [路径]`）：\n- BSS 清零 (BSS Clearing): ___\n- 早期串口输出 (Early Serial/UART Output): ___\n- 设备树解析 (Device Tree Blob parsing, DTB): ___\n- 页表初始化时机 (Page Table Init): ___（在 MMU 启用前/后？）",
+      "value": "- BSS 清零 (BSS Clearing): not_found [未在提供的证据中发现显式 BSS 清零代码]\n- 早期串口输出 (Early Serial/UART Output): implemented [src/main.c 中 printfinit() 和 printf() 调用]\n- 设备树解析 (Device Tree Blob parsing, DTB): not_found [未在提供的证据中发现 DTB 解析代码]\n- 页表初始化时机 (Page Table Init): implemented [src/vm.c kvminit() 在 MMU 启用前调用]",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_02_boot_trap_Q02_001_discovery_2238b2fc",
+          "path": "src/main.c",
+          "excerpt": "printfinit(); printf(\"hart %d enter main() from %p...\\n\", hartid,_entry);"
+        },
+        {
+          "evidence_id": "ev_task_02_boot_trap_Q02_012_discovery_18dd7448",
+          "path": "src/vm.c",
+          "excerpt": "void kvminit() { kernel_pagetable = (pagetable_t) allocpage(); ... }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_008",
+      "question_type": "tri_state_impl",
+      "stem": "是否初始化/启用了 FPU（如 sstatus.fs / cpacr_el1 / cr4）？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_02_boot_trap_Q02_008_discovery_7a8351ee",
+          "path": "src/fat32.c",
+          "excerpt": "RAG 语义搜索未发现 FPU 初始化相关代码。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_009",
+      "question_type": "tri_state_impl",
+      "stem": "是否设置 trap/中断向量（如 stvec/idt 等）并能指出设置点？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_02_boot_trap_Q02_009_discovery_65291d3b",
+          "path": "src/trap.c",
+          "excerpt": "void trapinithart(void) { w_stvec((uint64)kernelvec); ... }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_010",
+      "question_type": "short_answer",
+      "stem": "构建系统如何选择目标平台/架构与入口文件？（Cargo features/Kconfig/Makefile 条件；必须引用配置证据）",
+      "value": "通过 Makefile 中的 MAC 变量选择平台（QEMU 或 SIFIVE_U），链接器脚本为 linker/kernel.ld，入口为 _entry。",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_02_boot_trap_Q02_010_build_platform_8be69b20",
+          "path": "Makefile",
+          "excerpt": "MAC?=SIFIVE_U  ifeq ($(MAC),SIFIVE_U) DISK:=$K/link_null.o endif  ifeq ($(MAC),QEMU) DISK:=$K/link_disk.o endif"
+        },
+        {
+          "evidence_id": "ev_task_02_boot_trap_Q02_010_build_platform_8be69b20",
+          "path": "linker/kernel.ld",
+          "excerpt": "OUTPUT_ARCH(riscv) ENTRY(_entry)"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_011",
+      "question_type": "tri_state_impl",
+      "stem": "对 RISC-V 平台：是否能证实 SBI/OpenSBI/U-Boot 固件链（固件将控制权移交内核）？（必须三态；搜索 sbi|opensbi|u-boot；非 RISC-V 平台写 not_found 并说明架构）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_02_boot_trap_Q02_011_build_platform_3e125dc6",
+          "path": "Makefile",
+          "excerpt": "SBI=sbi/fw_jump.elf"
+        },
+        {
+          "evidence_id": "ev_task_02_boot_trap_Q02_001_discovery_2238b2fc",
+          "path": "src/include/sbi.h",
+          "excerpt": "static inline void start_hart(uint64 hartid,uint64 start_addr, uint64 a1) { a_sbi_ecall(0x48534D, 0, hartid, start_addr, a1, 0, 0, 0); }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_012",
+      "question_type": "tri_state_impl",
+      "stem": "MMU 启用前后是否存在串口/UART 地址切换逻辑（物理地址→虚拟地址）？（必须三态；搜索 phys_to_virt|virt_to_phys 及 UART 基址常量）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_02_boot_trap_Q02_012_discovery_18dd7448",
+          "path": "src/vm.c",
+          "excerpt": "RAG 语义搜索未发现 phys_to_virt/virt_to_phys 及 UART 基址切换逻辑。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_013",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在从内核返回用户态的路径（usertrapret/trap_return/trampoline/eret 等）并设置 stvec/VBAR/IDT？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_02_boot_trap_Q02_013_discovery_ae054233",
+          "path": "src/trap.c",
+          "excerpt": "void usertrapret(){ ... w_stvec(TRAMPOLINE + (uservec - trampoline)); ... }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_014",
+      "question_type": "short_answer",
+      "stem": "是否支持多平台启动（StarFive VisionFive2/LoongArch/多板型）？（搜索 visionfive|jh7110|loongarch；有则描述差异入口与互斥关系；无则写未发现）",
+      "value": "未发现。仅支持 QEMU 和 SIFIVE_U 平台。",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_02_boot_trap_Q02_014_build_platform_5c247651",
+          "path": "Makefile",
+          "excerpt": "MAC?=SIFIVE_U  ifeq ($(MAC),SIFIVE_U) ... endif  ifeq ($(MAC),QEMU) ... endif"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_015",
+      "question_type": "short_answer",
+      "stem": "trap/异常向量入口在哪里？（trap_handler/trap_vector/__alltraps 等；必须给证据）",
+      "value": "kernelvec (src/trap.c 中通过 w_stvec 设置) 和 uservec (trampoline.S)。",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_02_boot_trap_Q02_009_discovery_65291d3b",
+          "path": "src/trap.c",
+          "excerpt": "w_stvec((uint64)kernelvec);"
+        },
+        {
+          "evidence_id": "ev_task_02_boot_trap_Q02_013_discovery_ae054233",
+          "path": "src/trap.c",
+          "excerpt": "w_stvec(TRAMPOLINE + (uservec - trampoline));"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_016",
+      "question_type": "single_choice",
+      "stem": "trap 上下文 (TrapFrame/TrapContext) 更可能存放在哪里？",
+      "choices": [
+        "内核栈上",
+        "每 CPU 独立陷阱栈上",
+        "用户地址空间预留页（trampoline/trap_context page）",
+        "未发现/待核实"
+      ],
+      "value": "内核栈上",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_02_boot_trap_Q02_013_discovery_ae054233",
+          "path": "src/trap.c",
+          "excerpt": "p->trapframe->kernel_sp = p->kstack + PGSIZE;"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_017",
+      "question_type": "short_answer",
+      "stem": "TrapFrame/寄存器保存结构体定义在哪里？寄存器数量与字节数是多少？（必须引用结构体定义证据）",
+      "value": "定义在 src/include/trap.h，结构体 struct trapframe 包含 32 个 uint64 字段，共 256 字节。",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_02_boot_trap_Q02_017_discovery_94f41efb",
+          "path": "src/include/trap.h",
+          "excerpt": "struct trapframe { /*   0 */ uint64 kernel_satp; ... /* 248 */ uint64 t6; };"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_018",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在系统调用分发表（syscall table / match 分发）？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_02_boot_trap_Q02_018_discovery_79aa0a0a",
+          "path": "syscall/syscall.c",
+          "excerpt": "void syscall(void) { ... num = p->trapframe->a7; if(num > 0 && num < NELEM(syscalls) && syscalls[num]) { p->trapframe->a0 = syscalls[num](); ... }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_019",
+      "question_type": "tri_state_impl",
+      "stem": "系统调用号是否做边界检查？（越界默认分支/返回错误/panic；必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_02_boot_trap_Q02_019_discovery_99ac9042",
+          "path": "syscall/syscall.c",
+          "excerpt": "if(num > 0 && num < NELEM(syscalls) && syscalls[num]) { ... } else { printf(\"pid %d %s: unknown sys call %d\\n\", p->pid, p->name, num); p->trapframe->a0 = -1; }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_020",
+      "question_type": "short_answer",
+      "stem": "选择一个具体 syscall（优先 sys_write），追踪：用户指令 → trap → 分发 → 实现体。列出 3-6 个关键节点并给证据。",
+      "value": "1. 用户态 ecall 指令触发 trap → 2. uservec (trampoline.S) → 3. usertrap() (src/trap.c) → 4. syscall() (syscall/syscall.c) → 5. syscalls[SYS_write]() → 6. sys_write() (src/sysfile.c)",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_02_boot_trap_Q02_020_discovery_ebace5bd",
+          "path": "syscall/syscall.c",
+          "excerpt": "void syscall(void) { ... num = p->trapframe->a7; ... p->trapframe->a0 = syscalls[num](); ... }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_021",
+      "question_type": "short_answer",
+      "stem": "列出 5-10 个“高价值 syscall”（fork/exec/mmap/open/write 等）的实现三态（implemented/stub/not_found），并为每个至少给一条证据。",
+      "value": "fork: implemented [src/sysproc.c sys_fork()]\nexec: implemented [src/sysproc.c sys_exec()]\nmmap: not_found [未在证据中发现]\nopen: implemented [src/sysfile.c sys_open()]\nwrite: implemented [src/sysfile.c sys_write()]\nread: implemented [src/sysfile.c sys_read()]\nclose: implemented [src/sysfile.c sys_close()]\nbrk: implemented [src/sysproc.c sys_brk()]\nkill: implemented [src/syssig.c sys_kill()]\nexit: implemented [src/sysproc.c sys_exit()]",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_02_boot_trap_Q02_021_discovery_dff16df6",
+          "path": "src/sysproc.c",
+          "excerpt": "uint64 sys_fork(void) { return fork(); }"
+        },
+        {
+          "evidence_id": "ev_task_02_boot_trap_Q02_021_discovery_dff16df6",
+          "path": "src/sysproc.c",
+          "excerpt": "uint64 sys_exec(void) { ... }"
+        },
+        {
+          "evidence_id": "ev_task_02_boot_trap_Q02_021_discovery_dff16df6",
+          "path": "src/sysproc.c",
+          "excerpt": "uint64 sys_brk(void) { ... }"
+        },
+        {
+          "evidence_id": "ev_task_02_boot_trap_Q02_032_discovery_ae8e9321",
+          "path": "src/syssig.c",
+          "excerpt": "uint64 sys_kill(){ ... }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_022",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在用户指针访问安全检查（copyin/copyout/access_ok/UserInPtr 等）？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_02_boot_trap_Q02_022_discovery_9d95821f",
+          "path": "src/copy.c",
+          "excerpt": "int either_copyin( int user_src,void *dst, uint64 src, uint64 len) { ... if(user_src){ return copyin(p->pagetable, dst, src, len); } ... }"
+        },
+        {
+          "evidence_id": "ev_task_02_boot_trap_Q02_022_discovery_9d95821f",
+          "path": "src/copy.c",
+          "excerpt": "int either_copyout(int user_dst, uint64 dst, void *src, uint64 len) { ... if(user_dst){ return copyout(p->pagetable, dst, src, len); } ... }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_023",
+      "question_type": "tri_state_impl",
+      "stem": "时钟中断是否触发抢占调度（timer tick 中调用 yield/schedule/resched）？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_02_boot_trap_Q02_023_discovery_9e9bb3dd",
+          "path": "src/timer.c",
+          "excerpt": "void timer_tick() { acquire(&tickslock); ticks++; wakeup(&ticks); release(&tickslock); set_next_timeout(); } 未调用 yield/schedule/resched。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_024",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在信号处理链路（trap 返回前处理 pending signal、sigreturn/trampoline）？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_02_boot_trap_Q02_024_discovery_56e6f3ea",
+          "path": "src/signal.c",
+          "excerpt": "void sighandle(void) { ... struct sig_frame *frame; struct trapframe *tf; ksigaction_t *sigact; ... }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_025",
+      "question_type": "short_answer",
+      "stem": "缺页异常与内存特性（CoW/lazy）是否在 trap 中联动？（若存在，说明入口点与调用到内存模块的证据）",
+      "value": "not_found。在 kerneltrap() 中未发现缺页异常处理逻辑，直接 panic。",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_02_boot_trap_Q02_025_discovery_c03b2d01",
+          "path": "src/trap.c",
+          "excerpt": "void kerneltrap() { ... if((which_dev = devintr()) == 0){ ... panic(\"kerneltrap\"); } }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_026",
+      "question_type": "short_answer",
+      "stem": "与 09 多核交叉一致性：per-CPU trap 栈/时钟初始化顺序与 AP 上线是否一致？（互指证据或写单核不适用）",
+      "value": "待核实。证据中 main() 函数有启动其他 hart 的逻辑，但未提供完整的 per-CPU 初始化顺序细节。",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_02_boot_trap_Q02_001_discovery_2238b2fc",
+          "path": "src/main.c",
+          "excerpt": "for(int i = 1; i < NCPU; i++) { printf(\"cpu#%d state:%d\" ... }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_027",
+      "question_type": "fill_in",
+      "stem": "Syscall 实现全量统计 (Syscall Coverage Analysis)，请按格式填写：\n- 分发表路径: ___\n- 完整实现 ✅ (implemented): ___ 个\n- 桩/ENOSYS/return 0 🔸 (stub): ___ 个，代表性例子: ___\n- 未注册 ❌ (not_found): ___ 个\n- 统计依据（grep 或 outline 方式）: ___\n（若无法精确计数，给出区间估计并说明理由）",
+      "value": "- 分发表路径: syscall/syscall.c (syscalls[] 数组)\n- 完整实现 ✅ (implemented): 约 30-40 个\n- 桩/ENOSYS/return 0 🔸 (stub): 待核实\n- 未注册 ❌ (not_found): 待核实\n- 统计依据（grep 或 outline 方式）: 基于提供的证据片段，无法精确计数，给出区间估计。",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_02_boot_trap_Q02_027_discovery_ed9dc59a",
+          "path": "syscall/syscall.c",
+          "excerpt": "void syscall(void) { ... num = p->trapframe->a7; if(num > 0 && num < NELEM(syscalls) && syscalls[num]) { ... }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_028",
+      "question_type": "short_answer",
+      "stem": "README 与 syscall 声称对照：README 中声称兼容/实现了哪些 syscall 或标准？与代码分发表实际是否一致？（无 README 则写「无 README，仅以代码为准」）",
+      "value": "无 README，仅以代码为准。",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_02_boot_trap_Q02_028_discovery_3f67d07b",
+          "path": "syscall/syscall.c",
+          "excerpt": "RAG 语义搜索未发现 README 文件。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_029",
+      "question_type": "short_answer",
+      "stem": "`_impl` 命名模式搜索结论：grep `_impl\\b|sys_[a-z0-9_]*_impl`，结果是命中了哪些函数（列出），还是「未见该命名模式」？（必须给搜索结论）",
+      "value": "未见该命名模式。",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_02_boot_trap_Q02_029_discovery_252f6a87",
+          "path": "src/dev.c",
+          "excerpt": "RAG 语义搜索未发现 _impl 命名模式的函数。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_030",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在外部中断（PLIC/APIC 等）的分发处理逻辑？（必须三态；与时钟中断分开作答）",
+      "value": "stub",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_02_boot_trap_Q02_030_discovery_86863fcb",
+          "path": "src/trap.c",
+          "excerpt": "int devintr(void) { ... if ((0x8000000000000000L & scause) && 9 == (scause & 0xff)) { int irq =0; // plic_claim(); printf(\"irq:%d\\n\",irq); ... } } 有框架但 PLIC 处理被注释。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_031",
+      "question_type": "tri_state_impl",
+      "stem": "非法内存访问时是否向进程发送 SIGSEGV 信号？（必须三态；搜索 SIGSEGV|sig_segv）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_02_boot_trap_Q02_031_discovery_68bb00ea",
+          "path": "src/signal.c",
+          "excerpt": "RAG 语义搜索未发现 SIGSEGV 或 sig_segv 相关代码。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_032",
+      "question_type": "short_answer",
+      "stem": "信号发送支持哪些粒度？（搜索 sys_kill/sys_tkill/sys_tgkill；分别是进程级/线程级/进程组级；列出已实现的与其证据）",
+      "value": "进程级 (sys_kill) 和线程级 (sys_tgkill)。未发现 sys_tkill。",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_02_boot_trap_Q02_032_discovery_ae8e9321",
+          "path": "src/syssig.c",
+          "excerpt": "uint64 sys_kill(){ ... }"
+        },
+        {
+          "evidence_id": "ev_task_02_boot_trap_Q02_032_discovery_ae8e9321",
+          "path": "src/syssig.c",
+          "excerpt": "uint64 sys_tgkill(){ ... }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_033",
+      "question_type": "single_choice",
+      "stem": "中断 (Interrupt)、异常 (Exception/Fault/Trap) 的区分机制更接近哪种？（Stallings Ch5；即 trap handler 如何区分「外部中断」与「同步异常」）",
+      "choices": [
+        "通过 scause/mcause/VBAR 中断原因寄存器区分（硬件编码原因号）",
+        "通过不同的向量表入口区分（每类有独立向量）",
+        "统一入口后软件判断中断号/异常码",
+        "未发现显式区分机制"
+      ],
+      "value": "通过 scause/mcause/VBAR 中断原因寄存器区分（硬件编码原因号）",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_02_boot_trap_Q02_033_discovery_7a772148",
+          "path": "src/trap.c",
+          "excerpt": "int devintr(void) { uint64 scause = r_scause(); if ((0x8000000000000000L & scause) && 9 == (scause & 0xff)) { ... } }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_034",
+      "question_type": "tri_state_impl",
+      "stem": "是否支持中断嵌套 (Nested Interrupt / Interrupt Nesting, Stallings Ch5)？（必须三态；搜索 enable_irq_in_handler / nested_irq / 中断处理时是否重开中断；若 not_found 需说明是否关中断运行整个 handler）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_02_boot_trap_Q02_034_discovery_ad481a95",
+          "path": "src/trap.c",
+          "excerpt": "kerneltrap() 中检查 if(intr_get() != 0) panic(\"kerneltrap: interrupts enabled\"); 表明中断处理时关中断运行整个 handler。"
+        }
+      ]
+    }
+  ]
+}

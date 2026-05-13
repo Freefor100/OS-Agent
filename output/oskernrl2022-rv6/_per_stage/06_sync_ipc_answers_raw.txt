@@ -1,0 +1,511 @@
+{
+  "schema_version": "1.0",
+  "stage_id": "06_sync_ipc",
+  "stage_title": "同步互斥与进程间通信",
+  "terminology_profile": {
+    "SpinLock": "struct spinlock { uint locked; char *name; struct cpu *cpu; }",
+    "Sleeplock": "struct sleeplock { uint locked; struct spinlock lk; ... }",
+    "WaitQueue": "queue with waitq_push/waitq_pop",
+    "Pipe": "struct pipe { struct spinlock lock; char data[PIPESIZE]; uint nread; uint nwrite; int readopen; int writeopen; }",
+    "Signal": "sigaction, kill, sigreturn, trampoline",
+    "Barrier": "struct Barrier { _Atomic volatile int entered[2]; _Atomic volatile int wait[2]; _Atomic volatile int gen; }"
+  },
+  "answers": [
+    {
+      "question_id": "Q06_001",
+      "question_type": "short_answer",
+      "stem": "该内核提供了哪些同步原语？（SpinLock/Mutex/RwLock/Semaphore/Condvar/WaitQueue 等；列出类型定义证据）",
+      "value": "SpinLock (struct spinlock, src/include/spinlock.h:7-13), Sleeplock (struct sleeplock, src/include/sleeplock.h:10-17), WaitQueue (queue with waitq_push/waitq_pop, src/proc.c:580-592, src/include/queue.h:36-41). 未发现 Mutex/RwLock/Semaphore/Condvar 的独立类型定义。",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_06_sync_ipc_Q06_001_discovery_5ad3faae",
+          "path": "repos/oskernrl2022-rv6/src/include/spinlock.h",
+          "symbol": "struct spinlock",
+          "source_type": "source_code",
+          "evidence_type": "definition",
+          "confidence": "low",
+          "validity": "invalid",
+          "excerpt": "struct spinlock {\n  uint locked;       // Is the lock held?\n\n  // For debugging:\n  char *name;        // Name of lock.\n  struct cpu *cpu;   // The cpu holding the lock.\n}"
+        },
+        {
+          "evidence_id": "ev_task_06_sync_ipc_Q06_002_discovery_cefae7bc",
+          "path": "repos/oskernrl2022-rv6/src/include/sleeplock.h",
+          "symbol": "struct sleeplock",
+          "source_type": "source_code",
+          "evidence_type": "definition",
+          "confidence": "low",
+          "validity": "invalid",
+          "excerpt": "struct sleeplock {\n  uint locked;       // Is the lock held?\n  struct spinlock lk; // spinlock protecting this sleep lock\n  \n  // For..."
+        },
+        {
+          "evidence_id": "ev_task_06_sync_ipc_Q06_003_discovery_c11421e8",
+          "path": "repos/oskernrl2022-rv6/src/proc.c",
+          "symbol": "wakeup",
+          "source_type": "source_code",
+          "evidence_type": "definition",
+          "confidence": "low",
+          "validity": "invalid",
+          "excerpt": "void\nwakeup(void *chan)\n{\n   queue* q = findwaitq(chan);\n   if(q){\n     struct proc* p;\n     while((p = waitq_pop(q))!=NULL){\n       p->state = RUNNABLE;\n       readyq_push(p);\n     }\n     delwaitq(q);\n   }\n}"
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_002",
+      "question_type": "single_choice",
+      "stem": "Mutex 更接近哪种实现？",
+      "choices": [
+        "自旋锁（Spinlock，Busy-Waiting）",
+        "阻塞锁（Blocking Mutex，进入等待队列并挂起）",
+        "混合（短自旋 + 阻塞）",
+        "未发现/待核实"
+      ],
+      "value": "未发现/待核实",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_06_sync_ipc_Q06_002_discovery_cefae7bc",
+          "path": "repos/oskernrl2022-rv6/src/file.c",
+          "symbol": "fileiolock",
+          "source_type": "source_code",
+          "evidence_type": "semantic_search",
+          "confidence": "low",
+          "validity": "invalid",
+          "excerpt": "RAG 语义搜索 'Mutex' 找到的 Top 5 代码块，未发现 Mutex 类型或实现。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_003",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在等待队列 (Wait Queue, WaitQueue) 与 sleep/wakeup（或等价阻塞/唤醒）实现？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_06_sync_ipc_Q06_003_discovery_c11421e8",
+          "path": "repos/oskernrl2022-rv6/src/proc.c",
+          "symbol": "wakeup",
+          "source_type": "source_code",
+          "evidence_type": "definition",
+          "confidence": "low",
+          "validity": "invalid",
+          "excerpt": "void\nwakeup(void *chan)\n{\n   queue* q = findwaitq(chan);\n   if(q){\n     struct proc* p;\n     while((p = waitq_pop(q))!=NULL){\n       p->state = RUNNABLE;\n       readyq_push(p);\n     }\n     delwaitq(q);\n   }\n}"
+        },
+        {
+          "evidence_id": "ev_task_06_sync_ipc_Q06_003_discovery_c11421e8",
+          "path": "repos/oskernrl2022-rv6/src/proc.c",
+          "symbol": "sleep",
+          "source_type": "source_code",
+          "evidence_type": "definition",
+          "confidence": "low",
+          "validity": "invalid",
+          "excerpt": "void\nsleep(void *chan, struct spinlock *lk)\n{\n  struct proc *p = myproc();\n  \n  // Must acquire p->lock in order to\n  // change p->state and then call sched.\n  // Once we hold p->lock, we can be\n  // guaranteed that we won't miss any wakeup\n  // (wakeup locks p->lock),\n  // so it's okay to release lk.\n  if(lk !"
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_004",
+      "question_type": "fill_in",
+      "stem": "sleep / wakeup 不变量 (Sleep-Wakeup Invariant) 分析，按格式填写：\n- sleep 入口函数: ___（路径）\n- 入睡前持有的锁: ___（无则写 none）\n- 防丢 wakeup (Lost Wakeup Prevention) 机制: ___（如：持队列锁检查条件 / 无防护）\n- wakeup 函数: ___（路径）\n- 唤醒与锁释放顺序: ___（先唤醒后释放 / 先释放后唤醒 / 其他）",
+      "value": "- sleep 入口函数: src/proc.c:542-576\n- 入睡前持有的锁: p->lock\n- 防丢 wakeup (Lost Wakeup Prevention) 机制: 持 p->lock 检查条件并修改状态，保证不会错过 wakeup（wakeup 也需获取 p->lock）\n- wakeup 函数: src/proc.c:580-592\n- 唤醒与锁释放顺序: 先唤醒后释放（wakeup 将进程状态设为 RUNNABLE 并加入就绪队列，之后由调度器恢复执行，锁在 sleep 内部释放）",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_06_sync_ipc_Q06_004_discovery_151c6f92",
+          "path": "repos/oskernrl2022-rv6/src/proc.c",
+          "symbol": "sleep",
+          "source_type": "source_code",
+          "evidence_type": "definition",
+          "confidence": "low",
+          "validity": "invalid",
+          "excerpt": "void\nsleep(void *chan, struct spinlock *lk)\n{\n  struct proc *p = myproc();\n  \n  // Must acquire p->lock in order to\n  // change p->state and then call sched.\n  // Once we hold p->lock, we can be\n  // guaranteed that we won't miss any wakeup\n  // (wakeup locks p->lock),\n  // so it's okay to release lk.\n  if(lk != &p->lock){  //DOC: sleeplock0\n    acquire(&p->lock);  //DOC: sleeplock1\n    release(lk);\n  }\n\n  // Go to sleep.\n  queue* q = findwaitq(chan);\n  i"
+        },
+        {
+          "evidence_id": "ev_task_06_sync_ipc_Q06_003_discovery_c11421e8",
+          "path": "repos/oskernrl2022-rv6/src/proc.c",
+          "symbol": "wakeup",
+          "source_type": "source_code",
+          "evidence_type": "definition",
+          "confidence": "low",
+          "validity": "invalid",
+          "excerpt": "void\nwakeup(void *chan)\n{\n   queue* q = findwaitq(chan);\n   if(q){\n     struct proc* p;\n     while((p = waitq_pop(q))!=NULL){\n       p->state = RUNNABLE;\n       readyq_push(p);\n     }\n     delwaitq(q);\n   }\n}"
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_005",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现管道 (Pipe)？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_06_sync_ipc_Q06_005_discovery_1ee35355",
+          "path": "repos/oskernrl2022-rv6/src/include/pipe.h",
+          "symbol": "struct pipe",
+          "source_type": "source_code",
+          "evidence_type": "definition",
+          "confidence": "low",
+          "validity": "invalid",
+          "excerpt": "struct pipe {\n  struct spinlock lock;\n  char data[PIPESIZE];\n  uint nread;     // number of bytes read\n  uint nwrite;    // number of bytes written\n  int readopen;   // read fd is still open\n  int writeopen;  // write fd is still open\n}"
+        },
+        {
+          "evidence_id": "ev_task_06_sync_ipc_Q06_005_discovery_1ee35355",
+          "path": "repos/oskernrl2022-rv6/src/pipe.c",
+          "symbol": "pipewrite",
+          "source_type": "source_code",
+          "evidence_type": "definition",
+          "confidence": "low",
+          "validity": "invalid",
+          "excerpt": "int\npipewrite(struct pipe *pi, int user, uint64 addr, int n)\n{\n  int i;\n  char ch;\n  struct proc *pr = myproc();\n  \n  printf(\"[pipe]nread %d nwrite %d n %p\\n\", pi->nread, pi->nwrite, n);\n  for(i = 0; i < n; i++){\n    while(pi->nwrite == pi->nread + PIPESIZE){  //DOC: pipewrite-full\n      if(pi->readopen == 0 || pr->killed){\n        release(&pi->lock);\n        re"
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_006",
+      "question_type": "single_choice",
+      "stem": "pipe 缓冲形态更接近哪种？",
+      "choices": [
+        "字节环形缓冲区 (ring buffer)",
+        "页级传递/引用计数页",
+        "无缓冲/仅占位",
+        "未发现"
+      ],
+      "value": "字节环形缓冲区 (ring buffer)",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_06_sync_ipc_Q06_006_discovery_ee64b1eb",
+          "path": "repos/oskernrl2022-rv6/src/pipe.c",
+          "symbol": "pipewrite",
+          "source_type": "source_code",
+          "evidence_type": "definition",
+          "confidence": "low",
+          "validity": "invalid",
+          "excerpt": "pi->data[pi->nwrite++ % PIPESIZE] = ch;"
+        },
+        {
+          "evidence_id": "ev_task_06_sync_ipc_Q06_005_discovery_1ee35355",
+          "path": "repos/oskernrl2022-rv6/src/include/pipe.h",
+          "symbol": "struct pipe",
+          "source_type": "source_code",
+          "evidence_type": "definition",
+          "confidence": "low",
+          "validity": "invalid",
+          "excerpt": "char data[PIPESIZE];"
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_007",
+      "question_type": "single_choice",
+      "stem": "pipe 的阻塞语义更接近哪种？",
+      "choices": [
+        "阻塞：挂起当前线程/任务进入等待队列",
+        "非阻塞：返回 EAGAIN",
+        "忙等/轮询（yield 循环）",
+        "未发现/不支持"
+      ],
+      "value": "阻塞：挂起当前线程/任务进入等待队列",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_06_sync_ipc_Q06_007_discovery_aaec5a06",
+          "path": "repos/oskernrl2022-rv6/src/pipe.c",
+          "symbol": "pipewrite",
+          "source_type": "source_code",
+          "evidence_type": "definition",
+          "confidence": "low",
+          "validity": "invalid",
+          "excerpt": "while(pi->nwrite == pi->nread + PIPESIZE){  //DOC: pipewrite-full\n      if(pi->readopen == 0 || pr->killed){\n        release(&pi->lock);\n        return -1;\n      }\n      wakeup(&pi->nread);\n      sleep(&pi->nwrite, &pi->lock);\n    }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_008",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现消息队列/信号量/共享内存等 SysV IPC (Message Queue / Semaphore / Shared Memory, msg/sem/shm)？（必须三态；若仅实现其一需说明）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_06_sync_ipc_Q06_008_discovery_512a2f9c",
+          "path": "repos/oskernrl2022-rv6/src/proc.c",
+          "symbol": null,
+          "source_type": "source_code",
+          "evidence_type": "semantic_search",
+          "confidence": "low",
+          "validity": "invalid",
+          "excerpt": "RAG 语义搜索 'SysV IPC' 找到的 Top 5 代码块，未发现 msg/sem/shm 相关实现。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_009",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 futex？（必须三态）",
+      "value": "stub",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_06_sync_ipc_Q06_009_discovery_2485dd8e",
+          "path": "repos/oskernrl2022-rv6/src/include/proc.h",
+          "symbol": "struct robust_list_head",
+          "source_type": "source_code",
+          "evidence_type": "definition",
+          "confidence": "low",
+          "validity": "invalid",
+          "excerpt": "struct robust_list_head {\n  struct robust_list list;\n  long futex_offset;\n  struct robust_list *list_op_pending;\n}"
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_010",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现信号机制（sigaction/kill/sigreturn/trampoline）？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_06_sync_ipc_Q06_010_discovery_44cb765c",
+          "path": "repos/oskernrl2022-rv6/src/signal.c",
+          "symbol": "set_sigaction",
+          "source_type": "source_code",
+          "evidence_type": "definition",
+          "confidence": "low",
+          "validity": "invalid",
+          "excerpt": "int set_sigaction(\n\tint signum, \n\tstruct sigaction const *act, \n\tstruct sigaction *oldact \n) {\n\tstruct proc *p = myproc();\n\n\tksigaction_t *tmp = __search_sig(p, signum);\n\t// printf(\"pid %d search %d find %p\\n\", p->pid, signum, tmp);\n\n\tif (NULL != oldact && NULL != tmp) {\n\t\toldact->__sigaction_handler = tmp->sigact.__sigaction_handler;\n\t\t// oldact->sa_flags = tmp->sigact.sa_flags;\n\t\t// for (int i = 0; i < len; i ++) {\n\t\t// \toldact->sa_mask.__val[i] = tmp->sigact.sa_mask.__val[i];\n\t\t// }\n\t}\n\n\tif (NULL != act) {\n\t\tif (NULL == tmp) {\n\t\t\t// insert a new action into the proc \n\t\t\t// ksigaction_t *new = kmalloc(sizeof(ksigaction_t));\n     "
+        },
+        {
+          "evidence_id": "ev_task_06_sync_ipc_Q06_011_discovery_393015b0",
+          "path": "repos/oskernrl2022-rv6/src/signal.c",
+          "symbol": "sighandle",
+          "source_type": "source_code",
+          "evidence_type": "definition",
+          "confidence": "low",
+          "validity": "invalid",
+          "excerpt": "void sighandle(void) {\n\tstruct proc *p = myproc();\n\n\tint signum = 0;\n\tif (p->killed) {\n\t\tsignum = p->killed;\n\n\t\tconst int len = sizeof(unsigned long) * 8;\n\t\tint i = (unsigned long)(p->killed) / len;\n\t\tint bit = (unsigned long)(p->killed) % len;\n\t\tp->sig_pending.__val[i] &= ~(1ul << bit++);\n\t\tp->killed = 0;\n\n\t\tfor (; i < SIGSET_LEN; i ++) {\n\t\t\twhile (bit < len) {\n\t\t\t\tif (p->sig_pending.__val[i] & (1ul << bit)) {\n\t\t\t\t\tp->killed = i * len + bit; // p->killed\n\t\t\t\t\tgoto start_handle;\n\t\t\t\t}\n\t\t\t\tbit ++;\n\t\t\t}\n\t\t}\n\n\t}\n\telse {\n\t\t// no signal to handle\n\t\treturn ;\n\t}\n\n\tstruct sig_frame *frame;\n\tstruct trapframe *tf;\n\tksi"
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_011",
+      "question_type": "short_answer",
+      "stem": "若实现 signal handler：用户态 handler 上下文如何构建？是否存在 sigreturn 恢复原 trap frame？（必须给证据）",
+      "value": "用户态 handler 上下文通过构建 sig_frame 并修改 trapframe 实现，存在 sigreturn 恢复原 trap frame。",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_06_sync_ipc_Q06_011_discovery_393015b0",
+          "path": "repos/oskernrl2022-rv6/src/signal.c",
+          "symbol": "sighandle",
+          "source_type": "source_code",
+          "evidence_type": "definition",
+          "confidence": "low",
+          "validity": "invalid",
+          "excerpt": "void sighandle(void) {\n\tstruct proc *p = myproc();\n\n\tint signum = 0;\n\tif (p->killed) {\n\t\tsignum = p->killed;\n\n\t\tconst int len = sizeof(unsigned long) * 8;\n\t\tint i = (unsigned long)(p->killed) / len;\n\t\tint bit = (unsigned long)(p->killed) % len;\n\t\tp->sig_pending.__val[i] &= ~(1ul << bit++);\n\t\tp->killed = 0;\n\n\t\tfor (; i < SIGSET_LEN; i ++) {\n\t\t\twhile (bit < len) {\n\t\t\t\tif (p->sig_pending.__val[i] & (1ul << bit)) {\n\t\t\t\t\tp->killed = i * len + bit; // p->killed\n\t\t\t\t\tgoto start_handle;\n\t\t\t\t}\n\t\t\t\tbit ++;\n\t\t\t}\n\t\t}\n\n\t}\n\telse {\n\t\t// no signal to handle\n\t\treturn ;\n\t}\n\n\tstruct sig_frame *frame;\n\tstruct trapframe *tf;\n\tksi"
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_012",
+      "question_type": "single_choice",
+      "stem": "RwLock（读写锁 Reader-Writer Lock）的实现形态更接近哪种？",
+      "choices": [
+        "真读写锁（多读单写，读并发）",
+        "自旋锁/互斥锁包装（无读并发优化）",
+        "未发现/不支持"
+      ],
+      "value": "未发现/不支持",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_06_sync_ipc_Q06_012_discovery_00945780",
+          "path": "repos/oskernrl2022-rv6/src/spinlock.c",
+          "symbol": "acquire",
+          "source_type": "source_code",
+          "evidence_type": "semantic_search",
+          "confidence": "low",
+          "validity": "invalid",
+          "excerpt": "RAG 语义搜索 'RwLock' 找到的 Top 5 代码块，未发现 RwLock 类型或实现。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_013",
+      "question_type": "single_choice",
+      "stem": "底层原子操作来源更接近哪种？",
+      "choices": [
+        "Rust core::sync::atomic（标准库）",
+        "自定义汇编（ldxr/stxr、lock xchg 等）",
+        "两者均有",
+        "未发现/不确定"
+      ],
+      "value": "自定义汇编（ldxr/stxr、lock xchg 等）",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_06_sync_ipc_Q06_012_discovery_00945780",
+          "path": "repos/oskernrl2022-rv6/src/spinlock.c",
+          "symbol": "acquire",
+          "source_type": "source_code",
+          "evidence_type": "definition",
+          "confidence": "low",
+          "validity": "invalid",
+          "excerpt": "// On RISC-V, sync_lock_test_and_set turns into an atomic swap:\n  //   a5 = 1\n  //   s1 = &lk->locked\n  //   amoswap.w.aq a5, a5, (s1)\n  while(__sync_lock_test_and_set(&lk->locked, 1) != 0)\n    ;"
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_014",
+      "question_type": "short_answer",
+      "stem": "死锁四必要条件（Coffman Conditions）在该内核中是否均成立？\n请逐条作答（互斥 Mutual Exclusion / 持有并等待 Hold-and-Wait / 不可剥夺 No Preemption / 循环等待 Circular Wait），并结合 SpinLock/Mutex 的实现给出证据或写「不适用」。",
+      "value": "互斥 Mutual Exclusion：成立，spinlock 通过原子操作实现互斥。\n持有并等待 Hold-and-Wait：成立，进程可持有 spinlock 并等待其他资源（如 sleeplock）。\n不可剥夺 No Preemption：成立，spinlock 不可被剥夺，只能由持有者释放。\n循环等待 Circular Wait：可能成立，未发现全局锁顺序规范，嵌套锁可能导致循环等待。",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_06_sync_ipc_Q06_012_discovery_00945780",
+          "path": "repos/oskernrl2022-rv6/src/spinlock.c",
+          "symbol": "acquire",
+          "source_type": "source_code",
+          "evidence_type": "definition",
+          "confidence": "low",
+          "validity": "invalid",
+          "excerpt": "void\nacquire(struct spinlock *lk)\n{\n  push_off(); // disable interrupts to avoid deadlock.\n  if(holding(lk))\n    panic(\"acquire\");\n\n  // On RISC-V, sync_lock_test_and_set turns into an atomic swap:\n  //   a5 = 1\n  //   s1 = &lk->locked\n  //   amoswap.w.aq a5, a5, (s1)\n  while(__sync_lock_test_and_set(&lk->locked, 1) != 0)\n    ;\n\n  // Tell the C compiler and the processor to not move loads or stores\n  // past this point, to ensure that the critical section's memory\n  // references happen strictly after the lock is acquired.\n  // On RISC-V, this emits a fence instruction.\n  __sync_synchronize();\n\n  // Record info about lock acquisition for holding() and d"
+        },
+        {
+          "evidence_id": "ev_task_06_sync_ipc_Q06_015_discovery_7036f2b7",
+          "path": "repos/oskernrl2022-rv6/src/sleeplock.c",
+          "symbol": "acquiresleep",
+          "source_type": "source_code",
+          "evidence_type": "definition",
+          "confidence": "low",
+          "validity": "invalid",
+          "excerpt": "void\nacquiresleep(struct sleeplock *lk)\n{\n  acquire(&lk->lk);\n  while (lk->locked) {\n    sleep(lk, &lk->lk);\n  }\n  lk->locked = 1;\n  //lk->pid ="
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_015",
+      "question_type": "single_choice",
+      "stem": "内核对死锁 (Deadlock) 的处理策略更接近哪种？",
+      "choices": [
+        "死锁预防 (Deadlock Prevention)：通过锁顺序等消除 Coffman 必要条件",
+        "死锁避免 (Deadlock Avoidance)：运行时检查资源分配安全性（如 Banker 算法）",
+        "死锁检测与恢复 (Detection & Recovery)：允许死锁发生后恢复",
+        "忽略 (Ostrich Algorithm)：不处理，依赖外部重启",
+        "未发现相关机制"
+      ],
+      "value": "忽略 (Ostrich Algorithm)：不处理，依赖外部重启",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_06_sync_ipc_Q06_015_discovery_7036f2b7",
+          "path": "repos/oskernrl2022-rv6/src/bio.c",
+          "symbol": "brelse",
+          "source_type": "source_code",
+          "evidence_type": "semantic_search",
+          "confidence": "low",
+          "validity": "invalid",
+          "excerpt": "RAG 语义搜索 'Deadlock' 找到的 Top 5 代码块，未发现死锁预防/避免/检测机制。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_016",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在全局锁顺序（Lock Ordering）规范或注释，以预防嵌套锁导致的循环等待死锁 (Circular Wait Deadlock)？（必须三态；若 implemented 需给出锁排序规则或 ABBA 锁检测代码证据）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_06_sync_ipc_Q06_016_discovery_956d6959",
+          "path": "repos/oskernrl2022-rv6/src/spinlock.c",
+          "symbol": "acquire",
+          "source_type": "source_code",
+          "evidence_type": "semantic_search",
+          "confidence": "low",
+          "validity": "invalid",
+          "excerpt": "RAG 语义搜索 'Lock Ordering' 找到的 Top 5 代码块，未发现全局锁顺序规范或 ABBA 锁检测代码。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_017",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现管程/条件变量 (Monitor / Condition Variable, Stallings Ch5)？（必须三态；搜索 Condvar / condition_variable / monitor / wait/notify/signal 等；若 implemented 需区分 Hoare 语义（等待者立即恢复）vs Mesa 语义（等待者重新竞争锁））",
+      "value": "not_found",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_06_sync_ipc_Q06_017_discovery_241bc3d5",
+          "path": "repos/oskernrl2022-rv6/src/sifive/barrier.h",
+          "symbol": "Barrier_Wait",
+          "source_type": "source_code",
+          "evidence_type": "semantic_search",
+          "confidence": "low",
+          "validity": "invalid",
+          "excerpt": "RAG 语义搜索 'Condvar' 找到的 Top 5 代码块，未发现管程/条件变量实现。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_018",
+      "question_type": "short_answer",
+      "stem": "经典同步问题验证 (Classic Synchronization Problems, Stallings Ch5)：\n以下三个经典问题在该内核中是否有对应实现或测试？\n- 生产者-消费者 (Producer-Consumer / Bounded Buffer)：___（implemented/not_found + 证据）\n- 读者-写者 (Readers-Writers)：___（实现了读者优先/写者优先/公平？ + 证据）\n- 哲学家就餐 (Dining Philosophers)：___（implemented/not_found）",
+      "value": "- 生产者-消费者 (Producer-Consumer / Bounded Buffer)：implemented，pipe 实现即为有界缓冲区，见 src/pipe.c。\n- 读者-写者 (Readers-Writers)：not_found，未发现 RwLock 实现。\n- 哲学家就餐 (Dining Philosophers)：not_found，未发现相关实现或测试。",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_06_sync_ipc_Q06_005_discovery_1ee35355",
+          "path": "repos/oskernrl2022-rv6/src/pipe.c",
+          "symbol": "pipewrite",
+          "source_type": "source_code",
+          "evidence_type": "definition",
+          "confidence": "low",
+          "validity": "invalid",
+          "excerpt": "int\npipewrite(struct pipe *pi, int user, uint64 addr, int n)\n{\n  int i;\n  char ch;\n  struct proc *pr = myproc();\n  \n  printf(\"[pipe]nread %d nwrite %d n %p\\n\", pi->nread, pi->nwrite, n);\n  for(i = 0; i < n; i++){\n    while(pi->nwrite == pi->nread + PIPESIZE){  //DOC: pipewrite-full\n      if(pi->readopen == 0 || pr->killed){\n        release(&pi->lock);\n        re"
+        },
+        {
+          "evidence_id": "ev_task_06_sync_ipc_Q06_018_discovery_2877baa0",
+          "path": "repos/oskernrl2022-rv6/src/sifive/barrier.h",
+          "symbol": "Barrier",
+          "source_type": "source_code",
+          "evidence_type": "semantic_search",
+          "confidence": "low",
+          "validity": "invalid",
+          "excerpt": "RAG 语义搜索 'Readers-Writers' 和 'Dining Philosophers' 找到的 Top 5 代码块，未发现相关实现。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_019",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现消息传递 (Message Passing, Stallings Ch5) 作为 IPC 机制？（必须三态；区分直接消息传递 Direct / 间接通过邮箱 Mailbox / POSIX mq_open 等；与 SysV msgq 的区别是是否通过内核邮箱路由）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_06_sync_ipc_Q06_019_discovery_404175ae",
+          "path": "repos/oskernrl2022-rv6/src/proc.c",
+          "symbol": "readyq_push",
+          "source_type": "source_code",
+          "evidence_type": "semantic_search",
+          "confidence": "low",
+          "validity": "invalid",
+          "excerpt": "RAG 语义搜索 'Message Passing' 找到的 Top 5 代码块，未发现消息传递 IPC 机制。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_020",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现屏障同步 (Barrier Synchronization, Stallings Ch5)？（必须三态；搜索 barrier / sync_barrier / pthread_barrier 或等价；用于多线程/多核同步到同一检查点）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "evidence_id": "ev_task_06_sync_ipc_Q06_020_discovery_7131fc37",
+          "path": "repos/oskernrl2022-rv6/src/sifive/barrier.h",
+          "symbol": "Barrier_Wait",
+          "source_type": "source_code",
+          "evidence_type": "definition",
+          "confidence": "low",
+          "validity": "invalid",
+          "excerpt": "static inline void Barrier_Wait(Barrier *bar, int numProcs) // re-write for C/C++11 atomics\n{\n  int gen, arrived;\n\n  if (numProcs == 1)\n    return;\n\n  gen = bar->gen;       /* gen only changes when everyone is waiting */\n  // update number of threads arrived at barrier\n  arrived = atomic_fetch_add(&(bar->entered[gen]), 1) + 1;\n\n  /* signal waiting threads if everyone is here */\n  if (arrived == numProcs) {\n    /* new gen only affect threads arriving for the next barrier */\n    bar->gen = 1 - gen;\n\n    atomic_fetch_add(&(bar-"
+        },
+        {
+          "evidence_id": "ev_task_06_sync_ipc_Q06_020_discovery_7131fc37",
+          "path": "repos/oskernrl2022-rv6/src/sifive/barrier.h",
+          "symbol": "struct Barrier",
+          "source_type": "source_code",
+          "evidence_type": "definition",
+          "confidence": "low",
+          "validity": "invalid",
+          "excerpt": "struct Barrier {\n  _Atomic volatile int entered[2];\n  _Atomic volatile int wait[2];\n  _Atomic volatile int gen;\n}"
+        }
+      ]
+    }
+  ]
+}

@@ -36,6 +36,7 @@ from tools.lsp_ops import (
     lsp_set_target_arch,
 )
 from tools.web_search import web_search
+from tools.build_config_ops import parse_build_config
 
 load_dotenv()
 
@@ -388,6 +389,44 @@ def build_sub_agent(model: str = None, stage_id: str = "", tool_names=None):
         wanted = set(tool_names)
         tools = [tool for tool in tools if getattr(tool, "name", getattr(tool, "__name__", "")) in wanted]
     return build_executor_agent(model=model, stage_id=stage_id, tools=tools)
+
+
+def get_task_agent_tools(task_type: str, stage_id: str = ""):
+    """Return a restricted tool set for Multi-Agent task workers."""
+    task_type = (task_type or "").strip().lower()
+    if task_type in {"discovery", "implementation_state", "rag"}:
+        return [rag_search_code, grep_in_repo, find_os_core_modules]
+    if task_type in {"definition", "flow", "lsp"}:
+        return [
+            lsp_get_definition,
+            lsp_get_references,
+            lsp_get_document_outline,
+            lsp_get_call_graph,
+            lsp_set_target_arch,
+        ]
+    if task_type in {"code_evidence", "code", "read"}:
+        return [read_code_segment, grep_in_repo, lsp_get_definition]
+    if task_type in {"build_platform", "platform", "build"}:
+        return [list_repo_structure, read_code_segment, grep_in_repo, parse_build_config]
+    if task_type in {"git_history", "history"}:
+        return [
+            get_git_history_summary,
+            analyze_git_history,
+            find_symbol_first_commit,
+            trace_file_evolution,
+            analyze_authors_contribution,
+            get_commit_diff_summary,
+        ]
+    return get_describe_tools(stage_id)
+
+
+def build_task_agent(model: str = None, task_type: str = "", stage_id: str = ""):
+    """Build a restricted ReAct agent for one Multi-Agent task type."""
+    return build_executor_agent(
+        model=model,
+        stage_id=stage_id,
+        tools=get_task_agent_tools(task_type, stage_id),
+    )
 
 
 def build_agent(model: str = None, stage_id: str = ""):

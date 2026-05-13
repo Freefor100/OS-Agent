@@ -690,6 +690,18 @@ def build_coarse_preplan(target_name: str, target_sections_dir: str) -> Dict[str
     lowered = overview_text.lower()
     framework_guess = _guess_framework(overview_text, section_files)
     arch_guess = _guess_architecture(overview_text, section_files)
+    handoff_path = os.path.join(os.path.dirname(target_sections_dir), "handoff_to_c.json")
+    handoff = {}
+    if os.path.isfile(handoff_path):
+        try:
+            import json
+
+            with open(handoff_path, "r", encoding="utf-8") as f:
+                loaded = json.load(f)
+            if isinstance(loaded, dict):
+                handoff = loaded
+        except Exception:
+            handoff = {}
     critical_dims = []
     if any(x in lowered for x in ("arceos", "rcore", "xv6")):
         critical_dims.append("framework")
@@ -705,4 +717,10 @@ def build_coarse_preplan(target_name: str, target_sections_dir: str) -> Dict[str
         "arch_guess": arch_guess,
         "critical_dims": _dedupe_keep_order(critical_dims),
         "available_sections": section_files,
+        "describe_handoff": {
+            "available": bool(handoff),
+            "fingerprint_ready": bool(handoff.get("fingerprint_ready")) if handoff else False,
+            "stage_quality": handoff.get("stage_quality", {}) if handoff else {},
+            "evidence_summary": handoff.get("evidence_summary", {}) if handoff else {},
+        },
     }

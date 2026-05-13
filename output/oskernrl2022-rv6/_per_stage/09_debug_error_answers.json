@@ -1,0 +1,192 @@
+{
+  "schema_version": "v1",
+  "stage_id": "09_debug_error",
+  "stage_title": "调试机制与错误处理",
+  "terminology_profile": "stallings_en_zh",
+  "answers": [
+    {
+      "question_id": "Q09_001",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在日志系统（log/printk/println 宏）与日志级别控制？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/syslog.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '调试机制与错误处理 / Q09_001: 是否存在日志系统（log/printk/println 宏）与日志级别控制？（必须三态）\n关键词: log, printk, println' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4868 | 文件: repos\\oskernrl2022-rv6\\src\\syslog.c:24-50 | 类型: function_definition | 符号名: sys_syslog\n```\nuint64\nsys_syslog(){\n  int type;\n  uint64 bufp;\n  int len;\n  if(argint(0,&type)<0){\n    return -1;\n  }\n  if(argaddr(1,&bufp)<0){\n    return -1;\n  }\n  if(argint(2,&len)<0){\n    return -1;\n  }\n  switch(type){\n    case SYSLOG_ACTION_READ_ALL:\n    {\n      if(either_copyout"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/syslog.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '调试机制与错误处理 / Q09_001: 是否存在日志系统（log/printk/println 宏）与日志级别控制？（必须三态）\n关键词: log, printk, println' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4868 | 文件: repos\\oskernrl2022-rv6\\src\\syslog.c:24-50 | 类型: function_definition | 符号名: sys_syslog\n```\nuint64\nsys_syslog(){\n  int type;\n  uint64 bufp;\n  int len;\n  if(argint(0,&type)<0){\n    return -1;\n  }\n  if(argaddr(1,&bufp)<0){\n    return -1;\n  }\n  if(argint(2,&len)<0){\n    return -1;\n  }\n  switch(type){\n    case SYSLOG_ACTION_READ_ALL:\n    {\n      if(either_copyout"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_002",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 panic/崩溃处理路径（panic_handler/oom/abort 等）？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/printf.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '调试机制与错误处理 / Q09_002: 是否存在 panic/崩溃处理路径（panic_handler/oom/abort 等）？（必须三态）\n关键词: panic, panic_handler, oom, abort' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5701 | 文件: repos\\oskernrl2022-rv6\\src\\printf.c:139-149 | 类型: function_definition | 符号名: panic\n```\nvoid\npanic(char *s)\n{\n  printf(\"panic: \");\n  printf(s);\n  printf(\"\\n\");\n  backtrace();\n  panicked = 1; // freeze uart output from other CPUs\n  for(;;)\n    ;\n}\n```\n\n[2] 相似度: 0.4038 | 文件: repos\\oskernrl2022-rv6\\src\\printf.c:279-342 | 类型: function_definiti"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_003",
+      "question_type": "short_answer",
+      "stem": "panic 路径会输出哪些诊断？（寄存器 dump/栈回溯/停机；必须引用实现证据）",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/printf.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '调试机制与错误处理 / Q09_003: panic 路径会输出哪些诊断？（寄存器 dump/栈回溯/停机；必须引用实现证据）\n关键词: panic, dump' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6889 | 文件: repos\\oskernrl2022-rv6\\src\\printf.c:139-149 | 类型: function_definition | 符号名: panic\n```\nvoid\npanic(char *s)\n{\n  printf(\"panic: \");\n  printf(s);\n  printf(\"\\n\");\n  backtrace();\n  panicked = 1; // freeze uart output from other CPUs\n  for(;;)\n    ;\n}\n```\n\n[2] 相似度: 0.5400 | 文件: repos\\oskernrl2022-rv6\\src\\trap.c:263-297 | 类型: function_definition | 符号名: trapframedump\n```\nvoid"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_004",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现栈回溯 (backtrace/unwind/stack_trace)？（必须三态；仅打印 ra 不算）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/printf.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '调试机制与错误处理 / Q09_004: 是否实现栈回溯 (backtrace/unwind/stack_trace)？（必须三态；仅打印 ra 不算）\n关键词: backtrace, unwind, stack_trace' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6368 | 文件: repos\\oskernrl2022-rv6\\src\\printf.c:151-161 | 类型: function_definition | 符号名: backtrace\n```\nvoid backtrace()\n{\n  uint64 *fp = (uint64 *)r_fp();\n  uint64 *bottom = (uint64 *)PGROUNDUP((uint64)fp);\n  printf(\"backtrace:\\n\");\n  while (fp < bottom) {\n    uint64 ra = *(fp - 1);\n    printf(\"%p\\n\", ra - 4);\n    fp = (uint64 *)*(fp - 2);\n  }\n}\n``"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/printf.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '调试机制与错误处理 / Q09_004: 是否实现栈回溯 (backtrace/unwind/stack_trace)？（必须三态；仅打印 ra 不算）\n关键词: backtrace, unwind, stack_trace' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6368 | 文件: repos\\oskernrl2022-rv6\\src\\printf.c:151-161 | 类型: function_definition | 符号名: backtrace\n```\nvoid backtrace()\n{\n  uint64 *fp = (uint64 *)r_fp();\n  uint64 *bottom = (uint64 *)PGROUNDUP((uint64)fp);\n  printf(\"backtrace:\\n\");\n  while (fp < bottom) {\n    uint64 ra = *(fp - 1);\n    printf(\"%p\\n\", ra - 4);\n    fp = (uint64 *)*(fp - 2);\n  }\n}\n``"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_005",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 **内核驻留的交互式监视器（kernel monitor）**？（对齐 Stallings《操作系统：精髓与设计原理》语境：**在内核态上下文**接受命令、用于探查/操控系统的监视器；**不包括**仅在用户态运行的常规 shell，如 `xv6-user/sh.c`、`user/` 下用户程序等——除非题面另有定义。必须三态；若 `implemented`：须给出 3–10 个 **用户可键入的 monitor 命令名** 及对应 **内核内** 解析/分发入口的 `路径:行号` 证据；仅以用户态 shell 充当内核 monitor 视为 **未切题** 应判 `stub` 或 `not_found` 并说明理由。）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "xv6-user/sh.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '调试机制与错误处理 / Q09_005: 是否存在 **内核驻留的交互式监视器（kernel monitor）**？（对齐 Stallings《操作系统：精髓与设计原理》语境：**在内核态上下文**接受命令、用于探查/操控系统的监视器；**不包括**仅在用户态运行的常规 shell，如 `xv6-user/sh.c`、`user/` 下用户程序等——除非题面另有定义。必须三态；若 `implemented`：须给出 3–10 个 **用户可键入的 monitor 命令名** 及对应 **内核内** 解析/分发入口的 `路径:行号` 证据；仅以用户态 shell 充当内核 monitor 视为 **未切题** 应判 `stub` 或 `not_found` 并说明理由。）\n关键词: kernel, monitor, Stallings, shell, xv6, user, implemented, stub' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5032 | 文件: repos\\oskernrl2022-rv6\\syscall\\syscall.c:1"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_006",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 GDB stub（需数据包解析循环，如 handle_gdb_packet）？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/trap.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '调试机制与错误处理 / Q09_006: 是否实现 GDB stub（需数据包解析循环，如 handle_gdb_packet）？（必须三态）\n关键词: GDB, stub, handle_gdb_packet' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4543 | 文件: repos\\oskernrl2022-rv6\\src\\trap.c:263-297 | 类型: function_definition | 符号名: trapframedump\n```\nvoid trapframedump(struct trapframe *tf)\n{\n  printf(\"a0: %p\\t\", tf->a0);\n  printf(\"a1: %p\\t\", tf->a1);\n  printf(\"a2: %p\\t\", tf->a2);\n  printf(\"a3: %p\\n\", tf->a3);\n  printf(\"a4: %p\\t\", tf->a4);\n  printf(\"a5: %p\\t\", tf->a5);\n  printf(\"a6: %p\\t\", tf->a6);"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/trap.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '调试机制与错误处理 / Q09_006: 是否实现 GDB stub（需数据包解析循环，如 handle_gdb_packet）？（必须三态）\n关键词: GDB, stub, handle_gdb_packet' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4543 | 文件: repos\\oskernrl2022-rv6\\src\\trap.c:263-297 | 类型: function_definition | 符号名: trapframedump\n```\nvoid trapframedump(struct trapframe *tf)\n{\n  printf(\"a0: %p\\t\", tf->a0);\n  printf(\"a1: %p\\t\", tf->a1);\n  printf(\"a2: %p\\t\", tf->a2);\n  printf(\"a3: %p\\n\", tf->a3);\n  printf(\"a4: %p\\t\", tf->a4);\n  printf(\"a5: %p\\t\", tf->a5);\n  printf(\"a6: %p\\t\", tf->a6);"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_007",
+      "question_type": "short_answer",
+      "stem": "错误码/错误类型体系是什么？（errno/Result/Error enum；给类型定义与传播点证据）",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "definition",
+          "symbol_name": "lsp_get_definition",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "definition",
+          "symbol_name": "lsp_get_definition",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/printf.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '调试机制与错误处理 / Q09_007: 错误码/错误类型体系是什么？（errno/Result/Error enum；给类型定义与传播点证据）\n关键词: errno, Result, Error, enum' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4546 | 文件: repos\\oskernrl2022-rv6\\src\\printf.c:279-342 | 类型: function_definition | 符号名: __debug_error\n```\nvoid\n__debug_error(char *fmt, ...){\n#ifdef ERROR\n  va_list ap;\n  int i, c;\n  int locking;\n  char *s;\n  locking = pr.locking;\n  if(locking)\n    acquire(&pr.lock);\n  \n  if (fmt == 0)\n    panic(\"null fmt\");\n\n  printstring(errorstr);\n  va_start(ap, fmt);\n"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_008",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 trace/perf/ftrace 等跟踪机制或 tracepoints？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/printf.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '调试机制与错误处理 / Q09_008: 是否存在 trace/perf/ftrace 等跟踪机制或 tracepoints？（必须三态）\n关键词: trace, perf, ftrace, tracepoints' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4429 | 文件: repos\\oskernrl2022-rv6\\src\\printf.c:151-161 | 类型: function_definition | 符号名: backtrace\n```\nvoid backtrace()\n{\n  uint64 *fp = (uint64 *)r_fp();\n  uint64 *bottom = (uint64 *)PGROUNDUP((uint64)fp);\n  printf(\"backtrace:\\n\");\n  while (fp < bottom) {\n    uint64 ra = *(fp - 1);\n    printf(\"%p\\n\", ra - 4);\n    fp = (uint64 *)*(fp - 2);\n  }\n}\n```\n\n[2"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/printf.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '调试机制与错误处理 / Q09_008: 是否存在 trace/perf/ftrace 等跟踪机制或 tracepoints？（必须三态）\n关键词: trace, perf, ftrace, tracepoints' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4429 | 文件: repos\\oskernrl2022-rv6\\src\\printf.c:151-161 | 类型: function_definition | 符号名: backtrace\n```\nvoid backtrace()\n{\n  uint64 *fp = (uint64 *)r_fp();\n  uint64 *bottom = (uint64 *)PGROUNDUP((uint64)fp);\n  printf(\"backtrace:\\n\");\n  while (fp < bottom) {\n    uint64 ra = *(fp - 1);\n    printf(\"%p\\n\", ra - 4);\n    fp = (uint64 *)*(fp - 2);\n  }\n}\n```\n\n[2"
+        }
+      ]
+    }
+  ]
+}

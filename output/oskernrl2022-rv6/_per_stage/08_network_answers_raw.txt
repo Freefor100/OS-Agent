@@ -1,0 +1,62 @@
+--- Q08_001 ---
+{
+  "question_id": "Q08_001",
+  "question_type": "tri_state_impl",
+  "stem": "是否存在网络子系统实现（协议栈或 socket 层）？（必须三态）",
+  "value": "stub",
+  "evidence": "src/include/socket.h"
+}
+
+--- Q08_002 ---
+{
+  "question_id": "Q08_002",
+  "question_type": "single_choice",
+  "stem": "协议栈来源更接近哪种？",
+  "value": "未发现",
+  "evidence": "not_found"
+}
+
+--- Q08_003 ---
+{
+  "question_id": "Q08_003",
+  "question_type": "tri_state_impl",
+  "stem": "是否实现 socket 系统调用接口（socket/bind/connect/sendto/recvfrom 等）？（必须三态）",
+  "value": "not_found",
+  "evidence": "ev_task_08_network_Q08_003_discovery_d577e9af"
+}
+
+--- Q08_004 ---
+{
+  "question_id": "Q08_004",
+  "question_type": "short_answer",
+  "stem": "选择一个发送路径（优先 sys_sendto），追踪：syscall → 协议栈 → 网卡驱动。列 3-6 个关键节点并给证据。",
+  "value": "not_found",
+  "evidence": "提供的证据中，syscall/syscall.c 仅展示了通用 syscall 分发逻辑，未包含 sys_sendto 的具体实现；其余证据均为 sd/test.c 中未找到符号的错误或语义搜索片段，无法构建从 sys_sendto 到协议栈再到网卡驱动的完整调用链。"
+}
+
+--- Q08_005 ---
+{
+  "question_id": "Q08_005",
+  "question_type": "tri_state_impl",
+  "stem": "是否实现网卡驱动（virtio-net/e1000 等）与收包中断路径？（必须三态）",
+  "value": "not_found",
+  "evidence": "ev_task_08_network_Q08_005_discovery_e744b67e"
+}
+
+--- Q08_006 ---
+{
+  "question_id": "Q08_006",
+  "question_type": "multi_choice",
+  "stem": "协议支持情况（多选；未发现则留空并在 notes 写 not_found）：",
+  "value": [],
+  "evidence": "not_found"
+}
+
+--- Q08_007 ---
+{
+  "question_id": "Q08_007",
+  "question_type": "tri_state_impl",
+  "stem": "是否存在零拷贝/共享缓冲/DMA 描述符等路径（zero-copy）？（必须三态；仅有名词不算 implemented）",
+  "value": "not_found",
+  "evidence": "not_found"
+}

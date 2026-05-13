@@ -1,0 +1,778 @@
+{
+  "schema_version": "v1",
+  "stage_id": "02_boot_trap",
+  "stage_title": "启动/架构与 Trap/系统调用",
+  "terminology_profile": "stallings_en_zh",
+  "answers": [
+    {
+      "question_id": "Q02_001",
+      "question_type": "short_answer",
+      "stem": "启动入口在哪里？（例如 linker.ld 的 ENTRY、`_start`/`start`/`head`/`entry` 标签；必须给文件路径+符号证据）",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/syscall/syscall.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/syscall/syscall.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/syscall/syscall.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/syscall/syscall.c"
+        },
+        {
+          "path": "linker.ld",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '启动/架构与 Trap/系统调用 / Q02_001: 启动入口在哪里？（例如 linker.ld 的 ENTRY、`_start`/`start`/`head`/`entry` 标签；必须给文件路径+符号证据）\n关键词: linker, ENTRY, _start, start, head' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5602 | 文件: repos\\oskernrl2022-rv6\\src\\include\\sbi.h:78-80 | 类型: function_definition | 符号名: start_hart\n```\nstatic inline void start_hart(uint64 hartid,uint64 start_addr, uint64 a1) {\n    a_sbi_ecall(0x48534D, 0, hartid, start_addr, a1, 0, 0, 0);\n}\n```\n\n[2] 相似度: 0.5002 | 文件: repos\\oskernrl2022-rv6\\src\\main.c:44-96 |"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_002",
+      "question_type": "single_choice",
+      "stem": "启动链更接近哪种交接方式？",
+      "value": "未知/未发现",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/syscall/syscall.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/syscall/syscall.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/syscall/syscall.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/syscall/syscall.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/include/sbi.h",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '启动/架构与 Trap/系统调用 / Q02_002: 启动链更接近哪种交接方式？\n关键词: ' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4997 | 文件: repos\\oskernrl2022-rv6\\src\\include\\sbi.h:78-80 | 类型: function_definition | 符号名: start_hart\n```\nstatic inline void start_hart(uint64 hartid,uint64 start_addr, uint64 a1) {\n    a_sbi_ecall(0x48534D, 0, hartid, start_addr, a1, 0, 0, 0);\n}\n```\n\n[2] 相似度: 0.4523 | 文件: repos\\oskernrl2022-rv6\\src\\sysproc.c:162-169 | 类型: function_definition | 符号名: sys_brk\n```\nuint64\nsys_brk(void)\n{\n  int n;\n  if(argint(0, &n)"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_003",
+      "question_type": "tri_state_impl",
+      "stem": "是否能在代码中证实发生了 CPU 特权级/模式切换？（RISC-V M→S、x86 实→保→长等；必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/proc.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '启动/架构与 Trap/系统调用 / Q02_003: 是否能在代码中证实发生了 CPU 特权级/模式切换？（RISC-V M→S、x86 实→保→长等；必须三态）\n关键词: CPU, RISC, x86' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5855 | 文件: repos\\oskernrl2022-rv6\\src\\proc.c:520-538 | 类型: function_definition | 符号名: sched\n```\nvoid\nsched(void)\n{\n  int intena;\n  struct proc *p = myproc();\n\n  if(!holding(&p->lock))\n    panic(\"sched p->lock\");\n  if(mycpu()->noff != 1)\n    panic(\"sched locks\");\n  if(p->state == RUNNING)\n    panic(\"sched running\");\n  if(intr_get())\n    panic(\"sched interrup"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/proc.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '启动/架构与 Trap/系统调用 / Q02_003: 是否能在代码中证实发生了 CPU 特权级/模式切换？（RISC-V M→S、x86 实→保→长等；必须三态）\n关键词: CPU, RISC, x86' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5855 | 文件: repos\\oskernrl2022-rv6\\src\\proc.c:520-538 | 类型: function_definition | 符号名: sched\n```\nvoid\nsched(void)\n{\n  int intena;\n  struct proc *p = myproc();\n\n  if(!holding(&p->lock))\n    panic(\"sched p->lock\");\n  if(mycpu()->noff != 1)\n    panic(\"sched locks\");\n  if(p->state == RUNNING)\n    panic(\"sched running\");\n  if(intr_get())\n    panic(\"sched interrup"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_004",
+      "question_type": "short_answer",
+      "stem": "模式切换涉及的关键寄存器/位是什么？（例如 RISC-V mstatus/sstatus、x86 cr0/cr4/eflags；必须给证据摘录）",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/include/riscv.h",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '启动/架构与 Trap/系统调用 / Q02_004: 模式切换涉及的关键寄存器/位是什么？（例如 RISC-V mstatus/sstatus、x86 cr0/cr4/eflags；必须给证据摘录）\n关键词: RISC, mstatus, sstatus, x86, cr0, cr4, eflags' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6060 | 文件: repos\\oskernrl2022-rv6\\src\\include\\riscv.h:266-270 | 类型: function_definition | 符号名: intr_on\n```\nstatic inline void\nintr_on()\n{\n  w_sstatus(r_sstatus() | SSTATUS_SIE);\n}\n```\n\n[2] 相似度: 0.5955 | 文件: repos\\oskernrl2022-rv6\\src\\include\\riscv.h:52-58 | 类型: function_definition | 符号名: r_sstatus\n```\nstatic "
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_005",
+      "question_type": "tri_state_impl",
+      "stem": "是否启用/初始化了 MMU（设置 SATP/CR3 等并建立页表）？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/ramdisk.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '启动/架构与 Trap/系统调用 / Q02_005: 是否启用/初始化了 MMU（设置 SATP/CR3 等并建立页表）？（必须三态）\n关键词: MMU, SATP, CR3, 页表' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5468 | 文件: repos\\oskernrl2022-rv6\\src\\ramdisk.c:18-29 | 类型: function_definition | 符号名: ramdisk_init\n```\nvoid\nramdisk_init(void)\n{\n#ifdef QEMU\n  ramdisk = fs_img_start;\n#endif\n#ifdef SIFIVE_U\n  ramdisk = (char*)RAMDISK;\n#endif\n  initlock(&ramdisklock, \"ramdisk lock\");\n  __debug_info(\"ramdiskinit ram start:%p\\n\",ramdisk);\n}\n```\n\n[2] 相似度: 0.5238 | 文件: repos\\oskernrl2022"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/ramdisk.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '启动/架构与 Trap/系统调用 / Q02_005: 是否启用/初始化了 MMU（设置 SATP/CR3 等并建立页表）？（必须三态）\n关键词: MMU, SATP, CR3, 页表' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5468 | 文件: repos\\oskernrl2022-rv6\\src\\ramdisk.c:18-29 | 类型: function_definition | 符号名: ramdisk_init\n```\nvoid\nramdisk_init(void)\n{\n#ifdef QEMU\n  ramdisk = fs_img_start;\n#endif\n#ifdef SIFIVE_U\n  ramdisk = (char*)RAMDISK;\n#endif\n  initlock(&ramdisklock, \"ramdisk lock\");\n  __debug_info(\"ramdiskinit ram start:%p\\n\",ramdisk);\n}\n```\n\n[2] 相似度: 0.5238 | 文件: repos\\oskernrl2022"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_006",
+      "question_type": "short_answer",
+      "stem": "从入口汇编/固件交接到 C/Rust 主入口函数的跳转链是什么？（列出 3-6 个关键节点并给证据）",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/syscall/syscall.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/syscall/syscall.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/syscall/syscall.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/syscall/syscall.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/syscall/syscall.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '启动/架构与 Trap/系统调用 / Q02_006: 从入口汇编/固件交接到 C/Rust 主入口函数的跳转链是什么？（列出 3-6 个关键节点并给证据）\n关键词: Rust' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5685 | 文件: repos\\oskernrl2022-rv6\\syscall\\syscall.c:1-20 | 类型: function_definition | 符号名: syscall\n```\nvoid\nsyscall(void)\n{\n  int num;\n  struct proc *p = myproc();\n\n  num = p->trapframe->a7;\n  if(num > 0 && num < NELEM(syscalls) && syscalls[num]) {\n    //printf(\"syscall %d\\n\",num);\n    p->trapframe->a0 = syscalls[num]();\n        // trace\n    if ((p->tmask & (1 << num)) !="
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_007",
+      "question_type": "fill_in",
+      "stem": "早期初始化 (Early Initialization) 各项状态（每项必须 implemented / stub / not_found + 证据路径，格式：`项目: 状态 [路径]`）：\n- BSS 清零 (BSS Clearing): ___\n- 早期串口输出 (Early Serial/UART Output): ___\n- 设备树解析 (Device Tree Blob parsing, DTB): ___\n- 页表初始化时机 (Page Table Init): ___（在 MMU 启用前/后？）",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/syscall/syscall.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/syscall/syscall.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/syscall/syscall.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/syscall/syscall.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/disk.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '启动/架构与 Trap/系统调用 / Q02_007: 早期初始化 (Early Initialization) 各项状态（每项必须 implemented / stub / not_found + 证据路径，格式：`项目: 状态 [路径]`）：\n- BSS 清零 (BSS Clearing): ___\n- 早期串口输出 (Early Serial/UART Output): ___\n- 设备树解析 (Device Tree Blob parsing, DTB): ___\n- 页表初始化时机 (Page Table Init): ___（在 MMU 启用前/后？）\n关键词: Early, Initialization, implemented, stub, not_found, BSS, Clearing, ___' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5614 | 文件: repos\\oskernrl2022-rv6\\src\\disk.c:16-25 | 类型: function_definition | 符号名: disk_init\n```\nv"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_008",
+      "question_type": "tri_state_impl",
+      "stem": "是否初始化/启用了 FPU（如 sstatus.fs / cpacr_el1 / cr4）？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/fat32.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '启动/架构与 Trap/系统调用 / Q02_008: 是否初始化/启用了 FPU（如 sstatus.fs / cpacr_el1 / cr4）？（必须三态）\n关键词: FPU, sstatus, cpacr_el1, cr4' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5056 | 文件: repos\\oskernrl2022-rv6\\src\\fat32.c:68-83 | 类型: function_definition | 符号名: fs_init\n```\nint fs_init()\n{\n    debug_output = 0;\n    for(int i=0;i<FSNUM;i++){\n      FatFs[i].valid = 0;\n      FatFs[i].devno = i;\n      FatFs[i].image = NULL;\n    }\n    rootfs = FatFs;\n    FatFs[0].image = NULL;\n    FatFs[0].disk_init = (void*)disk_init;\n    F"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/fat32.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '启动/架构与 Trap/系统调用 / Q02_008: 是否初始化/启用了 FPU（如 sstatus.fs / cpacr_el1 / cr4）？（必须三态）\n关键词: FPU, sstatus, cpacr_el1, cr4' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5056 | 文件: repos\\oskernrl2022-rv6\\src\\fat32.c:68-83 | 类型: function_definition | 符号名: fs_init\n```\nint fs_init()\n{\n    debug_output = 0;\n    for(int i=0;i<FSNUM;i++){\n      FatFs[i].valid = 0;\n      FatFs[i].devno = i;\n      FatFs[i].image = NULL;\n    }\n    rootfs = FatFs;\n    FatFs[0].image = NULL;\n    FatFs[0].disk_init = (void*)disk_init;\n    F"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_009",
+      "question_type": "tri_state_impl",
+      "stem": "是否设置 trap/中断向量（如 stvec/idt 等）并能指出设置点？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/trap.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '启动/架构与 Trap/系统调用 / Q02_009: 是否设置 trap/中断向量（如 stvec/idt 等）并能指出设置点？（必须三态）\n关键词: trap, stvec, idt' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5758 | 文件: repos\\oskernrl2022-rv6\\src\\trap.c:51-60 | 类型: function_definition | 符号名: trapinithart\n```\nvoid\ntrapinithart(void)\n{\n  w_stvec((uint64)kernelvec);\n  w_sstatus(r_sstatus() | SSTATUS_SIE);\n  // enable supervisor-mode timer interrupts.\n  w_sie(r_sie() | SIE_SEIE | SIE_SSIE | SIE_STIE);\n  set_next_timeout();\n  __debug_info(\"trapinithart\\n\");\n}\n```\n\n[2] 相似度: 0."
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/trap.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '启动/架构与 Trap/系统调用 / Q02_009: 是否设置 trap/中断向量（如 stvec/idt 等）并能指出设置点？（必须三态）\n关键词: trap, stvec, idt' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5758 | 文件: repos\\oskernrl2022-rv6\\src\\trap.c:51-60 | 类型: function_definition | 符号名: trapinithart\n```\nvoid\ntrapinithart(void)\n{\n  w_stvec((uint64)kernelvec);\n  w_sstatus(r_sstatus() | SSTATUS_SIE);\n  // enable supervisor-mode timer interrupts.\n  w_sie(r_sie() | SIE_SEIE | SIE_SSIE | SIE_STIE);\n  set_next_timeout();\n  __debug_info(\"trapinithart\\n\");\n}\n```\n\n[2] 相似度: 0."
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_010",
+      "question_type": "short_answer",
+      "stem": "构建系统如何选择目标平台/架构与入口文件？（Cargo features/Kconfig/Makefile 条件；必须引用配置证据）",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/syscall/syscall.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/syscall/syscall.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/syscall/syscall.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/syscall/syscall.c"
+        },
+        {
+          "path": "LINKER=linker/kernel.ld",
+          "symbol_kind": "build_config",
+          "symbol_name": "parse_build_config",
+          "excerpt": "## Build Config Summary\n- Makefile markers=[qemu-system, -machine, riscv, ENTRY, disk.img]\n  excerpt: K=src U=usrinit SBI=sbi/fw_jump.elf LINKER=linker/kernel.ld  FS?=FAT MAC?=SIFIVE_U  ifeq ($(MAC),SIFIVE_U) DISK:=$K/link_null.o endif  ifeq ($(MAC),QEMU) DISK:=$K/link_disk.o endif  OBJS += \\ \t$K/entry.o \\ \t$K/bio.o \\ \t$(DISK) \\ \t$K/ramdisk.o \\ \t$K/spi.o \\ \t$K/sd.o \\ \t$K/diskio.o \\ \t$K/disk.o \\ \t$K/\n- linker/kernel.ld markers=[riscv, ENTRY]\n  excerpt: OUTPUT_ARCH(riscv) ENTRY(_entry)  BASE_ADDRE"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_011",
+      "question_type": "tri_state_impl",
+      "stem": "对 RISC-V 平台：是否能证实 SBI/OpenSBI/U-Boot 固件链（固件将控制权移交内核）？（必须三态；搜索 sbi|opensbi|u-boot；非 RISC-V 平台写 not_found 并说明架构）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/sd.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '启动/架构与 Trap/系统调用 / Q02_011: 对 RISC-V 平台：是否能证实 SBI/OpenSBI/U-Boot 固件链（固件将控制权移交内核）？（必须三态；搜索 sbi|opensbi|u-boot；非 RISC-V 平台写 not_found 并说明架构）\n关键词: RISC, SBI, OpenSBI, Boot, not_found' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5568 | 文件: repos\\oskernrl2022-rv6\\src\\sd.c:137-149 | 类型: function_definition | 符号名: sd_cmd8\n```\nstatic int sd_cmd8(spi_ctrl* spi)\n{\n  // Check for high capacity cards\n  // Fail if card does not support SDHC\n  int rc;\n  rc = (sd_cmd(spi, SD_CMD(SD_CMD_SEND_IF_COND), 0x000001AA, 0x87"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/syscall/syscall.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/syscall/syscall.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/syscall/syscall.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/syscall/syscall.c"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_012",
+      "question_type": "tri_state_impl",
+      "stem": "MMU 启用前后是否存在串口/UART 地址切换逻辑（物理地址→虚拟地址）？（必须三态；搜索 phys_to_virt|virt_to_phys 及 UART 基址常量）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/vm.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '启动/架构与 Trap/系统调用 / Q02_012: MMU 启用前后是否存在串口/UART 地址切换逻辑（物理地址→虚拟地址）？（必须三态；搜索 phys_to_virt|virt_to_phys 及 UART 基址常量）\n关键词: MMU, UART, phys_to_virt, virt_to_phys' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5374 | 文件: repos\\oskernrl2022-rv6\\src\\vm.c:64-69 | 类型: function_definition | 符号名: kvmmap\n```\nvoid\nkvmmap(uint64 va, uint64 pa, uint64 sz, int perm)\n{\n  if(mappages(kernel_pagetable, va, sz, pa, perm) != 0)\n    panic(\"kvmmap\");\n}\n```\n\n[2] 相似度: 0.5351 | 文件: repos\\oskernrl2022-rv6\\src\\vm.c:52-59 | 类型: funct"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/vm.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '启动/架构与 Trap/系统调用 / Q02_012: MMU 启用前后是否存在串口/UART 地址切换逻辑（物理地址→虚拟地址）？（必须三态；搜索 phys_to_virt|virt_to_phys 及 UART 基址常量）\n关键词: MMU, UART, phys_to_virt, virt_to_phys' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5374 | 文件: repos\\oskernrl2022-rv6\\src\\vm.c:64-69 | 类型: function_definition | 符号名: kvmmap\n```\nvoid\nkvmmap(uint64 va, uint64 pa, uint64 sz, int perm)\n{\n  if(mappages(kernel_pagetable, va, sz, pa, perm) != 0)\n    panic(\"kvmmap\");\n}\n```\n\n[2] 相似度: 0.5351 | 文件: repos\\oskernrl2022-rv6\\src\\vm.c:52-59 | 类型: funct"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_013",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在从内核返回用户态的路径（usertrapret/trap_return/trampoline/eret 等）并设置 stvec/VBAR/IDT？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/trap.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '启动/架构与 Trap/系统调用 / Q02_013: 是否存在从内核返回用户态的路径（usertrapret/trap_return/trampoline/eret 等）并设置 stvec/VBAR/IDT？（必须三态）\n关键词: usertrapret, trap_return, trampoline, eret, stvec, VBAR, IDT, trap' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6788 | 文件: repos\\oskernrl2022-rv6\\src\\trap.c:134-174 | 类型: function_definition | 符号名: usertrapret\n```\nvoid\nusertrapret(){\n  struct proc *p = myproc();\n  // we're about to switch the destination of traps from\n  // kerneltrap() to usertrap(), so turn off interrupts until\n  // we'"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/syscall/syscall.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/syscall/syscall.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/syscall/syscall.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/syscall/syscall.c"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_014",
+      "question_type": "short_answer",
+      "stem": "是否支持多平台启动（StarFive VisionFive2/LoongArch/多板型）？（搜索 visionfive|jh7110|loongarch；有则描述差异入口与互斥关系；无则写未发现）",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/syscall/syscall.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/syscall/syscall.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/syscall/syscall.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/syscall/syscall.c"
+        },
+        {
+          "path": "LINKER=linker/kernel.ld",
+          "symbol_kind": "build_config",
+          "symbol_name": "parse_build_config",
+          "excerpt": "## Build Config Summary\n- Makefile markers=[qemu-system, -machine, riscv, ENTRY, disk.img]\n  excerpt: K=src U=usrinit SBI=sbi/fw_jump.elf LINKER=linker/kernel.ld  FS?=FAT MAC?=SIFIVE_U  ifeq ($(MAC),SIFIVE_U) DISK:=$K/link_null.o endif  ifeq ($(MAC),QEMU) DISK:=$K/link_disk.o endif  OBJS += \\ \t$K/entry.o \\ \t$K/bio.o \\ \t$(DISK) \\ \t$K/ramdisk.o \\ \t$K/spi.o \\ \t$K/sd.o \\ \t$K/diskio.o \\ \t$K/disk.o \\ \t$K/\n- linker/kernel.ld markers=[riscv, ENTRY]\n  excerpt: OUTPUT_ARCH(riscv) ENTRY(_entry)  BASE_ADDRE"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_015",
+      "question_type": "short_answer",
+      "stem": "trap/异常向量入口在哪里？（trap_handler/trap_vector/__alltraps 等；必须给证据）",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/syscall/syscall.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/syscall/syscall.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/syscall/syscall.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/syscall/syscall.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/trap.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '启动/架构与 Trap/系统调用 / Q02_015: trap/异常向量入口在哪里？（trap_handler/trap_vector/__alltraps 等；必须给证据）\n关键词: trap, trap_handler, trap_vector, __alltraps' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.7167 | 文件: repos\\oskernrl2022-rv6\\src\\trap.c:51-60 | 类型: function_definition | 符号名: trapinithart\n```\nvoid\ntrapinithart(void)\n{\n  w_stvec((uint64)kernelvec);\n  w_sstatus(r_sstatus() | SSTATUS_SIE);\n  // enable supervisor-mode timer interrupts.\n  w_sie(r_sie() | SIE_SEIE | SIE_SSIE | SIE_STIE);\n  set_next_timeout();\n  __debu"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_016",
+      "question_type": "single_choice",
+      "stem": "trap 上下文 (TrapFrame/TrapContext) 更可能存放在哪里？",
+      "value": "未发现/待核实",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/trap.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '启动/架构与 Trap/系统调用 / Q02_016: trap 上下文 (TrapFrame/TrapContext) 更可能存放在哪里？\n关键词: trap, TrapFrame, TrapContext' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6211 | 文件: repos\\oskernrl2022-rv6\\src\\trap.c:176-209 | 类型: function_definition | 符号名: kerneltrap\n```\nvoid \nkerneltrap() {\n  int which_dev = 0;\n  uint64 sepc = r_sepc();\n  uint64 sstatus = r_sstatus();\n  uint64 scause = r_scause();\n\n  // printf(\"kerneltrap scause:%p\\n\",scause);\n  if((sstatus & SSTATUS_SPP) == 0)\n    panic(\"kerneltrap: not from supervisor m"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_017",
+      "question_type": "short_answer",
+      "stem": "TrapFrame/寄存器保存结构体定义在哪里？寄存器数量与字节数是多少？（必须引用结构体定义证据）",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/include/trap.h",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '启动/架构与 Trap/系统调用 / Q02_017: TrapFrame/寄存器保存结构体定义在哪里？寄存器数量与字节数是多少？（必须引用结构体定义证据）\n关键词: TrapFrame' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5870 | 文件: repos\\oskernrl2022-rv6\\src\\include\\trap.h:58-58 | 类型: struct_specifier | 符号名: \n```\nstruct trapframe\n```\n\n[2] 相似度: 0.5446 | 文件: repos\\oskernrl2022-rv6\\src\\include\\trap.h:17-54 | 类型: struct_specifier | 符号名: \n```\nstruct trapframe {\n  /*   0 */ uint64 kernel_satp;   // kernel page table\n  /*   8 */ uint64 kernel_sp;     // top of process's kernel stack\n  /*  "
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/syscall/syscall.c",
+          "symbol_kind": "definition",
+          "symbol_name": "lsp_get_definition",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/syscall/syscall.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/syscall/syscall.c",
+          "symbol_kind": "definition",
+          "symbol_name": "lsp_get_definition",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/syscall/syscall.c"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_018",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在系统调用分发表（syscall table / match 分发）？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/syscall/syscall.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '启动/架构与 Trap/系统调用 / Q02_018: 是否存在系统调用分发表（syscall table / match 分发）？（必须三态）\n关键词: syscall, table, match, 系统调用' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6783 | 文件: repos\\oskernrl2022-rv6\\syscall\\syscall.c:1-20 | 类型: function_definition | 符号名: syscall\n```\nvoid\nsyscall(void)\n{\n  int num;\n  struct proc *p = myproc();\n\n  num = p->trapframe->a7;\n  if(num > 0 && num < NELEM(syscalls) && syscalls[num]) {\n    //printf(\"syscall %d\\n\",num);\n    p->trapframe->a0 = syscalls[num]();\n        // trace\n    if ((p->tmask"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/syscall/syscall.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/syscall/syscall.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/syscall/syscall.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/syscall/syscall.c"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_019",
+      "question_type": "tri_state_impl",
+      "stem": "系统调用号是否做边界检查？（越界默认分支/返回错误/panic；必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/printf.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '启动/架构与 Trap/系统调用 / Q02_019: 系统调用号是否做边界检查？（越界默认分支/返回错误/panic；必须三态）\n关键词: panic, 系统调用' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6278 | 文件: repos\\oskernrl2022-rv6\\src\\printf.c:139-149 | 类型: function_definition | 符号名: panic\n```\nvoid\npanic(char *s)\n{\n  printf(\"panic: \");\n  printf(s);\n  printf(\"\\n\");\n  backtrace();\n  panicked = 1; // freeze uart output from other CPUs\n  for(;;)\n    ;\n}\n```\n\n[2] 相似度: 0.5738 | 文件: repos\\oskernrl2022-rv6\\syscall\\syscall.c:1-20 | 类型: function_definition | 符号名: syscall\n```\nvoid"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/syscall/syscall.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/syscall/syscall.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/syscall/syscall.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/syscall/syscall.c"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_020",
+      "question_type": "short_answer",
+      "stem": "选择一个具体 syscall（优先 sys_write），追踪：用户指令 → trap → 分发 → 实现体。列出 3-6 个关键节点并给证据。",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/syscall/syscall.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/syscall/syscall.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/syscall/syscall.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/syscall/syscall.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/syscall/syscall.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '启动/架构与 Trap/系统调用 / Q02_020: 选择一个具体 syscall（优先 sys_write），追踪：用户指令 → trap → 分发 → 实现体。列出 3-6 个关键节点并给证据。\n关键词: syscall, sys_write, trap' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.7511 | 文件: repos\\oskernrl2022-rv6\\syscall\\syscall.c:1-20 | 类型: function_definition | 符号名: syscall\n```\nvoid\nsyscall(void)\n{\n  int num;\n  struct proc *p = myproc();\n\n  num = p->trapframe->a7;\n  if(num > 0 && num < NELEM(syscalls) && syscalls[num]) {\n    //printf(\"syscall %d\\n\",num);\n    p->trapframe->a0 = syscalls[num]();\n        /"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_021",
+      "question_type": "short_answer",
+      "stem": "列出 5-10 个“高价值 syscall”（fork/exec/mmap/open/write 等）的实现三态（implemented/stub/not_found），并为每个至少给一条证据。",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/syscall/syscall.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '启动/架构与 Trap/系统调用 / Q02_021: 列出 5-10 个“高价值 syscall”（fork/exec/mmap/open/write 等）的实现三态（implemented/stub/not_found），并为每个至少给一条证据。\n关键词: syscall, fork, exec, mmap, open, write, implemented, stub' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.7061 | 文件: repos\\oskernrl2022-rv6\\syscall\\syscall.c:1-20 | 类型: function_definition | 符号名: syscall\n```\nvoid\nsyscall(void)\n{\n  int num;\n  struct proc *p = myproc();\n\n  num = p->trapframe->a7;\n  if(num > 0 && num < NELEM(syscalls) && syscalls[num]) {\n    //printf(\"syscall %d\\"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/syscall/syscall.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/syscall/syscall.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/syscall/syscall.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/syscall/syscall.c"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_022",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在用户指针访问安全检查（copyin/copyout/access_ok/UserInPtr 等）？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/copy.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '启动/架构与 Trap/系统调用 / Q02_022: 是否存在用户指针访问安全检查（copyin/copyout/access_ok/UserInPtr 等）？（必须三态）\n关键词: copyin, copyout, access_ok, UserInPtr' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5769 | 文件: repos\\oskernrl2022-rv6\\src\\copy.c:192-202 | 类型: function_definition | 符号名: either_copyin\n```\nint\neither_copyin( int user_src,void *dst, uint64 src, uint64 len)\n{\n  struct proc *p = myproc();\n  if(user_src){\n    return copyin(p->pagetable, dst, src, len);\n  } else {\n    memmove(dst, (char*)src, len);\n    return 0;\n  }\n}"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/copy.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '启动/架构与 Trap/系统调用 / Q02_022: 是否存在用户指针访问安全检查（copyin/copyout/access_ok/UserInPtr 等）？（必须三态）\n关键词: copyin, copyout, access_ok, UserInPtr' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5769 | 文件: repos\\oskernrl2022-rv6\\src\\copy.c:192-202 | 类型: function_definition | 符号名: either_copyin\n```\nint\neither_copyin( int user_src,void *dst, uint64 src, uint64 len)\n{\n  struct proc *p = myproc();\n  if(user_src){\n    return copyin(p->pagetable, dst, src, len);\n  } else {\n    memmove(dst, (char*)src, len);\n    return 0;\n  }\n}"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_023",
+      "question_type": "tri_state_impl",
+      "stem": "时钟中断是否触发抢占调度（timer tick 中调用 yield/schedule/resched）？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/timer.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '启动/架构与 Trap/系统调用 / Q02_023: 时钟中断是否触发抢占调度（timer tick 中调用 yield/schedule/resched）？（必须三态）\n关键词: timer, tick, yield, schedule, resched, 调度' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6642 | 文件: repos\\oskernrl2022-rv6\\src\\timer.c:35-41 | 类型: function_definition | 符号名: timer_tick\n```\nvoid timer_tick() {\n    acquire(&tickslock);\n    ticks++;\n    wakeup(&ticks);\n    release(&tickslock);\n    set_next_timeout();\n}\n```\n\n[2] 相似度: 0.6001 | 文件: repos\\oskernrl2022-rv6\\src\\timer.c:16-22 | 类型: function_definition | 符号名"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/syscall/syscall.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/syscall/syscall.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/syscall/syscall.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/syscall/syscall.c"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_024",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在信号处理链路（trap 返回前处理 pending signal、sigreturn/trampoline）？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/signal.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '启动/架构与 Trap/系统调用 / Q02_024: 是否存在信号处理链路（trap 返回前处理 pending signal、sigreturn/trampoline）？（必须三态）\n关键词: trap, pending, signal, sigreturn, trampoline' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5911 | 文件: repos\\oskernrl2022-rv6\\src\\signal.c:124-202 | 类型: function_definition | 符号名: sighandle\n```\nvoid sighandle(void) {\n\tstruct proc *p = myproc();\n\n\tint signum = 0;\n\tif (p->killed) {\n\t\tsignum = p->killed;\n\n\t\tconst int len = sizeof(unsigned long) * 8;\n\t\tint i = (unsigned long)(p->killed) / len;\n\t\tint bit = (unsi"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/syscall/syscall.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/syscall/syscall.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/syscall/syscall.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/syscall/syscall.c"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_025",
+      "question_type": "short_answer",
+      "stem": "缺页异常与内存特性（CoW/lazy）是否在 trap 中联动？（若存在，说明入口点与调用到内存模块的证据）",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/trap.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '启动/架构与 Trap/系统调用 / Q02_025: 缺页异常与内存特性（CoW/lazy）是否在 trap 中联动？（若存在，说明入口点与调用到内存模块的证据）\n关键词: CoW, lazy, trap' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5955 | 文件: repos\\oskernrl2022-rv6\\src\\trap.c:176-209 | 类型: function_definition | 符号名: kerneltrap\n```\nvoid \nkerneltrap() {\n  int which_dev = 0;\n  uint64 sepc = r_sepc();\n  uint64 sstatus = r_sstatus();\n  uint64 scause = r_scause();\n\n  // printf(\"kerneltrap scause:%p\\n\",scause);\n  if((sstatus & SSTATUS_SPP) == 0)\n    panic(\"kerneltrap: not from supervisor mo"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/syscall/syscall.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/syscall/syscall.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/syscall/syscall.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/syscall/syscall.c"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_026",
+      "question_type": "short_answer",
+      "stem": "与 09 多核交叉一致性：per-CPU trap 栈/时钟初始化顺序与 AP 上线是否一致？（互指证据或写单核不适用）",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/trap.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '启动/架构与 Trap/系统调用 / Q02_026: 与 09 多核交叉一致性：per-CPU trap 栈/时钟初始化顺序与 AP 上线是否一致？（互指证据或写单核不适用）\n关键词: per, CPU, trap' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6443 | 文件: repos\\oskernrl2022-rv6\\src\\trap.c:176-209 | 类型: function_definition | 符号名: kerneltrap\n```\nvoid \nkerneltrap() {\n  int which_dev = 0;\n  uint64 sepc = r_sepc();\n  uint64 sstatus = r_sstatus();\n  uint64 scause = r_scause();\n\n  // printf(\"kerneltrap scause:%p\\n\",scause);\n  if((sstatus & SSTATUS_SPP) == 0)\n    panic(\"kerneltrap: not from supervis"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/trap.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '启动/架构与 Trap/系统调用 / Q02_026: 与 09 多核交叉一致性：per-CPU trap 栈/时钟初始化顺序与 AP 上线是否一致？（互指证据或写单核不适用）\n关键词: per, CPU, trap' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6443 | 文件: repos\\oskernrl2022-rv6\\src\\trap.c:176-209 | 类型: function_definition | 符号名: kerneltrap\n```\nvoid \nkerneltrap() {\n  int which_dev = 0;\n  uint64 sepc = r_sepc();\n  uint64 sstatus = r_sstatus();\n  uint64 scause = r_scause();\n\n  // printf(\"kerneltrap scause:%p\\n\",scause);\n  if((sstatus & SSTATUS_SPP) == 0)\n    panic(\"kerneltrap: not from supervis"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_027",
+      "question_type": "fill_in",
+      "stem": "Syscall 实现全量统计 (Syscall Coverage Analysis)，请按格式填写：\n- 分发表路径: ___\n- 完整实现 ✅ (implemented): ___ 个\n- 桩/ENOSYS/return 0 🔸 (stub): ___ 个，代表性例子: ___\n- 未注册 ❌ (not_found): ___ 个\n- 统计依据（grep 或 outline 方式）: ___\n（若无法精确计数，给出区间估计并说明理由）",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/syscall/syscall.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/syscall/syscall.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/syscall/syscall.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/syscall/syscall.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/syscall/syscall.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '启动/架构与 Trap/系统调用 / Q02_027: Syscall 实现全量统计 (Syscall Coverage Analysis)，请按格式填写：\n- 分发表路径: ___\n- 完整实现 ✅ (implemented): ___ 个\n- 桩/ENOSYS/return 0 🔸 (stub): ___ 个，代表性例子: ___\n- 未注册 ❌ (not_found): ___ 个\n- 统计依据（grep 或 outline 方式）: ___\n（若无法精确计数，给出区间估计并说明理由）\n关键词: Syscall, Coverage, Analysis, ___, implemented, ENOSYS, return, stub' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6275 | 文件: repos\\oskernrl2022-rv6\\syscall\\syscall.c:1-20 | 类型: function_definition | 符号名: syscall\n```\nvoid\nsyscall(void)\n{\n  int num;\n  stru"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_028",
+      "question_type": "short_answer",
+      "stem": "README 与 syscall 声称对照：README 中声称兼容/实现了哪些 syscall 或标准？与代码分发表实际是否一致？（无 README 则写「无 README，仅以代码为准」）",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/syscall/syscall.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/syscall/syscall.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/syscall/syscall.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/syscall/syscall.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/syscall/syscall.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '启动/架构与 Trap/系统调用 / Q02_028: README 与 syscall 声称对照：README 中声称兼容/实现了哪些 syscall 或标准？与代码分发表实际是否一致？（无 README 则写「无 README，仅以代码为准」）\n关键词: README, syscall' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6579 | 文件: repos\\oskernrl2022-rv6\\syscall\\syscall.c:1-20 | 类型: function_definition | 符号名: syscall\n```\nvoid\nsyscall(void)\n{\n  int num;\n  struct proc *p = myproc();\n\n  num = p->trapframe->a7;\n  if(num > 0 && num < NELEM(syscalls) && syscalls[num]) {\n    //printf(\"syscall %d\\n\",num);\n    p->trapframe->a0 = syscalls[nu"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_029",
+      "question_type": "short_answer",
+      "stem": "`_impl` 命名模式搜索结论：grep `_impl\\b|sys_[a-z0-9_]*_impl`，结果是命中了哪些函数（列出），还是「未见该命名模式」？（必须给搜索结论）",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/dev.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '启动/架构与 Trap/系统调用 / Q02_029: `_impl` 命名模式搜索结论：grep `_impl\\b|sys_[a-z0-9_]*_impl`，结果是命中了哪些函数（列出），还是「未见该命名模式」？（必须给搜索结论）\n关键词: _impl, grep, sys_' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5202 | 文件: repos\\oskernrl2022-rv6\\src\\dev.c:67-76 | 类型: function_definition | 符号名: devlookup\n```\nint \ndevlookup(char *name)\n{\n  for(int i = 0;i < NDEV;i++){\n    if(strncmp(name,devsw[i].name,DEV_NAME_MAX+1)==0){\n      return i;\n    }\n  }\n  return -1;\n}\n```\n\n[2] 相似度: 0.4462 | 文件: repos\\oskernrl2022-rv6\\syscall\\syscall.c:1"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_030",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在外部中断（PLIC/APIC 等）的分发处理逻辑？（必须三态；与时钟中断分开作答）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/include/riscv.h",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '启动/架构与 Trap/系统调用 / Q02_030: 是否存在外部中断（PLIC/APIC 等）的分发处理逻辑？（必须三态；与时钟中断分开作答）\n关键词: PLIC, APIC' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5186 | 文件: repos\\oskernrl2022-rv6\\src\\include\\riscv.h:266-270 | 类型: function_definition | 符号名: intr_on\n```\nstatic inline void\nintr_on()\n{\n  w_sstatus(r_sstatus() | SSTATUS_SIE);\n}\n```\n\n[2] 相似度: 0.5130 | 文件: repos\\oskernrl2022-rv6\\src\\proc.c:520-538 | 类型: function_definition | 符号名: sched\n```\nvoid\nsched(void)\n{\n  int intena;\n  struct proc *p = myproc();\n\n  if(!holding(&p-"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/include/riscv.h",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '启动/架构与 Trap/系统调用 / Q02_030: 是否存在外部中断（PLIC/APIC 等）的分发处理逻辑？（必须三态；与时钟中断分开作答）\n关键词: PLIC, APIC' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5186 | 文件: repos\\oskernrl2022-rv6\\src\\include\\riscv.h:266-270 | 类型: function_definition | 符号名: intr_on\n```\nstatic inline void\nintr_on()\n{\n  w_sstatus(r_sstatus() | SSTATUS_SIE);\n}\n```\n\n[2] 相似度: 0.5130 | 文件: repos\\oskernrl2022-rv6\\src\\proc.c:520-538 | 类型: function_definition | 符号名: sched\n```\nvoid\nsched(void)\n{\n  int intena;\n  struct proc *p = myproc();\n\n  if(!holding(&p-"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_031",
+      "question_type": "tri_state_impl",
+      "stem": "非法内存访问时是否向进程发送 SIGSEGV 信号？（必须三态；搜索 SIGSEGV|sig_segv）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/signal.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '启动/架构与 Trap/系统调用 / Q02_031: 非法内存访问时是否向进程发送 SIGSEGV 信号？（必须三态；搜索 SIGSEGV|sig_segv）\n关键词: SIGSEGV, sig_segv' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6042 | 文件: repos\\oskernrl2022-rv6\\src\\signal.c:124-202 | 类型: function_definition | 符号名: sighandle\n```\nvoid sighandle(void) {\n\tstruct proc *p = myproc();\n\n\tint signum = 0;\n\tif (p->killed) {\n\t\tsignum = p->killed;\n\n\t\tconst int len = sizeof(unsigned long) * 8;\n\t\tint i = (unsigned long)(p->killed) / len;\n\t\tint bit = (unsigned long)(p->killed) % len;\n\t\tp->sig_pe"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/signal.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '启动/架构与 Trap/系统调用 / Q02_031: 非法内存访问时是否向进程发送 SIGSEGV 信号？（必须三态；搜索 SIGSEGV|sig_segv）\n关键词: SIGSEGV, sig_segv' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6042 | 文件: repos\\oskernrl2022-rv6\\src\\signal.c:124-202 | 类型: function_definition | 符号名: sighandle\n```\nvoid sighandle(void) {\n\tstruct proc *p = myproc();\n\n\tint signum = 0;\n\tif (p->killed) {\n\t\tsignum = p->killed;\n\n\t\tconst int len = sizeof(unsigned long) * 8;\n\t\tint i = (unsigned long)(p->killed) / len;\n\t\tint bit = (unsigned long)(p->killed) % len;\n\t\tp->sig_pe"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_032",
+      "question_type": "short_answer",
+      "stem": "信号发送支持哪些粒度？（搜索 sys_kill/sys_tkill/sys_tgkill；分别是进程级/线程级/进程组级；列出已实现的与其证据）",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/syssig.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '启动/架构与 Trap/系统调用 / Q02_032: 信号发送支持哪些粒度？（搜索 sys_kill/sys_tkill/sys_tgkill；分别是进程级/线程级/进程组级；列出已实现的与其证据）\n关键词: sys_kill, sys_tkill, sys_tgkill' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6272 | 文件: repos\\oskernrl2022-rv6\\src\\syssig.c:102-110 | 类型: function_definition | 符号名: sys_tgkill\n```\nuint64 sys_tgkill(){\n  int sig;\n  int tid;\n  int pid;\n  argint(0,&pid);\n  argint(1,&tid);\n  argint(2,&sig);\n  return tgkill(pid,tid,sig);\n}\n```\n\n[2] 相似度: 0.6133 | 文件: repos\\oskernrl2022-rv6\\src\\syssig.c:94-100 | 类型: funct"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/syssig.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '启动/架构与 Trap/系统调用 / Q02_032: 信号发送支持哪些粒度？（搜索 sys_kill/sys_tkill/sys_tgkill；分别是进程级/线程级/进程组级；列出已实现的与其证据）\n关键词: sys_kill, sys_tkill, sys_tgkill' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6272 | 文件: repos\\oskernrl2022-rv6\\src\\syssig.c:102-110 | 类型: function_definition | 符号名: sys_tgkill\n```\nuint64 sys_tgkill(){\n  int sig;\n  int tid;\n  int pid;\n  argint(0,&pid);\n  argint(1,&tid);\n  argint(2,&sig);\n  return tgkill(pid,tid,sig);\n}\n```\n\n[2] 相似度: 0.6133 | 文件: repos\\oskernrl2022-rv6\\src\\syssig.c:94-100 | 类型: funct"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_033",
+      "question_type": "single_choice",
+      "stem": "中断 (Interrupt)、异常 (Exception/Fault/Trap) 的区分机制更接近哪种？（Stallings Ch5；即 trap handler 如何区分「外部中断」与「同步异常」）",
+      "value": "未发现显式区分机制",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/trap.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '启动/架构与 Trap/系统调用 / Q02_033: 中断 (Interrupt)、异常 (Exception/Fault/Trap) 的区分机制更接近哪种？（Stallings Ch5；即 trap handler 如何区分「外部中断」与「同步异常」）\n关键词: Interrupt, Exception, Fault, Trap, Stallings, Ch5, handler' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6397 | 文件: repos\\oskernrl2022-rv6\\src\\trap.c:176-209 | 类型: function_definition | 符号名: kerneltrap\n```\nvoid \nkerneltrap() {\n  int which_dev = 0;\n  uint64 sepc = r_sepc();\n  uint64 sstatus = r_sstatus();\n  uint64 scause = r_scause();\n\n  // printf(\"kerneltrap scause:%p\\n\","
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_034",
+      "question_type": "tri_state_impl",
+      "stem": "是否支持中断嵌套 (Nested Interrupt / Interrupt Nesting, Stallings Ch5)？（必须三态；搜索 enable_irq_in_handler / nested_irq / 中断处理时是否重开中断；若 not_found 需说明是否关中断运行整个 handler）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/trap.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '启动/架构与 Trap/系统调用 / Q02_034: 是否支持中断嵌套 (Nested Interrupt / Interrupt Nesting, Stallings Ch5)？（必须三态；搜索 enable_irq_in_handler / nested_irq / 中断处理时是否重开中断；若 not_found 需说明是否关中断运行整个 handler）\n关键词: Nested, Interrupt, Nesting, Stallings, Ch5, enable_irq_in_handler, nested_irq, not_found' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5964 | 文件: repos\\oskernrl2022-rv6\\src\\trap.c:216-260 | 类型: function_definition | 符号名: devintr\n```\nint devintr(void) {\n\tuint64 scause = r_scause();\n\t//printf(\"devintr scause:%p\\n\",scause"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/trap.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '启动/架构与 Trap/系统调用 / Q02_034: 是否支持中断嵌套 (Nested Interrupt / Interrupt Nesting, Stallings Ch5)？（必须三态；搜索 enable_irq_in_handler / nested_irq / 中断处理时是否重开中断；若 not_found 需说明是否关中断运行整个 handler）\n关键词: Nested, Interrupt, Nesting, Stallings, Ch5, enable_irq_in_handler, nested_irq, not_found' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5964 | 文件: repos\\oskernrl2022-rv6\\src\\trap.c:216-260 | 类型: function_definition | 符号名: devintr\n```\nint devintr(void) {\n\tuint64 scause = r_scause();\n\t//printf(\"devintr scause:%p\\n\",scause"
+        }
+      ]
+    }
+  ]
+}

@@ -44,6 +44,68 @@
 1. 🧭 **Plan**：每章生成结构化 `PlanSpec`（`seed_paths`、`must_cover`、`entry_symbols` 等），并锁定 **`execution_steps`**（4～8 条短句）；Execute **须按该顺序**调工具与收束正文（见 `render_plan_context` + `STAGE_EXECUTION_CONTRACT`）。
 2. 🧠 **Execute**：ReAct Agent 做证据搜集与章节 Markdown；可抽取 `evidence_index` / `claim_map` 供内存侧逻辑参考；章节正文写入 `sections/*.md`，计划写入 `_per_stage/{stage_id}_plan.json`。
 
+**v4.1 可选：OS-Agent D Multi-Agent 图模式（实验性）**
+
+默认仍使用上面的串行 Plan→Execute→Review 流水线；如需启用 Multi-Agent 图模式，可使用命令行开关或 `.env`：
+
+```bash
+conda run -n os_agent python os_agent_d_describe.py --multi-agent
+```
+
+或：
+
+```env
+OS_AGENT_D_MULTI_AGENT=1
+```
+
+Multi-Agent 模式采用 **程序化 Supervisor + LangChain 节点 Agent + 结构化证据黑板**：
+
+- **Supervisor / Repo Profile / Task Builder / Evidence Verifier / Publisher**：程序节点，负责调度、状态、断点、证据校验和产物写入。
+- **Planner Agent**：沿用现有 `PlanSpec`，为每个 stage 锁定 seed paths、entry symbols 和执行方向。
+- **Task Agents**：按题目拆分为 RAG 定位、LSP 定义/调用图、代码证据、构建平台、Git 历史等小任务。
+- **Stage Writer Agent**：默认不再自由查源码，而是按 `question_id` 使用已绑定证据逐题生成 JSON-QA 或 Markdown。
+- **Review Agent**：默认无源码工具，只读审计题单、答案 JSON 与 evidence 摘要；低分时生成 fix task，再交回 Task Agent 补证据。
+
+并行调度策略：
+
+- `02_boot_trap` 到 `09_debug_error` 以及 `10_history` 可并行执行。
+- `01_overview` 必须等待 02–10 全部完成后串行执行。
+- Stage/task 并行、LLM API 并发、LSP/RAG 资源并发分别限流，避免把 `stage 并行 × task 并行` 直接放大成 API 并发。
+
+`.env` 中的核心开关：
+
+```env
+OS_AGENT_D_MULTI_AGENT=0
+OS_AGENT_MAX_PARALLEL_STAGES=2
+OS_AGENT_MAX_PARALLEL_TASKS_PER_STAGE=3
+OS_AGENT_MAX_PARALLEL_LLM_CALLS=2
+OS_AGENT_MAX_PARALLEL_LSP_TASKS=1
+OS_AGENT_MAX_PARALLEL_RAG_TASKS=3
+OS_AGENT_MAX_REVIEW_FIX_ROUNDS=2
+OS_AGENT_MAX_TASK_RETRIES=2
+# OS_AGENT_FORCE_STAGES=
+OS_AGENT_TERMINAL_MODE=compact
+OS_AGENT_EVENT_PREVIEW_CHARS=180
+```
+
+断点与事件产物写入 `output/<repo>/_agent_state/`：
+
+```text
+_agent_state/
+├── run_state.json
+├── graph_state.json
+├── evidence_store.jsonl
+├── events.jsonl
+├── stages/
+├── tasks/
+├── reviews/
+└── locks/
+```
+
+Multi-Agent 终端输出 v1 仅支持 `compact` / `verbose` / `silent` 事件流；Dashboard 暂缓。并行节点不会直接 `print()`，而是写入 `events.jsonl` 并由事件 renderer 摘要显示，避免并发输出交错。
+
+Multi-Agent 完成后会额外生成 `handoff_to_c.json`，供 OS-Agent C 粗筛优先读取 D 的章节质量、证据摘要与交接信息；缺失时 C 仍回退到原有 `sections/` 流程。
+
 **v4.0 受限外部背景补充**
 
 - 新增 `web_search` 工具，但**默认关闭**。
