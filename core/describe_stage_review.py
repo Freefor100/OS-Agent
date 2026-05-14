@@ -52,12 +52,13 @@ def build_stage_qa_question_sheet(stage_id: str, stage_title: str) -> str:
         lines.append(f"### {qid}（{qtype}）\n\n{stem}\n\n")
         choices = q.get("choices")
         if isinstance(choices, list) and choices:
-            lines.append("**choices**:\n")
+            lines.append("**choices**（前缀 A/B/C/D 仅为显示标签；答案 `value` 应使用选项原文，不必包含字母前缀）:\n")
             for i, c in enumerate(choices[:12]):
                 label = chr(ord("A") + i) if i < 26 else str(i)
                 lines.append(f"- {label}. {str(c).strip()}\n")
             if len(choices) > 12:
                 lines.append(f"- …（共 {len(choices)} 项）\n")
+            lines.append(f"\n**valid value texts**: {json.dumps([str(c).strip() for c in choices], ensure_ascii=False)}\n")
             lines.append("\n")
     return "".join(lines)
 
@@ -105,24 +106,26 @@ def coerce_review_payload(
     if not isinstance(raw_list, list):
         raw_list = data.get("per_question_reviews") or data.get("questions_review") or []
 
-    by_id: Dict[str, Tuple[Any, Any, str]] = {}
+    by_id: Dict[str, Tuple[Any, Any, str, Dict[str, Any]]] = {}
     for item in raw_list:
         parsed = _normalize_one_question_review(item)
         if not parsed:
             continue
         qid, se, sc, rev = parsed
-        by_id[qid] = (se, sc, rev)
+        fix_hints = item.get("fix_hints") if isinstance(item, dict) and isinstance(item.get("fix_hints"), dict) else {}
+        by_id[qid] = (se, sc, rev, fix_hints)
 
     question_reviews: List[Dict[str, Any]] = []
     for qid in expected_question_ids:
         if qid in by_id:
-            se, sc, rev = by_id[qid]
+            se, sc, rev, fix_hints = by_id[qid]
             question_reviews.append(
                 {
                     "question_id": qid,
                     "score_evidence": se,
                     "score_consistency": sc,
                     "review": rev if rev else "（审计输出中本题为空白评审）",
+                    "fix_hints": fix_hints,
                 }
             )
         else:

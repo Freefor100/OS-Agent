@@ -58,13 +58,14 @@ conda run -n os_agent python os_agent_d_describe.py --multi-agent
 OS_AGENT_D_MULTI_AGENT=1
 ```
 
-Multi-Agent 模式采用 **程序化 Supervisor + LangChain 节点 Agent + 结构化证据黑板**：
+Multi-Agent 模式采用 **程序化 Supervisor + LLM ReAct Task Agents + 结构化证据黑板**：
 
 - **Supervisor / Repo Profile / Task Builder / Evidence Verifier / Publisher**：程序节点，负责调度、状态、断点、证据校验和产物写入。
-- **Planner Agent**：沿用现有 `PlanSpec`，为每个 stage 锁定 seed paths、entry symbols 和执行方向。
-- **Task Agents**：按题目拆分为 RAG 定位、LSP 定义/调用图、代码证据、构建平台、Git 历史等小任务。
-- **Stage Writer Agent**：默认不再自由查源码，而是按 `question_id` 使用已绑定证据逐题生成 JSON-QA 或 Markdown。
-- **Review Agent**：默认无源码工具，只读审计题单、答案 JSON 与 evidence 摘要；低分时生成 fix task，再交回 Task Agent 补证据。
+- **Stage Plan Agent**：基于题单、`PlanSpec` 和 repo profile 生成 grouped `task_plan[]`；相近题可以合并到一个 task。
+- **Task Builder**：程序校验 Plan Agent 的任务，修正非法 `question_ids`、去重、限流；缺计划时回退到规则任务。
+- **Task ReAct Agents**：每个 task 都是受限工具集的小 ReAct Agent，主动调用 RAG/LSP/read/build/git 工具查证据，并产出 `evidence` + `draft_answers`。
+- **Stage Assembler Agent**：不从零查源码，只消费 task 草稿与绑定证据，逐题统一格式、去重、修正过度表述。
+- **Review Agent**：默认无源码工具，只读审计题单、最终答案 JSON 与 evidence 摘要；重点检查回答 claim 是否被证据支撑，低分时生成 fix task，再交回 Task Agent 补证据。
 
 并行调度策略：
 
@@ -83,6 +84,13 @@ OS_AGENT_MAX_PARALLEL_LSP_TASKS=1
 OS_AGENT_MAX_PARALLEL_RAG_TASKS=3
 OS_AGENT_MAX_REVIEW_FIX_ROUNDS=2
 OS_AGENT_MAX_TASK_RETRIES=2
+OS_AGENT_TASK_PLANNER_MODE=llm_fallback
+OS_AGENT_TASK_AGENT_MODE=react
+OS_AGENT_MAX_QUESTIONS_PER_TASK=4
+OS_AGENT_MAX_TASKS_PER_STAGE_TOTAL=80
+OS_AGENT_TASK_AGENT_MAX_STEPS=10
+OS_AGENT_TASK_OUTPUT_MODE=evidence_and_draft
+OS_AGENT_STAGE_WRITER_MODE=assembler
 # OS_AGENT_FORCE_STAGES=
 OS_AGENT_TERMINAL_MODE=compact
 OS_AGENT_EVENT_PREVIEW_CHARS=180
@@ -95,7 +103,9 @@ _agent_state/
 ├── run_state.json
 ├── graph_state.json
 ├── evidence_store.jsonl
+├── draft_answer_store.jsonl
 ├── events.jsonl
+├── assembler/
 ├── stages/
 ├── tasks/
 ├── reviews/

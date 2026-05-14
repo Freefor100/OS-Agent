@@ -5,9 +5,11 @@ import re
 import uuid
 import io
 from contextlib import redirect_stderr, redirect_stdout
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
-from core.agent_graph_state import EvidenceRecord, TaskResult, TaskSpec
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+
+from core.agent_graph_state import DraftAnswerRecord, EvidenceRecord, TaskResult, TaskSpec
 from core.evidence_verifier import verify_evidence
 
 
@@ -81,6 +83,13 @@ def _first_existing_source_file(repo_path: str, seeds: List[str]) -> str:
     return ""
 
 
+def _task_question_ids(task: TaskSpec) -> List[str]:
+    qids = list(task.question_ids or [])
+    if task.question_id and task.question_id not in qids:
+        qids.insert(0, task.question_id)
+    return [str(q).strip() for q in qids if str(q).strip()]
+
+
 def _make_evidence(
     *,
     task: TaskSpec,
@@ -97,7 +106,7 @@ def _make_evidence(
     rec = EvidenceRecord(
         evidence_id=f"ev_{task.task_id}_{uuid.uuid4().hex[:8]}",
         stage_id=task.stage_id,
-        question_ids=[task.question_id] if task.question_id else [],
+        question_ids=_task_question_ids(task),
         task_id=task.task_id,
         path=path,
         source_type=source_type,
@@ -109,7 +118,20 @@ def _make_evidence(
     return verify_evidence(rec, repo_path=repo_path)
 
 
-def run_task_agent(task: TaskSpec, *, repo_path: str) -> Tuple[TaskResult, List[EvidenceRecord]]:
+def run_task_agent(task: TaskSpec, *, repo_path: str) -> Tuple[TaskResult, List[EvidenceRecord], List[DraftAnswerRecord]]:
+    mode = (os.environ.get("OS_AGENT_TASK_AGENT_MODE") or "react").strip().lower()
+    if mode not in {"tool", "tools", "program"}:
+        result, records, drafts = _run_react_task_agent(task, repo_path=repo_path)
+        if result.status == "done" or mode in {"react_only", "llm_only"}:
+            return result, records, drafts
+    result, records = _run_tool_task_agent(task, repo_path=repo_path)
+    drafts = _drafts_from_tool_result(task, records)
+    result.draft_answer_ids = [d.draft_answer_id for d in drafts]
+    result.metadata["mode"] = "tool_fallback" if mode not in {"tool", "tools", "program"} else "tool"
+    return result, records, drafts
+
+
+def _run_tool_task_agent(task: TaskSpec, *, repo_path: str) -> Tuple[TaskResult, List[EvidenceRecord]]:
     try:
         if task.task_type in {"discovery", "implementation_state"}:
             return _run_rag_task(task, repo_path=repo_path)
@@ -126,12 +148,234 @@ def run_task_agent(task: TaskSpec, *, repo_path: str) -> Tuple[TaskResult, List[
                 task_id=task.task_id,
                 stage_id=task.stage_id,
                 question_id=task.question_id,
+                question_ids=_task_question_ids(task),
                 status="failed",
                 errors=[f"{type(exc).__name__}: {exc}"],
                 confidence="low",
             ),
             [],
         )
+
+
+def _run_react_task_agent(task: TaskSpec, *, repo_path: str) -> Tuple[TaskResult, List[EvidenceRecord], List[DraftAnswerRecord]]:
+    from core.agent_builder import build_task_agent, get_task_agent_tools
+    from core.per_llm_stages import extract_json_object
+
+    max_steps = _env_int("OS_AGENT_TASK_AGENT_MAX_STEPS", 10)
+    tool_names = [getattr(t, "name", getattr(t, "__name__", "")) for t in get_task_agent_tools(task.task_type, task.stage_id)]
+    prompt = _react_task_prompt(task, repo_path=repo_path, tool_names=tool_names)
+    try:
+        agent = build_task_agent(task_type=task.task_type, stage_id=task.stage_id)
+        final_state = agent.invoke(
+            {"messages": [SystemMessage(content=_TASK_AGENT_SYSTEM), HumanMessage(content=prompt)]},
+            config={"recursion_limit": max(6, max_steps + 6)},
+        )
+        text = _last_ai_text(final_state)
+        parsed = extract_json_object(text) or {}
+        if not parsed:
+            raise ValueError("Task Agent did not return parseable JSON")
+        records = _records_from_react_output(task, repo_path, parsed)
+        drafts = _drafts_from_react_output(task, parsed, records)
+        result = _result_from_records(task, records)
+        result.draft_answer_ids = [d.draft_answer_id for d in drafts]
+        result.findings = parsed.get("open_issues") if isinstance(parsed.get("open_issues"), list) else []
+        result.metadata.update(
+            {
+                "mode": "react",
+                "summary": str(parsed.get("summary") or "")[:1000],
+                "raw_output_excerpt": text[:2000],
+            }
+        )
+        return result, records, drafts
+    except Exception as exc:
+        return (
+            TaskResult(
+                task_id=task.task_id,
+                stage_id=task.stage_id,
+                question_id=task.question_id,
+                question_ids=_task_question_ids(task),
+                status="failed",
+                errors=[f"{type(exc).__name__}: {exc}"],
+                confidence="low",
+                metadata={"mode": "react"},
+            ),
+            [],
+            [],
+        )
+
+
+_TASK_AGENT_SYSTEM = """你是 OS-Agent D 的 question-bound Task ReAct Agent。
+你负责一个小任务或一组相近题。你必须主动使用工具查证据，然后输出结构化 JSON。
+
+硬性要求：
+- 可以思考和调用工具，但最终回复必须只包含一个 JSON 对象。
+- 不直接写最终章节，只输出 evidence 和 draft_answers。
+- 每个关键结论必须有 used_evidence_ids。
+- 证据不足时明确 status=blocked 或 draft value 写 not_found/待核实。
+- 不要编造路径、行号、符号名；无法确认就写 open_issues。
+"""
+
+
+def _react_task_prompt(task: TaskSpec, *, repo_path: str, tool_names: List[str]) -> str:
+    qids = _task_question_ids(task)
+    return (
+        f"repo_path: {repo_path}\n"
+        f"stage_id: {task.stage_id}\n"
+        f"task_id: {task.task_id}\n"
+        f"question_ids: {qids}\n"
+        f"task_type: {task.task_type}\n"
+        f"task_goal: {task.task_goal or task.query}\n"
+        f"query: {task.query}\n"
+        f"seed_paths: {task.seed_paths}\n"
+        f"entry_symbols: {task.entry_symbols}\n"
+        f"expected_evidence_types: {task.expected_evidence_types}\n"
+        f"available_tools: {tool_names}\n\n"
+        "请用工具查证后输出如下 JSON（不要 Markdown 围栏）：\n"
+        "{\n"
+        '  "status": "done|blocked|failed",\n'
+        '  "summary": "简短说明查到了什么",\n'
+        '  "evidence": [\n'
+        "    {\n"
+        '      "evidence_type": "definition|implementation_body|call_site|search|build_config|git_history|other",\n'
+        '      "question_ids": ["Qxx_001"],\n'
+        '      "path": "repo-relative/path",\n'
+        '      "line_start": 1,\n'
+        '      "line_end": 20,\n'
+        '      "symbol": "optional_symbol",\n'
+        '      "claim": "这条证据能支撑的最小事实",\n'
+        '      "snippet": "关键摘录，不超过 1200 字"\n'
+        "    }\n"
+        "  ],\n"
+        '  "draft_answers": [\n'
+        "    {\n"
+        '      "question_id": "Qxx_001",\n'
+        '      "value": "草稿答案或枚举值",\n'
+        '      "used_evidence_ids": ["可留空，系统会用本 task evidence 补齐"],\n'
+        '      "confidence": "high|medium|low",\n'
+        '      "notes": "可选"\n'
+        "    }\n"
+        "  ],\n"
+        '  "open_issues": []\n'
+        "}\n"
+    )
+
+
+def _last_ai_text(final_state: Any) -> str:
+    messages = []
+    if isinstance(final_state, dict):
+        messages = final_state.get("messages") or []
+    text = ""
+    for msg in reversed(messages):
+        if isinstance(msg, AIMessage):
+            content = getattr(msg, "content", "") or ""
+            tool_calls = getattr(msg, "tool_calls", None) or []
+            if content and not tool_calls:
+                return str(content).strip()
+            if content and not text:
+                text = str(content).strip()
+    return text
+
+
+def _records_from_react_output(task: TaskSpec, repo_path: str, parsed: Dict[str, Any]) -> List[EvidenceRecord]:
+    records: List[EvidenceRecord] = []
+    for item in parsed.get("evidence", []) if isinstance(parsed.get("evidence"), list) else []:
+        if not isinstance(item, dict):
+            continue
+        qids = item.get("question_ids") if isinstance(item.get("question_ids"), list) else _task_question_ids(task)
+        excerpt = str(item.get("snippet") or item.get("excerpt") or item.get("claim") or "").strip()
+        if len(excerpt) > 1800:
+            excerpt = excerpt[:1800] + "\n... [truncated]"
+        rec = EvidenceRecord(
+            evidence_id=f"ev_{task.task_id}_{uuid.uuid4().hex[:8]}",
+            stage_id=task.stage_id,
+            question_ids=[str(q).strip() for q in qids if str(q).strip()],
+            task_id=task.task_id,
+            path=_safe_rel_path(repo_path, str(item.get("path") or "")),
+            symbol=str(item.get("symbol") or "") or None,
+            line_start=_safe_int(item.get("line_start")),
+            line_end=_safe_int(item.get("line_end")),
+            source_type=str(item.get("source_type") or "source_code"),
+            evidence_type=str(item.get("evidence_type") or "search"),
+            tool_name="task_react_agent",
+            excerpt=excerpt,
+            notes=str(item.get("claim") or ""),
+            metadata={"query": task.query, "task_goal": task.task_goal},
+        )
+        records.append(verify_evidence(rec, repo_path=repo_path))
+    return records
+
+
+def _drafts_from_react_output(task: TaskSpec, parsed: Dict[str, Any], records: List[EvidenceRecord]) -> List[DraftAnswerRecord]:
+    by_qid: Dict[str, List[str]] = {}
+    for rec in records:
+        for qid in rec.question_ids:
+            by_qid.setdefault(qid, []).append(rec.evidence_id)
+    drafts: List[DraftAnswerRecord] = []
+    for item in parsed.get("draft_answers", []) if isinstance(parsed.get("draft_answers"), list) else []:
+        if not isinstance(item, dict):
+            continue
+        qid = str(item.get("question_id") or "").strip()
+        if not qid:
+            continue
+        used = [str(x) for x in item.get("used_evidence_ids", [])] if isinstance(item.get("used_evidence_ids"), list) else []
+        if not used:
+            used = by_qid.get(qid, [])
+        answer = dict(item)
+        answer.setdefault("question_id", qid)
+        drafts.append(
+            DraftAnswerRecord(
+                draft_answer_id=f"draft_{task.task_id}_{qid}_{uuid.uuid4().hex[:8]}",
+                task_id=task.task_id,
+                stage_id=task.stage_id,
+                question_id=qid,
+                answer=answer,
+                used_evidence_ids=used,
+                confidence=str(item.get("confidence") or "low"),
+                notes=str(item.get("notes") or ""),
+            )
+        )
+    return drafts
+
+
+def _drafts_from_tool_result(task: TaskSpec, records: List[EvidenceRecord]) -> List[DraftAnswerRecord]:
+    drafts: List[DraftAnswerRecord] = []
+    by_qid: Dict[str, List[str]] = {}
+    for rec in records:
+        for qid in rec.question_ids:
+            by_qid.setdefault(qid, []).append(rec.evidence_id)
+    for qid in _task_question_ids(task):
+        evidence_ids = by_qid.get(qid, [r.evidence_id for r in records])
+        drafts.append(
+            DraftAnswerRecord(
+                draft_answer_id=f"draft_{task.task_id}_{qid}_{uuid.uuid4().hex[:8]}",
+                task_id=task.task_id,
+                stage_id=task.stage_id,
+                question_id=qid,
+                answer={
+                    "question_id": qid,
+                    "value": "待核实：Task Agent 已收集证据，需由 Assembler 结合题面整理。",
+                    "used_evidence_ids": evidence_ids,
+                },
+                used_evidence_ids=evidence_ids,
+                confidence="medium" if evidence_ids else "low",
+                notes="programmatic tool fallback draft",
+            )
+        )
+    return drafts
+
+
+def _safe_int(value: Any) -> Optional[int]:
+    try:
+        return int(value)
+    except Exception:
+        return None
+
+
+def _env_int(name: str, default: int) -> int:
+    try:
+        return max(1, int((os.environ.get(name) or "").strip() or default))
+    except ValueError:
+        return default
 
 
 def _run_rag_task(task: TaskSpec, *, repo_path: str) -> Tuple[TaskResult, List[EvidenceRecord]]:
@@ -284,6 +528,7 @@ def _result_from_records(task: TaskSpec, records: List[EvidenceRecord]) -> TaskR
         task_id=task.task_id,
         stage_id=task.stage_id,
         question_id=task.question_id,
+        question_ids=_task_question_ids(task),
         status="done" if valid else "failed",
         evidence_ids=[r.evidence_id for r in records],
         confidence=confidence,

@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import json
 import os
+import re
 import sys
 import threading
 import time
@@ -14,7 +15,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from langchain_core.messages import HumanMessage
 
 from core.agent_events import EventLogger
-from core.agent_graph_state import DescribeGraphState, EvidenceRecord, TaskResult, TaskSpec, utcnow_iso
+from core.agent_graph_state import DescribeGraphState, DraftAnswerRecord, EvidenceRecord, TaskResult, TaskSpec, utcnow_iso
 from core.agent_locks import FileLock, lock_path, named_thread_lock
 from core.describe_json_qa import (
     SCHEMA_VERSION as JSON_QA_SCHEMA_VERSION,
@@ -34,11 +35,13 @@ from core.describe_stage_review import (
     write_review_score_json,
 )
 from core.evidence_store import EvidenceStore
+from core.draft_answer_store import DraftAnswerStore
 from core.handoff_to_c import emit_handoff_to_c
 from core.per_planner import build_repo_profile, ensure_execution_steps, plan_stage
+from core.per_llm_stages import extract_json_object
 from core.per_types import StageState
 from core.task_agents import run_task_agent
-from core.task_builder import build_tasks_for_stage
+from core.task_builder import build_tasks_for_stage, build_tasks_from_llm_plan
 from core.utils import repo_name_from_url
 
 
@@ -113,8 +116,88 @@ def _questions_for_stage(stage_id: str) -> Tuple[List[Dict[str, Any]], List[str]
     return questions, list_question_ids(qa)
 
 
+def _group_evidence_records(records: List[EvidenceRecord], stage_id: str = "") -> Dict[str, List[EvidenceRecord]]:
+    grouped: Dict[str, List[EvidenceRecord]] = {}
+    for rec in records:
+        if stage_id and rec.stage_id != stage_id:
+            continue
+        for qid in rec.question_ids or [""]:
+            grouped.setdefault(qid, []).append(rec)
+    return grouped
+
+
+def _curate_grouped_evidence(grouped: Dict[str, List[EvidenceRecord]]) -> Dict[str, List[EvidenceRecord]]:
+    curated: Dict[str, List[EvidenceRecord]] = {}
+    rank = {"high": 3, "medium": 2, "low": 1}
+    for qid, records in grouped.items():
+        kept = [
+            r
+            for r in records
+            if (r.validity != "invalid" and not _is_bad_negative_search_evidence(r))
+            or _is_good_negative_search_evidence(r)
+        ]
+        if not kept:
+            kept = list(records)
+        seen = set()
+        deduped: List[EvidenceRecord] = []
+        for rec in sorted(
+            kept,
+            key=lambda r: (
+                rank.get(r.confidence, 0),
+                float(r.verifier_score or 0.0),
+                1 if r.path else 0,
+            ),
+            reverse=True,
+        ):
+            key = (rec.path, rec.evidence_type, (rec.excerpt or "")[:160])
+            if key in seen:
+                continue
+            seen.add(key)
+            deduped.append(rec)
+        curated[qid] = deduped
+    return curated
+
+
+def _is_bad_negative_search_evidence(record: EvidenceRecord) -> bool:
+    text = (record.excerpt or "").lower()
+    return any(
+        bad in text
+        for bad in (
+            "notes|not_found",
+            "notes, not_found",
+            "notes not_found",
+        )
+    )
+
+
+def _is_good_negative_search_evidence(record: EvidenceRecord) -> bool:
+    text = (record.excerpt or "").lower()
+    return (
+        ("未找到匹配" in text or "no matches" in text or "no results" in text)
+        and ("已搜索" in text or "searched" in text)
+        and not _is_bad_negative_search_evidence(record)
+    )
+
+
 def _stage_by_id(stages: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
     return {str(s.get("id")): s for s in stages}
+
+
+def _list_str(value: Any, limit: int) -> List[str]:
+    if not isinstance(value, list):
+        return []
+    return _dedupe_str([str(x).strip() for x in value if str(x).strip()])[:limit]
+
+
+def _dedupe_str(items: List[str]) -> List[str]:
+    seen = set()
+    out: List[str] = []
+    for item in items:
+        key = item.lower()
+        if key not in seen:
+            seen.add(key)
+            out.append(item)
+    return out
 
 
 class MultiAgentRuntime:
@@ -129,6 +212,7 @@ class MultiAgentRuntime:
         self.run_id = self._load_or_create_run_id()
         self.events = EventLogger(self.run_id, self.state_dir)
         self.evidence_store = EvidenceStore(os.path.join(self.state_dir, "evidence_store.jsonl"))
+        self.draft_store = DraftAnswerStore(os.path.join(self.state_dir, "draft_answer_store.jsonl"))
         self.max_parallel_stages = _env_int("OS_AGENT_MAX_PARALLEL_STAGES", 2)
         self.max_parallel_tasks = _env_int("OS_AGENT_MAX_PARALLEL_TASKS_PER_STAGE", 3)
         self.llm_semaphore = threading.BoundedSemaphore(_env_int("OS_AGENT_MAX_PARALLEL_LLM_CALLS", 2))
@@ -143,6 +227,7 @@ class MultiAgentRuntime:
         }
         os.makedirs(os.path.join(self.state_dir, "stages"), exist_ok=True)
         os.makedirs(os.path.join(self.state_dir, "tasks"), exist_ok=True)
+        os.makedirs(os.path.join(self.state_dir, "assembler"), exist_ok=True)
         os.makedirs(os.path.join(self.state_dir, "reviews"), exist_ok=True)
         os.makedirs(os.path.join(self.repo_output_dir, "sections"), exist_ok=True)
         os.makedirs(os.path.join(self.repo_output_dir, "_per_stage"), exist_ok=True)
@@ -181,6 +266,12 @@ class MultiAgentRuntime:
 
     def _stage_status(self, stage_id: str) -> str:
         return str(_load_json(self._stage_state_path(stage_id)).get("status") or "")
+
+    def _group_records_by_question(self, stage_id: str, records: List[EvidenceRecord]) -> Dict[str, List[EvidenceRecord]]:
+        return _curate_grouped_evidence(_group_evidence_records(records, stage_id))
+
+    def _store_evidence_by_question(self, stage_id: str) -> Dict[str, List[EvidenceRecord]]:
+        return _curate_grouped_evidence(self.evidence_store.grouped_by_question(stage_id))
 
     def run(self) -> None:
         self.events.emit("run_start", f"OS-Agent D Multi-Agent start repo={self.repo_name}")
@@ -261,6 +352,9 @@ class MultiAgentRuntime:
             return
         self.events.emit("stage_start", title, stage_id=stage_id)
         questions, expected_question_ids = _questions_for_stage(stage_id)
+        if self._stage_status(stage_id) == "blocked" and stage_id not in self.force_stages and questions:
+            self._resume_blocked_stage(stage_id, title, stage, questions, expected_question_ids)
+            return
         stage_state = StageState(
             stage_id=stage_id,
             stage_title=title,
@@ -268,16 +362,51 @@ class MultiAgentRuntime:
             stage_prompt=str(stage.get("prompt") or ""),
         )
         stage_state.plan = ensure_execution_steps(plan_stage(stage_state, repo_profile=repo_profile, global_memory={}))
+        task_plan_overlay = self._run_stage_plan_agent(stage_id, title, questions, stage_state.plan, repo_profile)
+        if isinstance(task_plan_overlay, dict):
+            stage_state.dynamic_context["llm_task_plan"] = task_plan_overlay.get("task_plan") or []
         _atomic_save_json(
             os.path.join(self.repo_output_dir, "_per_stage", f"{stage_id}_plan.json"),
-            stage_state.plan.to_dict(),
+            {**stage_state.plan.to_dict(), "task_plan": stage_state.dynamic_context.get("llm_task_plan", [])},
         )
-        tasks = build_tasks_for_stage(stage_id=stage_id, stage_title=title, questions=questions, plan=stage_state.plan)
-        task_results, records = self._run_tasks(stage_id, tasks, force=stage_id in self.force_stages)
+        tasks = build_tasks_from_llm_plan(
+            stage_id=stage_id,
+            stage_title=title,
+            questions=questions,
+            plan=stage_state.plan,
+            llm_task_plan=stage_state.dynamic_context.get("llm_task_plan", []),
+        )
+        task_results, records, drafts = self._run_tasks(stage_id, tasks, force=stage_id in self.force_stages)
         for rec in records:
             self.evidence_store.append(rec)
-        evidence_by_question = self.evidence_store.grouped_by_question(stage_id)
-        payload, markdown = self._write_stage(stage_id, title, questions, expected_question_ids, evidence_by_question)
+        for draft in drafts:
+            self.draft_store.append(draft)
+        force_stage = stage_id in self.force_stages
+        evidence_by_question = self._group_records_by_question(stage_id, records) if force_stage else self._store_evidence_by_question(stage_id)
+        precheck: Dict[str, Any] = {}
+        if questions:
+            precheck_round = 0
+            precheck = self._assembler_precheck(stage_id, title, questions, evidence_by_question)
+            while precheck.get("status") == "blocked" and precheck_round < self.max_review_fix_rounds:
+                precheck_round += 1
+                self.events.emit("assembler_fix_start", f"round={precheck_round}", stage_id=stage_id, agent_name="stage_assembler")
+                precheck_tasks = self._build_precheck_fix_tasks(stage_id, title, precheck, questions)
+                if not precheck_tasks:
+                    break
+                pre_results, pre_records, pre_drafts = self._run_tasks(stage_id, precheck_tasks)
+                task_results.extend(pre_results)
+                records.extend(pre_records)
+                drafts.extend(pre_drafts)
+                for rec in pre_records:
+                    self.evidence_store.append(rec)
+                for draft in pre_drafts:
+                    self.draft_store.append(draft)
+                evidence_by_question = self._group_records_by_question(stage_id, records) if force_stage else self._store_evidence_by_question(stage_id)
+                precheck = self._assembler_precheck(stage_id, title, questions, evidence_by_question)
+        if questions:
+            payload, markdown = self._assemble_stage(stage_id, title, questions, expected_question_ids, evidence_by_question)
+        else:
+            payload, markdown = self._write_stage(stage_id, title, questions, expected_question_ids, evidence_by_question)
         section_path = _section_path(self.repo_output_dir, stage_id, title)
         if markdown and not stage.get("skip_in_report", False):
             with FileLock(lock_path(self.state_dir, "output_write")):
@@ -291,25 +420,35 @@ class MultiAgentRuntime:
             fix_tasks = self._build_fix_tasks(stage_id, title, review, questions)
             if not fix_tasks:
                 break
-            fix_results, fix_records = self._run_tasks(stage_id, fix_tasks)
+            fix_results, fix_records, fix_drafts = self._run_tasks(stage_id, fix_tasks)
             for rec in fix_records:
                 self.evidence_store.append(rec)
+            for draft in fix_drafts:
+                self.draft_store.append(draft)
             records.extend(fix_records)
+            drafts.extend(fix_drafts)
             task_results.extend(fix_results)
-            evidence_by_question = self.evidence_store.grouped_by_question(stage_id)
-            payload, markdown = self._write_stage(stage_id, title, questions, expected_question_ids, evidence_by_question)
+            evidence_by_question = self._store_evidence_by_question(stage_id)
+            if stage_id in self.force_stages:
+                evidence_by_question = self._group_records_by_question(stage_id, records)
+            precheck = self._assembler_precheck(stage_id, title, questions, evidence_by_question)
+            payload, markdown = self._assemble_stage(stage_id, title, questions, expected_question_ids, evidence_by_question)
             if markdown and not stage.get("skip_in_report", False):
                 with FileLock(lock_path(self.state_dir, "output_write")):
                     with open(section_path, "w", encoding="utf-8") as f:
                         f.write(markdown.strip() + "\n")
             review = self._review_stage(stage_id, title, expected_question_ids, payload)
+        final_stage_status = "blocked" if precheck.get("status") == "blocked" else "reviewed"
         state_payload = {
             "stage_id": stage_id,
             "stage_title": title,
-            "status": "reviewed",
+            "status": final_stage_status,
+            "assembler_precheck_status": precheck.get("status") if precheck else "",
+            "blocked_question_ids": list(precheck.get("missing_question_ids") or []) + list(precheck.get("weak_question_ids") or []),
             "plan_path": os.path.join(self.repo_output_dir, "_per_stage", f"{stage_id}_plan.json"),
             "task_ids": [t.task_id for t in tasks],
             "evidence_ids": [r.evidence_id for r in records],
+            "draft_answer_ids": [d.draft_answer_id for d in drafts],
             "answer_path": os.path.join(self.repo_output_dir, "_per_stage", f"{stage_id}_answers.json") if questions else "",
             "section_path": section_path,
             "review_path": os.path.join(self.repo_output_dir, "_per_stage", f"{stage_id}_review.json") if review else "",
@@ -320,7 +459,70 @@ class MultiAgentRuntime:
             self._save_graph_snapshot_unlocked(status="running", current_stage=stage_id)
         self.events.emit(
             "stage_done",
-            f"{title} evidence={len(records)} tasks={len(task_results)}",
+            f"{title} status={final_stage_status} evidence={len(records)} tasks={len(task_results)}",
+            stage_id=stage_id,
+            metadata={"review_confidence": review.get("confidence") if isinstance(review, dict) else None},
+        )
+
+    def _resume_blocked_stage(
+        self,
+        stage_id: str,
+        title: str,
+        stage: Dict[str, Any],
+        questions: List[Dict[str, Any]],
+        expected_question_ids: List[str],
+    ) -> None:
+        self.events.emit("stage_resume_blocked", "resume blocked precheck only", stage_id=stage_id)
+        precheck = _load_json(os.path.join(self.state_dir, "assembler", f"{stage_id}_precheck.json"))
+        records: List[EvidenceRecord] = []
+        drafts: List[DraftAnswerRecord] = []
+        task_results: List[TaskResult] = []
+        evidence_by_question = self._store_evidence_by_question(stage_id)
+        for fix_round in range(1, self.max_review_fix_rounds + 1):
+            if precheck.get("status") != "blocked":
+                break
+            self.events.emit("assembler_fix_start", f"resume_round={fix_round}", stage_id=stage_id, agent_name="stage_assembler")
+            fix_tasks = self._build_precheck_fix_tasks(stage_id, title, precheck, questions)
+            if not fix_tasks:
+                break
+            fix_results, fix_records, fix_drafts = self._run_tasks(stage_id, fix_tasks)
+            task_results.extend(fix_results)
+            records.extend(fix_records)
+            drafts.extend(fix_drafts)
+            for rec in fix_records:
+                self.evidence_store.append(rec)
+            for draft in fix_drafts:
+                self.draft_store.append(draft)
+            evidence_by_question = self._store_evidence_by_question(stage_id)
+            precheck = self._assembler_precheck(stage_id, title, questions, evidence_by_question)
+        payload, markdown = self._assemble_stage(stage_id, title, questions, expected_question_ids, evidence_by_question)
+        section_path = _section_path(self.repo_output_dir, stage_id, title)
+        if markdown and not stage.get("skip_in_report", False):
+            with FileLock(lock_path(self.state_dir, "output_write")):
+                with open(section_path, "w", encoding="utf-8") as f:
+                    f.write(markdown.strip() + "\n")
+        review = self._review_stage(stage_id, title, expected_question_ids, payload)
+        final_stage_status = "blocked" if precheck.get("status") == "blocked" else "reviewed"
+        state_payload = {
+            "stage_id": stage_id,
+            "stage_title": title,
+            "status": final_stage_status,
+            "assembler_precheck_status": precheck.get("status") if precheck else "",
+            "blocked_question_ids": list(precheck.get("missing_question_ids") or []) + list(precheck.get("weak_question_ids") or []),
+            "task_ids": [r.task_id for r in task_results],
+            "evidence_ids": [r.evidence_id for r in records],
+            "draft_answer_ids": [d.draft_answer_id for d in drafts],
+            "answer_path": os.path.join(self.repo_output_dir, "_per_stage", f"{stage_id}_answers.json"),
+            "section_path": section_path,
+            "review_path": os.path.join(self.repo_output_dir, "_per_stage", f"{stage_id}_review.json") if review else "",
+            "updated_at": utcnow_iso(),
+        }
+        with FileLock(lock_path(self.state_dir, "output_write")):
+            _atomic_save_json(self._stage_state_path(stage_id), state_payload)
+            self._save_graph_snapshot_unlocked(status="running", current_stage=stage_id)
+        self.events.emit(
+            "stage_done",
+            f"{title} status={final_stage_status} resume_fix_tasks={len(task_results)}",
             stage_id=stage_id,
             metadata={"review_confidence": review.get("confidence") if isinstance(review, dict) else None},
         )
@@ -352,34 +554,300 @@ class MultiAgentRuntime:
         questions: List[Dict[str, Any]],
     ) -> List[TaskSpec]:
         qmap = {str(q.get("question_id")): q for q in questions if isinstance(q, dict)}
-        weak_qids: List[str] = []
+        review_by_qid: Dict[str, Dict[str, Any]] = {}
         for item in review.get("question_reviews", []) if isinstance(review.get("question_reviews"), list) else []:
             if not isinstance(item, dict):
                 continue
             qid = str(item.get("question_id") or "")
+            if qid:
+                review_by_qid[qid] = item
+        finding_messages: Dict[str, List[str]] = {}
+        for finding in review.get("findings", []) if isinstance(review.get("findings"), list) else []:
+            if not isinstance(finding, dict):
+                continue
+            qid = str(finding.get("question_id") or "").strip()
+            if qid:
+                finding_messages.setdefault(qid, []).append(str(finding.get("message") or ""))
+
+        weak_qids: List[str] = []
+        for qid, item in review_by_qid.items():
             try:
                 score = float(item.get("score_evidence"))
             except Exception:
                 score = 0.0
-            if qid and score < 0.75:
+            if score < 0.75:
                 weak_qids.append(qid)
-        if not weak_qids and qmap:
-            weak_qids = list(qmap.keys())[:2]
-        fix_questions = [qmap[qid] for qid in weak_qids[:4] if qid in qmap]
-        tasks = build_tasks_for_stage(
-            stage_id=stage_id,
-            stage_title=title,
-            questions=fix_questions,
-            plan=StageState(stage_id=stage_id, stage_title=title, stage_type="describe", stage_prompt="").plan,
-        )
-        for task in tasks:
-            task.task_id = f"{task.task_id}_fix_{uuid.uuid4().hex[:6]}"
-            task.metadata["fix_reason"] = "review_low_evidence"
+        for qid in finding_messages:
+            if qid not in weak_qids and qid in qmap:
+                weak_qids.append(qid)
+        if not weak_qids:
+            return []
+
+        tasks: List[TaskSpec] = []
+        for qid in weak_qids[:6]:
+            question = qmap.get(qid)
+            if not question:
+                continue
+            review_item = review_by_qid.get(qid, {})
+            messages = finding_messages.get(qid, [])
+            task = self._build_targeted_review_fix_task(
+                stage_id=stage_id,
+                title=title,
+                question=question,
+                review_item=review_item,
+                finding_messages=messages,
+            )
+            if task is not None:
+                tasks.append(task)
         return tasks
 
-    def _run_tasks(self, stage_id: str, tasks: List[TaskSpec], *, force: bool = False) -> Tuple[List[TaskResult], List[EvidenceRecord]]:
+    def _build_targeted_review_fix_task(
+        self,
+        *,
+        stage_id: str,
+        title: str,
+        question: Dict[str, Any],
+        review_item: Dict[str, Any],
+        finding_messages: List[str],
+    ) -> Optional[TaskSpec]:
+        qid = str(question.get("question_id") or "").strip()
+        if not qid:
+            return None
+        fix_hints = review_item.get("fix_hints") if isinstance(review_item.get("fix_hints"), dict) else {}
+        finding_type = str(fix_hints.get("finding_type") or "").strip().lower()
+        try:
+            score_evidence = float(review_item.get("score_evidence"))
+        except Exception:
+            score_evidence = 0.0
+        try:
+            score_consistency = float(review_item.get("score_consistency"))
+        except Exception:
+            score_consistency = 1.0
+        if finding_type == "contract_only" and score_evidence >= 0.75:
+            return None
+
+        review_text = str(review_item.get("review") or "")
+        combined_review = "\n".join([review_text] + [m for m in finding_messages if m])
+        keywords = self._targeted_fix_keywords(question, fix_hints, combined_review)
+        seed_paths = self._targeted_fix_seed_paths(stage_id, question, fix_hints, combined_review)
+        expected = self._targeted_fix_evidence_types(question, fix_hints, combined_review)
+        task_type = self._targeted_fix_task_type(combined_review, expected)
+        issue_summary = combined_review.strip()[:500] or "Review 指出该题证据支撑不足。"
+        goal = str(fix_hints.get("fix_goal") or "").strip()
+        if not goal:
+            goal = (
+                f"针对 Review 发现补证据：{issue_summary}\n"
+                f"请围绕关键词 {', '.join(keywords[:12]) or '题面关键词'} 在指定路径内查找 definition/implementation/call-site。"
+            )
+        if any(x in combined_review for x in ("未搜索", "未找到", "未发现", "无法支撑", "not_found")):
+            goal += "\n如果仍然找不到实现，必须给出针对这些关键词和路径的负向搜索证据，而不是只搜索 notes/not_found。"
+        query_parts = [
+            str(question.get("stem") or ""),
+            " ".join(keywords),
+            issue_summary,
+        ]
+        task = TaskSpec(
+            task_id=f"task_{stage_id}_{qid}_review_fix_{uuid.uuid4().hex[:6]}",
+            stage_id=stage_id,
+            question_id=qid,
+            question_ids=[qid],
+            task_type=task_type,
+            agent_type=task_type,
+            task_goal=goal,
+            query="\n".join(p for p in query_parts if p).strip(),
+            seed_paths=seed_paths,
+            entry_symbols=keywords[:20],
+            expected_evidence_types=expected,
+            metadata={
+                "fix_reason": "review_targeted_evidence",
+                "review_score_evidence": score_evidence,
+                "review_score_consistency": score_consistency,
+                "review_text": review_text,
+                "finding_messages": finding_messages,
+                "fix_hints": fix_hints,
+                "keywords": keywords,
+            },
+        )
+        return task
+
+    def _targeted_fix_keywords(self, question: Dict[str, Any], fix_hints: Dict[str, Any], review_text: str) -> List[str]:
+        out: List[str] = []
+        out.extend(_list_str(fix_hints.get("recommended_keywords"), 30))
+        hints = question.get("task_hints") if isinstance(question.get("task_hints"), dict) else {}
+        out.extend(_list_str(hints.get("keywords"), 20))
+        out.extend(_list_str(hints.get("entry_symbols"), 20))
+        stem = str(question.get("stem") or "")
+        text = "\n".join([stem, review_text])
+        protocol_keywords = [
+            "Ethernet", "ARP", "IPv4", "IPv6", "ICMP", "UDP", "TCP", "DHCP", "DNS",
+            "socket", "bind", "connect", "sendto", "recvfrom", "send", "recv",
+            "virtio-net", "virtio_net", "e1000", "netif", "net_tx", "net_rx",
+            "udp_send", "tcp_send", "ip_output", "lwip", "smoltcp",
+            "zero_copy", "DMA", "descriptor",
+        ]
+        for kw in protocol_keywords:
+            if kw.lower() in text.lower():
+                out.append(kw)
+        for token in re.findall(r"`([^`]{2,80})`|'([^']{2,80})'|\"([^\"]{2,80})\"|([A-Za-z_][A-Za-z0-9_\-]{2,})", text):
+            raw = next((part for part in token if part), "")
+            if raw:
+                out.append(raw)
+        banned = {
+            "notes", "not_found", "implemented", "stub", "value", "score_evidence", "score_consistency",
+            "evidence", "review", "question", "answer", "confidence", "warning", "warn",
+            "JSON", "Agent", "Review", "Task", "not", "found", "choices", "choice",
+            "未发现", "题面", "答案", "证据", "契约",
+        }
+        cleaned: List[str] = []
+        seen = set()
+        for item in out:
+            item = str(item).strip().strip("，。；:：,.()[]{}")
+            if not item or item in banned or item.lower() in {b.lower() for b in banned}:
+                continue
+            low_item = item.lower()
+            if re.match(r"^Q\d+_\d+$", item) or "未发现" in item or "仅有名词" in item:
+                continue
+            if any(bad in low_item for bad in ("notes", "not_found", "score_", "question_", "answer_", "value=")):
+                continue
+            if len(item) > 40:
+                continue
+            key = item.lower()
+            if key not in seen:
+                seen.add(key)
+                cleaned.append(item)
+        return cleaned[:24]
+
+    def _targeted_fix_seed_paths(self, stage_id: str, question: Dict[str, Any], fix_hints: Dict[str, Any], review_text: str) -> List[str]:
+        out: List[str] = []
+        out.extend(_list_str(fix_hints.get("recommended_seed_paths"), 20))
+        hints = question.get("task_hints") if isinstance(question.get("task_hints"), dict) else {}
+        out.extend(_list_str(hints.get("seed_paths"), 20))
+        if "network" in stage_id or any(x in review_text.lower() for x in ["tcp", "udp", "socket", "protocol", "net"]):
+            out.extend(["net", "network", "socket", "syscall", "src", "kernel", "drivers", "lwip", "smoltcp"])
+        if any(x in review_text.lower() for x in ["virtio", "e1000", "dma", "driver", "interrupt"]):
+            out.extend(["drivers", "device", "devices", "virtio", "src/sifive", "src/include"])
+        if any(x in review_text.lower() for x in ["sendto", "call", "path", "调用", "路径"]):
+            out.extend(["syscall", "net", "socket", "src"])
+        if not out:
+            out.extend(["src", "kernel"])
+        seen = set()
+        cleaned: List[str] = []
+        for item in out:
+            item = str(item).strip().strip("/\\")
+            if item and item.lower() not in seen:
+                seen.add(item.lower())
+                cleaned.append(item)
+        return cleaned[:20]
+
+    def _targeted_fix_evidence_types(self, question: Dict[str, Any], fix_hints: Dict[str, Any], review_text: str) -> List[str]:
+        out = _list_str(fix_hints.get("missing_evidence_types"), 12)
+        policy = question.get("evidence_policy") if isinstance(question.get("evidence_policy"), dict) else {}
+        out.extend(_list_str(policy.get("required_evidence_types"), 12))
+        text = review_text.lower()
+        if any(x in text for x in ["call", "调用", "路径", "sendto", "trace"]):
+            out.extend(["definition", "call_site", "usage_flow"])
+        if any(x in text for x in ["实现", "implementation", "body", "stub", "桩"]):
+            out.extend(["definition", "implementation_body"])
+        if any(x in text for x in ["未搜索", "关键词", "protocol", "协议"]):
+            out.extend(["search", "definition", "implementation_body"])
+        if not out:
+            out = ["search", "definition", "implementation_body"]
+        return _dedupe_str(out)[:12]
+
+    def _targeted_fix_task_type(self, review_text: str, expected: List[str]) -> str:
+        text = review_text.lower()
+        if any(x in expected for x in ["call_site", "usage_flow"]) or any(x in text for x in ["call_graph", "调用", "路径", "trace", "sendto"]):
+            return "react_lsp"
+        return "react_code"
+
+    def _run_stage_plan_agent(
+        self,
+        stage_id: str,
+        title: str,
+        questions: List[Dict[str, Any]],
+        plan: Any,
+        repo_profile: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        mode = (os.environ.get("OS_AGENT_TASK_PLANNER_MODE") or "llm_fallback").strip().lower()
+        if mode in {"rule", "rules", "off", "0"} or not questions:
+            return {"task_plan": []}
+        self.events.emit("stage_plan_start", "planning grouped tasks", stage_id=stage_id, agent_name="stage_plan_agent")
+        prompt = self._stage_task_planner_prompt(stage_id, title, questions, plan, repo_profile)
+        raw = self._invoke_llm(prompt, stage_id=stage_id, agent_name="stage_plan_agent")
+        parsed = extract_json_object(raw) or {}
+        task_plan = parsed.get("task_plan") if isinstance(parsed.get("task_plan"), list) else []
+        if not task_plan and mode in {"llm", "llm_only"}:
+            self.events.emit("stage_plan_empty", "LLM returned no task_plan", stage_id=stage_id, agent_name="stage_plan_agent", level="warn")
+        self.events.emit("stage_plan_done", f"task_plan={len(task_plan)}", stage_id=stage_id, agent_name="stage_plan_agent")
+        with FileLock(lock_path(self.state_dir, "output_write")):
+            _atomic_save_json(
+                os.path.join(self.state_dir, "stages", f"{stage_id}_task_plan_raw.json"),
+                {"raw": raw, "parsed": parsed, "task_plan_count": len(task_plan)},
+            )
+        return parsed if isinstance(parsed, dict) else {"task_plan": []}
+
+    def _stage_task_planner_prompt(
+        self,
+        stage_id: str,
+        title: str,
+        questions: List[Dict[str, Any]],
+        plan: Any,
+        repo_profile: Dict[str, Any],
+    ) -> str:
+        q_payload = [
+            {
+                "question_id": q.get("question_id"),
+                "question_type": q.get("question_type"),
+                "stem": q.get("stem"),
+                "choices": q.get("choices"),
+                "evidence_policy": q.get("evidence_policy"),
+                "task_hints": q.get("task_hints"),
+            }
+            for q in questions
+        ]
+        max_q = _env_int("OS_AGENT_MAX_QUESTIONS_PER_TASK", 4)
+        max_tasks = _env_int("OS_AGENT_MAX_TASKS_PER_STAGE_TOTAL", 80)
+        return (
+            "你是 OS-Agent D 的 Stage Plan Agent。你的任务是把当前 stage 的题单划分为 grouped Task，供后续 LLM ReAct Task Agent 查证据并产草稿答案。\n"
+            "只输出一个 JSON 对象，不要 Markdown 围栏，不要解释。\n\n"
+            "规划原则：\n"
+            "- 相近题可以放入同一个 task，但每个 task 的 question_ids 不超过配置上限。\n"
+            "- 按共享 seed_paths、entry_symbols、证据类型、同一实现链路来合并。\n"
+            "- 高风险或互斥判断题不要合并过大。\n"
+            "- task_goal 必须具体到要查什么证据，不要写泛泛的“分析代码”。\n"
+            "- agent_type 使用 react_code / react_lsp / react_rag / react_build / react_history。\n"
+            "- expected_evidence_types 使用 definition / implementation_body / call_site / usage_flow / build_config / git_history / search。\n\n"
+            f"stage_id={stage_id}\nstage_title={title}\n"
+            f"max_questions_per_task={max_q}\nmax_tasks_total={max_tasks}\n\n"
+            "## Heuristic PlanSpec\n"
+            f"{json.dumps(plan.to_dict() if hasattr(plan, 'to_dict') else {}, ensure_ascii=False, indent=2)}\n\n"
+            "## Repo Profile Summary\n"
+            f"{json.dumps({k: repo_profile.get(k) for k in ['framework_guess', 'arch_guess', 'core_paths', 'build_files']}, ensure_ascii=False, indent=2)}\n\n"
+            "## Question Sheet\n"
+            f"{json.dumps(q_payload, ensure_ascii=False, indent=2)}\n\n"
+            "输出格式：\n"
+            "{\n"
+            '  "task_plan": [\n'
+            "    {\n"
+            '      "task_id": "task_<stage>_<short_name>",\n'
+            '      "question_ids": ["Qxx_001"],\n'
+            '      "task_type": "react_code",\n'
+            '      "agent_type": "react_code",\n'
+            '      "task_goal": "查证某机制是否实现，并找到定义/实现体/调用点",\n'
+            '      "group_reason": "这些题共享同一实现线索",\n'
+            '      "query": "自然语言检索/分析目标",\n'
+            '      "seed_paths": ["mm", "kernel"],\n'
+            '      "entry_symbols": ["alloc_page"],\n'
+            '      "expected_evidence_types": ["definition", "implementation_body"]\n'
+            "    }\n"
+            "  ]\n"
+            "}\n"
+        )
+
+    def _run_tasks(self, stage_id: str, tasks: List[TaskSpec], *, force: bool = False) -> Tuple[List[TaskResult], List[EvidenceRecord], List[DraftAnswerRecord]]:
         results: List[TaskResult] = []
         records: List[EvidenceRecord] = []
+        drafts: List[DraftAnswerRecord] = []
         pending = list(tasks) if force else [t for t in tasks if _load_json(self._task_state_path(t.task_id)).get("status") != "done"]
         skipped = 0 if force else len(tasks) - len(pending)
         if skipped:
@@ -389,9 +857,10 @@ class MultiAgentRuntime:
             futures = {pool.submit(self._run_one_task_with_limits, t): t for t in pending}
             for future in as_completed(futures):
                 task = futures[future]
-                result, evs = future.result()
+                result, evs, task_drafts = future.result()
                 results.append(result)
                 records.extend(evs)
+                drafts.extend(task_drafts)
                 with FileLock(lock_path(self.state_dir, "output_write")):
                     _atomic_save_json(self._task_state_path(task.task_id), result.to_dict())
                 self.events.emit(
@@ -401,18 +870,25 @@ class MultiAgentRuntime:
                     task_id=task.task_id,
                     agent_name=f"{task.task_type}_agent",
                     level="info" if result.status == "done" else "warn",
+                    metadata={"question_ids": task.question_ids or ([task.question_id] if task.question_id else [])},
                 )
-        return results, records
+        return results, records, drafts
 
-    def _run_one_task_with_limits(self, task: TaskSpec) -> Tuple[TaskResult, List[EvidenceRecord]]:
-        sem = None
+    def _run_one_task_with_limits(self, task: TaskSpec) -> Tuple[TaskResult, List[EvidenceRecord], List[DraftAnswerRecord]]:
+        semaphores = []
         lock_cm = None
-        if task.task_type in {"definition", "flow"}:
-            sem = self.lsp_semaphore
+        task_mode = (os.environ.get("OS_AGENT_TASK_AGENT_MODE") or "react").strip().lower()
+        if task_mode not in {"tool", "tools", "program"}:
+            semaphores.append(self.llm_semaphore)
+            if task.task_type in {"react_lsp", "definition", "flow"}:
+                semaphores.append(self.lsp_semaphore)
+                lock_cm = named_thread_lock("lsp_task")
+        elif task.task_type in {"definition", "flow"}:
+            semaphores.append(self.lsp_semaphore)
             lock_cm = named_thread_lock("lsp_task")
         elif task.task_type in {"discovery", "implementation_state"}:
-            sem = self.rag_semaphore
-        if sem:
+            semaphores.append(self.rag_semaphore)
+        for sem in semaphores:
             sem.acquire()
         try:
             if lock_cm:
@@ -420,8 +896,184 @@ class MultiAgentRuntime:
                     return run_task_agent(task, repo_path=self.repo_path)
             return run_task_agent(task, repo_path=self.repo_path)
         finally:
-            if sem:
+            for sem in reversed(semaphores):
                 sem.release()
+
+    def _assembler_precheck(
+        self,
+        stage_id: str,
+        title: str,
+        questions: List[Dict[str, Any]],
+        evidence_by_question: Dict[str, List[EvidenceRecord]],
+    ) -> Dict[str, Any]:
+        draft_by_question = self.draft_store.grouped_by_question(stage_id)
+        missing: List[str] = []
+        weak: List[str] = []
+        for q in questions:
+            qid = str(q.get("question_id", "")).strip()
+            if not qid:
+                continue
+            evs = [
+                e
+                for e in evidence_by_question.get(qid, [])
+                if e.validity != "invalid" or _is_good_negative_search_evidence(e)
+            ]
+            drafts = draft_by_question.get(qid, [])
+            if not evs or not drafts:
+                missing.append(qid)
+            elif not any(e.confidence in {"medium", "high"} or _is_good_negative_search_evidence(e) for e in evs):
+                weak.append(qid)
+        status = "pass" if not missing and not weak else "blocked"
+        precheck = {
+            "stage_id": stage_id,
+            "stage_title": title,
+            "status": status,
+            "missing_question_ids": missing,
+            "weak_question_ids": weak,
+            "covered_question_ids": [
+                str(q.get("question_id"))
+                for q in questions
+                if str(q.get("question_id")) not in set(missing + weak)
+            ],
+            "updated_at": utcnow_iso(),
+        }
+        with FileLock(lock_path(self.state_dir, "output_write")):
+            _atomic_save_json(os.path.join(self.state_dir, "assembler", f"{stage_id}_precheck.json"), precheck)
+        self.events.emit(
+            "assembler_precheck",
+            f"{status} missing={len(missing)} weak={len(weak)}",
+            stage_id=stage_id,
+            agent_name="stage_assembler",
+            level="info" if status == "pass" else "warn",
+        )
+        return precheck
+
+    def _build_precheck_fix_tasks(
+        self,
+        stage_id: str,
+        title: str,
+        precheck: Dict[str, Any],
+        questions: List[Dict[str, Any]],
+    ) -> List[TaskSpec]:
+        qmap = {str(q.get("question_id")): q for q in questions if isinstance(q, dict)}
+        qids = list(precheck.get("missing_question_ids") or []) + list(precheck.get("weak_question_ids") or [])
+        fix_questions = [qmap[qid] for qid in qids[:6] if qid in qmap]
+        if not fix_questions:
+            return []
+        tasks = build_tasks_for_stage(
+            stage_id=stage_id,
+            stage_title=title,
+            questions=fix_questions,
+            plan=StageState(stage_id=stage_id, stage_title=title, stage_type="describe", stage_prompt="").plan,
+        )
+        for task in tasks:
+            task.task_id = f"{task.task_id}_assembler_fix_{uuid.uuid4().hex[:6]}"
+            task.task_type = "react_code"
+            task.agent_type = "react_code"
+            task.task_goal = f"补足 Assembler precheck 发现的缺失/弱证据：{task.query}"
+            task.question_ids = task.question_ids or ([task.question_id] if task.question_id else [])
+            task.metadata["fix_reason"] = "assembler_precheck"
+        return tasks
+
+    def _assemble_stage(
+        self,
+        stage_id: str,
+        title: str,
+        questions: List[Dict[str, Any]],
+        expected_question_ids: List[str],
+        evidence_by_question: Dict[str, List[EvidenceRecord]],
+    ) -> Tuple[Dict[str, Any], str]:
+        self.events.emit("assembler_start", "assembling task drafts", stage_id=stage_id, agent_name="stage_assembler")
+        draft_by_question = self.draft_store.grouped_by_question(stage_id)
+        answers: List[Dict[str, Any]] = []
+        raw_parts: List[str] = []
+        for idx, question in enumerate(questions, 1):
+            qid = str(question.get("question_id", "")).strip()
+            evs = evidence_by_question.get(qid, [])
+            drafts = draft_by_question.get(qid, [])
+            prompt = self._one_question_assembler_prompt(stage_id, title, question, evs, drafts, idx, len(questions))
+            raw = self._invoke_llm(prompt, stage_id=stage_id, agent_name="stage_assembler")
+            raw_parts.append(f"--- {qid} ---\n{raw}")
+            answer = self._parse_one_answer_or_fallback(stage_id, title, question, raw, evs)
+            answers.append(answer)
+        payload = {
+            "schema_version": JSON_QA_SCHEMA_VERSION,
+            "stage_id": stage_id,
+            "stage_title": title,
+            "terminology_profile": "stallings_en_zh",
+            "answers": answers,
+        }
+        try:
+            stage_qa = load_stage_qa(stage_id)
+            payload = coerce_answers_payload_by_stage_qa(payload, stage_qa=stage_qa)
+            issues = validate_answers_payload(
+                payload,
+                stage_id=stage_id,
+                stage_title=title,
+                expected_question_ids=expected_question_ids,
+            )
+            if issues:
+                self.events.emit("assembler_json_invalid", f"validation issues={len(issues)}; keeping fallback-safe payload", stage_id=stage_id, level="warn")
+        except Exception as exc:
+            self.events.emit("assembler_json_invalid", f"{type(exc).__name__}: {exc}", stage_id=stage_id, level="warn")
+        markdown = render_answers_to_markdown(payload).strip()
+        sidecar = os.path.join(self.repo_output_dir, "_per_stage")
+        with FileLock(lock_path(self.state_dir, "output_write")):
+            _atomic_save_json(os.path.join(sidecar, f"{stage_id}_answers.json"), payload)
+            _atomic_save_json(os.path.join(self.state_dir, "assembler", f"{stage_id}_assembled.json"), payload)
+            with open(os.path.join(sidecar, f"{stage_id}_answers_raw.txt"), "w", encoding="utf-8") as f:
+                f.write("\n\n".join(raw_parts).strip() + "\n")
+        return payload, markdown
+
+    def _one_question_assembler_prompt(
+        self,
+        stage_id: str,
+        title: str,
+        question: Dict[str, Any],
+        evidence: List[EvidenceRecord],
+        drafts: List[DraftAnswerRecord],
+        idx: int,
+        total: int,
+    ) -> str:
+        ev_payload = [
+            {
+                "evidence_id": r.evidence_id,
+                "path": r.path,
+                "symbol": r.symbol,
+                "source_type": r.source_type,
+                "evidence_type": r.evidence_type,
+                "confidence": r.confidence,
+                "validity": r.validity,
+                "excerpt": (r.excerpt or "")[:1200],
+            }
+            for r in evidence[:10]
+        ]
+        draft_payload = [
+            {
+                "draft_answer_id": d.draft_answer_id,
+                "task_id": d.task_id,
+                "confidence": d.confidence,
+                "used_evidence_ids": d.used_evidence_ids,
+                "answer": d.answer,
+                "notes": d.notes,
+            }
+            for d in drafts[:6]
+        ]
+        return (
+            "你是 OS-Agent D 的 Stage Assembler Agent。现在只组装一个小题的最终 JSON answer。\n"
+            "你不是源码分析执行者，不能发明新事实；只能根据 Task draft 和 Bound Evidence 统一格式、去重、修正过度表述。\n"
+            "只输出一个 JSON object，字段必须是 question_id, question_type, stem, value, evidence。\n"
+            "tri_state_impl 的 value 只能是 implemented / stub / not_found。\n"
+            "single_choice 的 value 必须等于 choices 中某一项完整原文；multi_choice 的 value 必须是数组。\n"
+            "如果 draft 与 evidence 不一致，以 evidence 为准；证据不足写 not_found/待核实。\n\n"
+            f"stage_id={stage_id}\nstage_title={title}\nquestion_index={idx}/{total}\n\n"
+            "## Question\n"
+            f"{json.dumps(question, ensure_ascii=False, indent=2)}\n\n"
+            "## Task Drafts\n"
+            f"{json.dumps(draft_payload, ensure_ascii=False, indent=2)}\n\n"
+            "## Bound Evidence\n"
+            f"{json.dumps(ev_payload, ensure_ascii=False, indent=2)}\n"
+        )
 
     def _write_stage(
         self,
@@ -596,12 +1248,47 @@ class MultiAgentRuntime:
                 candidate = coerce_answers_payload_by_stage_qa(candidate, stage_qa={"questions": [question]})
                 answer = candidate["answers"][0]
                 # Ensure evidence has the exact minimal schema accepted by renderer.
-                if not isinstance(answer.get("evidence"), list):
-                    answer["evidence"] = []
-                return answer
+                return self._normalize_answer_evidence(answer, evidence)
         except Exception:
             pass
         return self._fallback_answer(question, evidence)
+
+    def _normalize_answer_evidence(self, answer: Dict[str, Any], evidence: List[EvidenceRecord]) -> Dict[str, Any]:
+        evs = answer.get("evidence")
+        if not isinstance(evs, list):
+            evs = []
+        source = list(evidence or [])
+        normalized: List[Dict[str, Any]] = []
+        for idx, ev in enumerate(evs):
+            if not isinstance(ev, dict):
+                continue
+            ref = source[idx] if idx < len(source) else None
+            path = str(ev.get("path") or (ref.path if ref else "") or self.repo_path).strip()
+            symbol_kind = str(ev.get("symbol_kind") or ev.get("evidence_type") or (ref.evidence_type if ref else "") or "evidence").strip()
+            symbol_name = str(ev.get("symbol_name") or ev.get("symbol") or (ref.symbol if ref and ref.symbol else "") or (ref.tool_name if ref else "") or symbol_kind).strip()
+            excerpt = str(ev.get("excerpt") or (ref.excerpt if ref else "") or "证据摘录为空；需结合路径继续核验。").strip()
+            normalized.append(
+                {
+                    "path": path,
+                    "symbol_kind": symbol_kind,
+                    "symbol_name": symbol_name,
+                    "excerpt": excerpt,
+                }
+            )
+        if not normalized:
+            normalized = [
+                {
+                    "path": r.path or self.repo_path,
+                    "symbol_kind": r.evidence_type or "evidence",
+                    "symbol_name": r.symbol or r.tool_name or r.evidence_type or "evidence",
+                    "excerpt": (r.excerpt or "证据摘录为空；需结合路径继续核验。")[:500],
+                }
+                for r in source[:3]
+            ]
+        if not normalized:
+            normalized = [{"path": self.repo_path, "symbol_kind": "search", "symbol_name": "no_valid_evidence", "excerpt": "未找到可验证证据。"}]
+        answer["evidence"] = normalized
+        return answer
 
     def _fallback_answer(self, question: Dict[str, Any], evidence: List[EvidenceRecord]) -> Dict[str, Any]:
         qid = str(question.get("question_id", "")).strip()

@@ -176,6 +176,13 @@ DESCRIBE_REVIEW_SYSTEM_PROMPT = """你是 OS-Agent Describe 管线的**审计员
 ## `findings` 与 `summary_zh`
 - `findings`：默认 `[]`；在明确契约/题面/证据矛盾时列入。severity：info=轻微；warn=明显不符/证据明显不足/契约违例；blocker=严重失配。禁止「评价 OS 架构不好」式 warn。
 - `summary_zh`：概括在题面/契约/证据上的**报告质量**（哪类题证据薄、哪类题落实得好），**不写**设计点评。
+- 当某题 `score_evidence < 0.75` 或存在证据类 finding 时，必须在该题 `question_reviews[]` 内附加 `fix_hints`，供后续 Task Agent 补证据：
+  - `finding_type`: missing_evidence | weak_evidence | wrong_evidence | duplicate_evidence | contract_only
+  - `missing_evidence_types`: string[]，如 definition / implementation_body / call_site / usage_flow / search
+  - `recommended_keywords`: string[]，必须是后续应搜索的具体英文符号/协议/函数/模块关键词，禁止写泛泛词
+  - `recommended_seed_paths`: string[]，建议搜索的 repo-relative 目录
+  - `fix_goal`: string，下一轮 Task Agent 应完成的具体取证目标
+- 若问题只是单选/多选/枚举格式不合规且证据足够，`finding_type` 写 `contract_only`，不要建议无关源码搜索。
 
 ## 输出 JSON 模式（字段名必须一致；`report_quality_score` 由管线后处理写入，**你方勿输出**）
 {
@@ -188,7 +195,14 @@ DESCRIBE_REVIEW_SYSTEM_PROMPT = """你是 OS-Agent Describe 管线的**审计员
       "question_id": "<与题单及B一致>",
       "score_evidence": <0~1 本题证据支撑度>,
       "score_consistency": <0~1 本题题面相符度>,
-      "review": "<中文，仅题面/契约/证据，勿评内核设计>"
+      "review": "<中文，仅题面/契约/证据，勿评内核设计>",
+      "fix_hints": {
+        "finding_type": "missing_evidence|weak_evidence|wrong_evidence|duplicate_evidence|contract_only",
+        "missing_evidence_types": [],
+        "recommended_keywords": [],
+        "recommended_seed_paths": [],
+        "fix_goal": ""
+      }
     }
   ],
   "findings": [],
@@ -394,8 +408,8 @@ def build_sub_agent(model: str = None, stage_id: str = "", tool_names=None):
 def get_task_agent_tools(task_type: str, stage_id: str = ""):
     """Return a restricted tool set for Multi-Agent task workers."""
     task_type = (task_type or "").strip().lower()
-    if task_type in {"discovery", "implementation_state", "rag"}:
-        return [rag_search_code, grep_in_repo, find_os_core_modules]
+    if task_type in {"react_code", "react_rag", "react_lsp", "discovery", "implementation_state", "rag"}:
+        return [rag_search_code, grep_in_repo, find_os_core_modules, read_code_segment, lsp_get_definition, lsp_get_references, lsp_get_document_outline]
     if task_type in {"definition", "flow", "lsp"}:
         return [
             lsp_get_definition,
@@ -406,9 +420,9 @@ def get_task_agent_tools(task_type: str, stage_id: str = ""):
         ]
     if task_type in {"code_evidence", "code", "read"}:
         return [read_code_segment, grep_in_repo, lsp_get_definition]
-    if task_type in {"build_platform", "platform", "build"}:
+    if task_type in {"react_build", "build_platform", "platform", "build"}:
         return [list_repo_structure, read_code_segment, grep_in_repo, parse_build_config]
-    if task_type in {"git_history", "history"}:
+    if task_type in {"react_history", "git_history", "history"}:
         return [
             get_git_history_summary,
             analyze_git_history,

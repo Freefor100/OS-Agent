@@ -14,7 +14,10 @@ class TaskSpec:
     task_id: str
     stage_id: str
     question_id: str = ""
+    question_ids: List[str] = field(default_factory=list)
     task_type: str = "discovery"
+    agent_type: str = ""
+    task_goal: str = ""
     query: str = ""
     seed_paths: List[str] = field(default_factory=list)
     entry_symbols: List[str] = field(default_factory=list)
@@ -25,11 +28,19 @@ class TaskSpec:
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
-        return asdict(self)
+        data = asdict(self)
+        if not data.get("question_ids") and self.question_id:
+            data["question_ids"] = [self.question_id]
+        return data
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "TaskSpec":
-        return cls(**{k: data.get(k) for k in cls.__dataclass_fields__.keys() if k in data})
+        payload = {k: data.get(k) for k in cls.__dataclass_fields__.keys() if k in data}
+        if not payload.get("question_ids") and payload.get("question_id"):
+            payload["question_ids"] = [payload["question_id"]]
+        if not payload.get("question_id") and payload.get("question_ids"):
+            payload["question_id"] = str(payload["question_ids"][0])
+        return cls(**payload)
 
 
 @dataclass
@@ -37,8 +48,10 @@ class TaskResult:
     task_id: str
     stage_id: str
     question_id: str = ""
+    question_ids: List[str] = field(default_factory=list)
     status: str = "pending"
     evidence_ids: List[str] = field(default_factory=list)
+    draft_answer_ids: List[str] = field(default_factory=list)
     findings: List[Dict[str, Any]] = field(default_factory=list)
     confidence: str = "low"
     errors: List[str] = field(default_factory=list)
@@ -46,7 +59,31 @@ class TaskResult:
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
+        data = asdict(self)
+        if not data.get("question_ids") and self.question_id:
+            data["question_ids"] = [self.question_id]
+        return data
+
+
+@dataclass
+class DraftAnswerRecord:
+    draft_answer_id: str
+    task_id: str
+    stage_id: str
+    question_id: str
+    answer: Dict[str, Any] = field(default_factory=dict)
+    used_evidence_ids: List[str] = field(default_factory=list)
+    confidence: str = "low"
+    status: str = "draft"
+    notes: str = ""
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "DraftAnswerRecord":
+        return cls(**{k: data.get(k) for k in cls.__dataclass_fields__.keys() if k in data})
 
 
 @dataclass

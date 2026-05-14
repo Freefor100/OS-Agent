@@ -43,6 +43,15 @@ def verify_evidence(record: EvidenceRecord, *, repo_path: str) -> EvidenceRecord
         score += 0.10
 
     text = (record.excerpt or "") + "\n" + (record.notes or "")
+    negative_search = bool(
+        record.evidence_type in {"search", "semantic_search"}
+        and ("未找到匹配" in text or "no matches" in text.lower() or "no results" in text.lower())
+        and ("已搜索" in text or "searched" in text.lower())
+    )
+    if negative_search:
+        # A repository-wide negative search is valid evidence for "not_found"
+        # claims even when there is no single source path to cite.
+        score += 0.35
     if "confidence=low" in text or "Generic Fallback" in text or "ASM Fallback" in text:
         score -= 0.25
     if text.lstrip().startswith("Error:") or "无法生成调用图" in text or "未出现，无法生成" in text:
@@ -51,7 +60,7 @@ def verify_evidence(record: EvidenceRecord, *, repo_path: str) -> EvidenceRecord
         score -= 0.30
     if _DECLARATION_HINT_RE.search(record.excerpt or "") and record.metadata.get("supports_implementation_claim"):
         score -= 0.40
-    if not path_exists or not (record.excerpt or "").strip():
+    if (not path_exists and not negative_search) or not (record.excerpt or "").strip():
         score -= 0.50
 
     score = max(0.0, min(1.0, score))
