@@ -1,0 +1,107 @@
+{
+  "schema_version": "describe_review_v1",
+  "stage_id": "08_network",
+  "stage_title": "网络子系统与协议栈",
+  "confidence": 0.96,
+  "question_reviews": [
+    {
+      "question_id": "Q08_001",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "题面要求三态判断是否存在网络子系统实现。答案最终 value 为 'not_found'，符合题面要求。所有 6 个 structured_facts 均被覆盖，fact_answers 中每个 fact 都绑定了 evidence_id。evidence 包含 syscall table 无 socket 条目、grep 搜索无协议栈匹配、目录结构无 net/ 子目录、errno.h 仅有 POSIX 常量等强负向证据。negative_search_coverage 记录了 19 个关键词、8 个目录、207 文件、0 匹配，覆盖充分。证据与结论一致，无矛盾。",
+      "fix_hints": {
+        "finding_type": "contract_only",
+        "missing_evidence_types": [],
+        "recommended_keywords": [],
+        "recommended_seed_paths": [],
+        "fix_goal": ""
+      }
+    },
+    {
+      "question_id": "Q08_002",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "题面要求单选协议栈来源。答案 value 为 '未发现'，属于 valid value texts 之一。所有 6 个 structured_facts 均被覆盖，fact_answers 中每个 fact 都绑定了 evidence_id。evidence 包含 syscall table 无 socket 条目、grep 搜索无协议栈匹配、目录结构无 net/ 子目录等强负向证据。negative_search_coverage 记录充分。证据与结论一致。",
+      "fix_hints": {
+        "finding_type": "contract_only",
+        "missing_evidence_types": [],
+        "recommended_keywords": [],
+        "recommended_seed_paths": [],
+        "fix_goal": ""
+      }
+    },
+    {
+      "question_id": "Q08_003",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "题面要求三态判断是否实现 socket 系统调用接口。答案 value 为 'not_found'，符合题面要求。所有 6 个 structured_facts 均被覆盖，fact_answers 中每个 fact 都绑定了 evidence_id。evidence 包含 syscall.c 无 socket 条目、sysnum.h 无 socket 号、user.h 无 socket 声明、Makefile 无网络源文件、grep 搜索无协议栈匹配等强负向证据。negative_search_coverage 记录充分。证据与结论一致。",
+      "fix_hints": {
+        "finding_type": "contract_only",
+        "missing_evidence_types": [],
+        "recommended_keywords": [],
+        "recommended_seed_paths": [],
+        "fix_goal": ""
+      }
+    },
+    {
+      "question_id": "Q08_004",
+      "score_evidence": 0.95,
+      "score_consistency": 0.95,
+      "review": "题面要求描述 send/recv 路径。答案 value 为对象形式，包含所有 6 个 fact 的枚举值，符合 structured_facts 展开要求。所有 fact_answers 均绑定了 evidence_id。evidence 包含 syscall table 无 socket 条目、grep 搜索无协议栈匹配、目录结构无 net/ 子目录等强负向证据。negative_search_coverage 记录充分。证据与结论一致。注意：题面未明确要求 value 为对象格式，但 fact_key 固定展开符合契约精神，无实质问题。",
+      "fix_hints": {
+        "finding_type": "contract_only",
+        "missing_evidence_types": [],
+        "recommended_keywords": [],
+        "recommended_seed_paths": [],
+        "fix_goal": ""
+      }
+    },
+    {
+      "question_id": "Q08_005",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "题面要求三态判断是否存在网卡驱动。答案 value 为 'not_found'，符合题面要求。所有 6 个 structured_facts 均被覆盖，fact_answers 中每个 fact 都绑定了 evidence_id。evidence 包含 Makefile 无网络源文件、kernel/ 目录无 net/ 子目录、virtio.h 仅有 disk 无 net、trap.c 中断处理无网络 IRQ 等强负向证据。negative_search_coverage 记录充分。证据与结论一致。",
+      "fix_hints": {
+        "finding_type": "contract_only",
+        "missing_evidence_types": [],
+        "recommended_keywords": [],
+        "recommended_seed_paths": [],
+        "fix_goal": ""
+      }
+    },
+    {
+      "question_id": "Q08_006",
+      "score_evidence": 0.95,
+      "score_consistency": 0.85,
+      "review": "题面要求列出支持的协议层（多选）。答案 value 为 []（空数组），表示无支持的协议层。所有 6 个 structured_facts 均被覆盖，fact_answers 中每个 fact 都绑定了 evidence_id。evidence 包含 syscall table 无 socket 条目、grep 搜索无协议栈匹配、Makefile 无网络源文件、trap.c 无网络 IRQ、plic.h 无网络设备等强负向证据。negative_search_coverage 记录充分。证据与结论一致。扣分原因：题面要求 '列出支持的协议层'，空数组虽合理但略显敷衍，未明确说明 '无' 或 'none' 等更清晰的表述。",
+      "fix_hints": {
+        "finding_type": "contract_only",
+        "missing_evidence_types": [],
+        "recommended_keywords": [],
+        "recommended_seed_paths": [],
+        "fix_goal": ""
+      }
+    },
+    {
+      "question_id": "Q08_007",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "题面要求三态判断是否存在零拷贝网络路径。答案 value 为 'not_found'，符合题面要求。所有 6 个 structured_facts 均被覆盖，fact_answers 中每个 fact 都绑定了 evidence_id。evidence 包含 syscall table 无 socket 条目、Makefile 无网络源文件、kernel 目录结构无 net/、grep 搜索无协议栈匹配、virtio.h 仅有 disk 无 net 等强负向证据。negative_search_coverage 记录充分。证据与结论一致。",
+      "fix_hints": {
+        "finding_type": "contract_only",
+        "missing_evidence_types": [],
+        "recommended_keywords": [],
+        "recommended_seed_paths": [],
+        "fix_goal": ""
+      }
+    }
+  ],
+  "findings": [],
+  "summary_zh": "本阶段 7 道题均围绕网络子系统实现情况，答案整体质量高。所有题目均严格遵循 JSON-QA 输出契约，structured_facts 全覆盖，evidence 引用充分且与结论一致。证据以负向搜索为主，覆盖了 syscall table、目录结构、Makefile、grep 搜索等多个维度，符合 not_found 的取证要求。Q08_004 的 value 格式为对象展开而非简单枚举，但符合 fact_key 固定展开的契约精神。Q08_006 的 value 为空数组，虽合理但表述可更明确。全阶段 confidence 按各题 mean_score 算术平均计算，无任何题 mean_score < 0.7，故未触发截断。",
+  "report_quality_score": 0.96,
+  "_meta": {
+    "quality": {
+      "mean_question_confidence": 0.9607
+    }
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "task_id": "task_04_signal_futex",
+  "stage_id": "04_process_smp",
+  "question_id": "Q04_014",
+  "question_ids": [
+    "Q04_014"
+  ],
+  "status": "done",
+  "evidence_ids": [
+    "ev_task_04_signal_futex_a88acad5",
+    "ev_task_04_signal_futex_3a3f1ef6",
+    "ev_task_04_signal_futex_24195d8f",
+    "ev_task_04_signal_futex_cf618d26",
+    "ev_task_04_signal_futex_df9fdb40",
+    "ev_task_04_signal_futex_4b394083",
+    "ev_task_04_signal_futex_b53c947e",
+    "ev_task_04_signal_futex_61313a35",
+    "ev_task_04_signal_futex_4a7451e2",
+    "ev_task_04_signal_futex_7ba910a2",
+    "ev_task_04_signal_futex_55dec20c",
+    "ev_task_04_signal_futex_ca7d8dc3",
+    "ev_task_04_signal_futex_624768e3",
+    "ev_task_04_signal_futex_0e7eec86"
+  ],
+  "draft_answer_ids": [
+    "draft_task_04_signal_futex_Q04_014_c8e43ed8"
+  ],
+  "findings": [],
+  "confidence": "high",
+  "errors": [],
+  "token_usage": {},
+  "metadata": {
+    "evidence_count": 14,
+    "mode": "react",
+    "summary": "Signal (signal) is fully implemented with syscalls (rt_sigaction, rt_sigprocmask, kill), signal structures (sigaction, ksigaction_t, sig_frame), signal handling in trap.c, and signal trampoline assembly. Futex is not found anywhere in the codebase.",
+    "raw_output_excerpt": "Now I have all the evidence I need. Let me compile the comprehensive answer.\n\nSummary of findings:\n1. **Signal (signal)**: Fully implemented with:\n   - Signal structures: `sigaction`, `__sigset_t`, `ksigaction_t`, `sig_frame` defined in `include/sched/signal.h`\n   - Signal fields in PCB (`struct proc`): `sig_act`, `sig_set`, `sig_pending`, `sig_frame`, `killed`\n   - System calls: `sys_rt_sigaction`, `sys_rt_sigprocmask`, `sys_kill` (in `kernel/syscall/syssignal.c`)\n   - Core implementation: `set_sigaction`, `sigprocmask`, `sighandle`, `sigreturn`, `kill` (in `kernel/sched/signal.c` and `kernel/sched/proc.c`)\n   - Signal trampoline assembly: `kernel/trap/sig_trampoline.S`\n   - Signal handling invoked from `usertrap()` in `kernel/trap/trap.c`\n   - Signal actions copied during `clone()` in `kernel/sched/proc.c`\n   - Signal pending set on `exit()` for SIGCHLD\n\n2. **Futex**: Not found anywhere in the codebase.\n\nLet me now produce the final JSON output.\n\n```json\n{\n  \"status\": \"done\",\n  \"summary\": \"Signal (signal) is fully implemented with syscalls (rt_sigaction, rt_sigprocmask, kill), signal structures (sigaction, ksigaction_t, sig_frame), signal handling in trap.c, and signal trampoline assembly. Futex is not found anywhere in the codebase.\",\n  \"claim\": \"Signal is implemented; futex is not found.\",\n  \"structured_fact_results\": [\n    {\n      \"fact_id\": \"Q04_014_01\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [0, 1, 2, 3],\n      \"notes\": \"entity_state: Signal structures (sigaction, ksigaction_t, sig_frame, __sigset_t) are fully defined in include/sched/signal.h. PCB (struct proc) has signal fields: sig_act, sig_set, sig_pending, sig_frame, killed. These are initialized in allocproc() and used throughout signal handling.\"\n    },\n    {\n      \"fact_id\": \"Q04_014_02\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [4, 5, 6, 7],\n      \"notes\": \"syscall_or_kernel_entry: sys_rt_sigaction, sys_rt_sigprocmask, sys_kill are"
+  }
+}

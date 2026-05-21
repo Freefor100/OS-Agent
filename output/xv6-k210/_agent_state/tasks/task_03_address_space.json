@@ -1,0 +1,42 @@
+{
+  "task_id": "task_03_address_space",
+  "stage_id": "03_mem_mgmt",
+  "question_id": "Q03_009",
+  "question_ids": [
+    "Q03_009"
+  ],
+  "status": "done",
+  "evidence_ids": [
+    "ev_task_03_address_space_3e334dd4",
+    "ev_task_03_address_space_d6a8174d",
+    "ev_task_03_address_space_0621c8c6",
+    "ev_task_03_address_space_6a84c347",
+    "ev_task_03_address_space_21503ffb",
+    "ev_task_03_address_space_4c4ce459",
+    "ev_task_03_address_space_fdaabfbd",
+    "ev_task_03_address_space_c2b76f86",
+    "ev_task_03_address_space_f0a16924",
+    "ev_task_03_address_space_ce9d8d4e",
+    "ev_task_03_address_space_ffaa8c7c",
+    "ev_task_03_address_space_c9fc170c",
+    "ev_task_03_address_space_2f71c2e7",
+    "ev_task_03_address_space_7c67d31e",
+    "ev_task_03_address_space_32028373",
+    "ev_task_03_address_space_e7016329",
+    "ev_task_03_address_space_953fb076",
+    "ev_task_03_address_space_33240dcc"
+  ],
+  "draft_answer_ids": [
+    "draft_task_03_address_space_Q03_009_185cf5fe"
+  ],
+  "findings": [],
+  "confidence": "high",
+  "errors": [],
+  "token_usage": {},
+  "metadata": {
+    "evidence_count": 18,
+    "mode": "react",
+    "summary": "查证了 xv6-k210 内核与用户地址空间关系。每个进程拥有独立页表（通过 kvmcreate() 拷贝内核页表作为基础），进程切换时 scheduler() 切换 satp 到进程页表，返回内核时切回 kernel_pagetable。trampoline 页在用户和内核页表中映射到相同虚拟地址。物理页分配器使用 freelist 结构（非 buddy/bitmap/slab）。PTE 保护位（PTE_U/R/W/X）和 SSTATUS_PUM/SUM 实现用户/内核隔离。地址转换由 MMU 运行时通过 satp 完成。",
+    "raw_output_excerpt": "Now I have all the evidence. Let me produce the final structured JSON output.\n\n```json\n{\n  \"status\": \"done\",\n  \"summary\": \"查证了 xv6-k210 内核与用户地址空间关系。每个进程拥有独立页表（通过 kvmcreate() 拷贝内核页表作为基础），进程切换时 scheduler() 切换 satp 到进程页表，返回内核时切回 kernel_pagetable。trampoline 页在用户和内核页表中映射到相同虚拟地址。物理页分配器使用 freelist 结构（非 buddy/bitmap/slab）。PTE 保护位（PTE_U/R/W/X）和 SSTATUS_PUM/SUM 实现用户/内核隔离。地址转换由 MMU 运行时通过 satp 完成。\",\n  \"claim\": \"xv6-k210 采用每个进程独立页表（共享内核映射拷贝）的地址空间模型。进程切换时通过 w_satp() 切换页表基址寄存器。\",\n  \"structured_fact_results\": [\n    {\n      \"fact_id\": \"Q03_009_01\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [0, 1, 2, 3],\n      \"notes\": \"内存常量定义完整：PGSIZE=4096 (riscv.h:378), PGSHIFT=12 (riscv.h:379), KERNBASE=0x80020000 (memlayout.h:100), PHYSTOP=0x80600000 (memlayout.h:102), MAXUVA=RUSTSBI_BASE=0x80000000 (memlayout.h:130), TRAMPOLINE=MAXVA-PGSIZE (memlayout.h:106), Sv39 三级页表 (riscv.h:401-406)。\"\n    },\n    {\n      \"fact_id\": \"Q03_009_02\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [4, 5],\n      \"notes\": \"物理页分配器使用 freelist 结构（pm.c:33 struct run {next, npage}），分为 multiple（多页分配）和 single（单页分配）两个池。非 buddy/bitmap/slab 算法。kpminit() 初始化空闲链表，_allocpage()/_freepage() 实现分配释放。\"\n    },\n    {\n      \"fact_id\": \"Q03_009_03\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [6, 7, 8, 9],\n      \"notes\": \"walk() (vm.c:220-240) 实现 Sv39 三级页表遍历，mappages() (vm.c:310-340) 创建 PTE 映射，unmappages() (vm.c:350-390) 删除映射并可选释放物理页。kvmmap() 用于内核映射，uvmalloc()/uvmdealloc() 用于用户空间。所有函数真实修改 PTE 条目。\"\n    },\n    {\n      \"fact_id\": \"Q03_009_04\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [10, 11, 12, 13],\n      \"notes\": \"PTE 保护位定义完整：PTE_V/R/W/X/U (riscv.h:370-376)。PTE_U 控制用户态访问。SSTATUS_PUM (k210) / SSTATUS_SUM (QEMU) 控制内核能否访问用户内存（vm.h:13-31）。地址转换由 MMU 运行时通过 satp 寄存器完成（非链接/装载期重定位）。\"\n    },\n    {\n      \"fact_id\": \"Q03_009_05\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [14, 15, 16, 17, 18],\n "
+  }
+}

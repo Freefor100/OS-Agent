@@ -1,0 +1,36 @@
+{
+  "task_id": "task_05_block_cache",
+  "stage_id": "05_fs_drivers",
+  "question_id": "Q05_006",
+  "question_ids": [
+    "Q05_006",
+    "Q05_008"
+  ],
+  "status": "done",
+  "evidence_ids": [
+    "ev_task_05_block_cache_0afb5fb2",
+    "ev_task_05_block_cache_2d26fd56",
+    "ev_task_05_block_cache_80994832",
+    "ev_task_05_block_cache_da17b387",
+    "ev_task_05_block_cache_61d3fca9",
+    "ev_task_05_block_cache_bf215cdb",
+    "ev_task_05_block_cache_5e3e0556",
+    "ev_task_05_block_cache_bcfca518",
+    "ev_task_05_block_cache_b5b7b0ab",
+    "ev_task_05_block_cache_b96a31eb"
+  ],
+  "draft_answer_ids": [
+    "draft_task_05_block_cache_Q05_006_47a0bf38",
+    "draft_task_05_block_cache_Q05_008_ac863965"
+  ],
+  "findings": [],
+  "confidence": "high",
+  "errors": [],
+  "token_usage": {},
+  "metadata": {
+    "evidence_count": 10,
+    "mode": "react",
+    "summary": "查证了块缓存(bcache)和页缓存(page cache)的实现状态。bcache已完整实现(struct buf, hash+LRU, dirty/writeback, 接入read/write路径)。页缓存方面：没有struct page/address_space定义，没有page-level dirty/writeback；但存在inode->mapping (rb_root of mmap_page)用于跟踪文件mmap页，key为f_off(file offset)，mmap页通过buffer cache与read/write共享底层数据。",
+    "raw_output_excerpt": "Now I have all the information needed. Let me compile the final JSON output.\n\nKey conclusions:\n\n**Q05_006 (Block Cache / Buffer Cache)**: \n- Fully **implemented**. The buffer cache is in `kernel/fs/bio.c` with `struct buf` in `include/fs/buf.h`. It uses a hash table + LRU list, keyed by `dev + sectorno`. Has dirty tracking, writeback via `bwrite()` -> `disk_submit()`, and is fully integrated into the read/write path via `disk_read_block()`/`disk_write_block()` in `blkdev.c`.\n\n**Q05_008 (Page Cache)**:\n- **not_found** for a full page cache (no `struct page`, no `address_space`, no page-level dirty/writeback). \n- However, there IS a per-inode mmap page tracking mechanism (`inode->mapping` as `rb_root` of `struct mmap_page`) that tracks file-backed mmap pages. This is NOT a full page cache - it's a simple red-black tree for mmap'd pages with file offset as key. The buffer cache (bcache) serves as the block-level cache underneath.\n- The mmap pages DO share with read/write through the buffer cache: when a page fault occurs for a file mmap, `handle_file_mmap()` reads from the file via `ip->fop->read()` which goes through the buffer cache. When writeback happens (`__file_mmapdel` or `do_msync`), it writes via `ip->fop->write()` which also goes through the buffer cache.\n- So the answer is: no full page cache exists, but there's a mmap page tracking mechanism that works with the buffer cache underneath.\n\nLet me produce the final output.\n\n```json\n{\n  \"status\": \"done\",\n  \"summary\": \"查证了块缓存(bcache)和页缓存(page cache)的实现状态。bcache已完整实现(struct buf, hash+LRU, dirty/writeback, 接入read/write路径)。页缓存方面：没有struct page/address_space定义，没有page-level dirty/writeback；但存在inode->mapping (rb_root of mmap_page)用于跟踪文件mmap页，key为f_off(file offset)，mmap页通过buffer cache与read/write共享底层数据。\",\n  \"claim\": \"块缓存(bcache)已实现；页缓存(page cache)未实现(无struct page/address_space)，但存在基于inode->mapping的mmap页跟踪机制，通过buffer cache与read/write共享数据。\",\n  \"structured_fact_results\": [\n    {\n      \"fact_id\": \"Q05_006_01\",\n      \"status_o"
+  }
+}

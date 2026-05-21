@@ -1,38 +1,29 @@
 {
   "stage_id": "05_fs_drivers",
   "evidence_targets": [
-    "VFS 设计 (superblock/inode/dentry/file 四层抽象 + 操作表)",
-    "具体文件系统 FAT32 实现",
-    "fd table 与文件描述符分配",
-    "pipe 实现",
-    "块设备驱动框架 (bio 缓存层 + blkdev + disk 抽象)",
-    "中断注册与 PLIC 路由 (UART_IRQ / DISK_IRQ)",
-    "virtio 块设备驱动 (QEMU)",
-    "SD 卡 SPI 驱动 (K210)",
-    "平台适配 (QEMU vs K210 编译时切换)",
-    "mount/umount 与 sysfs 挂载机制",
-    "console 设备 (UART 字符设备)",
-    "poll/select 多路复用",
     "VFS 设计",
     "具体文件系统",
     "fd table",
-    "pipe/mmap"
+    "pipe/mmap",
+    "驱动框架",
+    "中断注册",
+    "块设备/网卡",
+    "平台适配",
+    "整盘挂载与根目录测例脚本交界"
   ],
   "seed_paths": [
-    "include/fs/fs.h",
-    "include/fs/file.h",
-    "include/fs/pipe.h",
-    "include/fs/buf.h",
-    "include/hal/disk.h",
-    "include/hal/virtio.h",
-    "kernel/fs/fs.c",
-    "kernel/fs/file.c",
-    "kernel/fs/blkdev.c",
-    "kernel/fs/mount.c",
-    "kernel/syscall/sysfile.c",
-    "kernel/main.c",
     "fs",
-    "vfs"
+    "vfs",
+    "file",
+    "inode",
+    "kernel/fs",
+    "driver",
+    "device",
+    "net",
+    "pci",
+    "virtio",
+    "uart",
+    "README.md"
   ],
   "framework_guess": [
     "xv6"
@@ -41,18 +32,16 @@
     "riscv64"
   ],
   "entry_symbols": [
-    "sys_openat",
-    "sys_read",
-    "sys_write",
-    "sys_mount",
-    "sys_pipe",
-    "filealloc",
-    "fdalloc",
-    "namei",
-    "create",
-    "do_mount",
     "sys_open",
-    "vfs_open"
+    "vfs_open",
+    "openat",
+    "File",
+    "Inode",
+    "probe",
+    "init_driver",
+    "uart_init",
+    "virtio",
+    "interrupt"
   ],
   "repo_hotspots": [
     "Makefile",
@@ -67,13 +56,10 @@
     "include/fs"
   ],
   "preferred_tools": [
-    "lsp_get_document_outline",
-    "lsp_get_definition",
-    "lsp_get_references",
-    "lsp_get_call_graph",
-    "read_code_segment",
     "rag_search_code",
-    "grep_in_repo"
+    "lsp_get_call_graph",
+    "lsp_get_definition",
+    "read_code_segment"
   ],
   "avoid_tools": [
     "blind_read_large_files",
@@ -86,37 +72,304 @@
     "max_memory_items": 8
   },
   "execution_steps": [
-    "1. 用 lsp_get_document_outline 鸟瞰 include/fs/fs.h，确认 VFS 核心结构体 (superblock/inode/dentry/fs_op/inode_op/dentry_op/file_op) 的完整字段",
-    "2. 用 read_code_segment 精读 include/fs/fs.h 中 superblock 结构体 (约 L80-L95) 和 inode 结构体 (约 L105-L125)，记录关键字段与注释",
-    "3. 用 lsp_get_document_outline 鸟瞰 include/fs/file.h，确认 file/fdtable/iovec 结构体及 file_type_e 枚举",
-    "4. 用 read_code_segment 精读 include/fs/file.h 中 file 结构体 (L18-L29) 和 fdtable 结构体 (L32-L41)，记录 type 枚举值 FD_NONE/FD_PIPE/FD_INODE/FD_DEVICE",
-    "5. 用 lsp_get_document_outline 鸟瞰 kernel/fs/fs.c，确认 VFS 核心函数 (create/unlink/namei/nameiparent/idup/iput/ilock/iunlock/syncfs 等)",
-    "6. 用 read_code_segment 精读 kernel/fs/fs.c 中 create() (L24-L110) 和 namei() (L463-L468)，理解路径解析与 inode 创建流程",
-    "7. 用 lsp_get_document_outline 鸟瞰 kernel/fs/file.c，确认文件操作函数 (filealloc/filedup/fileclose/fileread/filewrite/fdalloc/fdalloc3 等)",
-    "8. 用 read_code_segment 精读 kernel/fs/file.c 中 filealloc() (L30-L44) 和 fdalloc() (L411-L445)，理解文件结构分配与 fd 分配算法",
-    "9. 用 read_code_segment 精读 kernel/fs/file.c 中 fileread() (L113-L155) 和 filewrite() (L157-L192)，理解按 type 分派到 pipe/device/inode 的读写路径",
-    "10. 用 read_code_segment 精读 kernel/fs/file.c 中 copyfdtable() (L313-L345) 和 fdcloexec() (L497-L530)，理解 fork 时 fd table 复制与 exec 时 close-on-exec 处理",
-    "11. 用 lsp_get_document_outline 鸟瞰 kernel/syscall/sysfile.c，确认所有文件系统相关系统调用 (sys_openat/sys_read/sys_write/sys_close/sys_pipe/sys_mount 等约 30 个)",
-    "12. 用 read_code_segment 精读 kernel/syscall/sysfile.c 中 sys_openat() (L194-L268)，追踪从路径解析到 filealloc/fdalloc 的完整 open 流程",
-    "13. 用 read_code_segment 精读 kernel/syscall/sysfile.c 中 sys_mount() (L492-L538) 和 sys_umount() (L539-L566)，理解挂载系统调用入口",
-    "14. 用 read_code_segment 精读 kernel/syscall/sysfile.c 中 sys_pipe() (L317-L353)，理解 pipe 创建与两个 fd 返回",
-    "15. 用 lsp_get_document_outline 鸟瞰 kernel/fs/blkdev.c，确认块设备操作函数 (img_read_block/img_write_block/disk_read_block/disk_write_block/fs_install/fs_uninstall)",
-    "16. 用 read_code_segment 精读 kernel/fs/blkdev.c 中 fs_install() (L169-L245)，理解如何根据 dev 类型 (块设备 vs 普通文件) 选择 disk_* 或 img_* 操作并绑定 FAT32",
-    "17. 用 lsp_get_document_outline 鸟瞰 kernel/fs/mount.c，确认 do_mount/do_umount/mountsysfs 函数",
-    "18. 用 read_code_segment 精读 kernel/fs/mount.c 中 do_mount() (L93-L147)，理解 superblock 链管理、dentry 挂载点绑定",
-    "19. 用 lsp_get_document_outline 鸟瞰 kernel/fs/rootfs.c，确认 rootfs/procfs/devfs 三个虚拟文件系统及其 dummy 操作",
-    "20. 用 read_code_segment 精读 kernel/fs/rootfs.c 中 rootfs_init() (L230-L313)，理解 /dev /proc 虚拟目录的初始化与 console/zero/null 设备注册",
-    "21. 用 lsp_get_document_outline 鸟瞰 kernel/fs/fat32/fat32.c 和 kernel/fs/fat32/fat32.h，确认 FAT32 的 inode_op/file_op 实现及 fat32_init/fat_alloc_inode 等",
-    "22. 用 read_code_segment 精读 kernel/fs/fat32/fat32.c 中 fat32_init() (L47-L140)，理解 FAT32 超级块读取与根目录 inode 初始化",
-    "23. 用 lsp_get_document_outline 鸟瞰 kernel/fs/pipe.c 和 include/fs/pipe.h，确认 pipe 结构体字段与 pipealloc/pipewrite/piperead 函数",
-    "24. 用 read_code_segment 精读 kernel/fs/pipe.c 中 pipealloc() (L39-L95) 和 pipewrite() (L240-L300)，理解环形缓冲区与 wait_queue 同步机制",
-    "25. 用 lsp_get_document_outline 鸟瞰 kernel/fs/bio.c 和 include/fs/buf.h，确认 buf 结构体与 bget/bread/bwrite/brelse 缓存接口",
-    "26. 用 read_code_segment 精读 kernel/fs/bio.c 中 binit() (L84-L106) 和 bread() (L185-L196)，理解块缓存初始化与读取流程",
-    "27. 用 lsp_get_document_outline 鸟瞰 kernel/hal/disk.c 和 include/hal/disk.h，确认 disk_init/disk_read/disk_write 等抽象接口",
-    "28. 用 read_code_segment 精读 kernel/hal/disk.c 全部 (L1-L173)，理解编译时 #ifdef QEMU 切换 virtio_disk_* 与 sdcard_* 的机制",
-    "29. 用 lsp_get_document_outline 鸟瞰 kernel/hal/virtio_disk.c 和 include/hal/virtio.h，确认 virtio 队列结构 (virtq_desc/virtq_avail/virtq_used) 与 virtio_disk_rw",
-    "30. 用 lsp_get_document_outline 鸟瞰 kernel/hal/sdcard.c，确认 SD 卡 SPI 初始化与读写 (sd_init/sdcard_read/sdcard_write/sdcard_intr)",
-    "31. 用 read_code_segment 精读 kernel/trap/trap.c 中 handle_intr() (L246-L330)，理解 UART_IRQ→consoleintr 和 DISK_IRQ→disk_intr 的中断路由",
-    "32. 用 read_code_segment 精读 kernel/main.c 中 main() (L34-L98)，确认启动初始化顺序：disk_init()→binit()→userinit()，以及 plicinit()/plicinithart() 的调用时机"
+    "对照 seed_paths、entry_symbols，用 rag_search_code / list_repo_structure / LSP 锁定与本阶段相关的关键文件与符号。",
+    "对核心入口使用 lsp_get_document_outline → lsp_get_call_graph（单入口、浅深度）→ 必要时 read_code_segment 精读。",
+    "按题单逐项输出结论，每条附反引号源码路径；无实现则显式写「未发现/桩函数」等，勿臆测。"
+  ],
+  "task_plan": [
+    {
+      "task_id": "task_05_vfs_interface",
+      "question_ids": [
+        "Q05_001",
+        "Q05_002",
+        "Q05_003",
+        "Q05_004",
+        "Q05_005",
+        "Q05_007",
+        "Q05_010",
+        "Q05_011",
+        "Q05_012",
+        "Q05_013",
+        "Q05_014",
+        "Q05_015",
+        "Q05_016",
+        "Q05_031"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证VFS抽象层接口形态、具体文件系统后端、文件打开路径、FD Table实现、缓存驱逐策略、poll/select/epoll、路径解析、符号链接、管道、socket、伪文件系统、FD Table归属、MMU前后串口地址切换等共享VFS/文件系统核心证据链的题目。需要找到VFS核心对象定义（File/Inode/Dentry/SuperBlock）、具体后端实现、syscall路径、FD Table结构体定义、路径解析函数、符号链接处理、pipe/socket/devfs/procfs实现、fd table归属结构、MMU地址切换逻辑等强证据。",
+      "group_reason": "这些题目都围绕VFS抽象层、具体文件系统后端、文件打开路径、FD Table、路径解析、特殊文件对象等共享同一实现线索，需要从VFS核心对象定义、syscall路径、后端实现等证据链中获取答案。",
+      "query": "查找VFS核心对象定义（File/Inode/Dentry/SuperBlock）、具体文件系统后端实现（如ramfs/FAT32）、sys_open/read/write syscall路径、FD Table结构体定义、路径解析函数（namei/path_walk/lookup）、符号链接处理、pipe/socket/devfs/procfs实现、fd table归属结构、MMU地址切换逻辑。需要读取定义、实现体、调用点、usage_flow等强证据。",
+      "seed_paths": [
+        "kernel/fs",
+        "include/fs",
+        "kernel/syscall",
+        "kernel/mm",
+        "include"
+      ],
+      "entry_symbols": [
+        "sys_open",
+        "vfs_open",
+        "openat",
+        "File",
+        "Inode",
+        "Dentry",
+        "SuperBlock",
+        "fd_table",
+        "namei",
+        "path_walk",
+        "lookup",
+        "symlink",
+        "pipe",
+        "socket",
+        "devfs",
+        "procfs",
+        "mmu",
+        "virt_to_phys"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow"
+      ]
+    },
+    {
+      "task_id": "task_05_block_cache",
+      "question_ids": [
+        "Q05_006",
+        "Q05_008"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证块缓存/缓冲缓存和页缓存的实现状态、结构定义、key粒度、dirty/writeback、mmap共享、read/write集成等。需要找到bcache/page_cache/address_space结构定义、缓存key字段、dirty标记、writeback路径、mmap共享证据、read/write/page fault集成证据。",
+      "group_reason": "这两题都涉及缓存机制，共享缓存结构定义、key粒度、dirty/writeback、mmap共享、read/write集成等证据链。",
+      "query": "查找块缓存/缓冲缓存（bcache/buffer cache）和页缓存（page_cache/address_space）的结构定义、缓存key字段（device+blockno vs inode+page offset）、dirty标记、writeback路径、文件mmap页是否与read/write共享同一缓存页、缓存是否接入read/write/page fault主路径。需要读取定义、实现体、调用点、usage_flow等强证据。",
+      "seed_paths": [
+        "kernel/fs",
+        "kernel/mm",
+        "include/fs",
+        "include/mm",
+        "kernel/block"
+      ],
+      "entry_symbols": [
+        "bcache",
+        "buffer_cache",
+        "page_cache",
+        "address_space",
+        "inode",
+        "pgoff",
+        "dirty",
+        "writeback",
+        "mmap",
+        "read",
+        "write",
+        "page_fault"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow"
+      ]
+    },
+    {
+      "task_id": "task_05_mmap",
+      "question_ids": [
+        "Q05_009"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证mmap文件映射或匿名映射的实现状态。需要找到mmap/munmap syscall入口、参数/flag解析、VMA结构定义、page fault路径、munmap/exit释放逻辑等强证据。",
+      "group_reason": "mmap实现独立，需要单独查证syscall入口、VMA结构、page fault路径、释放逻辑等证据链。",
+      "query": "查找mmap/munmap syscall入口、参数/flag解析（addr/len/prot/flags/fd/offset）、VMA/映射区结构定义、page fault根据VMA类型分配匿名页或读取文件页的路径、munmap/exit释放映射/页表/文件引用的逻辑。需要读取定义、实现体、调用点、usage_flow等强证据。",
+      "seed_paths": [
+        "kernel/mm",
+        "kernel/syscall",
+        "include/mm",
+        "kernel/fs"
+      ],
+      "entry_symbols": [
+        "mmap",
+        "munmap",
+        "MAP_FIXED",
+        "MAP_ANON",
+        "MAP_SHARED",
+        "MAP_PRIVATE",
+        "PROT_READ",
+        "VMA",
+        "page_fault",
+        "file"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow"
+      ]
+    },
+    {
+      "task_id": "task_05_file_allocation",
+      "question_ids": [
+        "Q05_017",
+        "Q05_018",
+        "Q05_019",
+        "Q05_020"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证文件数据块分配方式、空闲空间管理、目录结构、文件记录组织等Stallings Ch12文件管理概念。需要找到具体FS后端的分配算法、空闲空间管理方法、目录结构、记录组织等证据。",
+      "group_reason": "这四题都涉及Stallings Ch12文件管理概念，共享具体FS后端结构和算法证据链。",
+      "query": "查找具体文件系统后端的文件数据块分配方式（连续/链式/索引/extent/混合）、空闲空间管理方法（位图/空闲链表/成组链接/计数法/FAT）、目录结构（单级/两级/树形/无环图/通用图）、文件记录组织（字节流/固定长度/可变长度）。需要读取定义、实现体、调用点、usage_flow等强证据。",
+      "seed_paths": [
+        "kernel/fs",
+        "include/fs",
+        "kernel/block"
+      ],
+      "entry_symbols": [
+        "alloc",
+        "free",
+        "bitmap",
+        "inode",
+        "directory",
+        "record",
+        "contiguous",
+        "linked",
+        "indexed",
+        "extent",
+        "FAT"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow"
+      ]
+    },
+    {
+      "task_id": "task_05_drivers_io",
+      "question_ids": [
+        "Q05_021",
+        "Q05_022",
+        "Q05_023",
+        "Q05_024",
+        "Q05_025",
+        "Q05_026",
+        "Q05_027",
+        "Q05_028",
+        "Q05_029",
+        "Q05_030",
+        "Q05_032",
+        "Q05_033",
+        "Q05_034",
+        "Q05_035",
+        "Q05_036",
+        "Q05_037"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证设备发现机制、DTB解析、驱动框架接口、驱动注册初始化顺序、UART/Console驱动、块设备驱动、网络设备驱动、中断控制器驱动、MMIO地址来源、多平台适配、I/O缓冲模式、磁盘调度算法、I/O控制技术、DMA传输路径、I/O软件分层、异步同步I/O等驱动和I/O相关题目。需要找到设备发现代码、DTB解析入口、Driver trait/ops定义、init_drivers/probe顺序、UART驱动实现、virtio-blk/ramdisk驱动、virtio-net驱动、PLIC/CLINT驱动、MMIO地址来源、Makefile/Kconfig条件编译、缓冲结构定义、请求队列、调度算法字段、数据搬运方式、DMA描述符环、I/O分层调用链、阻塞/非阻塞/异步I/O路径等强证据。",
+      "group_reason": "这些题目都围绕设备驱动框架、I/O控制技术、具体驱动实现、中断、DMA、缓冲、调度等共享同一实现线索，需要从驱动框架定义、设备发现、驱动注册、具体驱动实现、I/O路径等证据链中获取答案。",
+      "query": "查找设备发现机制（DTB/PCI/硬编码）、DTB解析入口、驱动框架接口（Driver trait/ops）、驱动注册初始化顺序（init_drivers/probe）、UART/Console驱动实现、块设备驱动（virtio-blk/ramdisk）、网络设备驱动（virtio-net）、中断控制器驱动（PLIC/CLINT）、MMIO地址来源（DTB/常量/转换）、多平台适配（Makefile/Kconfig/条件编译）、I/O缓冲模式（单缓冲/双缓冲/环形缓冲/缓冲池）、磁盘调度算法（FCFS/SSTF/SCAN/C-SCAN/virtio环）、I/O控制技术（PIO/中断驱动/DMA）、DMA传输路径（dma_alloc/dma_map/描述符环）、I/O软件分层（syscall->VFS->驱动->硬件）、异步同步I/O（阻塞/非阻塞/异步完成队列）。需要读取定义、实现体、调用点、usage_flow等强证据。",
+      "seed_paths": [
+        "kernel/driver",
+        "kernel/hal",
+        "kernel/fs",
+        "kernel/trap",
+        "include/driver",
+        "include/hal",
+        "Makefile",
+        "kernel/block",
+        "kernel/net"
+      ],
+      "entry_symbols": [
+        "probe",
+        "init_driver",
+        "uart_init",
+        "virtio",
+        "interrupt",
+        "PLIC",
+        "CLINT",
+        "MMIO",
+        "DTB",
+        "driver",
+        "DMA",
+        "dma_alloc",
+        "dma_map",
+        "virtqueue",
+        "descriptor",
+        "buffer",
+        "ring",
+        "queue",
+        "FCFS",
+        "SSTF",
+        "SCAN",
+        "C-SCAN",
+        "elevator",
+        "sys_read",
+        "sys_write",
+        "vfs",
+        "FileOps",
+        "BlockDevice",
+        "async",
+        "aio",
+        "completion",
+        "callback",
+        "poll",
+        "select",
+        "epoll",
+        "WouldBlock",
+        "EAGAIN",
+        "nonblock",
+        "waitqueue"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow"
+      ]
+    },
+    {
+      "task_id": "task_05_file_sharing",
+      "question_ids": [
+        "Q05_038"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证文件共享访问权与并发访问控制的实现状态。需要找到inode/file权限元数据（owner/mode/ACL）、权限检查调用点（open/read/write/exec/unlink/chmod/chown）、拒绝路径（EACCES/EPERM）、并发访问控制（inode/file lock）等强证据。",
+      "group_reason": "文件共享访问权与并发访问控制独立于其他文件系统概念，需要单独查证权限元数据、检查调用点、拒绝路径、并发锁等证据链。",
+      "query": "查找inode/file/dentry的权限元数据（owner/mode/ACL/capability）、open/read/write/exec/unlink/chmod/chown路径中的权限检查函数调用、权限不足时返回EACCES/EPERM的拒绝路径、并发读写/append/truncate/rename的inode/file lock或事务保护。需要读取定义、实现体、调用点、usage_flow等强证据。",
+      "seed_paths": [
+        "kernel/fs",
+        "kernel/vfs",
+        "kernel/security",
+        "include/fs",
+        "include/security"
+      ],
+      "entry_symbols": [
+        "inode_permission",
+        "check_perm",
+        "access",
+        "mode",
+        "uid",
+        "gid",
+        "ACL",
+        "chmod",
+        "chown",
+        "flock",
+        "fcntl",
+        "file lock",
+        "O_APPEND",
+        "EACCES",
+        "EPERM"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow"
+      ]
+    }
   ]
 }

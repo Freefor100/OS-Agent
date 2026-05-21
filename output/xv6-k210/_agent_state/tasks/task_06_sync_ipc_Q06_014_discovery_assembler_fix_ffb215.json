@@ -1,0 +1,40 @@
+{
+  "task_id": "task_06_sync_ipc_Q06_014_discovery_assembler_fix_ffb215",
+  "stage_id": "06_sync_ipc",
+  "question_id": "Q06_014",
+  "question_ids": [
+    "Q06_014"
+  ],
+  "status": "done",
+  "evidence_ids": [
+    "ev_task_06_sync_ipc_Q06_014_discovery_assembler_fix_ffb215_56670bc5",
+    "ev_task_06_sync_ipc_Q06_014_discovery_assembler_fix_ffb215_5d29eef2",
+    "ev_task_06_sync_ipc_Q06_014_discovery_assembler_fix_ffb215_d8093f0b",
+    "ev_task_06_sync_ipc_Q06_014_discovery_assembler_fix_ffb215_51607f04",
+    "ev_task_06_sync_ipc_Q06_014_discovery_assembler_fix_ffb215_7396a4c2",
+    "ev_task_06_sync_ipc_Q06_014_discovery_assembler_fix_ffb215_38f27715",
+    "ev_task_06_sync_ipc_Q06_014_discovery_assembler_fix_ffb215_fab0efb6",
+    "ev_task_06_sync_ipc_Q06_014_discovery_assembler_fix_ffb215_fc62df99",
+    "ev_task_06_sync_ipc_Q06_014_discovery_assembler_fix_ffb215_a21bed99",
+    "ev_task_06_sync_ipc_Q06_014_discovery_assembler_fix_ffb215_725011c3",
+    "ev_task_06_sync_ipc_Q06_014_discovery_assembler_fix_ffb215_eafbb0ab",
+    "ev_task_06_sync_ipc_Q06_014_discovery_assembler_fix_ffb215_639298ad",
+    "ev_task_06_sync_ipc_Q06_014_discovery_assembler_fix_ffb215_d79d6745",
+    "ev_task_06_sync_ipc_Q06_014_discovery_assembler_fix_ffb215_1cd29fcf",
+    "ev_task_06_sync_ipc_Q06_014_discovery_assembler_fix_ffb215_9bb2e6bb",
+    "ev_task_06_sync_ipc_Q06_014_discovery_assembler_fix_ffb215_d5d88bb3"
+  ],
+  "draft_answer_ids": [
+    "draft_task_06_sync_ipc_Q06_014_discovery_assembler_fix_ffb215_Q06_014_627a8574"
+  ],
+  "findings": [],
+  "confidence": "high",
+  "errors": [],
+  "token_usage": {},
+  "metadata": {
+    "evidence_count": 16,
+    "mode": "react",
+    "summary": "对 xv6-k210 内核的锁实现（spinlock/sleeplock）及死锁相关代码进行了全面分析，确认了 Coffman 四必要条件在该内核中均成立，死锁处理策略以预防（锁顺序+关中断）为主、辅以 trylock 避免，无正式死锁检测/恢复机制。",
+    "raw_output_excerpt": "Good. Now I have all the evidence I need. Let me compile the final structured JSON output.\n\n```json\n{\n  \"status\": \"done\",\n  \"summary\": \"对 xv6-k210 内核的锁实现（spinlock/sleeplock）及死锁相关代码进行了全面分析，确认了 Coffman 四必要条件在该内核中均成立，死锁处理策略以预防（锁顺序+关中断）为主、辅以 trylock 避免，无正式死锁检测/恢复机制。\",\n  \"claim\": \"xv6-k210 内核中死锁四必要条件（Coffman Conditions）均成立：互斥（spinlock/sleeplock 实现）、持有并等待（acquiresleep/sleep 模式）、不可剥夺（spinlock 自旋等待、无抢占锁持有者）、循环等待（存在嵌套锁路径，通过锁顺序注释和 trysleeplock 缓解但无正式 lockdep 检测）。死锁策略为预防+局部避免，无检测/恢复。\",\n  \"structured_fact_results\": [\n    {\n      \"fact_id\": \"Q06_014_01\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [0, 1, 2],\n      \"notes\": \"spinlock 和 sleeplock 均实现互斥访问。spinlock 使用原子 amoswap 指令 test-and-set；sleeplock 内部使用 spinlock 保护 locked 标志。两者都确保同一时刻只有一个执行流能进入临界区。\"\n    },\n    {\n      \"fact_id\": \"Q06_014_02\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [3, 4, 5, 6],\n      \"notes\": \"acquiresleep() 在持有内部 spinlock (lk->lk) 的同时等待 locked 标志释放（通过 sleep()）。pipe 的 pipelock() 在持有 waitqueue spinlock 的同时等待成为队列第一个。sleep() 函数在释放调用者锁之前先获取 proc_lock，体现了持有并等待模式。\"\n    },\n    {\n      \"fact_id\": \"Q06_014_03\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [0, 1, 7],\n      \"notes\": \"spinlock acquire() 使用 while(__sync_lock_test_and_set) 自旋等待，无法被抢占。push_off() 关中断防止死锁，但也意味着锁持有者不能被中断/调度抢占。sleeplock 虽可睡眠但锁本身不可被其他线程强制剥夺。不存在 spinlock 的 trylock 变体（只有 sleeplock 有 trysleeplock）。\"\n    },\n    {\n      \"fact_id\": \"Q06_014_04\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [8, 9, 10, 11, 12],\n      \"notes\": \"存在嵌套锁路径：proc_lock 与进程锁 (p->lk) 的嵌套（exit/wait4），文件系统 inode 锁与 cache_lock 的嵌套，rename 操作中两个 inode 锁的嵌套。内核通过注释约定锁顺序（proc_lock 最后获取）和 trysleeplock 来缓解，但无正式 lockdep/ABBA 检测，循环等待条件在理论上成立。\"\n    },\n    {\n      \"fact_id\": \"Q06_014_05\",\n      \"status_or_value\": \"yes_weak\",\n      \"evidence_candidate_indexes\": [8, 9, 10, 11, 12, 13, 14],\n      \"notes\": \"死锁策略以预防为主：锁顺序约定（proc_lock 最后获取）、acquire 中 push_off 关中断防止中断处理程序死锁。辅以局"
+  }
+}

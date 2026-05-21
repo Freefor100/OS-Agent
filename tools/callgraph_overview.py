@@ -742,7 +742,7 @@ def _format_caller_hints(
 
 
 def _extract_token_usage_from_response(response) -> Dict[str, int]:
-    """与 os_agent_d_describe.print_step / core.vectorizer 一致，从 LLM 响应取 token。"""
+    """从 LLM 响应中提取 token usage。"""
     metadata = getattr(response, "response_metadata", None) or {}
     usage = metadata.get("token_usage", {}) or {}
     return {

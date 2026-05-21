@@ -1,0 +1,34 @@
+{
+  "task_id": "task_02_boot_trap_Q02_008_definition_assembler_fix_af0bc6",
+  "stage_id": "02_boot_trap",
+  "question_id": "Q02_008",
+  "question_ids": [
+    "Q02_008"
+  ],
+  "status": "done",
+  "evidence_ids": [
+    "ev_task_02_boot_trap_Q02_008_definition_assembler_fix_af0bc6_f7ba0bf0",
+    "ev_task_02_boot_trap_Q02_008_definition_assembler_fix_af0bc6_0d71a6aa",
+    "ev_task_02_boot_trap_Q02_008_definition_assembler_fix_af0bc6_442ad0fc",
+    "ev_task_02_boot_trap_Q02_008_definition_assembler_fix_af0bc6_8f6d46f1",
+    "ev_task_02_boot_trap_Q02_008_definition_assembler_fix_af0bc6_56c012b3",
+    "ev_task_02_boot_trap_Q02_008_definition_assembler_fix_af0bc6_304085dd",
+    "ev_task_02_boot_trap_Q02_008_definition_assembler_fix_af0bc6_8680a778",
+    "ev_task_02_boot_trap_Q02_008_definition_assembler_fix_af0bc6_74b2dbba",
+    "ev_task_02_boot_trap_Q02_008_definition_assembler_fix_af0bc6_6406346e",
+    "ev_task_02_boot_trap_Q02_008_definition_assembler_fix_af0bc6_09b7c967"
+  ],
+  "draft_answer_ids": [
+    "draft_task_02_boot_trap_Q02_008_definition_assembler_fix_af0bc6_Q02_008_973ac9ce"
+  ],
+  "findings": [],
+  "confidence": "high",
+  "errors": [],
+  "token_usage": {},
+  "metadata": {
+    "evidence_count": 10,
+    "mode": "react",
+    "summary": "FPU 初始化/启用已实现：floatinithart() 在 include/hal/riscv.h 中定义，通过设置 sstatus.fs 位（INIT→CLEAN）和浮点舍入模式（FRM_RNE）来启用 FPU；该函数在 kernel/main.c 的 hart 0 和 hart 1 启动路径中被调用；FPU 上下文通过 floatstore/floatload（fcntxt.S）在进程切换时保存/恢复；trapframe 包含完整的浮点寄存器（ft0-ft11, fs0-fs11, fa0-fa7, fcsr）。",
+    "raw_output_excerpt": "Now I have all the evidence. Let me produce the final structured JSON output.\n\n{\n  \"status\": \"done\",\n  \"summary\": \"FPU 初始化/启用已实现：floatinithart() 在 include/hal/riscv.h 中定义，通过设置 sstatus.fs 位（INIT→CLEAN）和浮点舍入模式（FRM_RNE）来启用 FPU；该函数在 kernel/main.c 的 hart 0 和 hart 1 启动路径中被调用；FPU 上下文通过 floatstore/floatload（fcntxt.S）在进程切换时保存/恢复；trapframe 包含完整的浮点寄存器（ft0-ft11, fs0-fs11, fa0-fa7, fcsr）。\",\n  \"claim\": \"xv6-k210 在启动过程中通过 floatinithart() 初始化并启用了 FPU（sstatus.fs），并在进程调度中保存/恢复 FPU 上下文。\",\n  \"structured_fact_results\": [\n    {\n      \"fact_id\": \"Q02_008_01\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [0, 1],\n      \"notes\": \"linker/k210.ld 使用 ENTRY(_start)，linker/linker64.ld 使用 ENTRY(_entry)，分别对应 kernel/entry_k210.S 的 _start 和 kernel/entry.S 的 _entry。链接脚本明确指定了入口点。\"\n    },\n    {\n      \"fact_id\": \"Q02_008_02\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [2, 3, 4],\n      \"notes\": \"入口汇编（entry.S/entry_k210.S/entry_qemu.S）设置栈指针（sp），然后直接 call main。未在汇编层设置 FPU——FPU 初始化在 C 层 main() 中完成。\"\n    },\n    {\n      \"fact_id\": \"Q02_008_03\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [5, 6, 7],\n      \"notes\": \"main() 中 hart 0 调用 floatinithart()（第42行），hart 1 也调用 floatinithart()（第81行）。floatinithart() 设置 sstatus.fs 为 INIT 再 CLEAN，并设置舍入模式 FRM_RNE。\"\n    },\n    {\n      \"fact_id\": \"Q02_008_04\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [2, 3, 4, 5],\n      \"notes\": \"入口汇编（_start/_entry）设置栈后直接 call main，将控制流传递给 C 主入口 main(unsigned long hartid, unsigned long dtb_pa)。\"\n    },\n    {\n      \"fact_id\": \"Q02_008_05\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [8],\n      \"notes\": \"Makefile 通过 platform 变量（k210/qemu）选择不同的入口文件（entry_k210.S/entry_qemu.S）、链接脚本（k210.ld/linker64.ld）和 SBI 实现。CFLAGS 使用 -march=rv64imafdc 包含浮点指令集。\"\n    },\n    {\n      \"fact_id\": \"Q02_008_06\",\n      \"status_or_value\": {\n        \"searched_keywords\": [\"sstatus\", \"fs\", \"FPU\", \"fpu\", \"fcsr\", \"floatinit"
+  }
+}

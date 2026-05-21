@@ -1,0 +1,39 @@
+{
+  "task_id": "task_07_access_control_model",
+  "stage_id": "07_security",
+  "question_id": "Q07_013",
+  "question_ids": [
+    "Q07_013"
+  ],
+  "status": "done",
+  "evidence_ids": [
+    "ev_task_07_access_control_model_171e5358",
+    "ev_task_07_access_control_model_e2934f40",
+    "ev_task_07_access_control_model_db140168",
+    "ev_task_07_access_control_model_a93745a5",
+    "ev_task_07_access_control_model_6a649c67",
+    "ev_task_07_access_control_model_6d21c122",
+    "ev_task_07_access_control_model_aac6778b",
+    "ev_task_07_access_control_model_eb3e6fe8",
+    "ev_task_07_access_control_model_38dca2b2",
+    "ev_task_07_access_control_model_c878c13e",
+    "ev_task_07_access_control_model_09743843",
+    "ev_task_07_access_control_model_bc904ddf",
+    "ev_task_07_access_control_model_e1730995",
+    "ev_task_07_access_control_model_3e1a10b3",
+    "ev_task_07_access_control_model_226dbf25"
+  ],
+  "draft_answer_ids": [
+    "draft_task_07_access_control_model_Q07_013_80f07092"
+  ],
+  "findings": [],
+  "confidence": "high",
+  "errors": [],
+  "token_usage": {},
+  "metadata": {
+    "evidence_count": 15,
+    "mode": "react",
+    "summary": "xv6-k210 没有实现真正的访问控制模型。struct proc 无 uid/gid 字段；sys_getuid() 固定返回 0；struct inode 有 mode 字段但仅用于区分文件类型；sys_faccessat 检查 owner 权限位但 uid 恒为 0 形同虚设；fileread/filewrite 仅检查 open 时设置的 readable/writable 标志，不基于主体身份。唯一的安全机制是 RISC-V 硬件 S/U 模式隔离 (PTE_U)。",
+    "raw_output_excerpt": "Now I have all the evidence. Let me compile the final structured JSON output.\n\n```json\n{\n  \"status\": \"done\",\n  \"summary\": \"xv6-k210 没有实现真正的访问控制模型。struct proc 无 uid/gid 字段；sys_getuid() 固定返回 0；struct inode 有 mode 字段但仅用于区分文件类型；sys_faccessat 检查 owner 权限位但 uid 恒为 0 形同虚设；fileread/filewrite 仅检查 open 时设置的 readable/writable 标志，不基于主体身份。唯一的安全机制是 RISC-V 硬件 S/U 模式隔离 (PTE_U)。\",\n  \"claim\": \"xv6-k210 未实现 DAC/MAC/RBAC/ACL/capability 等访问控制模型；存在 uid/gid/mode 字段定义和 faccessat 系统调用存根，但均无实际强制访问控制效果。\",\n  \"structured_fact_results\": [\n    {\n      \"fact_id\": \"Q07_013_01\",\n      \"status_or_value\": \"stub_or_declaration_only\",\n      \"evidence_candidate_indexes\": [0, 1, 2, 3],\n      \"notes\": \"主体凭证：struct proc 无 uid/gid 字段；sys_getuid() 固定返回 0；sys_geteuid/getgid/getegid 均映射到 sys_getuid（返回 0）。无 credential/capability/role 机制。仅有 RISC-V PTE_U 区分 S/U 模式。\"\n    },\n    {\n      \"fact_id\": \"Q07_013_02\",\n      \"status_or_value\": \"stub_or_declaration_only\",\n      \"evidence_candidate_indexes\": [4, 5, 6, 7, 8],\n      \"notes\": \"对象权限元数据：struct inode 有 mode 字段（uint16），struct kstat 有 uid/gid 字段但始终为 0。FAT32 设置 mode = type | 0x1ff（即 0777）。无 ACL/label。mode 主要用于区分文件类型（S_IFREG/S_IFDIR/S_IFCHR），owner/mode 权限位存在但无实际校验。\"\n    },\n    {\n      \"fact_id\": \"Q07_013_03\",\n      \"status_or_value\": \"stub_or_declaration_only\",\n      \"evidence_candidate_indexes\": [9, 10, 11, 12, 13],\n      \"notes\": \"强制检查路径：fileread/filewrite 仅检查 f->readable/f->writable（open 时根据 O_RDONLY/O_WRONLY/O_RDWR 设置），不基于主体身份。sys_openat 不检查文件权限。sys_faccessat 检查 (ip->mode>>6)&0x7 但 uid 恒为 0 形同虚设。EACCES/EPERM 用于结构错误（如 unlink root、类型不匹配），非访问控制。\"\n    },\n    {\n      \"fact_id\": \"Q07_013_04\",\n      \"status_or_value\": \"no_after_negative_search\",\n      \"evidence_candidate_indexes\": [14],\n      \"notes\": \"模型分类：未实现 DAC/MAC/RBAC/ACL/capability 中的任何一种。仅有 uid/gid/mode 字段定义和 faccessat 存根，但无实际强制访问控制。唯一的安全机制是 RISC-V 硬件 S/U 模式隔离（PTE_U）。\"\n    },\n    {\n      \"fact_id\": \"Q07_013_05\",\n      \"status_or_value\": {\n        \"searched_keywords\": [\"DAC\", \"MAC\", \"RBAC\", \"ACL\", \"capability\", \"ui"
+  }
+}

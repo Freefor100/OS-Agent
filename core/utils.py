@@ -150,20 +150,6 @@ def parse_env_repo_list(var_name: str, dotenv_path: str = ".env") -> list:
 def format_tool_call_summary(tool_name: str, tool_args: dict) -> str:
     """格式化工具调用为简洁摘要"""
 
-    # OS-Agent C：调用图对比（避免只显示第一个参数）
-    if tool_name == "compare_call_graphs":
-        repo_a = tool_args.get("repo_a", "?")
-        repo_b = tool_args.get("repo_b", "?")
-        entry = tool_args.get("entry_function", tool_args.get("function_name", "?"))
-        return f"repo_a={repo_a}, repo_b={repo_b}, entry_function={entry}"
-
-    # OS-Agent C：函数 Token 相似度（避免只显示第一个参数）
-    if tool_name == "compare_function_tokens":
-        repo_a = tool_args.get("repo_a", "?")
-        repo_b = tool_args.get("repo_b", "?")
-        fn = tool_args.get("function_name", tool_args.get("entry_function", "?"))
-        return f"repo_a={repo_a}, repo_b={repo_b}, function_name={fn}"
-
     # 文件读取类工具
     if tool_name in ("read_code_segment", "read_file", "read_human_doc"):
         file_path = tool_args.get("file_path", tool_args.get("path", "?"))
@@ -311,3 +297,29 @@ def llm_message_total_tokens(msg: Any) -> int:
         return int(t) if t is not None else 0
     except (TypeError, ValueError):
         return 0
+
+
+def safe_llm_invoke(llm, messages, max_retries: int = 5, initial_delay: float = 2.0, backoff_factor: float = 2.0) -> Any:
+    """安全的 llm.invoke 包装器，可在异常（如 AttributeError、超时）时以指数退避策略自动重试。"""
+    import time
+    import logging
+    logger = logging.getLogger("OS-Agent.SafeLLM")
+
+    last_exc = None
+    delay = initial_delay
+    for attempt in range(1, max_retries + 1):
+        try:
+            msg = llm.invoke(messages)
+            if msg is not None:
+                return msg
+            raise ValueError("llm.invoke 返回了 None")
+        except Exception as e:
+            last_exc = e
+            logger.warning(
+                f"llm.invoke 在第 {attempt}/{max_retries} 次尝试时失败，错误: {type(e).__name__}: {e}。"
+                f"将在 {delay:.1f} 秒后重试..."
+            )
+            time.sleep(delay)
+            delay *= backoff_factor
+    raise last_exc
+

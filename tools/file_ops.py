@@ -4,6 +4,7 @@
 from langchain.tools import tool
 import os
 import re
+from typing import Optional
 
 # 允许访问的根目录（相对于工作目录）
 ALLOWED_ROOTS = ["./repos", "./output", "repos", "output"]
@@ -25,7 +26,7 @@ def _is_path_allowed(file_path: str) -> bool:
 
 
 @tool
-def read_code_segment(file_path: str, start_line: int = None, end_line: int = None, max_chars: int = None) -> str:
+def read_code_segment(file_path: str, start_line: Optional[int] = None, end_line: Optional[int] = None, max_chars: Optional[int] = None) -> str:
     """
     读取代码文件的指定片段。
     
@@ -98,7 +99,7 @@ def read_code_segment(file_path: str, start_line: int = None, end_line: int = No
 
 
 @tool
-def grep_in_repo(repo_path: str, pattern: str, max_results: int = 20, file_extensions: str = None) -> str:
+def grep_in_repo(repo_path: str, pattern: str, max_results: int = 20, file_extensions: Optional[str] = None) -> str:
     """
     在仓库源代码中搜索关键词或正则模式。
     用于验证技术断言：如函数名、结构体名、算法名是否真实存在于源代码中。

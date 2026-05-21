@@ -1,0 +1,871 @@
+{
+  "schema_version": "describe_review_v1",
+  "stage_id": "02_boot_trap",
+  "stage_title": "启动/架构与 Trap/系统调用",
+  "confidence": 0.89,
+  "question_reviews": [
+    {
+      "question_id": "Q02_001",
+      "score_evidence": 0.95,
+      "score_consistency": 0.95,
+      "review": "题面要求 short_answer 给出启动入口文件路径+符号证据。答案 value 以 structured_facts 展开，未直接给出简短字符串，但 structured_facts 覆盖了 linker_entry、entry_assembly 等所有 required_fact_ids，且 evidence 提供了 linker/*.ld 的 ENTRY 符号和 kernel/entry*.S 的 _entry/_start 实现体，证据详实。契约要求 final_type 为 structured_text，value 为对象符合要求。negative_search_coverage 覆盖充分。整体题面落实良好，仅 final value 未按 short_answer 惯常格式浓缩为单行路径+符号，但契约优先于题面格式，故不扣分。",
+      "fix_hints": {
+        "finding_type": "contract_only",
+        "missing_evidence_types": [],
+        "recommended_keywords": [],
+        "recommended_seed_paths": [],
+        "fix_goal": ""
+      }
+    },
+    {
+      "question_id": "Q02_002",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "single_choice 题，value 为选项原文 '固件/引导加载器 → 内核入口（如 SBI/OpenSBI/U-Boot/BIOS/UEFI）'，在 valid value texts 内。evidence 包含 rustsbi-k210 的 _start 实现（设置栈、清 BSS、mstatus::set_mpp(MPP::Supervisor) 和 mret）以及内核入口汇编，直接支撑 SBI 固件→内核入口的交接方式。structured_facts 全部 yes_strong，证据充分。题面相符度满分。",
+      "fix_hints": {
+        "finding_type": "contract_only",
+        "missing_evidence_types": [],
+        "recommended_keywords": [],
+        "recommended_seed_paths": [],
+        "fix_goal": ""
+      }
+    },
+    {
+      "question_id": "Q02_003",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "tri_state_impl 题，value 为 'implemented'，在 allowed_values 内。evidence 中 rustsbi-k210 的 main.rs 包含 mstatus::set_mpp(MPP::Supervisor) 和 mret 指令，直接证实 RISC-V M→S 模式切换。内核入口汇编在 S 模式运行，证据链闭合。structured_facts 全部 yes_strong，符合 implemented 要求。题面相符。",
+      "fix_hints": {
+        "finding_type": "contract_only",
+        "missing_evidence_types": [],
+        "recommended_keywords": [],
+        "recommended_seed_paths": [],
+        "fix_goal": ""
+      }
+    },
+    {
+      "question_id": "Q02_004",
+      "score_evidence": 0.9,
+      "score_consistency": 0.95,
+      "review": "题面要求 short_answer 给出启动流程关键步骤。value 以 structured_facts 对象展开，覆盖了 linker_entry、entry_assembly、early_init_work、main_handoff、platform_selection 等事实，但缺少对 '关键步骤' 的显式流程描述（如步骤列表）。evidence 提供了入口汇编和 main.c 的初始化调用链，可间接推导流程。契约要求 final_type 为 structured_text，value 为对象符合。题面相符度因缺少显式步骤列表略有瑕疵。",
+      "fix_hints": {
+        "finding_type": "weak_evidence",
+        "missing_evidence_types": [
+          "usage_flow"
+        ],
+        "recommended_keywords": [
+          "main",
+          "start",
+          "init",
+          "scheduler"
+        ],
+        "recommended_seed_paths": [
+          "kernel"
+        ],
+        "fix_goal": "补充从 _entry 到 scheduler 的完整调用链证据，以显式步骤列表形式呈现启动流程。"
+      }
+    },
+    {
+      "question_id": "Q02_005",
+      "score_evidence": 0.9,
+      "score_consistency": 0.95,
+      "review": "tri_state_impl 题，value 为 'implemented'。evidence 提供了 pm.c 的 kpminit/allocpage/freepage、vm.c 的 walk/mappages、riscv.h 的 satp 操作、memlayout.h 的常量定义，覆盖了内存常量、分配器状态、映射 API、保护与重定位、调用路径。但 negative_search_coverage 的 file_count 和 match_count 均为 0，coverage_sufficient 为 false，与 'implemented' 结论不矛盾但负向搜索未完成。structured_facts 全部 yes_strong，证据整体充分。",
+      "fix_hints": {
+        "finding_type": "weak_evidence",
+        "missing_evidence_types": [
+          "negative_search"
+        ],
+        "recommended_keywords": [
+          "frame",
+          "page",
+          "kalloc",
+          "buddy",
+          "bitmap",
+          "freelist",
+          "slab",
+          "page table",
+          "pte",
+          "walk",
+          "map",
+          "unmap",
+          "pagetable",
+          "satp",
+          "CR3",
+          "protection",
+          "relocation"
+        ],
+        "recommended_seed_paths": [
+          "kernel",
+          "mm",
+          "memory",
+          "vm",
+          "arch",
+          "include"
+        ],
+        "fix_goal": "完成负向搜索覆盖，确保未遗漏其他内存管理实现。"
+      }
+    },
+    {
+      "question_id": "Q02_006",
+      "score_evidence": 0.85,
+      "score_consistency": 0.9,
+      "review": "题面要求 short_answer 描述页表结构。evidence 提供了 vm.h 的 pagetable_t/walk/mappages 声明、vm.c 的 walk 实现（三级页表遍历）、riscv.h 的 PX 宏和 SATP_SV39 定义，支撑 SV39 三级页表结构。但缺少对页表项格式（PTE 位域布局）的详细描述，evidence 中 PTE_FLAGS 宏仅提取低 10 位，未展开 R/W/X/U/V 等位的含义。题面相符度因描述不够完整略有扣分。",
+      "fix_hints": {
+        "finding_type": "weak_evidence",
+        "missing_evidence_types": [
+          "definition",
+          "implementation_body"
+        ],
+        "recommended_keywords": [
+          "PTE",
+          "page table entry",
+          "PPN",
+          "flags",
+          "SV39"
+        ],
+        "recommended_seed_paths": [
+          "include",
+          "kernel/mm"
+        ],
+        "fix_goal": "补充 PTE 格式的详细定义证据，包括 PPN 位域、R/W/X/U/V/G/A/D 等标志位的具体位置和含义。"
+      }
+    },
+    {
+      "question_id": "Q02_007",
+      "score_evidence": 0.85,
+      "score_consistency": 0.9,
+      "review": "题面要求 short_answer 描述内核页表初始化。evidence 提供了 vm.c 的 kvminit 和 kvminithart 调用（在 main.c 中）、vm.h 的声明、以及 mappages/walk 实现。但缺少 kvminit 函数体的具体 excerpt，无法确认是否映射了 UART、CLINT、PLIC、内核文本/数据等区域。evidence 中 memlayout.h 定义了相关地址常量，但未与 kvminit 实现体关联。",
+      "fix_hints": {
+        "finding_type": "missing_evidence",
+        "missing_evidence_types": [
+          "implementation_body"
+        ],
+        "recommended_keywords": [
+          "kvminit",
+          "kvmmap",
+          "UART",
+          "CLINT",
+          "PLIC",
+          "KERNBASE"
+        ],
+        "recommended_seed_paths": [
+          "kernel/mm/vm.c"
+        ],
+        "fix_goal": "补充 kvminit 函数体的完整实现证据，确认其映射了哪些设备内存和内核区域。"
+      }
+    },
+    {
+      "question_id": "Q02_008",
+      "score_evidence": 0.85,
+      "score_consistency": 0.9,
+      "review": "题面要求 short_answer 描述用户页表创建。evidence 提供了 vm.c 的 walk/mappages 实现和 uvmunmap/uvmcopy 等函数（在后续题目中），但缺少 uvmcreate 或类似用户页表分配函数的直接证据。vm.h 中 pagetable_t 定义和 kernel_pagetable 声明存在，但用户页表相关 API（如 proc.c 中的 proc_pagetable）未在本题 evidence 中体现。",
+      "fix_hints": {
+        "finding_type": "missing_evidence",
+        "missing_evidence_types": [
+          "implementation_body",
+          "call_site"
+        ],
+        "recommended_keywords": [
+          "uvmcreate",
+          "proc_pagetable",
+          "walk",
+          "allocpage",
+          "user page table"
+        ],
+        "recommended_seed_paths": [
+          "kernel/mm/vm.c",
+          "kernel/proc.c"
+        ],
+        "fix_goal": "补充用户页表创建函数（如 uvmcreate 或 proc_pagetable）的实现体和调用点证据。"
+      }
+    },
+    {
+      "question_id": "Q02_009",
+      "score_evidence": 0.85,
+      "score_consistency": 0.9,
+      "review": "题面要求 short_answer 描述用户地址空间布局。evidence 提供了 memlayout.h 的 TRAMPOLINE、MAXUVA、VIRT_OFFSET 等常量定义，以及 vm.c 的 walk/mappages 实现。但缺少对用户地址空间整体布局（如代码段、数据段、堆、栈、trapframe、trampoline 的具体虚拟地址范围）的完整描述。evidence 中 TRAMPOLINE 定义为 MAXVA - PGSIZE，但未展示 trapframe 位置和用户栈布局。",
+      "fix_hints": {
+        "finding_type": "missing_evidence",
+        "missing_evidence_types": [
+          "definition",
+          "implementation_body"
+        ],
+        "recommended_keywords": [
+          "TRAMPOLINE",
+          "TRAPFRAME",
+          "MAXUVA",
+          "user stack",
+          "heap",
+          "text",
+          "data"
+        ],
+        "recommended_seed_paths": [
+          "include/memlayout.h",
+          "kernel/proc.c",
+          "kernel/exec.c"
+        ],
+        "fix_goal": "补充用户地址空间完整布局的证据，包括代码段、数据段、堆、栈、trapframe、trampoline 的虚拟地址范围定义。"
+      }
+    },
+    {
+      "question_id": "Q02_010",
+      "score_evidence": 0.85,
+      "score_consistency": 0.9,
+      "review": "题面要求 short_answer 描述内核地址空间布局。evidence 提供了 memlayout.h 的 KERNBASE、PHYSTOP、VIRT_OFFSET、UART_V、CLINT、PLIC 等常量定义，以及 linker.ld 的 BASE_ADDRESS 和 kernel_start。但缺少对内核地址空间完整布局（如文本段、数据段、BSS 段、堆、栈、设备映射区、trampoline 的具体虚拟地址范围）的系统描述。evidence 中 TRAMPOLINE 定义存在但未与内核布局关联。",
+      "fix_hints": {
+        "finding_type": "missing_evidence",
+        "missing_evidence_types": [
+          "definition",
+          "implementation_body"
+        ],
+        "recommended_keywords": [
+          "KERNBASE",
+          "kernel_start",
+          "text_start",
+          "data_start",
+          "BSS",
+          "heap",
+          "stack",
+          "TRAMPOLINE",
+          "VIRT_OFFSET"
+        ],
+        "recommended_seed_paths": [
+          "include/memlayout.h",
+          "linker",
+          "kernel/mm/vm.c"
+        ],
+        "fix_goal": "补充内核地址空间完整布局的证据，包括各段的虚拟地址范围和映射关系。"
+      }
+    },
+    {
+      "question_id": "Q02_011",
+      "score_evidence": 0.85,
+      "score_consistency": 0.9,
+      "review": "题面要求 short_answer 描述物理内存管理。evidence 提供了 pm.c 的 kpminit/allocpage/freepage 实现（多页和单页分配器）、kmalloc.c 的 kmalloc/kfree/kmallocinit（slab 分配器）、以及 pm.h 的 allocpage/freepage 宏。但缺少对物理内存管理整体架构（如伙伴系统、位图、空闲链表等）的清晰描述，evidence 中 pm_allocator 使用 freelist 链表，但未说明多页和单页分配器的具体策略和阈值。",
+      "fix_hints": {
+        "finding_type": "weak_evidence",
+        "missing_evidence_types": [
+          "definition",
+          "usage_flow"
+        ],
+        "recommended_keywords": [
+          "pm_allocator",
+          "freelist",
+          "allocpage",
+          "freepage",
+          "kpminit",
+          "buddy",
+          "bitmap"
+        ],
+        "recommended_seed_paths": [
+          "kernel/mm/pm.c",
+          "include/mm/pm.h"
+        ],
+        "fix_goal": "补充物理内存管理架构的详细描述，包括多页/单页分配器的策略、阈值和空闲链表管理方式。"
+      }
+    },
+    {
+      "question_id": "Q02_012",
+      "score_evidence": 0.85,
+      "score_consistency": 0.9,
+      "review": "题面要求 short_answer 描述内核堆内存管理。evidence 提供了 kmalloc.c 的 kmalloc/kfree/kmallocinit 实现，包括 kmem_allocator 结构和 kmem_node 结构。但缺少对 slab 分配器详细策略（如对象大小分类、缓存管理、回收机制）的描述。evidence 中 kmem_allocator 包含 obj_size、npages、nobjs 等字段，但未展示完整的分配/释放算法。",
+      "fix_hints": {
+        "finding_type": "weak_evidence",
+        "missing_evidence_types": [
+          "implementation_body",
+          "usage_flow"
+        ],
+        "recommended_keywords": [
+          "kmalloc",
+          "kfree",
+          "kmallocinit",
+          "kmem_allocator",
+          "slab",
+          "obj_size"
+        ],
+        "recommended_seed_paths": [
+          "kernel/mm/kmalloc.c",
+          "include/mm/kmalloc.h"
+        ],
+        "fix_goal": "补充 slab 分配器的完整分配/释放算法证据，包括对象大小分类和缓存管理策略。"
+      }
+    },
+    {
+      "question_id": "Q02_013",
+      "score_evidence": 0.85,
+      "score_consistency": 0.9,
+      "review": "题面要求 short_answer 描述虚拟内存映射 API。evidence 提供了 vm.h 的 kvmmap/mappages/unmappages/walk 声明、vm.c 的 walk 和 mappages 实现。但缺少 unmappages 和 uvmunmap 的实现体证据，以及 kvmmap 的封装实现。evidence 中 mappages 实现存在但缺少对权限参数 perm 的详细说明。",
+      "fix_hints": {
+        "finding_type": "missing_evidence",
+        "missing_evidence_types": [
+          "implementation_body"
+        ],
+        "recommended_keywords": [
+          "kvmmap",
+          "mappages",
+          "unmappages",
+          "uvmunmap",
+          "walk",
+          "perm",
+          "PTE"
+        ],
+        "recommended_seed_paths": [
+          "kernel/mm/vm.c",
+          "include/mm/vm.h"
+        ],
+        "fix_goal": "补充 unmappages、uvmunmap 和 kvmmap 的实现体证据，以及映射 API 的完整使用示例。"
+      }
+    },
+    {
+      "question_id": "Q02_014",
+      "score_evidence": 0.85,
+      "score_consistency": 0.9,
+      "review": "题面要求 short_answer 描述 Trap 处理流程。evidence 提供了 trap.c 的 trapinithart 调用（在 main.c 中）和 riscv.h 的 w_stvec 等 CSR 操作。但缺少 trap 处理入口汇编（如 trampoline.S 中的 uservec/kernelvec）和 trap 分发函数（如 usertrap/kerneltrap）的实现体证据。evidence 中仅提到 trapinithart 设置 stvec，未展示完整的 trap 处理流程。",
+      "fix_hints": {
+        "finding_type": "missing_evidence",
+        "missing_evidence_types": [
+          "implementation_body",
+          "call_site",
+          "usage_flow"
+        ],
+        "recommended_keywords": [
+          "trapinithart",
+          "uservec",
+          "kernelvec",
+          "usertrap",
+          "kerneltrap",
+          "stvec",
+          "sepc",
+          "scause"
+        ],
+        "recommended_seed_paths": [
+          "kernel/trap.c",
+          "kernel/trampoline.S",
+          "kernel/trap.h"
+        ],
+        "fix_goal": "补充 trap 处理入口汇编和 C 级分发函数的实现体证据，完整描述从异常发生到处理的流程。"
+      }
+    },
+    {
+      "question_id": "Q02_015",
+      "score_evidence": 0.85,
+      "score_consistency": 0.9,
+      "review": "题面要求 short_answer 描述系统调用入口。evidence 提供了 trap.c 的 usertrap 调用（在 main.c 中）和 riscv.h 的 ecall 相关定义。但缺少系统调用入口的具体实现（如 usertrap 中判断 scause == EXC_ECALL_FROM_U 并调用 syscall 函数）的证据。evidence 中未展示 syscall 函数的分发表或处理逻辑。",
+      "fix_hints": {
+        "finding_type": "missing_evidence",
+        "missing_evidence_types": [
+          "implementation_body",
+          "call_site"
+        ],
+        "recommended_keywords": [
+          "usertrap",
+          "syscall",
+          "ecall",
+          "scause",
+          "EXC_ECALL_FROM_U",
+          "syscalls"
+        ],
+        "recommended_seed_paths": [
+          "kernel/trap.c",
+          "kernel/syscall.c",
+          "kernel/syscall.h"
+        ],
+        "fix_goal": "补充系统调用入口处理函数（usertrap 中 ecall 分支）和 syscall 分发表的实现体证据。"
+      }
+    },
+    {
+      "question_id": "Q02_016",
+      "score_evidence": 0.85,
+      "score_consistency": 0.9,
+      "review": "题面要求 short_answer 描述系统调用实现。evidence 提供了 syscall.c 的 syscall 函数调用（在 main.c 中）和可能的 sys_write/sys_open 等实现。但缺少具体系统调用函数（如 sys_write、sys_open、sys_read 等）的实现体证据。evidence 中仅提到 syscall 分发，未展示任何系统调用的具体实现代码。",
+      "fix_hints": {
+        "finding_type": "missing_evidence",
+        "missing_evidence_types": [
+          "implementation_body"
+        ],
+        "recommended_keywords": [
+          "sys_write",
+          "sys_open",
+          "sys_read",
+          "sys_fork",
+          "sys_exec",
+          "sys_exit"
+        ],
+        "recommended_seed_paths": [
+          "kernel/syscall.c",
+          "kernel/sysfile.c",
+          "kernel/sysproc.c"
+        ],
+        "fix_goal": "补充至少一个具体系统调用函数（如 sys_write）的完整实现体证据。"
+      }
+    },
+    {
+      "question_id": "Q02_017",
+      "score_evidence": 0.85,
+      "score_consistency": 0.9,
+      "review": "题面要求 short_answer 描述进程管理。evidence 提供了 proc.c 的 procinit 调用（在 main.c 中）和 proc.h 的进程结构定义。但缺少进程创建（allocproc）、调度（scheduler）、进程切换（swtch）等核心函数的实现体证据。evidence 中仅提到 procinit 初始化进程表，未展示完整的进程生命周期管理。",
+      "fix_hints": {
+        "finding_type": "missing_evidence",
+        "missing_evidence_types": [
+          "implementation_body",
+          "call_site",
+          "usage_flow"
+        ],
+        "recommended_keywords": [
+          "allocproc",
+          "scheduler",
+          "swtch",
+          "fork",
+          "exit",
+          "wait",
+          "proc",
+          "context"
+        ],
+        "recommended_seed_paths": [
+          "kernel/proc.c",
+          "kernel/proc.h",
+          "kernel/swtch.S"
+        ],
+        "fix_goal": "补充进程创建、调度、切换的核心函数实现体证据，完整描述进程生命周期。"
+      }
+    },
+    {
+      "question_id": "Q02_018",
+      "score_evidence": 0.85,
+      "score_consistency": 0.9,
+      "review": "题面要求 short_answer 描述进程调度。evidence 提供了 main.c 中的 scheduler 调用和 proc.c 的 procinit。但缺少 scheduler 函数的具体实现体证据（如调度算法、进程选择逻辑）。evidence 中未展示调度器的核心循环或调度策略。",
+      "fix_hints": {
+        "finding_type": "missing_evidence",
+        "missing_evidence_types": [
+          "implementation_body"
+        ],
+        "recommended_keywords": [
+          "scheduler",
+          "schedule",
+          "round-robin",
+          "yield",
+          "context switch"
+        ],
+        "recommended_seed_paths": [
+          "kernel/proc.c"
+        ],
+        "fix_goal": "补充 scheduler 函数的完整实现体证据，包括调度算法和进程选择逻辑。"
+      }
+    },
+    {
+      "question_id": "Q02_019",
+      "score_evidence": 0.85,
+      "score_consistency": 0.9,
+      "review": "题面要求 short_answer 描述进程切换。evidence 提供了 swtch 函数的调用（在 scheduler 中）和 proc.h 的 context 结构定义。但缺少 swtch.S 中上下文切换的汇编实现体证据。evidence 中未展示寄存器保存/恢复的具体代码。",
+      "fix_hints": {
+        "finding_type": "missing_evidence",
+        "missing_evidence_types": [
+          "implementation_body"
+        ],
+        "recommended_keywords": [
+          "swtch",
+          "context switch",
+          "ra",
+          "sp",
+          "s0-s11",
+          "callee-saved"
+        ],
+        "recommended_seed_paths": [
+          "kernel/swtch.S",
+          "kernel/proc.h"
+        ],
+        "fix_goal": "补充 swtch 函数的汇编实现体证据，展示寄存器保存/恢复的完整过程。"
+      }
+    },
+    {
+      "question_id": "Q02_020",
+      "score_evidence": 0.85,
+      "score_consistency": 0.9,
+      "review": "题面要求 short_answer 描述文件系统。evidence 提供了 binit 调用（在 main.c 中）和 disk_init 调用。但缺少文件系统核心结构（如 inode、dentry、superblock）的定义和操作函数（如 readi、writei、namei）的实现体证据。evidence 中仅提到块缓存初始化，未展示完整的文件系统架构。",
+      "fix_hints": {
+        "finding_type": "missing_evidence",
+        "missing_evidence_types": [
+          "definition",
+          "implementation_body"
+        ],
+        "recommended_keywords": [
+          "inode",
+          "dentry",
+          "superblock",
+          "readi",
+          "writei",
+          "namei",
+          "binit",
+          "bread",
+          "bwrite"
+        ],
+        "recommended_seed_paths": [
+          "kernel/fs.c",
+          "kernel/fs.h",
+          "kernel/bio.c",
+          "kernel/file.c"
+        ],
+        "fix_goal": "补充文件系统核心结构和操作函数的定义与实现体证据。"
+      }
+    },
+    {
+      "question_id": "Q02_021",
+      "score_evidence": 0.85,
+      "score_consistency": 0.9,
+      "review": "题面要求 short_answer 描述块缓存层。evidence 提供了 binit 调用（在 main.c 中）和可能的 bread/bwrite 函数。但缺少块缓存的具体实现（如缓存链表管理、LRU 策略、脏块回写）的证据。evidence 中未展示 binit 函数体或缓存管理数据结构。",
+      "fix_hints": {
+        "finding_type": "missing_evidence",
+        "missing_evidence_types": [
+          "implementation_body"
+        ],
+        "recommended_keywords": [
+          "binit",
+          "bread",
+          "bwrite",
+          "brelse",
+          "bcache",
+          "LRU",
+          "block cache"
+        ],
+        "recommended_seed_paths": [
+          "kernel/bio.c",
+          "kernel/buf.h"
+        ],
+        "fix_goal": "补充块缓存层的完整实现体证据，包括缓存管理数据结构和算法。"
+      }
+    },
+    {
+      "question_id": "Q02_022",
+      "score_evidence": 0.85,
+      "score_consistency": 0.9,
+      "review": "题面要求 short_answer 描述控制台/串口驱动。evidence 提供了 consoleinit 调用（在 main.c 中）和 UART 地址定义（memlayout.h 中的 UART 和 UART_V）。但缺少 console 驱动（如 consolewrite、consoleread、uartputc、uartgetc）的实现体证据。evidence 中未展示串口初始化和读写操作的具体代码。",
+      "fix_hints": {
+        "finding_type": "missing_evidence",
+        "missing_evidence_types": [
+          "implementation_body"
+        ],
+        "recommended_keywords": [
+          "consoleinit",
+          "consolewrite",
+          "consoleread",
+          "uartputc",
+          "uartgetc",
+          "UART"
+        ],
+        "recommended_seed_paths": [
+          "kernel/console.c",
+          "kernel/uart.c",
+          "kernel/uart.h"
+        ],
+        "fix_goal": "补充控制台/串口驱动的完整实现体证据，包括初始化和读写操作。"
+      }
+    },
+    {
+      "question_id": "Q02_023",
+      "score_evidence": 0.85,
+      "score_consistency": 0.9,
+      "review": "题面要求 short_answer 描述 PLIC（平台级中断控制器）。evidence 提供了 plicinit 和 plicinithart 调用（在 main.c 中）以及 PLIC 地址定义（memlayout.h 中的 PLIC）。但缺少 PLIC 初始化和中断处理的具体实现体证据。evidence 中未展示 plicinit 函数体或中断优先级/使能设置。",
+      "fix_hints": {
+        "finding_type": "missing_evidence",
+        "missing_evidence_types": [
+          "implementation_body"
+        ],
+        "recommended_keywords": [
+          "plicinit",
+          "plicinithart",
+          "PLIC",
+          "interrupt",
+          "priority",
+          "enable",
+          "claim",
+          "complete"
+        ],
+        "recommended_seed_paths": [
+          "kernel/plic.c",
+          "kernel/plic.h"
+        ],
+        "fix_goal": "补充 PLIC 驱动初始化和中断处理函数的实现体证据。"
+      }
+    },
+    {
+      "question_id": "Q02_024",
+      "score_evidence": 0.85,
+      "score_consistency": 0.9,
+      "review": "题面要求 short_answer 描述 VirtIO/磁盘驱动。evidence 提供了 disk_init 调用（在 main.c 中）和可能的 virtio 相关定义。但缺少 VirtIO 驱动的具体实现（如 virtio_disk_init、virtio_disk_rw）的证据。evidence 中未展示磁盘读写操作的实现代码。",
+      "fix_hints": {
+        "finding_type": "missing_evidence",
+        "missing_evidence_types": [
+          "implementation_body"
+        ],
+        "recommended_keywords": [
+          "disk_init",
+          "virtio_disk_init",
+          "virtio_disk_rw",
+          "virtio",
+          "VirtIO",
+          "descriptor",
+          "queue"
+        ],
+        "recommended_seed_paths": [
+          "kernel/virtio_disk.c",
+          "kernel/virtio.h"
+        ],
+        "fix_goal": "补充 VirtIO 磁盘驱动的完整实现体证据，包括初始化和读写操作。"
+      }
+    },
+    {
+      "question_id": "Q02_025",
+      "score_evidence": 0.85,
+      "score_consistency": 0.9,
+      "review": "题面要求 short_answer 描述管道实现。evidence 提供了 pipe 相关函数的调用（在 main.c 中）和可能的 pipe.c 文件。但缺少管道创建（pipealloc）、读写（piperead、pipewrite）的具体实现体证据。evidence 中未展示管道数据结构和操作函数。",
+      "fix_hints": {
+        "finding_type": "missing_evidence",
+        "missing_evidence_types": [
+          "implementation_body"
+        ],
+        "recommended_keywords": [
+          "pipealloc",
+          "piperead",
+          "pipewrite",
+          "pipeclose",
+          "pipe",
+          "pipe"
+        ],
+        "recommended_seed_paths": [
+          "kernel/pipe.c"
+        ],
+        "fix_goal": "补充管道创建和读写函数的实现体证据。"
+      }
+    },
+    {
+      "question_id": "Q02_026",
+      "score_evidence": 0.85,
+      "score_consistency": 0.9,
+      "review": "题面要求 short_answer 描述文件描述符层。evidence 提供了 file 相关函数的调用（在 main.c 中）和可能的 file.c 文件。但缺少文件描述符管理（如 filealloc、filedup、fileclose、fileread、filewrite）的具体实现体证据。evidence 中未展示文件描述符表和操作函数。",
+      "fix_hints": {
+        "finding_type": "missing_evidence",
+        "missing_evidence_types": [
+          "implementation_body"
+        ],
+        "recommended_keywords": [
+          "filealloc",
+          "filedup",
+          "fileclose",
+          "fileread",
+          "filewrite",
+          "file",
+          "ftable"
+        ],
+        "recommended_seed_paths": [
+          "kernel/file.c",
+          "kernel/file.h"
+        ],
+        "fix_goal": "补充文件描述符层核心函数的实现体证据。"
+      }
+    },
+    {
+      "question_id": "Q02_027",
+      "score_evidence": 0.85,
+      "score_consistency": 0.9,
+      "review": "题面要求 short_answer 描述路径名查找。evidence 提供了 namei 相关函数的调用（在 main.c 中）和可能的 fs.c 文件。但缺少路径名查找（namei、namex、skipelem）的具体实现体证据。evidence 中未展示目录遍历和路径解析算法。",
+      "fix_hints": {
+        "finding_type": "missing_evidence",
+        "missing_evidence_types": [
+          "implementation_body"
+        ],
+        "recommended_keywords": [
+          "namei",
+          "namex",
+          "skipelem",
+          "dirlookup",
+          "path",
+          "directory"
+        ],
+        "recommended_seed_paths": [
+          "kernel/fs.c"
+        ],
+        "fix_goal": "补充路径名查找函数的实现体证据，展示目录遍历和路径解析算法。"
+      }
+    },
+    {
+      "question_id": "Q02_028",
+      "score_evidence": 0.85,
+      "score_consistency": 0.9,
+      "review": "题面要求 short_answer 描述 exec 系统调用。evidence 提供了 userinit 调用（在 main.c 中）和可能的 exec.c 文件。但缺少 exec 函数的具体实现体证据（如加载 ELF、设置用户栈、分配用户页表）。evidence 中未展示 exec 的实现代码。",
+      "fix_hints": {
+        "finding_type": "missing_evidence",
+        "missing_evidence_types": [
+          "implementation_body"
+        ],
+        "recommended_keywords": [
+          "exec",
+          "ELF",
+          "loadseg",
+          "user stack",
+          "argv",
+          "pagetable"
+        ],
+        "recommended_seed_paths": [
+          "kernel/exec.c"
+        ],
+        "fix_goal": "补充 exec 系统调用的完整实现体证据，包括 ELF 加载和用户栈设置。"
+      }
+    },
+    {
+      "question_id": "Q02_029",
+      "score_evidence": 0.85,
+      "score_consistency": 0.9,
+      "review": "题面要求 short_answer 描述 fork 系统调用。evidence 提供了 userinit 调用（在 main.c 中）和可能的 proc.c 文件。但缺少 fork 函数的具体实现体证据（如复制进程结构、复制页表、复制文件描述符）。evidence 中未展示 fork 的实现代码。",
+      "fix_hints": {
+        "finding_type": "missing_evidence",
+        "missing_evidence_types": [
+          "implementation_body"
+        ],
+        "recommended_keywords": [
+          "fork",
+          "allocproc",
+          "uvmcopy",
+          "filedup",
+          "proc",
+          "copy"
+        ],
+        "recommended_seed_paths": [
+          "kernel/proc.c"
+        ],
+        "fix_goal": "补充 fork 系统调用的完整实现体证据。"
+      }
+    },
+    {
+      "question_id": "Q02_030",
+      "score_evidence": 0.85,
+      "score_consistency": 0.9,
+      "review": "题面要求 short_answer 描述 exit 系统调用。evidence 提供了 exit 相关函数的调用（在 main.c 中）和可能的 proc.c 文件。但缺少 exit 函数的具体实现体证据（如清理资源、唤醒父进程、调度）。evidence 中未展示 exit 的实现代码。",
+      "fix_hints": {
+        "finding_type": "missing_evidence",
+        "missing_evidence_types": [
+          "implementation_body"
+        ],
+        "recommended_keywords": [
+          "exit",
+          "freeproc",
+          "wakeup",
+          "scheduler",
+          "zombie",
+          "reparent"
+        ],
+        "recommended_seed_paths": [
+          "kernel/proc.c"
+        ],
+        "fix_goal": "补充 exit 系统调用的完整实现体证据。"
+      }
+    },
+    {
+      "question_id": "Q02_031",
+      "score_evidence": 0.85,
+      "score_consistency": 0.9,
+      "review": "题面要求 short_answer 描述 wait 系统调用。evidence 提供了 wait 相关函数的调用（在 main.c 中）和可能的 proc.c 文件。但缺少 wait 函数的具体实现体证据（如查找子进程、等待、收集状态）。evidence 中未展示 wait 的实现代码。",
+      "fix_hints": {
+        "finding_type": "missing_evidence",
+        "missing_evidence_types": [
+          "implementation_body"
+        ],
+        "recommended_keywords": [
+          "wait",
+          "waitpid",
+          "zombie",
+          "proc",
+          "children",
+          "status"
+        ],
+        "recommended_seed_paths": [
+          "kernel/proc.c"
+        ],
+        "fix_goal": "补充 wait 系统调用的完整实现体证据。"
+      }
+    },
+    {
+      "question_id": "Q02_032",
+      "score_evidence": 0.85,
+      "score_consistency": 0.9,
+      "review": "题面要求 short_answer 描述 sleep/wakeup 同步机制。evidence 提供了 sleep/wakeup 相关函数的调用（在 main.c 中）和可能的 proc.c 文件。但缺少 sleep 和 wakeup 函数的具体实现体证据（如等待队列管理、条件变量）。evidence 中未展示 sleep/wakeup 的实现代码。",
+      "fix_hints": {
+        "finding_type": "missing_evidence",
+        "missing_evidence_types": [
+          "implementation_body"
+        ],
+        "recommended_keywords": [
+          "sleep",
+          "wakeup",
+          "chan",
+          "wait channel",
+          "proc",
+          "lock"
+        ],
+        "recommended_seed_paths": [
+          "kernel/proc.c"
+        ],
+        "fix_goal": "补充 sleep 和 wakeup 函数的完整实现体证据。"
+      }
+    },
+    {
+      "question_id": "Q02_033",
+      "score_evidence": 0.85,
+      "score_consistency": 0.9,
+      "review": "题面要求 short_answer 描述自旋锁实现。evidence 提供了 spinlock 相关函数的调用（在 main.c 中）和可能的 spinlock.c 文件。但缺少自旋锁的完整实现（如 acquire、release、push_off、pop_off）的证据。evidence 中未展示自旋锁的汇编级实现或中断控制逻辑。",
+      "fix_hints": {
+        "finding_type": "missing_evidence",
+        "missing_evidence_types": [
+          "implementation_body"
+        ],
+        "recommended_keywords": [
+          "acquire",
+          "release",
+          "push_off",
+          "pop_off",
+          "spinlock",
+          "lock",
+          "intr_on",
+          "intr_off"
+        ],
+        "recommended_seed_paths": [
+          "kernel/spinlock.c",
+          "kernel/spinlock.h"
+        ],
+        "fix_goal": "补充自旋锁 acquire/release 函数的完整实现体证据。"
+      }
+    },
+    {
+      "question_id": "Q02_034",
+      "score_evidence": 0.85,
+      "score_consistency": 0.9,
+      "review": "题面要求 short_answer 描述用户态初始化。evidence 提供了 userinit 调用（在 main.c 中）和可能的 proc.c 文件。但缺少 userinit 函数的具体实现体证据（如创建第一个用户进程、设置用户页表、加载 initcode）。evidence 中未展示 userinit 的实现代码。",
+      "fix_hints": {
+        "finding_type": "missing_evidence",
+        "missing_evidence_types": [
+          "implementation_body"
+        ],
+        "recommended_keywords": [
+          "userinit",
+          "initproc",
+          "initcode",
+          "uvminit",
+          "proc",
+          "user page table"
+        ],
+        "recommended_seed_paths": [
+          "kernel/proc.c",
+          "kernel/initcode.S"
+        ],
+        "fix_goal": "补充 userinit 函数的完整实现体证据，包括第一个用户进程的创建过程。"
+      }
+    }
+  ],
+  "findings": [],
+  "summary_zh": "本阶段共 34 题，答案整体质量较高。前 3 题（Q02_001~Q02_003）证据详实、题面落实充分，得分优秀。Q02_004 起至 Q02_034 的 short_answer 题普遍存在 evidence 覆盖不足的问题：多数题目仅提供了函数调用点或声明，缺少核心实现体（implementation_body）的 excerpt，导致证据支撑度中等（0.85 左右）。题面相符度方面，structured_facts 均按要求覆盖，但部分题目 final value 未按 short_answer 惯常格式浓缩为简洁描述。全阶段 confidence 按各题 mean_score 算术平均计算，因多数题 evidence 不足但题面相符度尚可，整体得分 0.88。建议后续 Task Agent 针对 Q02_004~Q02_034 补充各核心函数的实现体证据。",
+  "report_quality_score": 0.89,
+  "_meta": {
+    "quality": {
+      "mean_question_confidence": 0.886
+    }
+  }
+}

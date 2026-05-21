@@ -50,6 +50,17 @@ def build_stage_qa_question_sheet(stage_id: str, stage_title: str) -> str:
         if not qid:
             continue
         lines.append(f"### {qid}（{qtype}）\n\n{stem}\n\n")
+        if q.get("feature_ids") or q.get("evidence_policy") or q.get("tri_state_rule"):
+            feature_view = {
+                "feature_ids": q.get("feature_ids"),
+                "evidence_policy": q.get("evidence_policy"),
+                "tri_state_rule": q.get("tri_state_rule"),
+                "anti_examples": q.get("anti_examples"),
+                "structured_facts": q.get("structured_facts"),
+                "answer_contract": q.get("answer_contract"),
+            }
+            feature_view = {k: v for k, v in feature_view.items() if v is not None}
+            lines.append(f"**feature_schema**: {json.dumps(feature_view, ensure_ascii=False, separators=(',', ':'))}\n\n")
         choices = q.get("choices")
         if isinstance(choices, list) and choices:
             lines.append("**choices**（前缀 A/B/C/D 仅为显示标签；答案 `value` 应使用选项原文，不必包含字母前缀）:\n")
@@ -58,7 +69,7 @@ def build_stage_qa_question_sheet(stage_id: str, stage_title: str) -> str:
                 lines.append(f"- {label}. {str(c).strip()}\n")
             if len(choices) > 12:
                 lines.append(f"- …（共 {len(choices)} 项）\n")
-            lines.append(f"\n**valid value texts**: {json.dumps([str(c).strip() for c in choices], ensure_ascii=False)}\n")
+            lines.append(f"\n**valid value texts**: {json.dumps([str(c).strip() for c in choices], ensure_ascii=False, separators=(',', ':'))}\n")
             lines.append("\n")
     return "".join(lines)
 
@@ -281,6 +292,22 @@ def _review_parse_max_attempts() -> int:
     return max(1, min(8, n))
 
 
+def _review_max_chars() -> int:
+    v = (os.environ.get("DESCRIBE_REVIEW_MAX_CHARS") or "50000").strip().lower().replace("_", "")
+    mult = 1
+    if v.endswith("k"):
+        mult = 1000
+        v = v[:-1]
+    elif v.endswith("w"):
+        mult = 10000
+        v = v[:-1]
+    try:
+        n = int(float(v) * mult)
+    except ValueError:
+        n = 50_000
+    return max(10_000, n)
+
+
 def run_describe_stage_review(
     *,
     stage_id: str,
@@ -298,22 +325,71 @@ def run_describe_stage_review(
     第四项：本阶段 review 的 LLM 调用**累计** total_tokens（与 print_step 同源；未返回则为 0）。
     """
     id_line = ", ".join(expected_question_ids) if expected_question_ids else "(无)"
+    question_sheet_text = question_sheet.strip()
+    model_json_text = (model_json_before_stage_qa_coerce or "").strip()
+    try:
+        # 去除模型输出 JSON 的多余空白和缩进以极大节省字符数
+        _obj = json.loads(model_json_text)
+        if isinstance(_obj, dict) and isinstance(_obj.get("answers"), list):
+            for k in ["schema_version", "stage_title", "terminology_profile"]:
+                _obj.pop(k, None)
+            for ans in _obj["answers"]:
+                if not isinstance(ans, dict):
+                    continue
+                ans.pop("stem", None)
+                ans.pop("question_type", None)
+                ans.pop("notes", None)
+                if isinstance(ans.get("fact_answers"), list):
+                    for fa in ans["fact_answers"]:
+                        if isinstance(fa, dict):
+                            fa.pop("notes", None)
+                if isinstance(ans.get("evidence"), list):
+                    for ev in ans["evidence"]:
+                        if isinstance(ev, dict):
+                            for ev_key in ["line_start", "line_end", "evidence_type", "strength", "validity", "supports_claim_types", "symbol_kind"]:
+                                ev.pop(ev_key, None)
+        model_json_text = json.dumps(_obj, ensure_ascii=False, separators=(',', ':'))
+    except Exception:
+        pass
+    max_user_chars = _review_max_chars()
+    fixed_overhead = 3_000 + len(id_line)
+    available_chars = max(5_000, max_user_chars - fixed_overhead)
+    model_budget = min(len(model_json_text), max(1_000, int(available_chars * 0.65)))
+    question_budget = min(len(question_sheet_text), max(1_000, available_chars - model_budget))
+    leftover = available_chars - model_budget - question_budget
+    if leftover > 0 and len(model_json_text) > model_budget:
+        add = min(leftover, len(model_json_text) - model_budget)
+        model_budget += add
+        leftover -= add
+    if leftover > 0 and len(question_sheet_text) > question_budget:
+        question_budget += min(leftover, len(question_sheet_text) - question_budget)
+    if len(question_sheet_text) > question_budget:
+        question_sheet_text = (
+            question_sheet_text[: max(0, question_budget - 500)]
+            + "\n\n...[question sheet truncated; Material B is preserved]...\n"
+        )
+    if len(model_json_text) > model_budget:
+        model_json_text = (
+            model_json_text[: max(0, model_budget - 500)]
+            + "\n\n...[model answer JSON truncated; caller should pass compact review payload]...\n"
+        )
+
     user_parts = [
         "# 材料 A：题库题单（仅 describe_stage_qa JSON，不含模型输出）\n\n",
-        question_sheet.strip(),
+        question_sheet_text,
         "\n\n# 须逐题评审的 question_id 列表（顺序即输出 `question_reviews` 顺序，不得遗漏）\n\n",
         id_line,
-        "\n\n# 材料 B：模型答案 JSON（**已通过解析与 defaults 处理**，且为 **`coerce_answers_payload_by_stage_qa` 覆写题面之前** 的快照；证据仅看本 JSON 内 `answers[].evidence`）\n\n",
+        "\n\n# 材料 B：模型答案 JSON（证据仅看本 JSON 内 `answers[].evidence`。注：为精简上下文，传入的 B 已由系统剔除了 stem, notes 等重复或冗余字段，此为正常现象，请勿判定为字段缺失契约违例）\n\n",
         "```json\n",
-        (model_json_before_stage_qa_coerce or "").strip(),
+        model_json_text,
         "\n```\n\n",
         "请根据以上两份材料：**对列表中每一题**写出 `review` 与本题 `confidence`，并给出全阶段 `confidence` 与 `summary_zh` 总评。"
         " **仅**核对题面↔答案、JSON 契约、`evidence`↔`value`；**勿**评价参赛 OS 的设计好坏；`findings` 默认 `[]`。"
         " 输出**唯一一个**符合系统说明 JSON 模式的对象（可用 ```json 围栏）。\n",
     ]
     user_text = "".join(user_parts)
-    if len(user_text) > 200_000:
-        user_text = user_text[:190_000] + "\n\n...[user bundle hard truncated at 200k chars]...\n"
+    if len(user_text) > max_user_chars:
+        user_text = user_text[: max_user_chars - 1000] + f"\n\n...[user bundle hard truncated at {max_user_chars} chars]...\n"
 
     model = os.environ.get("DESCRIBE_REVIEW_MODEL") or get_model_name()
     llm = build_chat_model(model=model, temperature=0, max_retries=0)
@@ -326,7 +402,16 @@ def run_describe_stage_review(
     raw_text = ""
     review_tokens_total = 0
     for attempt in range(1, max_attempts + 1):
-        msg = llm.invoke(messages)
+        try:
+            from core.utils import safe_llm_invoke
+            msg = safe_llm_invoke(llm, messages)
+        except Exception as e:
+            last_err = f"SafeLLMInvokeError: {type(e).__name__}: {e}"
+            logger.warning("Describe review LLM invoke failed attempt %s/%s: %s", attempt, max_attempts, last_err)
+            if attempt >= max_attempts:
+                return None, "", last_err, review_tokens_total
+            continue
+
         review_tokens_total += llm_message_total_tokens(msg)
         raw_text = (getattr(msg, "content", None) or "").strip()
         try:

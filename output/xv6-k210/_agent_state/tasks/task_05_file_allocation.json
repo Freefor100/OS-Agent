@@ -1,0 +1,57 @@
+{
+  "task_id": "task_05_file_allocation",
+  "stage_id": "05_fs_drivers",
+  "question_id": "Q05_017",
+  "question_ids": [
+    "Q05_017",
+    "Q05_018",
+    "Q05_019",
+    "Q05_020"
+  ],
+  "status": "done",
+  "evidence_ids": [
+    "ev_task_05_file_allocation_807be659",
+    "ev_task_05_file_allocation_e5b1bf51",
+    "ev_task_05_file_allocation_2a3b0a15",
+    "ev_task_05_file_allocation_bd2697ab",
+    "ev_task_05_file_allocation_25953661",
+    "ev_task_05_file_allocation_543851d9",
+    "ev_task_05_file_allocation_98ec3987",
+    "ev_task_05_file_allocation_32a8a7ca",
+    "ev_task_05_file_allocation_c4276aa4",
+    "ev_task_05_file_allocation_e13ce4e2",
+    "ev_task_05_file_allocation_2665912e",
+    "ev_task_05_file_allocation_90e40842",
+    "ev_task_05_file_allocation_43017653",
+    "ev_task_05_file_allocation_5f261799",
+    "ev_task_05_file_allocation_653efca7",
+    "ev_task_05_file_allocation_3c69134a",
+    "ev_task_05_file_allocation_326bc7bd",
+    "ev_task_05_file_allocation_237caff9",
+    "ev_task_05_file_allocation_f627e829",
+    "ev_task_05_file_allocation_885dd509",
+    "ev_task_05_file_allocation_6aa8975b",
+    "ev_task_05_file_allocation_1e1e3a4b",
+    "ev_task_05_file_allocation_c18e6d65",
+    "ev_task_05_file_allocation_7025d013",
+    "ev_task_05_file_allocation_1cb11046",
+    "ev_task_05_file_allocation_35eab2d6",
+    "ev_task_05_file_allocation_6cb23e8e"
+  ],
+  "draft_answer_ids": [
+    "draft_task_05_file_allocation_Q05_017_63eb3935",
+    "draft_task_05_file_allocation_Q05_018_820c30b6",
+    "draft_task_05_file_allocation_Q05_019_73fa65f1",
+    "draft_task_05_file_allocation_Q05_020_7f1cbe9b"
+  ],
+  "findings": [],
+  "confidence": "medium",
+  "errors": [],
+  "token_usage": {},
+  "metadata": {
+    "evidence_count": 27,
+    "mode": "react",
+    "summary": "查证了 xv6-k210 的 FAT32 文件系统后端，确认了文件数据块分配方式（FAT/cluster 链式索引）、空闲空间管理（FAT 表 + free_count/next_free 缓存）、目录结构（树形，通过 dentry 缓存实现）、文件记录组织（字节流）。同时查证了 I/O 驱动层（virtio 和 SD 卡 SPI+DMA+中断驱动）。",
+    "raw_output_excerpt": "Now I have all the evidence needed. Let me compile the final answer.\n\n```json\n{\n  \"status\": \"done\",\n  \"summary\": \"查证了 xv6-k210 的 FAT32 文件系统后端，确认了文件数据块分配方式（FAT/cluster 链式索引）、空闲空间管理（FAT 表 + free_count/next_free 缓存）、目录结构（树形，通过 dentry 缓存实现）、文件记录组织（字节流）。同时查证了 I/O 驱动层（virtio 和 SD 卡 SPI+DMA+中断驱动）。\",\n  \"claim\": \"xv6-k210 使用 FAT32 文件系统后端，数据块分配采用 FAT 表链式索引（cluster chain via FAT），空闲空间管理通过 FAT 表项（0 值表示空闲）+ free_count/next_free 缓存，目录结构为树形（dentry 缓存树），文件记录组织为无结构的字节流（byte stream）。I/O 控制技术：QEMU 下使用 virtio MMIO + 中断驱动；K210 硬件上使用 SPI + DMA（DMAC）+ PLIC 中断驱动。\",\n  \"structured_fact_results\": [\n    {\n      \"fact_id\": \"Q05_017_01\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [0, 1, 2],\n      \"notes\": \"FAT32 文件数据块分配使用 FAT 表链式索引（cluster chain）。alloc_clus() 分配新簇，write_fat() 写入 FAT 表项链接，read_fat() 读取下一簇号。reloc_clus() 通过 FAT 链定位文件偏移对应的簇。这是典型的 FAT/cluster 链式索引分配。\"\n    },\n    {\n      \"fact_id\": \"Q05_017_02\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [3, 4, 5],\n      \"notes\": \"空闲空间管理通过 FAT 表（0 值表示空闲簇）+ free_count/next_free 缓存。fat_update_next_free() 扫描 FAT 表查找空闲簇，free_clus() 将 FAT 表项写 0 释放簇。fat32_sb 中 free_count 和 next_free 字段缓存空闲信息。\"\n    },\n    {\n      \"fact_id\": \"Q05_017_03\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [6, 7, 8],\n      \"notes\": \"目录结构为树形。VFS 层通过 dentry 结构体（含 parent/child/next 指针）构建目录树。FAT32 后端目录项通过 fat_read_entry() 读取磁盘上的短/长文件名目录项。dentry 缓存实现 LRU 树形结构。\"\n    },\n    {\n      \"fact_id\": \"Q05_017_04\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [9, 10],\n      \"notes\": \"文件记录组织为无结构的字节流（byte stream）。fat_read_file() 和 fat_write_file() 直接按偏移读写字节，不涉及固定/可变长度记录管理。文件大小由 file_size 字段记录。\"\n    },\n    {\n      \"fact_id\": \"Q05_017_05\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],\n      \"notes\": \"后端证据充分：FAT32 文件系统完整实现，包括 fat32_init()、fat32_file_op、fat32_inode_op、cluster 分配/释放、FAT 表缓存、目录项管理等。\"\n    },\n    {\n      \""
+  }
+}

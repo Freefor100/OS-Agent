@@ -2402,7 +2402,7 @@ def lsp_get_call_graph(repo_path: str, file_path: str, symbol: str,
     适用场景：
     - 分析内核关键路径（如 fork、handle_page_fault、syscall_handler）的完整调用链
     - 验证某个函数是否被正确调用，以及调用层次是否合理
-    - 为 OS-Agent C 的细粒度比对提供 Call Graph 快照
+    - 为结构化源码报告提供 Call Graph 快照
 
     注意：需要 Language Server 支持 callHierarchy 协议。
     clangd (v12+) 和 rust-analyzer 均支持。

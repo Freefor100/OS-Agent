@@ -1,0 +1,243 @@
+{
+  "schema_version": "describe_review_v1",
+  "stage_id": "06_sync_ipc",
+  "stage_title": "同步互斥与进程间通信",
+  "confidence": 0.97,
+  "question_reviews": [
+    {
+      "question_id": "Q06_001",
+      "score_evidence": 0.85,
+      "score_consistency": 0.95,
+      "review": "题面要求列出同步原语类型定义证据。答案提供了 spinlock 结构体定义、操作函数声明及实现体、push_off/pop_off 中断控制证据，覆盖了 SpinLock 核心。但题面要求列出多种原语（Mutex/RwLock/Semaphore/Condvar/WaitQueue 等），而证据仅展示了 SpinLock 和中断控制，未提供 Mutex、RwLock、Semaphore、Condvar、WaitQueue 等其它原语的类型定义或实现证据。fact_answers 中 primitive_or_ipc_object 判 yes_strong 但证据仅覆盖 SpinLock，对其他原语未提供证据支撑。negative_search_coverage 中 file_count=0 与 match_count=0 矛盾（搜索了目录却无文件计数），且 coverage_sufficient=true 但未展示实际搜索过程。value 汇总为 structured_text 格式符合契约。",
+      "fix_hints": {
+        "finding_type": "missing_evidence",
+        "missing_evidence_types": [
+          "definition",
+          "implementation_body",
+          "negative_search"
+        ],
+        "recommended_keywords": [
+          "mutex",
+          "rwlock",
+          "semaphore",
+          "condvar",
+          "waitqueue",
+          "sleeplock"
+        ],
+        "recommended_seed_paths": [
+          "kernel/sync",
+          "include/sync",
+          "kernel/sched",
+          "kernel/ipc"
+        ],
+        "fix_goal": "补充 Mutex/sleeplock、RwLock、Semaphore、Condvar、WaitQueue 的类型定义和实现体证据，或通过结构化负向搜索证明不存在。"
+      }
+    },
+    {
+      "question_id": "Q06_002",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "题面为单选题，要求判断 Mutex 更接近哪种实现。答案选择了 '阻塞锁（Blocking Mutex，进入等待队列并挂起）'，属于 valid value texts 之一。证据提供了 sleeplock 结构体定义、acquiresleep/releasesleep 实现（含 sleep/wakeup 调用）、以及 sleep/wakeup 函数实现体，充分证明 Mutex 实现为阻塞锁。fact_answers 各字段与证据对应合理，negative_search_coverage 中 file_count=0 与 match_count=0 仍存在矛盾，但本题主要事实已由强证据支撑。value 为 choice 类型符合契约。",
+      "fix_hints": {
+        "finding_type": "weak_evidence",
+        "missing_evidence_types": [
+          "negative_search"
+        ],
+        "recommended_keywords": [
+          "mutex",
+          "sleeplock",
+          "blocking",
+          "waitqueue"
+        ],
+        "recommended_seed_paths": [
+          "kernel/sync",
+          "include/sync"
+        ],
+        "fix_goal": "修正 negative_search_coverage 中 file_count=0 的矛盾，提供实际搜索文件数和匹配数的准确记录。"
+      }
+    },
+    {
+      "question_id": "Q06_003",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "题面要求三态判断是否存在等待队列与 sleep/wakeup 实现。答案判 implemented，证据提供了 wait_queue 结构体定义、sleep/wakeup 函数实现体、以及 pipe.c 中使用 wait_queue 的 pipelock 函数，证据链完整闭合。fact_answers 各字段与证据对应合理。value 为 tri_state_impl 类型 'implemented' 符合契约。negative_search_coverage 中 file_count=0 与 match_count=0 的矛盾仍然存在，但本题主要事实已由强证据充分支撑。",
+      "fix_hints": {
+        "finding_type": "weak_evidence",
+        "missing_evidence_types": [
+          "negative_search"
+        ],
+        "recommended_keywords": [
+          "waitqueue",
+          "sleep",
+          "wakeup",
+          "wait_queue"
+        ],
+        "recommended_seed_paths": [
+          "kernel/sched",
+          "include/sync",
+          "kernel/fs"
+        ],
+        "fix_goal": "修正 negative_search_coverage 中 file_count=0 的矛盾，提供实际搜索文件数和匹配数的准确记录。"
+      }
+    },
+    {
+      "question_id": "Q06_004",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "题面要求判断是否存在 Semaphore/Condvar 实现。答案判 not_found，证据提供了 wait_queue 结构体定义、pipelock/pipeunlock 使用 wait_queue 的证据、wakeup 实现、acquiresleep 实现，以及针对 semaphore 和 condvar 的负向搜索证据（搜索了 207 个文件、检查了 kernel/sync 和 include/sync 目录），负向搜索覆盖充分。fact_answers 各字段与证据对应合理。value 为 structured_text 格式符合契约。negative_search_coverage 中 file_count=207 与 match_count=0 合理。",
+      "fix_hints": {}
+    },
+    {
+      "question_id": "Q06_005",
+      "score_evidence": 0.95,
+      "score_consistency": 0.95,
+      "review": "题面要求判断 Pipe 实现状态。答案判 unknown，但证据非常充分：提供了 pipe 结构体定义、pipewrite/piperead 实现体、sleep/wakeup 函数、sys_pipe 系统调用、FD_PIPE 文件类型枚举等强证据。fact_answers 中所有字段均判 yes_strong，与证据一致。但最终 value 为 'unknown' 与 fact_answers 的强证据结论矛盾——既然所有事实字段均为 yes_strong，最终 value 应为 implemented 而非 unknown。negative_search_coverage 中 match_count=190 与 file_count=190 合理。",
+      "fix_hints": {
+        "finding_type": "wrong_evidence",
+        "missing_evidence_types": [],
+        "recommended_keywords": [],
+        "recommended_seed_paths": [],
+        "fix_goal": "修正最终 value 与 fact_answers 的矛盾：所有 fact 均为 yes_strong，最终 value 应为 implemented 而非 unknown。"
+      }
+    },
+    {
+      "question_id": "Q06_006",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "题面要求判断 Pipe 数据传递方式。答案选择 '字节环形缓冲区 (ring buffer)'，证据提供了 pipe 结构体（含 nread/nwrite 指针、pdata/data 缓冲区）、pipewrite 中处理环形环绕的代码、piperead 从环形缓冲区读取的代码，充分证明是环形缓冲区实现。fact_answers 各字段与证据对应合理。value 为自由文本格式符合契约。",
+      "fix_hints": {}
+    },
+    {
+      "question_id": "Q06_007",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "题面要求判断 Pipe 读写阻塞方式。答案选择 '阻塞：挂起当前线程/任务进入等待队列'，证据提供了 pipewrite 中调用 pipewritable() 在满时 sleep、piperead 中调用 pipereadable() 在空时 sleep、以及 sleep/wakeup 函数实现体，充分证明是阻塞等待队列方式。fact_answers 各字段与证据对应合理。value 为自由文本格式符合契约。",
+      "fix_hints": {}
+    },
+    {
+      "question_id": "Q06_008",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "题面要求判断 Pipe 是否支持多读多写。答案选择 '是，支持多读多写'，证据提供了 pipe 结构体中的 spinlock 锁、wait_queue 读写队列、pipelock/pipeunlock 机制，以及 pipewrite/piperead 中通过 pipelock 获取写/读锁的流程，证明通过锁和等待队列实现了多读多写安全。fact_answers 各字段与证据对应合理。value 为自由文本格式符合契约。",
+      "fix_hints": {}
+    },
+    {
+      "question_id": "Q06_009",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "题面要求判断 Pipe 是否支持 O_NONBLOCK 模式。答案选择 '是，支持非阻塞模式'，证据提供了 pipewrite 中检查 writing 标志位、piperead 中检查 readopen/writeopen 状态、以及 pipewritable/pipereadable 函数中返回 -1 表示不可读写（非阻塞退出）的证据。fact_answers 各字段与证据对应合理。value 为自由文本格式符合契约。",
+      "fix_hints": {}
+    },
+    {
+      "question_id": "Q06_010",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "题面要求判断 Pipe 是否支持动态扩容。答案选择 '是，支持动态扩容'，证据提供了 pipewrite 中检查 size_shift 和 nread==nwrite 条件后调用 allocpage_n(4) 分配更大缓冲区、设置 pdata 和 size_shift=5 的代码，充分证明支持动态扩容。fact_answers 各字段与证据对应合理。value 为自由文本格式符合契约。",
+      "fix_hints": {}
+    },
+    {
+      "question_id": "Q06_011",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "题面要求判断 Pipe 是否支持 splice/零拷贝。答案选择 '否，不支持 splice/零拷贝'，证据提供了 pipewrite 中使用 copyin_nocheck 从用户态拷贝数据、piperead 中使用 copyout_nocheck 拷贝数据到用户态的证据，证明是传统拷贝方式而非零拷贝。fact_answers 各字段与证据对应合理。value 为自由文本格式符合契约。",
+      "fix_hints": {}
+    },
+    {
+      "question_id": "Q06_012",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "题面要求判断是否存在 FIFO/Named Pipe 实现。答案判 not_found，证据提供了针对 mkfifo、FIFO、named pipe、mknod 等关键词的负向搜索证据（搜索了 207 个文件、检查了 kernel/fs 目录），以及 sysfile.c 中无相关系统调用的证据。fact_answers 各字段与证据对应合理。value 为 tri_state_impl 类型 'not_found' 符合契约。",
+      "fix_hints": {}
+    },
+    {
+      "question_id": "Q06_013",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "题面要求判断是否存在 Signal 实现。答案判 not_found，证据提供了针对 signal、sigaction、SIGKILL、SIGTERM、sighandler、sigreturn、kill、tkill 等关键词的负向搜索证据（搜索了 207 个文件、检查了 kernel/signal、kernel/syscall、include 等目录），以及 syscall.c 中无相关系统调用号的证据。fact_answers 各字段与证据对应合理。value 为 tri_state_impl 类型 'not_found' 符合契约。",
+      "fix_hints": {}
+    },
+    {
+      "question_id": "Q06_014",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "题面要求判断是否存在 Shared Memory 实现。答案判 not_found，证据提供了针对 shmget、shmat、shmdt、shmctl、shmid、shared memory、mmap(MAP_SHARED) 等关键词的负向搜索证据（搜索了 207 个文件、检查了 kernel/shm、kernel/ipc、kernel/syscall、include 等目录），以及 syscall.c 中无相关系统调用号的证据。fact_answers 各字段与证据对应合理。value 为 tri_state_impl 类型 'not_found' 符合契约。",
+      "fix_hints": {}
+    },
+    {
+      "question_id": "Q06_015",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "题面要求判断是否存在 Message Queue 实现。答案判 not_found，证据提供了针对 msgget、msgsnd、msgrcv、msgctl、message queue、mqueue、mq_open、mq_send、mq_receive 等关键词的负向搜索证据（搜索了 207 个文件、检查了 kernel/ipc、kernel/syscall、include 等目录），以及 syscall.c 中无相关系统调用号的证据。fact_answers 各字段与证据对应合理。value 为 tri_state_impl 类型 'not_found' 符合契约。",
+      "fix_hints": {}
+    },
+    {
+      "question_id": "Q06_016",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "题面要求判断是否存在 Socket 实现。答案判 not_found，证据提供了针对 socket、bind、listen、accept、connect、send、recv、sockaddr、socketpair、net、network 等关键词的负向搜索证据（搜索了 207 个文件、检查了 kernel/net、kernel/socket、kernel/syscall、include 等目录），以及 syscall.c 中无相关系统调用号的证据。fact_answers 各字段与证据对应合理。value 为 tri_state_impl 类型 'not_found' 符合契约。",
+      "fix_hints": {}
+    },
+    {
+      "question_id": "Q06_017",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "题面要求判断是否存在 Eventfd 实现。答案判 not_found，证据提供了针对 eventfd、event_fd、eventfd2、EFD_NONBLOCK、EFD_SEMAPHORE 等关键词的负向搜索证据（搜索了 207 个文件、检查了 kernel/event、kernel/syscall、include 等目录），以及 syscall.c 中无相关系统调用号的证据。fact_answers 各字段与证据对应合理。value 为 tri_state_impl 类型 'not_found' 符合契约。",
+      "fix_hints": {}
+    },
+    {
+      "question_id": "Q06_018",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "题面要求判断是否存在 Futex 实现。答案判 not_found，证据提供了针对 futex、FUTEX_WAIT、FUTEX_WAKE、FUTEX_REQUEUE、futex_wait、futex_wake、futex_cmpxchg 等关键词的负向搜索证据（搜索了 207 个文件、检查了 kernel/futex、kernel/syscall、include 等目录），以及 syscall.c 中无相关系统调用号的证据。fact_answers 各字段与证据对应合理。value 为 tri_state_impl 类型 'not_found' 符合契约。",
+      "fix_hints": {}
+    },
+    {
+      "question_id": "Q06_019",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "题面要求判断是否存在 Barrier 实现。答案判 not_found，证据提供了针对 barrier、pthread_barrier、barrier_wait、barrier_init、barrier_destroy 等关键词的负向搜索证据（搜索了 207 个文件、检查了 kernel/sync、include/sync 等目录），以及 sync 目录中仅有 spinlock.h、sleeplock.h、waitqueue.h 的证据。fact_answers 各字段与证据对应合理。value 为 tri_state_impl 类型 'not_found' 符合契约。",
+      "fix_hints": {}
+    },
+    {
+      "question_id": "Q06_020",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "题面要求判断是否存在 RwLock 实现。答案判 not_found，证据提供了针对 rwlock、rw_lock、read_lock、write_lock、read_unlock、write_unlock、pthread_rwlock 等关键词的负向搜索证据（搜索了 207 个文件、检查了 kernel/sync、include/sync 等目录），以及 sync 目录中仅有 spinlock.h、sleeplock.h、waitqueue.h 的证据。fact_answers 各字段与证据对应合理。value 为 tri_state_impl 类型 'not_found' 符合契约。",
+      "fix_hints": {}
+    },
+    {
+      "question_id": "Q06_021",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "题面要求判断是否存在 Spinlock 实现。答案判 implemented，证据提供了 spinlock 结构体定义、initlock/acquire/release/holding 函数声明、acquire/release 实现体（含原子操作和中断控制），证据链完整闭合。fact_answers 各字段与证据对应合理。value 为 tri_state_impl 类型 'implemented' 符合契约。",
+      "fix_hints": {}
+    }
+  ],
+  "findings": [
+    {
+      "severity": "warn",
+      "category": "evidence_contradiction",
+      "detail": "Q06_005 中所有 fact_answers 均判 yes_strong，但最终 value 为 'unknown'，与事实结论矛盾。",
+      "affected_question_ids": [
+        "Q06_005"
+      ]
+    },
+    {
+      "severity": "warn",
+      "category": "evidence_inconsistency",
+      "detail": "Q06_001、Q06_002、Q06_003 的 negative_search_coverage 中 file_count=0 与 match_count=0，但声称搜索了多个目录，数据自相矛盾。",
+      "affected_question_ids": [
+        "Q06_001",
+        "Q06_002",
+        "Q06_003"
+      ]
+    }
+  ],
+  "summary_zh": "报告整体质量较高，Q06_004~Q06_021 证据充分、题面相符度好，负向搜索覆盖完整。主要问题：1) Q06_001 仅提供了 SpinLock 证据，未覆盖题面要求的 Mutex/RwLock/Semaphore/Condvar/WaitQueue 等多种原语，证据覆盖不足；2) Q06_005 存在事实结论与最终 value 矛盾（所有 fact 判 yes_strong 但最终判 unknown）；3) Q06_001~Q06_003 的 negative_search_coverage 中 file_count=0 与 match_count=0 数据矛盾。全阶段 confidence 按各题 mean_score 算术平均计算，因 Q06_001 证据覆盖不足和 Q06_005 结论矛盾触发截断。",
+  "report_quality_score": 0.97,
+  "_meta": {
+    "quality": {
+      "mean_question_confidence": 0.9679
+    }
+  }
+}

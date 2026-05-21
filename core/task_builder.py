@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 import hashlib
-import os
 import re
 from typing import Any, Dict, Iterable, List, Set
 
 from core.agent_graph_state import TaskSpec
+from core.feature_schema_bank import (
+    collect_feature_ids,
+    feature_context_for_question,
+    negative_search_policy_for_question,
+    required_evidence_types_for_question,
+)
 from core.per_planner import STAGE_HINTS
 
 
@@ -111,14 +116,29 @@ def build_tasks_for_stage(
         task_hints = q.get("task_hints") if isinstance(q.get("task_hints"), dict) else {}
         evidence_policy = q.get("evidence_policy") if isinstance(q.get("evidence_policy"), dict) else {}
         hinted_types = task_hints.get("task_types") if isinstance(task_hints.get("task_types"), list) else []
-        expected = evidence_policy.get("required_evidence_types")
-        expected_types = [str(x) for x in expected] if isinstance(expected, list) else []
+        expected_types = required_evidence_types_for_question(q)
         seed_paths = [str(x) for x in task_hints.get("seed_paths", [])] if isinstance(task_hints.get("seed_paths"), list) else []
         entry_symbols = [str(x) for x in task_hints.get("entry_symbols", [])] if isinstance(task_hints.get("entry_symbols"), list) else []
         seed_paths = (seed_paths + stage_seed_paths)[:10]
         entry_symbols = (entry_symbols + stage_entry_symbols)[:10]
         keywords = _question_keywords(q)
-        query = f"{stage_title} / {qid}: {stem}\n关键词: {', '.join(keywords)}"
+        feature_ids = collect_feature_ids(q)
+        feature_context = feature_context_for_question(q)
+        negative_search_policy = negative_search_policy_for_question(q)
+        diagnostic_checks = _list_str(task_hints.get("diagnostic_checks"), 12)
+        structured_facts = _list_dict(task_hints.get("structured_facts"), 12) or _list_dict(q.get("structured_facts"), 12)
+        answer_contract = q.get("answer_contract") if isinstance(q.get("answer_contract"), dict) else {}
+        concept_boundary = str(q.get("concept_boundary") or "")
+        llm_answer_steps = _list_str(q.get("llm_answer_steps"), 12)
+        fact_brief = _structured_fact_brief(structured_facts, 10)
+        query = (
+            f"{stage_title} / {qid}: {stem}\n"
+            f"关键词: {', '.join(keywords)}\n"
+            f"概念边界: {concept_boundary}\n"
+            f"结构化事实: {fact_brief}\n"
+            f"LLM作答步骤: {' | '.join(llm_answer_steps)}\n"
+            f"局部判断步骤: {' | '.join(diagnostic_checks)}"
+        )
         base = f"task_{stage_id}_{qid}"
 
         task_types = list(hinted_types)
@@ -151,6 +171,14 @@ def build_tasks_for_stage(
                         "question_type": qtype,
                         "stem": stem,
                         "keywords": keywords,
+                        "feature_ids": feature_ids,
+                        "feature_context": feature_context,
+                        "negative_search_policy": negative_search_policy,
+                        "diagnostic_checks": diagnostic_checks,
+                        "structured_facts": structured_facts,
+                        "answer_contract": answer_contract,
+                        "concept_boundary": concept_boundary,
+                        "llm_answer_steps": llm_answer_steps,
                     },
                 )
             )
@@ -168,8 +196,7 @@ def build_tasks_from_llm_plan(
     """Validate LLM-proposed grouped tasks and fill missing fields safely.
 
     The Plan Agent proposes; this function disposes. Invalid question ids are
-    dropped, oversized groups are split by the configured maximum, and the
-    current rule-based builder remains the fallback when no valid task survives.
+    dropped, but grouping size remains the LLM planner's responsibility.
     """
 
     qmap = {str(q.get("question_id") or "").strip(): q for q in questions if isinstance(q, dict)}
@@ -177,8 +204,6 @@ def build_tasks_from_llm_plan(
     if not valid_qids:
         return build_tasks_for_stage(stage_id=stage_id, stage_title=stage_title, questions=questions, plan=plan)
 
-    max_q_per_task = _env_int("OS_AGENT_MAX_QUESTIONS_PER_TASK", 4)
-    max_tasks_total = _env_int("OS_AGENT_MAX_TASKS_PER_STAGE_TOTAL", 80)
     hints = STAGE_HINTS.get(stage_id, {})
     stage_seed_paths = list(getattr(plan, "seed_paths", None) or hints.get("seed_paths", []))
     stage_entry_symbols = list(getattr(plan, "entry_symbols", None) or hints.get("entry_symbols", []))
@@ -194,7 +219,7 @@ def build_tasks_from_llm_plan(
         qids = [str(x).strip() for x in raw_qids if str(x).strip() in valid_qids]
         if not qids:
             continue
-        for chunk_i, qchunk in enumerate(_chunks(_dedupe(qids), max_q_per_task), 1):
+        for chunk_i, qchunk in enumerate([_dedupe(qids)], 1):
             task_type = _normalize_task_type(str(raw.get("task_type") or raw.get("agent_type") or "react_code"))
             seed_paths = _list_str(raw.get("seed_paths"), 20) or stage_seed_paths[:20]
             entry_symbols = _list_str(raw.get("entry_symbols"), 20) or stage_entry_symbols[:20]
@@ -212,8 +237,33 @@ def build_tasks_from_llm_plan(
                 task_id = f"{task_id}_{chunk_i}"
             seen.add(task_id)
             keywords: List[str] = []
+            feature_ids: List[str] = []
+            negative_search_policy: Dict[str, Any] = {}
+            negative_search_policies: Dict[str, Dict[str, Any]] = {}
+            feature_contexts: Dict[str, Any] = {}
+            diagnostic_checks: List[str] = []
+            structured_facts: List[Dict[str, Any]] = []
+            answer_contracts: Dict[str, Any] = {}
+            concept_boundaries: Dict[str, str] = {}
+            llm_answer_steps: List[str] = []
             for qid in qchunk:
                 keywords.extend(_question_keywords(qmap[qid]))
+                feature_ids.extend(collect_feature_ids(qmap[qid]))
+                feature_contexts[qid] = feature_context_for_question(qmap[qid])
+                q_required = required_evidence_types_for_question(qmap[qid])
+                expected = _dedupe(list(expected) + q_required)[:12]
+                q_negative_policy = negative_search_policy_for_question(qmap[qid])
+                if q_negative_policy:
+                    negative_search_policies[qid] = q_negative_policy
+                hints = qmap[qid].get("task_hints") if isinstance(qmap[qid].get("task_hints"), dict) else {}
+                diagnostic_checks.extend(_list_str(hints.get("diagnostic_checks"), 12))
+                structured_facts.extend(_list_dict(hints.get("structured_facts"), 12) or _list_dict(qmap[qid].get("structured_facts"), 12))
+                if isinstance(qmap[qid].get("answer_contract"), dict):
+                    answer_contracts[qid] = qmap[qid]["answer_contract"]
+                if qmap[qid].get("concept_boundary"):
+                    concept_boundaries[qid] = str(qmap[qid].get("concept_boundary") or "")
+                llm_answer_steps.extend(_list_str(qmap[qid].get("llm_answer_steps"), 12))
+                negative_search_policy = _merge_negative_search_policies(negative_search_policies.values())
             tasks.append(
                 TaskSpec(
                     task_id=task_id,
@@ -232,22 +282,22 @@ def build_tasks_from_llm_plan(
                         "source": "llm_task_plan",
                         "group_reason": str(raw.get("group_reason") or ""),
                         "keywords": _dedupe(keywords)[:12],
+                        "feature_ids": _dedupe(feature_ids),
+                        "feature_context_by_question": feature_contexts,
+                        "negative_search_policy": negative_search_policy,
+                        "negative_search_policy_by_question": negative_search_policies,
+                        "diagnostic_checks": _dedupe(diagnostic_checks)[:20],
+                        "structured_facts": _dedupe_dicts_by_id(structured_facts)[:30],
+                        "answer_contract_by_question": answer_contracts,
+                        "concept_boundary_by_question": concept_boundaries,
+                        "llm_answer_steps": _dedupe(llm_answer_steps)[:30],
                     },
                 )
             )
-            if len(tasks) >= max_tasks_total:
-                return tasks
 
     if tasks:
         return tasks
-    return build_tasks_for_stage(stage_id=stage_id, stage_title=stage_title, questions=questions, plan=plan)
-
-
-def _env_int(name: str, default: int) -> int:
-    try:
-        return max(1, int((os.environ.get(name) or "").strip() or default))
-    except ValueError:
-        return default
+    return []
 
 
 def _list_str(value: Any, limit: int) -> List[str]:
@@ -259,6 +309,62 @@ def _list_str(value: Any, limit: int) -> List[str]:
     return _dedupe(out)[:limit]
 
 
+def _list_dict(value: Any, limit: int) -> List[Dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    out = [dict(x) for x in value if isinstance(x, dict)]
+    return out[:limit]
+
+
+def _structured_fact_brief(facts: List[Dict[str, Any]], limit: int) -> str:
+    parts: List[str] = []
+    for fact in facts[:limit]:
+        fid = str(fact.get("fact_id") or "").strip()
+        key = str(fact.get("fact_key") or "").strip()
+        answer_type = str(fact.get("answer_type") or "").strip()
+        allowed = fact.get("allowed_values") if isinstance(fact.get("allowed_values"), list) else []
+        allowed_brief = "/".join(str(x) for x in allowed[:5])
+        parts.append(f"{fid}:{key}({answer_type}:{allowed_brief})")
+    return " | ".join(parts)
+
+
+def _dedupe_dicts_by_id(items: Iterable[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    seen: Set[str] = set()
+    out: List[Dict[str, Any]] = []
+    for item in items:
+        key = str(item.get("fact_id") or item.get("fact_key") or item)
+        if key not in seen:
+            seen.add(key)
+            out.append(item)
+    return out
+
+
+def _merge_negative_search_policies(policies: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
+    merged_keywords: List[str] = []
+    merged_seed_paths: List[str] = []
+    min_keyword_coverage = 0.0
+    min_directory_coverage = 0.0
+    for policy in policies:
+        if not isinstance(policy, dict):
+            continue
+        keywords = policy.get("keywords") if isinstance(policy.get("keywords"), list) else []
+        seed_paths = policy.get("seed_paths") if isinstance(policy.get("seed_paths"), list) else []
+        merged_keywords.extend(str(x).strip() for x in keywords if str(x).strip())
+        merged_seed_paths.extend(str(x).strip() for x in seed_paths if str(x).strip())
+        min_keyword_coverage = max(min_keyword_coverage, float(policy.get("minimum_keyword_coverage", 0.0) or 0.0))
+        min_directory_coverage = max(min_directory_coverage, float(policy.get("minimum_directory_coverage", 0.0) or 0.0))
+    out: Dict[str, Any] = {}
+    if merged_keywords:
+        out["keywords"] = _dedupe(merged_keywords)[:40]
+    if merged_seed_paths:
+        out["seed_paths"] = _dedupe(merged_seed_paths)[:30]
+    if min_keyword_coverage:
+        out["minimum_keyword_coverage"] = min_keyword_coverage
+    if min_directory_coverage:
+        out["minimum_directory_coverage"] = min_directory_coverage
+    return out
+
+
 def _dedupe(items: Iterable[str]) -> List[str]:
     seen: Set[str] = set()
     out: List[str] = []
@@ -268,11 +374,6 @@ def _dedupe(items: Iterable[str]) -> List[str]:
             seen.add(key)
             out.append(item)
     return out
-
-
-def _chunks(items: List[str], size: int) -> Iterable[List[str]]:
-    for i in range(0, len(items), size):
-        yield items[i : i + size]
 
 
 def _normalize_task_type(value: str) -> str:

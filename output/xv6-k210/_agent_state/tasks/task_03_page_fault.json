@@ -1,0 +1,42 @@
+{
+  "task_id": "task_03_page_fault",
+  "stage_id": "03_mem_mgmt",
+  "question_id": "Q03_010",
+  "question_ids": [
+    "Q03_010",
+    "Q03_011"
+  ],
+  "status": "done",
+  "evidence_ids": [
+    "ev_task_03_page_fault_f897fbe6",
+    "ev_task_03_page_fault_ce683f52",
+    "ev_task_03_page_fault_49fe7306",
+    "ev_task_03_page_fault_039f2e39",
+    "ev_task_03_page_fault_5530db12",
+    "ev_task_03_page_fault_597e63aa",
+    "ev_task_03_page_fault_cbb6bd8f",
+    "ev_task_03_page_fault_f6d92c43",
+    "ev_task_03_page_fault_e2bb8763",
+    "ev_task_03_page_fault_692270d1",
+    "ev_task_03_page_fault_027ea7e1",
+    "ev_task_03_page_fault_d6f35eb4",
+    "ev_task_03_page_fault_d5026233",
+    "ev_task_03_page_fault_2551df0d",
+    "ev_task_03_page_fault_0bc32712",
+    "ev_task_03_page_fault_44459efa"
+  ],
+  "draft_answer_ids": [
+    "draft_task_03_page_fault_Q03_010_9e582917",
+    "draft_task_03_page_fault_Q03_011_ebd22625"
+  ],
+  "findings": [],
+  "confidence": "high",
+  "errors": [],
+  "token_usage": {},
+  "metadata": {
+    "evidence_count": 16,
+    "mode": "react",
+    "summary": "查证了 xv6-k210 的缺页异常处理完整链路：从 usertrap() 入口，handle_excp() 分发，到 handle_page_fault() 主处理函数，支持 COW、lazy allocation、ELF 按需加载、mmap 缺页。物理页分配器使用 freelist 结构（multiple+single 两级），页表 walk/map/unmap 真实修改 PTE，PTE 保护位（R/W/X/U）和 SSTATUS_PUM/SUM 实现用户/内核隔离。",
+    "raw_output_excerpt": "Now I have all the evidence needed. Let me produce the final structured JSON output.\n\n```json\n{\n  \"status\": \"done\",\n  \"summary\": \"查证了 xv6-k210 的缺页异常处理完整链路：从 usertrap() 入口，handle_excp() 分发，到 handle_page_fault() 主处理函数，支持 COW、lazy allocation、ELF 按需加载、mmap 缺页。物理页分配器使用 freelist 结构（multiple+single 两级），页表 walk/map/unmap 真实修改 PTE，PTE 保护位（R/W/X/U）和 SSTATUS_PUM/SUM 实现用户/内核隔离。\",\n  \"claim\": \"xv6-k210 实现了完整的缺页异常处理逻辑，与内存分配/映射联动。\",\n  \"structured_fact_results\": [\n    {\n      \"fact_id\": \"Q03_010_01\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [0, 1, 2],\n      \"notes\": \"PGSIZE=4096 定义于 include/hal/riscv.h:378；MAXVA、PGROUNDUP/DOWN 同文件定义；PHYSTOP=0x80600000、KERNBASE=0x80020000 定义于 include/memlayout.h；地址空间常量完整可复现。\"\n    },\n    {\n      \"fact_id\": \"Q03_010_02\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [3, 4],\n      \"notes\": \"物理页分配器 kernel/mm/pm.c 使用 freelist 结构（struct run 链表），分 multiple（大块连续）和 single（单页）两级池；allocpage()/freepage() 接口通过 _allocpage()/_freepage() 实现；有 spinlock 保护。\"\n    },\n    {\n      \"fact_id\": \"Q03_010_03\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [5, 6, 7],\n      \"notes\": \"walk() 实现三级 Sv39 页表遍历（kernel/mm/vm.c:212），mappages() 真实设置 PTE（含 PA2PTE、PTE_V、perm 标志），unmappages() 清除 PTE 并可选释放物理页；uvmalloc() 调用 allocpage()+mappages() 分配并映射。\"\n    },\n    {\n      \"fact_id\": \"Q03_010_04\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [8, 9, 10],\n      \"notes\": \"PTE 保护位 PTE_R/W/X/U 定义于 riscv.h:374-377；SSTATUS_PUM/SUM 通过 permit_usr_mem()/protect_usr_mem() 切换（vm.h:12-28）；地址转换由 MMU 运行时通过 satp CSR 完成（usertrapret 设置 MAKE_SATP）；COW 使用 PTE_RSW1 标记。\"\n    },\n    {\n      \"fact_id\": \"Q03_010_05\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [11, 12, 13, 14],\n      \"notes\": \"完整调用路径：usertrap() → handle_excp() → handle_page_fault(kind, badaddr) → 根据 seg->type 分发到 handle_page_fault_lazy/handle_page_fault_loadelf/handle_store_page_fault_cow/handle_page"
+  }
+}

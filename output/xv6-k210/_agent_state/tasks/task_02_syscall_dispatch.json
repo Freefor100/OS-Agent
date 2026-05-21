@@ -1,0 +1,52 @@
+{
+  "task_id": "task_02_syscall_dispatch",
+  "stage_id": "02_boot_trap",
+  "question_id": "Q02_018",
+  "question_ids": [
+    "Q02_018",
+    "Q02_019",
+    "Q02_020",
+    "Q02_021",
+    "Q02_027",
+    "Q02_028",
+    "Q02_029"
+  ],
+  "status": "done",
+  "evidence_ids": [
+    "ev_task_02_syscall_dispatch_3340f87c",
+    "ev_task_02_syscall_dispatch_183ac3a3",
+    "ev_task_02_syscall_dispatch_468fcd43",
+    "ev_task_02_syscall_dispatch_1fabc4b1",
+    "ev_task_02_syscall_dispatch_b93f805b",
+    "ev_task_02_syscall_dispatch_81055e6e",
+    "ev_task_02_syscall_dispatch_43f535db",
+    "ev_task_02_syscall_dispatch_8542d381",
+    "ev_task_02_syscall_dispatch_abfa4392",
+    "ev_task_02_syscall_dispatch_8c149c25",
+    "ev_task_02_syscall_dispatch_e23c7abc",
+    "ev_task_02_syscall_dispatch_111fa119",
+    "ev_task_02_syscall_dispatch_8fb728d6",
+    "ev_task_02_syscall_dispatch_488ee799",
+    "ev_task_02_syscall_dispatch_7322def8",
+    "ev_task_02_syscall_dispatch_f2fcbee3"
+  ],
+  "draft_answer_ids": [
+    "draft_task_02_syscall_dispatch_Q02_018_5f7a100c",
+    "draft_task_02_syscall_dispatch_Q02_019_aa88637c",
+    "draft_task_02_syscall_dispatch_Q02_020_ea9d2f9f",
+    "draft_task_02_syscall_dispatch_Q02_021_c946df01",
+    "draft_task_02_syscall_dispatch_Q02_027_be83a4f6",
+    "draft_task_02_syscall_dispatch_Q02_028_608b911f",
+    "draft_task_02_syscall_dispatch_Q02_029_7e47e3c6"
+  ],
+  "findings": [],
+  "confidence": "high",
+  "errors": [],
+  "token_usage": {},
+  "metadata": {
+    "evidence_count": 16,
+    "mode": "react",
+    "summary": "查证了 xv6-k210 系统调用分发表、边界检查、sys_write 追踪、fork/exec/mmap/open/write 三态、全量统计、README 对照、_impl 命名模式。系统调用分发表 (syscalls[] 数组) 完整实现，含 ~60+ 条目；边界检查通过 num < NELEM(syscalls) && syscalls[num] 实现；sys_write 从用户 write() → ecall → uservec → usertrap → syscall() → sys_write() → filewrite() 完整路径可追踪；fork/exec/mmap/open/write 均为非桩实现；_impl 命名模式未发现。",
+    "raw_output_excerpt": "Now I have all the data. Let me compile the final JSON output.\n\n```json\n{\n  \"status\": \"done\",\n  \"summary\": \"查证了 xv6-k210 系统调用分发表、边界检查、sys_write 追踪、fork/exec/mmap/open/write 三态、全量统计、README 对照、_impl 命名模式。系统调用分发表 (syscalls[] 数组) 完整实现，含 ~60+ 条目；边界检查通过 num < NELEM(syscalls) && syscalls[num] 实现；sys_write 从用户 write() → ecall → uservec → usertrap → syscall() → sys_write() → filewrite() 完整路径可追踪；fork/exec/mmap/open/write 均为非桩实现；_impl 命名模式未发现。\",\n  \"claim\": \"xv6-k210 存在完整的系统调用分发表（syscalls[] 函数指针数组），通过 a7 寄存器获取系统调用号，做边界检查（num < NELEM(syscalls) && syscalls[num]），越界返回 -1。参数通过 argint/argaddr/argstr 从 trapframe 寄存器读取，指针参数通过 copyin2/copyout2 在用户/内核间复制。sys_write 从用户态 write() 封装 → li a7, SYS_write; ecall → uservec 保存寄存器 → usertrap 识别 scause==8 → syscall() 分发 → sys_write() 实现体 → filewrite() 的完整路径已确认。fork/exec/mmap/open/write 均为非桩实现。分发表中约 60+ 个条目，其中约 50+ 个有 extern 声明和实现体，少数（如 sys_geteuid/sys_getgid/sys_getegid 映射到 sys_getuid）为 stub。README 未声明具体 syscall 标准。_impl 命名模式不存在。\",\n  \"structured_fact_results\": [\n    {\n      \"fact_id\": \"Q02_018_01\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [0, 1, 2, 3],\n      \"notes\": \"trap_to_syscall: 用户态通过 ecall 指令触发，uservec 保存寄存器到 trapframe，跳转到 usertrap，usertrap 检查 scause==EXCP_ENV_CALL(8) 后调用 syscall()。完整路径已通过 trampoline.S、trap.c、syscall.c 确认。\"\n    },\n    {\n      \"fact_id\": \"Q02_018_02\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [0, 4],\n      \"notes\": \"number_bounds: syscall() 函数中 num = p->trapframe->a7，然后检查 num < NELEM(syscalls) && syscalls[num]。NELEM 宏定义为 sizeof(x)/sizeof((x)[0])。越界或 NULL 时设置 p->trapframe->a0 = -1。\"\n    },\n    {\n      \"fact_id\": \"Q02_018_03\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [0, 5],\n      \"notes\": \"dispatch_table: syscalls[] 数组使用 C99 指定初始化器语法，如 [SYS_fork] sys_fork，约 60+ 个条目。syscall() 通过 syscalls[num]() 调用对应函数。\"\n    },\n    {\n      \"fact_id\": \"Q02_018_04\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [0, 6, "
+  }
+}

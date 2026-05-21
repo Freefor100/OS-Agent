@@ -1,0 +1,41 @@
+{
+  "task_id": "task_03_main_chain",
+  "stage_id": "03_mem_mgmt",
+  "question_id": "Q03_030",
+  "question_ids": [
+    "Q03_030"
+  ],
+  "status": "done",
+  "evidence_ids": [
+    "ev_task_03_main_chain_5452cc7d",
+    "ev_task_03_main_chain_8421b186",
+    "ev_task_03_main_chain_faa467e1",
+    "ev_task_03_main_chain_dadfdde3",
+    "ev_task_03_main_chain_5dcdf7d8",
+    "ev_task_03_main_chain_3c9fff0e",
+    "ev_task_03_main_chain_85983c86",
+    "ev_task_03_main_chain_d70786b2",
+    "ev_task_03_main_chain_9085b70c",
+    "ev_task_03_main_chain_c920d968",
+    "ev_task_03_main_chain_d25a634f",
+    "ev_task_03_main_chain_ee8c90ee",
+    "ev_task_03_main_chain_96aad7bd",
+    "ev_task_03_main_chain_99b3dd0e",
+    "ev_task_03_main_chain_5f206c15",
+    "ev_task_03_main_chain_9fc235fc",
+    "ev_task_03_main_chain_cefd81b9"
+  ],
+  "draft_answer_ids": [
+    "draft_task_03_main_chain_Q03_030_0eda2bd5"
+  ],
+  "findings": [],
+  "confidence": "high",
+  "errors": [],
+  "token_usage": {},
+  "metadata": {
+    "evidence_count": 17,
+    "mode": "react",
+    "summary": "查证了 xv6-k210 内存管理主链路：从缺页异常入口 handle_page_fault（trap.c）→ 分段定位 locateseg（usrmm）→ 按 segtype 分发到 lazy/loadelf/mmap/COW 处理 → 底层 walk/mappages（vm.c）→ 物理页分配 allocpage/_allocpage（pm.c）。物理页分配器使用 freelist 结构（struct run），分为 single（单页）和 multiple（多页连续）两个分配器。页表操作 walk/mappages/unmappages 真实修改 PTE。保护位通过 PTE_R/W/X/U 实现，地址重定位由 MMU 运行时通过 SATP 寄存器完成。",
+    "raw_output_excerpt": "Now I have comprehensive evidence. Let me produce the final structured JSON output.\n\n```json\n{\n  \"status\": \"done\",\n  \"summary\": \"查证了 xv6-k210 内存管理主链路：从缺页异常入口 handle_page_fault（trap.c）→ 分段定位 locateseg（usrmm）→ 按 segtype 分发到 lazy/loadelf/mmap/COW 处理 → 底层 walk/mappages（vm.c）→ 物理页分配 allocpage/_allocpage（pm.c）。物理页分配器使用 freelist 结构（struct run），分为 single（单页）和 multiple（多页连续）两个分配器。页表操作 walk/mappages/unmappages 真实修改 PTE。保护位通过 PTE_R/W/X/U 实现，地址重定位由 MMU 运行时通过 SATP 寄存器完成。\",\n  \"claim\": \"xv6-k210 实现了完整的内存管理主链路：缺页异常（handle_page_fault）→ 段定位（locateseg）→ 按类型分发（lazy/loadelf/mmap/COW）→ 页表操作（walk/mappages/unmappages）→ 物理页分配（allocpage/_allocpage）。物理页分配器为 freelist 结构（struct run），分 single/multiple 两级。页表为 Sv39 三级页表，PTE 包含 V/R/W/X/U 保护位。\",\n  \"structured_fact_results\": [\n    {\n      \"fact_id\": \"Q03_030_01\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [0, 1, 2],\n      \"notes\": \"memory_constants: PGSIZE=4096, PGSHIFT=12 定义于 include/hal/riscv.h:378-379; KERNBASE=0x80020000, PHYSTOP=0x80600000, MAXUVA=RUSTSBI_BASE=0x80000000 定义于 include/memlayout.h:100-130; PTE_V/R/W/X/U 定义于 riscv.h:384-388; Sv39 三级页表索引宏 PX/PXSHIFT 定义于 riscv.h:396-398。所有常量均有完整定义和广泛使用。\"\n    },\n    {\n      \"fact_id\": \"Q03_030_02\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [3, 4, 5],\n      \"notes\": \"allocator_state: 物理页分配器 pm.c 使用 freelist 结构（struct run {next, npage}），分为 single（单页分配，400页池）和 multiple（多页连续分配）两个分配器。kpminit() 初始化空闲链表，_allocpage() 优先从 single 分配，失败时从 multiple 借一页。kmalloc 是 slab 风格的小对象分配器，基于 allocpage/freepage。\"\n    },\n    {\n      \"fact_id\": \"Q03_030_03\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [6, 7, 8, 9],\n      \"notes\": \"map_unmap_api: walk() 实现 Sv39 三级页表遍历（vm.c:212-230），mappages() 创建 PTE 映射（vm.c:263-293），unmappages() 移除映射并可选释放物理页（vm.c:299-335）。所有函数均真实读写 PTE 表项（*pte = PA2PTE(pa) | perm | PTE_V），修改 PTE_V/PTE_U 等标志位。\"\n    },\n    {\n      \"fact_id\": \"Q03_030_04\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_i"
+  }
+}

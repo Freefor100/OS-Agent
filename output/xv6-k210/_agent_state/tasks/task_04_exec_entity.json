@@ -1,0 +1,40 @@
+{
+  "task_id": "task_04_exec_entity",
+  "stage_id": "04_process_smp",
+  "question_id": "Q04_001",
+  "question_ids": [
+    "Q04_001",
+    "Q04_002",
+    "Q04_019",
+    "Q04_021"
+  ],
+  "status": "done",
+  "evidence_ids": [
+    "ev_task_04_exec_entity_e57dcb67",
+    "ev_task_04_exec_entity_616a87b9",
+    "ev_task_04_exec_entity_cc1d0ef3",
+    "ev_task_04_exec_entity_abfcd40b",
+    "ev_task_04_exec_entity_77b30262",
+    "ev_task_04_exec_entity_1d0b0b55",
+    "ev_task_04_exec_entity_94742abf",
+    "ev_task_04_exec_entity_70b6d2f7",
+    "ev_task_04_exec_entity_7337be93",
+    "ev_task_04_exec_entity_32f72352"
+  ],
+  "draft_answer_ids": [
+    "draft_task_04_exec_entity_Q04_001_a30f24e5",
+    "draft_task_04_exec_entity_Q04_002_90ed8e4c",
+    "draft_task_04_exec_entity_Q04_019_de3ad6eb",
+    "draft_task_04_exec_entity_Q04_021_4489e8ef"
+  ],
+  "findings": [],
+  "confidence": "high",
+  "errors": [],
+  "token_usage": {},
+  "metadata": {
+    "evidence_count": 10,
+    "mode": "react",
+    "summary": "查证了 xv6-k210 的执行实体模型：使用统一的 struct proc (PCB) 作为唯一执行实体，无独立 TCB/thread_struct；状态枚举 procstate 包含 RUNNABLE/RUNNING/SLEEPING/ZOMBIE；clone/fork 均创建完整进程副本（独立地址空间、文件表、信号表），flag 参数被接收但未解释（无 CLONE_VM 等标志）；无用户态线程库，采用 1:1 进程模型。",
+    "raw_output_excerpt": "I already have the `struct cpu` definition from the proc.h file I read earlier. Let me now produce the final output.\n\n```json\n{\n  \"status\": \"done\",\n  \"summary\": \"查证了 xv6-k210 的执行实体模型：使用统一的 struct proc (PCB) 作为唯一执行实体，无独立 TCB/thread_struct；状态枚举 procstate 包含 RUNNABLE/RUNNING/SLEEPING/ZOMBIE；clone/fork 均创建完整进程副本（独立地址空间、文件表、信号表），flag 参数被接收但未解释（无 CLONE_VM 等标志）；无用户态线程库，采用 1:1 进程模型。\",\n  \"claim\": \"xv6-k210 使用 struct proc 作为 PCB，不区分 PCB 与 TCB；clone() 创建完整进程副本而非轻量线程；状态枚举为 RUNNABLE/RUNNING/SLEEPING/ZOMBIE；无用户态线程库，采用纯进程模型。\",\n  \"structured_fact_results\": [\n    {\n      \"fact_id\": \"Q04_001_01\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [0, 1],\n      \"notes\": \"struct proc 定义在 include/sched/proc.h:51-105，包含 pid、state、context、trapframe、pagetable、fds、parent/child/sibling 等完整 PCB 字段。无独立 TCB/thread_struct。\"\n    },\n    {\n      \"fact_id\": \"Q04_001_02\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [2, 3, 4],\n      \"notes\": \"sys_fork() (sysproc.c:85) 调用 clone(0, NULL)；sys_clone() (sysproc.c:91) 调用 clone(flag, stack)。clone() 实现 (proc.c:291-369) 分配新 proc、复制地址空间/文件表/信号/trapframe，插入 runnable 队列。\"\n    },\n    {\n      \"fact_id\": \"Q04_001_03\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [5, 6, 7],\n      \"notes\": \"状态变更：allocproc 后通过 __insert_runnable 设 RUNNABLE；scheduler 设 RUNNING；sleep() 设 SLEEPING；exit() 设 ZOMBIE；wakeup() 从 SLEEPING 切回 RUNNABLE。资源回收：exit() 释放内存/文件，wait4() 调用 freeproc() 回收 PCB。\"\n    },\n    {\n      \"fact_id\": \"Q04_001_04\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [0, 8],\n      \"notes\": \"父子关系通过 parent/child/sibling_next/sibling_pprev 字段维护。clone() 设置 np->parent = p 并插入 child 链表。exit() 将子进程重亲到 __initproc。无线程组概念，clone 不设 CLONE_THREAD 标志。\"\n    },\n    {\n      \"fact_id\": \"Q04_001_05\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [6, 7],\n      \"notes\": \"exit() (proc.c:408-465) 释放地址空间/文件/信号，设 ZOMBIE 状态，唤醒父进程。wait4() (proc.c:487-530) 搜索 Z"
+  }
+}

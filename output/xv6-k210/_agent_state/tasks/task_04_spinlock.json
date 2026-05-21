@@ -1,0 +1,31 @@
+{
+  "task_id": "task_04_spinlock",
+  "stage_id": "04_process_smp",
+  "question_id": "Q04_037",
+  "question_ids": [
+    "Q04_037"
+  ],
+  "status": "done",
+  "evidence_ids": [
+    "ev_task_04_spinlock_32b2759a",
+    "ev_task_04_spinlock_8bfe4277",
+    "ev_task_04_spinlock_abf67e53",
+    "ev_task_04_spinlock_5835be76",
+    "ev_task_04_spinlock_3aeeff16",
+    "ev_task_04_spinlock_72a50d5f",
+    "ev_task_04_spinlock_f59302b4"
+  ],
+  "draft_answer_ids": [
+    "draft_task_04_spinlock_Q04_037_72898fb4"
+  ],
+  "findings": [],
+  "confidence": "high",
+  "errors": [],
+  "token_usage": {},
+  "metadata": {
+    "evidence_count": 7,
+    "mode": "react",
+    "summary": "查证了 xv6-k210 的 SpinLock 实现：acquire() 通过 push_off() 调用 intr_off() 禁用中断（清除 SSTATUS_SIE 位），release() 通过 pop_off() 条件恢复中断。未找到 local_irq_save/local_irq_disable 等 Linux 风格函数名，xv6 使用 intr_off/intr_on 命名。",
+    "raw_output_excerpt": "Now I have all the evidence. Let me produce the final structured JSON output.\n\n```json\n{\n  \"status\": \"done\",\n  \"summary\": \"查证了 xv6-k210 的 SpinLock 实现：acquire() 通过 push_off() 调用 intr_off() 禁用中断（清除 SSTATUS_SIE 位），release() 通过 pop_off() 条件恢复中断。未找到 local_irq_save/local_irq_disable 等 Linux 风格函数名，xv6 使用 intr_off/intr_on 命名。\",\n  \"claim\": \"xv6-k210 的 SpinLock 在 acquire() 获取锁时通过 push_off() → intr_off() 禁用中断（清除 sstatus.SIE），release() 通过 pop_off() → intr_on() 条件恢复中断，实现了关中断保护临界区。\",\n  \"structured_fact_results\": [\n    {\n      \"fact_id\": \"Q04_037_01\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [0, 1],\n      \"notes\": \"spinlock 结构体定义完整，包含 locked/name/cpu 字段；acquire/release/holding/initlock 函数声明和实现体均存在。\"\n    },\n    {\n      \"fact_id\": \"Q04_037_02\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [1, 2],\n      \"notes\": \"acquire() 和 release() 是内核同步原语的核心入口，在 spinlock.c 中有完整实现体，被 proc.c、sleeplock.c 等多个内核模块调用。\"\n    },\n    {\n      \"fact_id\": \"Q04_037_03\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [1, 3, 4, 5],\n      \"notes\": \"acquire() 调用 push_off() → intr_off() 清除 SSTATUS_SIE 位禁用中断；release() 调用 pop_off() → 条件 intr_on() 恢复中断。push_off() 保存旧中断状态到 cpu->intena，支持嵌套计数。\"\n    },\n    {\n      \"fact_id\": \"Q04_037_04\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [0, 1, 6],\n      \"notes\": \"spinlock 持有指向 cpu 的指针（lk->cpu = mycpu()），cpu 结构包含 noff（push_off 嵌套深度）和 intena（原始中断使能状态）字段，形成锁与 CPU 的映射关系。\"\n    },\n    {\n      \"fact_id\": \"Q04_037_05\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [1, 3],\n      \"notes\": \"release() 先清除 lk->cpu，执行内存屏障，原子释放锁，最后调用 pop_off()。pop_off() 递减 noff，仅在 noff==0 且 intena 为真时调用 intr_on() 恢复中断。\"\n    },\n    {\n      \"fact_id\": \"Q04_037_06\",\n      \"status_or_value\": \"no_after_negative_search\",\n      \"evidence_candidate_indexes\": [7],\n      \"notes\": \"搜索了 local_irq_save/local_irq_restore/local_irq_disable/local_irq_enable，在 207 个文件中均未找到。x"
+  }
+}

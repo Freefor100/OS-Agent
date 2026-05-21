@@ -1,38 +1,30 @@
 {
   "stage_id": "02_boot_trap",
   "evidence_targets": [
-    "启动入口（_start vs _entry，K210 vs QEMU 双平台差异）",
-    "模式切换（M-mode SBI → S-mode kernel，stvec 设置）",
-    "页表/MMU（Sv39 内核页表 kvminit/kvminithart，TRAMPOLINE 映射）",
-    "trap 向量（kernelvec 与 uservec 两条路径）",
-    "trap 入口（usertrap / kerneltrap 的 C 处理逻辑）",
-    "syscall 分发（syscall() 函数，syscalls[] 跳转表，参数提取 argraw/argint/argstr）",
-    "TrapFrame 结构体（寄存器布局，浮点扩展，与 trampoline.S 的对应关系）",
-    "用户指针校验（copyin2/copyout2 的 seg 合法性检查 + safememmove 缺页逃生机制）",
-    "QEMU/K210 板型差异（plic 中断号、SSTATUS_PUM/SUM、sfence.vma 编码、页错误异常号）",
-    "RTC/定时器早期初始化（CLINT_MTIME 读取、sbi_set_timer、timer_tick）",
     "启动入口",
     "模式切换",
     "页表/MMU",
     "trap 向量",
     "trap 入口",
-    "syscall 分发"
+    "syscall 分发",
+    "TrapFrame",
+    "用户指针校验",
+    "QEMU/README 机模与板型差异",
+    "RTC/virtio 早期初始化线索"
   ],
   "seed_paths": [
-    "kernel/entry.S",
-    "kernel/entry_k210.S",
-    "kernel/entry_qemu.S",
-    "kernel/main.c",
-    "kernel/trap/trap.c",
-    "kernel/trap/trampoline.S",
-    "kernel/trap/kernelvec.S",
-    "kernel/syscall/syscall.c",
-    "include/trap.h",
-    "include/memlayout.h",
-    "kernel/mm/vm.c",
-    "Makefile",
     "arch",
-    "boot"
+    "boot",
+    "platform",
+    "trap",
+    "syscall",
+    "interrupt",
+    "exception",
+    "kernel/trap",
+    "README.md",
+    "Makefile",
+    "entry.S",
+    "start.S"
   ],
   "framework_guess": [
     "xv6"
@@ -41,18 +33,14 @@
     "riscv64"
   ],
   "entry_symbols": [
-    "_entry",
     "_start",
-    "main",
-    "kvminit",
-    "kvminithart",
-    "trapinithart",
-    "usertrap",
-    "kerneltrap",
-    "uservec",
-    "kernelvec",
     "start",
-    "rust_main"
+    "rust_main",
+    "kernel_main",
+    "trap_handler",
+    "syscall",
+    "syscall_dispatch",
+    "TrapFrame"
   ],
   "repo_hotspots": [
     "Makefile",
@@ -67,13 +55,10 @@
     "include/fs"
   ],
   "preferred_tools": [
-    "lsp_get_document_outline",
-    "lsp_get_definition",
-    "lsp_get_references",
-    "lsp_get_call_graph",
-    "read_code_segment",
     "rag_search_code",
-    "grep_in_repo"
+    "lsp_get_call_graph",
+    "lsp_get_definition",
+    "read_code_segment"
   ],
   "avoid_tools": [
     "blind_read_large_files",
@@ -86,37 +71,238 @@
     "max_memory_items": 8
   },
   "execution_steps": [
-    "1. 用 lsp_get_document_outline 鸟瞰 kernel/main.c，确认 main() 的初始化调用序列全貌",
-    "2. 用 lsp_get_definition 查 main 符号，确认其签名 `void main(unsigned long hartid, unsigned long dtb_pa)`",
-    "3. 用 lsp_get_call_graph 对 main 做 outgoing、max_depth=2，获取启动初始化调用链",
-    "4. 精读 kernel/main.c 中 hart0 初始化序列（cpuinit→consoleinit→kpminit→kvminit→kvminithart→kmallocinit→trapinithart→procinit→plicinit→plicinithart→disk_init→binit→userinit），逐行标注每个 init 函数的作用",
-    "5. 用 lsp_get_definition 查 kvminit，定位 kernel/mm/vm.c 中的实现，精读其 MMIO 映射（UART/CLINT/PLIC/VIRTIO/GPIOHS/SPI/FPIOA/SYSCTL）和 TRAMPOLINE 映射",
-    "6. 用 lsp_get_definition 查 kvminithart，确认 satp 写入方式（SATP_SV39 与 K210 的差异）和 sfence.vma 调用",
-    "7. 用 lsp_get_document_outline 鸟瞰 kernel/mm/vm.c，定位 walk/mappages/kvmmap/uvmalloc/uvmcopy/uvmdealloc/freewalk 等核心函数行号",
-    "8. 精读 walk() 函数（Sv39 三级页表遍历），标注 PX 宏和递归查找逻辑",
-    "9. 精读 mappages() 函数，标注 PTE 创建、COW 标记、page_ref 引用计数逻辑",
-    "10. 用 lsp_get_definition 查 trapinithart，确认 stvec 写入 kernelvec、sstatus/sie 配置",
-    "11. 用 lsp_get_document_outline 鸟瞰 kernel/trap/trap.c，获取 usertrap/usertrapret/kerneltrap/handle_intr/handle_excp 行号",
-    "12. 精读 usertrap() 函数：stvec 切换→protect_usr_mem→保存 sepc→判断 scause（ECALL/中断/异常）→syscall() 或 handle_intr/handle_excp→usertrapret()",
-    "13. 精读 usertrapret() 函数：intr_off→w_stvec(TRAMPOLINE+uservec)→填充 trapframe 的 kernel_satp/kernel_sp/kernel_trap/kernel_hartid→设置 sstatus SPP=0→permit_usr_mem→跳转 userret",
-    "14. 精读 kerneltrap() 函数：保存 sepc/sstatus/scause→protect_usr_mem→handle_intr/handle_excp→缺页逃生 kern_pgfault_escape→恢复 sepc/sstatus",
-    "15. 用 lsp_get_document_outline 鸟瞰 kernel/trap/trampoline.S，确认 uservec 和 userret 的汇编结构",
-    "16. 逐段精读 uservec：csrrw 交换 a0/sscratch→保存 32 个通用寄存器到 trapframe→恢复 kernel_sp/tp→加载 kernel_trap 地址→jr 跳入 usertrap()",
-    "17. 逐段精读 userret：从 trapframe 恢复 32 个寄存器→csrrw 恢复 a0 并保存 TRAPFRAME 到 sscratch→sret 返回用户态",
-    "18. 用 lsp_get_document_outline 鸟瞰 kernel/trap/kernelvec.S，确认 kernelvec 的保存/恢复序列和 call kerneltrap",
-    "19. 用 lsp_get_definition 查 syscall，定位 kernel/syscall/syscall.c，精读 syscall() 函数：从 trapframe->a7 取系统调用号→查 syscalls[] 跳转表→调用→返回值写入 trapframe->a0",
-    "20. 精读 argraw/argint/argaddr/argstr 参数提取函数，标注从 trapframe 寄存器取参的方式",
-    "21. 用 lsp_get_document_outline 鸟瞰 kernel/syscall/syscall.c，确认 syscalls[] 跳转表覆盖的系统调用列表（约 60+ 个）",
-    "22. 用 lsp_get_definition 查 TrapFrame 结构体（include/trap.h），逐字段标注偏移量与 trampoline.S 中 sd/ld 偏移的对应关系",
-    "23. 精读 include/trap.h 中 trapframe 的浮点寄存器区域（ft0-ft11, fs0-fs11, fa0-fa7, fcsr），标注与 floatstore/floatload 的关系",
-    "24. 用 lsp_get_definition 查 copyin2/copyout2（kernel/mm/vm.c），精读用户指针校验流程：partofseg 合法性检查→safememmove 逐字节拷贝→缺页时 kern_pgfault_escape 逃生",
-    "25. 精读 safememmove 函数：permit_usr_mem→逐字节循环→缺页时通过 save_point 跳回→protect_usr_mem 恢复",
-    "26. 精读 handle_page_fault 函数：locateseg 定位 segment→walk 查 PTE→COW 处理→lazy allocation→elf load→mmap 分发",
-    "27. 用 grep_in_repo 搜索 `#ifdef QEMU` 和 `#ifndef QEMU`，汇总 K210 vs QEMU 的所有条件编译差异点（plic 中断号、SSTATUS_PUM/SUM、sfence.vma 编码、页错误异常号、virtio vs sdcard）",
-    "28. 精读 kernel/hal/plic.c 的 plicinit/plicinithart/plic_claim/plic_complete，标注 K210 用 M-mode PLIC、QEMU 用 S-mode PLIC 的差异",
-    "29. 精读 kernel/timer.c 的 set_next_timeout/timer_tick，标注 CLINT_MTIME 读取和 sbi_set_timer 调用",
-    "30. 用 lsp_get_definition 查 handle_intr（kernel/trap/trap.c），精读中断分发：INTR_TIMER→timer_tick+proc_tick；INTR_EXTERNAL/INTR_SOFTWARE→plic_claim→UART_IRQ/DISK_IRQ 分支",
-    "31. 用 lsp_get_document_outline 鸟瞰 kernel/sched/proc.c，确认 userinit/scheduler 与启动流程的衔接",
-    "32. 汇总证据：整理启动全路径（_entry→main→各 init→userinit→scheduler）、trap 全路径（uservec→usertrap→syscall/usertrapret→userret 和 kernelvec→kerneltrap）、syscall 分发路径、用户指针校验路径，形成完整闭环"
+    "对照 seed_paths、entry_symbols，用 rag_search_code / list_repo_structure / LSP 锁定与本阶段相关的关键文件与符号。",
+    "对核心入口使用 lsp_get_document_outline → lsp_get_call_graph（单入口、浅深度）→ 必要时 read_code_segment 精读。",
+    "按题单逐项输出结论，每条附反引号源码路径；无实现则显式写「未发现/桩函数」等，勿臆测。"
+  ],
+  "task_plan": [
+    {
+      "task_id": "task_02_boot_entry",
+      "question_ids": [
+        "Q02_001",
+        "Q02_002",
+        "Q02_003",
+        "Q02_004",
+        "Q02_006",
+        "Q02_010",
+        "Q02_011",
+        "Q02_014"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证启动入口、链接脚本ENTRY、入口汇编、早期初始化、主入口跳转、平台选择、固件链（SBI/OpenSBI/U-Boot）及多平台支持，填充Q02_001_01~Q02_001_06等所有structured_facts",
+      "group_reason": "所有题目共享启动链的同一实现线索：链接脚本、入口汇编、早期初始化、主入口跳转、平台选择、固件链",
+      "query": "查找并读取linker.ld中的ENTRY符号，找到_start/start/head/entry.S等入口汇编文件，确认是否设置栈、清BSS、早期串口或hart状态，追踪控制流如何跳转到C/Rust主入口（rust_main/kernel_main），检查构建系统（Makefile/Cargo.toml）如何选择平台/架构/入口文件，搜索sbi/opensbi/u-boot相关代码或配置，搜索visionfive/jh7110/loongarch等平台差异入口",
+      "seed_paths": [
+        "kernel",
+        "boot",
+        "linker",
+        "arch",
+        "sbi",
+        "hal",
+        "Makefile",
+        "Cargo.toml"
+      ],
+      "entry_symbols": [
+        "_start",
+        "start",
+        "rust_main",
+        "kernel_main"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ]
+    },
+    {
+      "task_id": "task_02_mmu_pagetable",
+      "question_ids": [
+        "Q02_005",
+        "Q02_007",
+        "Q02_012"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证MMU是否启用/初始化（设置SATP/CR3并建立页表），填充Q02_005_01~Q02_005_06等structured_facts；同时查证早期初始化中的BSS清零、早期串口、DTB解析、页表初始化时机，以及MMU启用前后串口地址切换逻辑",
+      "group_reason": "这些题共享内存管理/MMU/页表/地址转换的同一实现线索",
+      "query": "查找物理页帧/页大小/地址空间常量（如PGSIZE、MAXVA），找到分配器（kalloc/buddy/freelist/slab）的状态结构，读取页表walk/map/unmap的实现体，确认是否真实修改PTE，检查地址转换/重定位由MMU运行时完成还是链接期完成，查找保护位/用户内核隔离的PTE/特权级实现，搜索phys_to_virt/virt_to_phys及UART基址常量，确认BSS清零、早期串口输出、DTB解析、页表初始化时机的代码",
+      "seed_paths": [
+        "kernel",
+        "mm",
+        "memory",
+        "vm",
+        "arch",
+        "include"
+      ],
+      "entry_symbols": [
+        "kalloc",
+        "kfree",
+        "walk",
+        "mappages",
+        "satp",
+        "CR3"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ]
+    },
+    {
+      "task_id": "task_02_fpu",
+      "question_ids": [
+        "Q02_008"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证FPU是否初始化/启用（如sstatus.fs/cpacr_el1/cr4），填充Q02_008_01~Q02_008_06等structured_facts",
+      "group_reason": "FPU初始化是独立的硬件特性，与启动链其他部分共享部分入口但证据链独立",
+      "query": "搜索sstatus.fs、cpacr_el1、cr4等FPU控制寄存器设置代码，查找入口汇编或C代码中是否启用FPU，读取相关实现体",
+      "seed_paths": [
+        "kernel",
+        "arch",
+        "trap",
+        "include"
+      ],
+      "entry_symbols": [
+        "sstatus",
+        "cpacr_el1",
+        "cr4"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ]
+    },
+    {
+      "task_id": "task_02_trap_vector",
+      "question_ids": [
+        "Q02_009",
+        "Q02_013",
+        "Q02_015",
+        "Q02_016",
+        "Q02_017",
+        "Q02_023",
+        "Q02_024",
+        "Q02_025",
+        "Q02_026",
+        "Q02_030",
+        "Q02_031",
+        "Q02_032",
+        "Q02_033",
+        "Q02_034"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证trap/中断向量设置、上下文保存恢复、原因解码、返回用户态路径、嵌套中断策略、时钟中断抢占、信号处理、缺页异常联动、per-CPU trap栈、外部中断分发、SIGSEGV信号、信号发送粒度、中断/异常区分机制、中断嵌套支持，填充所有相关structured_facts",
+      "group_reason": "所有trap/interrupt/异常/信号相关题目共享同一实现线索：trap向量、上下文保存、原因解码、返回路径、嵌套策略",
+      "query": "查找stvec/IDT/VBAR设置点，读取trap入口汇编（__alltraps/trap_vector），确认是否保存寄存器到TrapFrame/TrapContext，查找handler如何区分syscall/fault/timer/external interrupt（scause解码），查找返回路径（usertrapret/sret/iret）如何恢复上下文并回到正确特权级，查找嵌套中断/重开中断策略，查找时钟中断是否调用yield/schedule，查找信号处理（SIGSEGV/sigreturn/trampoline），查找缺页异常处理与CoW/lazy联动，查找per-CPU trap栈初始化，查找PLIC/APIC外部中断分发，搜索SIGSEGV/sig_segv，搜索sys_kill/sys_tkill/sys_tgkill，确认中断/异常区分机制（scause/独立向量/软件判断），搜索enable_irq_in_handler/nested_irq",
+      "seed_paths": [
+        "kernel",
+        "trap",
+        "arch",
+        "interrupt",
+        "syscall",
+        "include"
+      ],
+      "entry_symbols": [
+        "trap_handler",
+        "trap_vector",
+        "__alltraps",
+        "usertrapret",
+        "stvec",
+        "scause",
+        "sret"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ]
+    },
+    {
+      "task_id": "task_02_syscall_dispatch",
+      "question_ids": [
+        "Q02_018",
+        "Q02_019",
+        "Q02_020",
+        "Q02_021",
+        "Q02_027",
+        "Q02_028",
+        "Q02_029"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证系统调用分发表、边界检查、具体syscall追踪（sys_write）、高价值syscall三态统计、全量统计、README对照、_impl命名模式，填充所有相关structured_facts",
+      "group_reason": "所有系统调用分发/实现/统计相关题目共享同一实现线索：trap到syscall的路径、syscall number、分发表、参数复制、实现体",
+      "query": "查找用户态如何触发syscall并进入trap，查找syscall number从哪里取出（a7/scause），是否做边界检查，查找分发表/match如何映射到实现体，查找参数如何copyin/copyout或从寄存器读取，追踪sys_write从用户指令到实现体的完整路径，列出fork/exec/mmap/open/write等syscall的三态并给证据，统计分发表中完整实现/桩/未注册的数量，查找README中声称的syscall标准并与代码对照，搜索_impl/sys_*_impl命名模式",
+      "seed_paths": [
+        "kernel",
+        "syscall",
+        "trap",
+        "proc",
+        "fs",
+        "mm",
+        "include",
+        "user"
+      ],
+      "entry_symbols": [
+        "syscall",
+        "syscall_dispatch",
+        "sys_write",
+        "sys_fork",
+        "sys_exec",
+        "sys_mmap",
+        "sys_open"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ]
+    },
+    {
+      "task_id": "task_02_userptr_check",
+      "question_ids": [
+        "Q02_022"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证用户指针访问安全检查（copyin/copyout/access_ok/UserInPtr等），填充Q02_022_01~Q02_022_06等structured_facts",
+      "group_reason": "用户指针安全检查是独立的syscall安全机制，与启动链其他部分共享部分入口但证据链独立",
+      "query": "搜索copyin/copyout/access_ok/UserPtr等统一入口，检查是否验证地址范围、页表权限、跨页边界和读写方向，确认syscall参数复制是否通过该入口而不是直接解引用用户指针，查找失败路径是否返回EFAULT/错误码或杀死进程",
+      "seed_paths": [
+        "kernel",
+        "syscall",
+        "trap",
+        "mm",
+        "include"
+      ],
+      "entry_symbols": [
+        "copyin",
+        "copyout",
+        "access_ok",
+        "UserInPtr"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ]
+    }
   ]
 }

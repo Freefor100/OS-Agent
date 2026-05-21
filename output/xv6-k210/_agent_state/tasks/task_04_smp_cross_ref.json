@@ -1,0 +1,48 @@
+{
+  "task_id": "task_04_smp_cross_ref",
+  "stage_id": "04_process_smp",
+  "question_id": "Q04_015",
+  "question_ids": [
+    "Q04_015",
+    "Q04_036"
+  ],
+  "status": "done",
+  "evidence_ids": [
+    "ev_task_04_smp_cross_ref_8b4ecf3a",
+    "ev_task_04_smp_cross_ref_e876534b",
+    "ev_task_04_smp_cross_ref_42280e43",
+    "ev_task_04_smp_cross_ref_2ba8fd9d",
+    "ev_task_04_smp_cross_ref_e33df42c",
+    "ev_task_04_smp_cross_ref_51669650",
+    "ev_task_04_smp_cross_ref_188e061d",
+    "ev_task_04_smp_cross_ref_b6458e53",
+    "ev_task_04_smp_cross_ref_95b0f4be",
+    "ev_task_04_smp_cross_ref_2d3a28d3",
+    "ev_task_04_smp_cross_ref_7c8e39fe",
+    "ev_task_04_smp_cross_ref_d04f9f85",
+    "ev_task_04_smp_cross_ref_49d3958d",
+    "ev_task_04_smp_cross_ref_52b809cb",
+    "ev_task_04_smp_cross_ref_d5ef8bd9",
+    "ev_task_04_smp_cross_ref_c620589d"
+  ],
+  "draft_answer_ids": [
+    "draft_task_04_smp_cross_ref_Q04_015_287d2b61",
+    "draft_task_04_smp_cross_ref_Q04_036_44e79e3b"
+  ],
+  "findings": [
+    "未找到 per-CPU runqueue 实现（使用全局 proc_runnable[] 队列）",
+    "未找到 migrate_task/load_balance/affinity 相关代码",
+    "未找到远程 TLB shootdown 机制（仅本地 sfence_vma()）",
+    "未找到 NUMA 相关代码",
+    "plicinithart() 在 AP 启动路径中被注释掉（hart 1 未调用 plicinithart）"
+  ],
+  "confidence": "high",
+  "errors": [],
+  "token_usage": {},
+  "metadata": {
+    "evidence_count": 16,
+    "mode": "react",
+    "summary": "查证了 xv6-k210 的 SMP/多核实现：NCPU=2，per-CPU 通过 tp/hartid 索引 cpus[] 数组，IPI 通过 SBI 发送，wakeup() 使用 IPI 唤醒空闲核，调度器使用全局 proc_runnable 队列（非 per-CPU runqueue），无 migrate_task/load_balance/affinity，TLB 刷新使用 sfence.vma（K210 上模拟为 sfence.vm），SpinLock 使用 acquire/push_off 关中断，AP 启动通过 main() 中 hartid 分支 + SBI IPI 唤醒。",
+    "raw_output_excerpt": "Now I have all the evidence needed. Let me compile the final JSON output.\n\n```json\n{\n  \"status\": \"done\",\n  \"summary\": \"查证了 xv6-k210 的 SMP/多核实现：NCPU=2，per-CPU 通过 tp/hartid 索引 cpus[] 数组，IPI 通过 SBI 发送，wakeup() 使用 IPI 唤醒空闲核，调度器使用全局 proc_runnable 队列（非 per-CPU runqueue），无 migrate_task/load_balance/affinity，TLB 刷新使用 sfence.vma（K210 上模拟为 sfence.vm），SpinLock 使用 acquire/push_off 关中断，AP 启动通过 main() 中 hartid 分支 + SBI IPI 唤醒。\",\n  \"claim\": \"xv6-k210 实现了基础 SMP 支持（NCPU=2，per-CPU cpus[] 数组，IPI 发送/接收，SpinLock 关中断），但缺少 per-CPU runqueue、任务迁移、负载均衡、亲和性、远程 TLB shootdown 等高级多核调度特性。\",\n  \"structured_fact_results\": [\n    {\n      \"fact_id\": \"Q04_015_01\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [0, 1],\n      \"notes\": \"NCPU=2 定义于 include/param.h:5；cpus[NCPU] 数组定义于 kernel/sched/proc.c:94；cpuid() 通过 r_tp() 读取 tp 寄存器获取 hartid。\"\n    },\n    {\n      \"fact_id\": \"Q04_015_02\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [2, 3, 4],\n      \"notes\": \"AP 启动在 kernel/main.c 中实现：hart 0 初始化后通过 sbi_send_ipi() 唤醒其他 hart；hart 1 等待 started 标志后执行 floatinithart/kvminithart/trapinithart 等初始化。entry.S/entry_k210.S 中 _entry/_start 根据 hartid 计算栈偏移。\"\n    },\n    {\n      \"fact_id\": \"Q04_015_03\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [5, 6, 7],\n      \"notes\": \"per-CPU 存储通过 cpus[NCPU] 全局数组实现，cpuid()=r_tp() 读取 tp 寄存器（main() 中 inithartid 设置 tp=hartid&0x1），mycpu() 返回 &cpus[cpuid()]。struct cpu 包含 proc/context/noff/intena 字段。\"\n    },\n    {\n      \"fact_id\": \"Q04_015_04\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [8, 9, 10, 11],\n      \"notes\": \"IPI 路径完整：sbi_send_ipi() 通过 SBI 调用发送 IPI（include/sbi.h:98-103）；wakeup() 在有空闲核时发送 IPI（kernel/sched/proc.c:401）；trap.c 中 handle_intr 处理 INTR_SOFTWARE 中断并调用 sbi_clear_ipi()。但无专门的 ipi_handler 函数，软件中断处理在 kerneltrap/handle_intr 中。\"\n    },\n    {\n      \"fact_id\": \"Q04_015_05\",\n      \"status_or_value\": \"yes_weak\",\n      \"evidence_candidate_indexes\": [12, 13, 14, 15],\n    "
+  }
+}

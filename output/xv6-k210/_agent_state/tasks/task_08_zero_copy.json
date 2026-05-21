@@ -1,0 +1,41 @@
+{
+  "task_id": "task_08_zero_copy",
+  "stage_id": "08_network",
+  "question_id": "Q08_007",
+  "question_ids": [
+    "Q08_007"
+  ],
+  "status": "done",
+  "evidence_ids": [
+    "ev_task_08_zero_copy_ea6592e4",
+    "ev_task_08_zero_copy_0fe6598f",
+    "ev_task_08_zero_copy_013a7e2c",
+    "ev_task_08_zero_copy_ffd7ee7c",
+    "ev_task_08_zero_copy_fc49bd10",
+    "ev_task_08_zero_copy_a7172cf8",
+    "ev_task_08_zero_copy_079531ab",
+    "ev_task_08_zero_copy_f154ad5c",
+    "ev_task_08_zero_copy_5926cb32",
+    "ev_task_08_zero_copy_e44dd9a5",
+    "ev_task_08_zero_copy_46ae7600",
+    "ev_task_08_zero_copy_87c25c76",
+    "ev_task_08_zero_copy_985d2a48",
+    "ev_task_08_zero_copy_1ed96ef9",
+    "ev_task_08_zero_copy_faaa5282",
+    "ev_task_08_zero_copy_219c0de3",
+    "ev_task_08_zero_copy_d2e23dee"
+  ],
+  "draft_answer_ids": [
+    "draft_task_08_zero_copy_Q08_007_7765606e"
+  ],
+  "findings": [],
+  "confidence": "high",
+  "errors": [],
+  "token_usage": {},
+  "metadata": {
+    "evidence_count": 17,
+    "mode": "react",
+    "summary": "xv6-k210 没有网络协议栈、socket API、网络设备驱动、零拷贝/DMA 网络路径。DMA 仅用于 SD 卡（块设备）SPI 传输。未发现任何网络包专用的零拷贝机制、共享缓冲池或 DMA 描述符链。",
+    "raw_output_excerpt": "Good. Now I have all the evidence. Let me produce the final JSON output.\n\n{\n  \"status\": \"done\",\n  \"summary\": \"xv6-k210 没有网络协议栈、socket API、网络设备驱动、零拷贝/DMA 网络路径。DMA 仅用于 SD 卡（块设备）SPI 传输。未发现任何网络包专用的零拷贝机制、共享缓冲池或 DMA 描述符链。\",\n  \"claim\": \"xv6-k210 不存在网络零拷贝/共享缓冲/DMA 描述符等路径。该操作系统没有实现任何网络协议栈（无 socket/sendto/recvfrom 系统调用，无 Ethernet/ARP/IP/ICMP/UDP/TCP 协议层，无 netdev/loopback 驱动）。DMA 控制器仅用于 SD 卡块设备 I/O（通过 SPI 接口），不属于网络包路径。\",\n  \"structured_fact_results\": [\n    {\n      \"fact_id\": \"Q08_007_01\",\n      \"status_or_value\": \"no_after_negative_search\",\n      \"evidence_candidate_indexes\": [0, 1, 2, 3, 4],\n      \"notes\": \"socket/sendto/recvfrom/bind/connect 系统调用未注册。sysnum.h 中无 SYS_socket/SYS_sendto/SYS_recvfrom/SYS_bind/SYS_connect 定义。syscall.c 的 syscalls[] 表中无对应条目。仅 include/errno.h 定义了 ENOTSOCK/EPROTOTYPE/ESOCKTNOSUPPORT 错误码，include/fs/stat.h 定义了 S_IFSOCK 文件类型，但这些只是标准 POSIX 常量定义，不代表实现。\"\n    },\n    {\n      \"fact_id\": \"Q08_007_02\",\n      \"status_or_value\": \"no_after_negative_search\",\n      \"evidence_candidate_indexes\": [0, 5, 6, 7],\n      \"notes\": \"无协议栈模块。未发现 smoltcp、lwIP 等第三方协议栈依赖。Cargo.toml 中无网络相关依赖。Makefile 中无网络相关源文件。kernel 目录下无 net/ 或 network/ 子目录。\"\n    },\n    {\n      \"fact_id\": \"Q08_007_03\",\n      \"status_or_value\": \"no_after_negative_search\",\n      \"evidence_candidate_indexes\": [0, 8, 9],\n      \"notes\": \"不支持任何网络协议层。未发现 Ethernet/ARP/IP/ICMP/UDP/TCP 协议实现。include/ 和 kernel/ 目录中 grep ETH/ARP/IP/ICMP/UDP/TCP 仅匹配到非网络相关符号（如 errno 定义、sbi_ipi、pipe 等）。\"\n    },\n    {\n      \"fact_id\": \"Q08_007_04\",\n      \"status_or_value\": \"no_after_negative_search\",\n      \"evidence_candidate_indexes\": [0, 10, 11, 12],\n      \"notes\": \"无网络设备驱动。未发现 netdev、loopback、virtio-net、e1000 等网络设备驱动。virtio.h 仅定义了 virtio 块设备（VIRTIO_MMIO_DEVICE_ID 注释提到 1=net, 2=disk，但实际代码只实现了 virtio_disk，无 virtio_net）。DMA 驱动仅用于 SD 卡 SPI 传输。\"\n    },\n    {\n      \"fact_id\": \"Q08_007_05\",\n      \"status_or_value\": \"no_after_negative_search\",\n      \"evidence_candidate_indexes\": [0, 13, 14, 15],\n      \"notes\": \"无网络包专用的零拷贝机制、共享缓冲池或 DMA 描述符链。未发现 zero-copy"
+  }
+}

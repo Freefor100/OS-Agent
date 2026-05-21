@@ -1,0 +1,44 @@
+{
+  "task_id": "task_03_mem_overview",
+  "stage_id": "03_mem_mgmt",
+  "question_id": "Q03_001",
+  "question_ids": [
+    "Q03_001"
+  ],
+  "status": "done",
+  "evidence_ids": [
+    "ev_task_03_mem_overview_77172656",
+    "ev_task_03_mem_overview_bdf8ee41",
+    "ev_task_03_mem_overview_cfcb3df8",
+    "ev_task_03_mem_overview_1d6ccb1b",
+    "ev_task_03_mem_overview_34afe0f5",
+    "ev_task_03_mem_overview_4808ca66",
+    "ev_task_03_mem_overview_6c76d45f",
+    "ev_task_03_mem_overview_63239e9f",
+    "ev_task_03_mem_overview_550ef5f3",
+    "ev_task_03_mem_overview_c088cef1",
+    "ev_task_03_mem_overview_1f0c172a",
+    "ev_task_03_mem_overview_6647c8c3",
+    "ev_task_03_mem_overview_d8ba11b1",
+    "ev_task_03_mem_overview_0a92fff9",
+    "ev_task_03_mem_overview_2d348f17",
+    "ev_task_03_mem_overview_2b627b2a",
+    "ev_task_03_mem_overview_e15db673",
+    "ev_task_03_mem_overview_a6e820cc",
+    "ev_task_03_mem_overview_9a244305",
+    "ev_task_03_mem_overview_b5d5e0b3"
+  ],
+  "draft_answer_ids": [
+    "draft_task_03_mem_overview_Q03_001_a3f4bf5e"
+  ],
+  "findings": [],
+  "confidence": "high",
+  "errors": [],
+  "token_usage": {},
+  "metadata": {
+    "evidence_count": 20,
+    "mode": "react",
+    "summary": "xv6-k210 实现了完整的 RISC-V Sv39 分页内存管理，包括物理页分配器（pm.c，基于空闲链表）、slab 风格的小内存分配器（kmalloc.c）、三级页表 walk/map/unmap API（vm.c）、用户段管理（usrmm.c）、mmap（mmap.c）、COW fork、lazy allocation、页错误处理、以及通过 satp 寄存器和 sstatus.PUM/SUM 实现的保护/重定位机制。代码为 C 语言，使用 GCC 编译，Makefile 构建。",
+    "raw_output_excerpt": "Now I have all the information needed. Let me produce the final structured JSON output.\n\n```json\n{\n  \"status\": \"done\",\n  \"summary\": \"xv6-k210 实现了完整的 RISC-V Sv39 分页内存管理，包括物理页分配器（pm.c，基于空闲链表）、slab 风格的小内存分配器（kmalloc.c）、三级页表 walk/map/unmap API（vm.c）、用户段管理（usrmm.c）、mmap（mmap.c）、COW fork、lazy allocation、页错误处理、以及通过 satp 寄存器和 sstatus.PUM/SUM 实现的保护/重定位机制。代码为 C 语言，使用 GCC 编译，Makefile 构建。\",\n  \"claim\": \"xv6-k210 内存管理子系统是完整的 C 语言实现，包含物理页帧分配器（空闲链表）、slab 风格 kmalloc、Sv39 三级页表 walk/map/unmap、PTE 保护位（R/W/X/U/V/COW）、sstatus 用户内存保护、satp 页表切换（MMU 运行时重定位）、COW fork、lazy allocation 和页错误处理。\",\n  \"structured_fact_results\": [\n    {\n      \"fact_id\": \"Q03_001_01\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [0, 1, 2, 3],\n      \"notes\": \"memory_constants: PGSIZE=4096 定义于 include/hal/riscv.h:378；MAXVA 定义于 :408；PHYSTOP=0x80600000、KERNBASE=0x80020000 定义于 include/memlayout.h:106-109。均有完整定义和广泛使用。\"\n    },\n    {\n      \"fact_id\": \"Q03_001_02\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [4, 5, 6, 7],\n      \"notes\": \"allocator_state: 物理页分配器 pm.c 使用 struct pm_allocator（含 freelist 链表和 npage 计数），分为 multiple 和 single 两个分配器实例。kmalloc.c 使用 slab 风格分配器，含 struct kmem_allocator（obj_size、list、npages、nobjs）和 struct kmem_node（avail、cnt、table 数组）。均有完整实现体和调用链。\"\n    },\n    {\n      \"fact_id\": \"Q03_001_03\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [8, 9, 10, 11],\n      \"notes\": \"map_unmap_api: vm.c 实现了 walk() 三级页表遍历（可分配中间页表）、mappages() 创建 PTE 映射、unmappages() 移除映射（支持 VM_FREE 释放物理页、VM_USER 引用计数）。kvmmap() 封装内核映射。uvmalloc/uvmdealloc 为用户分配/释放。均有完整实现体和调用点。\"\n    },\n    {\n      \"fact_id\": \"Q03_001_04\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [12, 13, 14, 15],\n      \"notes\": \"protection_relocation: PTE 保护位（PTE_R/W/X/U/V/COW）定义于 riscv.h:373-379。sstatus.PUM/SUM 控制用户内存访问（vm.h 中 permit_usr_mem/protect_usr_mem）。satp 寄存器（w_satp/r_satp）在 kvminithart() 和进程切换时写入，启用 Sv39 分页实现 MMU 运行时重定位。handle_page_fault 处理 COW、la"
+  }
+}

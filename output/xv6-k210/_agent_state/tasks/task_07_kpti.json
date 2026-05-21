@@ -1,0 +1,31 @@
+{
+  "task_id": "task_07_kpti",
+  "stage_id": "07_security",
+  "question_id": "Q07_011",
+  "question_ids": [
+    "Q07_011"
+  ],
+  "status": "done",
+  "evidence_ids": [
+    "ev_task_07_kpti_8df6d13f",
+    "ev_task_07_kpti_0448f30c",
+    "ev_task_07_kpti_07e71c23",
+    "ev_task_07_kpti_091466f7",
+    "ev_task_07_kpti_5aa1f83d",
+    "ev_task_07_kpti_bbc55191",
+    "ev_task_07_kpti_47ea9c03"
+  ],
+  "draft_answer_ids": [
+    "draft_task_07_kpti_Q07_011_7e422538"
+  ],
+  "findings": [],
+  "confidence": "high",
+  "errors": [],
+  "token_usage": {},
+  "metadata": {
+    "evidence_count": 7,
+    "mode": "react",
+    "summary": "xv6-k210 没有实现 KPTI 或等价的内核/用户页表隔离机制。文档明确说明用户和内核页表已合并（不分离），trampoline.S 中的 satp 切换代码被注释掉。仅使用 RISC-V SSTATUS_PUM 位（protect_usr_mem/permit_usr_mem）防止内核误访问用户空间，这是一种弱保护而非完整 KPTI。未发现 PMP、SMEP/SMAP、TTBR0/TTBR1 等机制。uid/gid 字段存在于 kstat 结构体中但 sys_getuid 返回 0（硬编码 root），无实际权限检查。",
+    "raw_output_excerpt": "`sys_getuid()` returns `0` (hardcoded root). This confirms there's no real permission checking - it's a stub.\n\nNow I have all the evidence I need. Let me compile the final JSON output.\n\n{\n  \"status\": \"done\",\n  \"summary\": \"xv6-k210 没有实现 KPTI 或等价的内核/用户页表隔离机制。文档明确说明用户和内核页表已合并（不分离），trampoline.S 中的 satp 切换代码被注释掉。仅使用 RISC-V SSTATUS_PUM 位（protect_usr_mem/permit_usr_mem）防止内核误访问用户空间，这是一种弱保护而非完整 KPTI。未发现 PMP、SMEP/SMAP、TTBR0/TTBR1 等机制。uid/gid 字段存在于 kstat 结构体中但 sys_getuid 返回 0（硬编码 root），无实际权限检查。\",\n  \"claim\": \"xv6-k210 未实现 KPTI 或等价的内核/用户页表隔离机制。用户和内核共享同一页表，仅通过 sstatus.PUM 位提供用户内存保护。\",\n  \"structured_fact_results\": [\n    {\n      \"fact_id\": \"Q07_011_01\",\n      \"status_or_value\": \"no_after_negative_search\",\n      \"evidence_candidate_indexes\": [0, 1, 2, 3, 4, 5, 6],\n      \"notes\": \"security_state: 未发现 KPTI 或等价页表隔离机制。文档明确说明用户/内核页表合并，trampoline.S 中 satp 切换代码被注释。仅存在 PUM 位保护（protect_usr_mem/permit_usr_mem），这是弱保护而非完整 KPTI。\"\n    },\n    {\n      \"fact_id\": \"Q07_011_02\",\n      \"status_or_value\": \"no_after_negative_search\",\n      \"evidence_candidate_indexes\": [0, 1, 2, 3, 4, 5, 6],\n      \"notes\": \"enforcement_callsite: 未发现页表隔离的执行点。kvminithart 调用 protect_usr_mem() 设置 PUM 位，usertrapret 调用 permit_usr_mem() 允许用户内存访问，但这些是 PUM 位操作而非页表切换。trampoline.S 中 csrw satp 指令被注释。\"\n    },\n    {\n      \"fact_id\": \"Q07_011_03\",\n      \"status_or_value\": \"no_after_negative_search\",\n      \"evidence_candidate_indexes\": [0, 1, 2, 3, 4, 5, 6],\n      \"notes\": \"deny_or_fault_path: 未发现因页表隔离导致的拒绝/故障路径。PUM 保护仅在内核访问用户空间时临时解除（permit_usr_mem），完成后恢复（protect_usr_mem），无完整隔离的故障路径。\"\n    },\n    {\n      \"fact_id\": \"Q07_011_04\",\n      \"status_or_value\": \"no_after_negative_search\",\n      \"evidence_candidate_indexes\": [0, 1, 2, 3, 4, 5, 6],\n      \"notes\": \"policy_scope: 未发现页表隔离策略的作用域定义。无 KPTI 配置、无 PMP 配置、无 SMEP/SMAP/TTBR0/TTBR1 相关代码。仅有的安全相关机制是 PUM 位操作，但这不是页表隔离策略。\"\n    },\n    {\n      \"fact_id\": \"Q07_011_05\",\n      \"status_or_value\": \"no_after_negative_search\",\n      \"evidence_candidate_indexes\": [0, 1, 2, 3, 4, 5, 6],\n      \"notes\": \"stub_d"
+  }
+}

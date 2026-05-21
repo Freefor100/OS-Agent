@@ -1,0 +1,104 @@
+{
+  "schema_version": "describe_review_v1",
+  "stage_id": "09_debug_error",
+  "stage_title": "调试机制与错误处理",
+  "confidence": 0.87,
+  "question_reviews": [
+    {
+      "question_id": "Q09_001",
+      "score_evidence": 0.85,
+      "score_consistency": 0.8,
+      "review": "题面要求判断日志系统与日志级别控制的三态。fact_answers 中 debug_entry、runtime_integration、output_or_storage、external_or_userland_boundary 均判 yes_strong，有对应证据支撑（debug.h 宏定义、printf.c 实现、trap/syscall 调用点）。specialized_mechanism 判 yes_weak，仅引用 Makefile 中 DEBUG 条件编译和负向搜索证据，缺乏日志级别过滤/结构化事件等专门机制证据。最终 value 判 unknown，与事实矛盾：多数 fact 为 yes_strong，但 specialized_mechanism 为 yes_weak 且缺乏日志级别控制证据，判 unknown 可接受但理由不充分。负向搜索覆盖充分（207 文件，160 匹配）。",
+      "fix_hints": {
+        "finding_type": "weak_evidence",
+        "missing_evidence_types": [
+          "implementation_body",
+          "definition"
+        ],
+        "recommended_keywords": [
+          "LOG_LEVEL",
+          "log_level",
+          "printk",
+          "KERN_INFO",
+          "KERN_ERR",
+          "loglevel"
+        ],
+        "recommended_seed_paths": [
+          "kernel",
+          "include",
+          "console"
+        ],
+        "fix_goal": "搜索日志级别过滤/控制的具体实现，确认是否存在级别宏或过滤逻辑，以支撑 specialized_mechanism 的 yes_strong 或降级为 stub。"
+      }
+    },
+    {
+      "question_id": "Q09_002",
+      "score_evidence": 0.95,
+      "score_consistency": 0.95,
+      "review": "题面要求判断 panic/崩溃处理路径的三态。fact_answers 中 debug_entry、specialized_mechanism、runtime_integration、output_or_storage 均判 yes_strong，证据充分：panic 宏定义（include/printf.h）、__panic 实现体（kernel/printf.c，含 backtrace 调用和无限循环）、kerneltrap/usertrap 中调用 panic。external_or_userland_boundary 判 no_after_negative_search，负向搜索覆盖充分。最终 value 判 implemented，与事实一致。证据链完整，题面相符。",
+      "fix_hints": {}
+    },
+    {
+      "question_id": "Q09_003",
+      "score_evidence": 0.9,
+      "score_consistency": 0.7,
+      "review": "题面要求回答 panic 路径输出的诊断内容（寄存器 dump/栈回溯/停机），必须引用实现证据。fact_answers 中各 fact 均有证据支撑，但最终 value 为结构化对象（重复 fact_answers 内容），而非直接回答题面问题。题面为 short_answer，期望输出诊断内容列表（如寄存器 dump、栈回溯、停机），但 value 仅列出 fact 状态，未直接回答。证据中包含 __panic 实现（输出错误信息、调用 backtrace、设置 panicked、关中断、无限循环），可支撑诊断内容，但答案格式不符合 short_answer 要求。",
+      "fix_hints": {
+        "finding_type": "contract_only",
+        "missing_evidence_types": [],
+        "recommended_keywords": [],
+        "recommended_seed_paths": [],
+        "fix_goal": "将 value 改为直接回答 panic 路径输出的诊断内容（如：错误信息、hart ID、文件名行号、栈回溯、停机），并引用对应 evidence_id。"
+      }
+    },
+    {
+      "question_id": "Q09_004",
+      "score_evidence": 0.9,
+      "score_consistency": 0.95,
+      "review": "题面要求判断栈回溯/ unwind 的三态。fact_answers 中 debug_entry、specialized_mechanism、runtime_integration、output_or_storage 均判 yes_strong，证据充分：backtrace 函数实现（kernel/printf.c，遍历帧指针）、声明（include/printf.h）、在 __panic 中调用。external_or_userland_boundary 判 no_after_negative_search，负向搜索覆盖充分。最终 value 判 implemented，与事实一致。",
+      "fix_hints": {}
+    },
+    {
+      "question_id": "Q09_005",
+      "score_evidence": 0.85,
+      "score_consistency": 0.9,
+      "review": "题面要求判断交互式调试 monitor 的三态。fact_answers 中 debug_entry、specialized_mechanism、runtime_integration 均判 no_after_negative_search，负向搜索覆盖充分（207 文件，0 匹配）。output_or_storage 判 yes_weak，引用 consoleintr 中控制字符处理和 __panic 输出，但非 monitor 输出。external_or_userland_boundary 判 yes_strong，引用 consoleintr 和 sh.c 用户态 shell。最终 value 判 not_found，与事实一致。注意：output_or_storage 和 external_or_userland_boundary 的 yes 判断与 not_found 不矛盾，因这些证据指向的是通用控制台/用户态 shell，非 monitor 本身。",
+      "fix_hints": {}
+    },
+    {
+      "question_id": "Q09_006",
+      "score_evidence": 0.9,
+      "score_consistency": 0.95,
+      "review": "题面要求判断 GDB stub 的三态。fact_answers 中 packet_loop、checksum_ack、command_handlers、trap_integration 均判 no_after_negative_search，负向搜索覆盖充分（207 文件，仅 3 匹配，均为 OpenOCD 配置和文档，非内核实现）。not_external_config 判 yes_strong，确认无内核侧实现。最终 value 判 not_found，与事实一致。",
+      "fix_hints": {}
+    },
+    {
+      "question_id": "Q09_007",
+      "score_evidence": 0.85,
+      "score_consistency": 0.7,
+      "review": "题面要求判断错误码/Result 类型的三态。fact_answers 中 debug_entry 判 yes_strong（errno.h 定义），specialized_mechanism 判 yes_strong（多处 syscall/fs 返回负 errno），runtime_integration 判 yes_strong（sys_sleep/sys_nanosleep 中使用），external_or_userland_boundary 判 yes_strong（syscall 层返回用户态）。output_or_storage 判 yes_weak，仅引用负向搜索证据，缺乏错误码输出/存储机制证据。最终 value 为结构化对象（重复 fact_answers），题面为 tri_state_impl，期望输出 implemented/stub/not_found/unknown 之一，而非结构化对象。格式不符合 answer_contract 要求。",
+      "fix_hints": {
+        "finding_type": "contract_only",
+        "missing_evidence_types": [],
+        "recommended_keywords": [],
+        "recommended_seed_paths": [],
+        "fix_goal": "将 value 改为 tri_state_impl 允许的四值之一（implemented/stub/not_found/unknown），并确保与 fact_answers 一致。"
+      }
+    },
+    {
+      "question_id": "Q09_008",
+      "score_evidence": 0.85,
+      "score_consistency": 0.9,
+      "review": "题面要求判断 trace/ftrace 的三态。fact_answers 中 trace_abstraction 判 stub_or_declaration_only（SYS_trace 定义、tmask 字段、syscall 中条件打印），instrumentation_sites 判 stub_or_declaration_only（仅 syscall 中一处），control_readout 判 stub_or_declaration_only（sys_trace 实现）。event_storage 判 no_after_negative_search，not_logging 判 no_after_negative_search，负向搜索覆盖充分。最终 value 判 stub，与事实一致。证据链完整。",
+      "fix_hints": {}
+    }
+  ],
+  "findings": [],
+  "summary_zh": "本阶段 8 题中，Q09_002（panic 路径）、Q09_004（栈回溯）、Q09_005（monitor）、Q09_006（GDB stub）、Q09_008（trace）的证据支撑度和题面相符度较好，证据链完整。Q09_001（日志系统）的 specialized_mechanism 证据偏弱（仅 yes_weak），导致最终 value 判 unknown 但理由不充分。Q09_003（panic 诊断输出）和 Q09_007（错误码）存在格式问题：前者为 short_answer 但 value 输出结构化对象而非直接回答；后者为 tri_state_impl 但 value 输出结构化对象而非四值之一。全阶段 confidence 按各题 mean_score 均值计算，因 Q09_001 和 Q09_003 的 mean_score 低于 0.7 触发截断。",
+  "report_quality_score": 0.87,
+  "_meta": {
+    "quality": {
+      "mean_question_confidence": 0.8687
+    }
+  }
+}

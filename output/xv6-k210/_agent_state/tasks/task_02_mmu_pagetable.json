@@ -1,0 +1,47 @@
+{
+  "task_id": "task_02_mmu_pagetable",
+  "stage_id": "02_boot_trap",
+  "question_id": "Q02_005",
+  "question_ids": [
+    "Q02_005",
+    "Q02_007",
+    "Q02_012"
+  ],
+  "status": "done",
+  "evidence_ids": [
+    "ev_task_02_mmu_pagetable_918307ce",
+    "ev_task_02_mmu_pagetable_32e093ee",
+    "ev_task_02_mmu_pagetable_c63b337a",
+    "ev_task_02_mmu_pagetable_742b031f",
+    "ev_task_02_mmu_pagetable_0e4f86b8",
+    "ev_task_02_mmu_pagetable_595c9f89",
+    "ev_task_02_mmu_pagetable_a29fb5fe",
+    "ev_task_02_mmu_pagetable_8e884cfd",
+    "ev_task_02_mmu_pagetable_d96d22e5",
+    "ev_task_02_mmu_pagetable_756077be",
+    "ev_task_02_mmu_pagetable_fcbf3275",
+    "ev_task_02_mmu_pagetable_a84eecc9",
+    "ev_task_02_mmu_pagetable_e49ad467",
+    "ev_task_02_mmu_pagetable_2a511013",
+    "ev_task_02_mmu_pagetable_27478d9a",
+    "ev_task_02_mmu_pagetable_19f6a8a7",
+    "ev_task_02_mmu_pagetable_63f4646b",
+    "ev_task_02_mmu_pagetable_febc8239",
+    "ev_task_02_mmu_pagetable_0cf4d080"
+  ],
+  "draft_answer_ids": [
+    "draft_task_02_mmu_pagetable_Q02_005_7e903f74",
+    "draft_task_02_mmu_pagetable_Q02_007_48e2c0e2",
+    "draft_task_02_mmu_pagetable_Q02_012_455d9106"
+  ],
+  "findings": [],
+  "confidence": "high",
+  "errors": [],
+  "token_usage": {},
+  "metadata": {
+    "evidence_count": 19,
+    "mode": "react",
+    "summary": "查证了 xv6-k210 的 MMU 初始化、页表管理、物理页分配器、slab 分配器、UART 地址映射等核心内存管理机制。MMU 已启用（kvminit + kvminithart 设置 SATP），页表 walk/map/unmap 真实修改 PTE，分配器使用 freelist（pm.c 物理页）+ slab（kmalloc.c 小对象），地址转换由 MMU 运行时完成（直接映射 + VIRT_OFFSET），保护位通过 PTE_R/W/X/U/V 和 SSTATUS_PUM/SUM 实现。串口输出通过 SBI ecall 而非直接 UART 寄存器访问，因此不存在 MMU 启用前后的 UART 地址切换逻辑。",
+    "raw_output_excerpt": "Now I have comprehensive evidence. Let me compile the final structured output.\n\n{\n  \"status\": \"done\",\n  \"summary\": \"查证了 xv6-k210 的 MMU 初始化、页表管理、物理页分配器、slab 分配器、UART 地址映射等核心内存管理机制。MMU 已启用（kvminit + kvminithart 设置 SATP），页表 walk/map/unmap 真实修改 PTE，分配器使用 freelist（pm.c 物理页）+ slab（kmalloc.c 小对象），地址转换由 MMU 运行时完成（直接映射 + VIRT_OFFSET），保护位通过 PTE_R/W/X/U/V 和 SSTATUS_PUM/SUM 实现。串口输出通过 SBI ecall 而非直接 UART 寄存器访问，因此不存在 MMU 启用前后的 UART 地址切换逻辑。\",\n  \"claim\": \"xv6-k210 实现了完整的 MMU 初始化（设置 SATP 并建立页表），包含物理页帧常量（PGSIZE=4096, MAXVA）、freelist+slab 两级分配器、页表 walk/map/unmap 真实修改 PTE、MMU 运行时地址转换（直接映射 + VIRT_OFFSET）、PTE 保护位和 SSTATUS 用户/内核隔离。串口通过 SBI ecall 输出，无 MMU 启用前后的 UART 地址切换逻辑。\",\n  \"structured_fact_results\": [\n    {\n      \"fact_id\": \"Q02_005_01\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [0, 1, 2],\n      \"notes\": \"PGSIZE=4096, MAXVA, PGROUNDUP/DOWN, PTE_V/R/W/X/U 等常量在 include/hal/riscv.h 中完整定义。KERNBASE=0x80020000, PHYSTOP=0x80600000, VIRT_OFFSET=0x3F00000000 在 include/memlayout.h 中定义。\"\n    },\n    {\n      \"fact_id\": \"Q02_005_02\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [3, 4, 5],\n      \"notes\": \"物理页分配器 pm.c 使用 freelist（struct run 链表），支持多页连续分配（buddy-like）。小对象分配器 kmalloc.c 使用 slab 风格（kmem_node + kmem_allocator 哈希表）。两级分配器均完整实现。\"\n    },\n    {\n      \"fact_id\": \"Q02_005_03\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [6, 7, 8],\n      \"notes\": \"walk() 三级页表遍历（Sv39），mappages() 真实写入 PTE（*pte = PA2PTE(pa) | perm | PTE_V），unmappages() 清除 PTE（*pte = 0）并可选释放物理页。完整实现。\"\n    },\n    {\n      \"fact_id\": \"Q02_005_04\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [0, 9, 10, 11],\n      \"notes\": \"PTE 保护位：PTE_R/W/X/U/V 在 riscv.h 定义。用户/内核隔离通过 SSTATUS_PUM（k210）/ SSTATUS_SUM（QEMU）在 vm.h 中实现。地址转换由 MMU 运行时完成（SATP_SV39 写入 satp CSR），内核使用直接映射（物理地址=虚拟地址偏移 VIRT_OFFSET）。\"\n    },\n    {\n      \"fact_id\": \"Q02_005_05\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [12, 13],\n   "
+  }
+}

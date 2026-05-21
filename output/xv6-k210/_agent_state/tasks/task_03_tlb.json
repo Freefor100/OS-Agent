@@ -1,0 +1,43 @@
+{
+  "task_id": "task_03_tlb",
+  "stage_id": "03_mem_mgmt",
+  "question_id": "Q03_018",
+  "question_ids": [
+    "Q03_018",
+    "Q03_019"
+  ],
+  "status": "done",
+  "evidence_ids": [
+    "ev_task_03_tlb_3461f7a6",
+    "ev_task_03_tlb_acff2984",
+    "ev_task_03_tlb_5306f5d1",
+    "ev_task_03_tlb_3a53918d",
+    "ev_task_03_tlb_42c21b27",
+    "ev_task_03_tlb_c4ab242b",
+    "ev_task_03_tlb_5a86b107",
+    "ev_task_03_tlb_df9a9806",
+    "ev_task_03_tlb_ec2152d5",
+    "ev_task_03_tlb_f22fa3cb",
+    "ev_task_03_tlb_c0aa2af0",
+    "ev_task_03_tlb_56b9ba38",
+    "ev_task_03_tlb_074f0fd1",
+    "ev_task_03_tlb_811a0411",
+    "ev_task_03_tlb_680aef66",
+    "ev_task_03_tlb_b1c1bd2b",
+    "ev_task_03_tlb_8007430d"
+  ],
+  "draft_answer_ids": [
+    "draft_task_03_tlb_Q03_018_1c8e00cd",
+    "draft_task_03_tlb_Q03_019_53ed4c90"
+  ],
+  "findings": [],
+  "confidence": "high",
+  "errors": [],
+  "token_usage": {},
+  "metadata": {
+    "evidence_count": 17,
+    "mode": "react",
+    "summary": "查证了 xv6-k210 的 TLB 刷新机制：存在本地 sfence_vma() 封装函数（定义在 riscv.h），页表修改后多处调用本地 flush；存在 SBI IPI 机制用于唤醒其他核，但软件中断 handler 仅清除 IPI 标志，不执行 TLB flush，因此不存在完整的 TLB Shootdown 机制。",
+    "raw_output_excerpt": "Now I have all the evidence. Let me compile the final structured JSON output.\n\n```json\n{\n  \"status\": \"done\",\n  \"summary\": \"查证了 xv6-k210 的 TLB 刷新机制：存在本地 sfence_vma() 封装函数（定义在 riscv.h），页表修改后多处调用本地 flush；存在 SBI IPI 机制用于唤醒其他核，但软件中断 handler 仅清除 IPI 标志，不执行 TLB flush，因此不存在完整的 TLB Shootdown 机制。\",\n  \"claim\": \"xv6-k210 实现了本地 TLB flush（sfence_vma），页表修改后调用本地 flush；存在 IPI 机制（sbi_send_ipi）用于进程调度唤醒，但软件中断 handler 中不执行 TLB flush，因此不存在完整的 TLB Shootdown（远程 TLB 刷新）机制。\",\n  \"structured_fact_results\": [\n    {\n      \"fact_id\": \"Q03_018_01\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [0, 1],\n      \"notes\": \"sfence_vma() 定义在 include/hal/riscv.h:362，有完整的内联汇编实现（QEMU 用 sfence.vma，K210 用 sfence.vm 编码 0x10400073 + fence.i）。\"\n    },\n    {\n      \"fact_id\": \"Q03_018_02\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [2, 3, 4, 5, 6, 7, 8, 9],\n      \"notes\": \"页表修改后多处调用 sfence_vma()：vm.c 中 uvmcopy (line 587)、uvmprotect (line 665)、COW handler (line 997)、lazy alloc (line 1013)；mmap.c 中 do_mmap (line 769)、do_munmap (line 811)、page fault handler (line 904, 1119, 1151)；exec.c 中切换页表后 (line 292-293)。\"\n    },\n    {\n      \"fact_id\": \"Q03_018_03\",\n      \"status_or_value\": \"yes_weak\",\n      \"evidence_candidate_indexes\": [10, 11, 12],\n      \"notes\": \"存在 SBI IPI 机制：sbi_send_ipi() 定义在 include/sbi.h:98，用于 main.c 中唤醒其他 hart（line 65-69）和 proc.c 中 wakeup() 通知空闲核（line 401）。但 IPI 仅用于调度唤醒，不用于 TLB flush 目的。\"\n    },\n    {\n      \"fact_id\": \"Q03_018_04\",\n      \"status_or_value\": \"no_after_negative_search\",\n      \"evidence_candidate_indexes\": [13, 14],\n      \"notes\": \"软件中断 handler（INTR_SOFTWARE）在 trap.c:315-317 仅调用 sbi_clear_ipi() 清除 IPI 标志后返回，不执行任何 TLB flush。注释掉的代码（line 306-309）曾考虑发送 IPI 通知其他核，但被注释。因此远程核的 IPI handler 中不执行 TLB flush。\"\n    },\n    {\n      \"fact_id\": \"Q03_018_05\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [0, 15],\n      \"notes\": \"sfence_vma() 实现为全局 flush（sfence.vma zero, zero 或 sfence.vm x0），即 flush all TLB entries。未发现按 A"
+  }
+}

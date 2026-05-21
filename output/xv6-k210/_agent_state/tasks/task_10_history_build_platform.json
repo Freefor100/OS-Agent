@@ -1,0 +1,46 @@
+{
+  "task_id": "task_10_history_build_platform",
+  "stage_id": "10_history",
+  "question_id": "",
+  "question_ids": [],
+  "status": "done",
+  "evidence_ids": [
+    "ev_task_10_history_build_platform_2684b687",
+    "ev_task_10_history_build_platform_54b458bd",
+    "ev_task_10_history_build_platform_028b2f2a",
+    "ev_task_10_history_build_platform_74a044b3",
+    "ev_task_10_history_build_platform_f2669810",
+    "ev_task_10_history_build_platform_29614a16",
+    "ev_task_10_history_build_platform_97814252",
+    "ev_task_10_history_build_platform_5270b57d",
+    "ev_task_10_history_build_platform_c6cc0299",
+    "ev_task_10_history_build_platform_b23e7e0c",
+    "ev_task_10_history_build_platform_8a78894a",
+    "ev_task_10_history_build_platform_d0552e85",
+    "ev_task_10_history_build_platform_c1850c43",
+    "ev_task_10_history_build_platform_b931127d",
+    "ev_task_10_history_build_platform_fa3eb6e3",
+    "ev_task_10_history_build_platform_2ae43d0b",
+    "ev_task_10_history_build_platform_e99a3683",
+    "ev_task_10_history_build_platform_51144e64",
+    "ev_task_10_history_build_platform_cca1d9d5",
+    "ev_task_10_history_build_platform_6053809b",
+    "ev_task_10_history_build_platform_12344edf",
+    "ev_task_10_history_build_platform_231fae3c",
+    "ev_task_10_history_build_platform_09c4d260",
+    "ev_task_10_history_build_platform_0a863a6b"
+  ],
+  "draft_answer_ids": [
+    "draft_task_10_history_build_platform_Q10_001_baf8f83d"
+  ],
+  "findings": [],
+  "confidence": "high",
+  "errors": [],
+  "token_usage": {},
+  "metadata": {
+    "evidence_count": 24,
+    "mode": "react",
+    "summary": "查证了 xv6-k210 的构建平台、开发历史与里程碑信息。项目基于 MIT xv6-riscv，移植到 Kendryte K210 开发板（RISC-V 双核 64 位），同时支持 QEMU 模拟器。使用 RISC-V GCC 工具链（riscv64-unknown-elf-），Makefile 构建系统，支持 k210 和 qemu 双平台。SBI 使用 RustSBI/PsicaSBI。开发里程碑包括多核启动、内存分配、页表、时钟中断、S 态外部中断、SD 卡驱动、FAT32 文件系统、进程管理、用户程序等。",
+    "raw_output_excerpt": "Now I have all the information needed. Let me compile the final structured JSON output.\n\n```json\n{\n  \"status\": \"done\",\n  \"summary\": \"查证了 xv6-k210 的构建平台、开发历史与里程碑信息。项目基于 MIT xv6-riscv，移植到 Kendryte K210 开发板（RISC-V 双核 64 位），同时支持 QEMU 模拟器。使用 RISC-V GCC 工具链（riscv64-unknown-elf-），Makefile 构建系统，支持 k210 和 qemu 双平台。SBI 使用 RustSBI/PsicaSBI。开发里程碑包括多核启动、内存分配、页表、时钟中断、S 态外部中断、SD 卡驱动、FAT32 文件系统、进程管理、用户程序等。\",\n  \"claim\": \"xv6-k210 是基于 MIT xv6-riscv 移植到 K210 开发板的宏内核操作系统，支持 k210 和 qemu 双平台，使用 RISC-V GCC 工具链和 Makefile 构建，SBI 使用 RustSBI/PsicaSBI。\",\n  \"structured_fact_results\": [\n    {\n      \"fact_id\": \"Q10_001_F01\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [0, 1, 2],\n      \"notes\": \"README.md 和 README_cn.md 明确说明项目基于 MIT xv6-riscv，移植到 K210 开发板。doc/总言.md 也确认了这一点。\"\n    },\n    {\n      \"fact_id\": \"Q10_001_F02\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [3, 4, 5],\n      \"notes\": \"Makefile 明确支持 k210 和 qemu 双平台，通过 platform:=k210 / platform:=qemu 切换。linker/k210.ld 和 linker/qemu.ld 分别对应不同平台。\"\n    },\n    {\n      \"fact_id\": \"Q10_001_F03\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [3, 6],\n      \"notes\": \"Makefile 使用 riscv64-unknown-elf-gcc/gas/ld 工具链，linker 脚本使用 OUTPUT_ARCH(riscv)。\"\n    },\n    {\n      \"fact_id\": \"Q10_001_F04\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [7, 8, 9],\n      \"notes\": \"SBI 使用 RustSBI（后更名为 PsicaSBI），位于 sbi/psicasbi 子模块。doc/rustsbi.md 详细介绍了 RustSBI。\"\n    },\n    {\n      \"fact_id\": \"Q10_001_F05\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [10, 11, 12],\n      \"notes\": \"doc/总言.md 第3节列出了开发里程碑：多核启动、时钟/外部中断、SD卡驱动、FAT32文件系统、VFS、动态内存分配器、COW/Lazy Allocation、进程调度器重写、RustSBI/PsicaSBI、异步SD卡写策略等。\"\n    },\n    {\n      \"fact_id\": \"Q10_001_F06\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [13, 14, 15],\n      \"notes\": \"README.md Progress 部分列出了已完成功能清单。doc/report_2020_12_26.md 和 doc/xv6-k210-report-车春池.md"
+  }
+}

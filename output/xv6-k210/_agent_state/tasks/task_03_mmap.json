@@ -1,0 +1,39 @@
+{
+  "task_id": "task_03_mmap",
+  "stage_id": "03_mem_mgmt",
+  "question_id": "Q03_015",
+  "question_ids": [
+    "Q03_015"
+  ],
+  "status": "done",
+  "evidence_ids": [
+    "ev_task_03_mmap_f5398221",
+    "ev_task_03_mmap_046f83b9",
+    "ev_task_03_mmap_aebcdc2b",
+    "ev_task_03_mmap_16cc7fc8",
+    "ev_task_03_mmap_e1768691",
+    "ev_task_03_mmap_a6f7bdb3",
+    "ev_task_03_mmap_0c5caac8",
+    "ev_task_03_mmap_aebc1932",
+    "ev_task_03_mmap_2788b018",
+    "ev_task_03_mmap_e4bf761b",
+    "ev_task_03_mmap_4f4cedbb",
+    "ev_task_03_mmap_72f58f6b",
+    "ev_task_03_mmap_92d39fc9",
+    "ev_task_03_mmap_8428030a",
+    "ev_task_03_mmap_2bb78e2e"
+  ],
+  "draft_answer_ids": [
+    "draft_task_03_mmap_Q03_015_3a9cc1d9"
+  ],
+  "findings": [],
+  "confidence": "high",
+  "errors": [],
+  "token_usage": {},
+  "metadata": {
+    "evidence_count": 15,
+    "mode": "react",
+    "summary": "xv6-k210 实现了完整的 mmap/munmap 系统调用，包括 syscall 入口、参数/flag 解析、VMA（通过 seg 结构体管理）、page fault 路径（匿名/文件、共享/私有）、以及 munmap/exit 清理。MAP_FIXED/MAP_ANON/MAP_SHARED/MAP_PRIVATE 均被支持。",
+    "raw_output_excerpt": "Now I have all the evidence needed. Let me produce the final structured JSON output.\n\n```json\n{\n  \"status\": \"done\",\n  \"summary\": \"xv6-k210 实现了完整的 mmap/munmap 系统调用，包括 syscall 入口、参数/flag 解析、VMA（通过 seg 结构体管理）、page fault 路径（匿名/文件、共享/私有）、以及 munmap/exit 清理。MAP_FIXED/MAP_ANON/MAP_SHARED/MAP_PRIVATE 均被支持。\",\n  \"claim\": \"mmap（文件映射和匿名映射）在 xv6-k210 中已完整实现，支持 MAP_FIXED/MAP_ANON/MAP_SHARED/MAP_PRIVATE 标志位，通过 seg 链表管理映射区，page fault 时根据 VMA 类型分配匿名页或读取文件页，munmap/exit 释放映射、页表和文件引用。\",\n  \"structured_fact_results\": [\n    {\n      \"fact_id\": \"Q03_015_01\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [0, 1, 2, 3],\n      \"notes\": \"SYS_mmap (222) 和 SYS_munmap (215) 在 sysnum.h 中定义，syscall.c 中 extern 声明并注册到 syscalls[] 表，sysmem.c 中有完整非桩实现 sys_mmap/sys_munmap。\"\n    },\n    {\n      \"fact_id\": \"Q03_015_02\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [0, 1, 4, 5],\n      \"notes\": \"sys_mmap 解析 addr/len/prot/flags/fd/offset 六个参数，检查 MAP_ANONYMOUS/MAP_SHARED/MAP_PRIVATE 标志，验证 PROT_READ/PROT_WRITE 权限。do_mmap 处理 MAP_FIXED 分支。\"\n    },\n    {\n      \"fact_id\": \"Q03_015_03\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [6, 7, 8],\n      \"notes\": \"通过 seg 结构体（含 type=MMAP、addr、sz、mmap、f_off 等字段）管理映射区，挂接到进程的 segment 链表。mmap.h 定义 mmap_page 结构体（红黑树节点）用于跟踪共享页。\"\n    },\n    {\n      \"fact_id\": \"Q03_015_04\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [9, 10, 11],\n      \"notes\": \"handle_page_fault 在 vm.c 中根据 seg->type==MMAP 调用 handle_page_fault_mmap，该函数处理匿名私有（uvmalloc）、匿名共享（handle_anonymous_shared）、文件映射（handle_file_mmap，含共享/私有分支）三种情况。\"\n    },\n    {\n      \"fact_id\": \"Q03_015_05\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [12, 13, 14],\n      \"notes\": \"do_munmap 调用 lookup_fixed_segment 和 delseg 释放映射。delseg 对 MMAP 段调用 mmapdel(s, 1) 写回文件并释放页表。exit 调用 delsegs 清理所有段。mmapdel 处理匿名/文件、共享/私有不同清理路径。\"\n    },\n    {\n      \"fact_id\": \"Q03_015_06\",\n      \"status_or_value\": {\n        \"se"
+  }
+}

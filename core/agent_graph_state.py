@@ -101,10 +101,13 @@ class EvidenceRecord:
     evidence_type: str = "search"
     tool_name: Optional[str] = None
     confidence: str = "low"
+    strength: str = "weak"
+    supports_claim_types: List[str] = field(default_factory=list)
     verifier_score: float = 0.0
     validity: str = "unverified"
     excerpt: str = ""
     notes: str = ""
+    feature_ids: List[str] = field(default_factory=list)
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -128,20 +131,6 @@ class AgentEvent:
     message: str = ""
     metadata: Dict[str, Any] = field(default_factory=dict)
     token_usage: Dict[str, int] = field(default_factory=dict)
-
-    def to_dict(self) -> Dict[str, Any]:
-        return asdict(self)
-
-
-@dataclass
-class CDescribeHandoff:
-    repo_name: str
-    sections_dir: str
-    fingerprint_ready: bool = False
-    stage_quality: Dict[str, Any] = field(default_factory=dict)
-    normalized_facts: Dict[str, Any] = field(default_factory=dict)
-    evidence_summary: Dict[str, Any] = field(default_factory=dict)
-    risk_flags: List[str] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)

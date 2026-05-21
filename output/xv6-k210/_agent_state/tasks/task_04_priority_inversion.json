@@ -1,0 +1,33 @@
+{
+  "task_id": "task_04_priority_inversion",
+  "stage_id": "04_process_smp",
+  "question_id": "Q04_043",
+  "question_ids": [
+    "Q04_043"
+  ],
+  "status": "done",
+  "evidence_ids": [
+    "ev_task_04_priority_inversion_1a1b07c9",
+    "ev_task_04_priority_inversion_f7ce5d73",
+    "ev_task_04_priority_inversion_93f5b573",
+    "ev_task_04_priority_inversion_0c644922",
+    "ev_task_04_priority_inversion_78ceeb5c",
+    "ev_task_04_priority_inversion_294b2e36",
+    "ev_task_04_priority_inversion_6473780c",
+    "ev_task_04_priority_inversion_8ecd13b5",
+    "ev_task_04_priority_inversion_5cfa6566"
+  ],
+  "draft_answer_ids": [
+    "draft_task_04_priority_inversion_Q04_043_04e62780"
+  ],
+  "findings": [],
+  "confidence": "high",
+  "errors": [],
+  "token_usage": {},
+  "metadata": {
+    "evidence_count": 9,
+    "mode": "react",
+    "summary": "在 xv6-k210 代码库中未发现任何优先级反转处理机制（priority inheritance / priority ceiling / 禁用抢占临界区）。调度器使用三类优先级（TIMEOUT/IRQ/NORMAL）但仅为分类而非 per-process 优先级；锁结构（sleeplock/spinlock）无 owner priority 或 waiter priority 字段；wait queue 为 FIFO 无优先级排序；struct proc 无 priority 字段。",
+    "raw_output_excerpt": "Now I have a complete picture. Let me compile my findings.\n\nSummary of findings:\n1. **No priority inheritance/ceiling/inversion handling**: The codebase has no `priority_inheritance`, `priority_ceiling`, `pi_mutex`, `rt_mutex`, `inherit_priority`, `boost_priority` or any related concepts.\n2. **Scheduler**: Uses a simple priority array (`PRIORITY_TIMEOUT=0`, `PRIORITY_IRQ=1`, `PRIORITY_NORMAL=2`) but these are just categories (timeout, IRQ-woken, normal), not per-process priority levels. The scheduler iterates through these lists in order and picks the first runnable process. There's no per-process priority field in `struct proc`.\n3. **Lock structures**: `struct sleeplock` has only `locked`, `lk` (spinlock), `name`, `pid` - no owner priority, no waiter list, no priority tracking. `struct spinlock` has `locked`, `name`, `cpu` - no priority fields.\n4. **Wait queue**: Simple FIFO doubly-linked list, no priority ordering.\n5. **No priority field in `struct proc`**: The process control block has no `priority`, `rt_priority`, or `deadline` field.\n\nLet me now produce the final JSON output.\n\n{\n  \"status\": \"done\",\n  \"summary\": \"在 xv6-k210 代码库中未发现任何优先级反转处理机制（priority inheritance / priority ceiling / 禁用抢占临界区）。调度器使用三类优先级（TIMEOUT/IRQ/NORMAL）但仅为分类而非 per-process 优先级；锁结构（sleeplock/spinlock）无 owner priority 或 waiter priority 字段；wait queue 为 FIFO 无优先级排序；struct proc 无 priority 字段。\",\n  \"claim\": \"xv6-k210 未实现优先级反转处理（priority inheritance / priority ceiling / 禁用抢占临界区）。调度器仅有基于事件类型的分类优先级（TIMEOUT/IRQ/NORMAL），无 per-process 优先级字段；锁结构不记录 owner/waiter 优先级；等待队列为 FIFO 无优先级排序。\",\n  \"structured_fact_results\": [\n    {\n      \"fact_id\": \"Q04_043_01\",\n      \"status_or_value\": \"no_after_negative_search\",\n      \"evidence_candidate_indexes\": [0, 1, 2, 3],\n      \"notes\": \"调度器使用 PRIORITY_TIMEOUT(0)/PRIORITY_IRQ(1)/PRIORITY_NORMAL(2) 三个分类队列，但 struct proc 无 priority/rt_priority/deadline 字段。__get_runnable_no_lock 按队列索引顺序遍历，取第一个 RUNNABLE 进程，非基于 per-process 优先级的选择。\"\n    },\n    {\n      \"fact_id\": \"Q04_043_02\",\n      "
+  }
+}

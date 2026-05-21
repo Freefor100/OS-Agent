@@ -1,7 +1,7 @@
 """
 错误处理模块
 
-错误分类、重试策略与错误追踪（describe / coarse / fine / RAG 等链路共用）。
+错误分类、重试策略与错误追踪（Describe / RAG 等链路共用）。
 """
 import json
 import logging

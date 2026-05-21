@@ -1,0 +1,35 @@
+{
+  "task_id": "task_06_sync_ipc_Q06_014_definition_assembler_fix_de79f7",
+  "stage_id": "06_sync_ipc",
+  "question_id": "Q06_014",
+  "question_ids": [
+    "Q06_014"
+  ],
+  "status": "done",
+  "evidence_ids": [
+    "ev_task_06_sync_ipc_Q06_014_definition_assembler_fix_de79f7_031b90b1",
+    "ev_task_06_sync_ipc_Q06_014_definition_assembler_fix_de79f7_12a732aa",
+    "ev_task_06_sync_ipc_Q06_014_definition_assembler_fix_de79f7_fa0d8257",
+    "ev_task_06_sync_ipc_Q06_014_definition_assembler_fix_de79f7_340bf3d2",
+    "ev_task_06_sync_ipc_Q06_014_definition_assembler_fix_de79f7_62f715d9",
+    "ev_task_06_sync_ipc_Q06_014_definition_assembler_fix_de79f7_99feb329",
+    "ev_task_06_sync_ipc_Q06_014_definition_assembler_fix_de79f7_5fed43b3",
+    "ev_task_06_sync_ipc_Q06_014_definition_assembler_fix_de79f7_66335019",
+    "ev_task_06_sync_ipc_Q06_014_definition_assembler_fix_de79f7_2aee9a3f",
+    "ev_task_06_sync_ipc_Q06_014_definition_assembler_fix_de79f7_89e56822",
+    "ev_task_06_sync_ipc_Q06_014_definition_assembler_fix_de79f7_6e2db5fe"
+  ],
+  "draft_answer_ids": [
+    "draft_task_06_sync_ipc_Q06_014_definition_assembler_fix_de79f7_Q06_014_177d8ea0"
+  ],
+  "findings": [],
+  "confidence": "high",
+  "errors": [],
+  "token_usage": {},
+  "metadata": {
+    "evidence_count": 11,
+    "mode": "react",
+    "summary": "查证了 xv6-k210 内核的 spinlock 和 sleeplock 实现，以及死锁相关注释和代码。确认 Coffman 四条件均成立，死锁策略为预防（lock ordering + trylock），无检测/恢复机制。",
+    "raw_output_excerpt": "Now I have all the evidence I need. Let me compile the final JSON output.\n\n```json\n{\n  \"status\": \"done\",\n  \"summary\": \"查证了 xv6-k210 内核的 spinlock 和 sleeplock 实现，以及死锁相关注释和代码。确认 Coffman 四条件均成立，死锁策略为预防（lock ordering + trylock），无检测/恢复机制。\",\n  \"claim\": \"xv6-k210 内核中死锁四必要条件（Coffman Conditions）均成立：互斥（spinlock/sleeplock 实现）、持有并等待（spinlock 自旋等待 + sleeplock sleep 等待）、不可剥夺（spinlock 关中断 + 无抢占机制）、循环等待（存在嵌套锁场景，通过 lock ordering 注释和 trysleeplock 预防）。死锁处理策略为预防（prevention），无检测/恢复机制。\",\n  \"structured_fact_results\": [\n    {\n      \"fact_id\": \"Q06_014_01\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [0, 1, 2],\n      \"notes\": \"spinlock.h 第6行注释 'Mutual exclusion lock' 明确声明互斥锁语义；spinlock.c acquire() 使用原子 amoswap 确保同一时刻仅一个 CPU 获得锁；sleeplock 基于 spinlock 实现互斥。互斥条件成立。\"\n    },\n    {\n      \"fact_id\": \"Q06_014_02\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [0, 2, 3, 4, 5],\n      \"notes\": \"spinlock acquire() 在持有锁时若获取失败则自旋等待（while(__sync_lock_test_and_set(...) != 0)），即持有并等待；sleeplock acquiresleep() 在持有内部 spinlock 时调用 sleep() 等待；proc.c 注释明确提及嵌套锁场景下的死锁预防（'proc_lock should be acquired last'）。持有并等待条件成立。\"\n    },\n    {\n      \"fact_id\": \"Q06_014_03\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [0, 6],\n      \"notes\": \"spinlock acquire() 调用 push_off() 关中断，防止持有锁时被中断/抢占；内核无抢占式调度（非 PREEMPT），spinlock 持有者不会被强制剥夺锁；sleeplock 只能通过 releasesleep() 显式释放，无超时抢占机制。不可剥夺条件成立。\"\n    },\n    {\n      \"fact_id\": \"Q06_014_04\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [3, 4, 5, 7, 8],\n      \"notes\": \"proc.c 第249-250行注释明确要求 'proc_lock should be acquired last' 以避免死锁，说明存在多锁嵌套场景；exit() 中先 acquire parent->lk 再 acquire proc_lock（第454行）；sleep() 中先 release proc_lock 再 acquire(lk)（第603行）；rename 使用 trysleeplock 避免循环等待。循环等待条件在嵌套锁路径中可能成立，通过 lock ordering 预防。\"\n    },\n    {\n      \"fact_id\": \"Q06_014_05\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [3, 4, 5, 7, 8, 9],\n      \"notes\": \"死锁处理策略为预"
+  }
+}

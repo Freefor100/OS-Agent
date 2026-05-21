@@ -1,0 +1,41 @@
+{
+  "task_id": "task_03_user_ptr_check",
+  "stage_id": "03_mem_mgmt",
+  "question_id": "Q03_020",
+  "question_ids": [
+    "Q03_020"
+  ],
+  "status": "done",
+  "evidence_ids": [
+    "ev_task_03_user_ptr_check_f42a37b3",
+    "ev_task_03_user_ptr_check_400a309d",
+    "ev_task_03_user_ptr_check_7b88fc5d",
+    "ev_task_03_user_ptr_check_ed19d27a",
+    "ev_task_03_user_ptr_check_b6831ae0",
+    "ev_task_03_user_ptr_check_5b07e949",
+    "ev_task_03_user_ptr_check_e54a51ed",
+    "ev_task_03_user_ptr_check_9019af5d",
+    "ev_task_03_user_ptr_check_5ad13e66",
+    "ev_task_03_user_ptr_check_6eda90a3",
+    "ev_task_03_user_ptr_check_7417d765",
+    "ev_task_03_user_ptr_check_9ce853b9",
+    "ev_task_03_user_ptr_check_7b3e37c9",
+    "ev_task_03_user_ptr_check_edfdfea1",
+    "ev_task_03_user_ptr_check_f088372c",
+    "ev_task_03_user_ptr_check_ef00e9da",
+    "ev_task_03_user_ptr_check_b951c70c"
+  ],
+  "draft_answer_ids": [
+    "draft_task_03_user_ptr_check_Q03_020_0ba5be8c"
+  ],
+  "findings": [],
+  "confidence": "medium",
+  "errors": [],
+  "token_usage": {},
+  "metadata": {
+    "evidence_count": 17,
+    "mode": "react",
+    "summary": "查证了 xv6-k210 的用户指针安全检查机制。未发现 access_ok/verify_area/UserInPtr 符号；用户指针检查通过 partofseg() 段检查 + walkaddr() PTE_U 检查 + safememmove() 的 SSTATUS_PUM/SUM 保护实现。copyout/copyin 有多个变体（带检查的 copyout2/copyin2 和无检查的 _nocheck 版本）。",
+    "raw_output_excerpt": "Now I have all the evidence needed. Let me produce the final JSON output.\n\n```json\n{\n  \"status\": \"done\",\n  \"summary\": \"查证了 xv6-k210 的用户指针安全检查机制。未发现 access_ok/verify_area/UserInPtr 符号；用户指针检查通过 partofseg() 段检查 + walkaddr() PTE_U 检查 + safememmove() 的 SSTATUS_PUM/SUM 保护实现。copyout/copyin 有多个变体（带检查的 copyout2/copyin2 和无检查的 _nocheck 版本）。\",\n  \"claim\": \"xv6-k210 没有独立的 access_ok/verify_area 函数；用户指针合法性检查由 copyout2/copyin2 中的 partofseg() 段范围检查实现，以及 copyout() 中的 walkaddr() PTE_U 检查实现；safememmove() 通过 permit_usr_mem()/protect_usr_mem() 切换 SSTATUS_PUM/SUM 位提供硬件级保护。\",\n  \"structured_fact_results\": [\n    {\n      \"fact_id\": \"Q03_020_01\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [0, 1, 2],\n      \"notes\": \"内存常量定义完整：PGSIZE=4096 (riscv.h:378), PGSHIFT=12 (riscv.h:379), MAXVA (riscv.h:408), PHYSTOP=0x80600000 (memlayout.h:99), KERNBASE=0x80020000 (memlayout.h:97), MAXUVA=RUSTSBI_BASE=0x80000000 (memlayout.h:131)。这些常量在 kvminit()、walk()、mappages() 等函数中被实际使用。\"\n    },\n    {\n      \"fact_id\": \"Q03_020_02\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [3, 4],\n      \"notes\": \"物理页分配器 (pm.c) 使用 freelist 链表管理，分为 multiple（大块连续分配）和 single（单页分配）两个区域。kmalloc (kmalloc.c) 使用 slab 启发的小对象分配器，按对象大小哈希到不同 kmem_allocator。两者都基于 allocpage()/freepage() 的 4KB 页分配。\"\n    },\n    {\n      \"fact_id\": \"Q03_020_03\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [5, 6, 7],\n      \"notes\": \"mappages() (vm.c:280-310) 真实修改 PTE，设置 PA2PTE(pa)|perm|PTE_V；unmappages() (vm.c:320-355) 清除 PTE 并可选释放物理页；walk() (vm.c:195-215) 实现 Sv39 三级页表遍历，支持 alloc 参数动态分配页表页。\"\n    },\n    {\n      \"fact_id\": \"Q03_020_04\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [8, 9, 10],\n      \"notes\": \"保护机制：PTE_U 位 (riscv.h:388) 标记用户可访问页；walkaddr() (vm.c:225-240) 检查 PTE_U 位；permit_usr_mem()/protect_usr_mem() (vm.h:13-31) 切换 SSTATUS_PUM(k210)/SSTATUS_SUM(QEMU) 位实现用户内存访问使能/保护。地址转换由 MMU 运行时通过 SATP CSR 和 Sv39 页表完成。\"\n    },\n    {\n      \"fact_id\": \"Q0"
+  }
+}

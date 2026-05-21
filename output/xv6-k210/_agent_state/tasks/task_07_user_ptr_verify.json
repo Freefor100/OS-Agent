@@ -1,0 +1,40 @@
+{
+  "task_id": "task_07_user_ptr_verify",
+  "stage_id": "07_security",
+  "question_id": "Q07_005",
+  "question_ids": [
+    "Q07_005"
+  ],
+  "status": "done",
+  "evidence_ids": [
+    "ev_task_07_user_ptr_verify_5fccfef3",
+    "ev_task_07_user_ptr_verify_df841527",
+    "ev_task_07_user_ptr_verify_7159642b",
+    "ev_task_07_user_ptr_verify_5fb63a3d",
+    "ev_task_07_user_ptr_verify_9d5a713c",
+    "ev_task_07_user_ptr_verify_e2d6cdc2",
+    "ev_task_07_user_ptr_verify_fb8aae47",
+    "ev_task_07_user_ptr_verify_51528a60",
+    "ev_task_07_user_ptr_verify_a0a066b3",
+    "ev_task_07_user_ptr_verify_cb6d9656",
+    "ev_task_07_user_ptr_verify_bfdc67e2",
+    "ev_task_07_user_ptr_verify_d3126ecf",
+    "ev_task_07_user_ptr_verify_cf0f5cc8",
+    "ev_task_07_user_ptr_verify_f15c1d27",
+    "ev_task_07_user_ptr_verify_ccb520fe",
+    "ev_task_07_user_ptr_verify_1ed7c9d0"
+  ],
+  "draft_answer_ids": [
+    "draft_task_07_user_ptr_verify_Q07_005_c6a7fbb6"
+  ],
+  "findings": [],
+  "confidence": "high",
+  "errors": [],
+  "token_usage": {},
+  "metadata": {
+    "evidence_count": 16,
+    "mode": "react",
+    "summary": "查证 xv6-k210 用户指针验证机制：access_ok/verify_area/UserInPtr 未找到（negative_search）；但 copyin/copyout 系列函数已实现，通过 partofseg() 段地址校验 + walkaddr() PTE_U 检查 + safememmove() 的 PUM/SUM 位切换 + 页故障逃逸机制实现用户指针验证。",
+    "raw_output_excerpt": "Now I have all the evidence. Let me produce the final JSON output.\n\n```json\n{\n  \"status\": \"done\",\n  \"summary\": \"查证 xv6-k210 用户指针验证机制：access_ok/verify_area/UserInPtr 未找到（negative_search）；但 copyin/copyout 系列函数已实现，通过 partofseg() 段地址校验 + walkaddr() PTE_U 检查 + safememmove() 的 PUM/SUM 位切换 + 页故障逃逸机制实现用户指针验证。\",\n  \"claim\": \"xv6-k210 实现了用户指针验证机制，但使用自定义的 partofseg + safememmove + permit_usr_mem/protect_usr_mem 模式，而非标准的 access_ok/verify_area/UserInPtr 命名。copyin/copyout 系列函数完整实现，通过段范围检查和硬件 PUM/SUM 位保护用户内存访问。\",\n  \"structured_fact_results\": [\n    {\n      \"fact_id\": \"Q07_005_01\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [0, 1, 2, 3, 4],\n      \"notes\": \"security_state: 用户指针验证机制通过 permit_usr_mem/protect_usr_mem (SSTATUS_PUM/SUM 位切换) + safememmove (页故障逃逸) + partofseg (段范围检查) 实现。定义在 include/mm/vm.h:13-31，实现体在 kernel/mm/vm.c:700-760。\"\n    },\n    {\n      \"fact_id\": \"Q07_005_02\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [5, 6, 7, 8, 9],\n      \"notes\": \"enforcement_callsite: copyout2/copyin2 在 copy 前调用 partofseg() 检查用户地址是否在合法段内；walkaddr() 检查 PTE_U 位；safememmove() 通过 permit_usr_mem 临时允许 S-mode 访问用户内存。调用点包括 exec.c、console.c、file.c、blkdev.c、syscall.c 等。\"\n    },\n    {\n      \"fact_id\": \"Q07_005_03\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [10, 11, 12],\n      \"notes\": \"deny_or_fault_path: 当 partofseg() 返回 NULL（地址不在任何段内）时，copyout2/copyin2 返回 -1；当 walkaddr() 返回 NULL（页表未映射或无 PTE_U）时，原版 copyout/copyin 返回 -1；safememmove 中页故障通过 kern_pgfault_escape 逃逸并返回非零 badaddr。\"\n    },\n    {\n      \"fact_id\": \"Q07_005_04\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [13, 14, 15],\n      \"notes\": \"policy_scope: 用户指针验证覆盖 copyout/copyin/copyinstr/copyout2/copyin2/copyinstr2/copyout_nocheck/copyin_nocheck/either_copyout/either_copyin 系列函数。但 uid/gid 字段在 kstat 中定义但从未使用，sys_getuid 返回硬编码 0，无真正的访问控制策略。\"\n    },\n    {\n      \"fact_id\": \"Q07_005_05\",\n      \"status_or_value\": \"yes_strong\",\n      \"ev"
+  }
+}

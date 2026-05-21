@@ -1,31 +1,24 @@
 {
   "stage_id": "07_security",
   "evidence_targets": [
-    "用户身份模型 (UID/GID) — 是否存在真实的多用户区分",
-    "权限检查机制 — 文件访问/内存保护/系统调用门控",
-    "内核-用户隔离边界 — S/U 模式切换、PUM/SUM、页表保护",
-    "信号与进程终止 — kill/sigterm 作为安全兜底",
-    "地址空间隔离 — copyin/copyout 安全、页错误处理",
     "权限模型",
     "用户身份",
     "隔离边界",
     "安全机制"
   ],
   "seed_paths": [
-    "kernel/syscall/sysproc.c",
-    "kernel/syscall/sysfile.c",
-    "kernel/syscall/syscall.c",
-    "kernel/syscall/syssignal.c",
-    "kernel/syscall/sysmem.c",
-    "kernel/trap/trap.c",
-    "kernel/sched/proc.c",
-    "kernel/sched/signal.c",
-    "kernel/mm/vm.c",
-    "include/mm/vm.h",
-    "include/sched/proc.h",
-    "include/sched/signal.h",
     "security",
-    "capability"
+    "capability",
+    "uid",
+    "perm",
+    "auth",
+    "include/fs",
+    "include/mm",
+    "include/sync",
+    "kernel/fs",
+    "kernel/mm",
+    "kernel/sync",
+    "kernel/trap"
   ],
   "framework_guess": [
     "xv6"
@@ -35,17 +28,11 @@
   ],
   "entry_symbols": [
     "sys_getuid",
-    "sys_faccessat",
-    "usertrap",
-    "kerneltrap",
-    "protect_usr_mem",
-    "permit_usr_mem",
-    "either_copyout",
-    "either_copyin",
-    "sighandle",
-    "kill",
     "cap",
-    "permission"
+    "permission",
+    "check_perm",
+    "_start",
+    "start"
   ],
   "repo_hotspots": [
     "Makefile",
@@ -60,12 +47,10 @@
     "include/fs"
   ],
   "preferred_tools": [
-    "lsp_get_document_outline",
-    "lsp_get_definition",
-    "lsp_get_references",
-    "read_code_segment",
     "rag_search_code",
-    "grep_in_repo"
+    "lsp_get_call_graph",
+    "lsp_get_definition",
+    "read_code_segment"
   ],
   "avoid_tools": [
     "blind_read_large_files",
@@ -78,37 +63,397 @@
     "max_memory_items": 8
   },
   "execution_steps": [
-    "1. 用 lsp_get_document_outline 查看 kernel/syscall/sysproc.c 全貌，定位 sys_getuid/sys_geteuid/sys_getgid/sys_getegid 实现",
-    "2. 用 read_code_segment 精读 sys_getuid (sysproc.c:266-270)，确认硬编码返回 0 的证据",
-    "3. 用 grep_in_repo 搜索 'uid|gid' 在 include/sched/proc.h 中，确认 struct proc 无 uid/gid 字段",
-    "4. 用 read_code_segment 查看 include/sched/proc.h 中 struct proc 完整定义 (line 51-104)，列出所有字段以证明无用户身份",
-    "5. 用 lsp_get_document_outline 查看 kernel/syscall/sysfile.c，定位 sys_faccessat",
-    "6. 用 read_code_segment 精读 sys_faccessat (sysfile.c:788-823)，分析其权限检查逻辑与 'assume user as root' 注释",
-    "7. 用 read_code_segment 查看 include/fs/stat.h 中 struct kstat 的 uid/gid 字段定义，确认存在但未被使用",
-    "8. 用 lsp_get_document_outline 查看 kernel/trap/trap.c，定位 usertrap 和 kerneltrap",
-    "9. 用 read_code_segment 精读 usertrap (trap.c:74-145)，分析 SSTATUS_SPP 检查 + protect_usr_mem 调用作为隔离入口",
-    "10. 用 read_code_segment 精读 kerneltrap (trap.c:197-245)，分析 SSTATUS_SPP 断言 + protect_usr_mem 调用",
-    "11. 用 read_code_segment 查看 usertrapret (trap.c:146-196)，分析 SSTATUS_SPP 清零 + permit_usr_mem 作为返回用户态路径",
-    "12. 用 read_code_segment 查看 include/mm/vm.h:13-33 中 protect_usr_mem/permit_usr_mem 内联函数，分析 PUM/SUM 位操作",
-    "13. 用 read_code_segment 查看 include/hal/riscv.h:46-80 中 SSTATUS_PUM/SSTATUS_SUM/SSTATUS_SPP 宏定义",
-    "14. 用 lsp_get_definition 查 either_copyout 定义 (kernel/sched/proc.c:832)，分析用户/内核地址分发逻辑",
-    "15. 用 lsp_get_definition 查 either_copyin 定义 (kernel/sched/proc.c:848)，分析用户/内核地址分发逻辑",
-    "16. 用 read_code_segment 查看 kernel/mm/vm.c:700-780 中 safememmove 实现，分析 permit_usr_mem/protect_usr_mem 包裹的安全拷贝",
-    "17. 用 read_code_segment 查看 kernel/mm/vm.c:617-700 中 uvmprotect 实现，分析页级权限修改 (PTE_W/PTE_COW/PTE_U)",
-    "18. 用 lsp_get_document_outline 查看 kernel/sched/signal.c，定位 sighandle 和 sigreturn",
-    "19. 用 read_code_segment 精读 sighandle (signal.c:155-260)，分析信号分发、SIGTERM 不可屏蔽、SIGCHLD 处理",
-    "20. 用 read_code_segment 查看 include/sched/signal.h 中 SIGTERM/SIGKILL 等信号定义",
-    "21. 用 lsp_get_document_outline 查看 kernel/syscall/syssignal.c，定位 sys_kill/sys_rt_sigaction/sys_rt_sigprocmask",
-    "22. 用 read_code_segment 精读 sys_kill (syssignal.c:130-142)，追踪 kill() 调用链",
-    "23. 用 lsp_get_definition 查 kill 函数定义 (include/sched/proc.h:118 声明)，在 proc.c 中找到实现并精读",
-    "24. 用 read_code_segment 查看 kernel/syscall/sysmem.c 中 sys_mprotect 实现，分析用户态内存保护接口",
-    "25. 用 read_code_segment 查看 kernel/syscall/syscall.c:332-370 中 syscall() 分发函数，分析系统调用入口无额外权限检查",
-    "26. 用 read_code_segment 查看 kernel/exec.c:241-244 中 AT_UID/AT_EUID/AT_GID/AT_EGID 均硬编码为 0",
-    "27. 用 grep_in_repo 搜索 'EPERM|EACCES' 在 kernel/ 中的使用，确认权限拒绝错误码的实际触发点",
-    "28. 用 read_code_segment 查看 kernel/syscall/sysfile.c:194-270 中 sys_openat，分析文件打开时无 UID 权限检查",
-    "29. 用 read_code_segment 查看 kernel/sched/proc.c:420-470 中 exit() 函数，分析进程终止时的资源清理与信号通知",
-    "30. 用 lsp_get_references 查 protect_usr_mem 的所有调用点，确认隔离边界覆盖完整性",
-    "31. 用 lsp_get_references 查 sys_getuid 的所有引用，确认 UID 系统调用注册与调用路径",
-    "32. 汇总证据：整理安全模型结论——单用户(root)、硬件 S/U 隔离、页表保护、信号兜底、无真实多用户权限模型"
+    "对照 seed_paths、entry_symbols，用 rag_search_code / list_repo_structure / LSP 锁定与本阶段相关的关键文件与符号。",
+    "对核心入口使用 lsp_get_document_outline → lsp_get_call_graph（单入口、浅深度）→ 必要时 read_code_segment 精读。",
+    "按题单逐项输出结论，每条附反引号源码路径；无实现则显式写「未发现/桩函数」等，勿臆测。"
+  ],
+  "task_plan": [
+    {
+      "task_id": "task_07_privilege_isolation",
+      "question_ids": [
+        "Q07_001",
+        "Q07_002",
+        "Q07_003",
+        "Q07_004",
+        "Q07_012"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证特权级隔离形态、凭证/权限数据结构、syscall路径权限检查、检查链路及UID/GID字段在syscall路径上的执行证据。需要找到security_state定义、enforcement_callsite实现体、deny_or_fault_path调用点、policy_scope范围，并完成negative_search_coverage。",
+      "group_reason": "这5题共享同一实现链路：特权级隔离、凭证数据结构、权限检查执行、检查链路和UID/GID字段检查，均围绕security_state和enforcement_callsite展开。",
+      "query": "搜索security、capability、uid、perm、auth相关目录和符号，使用rag_search_code和grep_in_repo定位关键文件，再用lsp_get_definition和read_code_segment读取实现体，追踪syscall路径上的权限检查调用点。",
+      "seed_paths": [
+        "security",
+        "capability",
+        "uid",
+        "perm",
+        "auth",
+        "include/fs",
+        "include/mm",
+        "include/sync",
+        "kernel/fs",
+        "kernel/mm",
+        "kernel/sync",
+        "kernel/trap",
+        "kernel/syscall"
+      ],
+      "entry_symbols": [
+        "sys_getuid",
+        "cap",
+        "permission",
+        "check_perm",
+        "_start",
+        "start"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ]
+    },
+    {
+      "task_id": "task_07_user_ptr_verify",
+      "question_ids": [
+        "Q07_005"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证用户指针验证机制（access_ok/verify_area/UserInPtr/copyin/copyout）是否实现。需要找到定义、实现体、调用点，并完成negative_search_coverage。",
+      "group_reason": "该题独立，涉及用户指针验证，与权限检查链路不同。",
+      "query": "搜索access_ok、verify_area、UserInPtr、copyin、copyout等关键词，使用rag_search_code和grep_in_repo定位，再用lsp_get_definition和read_code_segment读取实现体，追踪调用点。",
+      "seed_paths": [
+        "kernel",
+        "mm",
+        "include",
+        "arch"
+      ],
+      "entry_symbols": [
+        "access_ok",
+        "verify_area",
+        "UserInPtr",
+        "copyin",
+        "copyout"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ]
+    },
+    {
+      "task_id": "task_07_seccomp_sandbox",
+      "question_ids": [
+        "Q07_006"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证seccomp/prctl/sandbox等系统调用过滤/沙箱机制是否实现。需要找到定义、实现体、调用点，并完成negative_search_coverage。",
+      "group_reason": "该题独立，涉及系统调用过滤/沙箱，与权限检查链路不同。",
+      "query": "搜索seccomp、prctl、sandbox等关键词，使用rag_search_code和grep_in_repo定位，再用lsp_get_definition和read_code_segment读取实现体，追踪调用点。",
+      "seed_paths": [
+        "kernel",
+        "security",
+        "syscall",
+        "include"
+      ],
+      "entry_symbols": [
+        "seccomp",
+        "prctl",
+        "sandbox"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ]
+    },
+    {
+      "task_id": "task_07_stack_protection",
+      "question_ids": [
+        "Q07_007",
+        "Q07_015"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证栈保护/溢出防护（stack canary/guard page）及缓冲区溢出防护（stack canary/guard page/NX-W^X/ASLR/bounds check）是否实现。需要找到定义、实现体、调用点，并完成negative_search_coverage。",
+      "group_reason": "这2题共享同一实现线索：栈保护和缓冲区溢出防护，均涉及stack canary、guard page、NX/W^X等机制。",
+      "query": "搜索stack_chk、stack canary、__stack_chk_fail、guard page、NX、W^X、noexec、ASLR、randomize、bounds check、FORTIFY、overflow等关键词，使用rag_search_code和grep_in_repo定位，再用lsp_get_definition和read_code_segment读取实现体，追踪调用点。",
+      "seed_paths": [
+        "kernel",
+        "mm",
+        "memory",
+        "arch",
+        "security",
+        "build",
+        "linker",
+        "include",
+        "os"
+      ],
+      "entry_symbols": [
+        "__stack_chk_fail",
+        "guard_page",
+        "nx",
+        "wx",
+        "aslr",
+        "randomize"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ]
+    },
+    {
+      "task_id": "task_07_audit_secureboot",
+      "question_ids": [
+        "Q07_008"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证审计/安全启动（audit/secure boot/signature）相关逻辑是否实现。需要找到定义、实现体、调用点，并完成negative_search_coverage。",
+      "group_reason": "该题独立，涉及审计/安全启动，与权限检查链路不同。",
+      "query": "搜索audit、secure boot、signature等关键词，使用rag_search_code和grep_in_repo定位，再用lsp_get_definition和read_code_segment读取实现体，追踪调用点。",
+      "seed_paths": [
+        "kernel",
+        "security",
+        "boot",
+        "include"
+      ],
+      "entry_symbols": [
+        "audit",
+        "secure_boot",
+        "signature"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ]
+    },
+    {
+      "task_id": "task_07_arch_support",
+      "question_ids": [
+        "Q07_009"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证项目支持的架构（riscv64/aarch64/x86_64/loongarch64）及每种架构的安全相关初始化（特权级配置、PMP/MPU/SMEP等）。需要逐架构找到支持证据和安全初始化证据，并完成negative_search_coverage。",
+      "group_reason": "该题独立，涉及架构支持，与权限检查链路不同。",
+      "query": "搜索riscv64、aarch64、x86_64、loongarch64、PMP、MPU、SMEP、SMAP、KPTI等关键词，使用rag_search_code和grep_in_repo定位，再用lsp_get_definition和read_code_segment读取实现体，追踪调用点。",
+      "seed_paths": [
+        "kernel",
+        "security",
+        "fs",
+        "proc",
+        "mm",
+        "syscall",
+        "arch",
+        "include",
+        "Makefile",
+        "Cargo.toml"
+      ],
+      "entry_symbols": [
+        "riscv64",
+        "aarch64",
+        "x86_64",
+        "loongarch64",
+        "PMP",
+        "MPU",
+        "SMEP",
+        "SMAP",
+        "KPTI"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ]
+    },
+    {
+      "task_id": "task_07_rust_raii",
+      "question_ids": [
+        "Q07_010"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证Rust RAII/所有权/生命周期相关的内核安全机制（如不可unsafe直接访问用户内存、锁的RAII自动释放等）是否实现。需要找到定义、实现体、调用点，并完成negative_search_coverage。",
+      "group_reason": "该题独立，涉及Rust语言安全机制，与权限检查链路不同。",
+      "query": "搜索RAII、unsafe、所有权、生命周期等关键词，使用rag_search_code和grep_in_repo定位，再用lsp_get_definition和read_code_segment读取实现体，追踪调用点。",
+      "seed_paths": [
+        "kernel",
+        "include",
+        "src"
+      ],
+      "entry_symbols": [
+        "RAII",
+        "unsafe",
+        "Ownership",
+        "Lifetime"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ]
+    },
+    {
+      "task_id": "task_07_kpti",
+      "question_ids": [
+        "Q07_011"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证内核/用户页表隔离（KPTI或等价机制）是否实现。需要找到定义、实现体、调用点，并完成negative_search_coverage。",
+      "group_reason": "该题独立，涉及页表隔离，与权限检查链路不同。",
+      "query": "搜索KPTI、PMP、SMEP、SMAP、TTBR0、TTBR1等关键词，使用rag_search_code和grep_in_repo定位，再用lsp_get_definition和read_code_segment读取实现体，追踪调用点。",
+      "seed_paths": [
+        "kernel",
+        "mm",
+        "arch",
+        "include"
+      ],
+      "entry_symbols": [
+        "KPTI",
+        "PMP",
+        "SMEP",
+        "SMAP",
+        "TTBR0",
+        "TTBR1"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ]
+    },
+    {
+      "task_id": "task_07_access_control_model",
+      "question_ids": [
+        "Q07_013"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证访问控制模型（DAC/MAC/RBAC/ACL/capability）的类型。需要找到subject_identity_model、object_permission_model、enforcement_path、model_classification的证据，并完成negative_search_coverage。",
+      "group_reason": "该题独立，涉及访问控制模型分类，与权限检查链路不同。",
+      "query": "搜索DAC、MAC、RBAC、ACL、capability、uid、gid、mode、owner、permission、access control、EACCES、EPERM等关键词，使用rag_search_code和grep_in_repo定位，再用lsp_get_definition和read_code_segment读取实现体，追踪调用点。",
+      "seed_paths": [
+        "kernel",
+        "security",
+        "fs",
+        "proc",
+        "syscall",
+        "include"
+      ],
+      "entry_symbols": [
+        "DAC",
+        "MAC",
+        "RBAC",
+        "ACL",
+        "capability",
+        "uid",
+        "gid",
+        "mode",
+        "owner",
+        "permission"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ]
+    },
+    {
+      "task_id": "task_07_integrity_policy",
+      "question_ids": [
+        "Q07_014"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证完整性策略（Biba模型、只读内核段、代码签名验证、W^X内存保护等）是否实现。需要找到定义、实现体、调用点，并完成negative_search_coverage。",
+      "group_reason": "该题独立，涉及完整性策略，与权限检查链路不同。",
+      "query": "搜索Biba、integrity、read-only、code signature、W^X等关键词，使用rag_search_code和grep_in_repo定位，再用lsp_get_definition和read_code_segment读取实现体，追踪调用点。",
+      "seed_paths": [
+        "kernel",
+        "security",
+        "mm",
+        "include"
+      ],
+      "entry_symbols": [
+        "Biba",
+        "integrity",
+        "read_only",
+        "code_signature",
+        "W^X"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ]
+    },
+    {
+      "task_id": "task_07_hardening_maintenance",
+      "question_ids": [
+        "Q07_016"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证系统硬化与安全维护措施（服务裁剪、权限最小化、审计日志、备份/恢复、补丁/版本策略）是否实现。需要找到service_minimization、least_privilege_defaults、security_audit_logging、backup_or_recovery_policy、patch_or_signature_policy的证据，并完成negative_search_coverage。",
+      "group_reason": "该题独立，涉及系统硬化与维护，与权限检查链路不同。",
+      "query": "搜索hardening、audit、log、secure boot、signature、service、daemon、backup、archive、patch、version、config、capability、least privilege等关键词，使用rag_search_code和grep_in_repo定位，再用lsp_get_definition和read_code_segment读取实现体，追踪调用点。",
+      "seed_paths": [
+        "kernel",
+        "security",
+        "config",
+        "scripts",
+        "tools",
+        "README.md",
+        "docs",
+        "os"
+      ],
+      "entry_symbols": [
+        "hardening",
+        "audit",
+        "log",
+        "secure_boot",
+        "signature",
+        "service",
+        "daemon",
+        "backup",
+        "archive",
+        "patch",
+        "version",
+        "config",
+        "capability",
+        "least_privilege"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ]
+    }
   ]
 }

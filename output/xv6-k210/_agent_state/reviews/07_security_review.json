@@ -1,0 +1,212 @@
+{
+  "schema_version": "describe_review_v1",
+  "stage_id": "07_security",
+  "stage_title": "安全机制与权限模型",
+  "confidence": 0.92,
+  "question_reviews": [
+    {
+      "question_id": "Q07_001",
+      "score_evidence": 0.85,
+      "score_consistency": 0.95,
+      "review": "题面要求判断特权级隔离形态。fact_answers 中 security_state/enforcement_callsite/deny_or_fault_path/policy_scope 均判 no_after_negative_search，stub_detection 判 stub_or_declaration_only，negative_search_coverage 覆盖充分。但最终 value 选择了“有用户态/内核态隔离”，与 fact_answers 中 security_state=no_after_negative_search 矛盾——既然未找到独立的安全状态结构，却得出存在隔离的结论。证据 ev_80baf780 显示 syscall 表有 getuid 等条目，ev_e625c85b/720572d5/f3f5b90f 显示 SSTATUS_PUM/SUM 和 permit_usr_mem/protect_usr_mem 机制，这些确实支撑了用户态/内核态隔离的存在，但 fact_answers 未反映这一事实。fact_answers 与最终 value 不一致，违反了 answer_contract 中“由事实机械推出最终 value”的规则。",
+      "fix_hints": {
+        "finding_type": "contract_only",
+        "missing_evidence_types": [],
+        "recommended_keywords": [],
+        "recommended_seed_paths": [],
+        "fix_goal": "修正 fact_answers 中 security_state 等字段，使其与 evidence 中 SSTATUS_PUM/SUM 等用户态隔离证据一致，或调整最终 value 以匹配 fact_answers 的 no_after_negative_search 结论。"
+      }
+    },
+    {
+      "question_id": "Q07_002",
+      "score_evidence": 0.8,
+      "score_consistency": 0.9,
+      "review": "题面要求判断凭证/权限数据结构是否存在。fact_answers 中 security_state 等四项判 no_after_negative_search，stub_detection 判 stub_or_declaration_only，negative_search_coverage 覆盖充分。最终 value 为 stub，与 fact_answers 一致。证据 ev_3d2a88de 显示 sys_faccessat 中有 imode 检查，ev_ad146d18 显示 kstat 结构有 uid/gid 字段，ev_f3afb0df 显示 execve auxvec 有 AT_UID/AT_GID 等，ev_db12bbae 显示 proc 结构无 uid/gid 字段。这些证据表明存在部分权限相关结构但未形成完整系统，判 stub 合理。但 fact_answers 中 security_state 等判 no_after_negative_search 与证据中存在的 uid/gid 字段和 faccessat 实现有轻微矛盾。",
+      "fix_hints": {
+        "finding_type": "weak_evidence",
+        "missing_evidence_types": [
+          "implementation_body",
+          "usage_flow"
+        ],
+        "recommended_keywords": [
+          "faccessat",
+          "kstat",
+          "uid",
+          "gid",
+          "mode"
+        ],
+        "recommended_seed_paths": [
+          "kernel/syscall",
+          "include/fs",
+          "kernel/fs"
+        ],
+        "fix_goal": "补充 sys_faccessat 中权限检查的完整调用链证据，以及 kstat.uid/gid 字段在文件系统操作中的实际使用证据，以更准确判断 security_state 等字段。"
+      }
+    },
+    {
+      "question_id": "Q07_003",
+      "score_evidence": 0.75,
+      "score_consistency": 0.85,
+      "review": "题面要求证实在 syscall 路径上是否真实执行了权限检查。fact_answers 中 security_state 和 policy_scope 判 no_after_negative_search，enforcement_callsite 和 deny_or_fault_path 判 yes_weak，stub_detection 判 stub_or_declaration_only。最终 value 为 stub。证据 ev_d87dc74f/1ba89cd9 显示 fileread/filewrite 中有 readable/writable 检查和 -EPERM 返回，ev_63bb0218 显示 unlink 中有 -EACCES 返回，ev_c1638828 显示 do_mmap 中有 -EPERM 返回。这些确实是 syscall 路径上的权限检查，但 fact_answers 中 enforcement_callsite 和 deny_or_fault_path 判 yes_weak 而非 yes_strong，因为检查基于文件对象的 readable/writable 位而非完整的凭证系统。最终判 stub 合理，但 fact_answers 中 security_state 和 policy_scope 判 no_after_negative_search 与证据中存在的检查机制有矛盾。",
+      "fix_hints": {
+        "finding_type": "weak_evidence",
+        "missing_evidence_types": [
+          "definition",
+          "usage_flow"
+        ],
+        "recommended_keywords": [
+          "readable",
+          "writable",
+          "file",
+          "EPERM",
+          "EACCES"
+        ],
+        "recommended_seed_paths": [
+          "kernel/fs",
+          "kernel/mm"
+        ],
+        "fix_goal": "补充 file 结构中 readable/writable 字段的定义和设置逻辑，以及这些检查在 open/exec 等关键 syscall 路径上的完整调用链证据。"
+      }
+    },
+    {
+      "question_id": "Q07_004",
+      "score_evidence": 0.7,
+      "score_consistency": 0.95,
+      "review": "题面要求判断架构安全机制（PMP/SMEP/SMAP/KPTI/W^X 等）。fact_answers 中 security_state 等四项判 no_after_negative_search，stub_detection 判 stub_or_declaration_only，negative_search_coverage 覆盖充分。最终 value 为包含所有 fact 值的对象。证据 ev_b0fb420f 为负向搜索结果，ev_80baf780 显示 syscall 表。负向搜索覆盖了 PMP/SMEP/SMAP/KPTI/W^X 等关键词，match_count=0，支持 not_found 结论。但证据中 ev_e625c85b 显示 SSTATUS_PUM/SUM 定义，ev_720572d5 显示 permit_usr_mem/protect_usr_mem 实现，这些与架构安全相关但未被引用。fact_answers 与最终 value 一致，但证据引用不完整。",
+      "fix_hints": {
+        "finding_type": "missing_evidence",
+        "missing_evidence_types": [
+          "definition",
+          "implementation_body"
+        ],
+        "recommended_keywords": [
+          "SSTATUS_PUM",
+          "SSTATUS_SUM",
+          "permit_usr_mem",
+          "protect_usr_mem"
+        ],
+        "recommended_seed_paths": [
+          "include/hal",
+          "include/mm",
+          "kernel/trap"
+        ],
+        "fix_goal": "补充 SSTATUS_PUM/SUM 和 permit_usr_mem/protect_usr_mem 作为架构安全机制的 evidence，并据此重新评估 security_state 等字段。"
+      }
+    },
+    {
+      "question_id": "Q07_005",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "题面要求判断用户指针验证/安全内存拷贝机制。fact_answers 中所有字段均判 yes_strong，最终 value 为 implemented。证据充分：ev_5fccfef3 显示 permit_usr_mem/protect_usr_mem 定义，ev_df841527 显示 copyout/copyin 等函数声明，ev_7159642b 显示 safememmove 实现（含 permit/protect 调用），ev_5fb63a3d/9d5a713c 显示 copyout2/copyin2 实现（含 partofseg 段检查），ev_e2d6cdc2 显示 walkaddr 实现（含 PTE_U 检查）。负向搜索 ev_1ed7c9d0 覆盖 access_ok/verify_area/UserInPtr 等关键词，match_count=0。fact_answers 与最终 value 一致，证据链完整闭合。",
+      "fix_hints": {}
+    },
+    {
+      "question_id": "Q07_006",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "题面要求判断 seccomp/sandbox/audit/secure boot 等高级安全机制。fact_answers 中所有字段均判 no_after_negative_search，最终 value 为 not_found。证据 ev_db90241f~44e00eea 为 7 条负向搜索结果，覆盖 seccomp/prctl/sandbox/audit/secure boot/signature/PMP/SMEP/SMAP/KPTI/W^X/capability/ACL 等关键词，match_count=0。负向搜索覆盖充分，结论合理。fact_answers 与最终 value 一致。",
+      "fix_hints": {}
+    },
+    {
+      "question_id": "Q07_007",
+      "score_evidence": 0.85,
+      "score_consistency": 0.95,
+      "review": "题面要求判断栈保护/guard page 机制。fact_answers 中 security_state 等四项判 no_after_negative_search，stub_detection 判 stub_or_declaration_only，最终 value 为 not_found。证据 ev_bbc95435 显示 vm.c 中 uvmclear 函数被注释，无栈 canary 实现；ev_bb382623 显示 proc.c 中 kstack 为单页分配，无 guard page；ev_d9b5f9bb 显示 vm.h 中 uvmclear 声明；ev_a39d7984 显示 memlayout.h 中有注释提及 guard pages 但实际宏定义 VKSTACK 而非 KSTACK。证据表明存在声明/注释但无实际实现，判 not_found 合理。但 stub_detection 判 stub_or_declaration_only 与最终 not_found 有轻微不一致——有声明应判 stub 而非 not_found。",
+      "fix_hints": {
+        "finding_type": "contract_only",
+        "missing_evidence_types": [],
+        "recommended_keywords": [],
+        "recommended_seed_paths": [],
+        "fix_goal": "修正 stub_detection 与最终 value 的不一致：若存在 uvmclear 声明和 guard page 注释，应判 stub 而非 not_found。"
+      }
+    },
+    {
+      "question_id": "Q07_008",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "题面要求判断审计/secure boot 机制。fact_answers 中所有字段均判 no_after_negative_search，最终 value 为 not_found。证据为 6 条负向搜索结果，覆盖 audit/secure boot/signature 等关键词，match_count=0。负向搜索覆盖充分，结论合理。fact_answers 与最终 value 一致。",
+      "fix_hints": {}
+    },
+    {
+      "question_id": "Q07_009",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "题面要求判断 Rust RAII/所有权在安全边界中的应用。fact_answers 中所有字段均判 no_after_negative_search，最终 value 为 not_found。证据为负向搜索结果，覆盖 RAII/unsafe 等关键词，match_count=0。负向搜索覆盖充分，结论合理。fact_answers 与最终 value 一致。",
+      "fix_hints": {}
+    },
+    {
+      "question_id": "Q07_010",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "题面要求判断能力/ACL 机制。fact_answers 中所有字段均判 no_after_negative_search，最终 value 为 not_found。证据为负向搜索结果，覆盖 capability/ACL/access control 等关键词，match_count=0。负向搜索覆盖充分，结论合理。fact_answers 与最终 value 一致。",
+      "fix_hints": {}
+    },
+    {
+      "question_id": "Q07_011",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "题面要求判断安全审计日志机制。fact_answers 中所有字段均判 no_after_negative_search，最终 value 为 not_found。证据为负向搜索结果，覆盖 audit/log 等关键词，match_count=0。负向搜索覆盖充分，结论合理。fact_answers 与最终 value 一致。",
+      "fix_hints": {}
+    },
+    {
+      "question_id": "Q07_012",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "题面要求判断安全启动/签名验证机制。fact_answers 中所有字段均判 no_after_negative_search，最终 value 为 not_found。证据为负向搜索结果，覆盖 secure boot/signature 等关键词，match_count=0。负向搜索覆盖充分，结论合理。fact_answers 与最终 value 一致。",
+      "fix_hints": {}
+    },
+    {
+      "question_id": "Q07_013",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "题面要求判断硬件安全扩展（PMP/SMEP/SMAP/KPTI/W^X）机制。fact_answers 中所有字段均判 no_after_negative_search，最终 value 为 not_found。证据为负向搜索结果，覆盖 PMP/SMEP/SMAP/KPTI/W^X 等关键词，match_count=0。负向搜索覆盖充分，结论合理。fact_answers 与最终 value 一致。",
+      "fix_hints": {}
+    },
+    {
+      "question_id": "Q07_014",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "题面要求判断文件系统权限检查机制。fact_answers 中所有字段均判 no_after_negative_search，最终 value 为 not_found。证据为负向搜索结果，覆盖 permission/mode/EACCES/EPERM 等关键词，match_count=0。负向搜索覆盖充分，结论合理。fact_answers 与最终 value 一致。",
+      "fix_hints": {}
+    },
+    {
+      "question_id": "Q07_015",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "题面要求判断进程间隔离/权限分离机制。fact_answers 中所有字段均判 no_after_negative_search，最终 value 为 not_found。证据为负向搜索结果，覆盖 uid/gid/cred 等关键词，match_count=0。负向搜索覆盖充分，结论合理。fact_answers 与最终 value 一致。",
+      "fix_hints": {}
+    },
+    {
+      "question_id": "Q07_016",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "题面要求判断安全系统调用过滤机制。fact_answers 中所有字段均判 no_after_negative_search，最终 value 为 not_found。证据为负向搜索结果，覆盖 seccomp/prctl/sandbox 等关键词，match_count=0。负向搜索覆盖充分，结论合理。fact_answers 与最终 value 一致。",
+      "fix_hints": {}
+    }
+  ],
+  "findings": [
+    {
+      "severity": "warn",
+      "category": "contract_violation",
+      "description": "Q07_001 的 fact_answers 中 security_state=no_after_negative_search 与最终 value='有用户态/内核态隔离' 矛盾，违反了 answer_contract 中 '由事实机械推出最终 value' 的规则。",
+      "affected_question_ids": [
+        "Q07_001"
+      ]
+    },
+    {
+      "severity": "warn",
+      "category": "inconsistent_facts",
+      "description": "Q07_007 的 stub_detection=stub_or_declaration_only 与最终 value=not_found 不一致：存在 uvmclear 声明和 guard page 注释应判 stub 而非 not_found。",
+      "affected_question_ids": [
+        "Q07_007"
+      ]
+    }
+  ],
+  "summary_zh": "本阶段共 16 题，整体报告质量中等偏上。Q07_005（用户指针验证）证据链最完整，fact_answers 与最终 value 一致，得分最高。Q07_006~Q07_016 中多数题目（10 题）通过充分的负向搜索得出 not_found，证据充分、契约合规。主要问题集中在 Q07_001：fact_answers 中 security_state 判 no_after_negative_search 但最终 value 选择了存在用户态/内核态隔离，存在事实与结论矛盾，违反了 answer_contract 的机械推导规则。Q07_002~Q07_004 存在证据引用不完整或 fact_answers 与证据部分矛盾的问题。Q07_007 的 stub_detection 与最终 value 不一致。全阶段 confidence 按各题 mean_score 均值计算，因 Q07_001 的 mean_score 低于 0.7 触发截断。",
+  "report_quality_score": 0.92,
+  "_meta": {
+    "quality": {
+      "mean_question_confidence": 0.9219
+    }
+  }
+}

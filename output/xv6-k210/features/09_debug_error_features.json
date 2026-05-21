@@ -1,0 +1,3533 @@
+{
+  "stage_id": "09_debug_error",
+  "features": [
+    {
+      "feature_id": "feat_09_debug_error_q09_001",
+      "stage_id": "09_debug_error",
+      "domain": "debug_error_handling",
+      "feature_name": "Q09_001 是否存在日志系统（log/printk/println 宏）与日志级别控制？（必须三态）",
+      "description": "是否存在日志系统（log/printk/println 宏）与日志级别控制？（必须三态）",
+      "textbook_basis": [
+        {
+          "source": "OS diagnostics and maintainability practice",
+          "concepts": [
+            "logging",
+            "panic handling",
+            "error propagation",
+            "kernel monitor",
+            "debug stub",
+            "tracepoint"
+          ]
+        }
+      ],
+      "concept_boundary": "调试/错误处理题要区分普通日志、日志级别、panic 终止路径、栈回溯、内核监视器、GDB remote stub、tracepoint 和 errno/Error 传播。printf 不等于 GDB stub 或 tracing。",
+      "dependencies": [
+        "02_boot_trap",
+        "04_process_smp"
+      ],
+      "question_ids": [
+        "Q09_001"
+      ],
+      "tri_state_rule": {
+        "allowed_values": [
+          "implemented",
+          "stub",
+          "not_found",
+          "unknown"
+        ],
+        "feature_scope": "是否存在日志系统（log/printk/println 宏）与日志级别控制？（必须三态）",
+        "diagnostic_checks": [
+          "日志/错误/调试入口在哪里？",
+          "是否有级别、过滤、结构化事件或错误类型？",
+          "panic/backtrace/monitor/gdb/trace 是否有各自专门实现体？",
+          "是否接入 trap/syscall/sched/mm/fs 等主路径？",
+          "是否只是外部配置、用户态 shell 或普通打印？"
+        ],
+        "implemented": "必须有本题 Bound Evidence 中的强证据，且闭合核心结构、实现体、调用点或主路径；RAG/grep 不能单独支撑 implemented。",
+        "stub": "只有声明、接口壳、固定返回、ENOSYS/unsupported、todo/unimplemented、或未接入主路径时判 stub。",
+        "not_found": "必须完成 negative_search_policy 覆盖的关键词和目录搜索后仍未发现相关结构/实现体/调用点，才能判 not_found。",
+        "unknown": "证据弱、覆盖不足、事实冲突、或未完成全部关键事实时判 unknown。",
+        "required_reasoning": "逐项完成 structured_facts，再根据反例和证据强度给最终三态。",
+        "keywords": [
+          "log",
+          "printk",
+          "println",
+          "panic",
+          "backtrace",
+          "unwind",
+          "gdb",
+          "gdbstub",
+          "monitor",
+          "trace",
+          "ftrace",
+          "perf",
+          "errno",
+          "Error",
+          "Result"
+        ]
+      },
+      "required_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ],
+      "negative_search_policy": {
+        "keywords": [
+          "log",
+          "printk",
+          "println",
+          "panic",
+          "backtrace",
+          "unwind",
+          "gdb",
+          "gdbstub",
+          "monitor",
+          "trace",
+          "ftrace",
+          "perf",
+          "errno",
+          "Error",
+          "Result"
+        ],
+        "seed_paths": [
+          "kernel",
+          "debug",
+          "console",
+          "trap",
+          "syscall",
+          "include",
+          "Makefile"
+        ],
+        "minimum_keyword_coverage": 0.7,
+        "minimum_directory_coverage": 0.6
+      },
+      "anti_examples": [
+        "RAG/grep 命中名称但没有读取实现体，不能判 implemented。",
+        "只有 trait/struct/extern/宏名/常量定义，不能判 implemented。",
+        "只搜索一个关键词或一个目录，不能判 not_found。"
+      ],
+      "diagnostic_checks": [
+        "日志/错误/调试入口在哪里？",
+        "是否有级别、过滤、结构化事件或错误类型？",
+        "panic/backtrace/monitor/gdb/trace 是否有各自专门实现体？",
+        "是否接入 trap/syscall/sched/mm/fs 等主路径？",
+        "是否只是外部配置、用户态 shell 或普通打印？"
+      ],
+      "structured_facts": [
+        {
+          "fact_id": "Q09_001_01",
+          "fact_key": "debug_entry",
+          "kind": "definition",
+          "question": "围绕 debug_entry 收集可复现证据并判断其状态。",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "probe": {
+            "keywords": [],
+            "seed_paths": [],
+            "hint_tools": [
+              "rag_search_code",
+              "grep_in_repo"
+            ],
+            "strong_tools": [
+              "read_code_segment",
+              "lsp_get_definition",
+              "lsp_get_references",
+              "lsp_get_call_graph"
+            ]
+          },
+          "status_meaning": {
+            "yes_strong": "读取到定义/实现体/调用点/状态变化等强证据，可复现。",
+            "yes_weak": "只有 RAG/grep/outline/README 等线索，不能单独支撑 implemented。",
+            "stub_or_declaration_only": "只有声明、空实现、固定返回、ENOSYS/unsupported、todo/unimplemented 等占位形态。",
+            "no_after_negative_search": "按本题 negative_search_policy 覆盖关键词和目录后仍未发现。",
+            "unknown": "证据冲突、搜索覆盖不足或事实链未闭合。"
+          },
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q09_001_02",
+          "fact_key": "specialized_mechanism",
+          "kind": "implementation",
+          "question": "围绕 specialized_mechanism 收集可复现证据并判断其状态。",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "probe": {
+            "keywords": [],
+            "seed_paths": [],
+            "hint_tools": [
+              "rag_search_code",
+              "grep_in_repo"
+            ],
+            "strong_tools": [
+              "read_code_segment",
+              "lsp_get_definition",
+              "lsp_get_references",
+              "lsp_get_call_graph"
+            ]
+          },
+          "status_meaning": {
+            "yes_strong": "读取到定义/实现体/调用点/状态变化等强证据，可复现。",
+            "yes_weak": "只有 RAG/grep/outline/README 等线索，不能单独支撑 implemented。",
+            "stub_or_declaration_only": "只有声明、空实现、固定返回、ENOSYS/unsupported、todo/unimplemented 等占位形态。",
+            "no_after_negative_search": "按本题 negative_search_policy 覆盖关键词和目录后仍未发现。",
+            "unknown": "证据冲突、搜索覆盖不足或事实链未闭合。"
+          },
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q09_001_03",
+          "fact_key": "runtime_integration",
+          "kind": "usage_flow",
+          "question": "围绕 runtime_integration 收集可复现证据并判断其状态。",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "probe": {
+            "keywords": [],
+            "seed_paths": [],
+            "hint_tools": [
+              "rag_search_code",
+              "grep_in_repo"
+            ],
+            "strong_tools": [
+              "read_code_segment",
+              "lsp_get_definition",
+              "lsp_get_references",
+              "lsp_get_call_graph"
+            ]
+          },
+          "status_meaning": {
+            "yes_strong": "读取到定义/实现体/调用点/状态变化等强证据，可复现。",
+            "yes_weak": "只有 RAG/grep/outline/README 等线索，不能单独支撑 implemented。",
+            "stub_or_declaration_only": "只有声明、空实现、固定返回、ENOSYS/unsupported、todo/unimplemented 等占位形态。",
+            "no_after_negative_search": "按本题 negative_search_policy 覆盖关键词和目录后仍未发现。",
+            "unknown": "证据冲突、搜索覆盖不足或事实链未闭合。"
+          },
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q09_001_04",
+          "fact_key": "output_or_storage",
+          "kind": "implementation",
+          "question": "围绕 output_or_storage 收集可复现证据并判断其状态。",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "probe": {
+            "keywords": [],
+            "seed_paths": [],
+            "hint_tools": [
+              "rag_search_code",
+              "grep_in_repo"
+            ],
+            "strong_tools": [
+              "read_code_segment",
+              "lsp_get_definition",
+              "lsp_get_references",
+              "lsp_get_call_graph"
+            ]
+          },
+          "status_meaning": {
+            "yes_strong": "读取到定义/实现体/调用点/状态变化等强证据，可复现。",
+            "yes_weak": "只有 RAG/grep/outline/README 等线索，不能单独支撑 implemented。",
+            "stub_or_declaration_only": "只有声明、空实现、固定返回、ENOSYS/unsupported、todo/unimplemented 等占位形态。",
+            "no_after_negative_search": "按本题 negative_search_policy 覆盖关键词和目录后仍未发现。",
+            "unknown": "证据冲突、搜索覆盖不足或事实链未闭合。"
+          },
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q09_001_05",
+          "fact_key": "external_or_userland_boundary",
+          "kind": "classification",
+          "question": "围绕 external_or_userland_boundary 收集可复现证据并判断其状态。",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "probe": {
+            "keywords": [],
+            "seed_paths": [],
+            "hint_tools": [
+              "rag_search_code",
+              "grep_in_repo"
+            ],
+            "strong_tools": [
+              "read_code_segment",
+              "lsp_get_definition",
+              "lsp_get_references",
+              "lsp_get_call_graph"
+            ]
+          },
+          "status_meaning": {
+            "yes_strong": "读取到定义/实现体/调用点/状态变化等强证据，可复现。",
+            "yes_weak": "只有 RAG/grep/outline/README 等线索，不能单独支撑 implemented。",
+            "stub_or_declaration_only": "只有声明、空实现、固定返回、ENOSYS/unsupported、todo/unimplemented 等占位形态。",
+            "no_after_negative_search": "按本题 negative_search_policy 覆盖关键词和目录后仍未发现。",
+            "unknown": "证据冲突、搜索覆盖不足或事实链未闭合。"
+          },
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q09_001_06",
+          "fact_key": "negative_search_coverage",
+          "kind": "negative_search",
+          "question": "若关键事实未找到，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown/待核实，不能判 not_found。",
+          "answer_type": "object",
+          "fields": {
+            "searched_keywords": "array<string>",
+            "searched_directories": "array<string>",
+            "file_count": "integer",
+            "match_count": "integer",
+            "coverage_sufficient": "boolean"
+          },
+          "evidence_required": [
+            "negative_search"
+          ],
+          "probe": {
+            "keywords": [
+              "log",
+              "printk",
+              "println",
+              "panic",
+              "backtrace",
+              "unwind",
+              "gdb",
+              "gdbstub",
+              "monitor",
+              "trace",
+              "ftrace",
+              "perf",
+              "errno",
+              "Error",
+              "Result"
+            ],
+            "seed_paths": [
+              "kernel",
+              "debug",
+              "console",
+              "trap",
+              "syscall",
+              "include",
+              "Makefile"
+            ],
+            "hint_tools": [
+              "grep_in_repo",
+              "rag_search_code"
+            ],
+            "strong_tools": []
+          },
+          "conclusion_role": "required_for_not_found"
+        }
+      ],
+      "answer_contract": {
+        "mode": "structured_facts_first",
+        "final_field": "value",
+        "final_type": "enum",
+        "allowed_final_values": [
+          "implemented",
+          "stub",
+          "not_found",
+          "unknown"
+        ],
+        "required_fact_ids": [
+          "Q09_001_F01",
+          "Q09_001_F02",
+          "Q09_001_F03",
+          "Q09_001_F04",
+          "Q09_001_NEG"
+        ],
+        "evidence_reference": "evidence_id_only",
+        "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
+        "reproducibility_rule": "回答时先逐项给出 structured_facts 的 status/value 与 evidence_id，再由这些事实机械推出最终 value；缺少强证据时 final value 必须降级为 unknown/待核实。"
+      },
+      "graph_tags": [
+        "debug",
+        "panic",
+        "logging",
+        "error",
+        "tri_state_impl"
+      ],
+      "seed_paths": [
+        "debug",
+        "log",
+        "panic",
+        "error",
+        "kernel",
+        "os"
+      ],
+      "keywords": [
+        "panic",
+        "log",
+        "trace",
+        "backtrace",
+        "assert",
+        "errno",
+        "printk",
+        "println"
+      ]
+    },
+    {
+      "feature_id": "feat_09_debug_error_q09_002",
+      "stage_id": "09_debug_error",
+      "domain": "debug_error_handling",
+      "feature_name": "Q09_002 是否存在 panic/崩溃处理路径（panic_handler/oom/abort 等）？（必须三态）",
+      "description": "是否存在 panic/崩溃处理路径（panic_handler/oom/abort 等）？（必须三态）",
+      "textbook_basis": [
+        {
+          "source": "OS diagnostics and maintainability practice",
+          "concepts": [
+            "logging",
+            "panic handling",
+            "error propagation",
+            "kernel monitor",
+            "debug stub",
+            "tracepoint"
+          ]
+        }
+      ],
+      "concept_boundary": "调试/错误处理题要区分普通日志、日志级别、panic 终止路径、栈回溯、内核监视器、GDB remote stub、tracepoint 和 errno/Error 传播。printf 不等于 GDB stub 或 tracing。",
+      "dependencies": [
+        "02_boot_trap",
+        "04_process_smp"
+      ],
+      "question_ids": [
+        "Q09_002"
+      ],
+      "tri_state_rule": {
+        "allowed_values": [
+          "implemented",
+          "stub",
+          "not_found",
+          "unknown"
+        ],
+        "feature_scope": "是否存在 panic/崩溃处理路径（panic_handler/oom/abort 等）？（必须三态）",
+        "diagnostic_checks": [
+          "日志/错误/调试入口在哪里？",
+          "是否有级别、过滤、结构化事件或错误类型？",
+          "panic/backtrace/monitor/gdb/trace 是否有各自专门实现体？",
+          "是否接入 trap/syscall/sched/mm/fs 等主路径？",
+          "是否只是外部配置、用户态 shell 或普通打印？"
+        ],
+        "implemented": "必须有本题 Bound Evidence 中的强证据，且闭合核心结构、实现体、调用点或主路径；RAG/grep 不能单独支撑 implemented。",
+        "stub": "只有声明、接口壳、固定返回、ENOSYS/unsupported、todo/unimplemented、或未接入主路径时判 stub。",
+        "not_found": "必须完成 negative_search_policy 覆盖的关键词和目录搜索后仍未发现相关结构/实现体/调用点，才能判 not_found。",
+        "unknown": "证据弱、覆盖不足、事实冲突、或未完成全部关键事实时判 unknown。",
+        "required_reasoning": "逐项完成 structured_facts，再根据反例和证据强度给最终三态。",
+        "keywords": [
+          "log",
+          "printk",
+          "println",
+          "panic",
+          "backtrace",
+          "unwind",
+          "gdb",
+          "gdbstub",
+          "monitor",
+          "trace",
+          "ftrace",
+          "perf",
+          "errno",
+          "Error",
+          "Result"
+        ]
+      },
+      "required_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ],
+      "negative_search_policy": {
+        "keywords": [
+          "log",
+          "printk",
+          "println",
+          "panic",
+          "backtrace",
+          "unwind",
+          "gdb",
+          "gdbstub",
+          "monitor",
+          "trace",
+          "ftrace",
+          "perf",
+          "errno",
+          "Error",
+          "Result"
+        ],
+        "seed_paths": [
+          "kernel",
+          "debug",
+          "console",
+          "trap",
+          "syscall",
+          "include",
+          "Makefile"
+        ],
+        "minimum_keyword_coverage": 0.7,
+        "minimum_directory_coverage": 0.6
+      },
+      "anti_examples": [
+        "RAG/grep 命中名称但没有读取实现体，不能判 implemented。",
+        "只有 trait/struct/extern/宏名/常量定义，不能判 implemented。",
+        "只搜索一个关键词或一个目录，不能判 not_found。"
+      ],
+      "diagnostic_checks": [
+        "日志/错误/调试入口在哪里？",
+        "是否有级别、过滤、结构化事件或错误类型？",
+        "panic/backtrace/monitor/gdb/trace 是否有各自专门实现体？",
+        "是否接入 trap/syscall/sched/mm/fs 等主路径？",
+        "是否只是外部配置、用户态 shell 或普通打印？"
+      ],
+      "structured_facts": [
+        {
+          "fact_id": "Q09_002_01",
+          "fact_key": "debug_entry",
+          "kind": "definition",
+          "question": "围绕 debug_entry 收集可复现证据并判断其状态。",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "probe": {
+            "keywords": [],
+            "seed_paths": [],
+            "hint_tools": [
+              "rag_search_code",
+              "grep_in_repo"
+            ],
+            "strong_tools": [
+              "read_code_segment",
+              "lsp_get_definition",
+              "lsp_get_references",
+              "lsp_get_call_graph"
+            ]
+          },
+          "status_meaning": {
+            "yes_strong": "读取到定义/实现体/调用点/状态变化等强证据，可复现。",
+            "yes_weak": "只有 RAG/grep/outline/README 等线索，不能单独支撑 implemented。",
+            "stub_or_declaration_only": "只有声明、空实现、固定返回、ENOSYS/unsupported、todo/unimplemented 等占位形态。",
+            "no_after_negative_search": "按本题 negative_search_policy 覆盖关键词和目录后仍未发现。",
+            "unknown": "证据冲突、搜索覆盖不足或事实链未闭合。"
+          },
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q09_002_02",
+          "fact_key": "specialized_mechanism",
+          "kind": "implementation",
+          "question": "围绕 specialized_mechanism 收集可复现证据并判断其状态。",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "probe": {
+            "keywords": [],
+            "seed_paths": [],
+            "hint_tools": [
+              "rag_search_code",
+              "grep_in_repo"
+            ],
+            "strong_tools": [
+              "read_code_segment",
+              "lsp_get_definition",
+              "lsp_get_references",
+              "lsp_get_call_graph"
+            ]
+          },
+          "status_meaning": {
+            "yes_strong": "读取到定义/实现体/调用点/状态变化等强证据，可复现。",
+            "yes_weak": "只有 RAG/grep/outline/README 等线索，不能单独支撑 implemented。",
+            "stub_or_declaration_only": "只有声明、空实现、固定返回、ENOSYS/unsupported、todo/unimplemented 等占位形态。",
+            "no_after_negative_search": "按本题 negative_search_policy 覆盖关键词和目录后仍未发现。",
+            "unknown": "证据冲突、搜索覆盖不足或事实链未闭合。"
+          },
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q09_002_03",
+          "fact_key": "runtime_integration",
+          "kind": "usage_flow",
+          "question": "围绕 runtime_integration 收集可复现证据并判断其状态。",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "probe": {
+            "keywords": [],
+            "seed_paths": [],
+            "hint_tools": [
+              "rag_search_code",
+              "grep_in_repo"
+            ],
+            "strong_tools": [
+              "read_code_segment",
+              "lsp_get_definition",
+              "lsp_get_references",
+              "lsp_get_call_graph"
+            ]
+          },
+          "status_meaning": {
+            "yes_strong": "读取到定义/实现体/调用点/状态变化等强证据，可复现。",
+            "yes_weak": "只有 RAG/grep/outline/README 等线索，不能单独支撑 implemented。",
+            "stub_or_declaration_only": "只有声明、空实现、固定返回、ENOSYS/unsupported、todo/unimplemented 等占位形态。",
+            "no_after_negative_search": "按本题 negative_search_policy 覆盖关键词和目录后仍未发现。",
+            "unknown": "证据冲突、搜索覆盖不足或事实链未闭合。"
+          },
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q09_002_04",
+          "fact_key": "output_or_storage",
+          "kind": "implementation",
+          "question": "围绕 output_or_storage 收集可复现证据并判断其状态。",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "probe": {
+            "keywords": [],
+            "seed_paths": [],
+            "hint_tools": [
+              "rag_search_code",
+              "grep_in_repo"
+            ],
+            "strong_tools": [
+              "read_code_segment",
+              "lsp_get_definition",
+              "lsp_get_references",
+              "lsp_get_call_graph"
+            ]
+          },
+          "status_meaning": {
+            "yes_strong": "读取到定义/实现体/调用点/状态变化等强证据，可复现。",
+            "yes_weak": "只有 RAG/grep/outline/README 等线索，不能单独支撑 implemented。",
+            "stub_or_declaration_only": "只有声明、空实现、固定返回、ENOSYS/unsupported、todo/unimplemented 等占位形态。",
+            "no_after_negative_search": "按本题 negative_search_policy 覆盖关键词和目录后仍未发现。",
+            "unknown": "证据冲突、搜索覆盖不足或事实链未闭合。"
+          },
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q09_002_05",
+          "fact_key": "external_or_userland_boundary",
+          "kind": "classification",
+          "question": "围绕 external_or_userland_boundary 收集可复现证据并判断其状态。",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "probe": {
+            "keywords": [],
+            "seed_paths": [],
+            "hint_tools": [
+              "rag_search_code",
+              "grep_in_repo"
+            ],
+            "strong_tools": [
+              "read_code_segment",
+              "lsp_get_definition",
+              "lsp_get_references",
+              "lsp_get_call_graph"
+            ]
+          },
+          "status_meaning": {
+            "yes_strong": "读取到定义/实现体/调用点/状态变化等强证据，可复现。",
+            "yes_weak": "只有 RAG/grep/outline/README 等线索，不能单独支撑 implemented。",
+            "stub_or_declaration_only": "只有声明、空实现、固定返回、ENOSYS/unsupported、todo/unimplemented 等占位形态。",
+            "no_after_negative_search": "按本题 negative_search_policy 覆盖关键词和目录后仍未发现。",
+            "unknown": "证据冲突、搜索覆盖不足或事实链未闭合。"
+          },
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q09_002_06",
+          "fact_key": "negative_search_coverage",
+          "kind": "negative_search",
+          "question": "若关键事实未找到，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown/待核实，不能判 not_found。",
+          "answer_type": "object",
+          "fields": {
+            "searched_keywords": "array<string>",
+            "searched_directories": "array<string>",
+            "file_count": "integer",
+            "match_count": "integer",
+            "coverage_sufficient": "boolean"
+          },
+          "evidence_required": [
+            "negative_search"
+          ],
+          "probe": {
+            "keywords": [
+              "log",
+              "printk",
+              "println",
+              "panic",
+              "backtrace",
+              "unwind",
+              "gdb",
+              "gdbstub",
+              "monitor",
+              "trace",
+              "ftrace",
+              "perf",
+              "errno",
+              "Error",
+              "Result"
+            ],
+            "seed_paths": [
+              "kernel",
+              "debug",
+              "console",
+              "trap",
+              "syscall",
+              "include",
+              "Makefile"
+            ],
+            "hint_tools": [
+              "grep_in_repo",
+              "rag_search_code"
+            ],
+            "strong_tools": []
+          },
+          "conclusion_role": "required_for_not_found"
+        }
+      ],
+      "answer_contract": {
+        "mode": "structured_facts_first",
+        "final_field": "value",
+        "final_type": "enum",
+        "allowed_final_values": [
+          "implemented",
+          "stub",
+          "not_found",
+          "unknown"
+        ],
+        "required_fact_ids": [
+          "Q09_002_F01",
+          "Q09_002_F02",
+          "Q09_002_F03",
+          "Q09_002_F04",
+          "Q09_002_NEG"
+        ],
+        "evidence_reference": "evidence_id_only",
+        "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
+        "reproducibility_rule": "回答时先逐项给出 structured_facts 的 status/value 与 evidence_id，再由这些事实机械推出最终 value；缺少强证据时 final value 必须降级为 unknown/待核实。"
+      },
+      "graph_tags": [
+        "debug",
+        "panic",
+        "logging",
+        "error",
+        "tri_state_impl"
+      ],
+      "seed_paths": [
+        "debug",
+        "log",
+        "panic",
+        "error",
+        "kernel",
+        "os"
+      ],
+      "keywords": [
+        "panic",
+        "log",
+        "trace",
+        "backtrace",
+        "assert",
+        "errno",
+        "panic_handler",
+        "oom",
+        "abort"
+      ]
+    },
+    {
+      "feature_id": "feat_09_debug_error_q09_003",
+      "stage_id": "09_debug_error",
+      "domain": "debug_error_handling",
+      "feature_name": "Q09_003 panic 路径会输出哪些诊断？（寄存器 dump/栈回溯/停机；必须引用实现证据）",
+      "description": "panic 路径会输出哪些诊断？（寄存器 dump/栈回溯/停机；必须引用实现证据）",
+      "textbook_basis": [
+        {
+          "source": "OS diagnostics and maintainability practice",
+          "concepts": [
+            "logging",
+            "panic handling",
+            "error propagation",
+            "kernel monitor",
+            "debug stub",
+            "tracepoint"
+          ]
+        }
+      ],
+      "concept_boundary": "调试/错误处理题要区分普通日志、日志级别、panic 终止路径、栈回溯、内核监视器、GDB remote stub、tracepoint 和 errno/Error 传播。printf 不等于 GDB stub 或 tracing。",
+      "dependencies": [
+        "02_boot_trap",
+        "04_process_smp"
+      ],
+      "question_ids": [
+        "Q09_003"
+      ],
+      "tri_state_rule": {},
+      "required_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ],
+      "negative_search_policy": {
+        "keywords": [
+          "log",
+          "printk",
+          "println",
+          "panic",
+          "backtrace",
+          "unwind",
+          "gdb",
+          "gdbstub",
+          "monitor",
+          "trace",
+          "ftrace",
+          "perf",
+          "errno",
+          "Error",
+          "Result"
+        ],
+        "seed_paths": [
+          "kernel",
+          "debug",
+          "console",
+          "trap",
+          "syscall",
+          "include",
+          "Makefile"
+        ],
+        "minimum_keyword_coverage": 0.7,
+        "minimum_directory_coverage": 0.6
+      },
+      "anti_examples": [
+        "RAG/grep 命中名称但没有读取实现体，不能判 implemented。",
+        "只有 trait/struct/extern/宏名/常量定义，不能判 implemented。",
+        "只搜索一个关键词或一个目录，不能判 not_found。"
+      ],
+      "diagnostic_checks": [
+        "日志/错误/调试入口在哪里？",
+        "是否有级别、过滤、结构化事件或错误类型？",
+        "panic/backtrace/monitor/gdb/trace 是否有各自专门实现体？",
+        "是否接入 trap/syscall/sched/mm/fs 等主路径？",
+        "是否只是外部配置、用户态 shell 或普通打印？"
+      ],
+      "structured_facts": [
+        {
+          "fact_id": "Q09_003_01",
+          "fact_key": "debug_entry",
+          "kind": "definition",
+          "question": "围绕 debug_entry 收集可复现证据并判断其状态。",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "probe": {
+            "keywords": [],
+            "seed_paths": [],
+            "hint_tools": [
+              "rag_search_code",
+              "grep_in_repo"
+            ],
+            "strong_tools": [
+              "read_code_segment",
+              "lsp_get_definition",
+              "lsp_get_references",
+              "lsp_get_call_graph"
+            ]
+          },
+          "status_meaning": {
+            "yes_strong": "读取到定义/实现体/调用点/状态变化等强证据，可复现。",
+            "yes_weak": "只有 RAG/grep/outline/README 等线索，不能单独支撑 implemented。",
+            "stub_or_declaration_only": "只有声明、空实现、固定返回、ENOSYS/unsupported、todo/unimplemented 等占位形态。",
+            "no_after_negative_search": "按本题 negative_search_policy 覆盖关键词和目录后仍未发现。",
+            "unknown": "证据冲突、搜索覆盖不足或事实链未闭合。"
+          },
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q09_003_02",
+          "fact_key": "specialized_mechanism",
+          "kind": "implementation",
+          "question": "围绕 specialized_mechanism 收集可复现证据并判断其状态。",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "probe": {
+            "keywords": [],
+            "seed_paths": [],
+            "hint_tools": [
+              "rag_search_code",
+              "grep_in_repo"
+            ],
+            "strong_tools": [
+              "read_code_segment",
+              "lsp_get_definition",
+              "lsp_get_references",
+              "lsp_get_call_graph"
+            ]
+          },
+          "status_meaning": {
+            "yes_strong": "读取到定义/实现体/调用点/状态变化等强证据，可复现。",
+            "yes_weak": "只有 RAG/grep/outline/README 等线索，不能单独支撑 implemented。",
+            "stub_or_declaration_only": "只有声明、空实现、固定返回、ENOSYS/unsupported、todo/unimplemented 等占位形态。",
+            "no_after_negative_search": "按本题 negative_search_policy 覆盖关键词和目录后仍未发现。",
+            "unknown": "证据冲突、搜索覆盖不足或事实链未闭合。"
+          },
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q09_003_03",
+          "fact_key": "runtime_integration",
+          "kind": "usage_flow",
+          "question": "围绕 runtime_integration 收集可复现证据并判断其状态。",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "probe": {
+            "keywords": [],
+            "seed_paths": [],
+            "hint_tools": [
+              "rag_search_code",
+              "grep_in_repo"
+            ],
+            "strong_tools": [
+              "read_code_segment",
+              "lsp_get_definition",
+              "lsp_get_references",
+              "lsp_get_call_graph"
+            ]
+          },
+          "status_meaning": {
+            "yes_strong": "读取到定义/实现体/调用点/状态变化等强证据，可复现。",
+            "yes_weak": "只有 RAG/grep/outline/README 等线索，不能单独支撑 implemented。",
+            "stub_or_declaration_only": "只有声明、空实现、固定返回、ENOSYS/unsupported、todo/unimplemented 等占位形态。",
+            "no_after_negative_search": "按本题 negative_search_policy 覆盖关键词和目录后仍未发现。",
+            "unknown": "证据冲突、搜索覆盖不足或事实链未闭合。"
+          },
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q09_003_04",
+          "fact_key": "output_or_storage",
+          "kind": "implementation",
+          "question": "围绕 output_or_storage 收集可复现证据并判断其状态。",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "probe": {
+            "keywords": [],
+            "seed_paths": [],
+            "hint_tools": [
+              "rag_search_code",
+              "grep_in_repo"
+            ],
+            "strong_tools": [
+              "read_code_segment",
+              "lsp_get_definition",
+              "lsp_get_references",
+              "lsp_get_call_graph"
+            ]
+          },
+          "status_meaning": {
+            "yes_strong": "读取到定义/实现体/调用点/状态变化等强证据，可复现。",
+            "yes_weak": "只有 RAG/grep/outline/README 等线索，不能单独支撑 implemented。",
+            "stub_or_declaration_only": "只有声明、空实现、固定返回、ENOSYS/unsupported、todo/unimplemented 等占位形态。",
+            "no_after_negative_search": "按本题 negative_search_policy 覆盖关键词和目录后仍未发现。",
+            "unknown": "证据冲突、搜索覆盖不足或事实链未闭合。"
+          },
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q09_003_05",
+          "fact_key": "external_or_userland_boundary",
+          "kind": "classification",
+          "question": "围绕 external_or_userland_boundary 收集可复现证据并判断其状态。",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "probe": {
+            "keywords": [],
+            "seed_paths": [],
+            "hint_tools": [
+              "rag_search_code",
+              "grep_in_repo"
+            ],
+            "strong_tools": [
+              "read_code_segment",
+              "lsp_get_definition",
+              "lsp_get_references",
+              "lsp_get_call_graph"
+            ]
+          },
+          "status_meaning": {
+            "yes_strong": "读取到定义/实现体/调用点/状态变化等强证据，可复现。",
+            "yes_weak": "只有 RAG/grep/outline/README 等线索，不能单独支撑 implemented。",
+            "stub_or_declaration_only": "只有声明、空实现、固定返回、ENOSYS/unsupported、todo/unimplemented 等占位形态。",
+            "no_after_negative_search": "按本题 negative_search_policy 覆盖关键词和目录后仍未发现。",
+            "unknown": "证据冲突、搜索覆盖不足或事实链未闭合。"
+          },
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q09_003_06",
+          "fact_key": "negative_search_coverage",
+          "kind": "negative_search",
+          "question": "若关键事实未找到，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown/待核实，不能判 not_found。",
+          "answer_type": "object",
+          "fields": {
+            "searched_keywords": "array<string>",
+            "searched_directories": "array<string>",
+            "file_count": "integer",
+            "match_count": "integer",
+            "coverage_sufficient": "boolean"
+          },
+          "evidence_required": [
+            "negative_search"
+          ],
+          "probe": {
+            "keywords": [
+              "log",
+              "printk",
+              "println",
+              "panic",
+              "backtrace",
+              "unwind",
+              "gdb",
+              "gdbstub",
+              "monitor",
+              "trace",
+              "ftrace",
+              "perf",
+              "errno",
+              "Error",
+              "Result"
+            ],
+            "seed_paths": [
+              "kernel",
+              "debug",
+              "console",
+              "trap",
+              "syscall",
+              "include",
+              "Makefile"
+            ],
+            "hint_tools": [
+              "grep_in_repo",
+              "rag_search_code"
+            ],
+            "strong_tools": []
+          },
+          "conclusion_role": "required_for_not_found"
+        }
+      ],
+      "answer_contract": {
+        "mode": "structured_facts_first",
+        "final_field": "value",
+        "final_type": "fact_table",
+        "allowed_final_values": [],
+        "required_fact_ids": [
+          "Q09_003_F01",
+          "Q09_003_F02",
+          "Q09_003_F03",
+          "Q09_003_F04",
+          "Q09_003_SHAPE",
+          "Q09_003_NEG"
+        ],
+        "evidence_reference": "evidence_id_only",
+        "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
+        "reproducibility_rule": "回答时先逐项给出 structured_facts 的 status/value 与 evidence_id，再由这些事实机械推出最终 value；缺少强证据时 final value 必须降级为 unknown/待核实。"
+      },
+      "graph_tags": [
+        "debug",
+        "panic",
+        "logging",
+        "error",
+        "short_answer"
+      ],
+      "seed_paths": [
+        "debug",
+        "log",
+        "panic",
+        "error",
+        "kernel",
+        "os"
+      ],
+      "keywords": [
+        "panic",
+        "log",
+        "trace",
+        "backtrace",
+        "assert",
+        "errno",
+        "dump"
+      ]
+    },
+    {
+      "feature_id": "feat_09_debug_error_q09_004",
+      "stage_id": "09_debug_error",
+      "domain": "debug_error_handling",
+      "feature_name": "Q09_004 是否实现栈回溯 (backtrace/unwind/stack_trace)？（必须三态；仅打印 ra 不算）",
+      "description": "是否实现栈回溯 (backtrace/unwind/stack_trace)？（必须三态；仅打印 ra 不算）",
+      "textbook_basis": [
+        {
+          "source": "OS diagnostics and maintainability practice",
+          "concepts": [
+            "logging",
+            "panic handling",
+            "error propagation",
+            "kernel monitor",
+            "debug stub",
+            "tracepoint"
+          ]
+        }
+      ],
+      "concept_boundary": "调试/错误处理题要区分普通日志、日志级别、panic 终止路径、栈回溯、内核监视器、GDB remote stub、tracepoint 和 errno/Error 传播。printf 不等于 GDB stub 或 tracing。",
+      "dependencies": [
+        "02_boot_trap",
+        "04_process_smp"
+      ],
+      "question_ids": [
+        "Q09_004"
+      ],
+      "tri_state_rule": {
+        "allowed_values": [
+          "implemented",
+          "stub",
+          "not_found",
+          "unknown"
+        ],
+        "feature_scope": "是否实现栈回溯 (backtrace/unwind/stack_trace)？（必须三态；仅打印 ra 不算）",
+        "diagnostic_checks": [
+          "日志/错误/调试入口在哪里？",
+          "是否有级别、过滤、结构化事件或错误类型？",
+          "panic/backtrace/monitor/gdb/trace 是否有各自专门实现体？",
+          "是否接入 trap/syscall/sched/mm/fs 等主路径？",
+          "是否只是外部配置、用户态 shell 或普通打印？"
+        ],
+        "implemented": "必须有本题 Bound Evidence 中的强证据，且闭合核心结构、实现体、调用点或主路径；RAG/grep 不能单独支撑 implemented。",
+        "stub": "只有声明、接口壳、固定返回、ENOSYS/unsupported、todo/unimplemented、或未接入主路径时判 stub。",
+        "not_found": "必须完成 negative_search_policy 覆盖的关键词和目录搜索后仍未发现相关结构/实现体/调用点，才能判 not_found。",
+        "unknown": "证据弱、覆盖不足、事实冲突、或未完成全部关键事实时判 unknown。",
+        "required_reasoning": "逐项完成 structured_facts，再根据反例和证据强度给最终三态。",
+        "keywords": [
+          "log",
+          "printk",
+          "println",
+          "panic",
+          "backtrace",
+          "unwind",
+          "gdb",
+          "gdbstub",
+          "monitor",
+          "trace",
+          "ftrace",
+          "perf",
+          "errno",
+          "Error",
+          "Result"
+        ]
+      },
+      "required_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ],
+      "negative_search_policy": {
+        "keywords": [
+          "log",
+          "printk",
+          "println",
+          "panic",
+          "backtrace",
+          "unwind",
+          "gdb",
+          "gdbstub",
+          "monitor",
+          "trace",
+          "ftrace",
+          "perf",
+          "errno",
+          "Error",
+          "Result"
+        ],
+        "seed_paths": [
+          "kernel",
+          "debug",
+          "console",
+          "trap",
+          "syscall",
+          "include",
+          "Makefile"
+        ],
+        "minimum_keyword_coverage": 0.7,
+        "minimum_directory_coverage": 0.6
+      },
+      "anti_examples": [
+        "RAG/grep 命中名称但没有读取实现体，不能判 implemented。",
+        "只有 trait/struct/extern/宏名/常量定义，不能判 implemented。",
+        "只搜索一个关键词或一个目录，不能判 not_found。"
+      ],
+      "diagnostic_checks": [
+        "日志/错误/调试入口在哪里？",
+        "是否有级别、过滤、结构化事件或错误类型？",
+        "panic/backtrace/monitor/gdb/trace 是否有各自专门实现体？",
+        "是否接入 trap/syscall/sched/mm/fs 等主路径？",
+        "是否只是外部配置、用户态 shell 或普通打印？"
+      ],
+      "structured_facts": [
+        {
+          "fact_id": "Q09_004_01",
+          "fact_key": "debug_entry",
+          "kind": "definition",
+          "question": "围绕 debug_entry 收集可复现证据并判断其状态。",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "probe": {
+            "keywords": [],
+            "seed_paths": [],
+            "hint_tools": [
+              "rag_search_code",
+              "grep_in_repo"
+            ],
+            "strong_tools": [
+              "read_code_segment",
+              "lsp_get_definition",
+              "lsp_get_references",
+              "lsp_get_call_graph"
+            ]
+          },
+          "status_meaning": {
+            "yes_strong": "读取到定义/实现体/调用点/状态变化等强证据，可复现。",
+            "yes_weak": "只有 RAG/grep/outline/README 等线索，不能单独支撑 implemented。",
+            "stub_or_declaration_only": "只有声明、空实现、固定返回、ENOSYS/unsupported、todo/unimplemented 等占位形态。",
+            "no_after_negative_search": "按本题 negative_search_policy 覆盖关键词和目录后仍未发现。",
+            "unknown": "证据冲突、搜索覆盖不足或事实链未闭合。"
+          },
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q09_004_02",
+          "fact_key": "specialized_mechanism",
+          "kind": "implementation",
+          "question": "围绕 specialized_mechanism 收集可复现证据并判断其状态。",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "probe": {
+            "keywords": [],
+            "seed_paths": [],
+            "hint_tools": [
+              "rag_search_code",
+              "grep_in_repo"
+            ],
+            "strong_tools": [
+              "read_code_segment",
+              "lsp_get_definition",
+              "lsp_get_references",
+              "lsp_get_call_graph"
+            ]
+          },
+          "status_meaning": {
+            "yes_strong": "读取到定义/实现体/调用点/状态变化等强证据，可复现。",
+            "yes_weak": "只有 RAG/grep/outline/README 等线索，不能单独支撑 implemented。",
+            "stub_or_declaration_only": "只有声明、空实现、固定返回、ENOSYS/unsupported、todo/unimplemented 等占位形态。",
+            "no_after_negative_search": "按本题 negative_search_policy 覆盖关键词和目录后仍未发现。",
+            "unknown": "证据冲突、搜索覆盖不足或事实链未闭合。"
+          },
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q09_004_03",
+          "fact_key": "runtime_integration",
+          "kind": "usage_flow",
+          "question": "围绕 runtime_integration 收集可复现证据并判断其状态。",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "probe": {
+            "keywords": [],
+            "seed_paths": [],
+            "hint_tools": [
+              "rag_search_code",
+              "grep_in_repo"
+            ],
+            "strong_tools": [
+              "read_code_segment",
+              "lsp_get_definition",
+              "lsp_get_references",
+              "lsp_get_call_graph"
+            ]
+          },
+          "status_meaning": {
+            "yes_strong": "读取到定义/实现体/调用点/状态变化等强证据，可复现。",
+            "yes_weak": "只有 RAG/grep/outline/README 等线索，不能单独支撑 implemented。",
+            "stub_or_declaration_only": "只有声明、空实现、固定返回、ENOSYS/unsupported、todo/unimplemented 等占位形态。",
+            "no_after_negative_search": "按本题 negative_search_policy 覆盖关键词和目录后仍未发现。",
+            "unknown": "证据冲突、搜索覆盖不足或事实链未闭合。"
+          },
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q09_004_04",
+          "fact_key": "output_or_storage",
+          "kind": "implementation",
+          "question": "围绕 output_or_storage 收集可复现证据并判断其状态。",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "probe": {
+            "keywords": [],
+            "seed_paths": [],
+            "hint_tools": [
+              "rag_search_code",
+              "grep_in_repo"
+            ],
+            "strong_tools": [
+              "read_code_segment",
+              "lsp_get_definition",
+              "lsp_get_references",
+              "lsp_get_call_graph"
+            ]
+          },
+          "status_meaning": {
+            "yes_strong": "读取到定义/实现体/调用点/状态变化等强证据，可复现。",
+            "yes_weak": "只有 RAG/grep/outline/README 等线索，不能单独支撑 implemented。",
+            "stub_or_declaration_only": "只有声明、空实现、固定返回、ENOSYS/unsupported、todo/unimplemented 等占位形态。",
+            "no_after_negative_search": "按本题 negative_search_policy 覆盖关键词和目录后仍未发现。",
+            "unknown": "证据冲突、搜索覆盖不足或事实链未闭合。"
+          },
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q09_004_05",
+          "fact_key": "external_or_userland_boundary",
+          "kind": "classification",
+          "question": "围绕 external_or_userland_boundary 收集可复现证据并判断其状态。",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "probe": {
+            "keywords": [],
+            "seed_paths": [],
+            "hint_tools": [
+              "rag_search_code",
+              "grep_in_repo"
+            ],
+            "strong_tools": [
+              "read_code_segment",
+              "lsp_get_definition",
+              "lsp_get_references",
+              "lsp_get_call_graph"
+            ]
+          },
+          "status_meaning": {
+            "yes_strong": "读取到定义/实现体/调用点/状态变化等强证据，可复现。",
+            "yes_weak": "只有 RAG/grep/outline/README 等线索，不能单独支撑 implemented。",
+            "stub_or_declaration_only": "只有声明、空实现、固定返回、ENOSYS/unsupported、todo/unimplemented 等占位形态。",
+            "no_after_negative_search": "按本题 negative_search_policy 覆盖关键词和目录后仍未发现。",
+            "unknown": "证据冲突、搜索覆盖不足或事实链未闭合。"
+          },
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q09_004_06",
+          "fact_key": "negative_search_coverage",
+          "kind": "negative_search",
+          "question": "若关键事实未找到，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown/待核实，不能判 not_found。",
+          "answer_type": "object",
+          "fields": {
+            "searched_keywords": "array<string>",
+            "searched_directories": "array<string>",
+            "file_count": "integer",
+            "match_count": "integer",
+            "coverage_sufficient": "boolean"
+          },
+          "evidence_required": [
+            "negative_search"
+          ],
+          "probe": {
+            "keywords": [
+              "log",
+              "printk",
+              "println",
+              "panic",
+              "backtrace",
+              "unwind",
+              "gdb",
+              "gdbstub",
+              "monitor",
+              "trace",
+              "ftrace",
+              "perf",
+              "errno",
+              "Error",
+              "Result"
+            ],
+            "seed_paths": [
+              "kernel",
+              "debug",
+              "console",
+              "trap",
+              "syscall",
+              "include",
+              "Makefile"
+            ],
+            "hint_tools": [
+              "grep_in_repo",
+              "rag_search_code"
+            ],
+            "strong_tools": []
+          },
+          "conclusion_role": "required_for_not_found"
+        }
+      ],
+      "answer_contract": {
+        "mode": "structured_facts_first",
+        "final_field": "value",
+        "final_type": "enum",
+        "allowed_final_values": [
+          "implemented",
+          "stub",
+          "not_found",
+          "unknown"
+        ],
+        "required_fact_ids": [
+          "Q09_004_F01",
+          "Q09_004_F02",
+          "Q09_004_F03",
+          "Q09_004_F04",
+          "Q09_004_NEG"
+        ],
+        "evidence_reference": "evidence_id_only",
+        "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
+        "reproducibility_rule": "回答时先逐项给出 structured_facts 的 status/value 与 evidence_id，再由这些事实机械推出最终 value；缺少强证据时 final value 必须降级为 unknown/待核实。"
+      },
+      "graph_tags": [
+        "debug",
+        "panic",
+        "logging",
+        "error",
+        "tri_state_impl"
+      ],
+      "seed_paths": [
+        "debug",
+        "log",
+        "panic",
+        "error",
+        "kernel",
+        "os"
+      ],
+      "keywords": [
+        "panic",
+        "log",
+        "trace",
+        "backtrace",
+        "assert",
+        "errno",
+        "unwind",
+        "stack_trace"
+      ]
+    },
+    {
+      "feature_id": "feat_09_debug_error_q09_005",
+      "stage_id": "09_debug_error",
+      "domain": "debug_error_handling",
+      "feature_name": "Q09_005 是否存在 **内核驻留的交互式调试监视器（kernel debug monitor）**？（本题指内核态命令解释器/调试控制台；不要与 Stallings Ch5 的 Monitor/Condition Variable 同步构造混淆；不包括仅在用户态运行的常规 shell。必须三态；若 implemented，须给出 3-10 个用户可键入的 monitor 命令名及对应内核内解析/分发入口证据。）",
+      "description": "是否存在 **内核驻留的交互式调试监视器（kernel debug monitor）**？（本题指内核态命令解释器/调试控制台；不要与 Stallings Ch5 的 Monitor/Condition Variable 同步构造混淆；不包括仅在用户态运行的常规 shell。必须三态；若 implemented，须给出 3-10 个用户可键入的 monitor 命令名及对应内核内解析/分发入口证据。）",
+      "textbook_basis": [
+        {
+          "source": "OS diagnostics/debugging practice; distinction from Stallings Ch5 Monitor synchronization primitive",
+          "concepts": [
+            "kernel debug monitor",
+            "debug console",
+            "command dispatch",
+            "not monitor synchronization"
+          ]
+        }
+      ],
+      "concept_boundary": "本题的 kernel debug monitor 是内核调试控制台/命令解释器，不是 Stallings Ch5 的 monitor 同步原语。implemented 必须有内核态命令解析循环、命令分发表和至少若干命令处理函数；用户态 shell、GDB 脚本或 README 调试说明不能替代。",
+      "dependencies": [
+        "02_boot_trap",
+        "04_process_smp"
+      ],
+      "question_ids": [
+        "Q09_005"
+      ],
+      "tri_state_rule": {
+        "allowed_values": [
+          "implemented",
+          "stub",
+          "not_found",
+          "unknown"
+        ],
+        "feature_scope": "是否存在 **内核驻留的交互式调试监视器（kernel debug monitor）**？（本题指内核态命令解释器/调试控制台；不要与 Stallings Ch5 的 Monitor/Condition Variable 同步构造混淆；不包括仅在用户态运行的常规 shell。必须三态；若 implemented，须给出 3-10 个用户可键入的 monitor 命令名及对应内核内解析/分发入口证据。）",
+        "diagnostic_checks": [
+          "日志/错误/调试入口在哪里？",
+          "是否有级别、过滤、结构化事件或错误类型？",
+          "panic/backtrace/monitor/gdb/trace 是否有各自专门实现体？",
+          "是否接入 trap/syscall/sched/mm/fs 等主路径？",
+          "是否只是外部配置、用户态 shell 或普通打印？"
+        ],
+        "implemented": "必须有本题 Bound Evidence 中的强证据，且闭合核心结构、实现体、调用点或主路径；RAG/grep 不能单独支撑 implemented。",
+        "stub": "只有声明、接口壳、固定返回、ENOSYS/unsupported、todo/unimplemented、或未接入主路径时判 stub。",
+        "not_found": "必须完成 negative_search_policy 覆盖的关键词和目录搜索后仍未发现相关结构/实现体/调用点，才能判 not_found。",
+        "unknown": "证据弱、覆盖不足、事实冲突、或未完成全部关键事实时判 unknown。",
+        "required_reasoning": "逐项完成 structured_facts，再根据反例和证据强度给最终三态。",
+        "keywords": [
+          "log",
+          "printk",
+          "println",
+          "panic",
+          "backtrace",
+          "unwind",
+          "gdb",
+          "gdbstub",
+          "monitor",
+          "trace",
+          "ftrace",
+          "perf",
+          "errno",
+          "Error",
+          "Result"
+        ]
+      },
+      "required_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ],
+      "negative_search_policy": {
+        "keywords": [
+          "log",
+          "printk",
+          "println",
+          "panic",
+          "backtrace",
+          "unwind",
+          "gdb",
+          "gdbstub",
+          "monitor",
+          "trace",
+          "ftrace",
+          "perf",
+          "errno",
+          "Error",
+          "Result"
+        ],
+        "seed_paths": [
+          "kernel",
+          "debug",
+          "console",
+          "trap",
+          "syscall",
+          "include",
+          "Makefile"
+        ],
+        "minimum_keyword_coverage": 0.7,
+        "minimum_directory_coverage": 0.6
+      },
+      "anti_examples": [
+        "RAG/grep 命中名称但没有读取实现体，不能判 implemented。",
+        "只有 trait/struct/extern/宏名/常量定义，不能判 implemented。",
+        "只搜索一个关键词或一个目录，不能判 not_found。"
+      ],
+      "diagnostic_checks": [
+        "日志/错误/调试入口在哪里？",
+        "是否有级别、过滤、结构化事件或错误类型？",
+        "panic/backtrace/monitor/gdb/trace 是否有各自专门实现体？",
+        "是否接入 trap/syscall/sched/mm/fs 等主路径？",
+        "是否只是外部配置、用户态 shell 或普通打印？"
+      ],
+      "structured_facts": [
+        {
+          "fact_id": "Q09_005_01",
+          "fact_key": "debug_entry",
+          "kind": "definition",
+          "question": "围绕 debug_entry 收集可复现证据并判断其状态。",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "probe": {
+            "keywords": [],
+            "seed_paths": [],
+            "hint_tools": [
+              "rag_search_code",
+              "grep_in_repo"
+            ],
+            "strong_tools": [
+              "read_code_segment",
+              "lsp_get_definition",
+              "lsp_get_references",
+              "lsp_get_call_graph"
+            ]
+          },
+          "status_meaning": {
+            "yes_strong": "读取到定义/实现体/调用点/状态变化等强证据，可复现。",
+            "yes_weak": "只有 RAG/grep/outline/README 等线索，不能单独支撑 implemented。",
+            "stub_or_declaration_only": "只有声明、空实现、固定返回、ENOSYS/unsupported、todo/unimplemented 等占位形态。",
+            "no_after_negative_search": "按本题 negative_search_policy 覆盖关键词和目录后仍未发现。",
+            "unknown": "证据冲突、搜索覆盖不足或事实链未闭合。"
+          },
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q09_005_02",
+          "fact_key": "specialized_mechanism",
+          "kind": "implementation",
+          "question": "围绕 specialized_mechanism 收集可复现证据并判断其状态。",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "probe": {
+            "keywords": [],
+            "seed_paths": [],
+            "hint_tools": [
+              "rag_search_code",
+              "grep_in_repo"
+            ],
+            "strong_tools": [
+              "read_code_segment",
+              "lsp_get_definition",
+              "lsp_get_references",
+              "lsp_get_call_graph"
+            ]
+          },
+          "status_meaning": {
+            "yes_strong": "读取到定义/实现体/调用点/状态变化等强证据，可复现。",
+            "yes_weak": "只有 RAG/grep/outline/README 等线索，不能单独支撑 implemented。",
+            "stub_or_declaration_only": "只有声明、空实现、固定返回、ENOSYS/unsupported、todo/unimplemented 等占位形态。",
+            "no_after_negative_search": "按本题 negative_search_policy 覆盖关键词和目录后仍未发现。",
+            "unknown": "证据冲突、搜索覆盖不足或事实链未闭合。"
+          },
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q09_005_03",
+          "fact_key": "runtime_integration",
+          "kind": "usage_flow",
+          "question": "围绕 runtime_integration 收集可复现证据并判断其状态。",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "probe": {
+            "keywords": [],
+            "seed_paths": [],
+            "hint_tools": [
+              "rag_search_code",
+              "grep_in_repo"
+            ],
+            "strong_tools": [
+              "read_code_segment",
+              "lsp_get_definition",
+              "lsp_get_references",
+              "lsp_get_call_graph"
+            ]
+          },
+          "status_meaning": {
+            "yes_strong": "读取到定义/实现体/调用点/状态变化等强证据，可复现。",
+            "yes_weak": "只有 RAG/grep/outline/README 等线索，不能单独支撑 implemented。",
+            "stub_or_declaration_only": "只有声明、空实现、固定返回、ENOSYS/unsupported、todo/unimplemented 等占位形态。",
+            "no_after_negative_search": "按本题 negative_search_policy 覆盖关键词和目录后仍未发现。",
+            "unknown": "证据冲突、搜索覆盖不足或事实链未闭合。"
+          },
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q09_005_04",
+          "fact_key": "output_or_storage",
+          "kind": "implementation",
+          "question": "围绕 output_or_storage 收集可复现证据并判断其状态。",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "probe": {
+            "keywords": [],
+            "seed_paths": [],
+            "hint_tools": [
+              "rag_search_code",
+              "grep_in_repo"
+            ],
+            "strong_tools": [
+              "read_code_segment",
+              "lsp_get_definition",
+              "lsp_get_references",
+              "lsp_get_call_graph"
+            ]
+          },
+          "status_meaning": {
+            "yes_strong": "读取到定义/实现体/调用点/状态变化等强证据，可复现。",
+            "yes_weak": "只有 RAG/grep/outline/README 等线索，不能单独支撑 implemented。",
+            "stub_or_declaration_only": "只有声明、空实现、固定返回、ENOSYS/unsupported、todo/unimplemented 等占位形态。",
+            "no_after_negative_search": "按本题 negative_search_policy 覆盖关键词和目录后仍未发现。",
+            "unknown": "证据冲突、搜索覆盖不足或事实链未闭合。"
+          },
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q09_005_05",
+          "fact_key": "external_or_userland_boundary",
+          "kind": "classification",
+          "question": "围绕 external_or_userland_boundary 收集可复现证据并判断其状态。",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "probe": {
+            "keywords": [],
+            "seed_paths": [],
+            "hint_tools": [
+              "rag_search_code",
+              "grep_in_repo"
+            ],
+            "strong_tools": [
+              "read_code_segment",
+              "lsp_get_definition",
+              "lsp_get_references",
+              "lsp_get_call_graph"
+            ]
+          },
+          "status_meaning": {
+            "yes_strong": "读取到定义/实现体/调用点/状态变化等强证据，可复现。",
+            "yes_weak": "只有 RAG/grep/outline/README 等线索，不能单独支撑 implemented。",
+            "stub_or_declaration_only": "只有声明、空实现、固定返回、ENOSYS/unsupported、todo/unimplemented 等占位形态。",
+            "no_after_negative_search": "按本题 negative_search_policy 覆盖关键词和目录后仍未发现。",
+            "unknown": "证据冲突、搜索覆盖不足或事实链未闭合。"
+          },
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q09_005_06",
+          "fact_key": "negative_search_coverage",
+          "kind": "negative_search",
+          "question": "若关键事实未找到，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown/待核实，不能判 not_found。",
+          "answer_type": "object",
+          "fields": {
+            "searched_keywords": "array<string>",
+            "searched_directories": "array<string>",
+            "file_count": "integer",
+            "match_count": "integer",
+            "coverage_sufficient": "boolean"
+          },
+          "evidence_required": [
+            "negative_search"
+          ],
+          "probe": {
+            "keywords": [
+              "log",
+              "printk",
+              "println",
+              "panic",
+              "backtrace",
+              "unwind",
+              "gdb",
+              "gdbstub",
+              "monitor",
+              "trace",
+              "ftrace",
+              "perf",
+              "errno",
+              "Error",
+              "Result"
+            ],
+            "seed_paths": [
+              "kernel",
+              "debug",
+              "console",
+              "trap",
+              "syscall",
+              "include",
+              "Makefile"
+            ],
+            "hint_tools": [
+              "grep_in_repo",
+              "rag_search_code"
+            ],
+            "strong_tools": []
+          },
+          "conclusion_role": "required_for_not_found"
+        }
+      ],
+      "answer_contract": {
+        "mode": "structured_facts_first",
+        "final_field": "value",
+        "final_type": "enum",
+        "allowed_final_values": [
+          "implemented",
+          "stub",
+          "not_found",
+          "unknown"
+        ],
+        "required_fact_ids": [
+          "Q09_005_F01",
+          "Q09_005_F02",
+          "Q09_005_F03",
+          "Q09_005_F04",
+          "Q09_005_F05",
+          "Q09_005_NEG"
+        ],
+        "evidence_reference": "evidence_id_only",
+        "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
+        "reproducibility_rule": "回答时先逐项给出 structured_facts 的 status/value 与 evidence_id，再由这些事实机械推出最终 value；缺少强证据时 final value 必须降级为 unknown/待核实。"
+      },
+      "graph_tags": [
+        "debug",
+        "panic",
+        "logging",
+        "error",
+        "tri_state_impl"
+      ],
+      "seed_paths": [
+        "debug",
+        "log",
+        "panic",
+        "error",
+        "kernel",
+        "os"
+      ],
+      "keywords": [
+        "panic",
+        "log",
+        "trace",
+        "backtrace",
+        "assert",
+        "errno",
+        "kernel",
+        "monitor",
+        "Stallings",
+        "shell",
+        "xv6-user",
+        "user",
+        "implemented",
+        "stub",
+        "not_found",
+        "入口"
+      ]
+    },
+    {
+      "feature_id": "feat_09_debug_error_q09_006",
+      "stage_id": "09_debug_error",
+      "domain": "debug_error_handling",
+      "feature_name": "Q09_006 是否实现 GDB stub（需数据包解析循环，如 handle_gdb_packet）？（必须三态）",
+      "description": "是否实现 GDB stub（需数据包解析循环，如 handle_gdb_packet）？（必须三态）",
+      "textbook_basis": [
+        {
+          "source": "OS diagnostics and maintainability practice",
+          "concepts": [
+            "logging",
+            "panic handling",
+            "error propagation",
+            "kernel monitor",
+            "debug stub",
+            "tracepoint"
+          ]
+        }
+      ],
+      "concept_boundary": "GDB stub 需要内核侧 Remote Serial Protocol 数据包解析循环和寄存器/内存/继续/单步等命令处理；仅有 GDB 调试脚本、OpenOCD 配置或 Makefile gdb 目标不算内核 GDB stub。",
+      "dependencies": [
+        "02_boot_trap",
+        "04_process_smp"
+      ],
+      "question_ids": [
+        "Q09_006"
+      ],
+      "tri_state_rule": {
+        "allowed_values": [
+          "implemented",
+          "stub",
+          "not_found",
+          "unknown"
+        ],
+        "feature_scope": "是否实现 GDB stub（需数据包解析循环，如 handle_gdb_packet）？（必须三态）",
+        "diagnostic_checks": [
+          "内核源码中是否有 GDB/RSP packet 接收解析循环？",
+          "是否解析 $...#checksum 并校验 checksum/ack？",
+          "是否处理读寄存器 g、读内存 m、继续 c、单步 s、断点 Z 等命令？",
+          "trap/breakpoint/exception 是否进入 stub？",
+          "若只有 debug/gdbinit/OpenOCD 配置，应判 not_found 或 stub。"
+        ],
+        "implemented": "必须有本题 Bound Evidence 中的强证据，且闭合核心结构、实现体、调用点或主路径；RAG/grep 不能单独支撑 implemented。",
+        "stub": "只有声明、接口壳、固定返回、ENOSYS/unsupported、todo/unimplemented、或未接入主路径时判 stub。",
+        "not_found": "必须完成 negative_search_policy 覆盖的关键词和目录搜索后仍未发现相关结构/实现体/调用点，才能判 not_found。",
+        "unknown": "证据弱、覆盖不足、事实冲突、或未完成全部关键事实时判 unknown。",
+        "required_reasoning": "逐项完成 structured_facts，再根据反例和证据强度给最终三态。",
+        "keywords": [
+          "gdb",
+          "gdbstub",
+          "remote serial protocol",
+          "RSP",
+          "handle_gdb_packet",
+          "$m",
+          "$g",
+          "$c",
+          "$s",
+          "breakpoint",
+          "qSupported"
+        ]
+      },
+      "required_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ],
+      "negative_search_policy": {
+        "keywords": [
+          "gdb",
+          "gdbstub",
+          "remote serial protocol",
+          "RSP",
+          "handle_gdb_packet",
+          "$m",
+          "$g",
+          "$c",
+          "$s",
+          "breakpoint",
+          "qSupported"
+        ],
+        "seed_paths": [
+          "kernel",
+          "debug",
+          "gdb",
+          "console",
+          "driver",
+          "trap",
+          "include"
+        ],
+        "minimum_keyword_coverage": 0.7,
+        "minimum_directory_coverage": 0.6
+      },
+      "anti_examples": [
+        "RAG/grep 命中名称但没有读取实现体，不能判 implemented。",
+        "只有 trait/struct/extern/宏名/常量定义，不能判 implemented。",
+        "只搜索一个关键词或一个目录，不能判 not_found。"
+      ],
+      "diagnostic_checks": [
+        "内核源码中是否有 GDB/RSP packet 接收解析循环？",
+        "是否解析 $...#checksum 并校验 checksum/ack？",
+        "是否处理读寄存器 g、读内存 m、继续 c、单步 s、断点 Z 等命令？",
+        "trap/breakpoint/exception 是否进入 stub？",
+        "若只有 debug/gdbinit/OpenOCD 配置，应判 not_found 或 stub。"
+      ],
+      "structured_facts": [
+        {
+          "fact_id": "Q09_006_01",
+          "fact_key": "packet_loop",
+          "kind": "definition",
+          "question": "内核源码中是否有 GDB/RSP packet 接收解析循环？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "probe": {
+            "keywords": [
+              "gdb",
+              "gdbstub",
+              "remote serial protocol",
+              "RSP",
+              "handle_gdb_packet",
+              "$m",
+              "$g",
+              "$c",
+              "$s",
+              "breakpoint",
+              "qSupported"
+            ],
+            "seed_paths": [
+              "kernel",
+              "debug",
+              "gdb",
+              "console",
+              "driver",
+              "trap",
+              "include"
+            ],
+            "hint_tools": [
+              "rag_search_code",
+              "grep_in_repo"
+            ],
+            "strong_tools": [
+              "read_code_segment",
+              "lsp_get_definition",
+              "lsp_get_references",
+              "lsp_get_call_graph"
+            ]
+          },
+          "status_meaning": {
+            "yes_strong": "读取到定义/实现体/调用点/状态变化等强证据，可复现。",
+            "yes_weak": "只有 RAG/grep/outline/README 等线索，不能单独支撑 implemented。",
+            "stub_or_declaration_only": "只有声明、空实现、固定返回、ENOSYS/unsupported、todo/unimplemented 等占位形态。",
+            "no_after_negative_search": "按本题 negative_search_policy 覆盖关键词和目录后仍未发现。",
+            "unknown": "证据冲突、搜索覆盖不足或事实链未闭合。"
+          },
+          "conclusion_role": "required_for_implemented_or_stub"
+        },
+        {
+          "fact_id": "Q09_006_02",
+          "fact_key": "checksum_ack",
+          "kind": "implementation",
+          "question": "是否解析 $...#checksum 并校验 checksum/ack？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "probe": {
+            "keywords": [
+              "gdb",
+              "gdbstub",
+              "remote serial protocol",
+              "RSP",
+              "handle_gdb_packet",
+              "$m",
+              "$g",
+              "$c",
+              "$s",
+              "breakpoint",
+              "qSupported"
+            ],
+            "seed_paths": [
+              "kernel",
+              "debug",
+              "gdb",
+              "console",
+              "driver",
+              "trap",
+              "include"
+            ],
+            "hint_tools": [
+              "rag_search_code",
+              "grep_in_repo"
+            ],
+            "strong_tools": [
+              "read_code_segment",
+              "lsp_get_definition",
+              "lsp_get_references",
+              "lsp_get_call_graph"
+            ]
+          },
+          "status_meaning": {
+            "yes_strong": "读取到定义/实现体/调用点/状态变化等强证据，可复现。",
+            "yes_weak": "只有 RAG/grep/outline/README 等线索，不能单独支撑 implemented。",
+            "stub_or_declaration_only": "只有声明、空实现、固定返回、ENOSYS/unsupported、todo/unimplemented 等占位形态。",
+            "no_after_negative_search": "按本题 negative_search_policy 覆盖关键词和目录后仍未发现。",
+            "unknown": "证据冲突、搜索覆盖不足或事实链未闭合。"
+          },
+          "conclusion_role": "required_for_implemented_or_stub"
+        },
+        {
+          "fact_id": "Q09_006_03",
+          "fact_key": "command_handlers",
+          "kind": "usage_flow",
+          "question": "是否处理读寄存器 g、读内存 m、继续 c、单步 s、断点 Z 等命令？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "probe": {
+            "keywords": [
+              "gdb",
+              "gdbstub",
+              "remote serial protocol",
+              "RSP",
+              "handle_gdb_packet",
+              "$m",
+              "$g",
+              "$c",
+              "$s",
+              "breakpoint",
+              "qSupported"
+            ],
+            "seed_paths": [
+              "kernel",
+              "debug",
+              "gdb",
+              "console",
+              "driver",
+              "trap",
+              "include"
+            ],
+            "hint_tools": [
+              "rag_search_code",
+              "grep_in_repo"
+            ],
+            "strong_tools": [
+              "read_code_segment",
+              "lsp_get_definition",
+              "lsp_get_references",
+              "lsp_get_call_graph"
+            ]
+          },
+          "status_meaning": {
+            "yes_strong": "读取到定义/实现体/调用点/状态变化等强证据，可复现。",
+            "yes_weak": "只有 RAG/grep/outline/README 等线索，不能单独支撑 implemented。",
+            "stub_or_declaration_only": "只有声明、空实现、固定返回、ENOSYS/unsupported、todo/unimplemented 等占位形态。",
+            "no_after_negative_search": "按本题 negative_search_policy 覆盖关键词和目录后仍未发现。",
+            "unknown": "证据冲突、搜索覆盖不足或事实链未闭合。"
+          },
+          "conclusion_role": "required_for_implemented_or_stub"
+        },
+        {
+          "fact_id": "Q09_006_04",
+          "fact_key": "trap_integration",
+          "kind": "usage_flow",
+          "question": "trap/breakpoint/exception 是否进入 stub？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "probe": {
+            "keywords": [
+              "gdb",
+              "gdbstub",
+              "remote serial protocol",
+              "RSP",
+              "handle_gdb_packet",
+              "$m",
+              "$g",
+              "$c",
+              "$s",
+              "breakpoint",
+              "qSupported"
+            ],
+            "seed_paths": [
+              "kernel",
+              "debug",
+              "gdb",
+              "console",
+              "driver",
+              "trap",
+              "include"
+            ],
+            "hint_tools": [
+              "rag_search_code",
+              "grep_in_repo"
+            ],
+            "strong_tools": [
+              "read_code_segment",
+              "lsp_get_definition",
+              "lsp_get_references",
+              "lsp_get_call_graph"
+            ]
+          },
+          "status_meaning": {
+            "yes_strong": "读取到定义/实现体/调用点/状态变化等强证据，可复现。",
+            "yes_weak": "只有 RAG/grep/outline/README 等线索，不能单独支撑 implemented。",
+            "stub_or_declaration_only": "只有声明、空实现、固定返回、ENOSYS/unsupported、todo/unimplemented 等占位形态。",
+            "no_after_negative_search": "按本题 negative_search_policy 覆盖关键词和目录后仍未发现。",
+            "unknown": "证据冲突、搜索覆盖不足或事实链未闭合。"
+          },
+          "conclusion_role": "required_for_implemented_or_stub"
+        },
+        {
+          "fact_id": "Q09_006_05",
+          "fact_key": "not_external_config",
+          "kind": "classification",
+          "question": "若只有 debug/gdbinit/OpenOCD 配置，应判 not_found 或 stub。",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "probe": {
+            "keywords": [
+              "gdb",
+              "gdbstub",
+              "remote serial protocol",
+              "RSP",
+              "handle_gdb_packet",
+              "$m",
+              "$g",
+              "$c",
+              "$s",
+              "breakpoint",
+              "qSupported"
+            ],
+            "seed_paths": [
+              "kernel",
+              "debug",
+              "gdb",
+              "console",
+              "driver",
+              "trap",
+              "include"
+            ],
+            "hint_tools": [
+              "rag_search_code",
+              "grep_in_repo"
+            ],
+            "strong_tools": [
+              "read_code_segment",
+              "lsp_get_definition",
+              "lsp_get_references",
+              "lsp_get_call_graph"
+            ]
+          },
+          "status_meaning": {
+            "yes_strong": "读取到定义/实现体/调用点/状态变化等强证据，可复现。",
+            "yes_weak": "只有 RAG/grep/outline/README 等线索，不能单独支撑 implemented。",
+            "stub_or_declaration_only": "只有声明、空实现、固定返回、ENOSYS/unsupported、todo/unimplemented 等占位形态。",
+            "no_after_negative_search": "按本题 negative_search_policy 覆盖关键词和目录后仍未发现。",
+            "unknown": "证据冲突、搜索覆盖不足或事实链未闭合。"
+          },
+          "conclusion_role": "disambiguates_tri_state"
+        },
+        {
+          "fact_id": "Q09_006_06",
+          "fact_key": "negative_search_coverage",
+          "kind": "negative_search",
+          "question": "若关键事实未找到，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown/待核实，不能判 not_found。",
+          "answer_type": "object",
+          "fields": {
+            "searched_keywords": "array<string>",
+            "searched_directories": "array<string>",
+            "file_count": "integer",
+            "match_count": "integer",
+            "coverage_sufficient": "boolean"
+          },
+          "evidence_required": [
+            "negative_search"
+          ],
+          "probe": {
+            "keywords": [
+              "gdb",
+              "gdbstub",
+              "remote serial protocol",
+              "RSP",
+              "handle_gdb_packet",
+              "$m",
+              "$g",
+              "$c",
+              "$s",
+              "breakpoint",
+              "qSupported"
+            ],
+            "seed_paths": [
+              "kernel",
+              "debug",
+              "gdb",
+              "console",
+              "driver",
+              "trap",
+              "include"
+            ],
+            "hint_tools": [
+              "grep_in_repo",
+              "rag_search_code"
+            ],
+            "strong_tools": []
+          },
+          "conclusion_role": "required_for_not_found"
+        }
+      ],
+      "answer_contract": {
+        "mode": "structured_facts_first",
+        "final_field": "value",
+        "final_type": "enum",
+        "allowed_final_values": [
+          "implemented",
+          "stub",
+          "not_found",
+          "unknown"
+        ],
+        "required_fact_ids": [
+          "Q09_006_F01",
+          "Q09_006_F02",
+          "Q09_006_F03",
+          "Q09_006_F04",
+          "Q09_006_NEG"
+        ],
+        "evidence_reference": "evidence_id_only",
+        "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
+        "reproducibility_rule": "回答时先逐项给出 structured_facts 的 status/value 与 evidence_id，再由这些事实机械推出最终 value；缺少强证据时 final value 必须降级为 unknown/待核实。"
+      },
+      "graph_tags": [
+        "debug",
+        "panic",
+        "logging",
+        "error",
+        "tri_state_impl"
+      ],
+      "seed_paths": [
+        "debug",
+        "log",
+        "panic",
+        "error",
+        "kernel",
+        "os"
+      ],
+      "keywords": [
+        "panic",
+        "log",
+        "trace",
+        "backtrace",
+        "assert",
+        "errno",
+        "GDB",
+        "stub",
+        "handle_gdb_packet"
+      ]
+    },
+    {
+      "feature_id": "feat_09_debug_error_q09_007",
+      "stage_id": "09_debug_error",
+      "domain": "debug_error_handling",
+      "feature_name": "Q09_007 错误码/错误类型体系是什么？（errno/Result/Error enum；给类型定义与传播点证据）",
+      "description": "错误码/错误类型体系是什么？（errno/Result/Error enum；给类型定义与传播点证据）",
+      "textbook_basis": [
+        {
+          "source": "OS diagnostics and maintainability practice",
+          "concepts": [
+            "logging",
+            "panic handling",
+            "error propagation",
+            "kernel monitor",
+            "debug stub",
+            "tracepoint"
+          ]
+        }
+      ],
+      "concept_boundary": "调试/错误处理题要区分普通日志、日志级别、panic 终止路径、栈回溯、内核监视器、GDB remote stub、tracepoint 和 errno/Error 传播。printf 不等于 GDB stub 或 tracing。",
+      "dependencies": [
+        "02_boot_trap",
+        "04_process_smp"
+      ],
+      "question_ids": [
+        "Q09_007"
+      ],
+      "tri_state_rule": {},
+      "required_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ],
+      "negative_search_policy": {
+        "keywords": [
+          "log",
+          "printk",
+          "println",
+          "panic",
+          "backtrace",
+          "unwind",
+          "gdb",
+          "gdbstub",
+          "monitor",
+          "trace",
+          "ftrace",
+          "perf",
+          "errno",
+          "Error",
+          "Result"
+        ],
+        "seed_paths": [
+          "kernel",
+          "debug",
+          "console",
+          "trap",
+          "syscall",
+          "include",
+          "Makefile"
+        ],
+        "minimum_keyword_coverage": 0.7,
+        "minimum_directory_coverage": 0.6
+      },
+      "anti_examples": [
+        "RAG/grep 命中名称但没有读取实现体，不能判 implemented。",
+        "只有 trait/struct/extern/宏名/常量定义，不能判 implemented。",
+        "只搜索一个关键词或一个目录，不能判 not_found。"
+      ],
+      "diagnostic_checks": [
+        "日志/错误/调试入口在哪里？",
+        "是否有级别、过滤、结构化事件或错误类型？",
+        "panic/backtrace/monitor/gdb/trace 是否有各自专门实现体？",
+        "是否接入 trap/syscall/sched/mm/fs 等主路径？",
+        "是否只是外部配置、用户态 shell 或普通打印？"
+      ],
+      "structured_facts": [
+        {
+          "fact_id": "Q09_007_01",
+          "fact_key": "debug_entry",
+          "kind": "definition",
+          "question": "围绕 debug_entry 收集可复现证据并判断其状态。",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "probe": {
+            "keywords": [],
+            "seed_paths": [],
+            "hint_tools": [
+              "rag_search_code",
+              "grep_in_repo"
+            ],
+            "strong_tools": [
+              "read_code_segment",
+              "lsp_get_definition",
+              "lsp_get_references",
+              "lsp_get_call_graph"
+            ]
+          },
+          "status_meaning": {
+            "yes_strong": "读取到定义/实现体/调用点/状态变化等强证据，可复现。",
+            "yes_weak": "只有 RAG/grep/outline/README 等线索，不能单独支撑 implemented。",
+            "stub_or_declaration_only": "只有声明、空实现、固定返回、ENOSYS/unsupported、todo/unimplemented 等占位形态。",
+            "no_after_negative_search": "按本题 negative_search_policy 覆盖关键词和目录后仍未发现。",
+            "unknown": "证据冲突、搜索覆盖不足或事实链未闭合。"
+          },
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q09_007_02",
+          "fact_key": "specialized_mechanism",
+          "kind": "implementation",
+          "question": "围绕 specialized_mechanism 收集可复现证据并判断其状态。",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "probe": {
+            "keywords": [],
+            "seed_paths": [],
+            "hint_tools": [
+              "rag_search_code",
+              "grep_in_repo"
+            ],
+            "strong_tools": [
+              "read_code_segment",
+              "lsp_get_definition",
+              "lsp_get_references",
+              "lsp_get_call_graph"
+            ]
+          },
+          "status_meaning": {
+            "yes_strong": "读取到定义/实现体/调用点/状态变化等强证据，可复现。",
+            "yes_weak": "只有 RAG/grep/outline/README 等线索，不能单独支撑 implemented。",
+            "stub_or_declaration_only": "只有声明、空实现、固定返回、ENOSYS/unsupported、todo/unimplemented 等占位形态。",
+            "no_after_negative_search": "按本题 negative_search_policy 覆盖关键词和目录后仍未发现。",
+            "unknown": "证据冲突、搜索覆盖不足或事实链未闭合。"
+          },
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q09_007_03",
+          "fact_key": "runtime_integration",
+          "kind": "usage_flow",
+          "question": "围绕 runtime_integration 收集可复现证据并判断其状态。",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "probe": {
+            "keywords": [],
+            "seed_paths": [],
+            "hint_tools": [
+              "rag_search_code",
+              "grep_in_repo"
+            ],
+            "strong_tools": [
+              "read_code_segment",
+              "lsp_get_definition",
+              "lsp_get_references",
+              "lsp_get_call_graph"
+            ]
+          },
+          "status_meaning": {
+            "yes_strong": "读取到定义/实现体/调用点/状态变化等强证据，可复现。",
+            "yes_weak": "只有 RAG/grep/outline/README 等线索，不能单独支撑 implemented。",
+            "stub_or_declaration_only": "只有声明、空实现、固定返回、ENOSYS/unsupported、todo/unimplemented 等占位形态。",
+            "no_after_negative_search": "按本题 negative_search_policy 覆盖关键词和目录后仍未发现。",
+            "unknown": "证据冲突、搜索覆盖不足或事实链未闭合。"
+          },
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q09_007_04",
+          "fact_key": "output_or_storage",
+          "kind": "implementation",
+          "question": "围绕 output_or_storage 收集可复现证据并判断其状态。",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "probe": {
+            "keywords": [],
+            "seed_paths": [],
+            "hint_tools": [
+              "rag_search_code",
+              "grep_in_repo"
+            ],
+            "strong_tools": [
+              "read_code_segment",
+              "lsp_get_definition",
+              "lsp_get_references",
+              "lsp_get_call_graph"
+            ]
+          },
+          "status_meaning": {
+            "yes_strong": "读取到定义/实现体/调用点/状态变化等强证据，可复现。",
+            "yes_weak": "只有 RAG/grep/outline/README 等线索，不能单独支撑 implemented。",
+            "stub_or_declaration_only": "只有声明、空实现、固定返回、ENOSYS/unsupported、todo/unimplemented 等占位形态。",
+            "no_after_negative_search": "按本题 negative_search_policy 覆盖关键词和目录后仍未发现。",
+            "unknown": "证据冲突、搜索覆盖不足或事实链未闭合。"
+          },
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q09_007_05",
+          "fact_key": "external_or_userland_boundary",
+          "kind": "classification",
+          "question": "围绕 external_or_userland_boundary 收集可复现证据并判断其状态。",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "probe": {
+            "keywords": [],
+            "seed_paths": [],
+            "hint_tools": [
+              "rag_search_code",
+              "grep_in_repo"
+            ],
+            "strong_tools": [
+              "read_code_segment",
+              "lsp_get_definition",
+              "lsp_get_references",
+              "lsp_get_call_graph"
+            ]
+          },
+          "status_meaning": {
+            "yes_strong": "读取到定义/实现体/调用点/状态变化等强证据，可复现。",
+            "yes_weak": "只有 RAG/grep/outline/README 等线索，不能单独支撑 implemented。",
+            "stub_or_declaration_only": "只有声明、空实现、固定返回、ENOSYS/unsupported、todo/unimplemented 等占位形态。",
+            "no_after_negative_search": "按本题 negative_search_policy 覆盖关键词和目录后仍未发现。",
+            "unknown": "证据冲突、搜索覆盖不足或事实链未闭合。"
+          },
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q09_007_06",
+          "fact_key": "negative_search_coverage",
+          "kind": "negative_search",
+          "question": "若关键事实未找到，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown/待核实，不能判 not_found。",
+          "answer_type": "object",
+          "fields": {
+            "searched_keywords": "array<string>",
+            "searched_directories": "array<string>",
+            "file_count": "integer",
+            "match_count": "integer",
+            "coverage_sufficient": "boolean"
+          },
+          "evidence_required": [
+            "negative_search"
+          ],
+          "probe": {
+            "keywords": [
+              "log",
+              "printk",
+              "println",
+              "panic",
+              "backtrace",
+              "unwind",
+              "gdb",
+              "gdbstub",
+              "monitor",
+              "trace",
+              "ftrace",
+              "perf",
+              "errno",
+              "Error",
+              "Result"
+            ],
+            "seed_paths": [
+              "kernel",
+              "debug",
+              "console",
+              "trap",
+              "syscall",
+              "include",
+              "Makefile"
+            ],
+            "hint_tools": [
+              "grep_in_repo",
+              "rag_search_code"
+            ],
+            "strong_tools": []
+          },
+          "conclusion_role": "required_for_not_found"
+        }
+      ],
+      "answer_contract": {
+        "mode": "structured_facts_first",
+        "final_field": "value",
+        "final_type": "fact_table",
+        "allowed_final_values": [],
+        "required_fact_ids": [
+          "Q09_007_F01",
+          "Q09_007_F02",
+          "Q09_007_F03",
+          "Q09_007_F04",
+          "Q09_007_SHAPE",
+          "Q09_007_NEG"
+        ],
+        "evidence_reference": "evidence_id_only",
+        "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
+        "reproducibility_rule": "回答时先逐项给出 structured_facts 的 status/value 与 evidence_id，再由这些事实机械推出最终 value；缺少强证据时 final value 必须降级为 unknown/待核实。"
+      },
+      "graph_tags": [
+        "debug",
+        "panic",
+        "logging",
+        "error",
+        "short_answer"
+      ],
+      "seed_paths": [
+        "debug",
+        "log",
+        "panic",
+        "error",
+        "kernel",
+        "os"
+      ],
+      "keywords": [
+        "panic",
+        "log",
+        "trace",
+        "backtrace",
+        "assert",
+        "errno",
+        "Result",
+        "Error",
+        "enum"
+      ]
+    },
+    {
+      "feature_id": "feat_09_debug_error_q09_008",
+      "stage_id": "09_debug_error",
+      "domain": "debug_error_handling",
+      "feature_name": "Q09_008 是否存在 trace/perf/ftrace 等跟踪机制或 tracepoints？（必须三态）",
+      "description": "是否存在 trace/perf/ftrace 等跟踪机制或 tracepoints？（必须三态）",
+      "textbook_basis": [
+        {
+          "source": "OS diagnostics and maintainability practice",
+          "concepts": [
+            "logging",
+            "panic handling",
+            "error propagation",
+            "kernel monitor",
+            "debug stub",
+            "tracepoint"
+          ]
+        }
+      ],
+      "concept_boundary": "trace/perf/ftrace 是结构化事件记录或探针机制；普通日志、printf、panic 输出不等于 tracepoint。",
+      "dependencies": [
+        "02_boot_trap",
+        "04_process_smp"
+      ],
+      "question_ids": [
+        "Q09_008"
+      ],
+      "tri_state_rule": {
+        "allowed_values": [
+          "implemented",
+          "stub",
+          "not_found",
+          "unknown"
+        ],
+        "feature_scope": "是否存在 trace/perf/ftrace 等跟踪机制或 tracepoints？（必须三态）",
+        "diagnostic_checks": [
+          "是否有 trace event/tracepoint/probe 类型或宏？",
+          "事件是否写入 ring buffer/list/log store，而非直接 printf？",
+          "是否在 syscall/sched/trap/mm/fs 等关键路径插桩？",
+          "是否有启停/过滤/读取 trace 的接口？",
+          "是否记录时间戳、CPU、任务或事件参数？"
+        ],
+        "implemented": "必须有本题 Bound Evidence 中的强证据，且闭合核心结构、实现体、调用点或主路径；RAG/grep 不能单独支撑 implemented。",
+        "stub": "只有声明、接口壳、固定返回、ENOSYS/unsupported、todo/unimplemented、或未接入主路径时判 stub。",
+        "not_found": "必须完成 negative_search_policy 覆盖的关键词和目录搜索后仍未发现相关结构/实现体/调用点，才能判 not_found。",
+        "unknown": "证据弱、覆盖不足、事实冲突、或未完成全部关键事实时判 unknown。",
+        "required_reasoning": "逐项完成 structured_facts，再根据反例和证据强度给最终三态。",
+        "keywords": [
+          "trace",
+          "tracepoint",
+          "ftrace",
+          "perf",
+          "event",
+          "probe",
+          "kprobe",
+          "record",
+          "ring buffer",
+          "timestamp"
+        ]
+      },
+      "required_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ],
+      "negative_search_policy": {
+        "keywords": [
+          "trace",
+          "tracepoint",
+          "ftrace",
+          "perf",
+          "event",
+          "probe",
+          "kprobe",
+          "record",
+          "ring buffer",
+          "timestamp"
+        ],
+        "seed_paths": [
+          "kernel",
+          "debug",
+          "trace",
+          "sched",
+          "syscall",
+          "trap",
+          "include"
+        ],
+        "minimum_keyword_coverage": 0.7,
+        "minimum_directory_coverage": 0.6
+      },
+      "anti_examples": [
+        "RAG/grep 命中名称但没有读取实现体，不能判 implemented。",
+        "只有 trait/struct/extern/宏名/常量定义，不能判 implemented。",
+        "只搜索一个关键词或一个目录，不能判 not_found。"
+      ],
+      "diagnostic_checks": [
+        "是否有 trace event/tracepoint/probe 类型或宏？",
+        "事件是否写入 ring buffer/list/log store，而非直接 printf？",
+        "是否在 syscall/sched/trap/mm/fs 等关键路径插桩？",
+        "是否有启停/过滤/读取 trace 的接口？",
+        "是否记录时间戳、CPU、任务或事件参数？"
+      ],
+      "structured_facts": [
+        {
+          "fact_id": "Q09_008_01",
+          "fact_key": "trace_abstraction",
+          "kind": "definition",
+          "question": "是否有 trace event/tracepoint/probe 类型或宏？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "probe": {
+            "keywords": [
+              "trace",
+              "tracepoint",
+              "ftrace",
+              "perf",
+              "event",
+              "probe",
+              "kprobe",
+              "record",
+              "ring buffer",
+              "timestamp"
+            ],
+            "seed_paths": [
+              "kernel",
+              "debug",
+              "trace",
+              "sched",
+              "syscall",
+              "trap",
+              "include"
+            ],
+            "hint_tools": [
+              "rag_search_code",
+              "grep_in_repo"
+            ],
+            "strong_tools": [
+              "read_code_segment",
+              "lsp_get_definition",
+              "lsp_get_references",
+              "lsp_get_call_graph"
+            ]
+          },
+          "status_meaning": {
+            "yes_strong": "读取到定义/实现体/调用点/状态变化等强证据，可复现。",
+            "yes_weak": "只有 RAG/grep/outline/README 等线索，不能单独支撑 implemented。",
+            "stub_or_declaration_only": "只有声明、空实现、固定返回、ENOSYS/unsupported、todo/unimplemented 等占位形态。",
+            "no_after_negative_search": "按本题 negative_search_policy 覆盖关键词和目录后仍未发现。",
+            "unknown": "证据冲突、搜索覆盖不足或事实链未闭合。"
+          },
+          "conclusion_role": "required_for_implemented_or_stub"
+        },
+        {
+          "fact_id": "Q09_008_02",
+          "fact_key": "event_storage",
+          "kind": "implementation",
+          "question": "事件是否写入 ring buffer/list/log store，而非直接 printf？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "probe": {
+            "keywords": [
+              "trace",
+              "tracepoint",
+              "ftrace",
+              "perf",
+              "event",
+              "probe",
+              "kprobe",
+              "record",
+              "ring buffer",
+              "timestamp"
+            ],
+            "seed_paths": [
+              "kernel",
+              "debug",
+              "trace",
+              "sched",
+              "syscall",
+              "trap",
+              "include"
+            ],
+            "hint_tools": [
+              "rag_search_code",
+              "grep_in_repo"
+            ],
+            "strong_tools": [
+              "read_code_segment",
+              "lsp_get_definition",
+              "lsp_get_references",
+              "lsp_get_call_graph"
+            ]
+          },
+          "status_meaning": {
+            "yes_strong": "读取到定义/实现体/调用点/状态变化等强证据，可复现。",
+            "yes_weak": "只有 RAG/grep/outline/README 等线索，不能单独支撑 implemented。",
+            "stub_or_declaration_only": "只有声明、空实现、固定返回、ENOSYS/unsupported、todo/unimplemented 等占位形态。",
+            "no_after_negative_search": "按本题 negative_search_policy 覆盖关键词和目录后仍未发现。",
+            "unknown": "证据冲突、搜索覆盖不足或事实链未闭合。"
+          },
+          "conclusion_role": "required_for_implemented_or_stub"
+        },
+        {
+          "fact_id": "Q09_008_03",
+          "fact_key": "instrumentation_sites",
+          "kind": "usage_flow",
+          "question": "是否在 syscall/sched/trap/mm/fs 等关键路径插桩？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "probe": {
+            "keywords": [
+              "trace",
+              "tracepoint",
+              "ftrace",
+              "perf",
+              "event",
+              "probe",
+              "kprobe",
+              "record",
+              "ring buffer",
+              "timestamp"
+            ],
+            "seed_paths": [
+              "kernel",
+              "debug",
+              "trace",
+              "sched",
+              "syscall",
+              "trap",
+              "include"
+            ],
+            "hint_tools": [
+              "rag_search_code",
+              "grep_in_repo"
+            ],
+            "strong_tools": [
+              "read_code_segment",
+              "lsp_get_definition",
+              "lsp_get_references",
+              "lsp_get_call_graph"
+            ]
+          },
+          "status_meaning": {
+            "yes_strong": "读取到定义/实现体/调用点/状态变化等强证据，可复现。",
+            "yes_weak": "只有 RAG/grep/outline/README 等线索，不能单独支撑 implemented。",
+            "stub_or_declaration_only": "只有声明、空实现、固定返回、ENOSYS/unsupported、todo/unimplemented 等占位形态。",
+            "no_after_negative_search": "按本题 negative_search_policy 覆盖关键词和目录后仍未发现。",
+            "unknown": "证据冲突、搜索覆盖不足或事实链未闭合。"
+          },
+          "conclusion_role": "required_for_implemented_or_stub"
+        },
+        {
+          "fact_id": "Q09_008_04",
+          "fact_key": "control_readout",
+          "kind": "usage_flow",
+          "question": "是否有启停/过滤/读取 trace 的接口？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "probe": {
+            "keywords": [
+              "trace",
+              "tracepoint",
+              "ftrace",
+              "perf",
+              "event",
+              "probe",
+              "kprobe",
+              "record",
+              "ring buffer",
+              "timestamp"
+            ],
+            "seed_paths": [
+              "kernel",
+              "debug",
+              "trace",
+              "sched",
+              "syscall",
+              "trap",
+              "include"
+            ],
+            "hint_tools": [
+              "rag_search_code",
+              "grep_in_repo"
+            ],
+            "strong_tools": [
+              "read_code_segment",
+              "lsp_get_definition",
+              "lsp_get_references",
+              "lsp_get_call_graph"
+            ]
+          },
+          "status_meaning": {
+            "yes_strong": "读取到定义/实现体/调用点/状态变化等强证据，可复现。",
+            "yes_weak": "只有 RAG/grep/outline/README 等线索，不能单独支撑 implemented。",
+            "stub_or_declaration_only": "只有声明、空实现、固定返回、ENOSYS/unsupported、todo/unimplemented 等占位形态。",
+            "no_after_negative_search": "按本题 negative_search_policy 覆盖关键词和目录后仍未发现。",
+            "unknown": "证据冲突、搜索覆盖不足或事实链未闭合。"
+          },
+          "conclusion_role": "required_for_implemented_or_stub"
+        },
+        {
+          "fact_id": "Q09_008_05",
+          "fact_key": "not_logging",
+          "kind": "classification",
+          "question": "是否记录时间戳、CPU、任务或事件参数？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "probe": {
+            "keywords": [
+              "trace",
+              "tracepoint",
+              "ftrace",
+              "perf",
+              "event",
+              "probe",
+              "kprobe",
+              "record",
+              "ring buffer",
+              "timestamp"
+            ],
+            "seed_paths": [
+              "kernel",
+              "debug",
+              "trace",
+              "sched",
+              "syscall",
+              "trap",
+              "include"
+            ],
+            "hint_tools": [
+              "rag_search_code",
+              "grep_in_repo"
+            ],
+            "strong_tools": [
+              "read_code_segment",
+              "lsp_get_definition",
+              "lsp_get_references",
+              "lsp_get_call_graph"
+            ]
+          },
+          "status_meaning": {
+            "yes_strong": "读取到定义/实现体/调用点/状态变化等强证据，可复现。",
+            "yes_weak": "只有 RAG/grep/outline/README 等线索，不能单独支撑 implemented。",
+            "stub_or_declaration_only": "只有声明、空实现、固定返回、ENOSYS/unsupported、todo/unimplemented 等占位形态。",
+            "no_after_negative_search": "按本题 negative_search_policy 覆盖关键词和目录后仍未发现。",
+            "unknown": "证据冲突、搜索覆盖不足或事实链未闭合。"
+          },
+          "conclusion_role": "disambiguates_tri_state"
+        },
+        {
+          "fact_id": "Q09_008_06",
+          "fact_key": "negative_search_coverage",
+          "kind": "negative_search",
+          "question": "若关键事实未找到，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown/待核实，不能判 not_found。",
+          "answer_type": "object",
+          "fields": {
+            "searched_keywords": "array<string>",
+            "searched_directories": "array<string>",
+            "file_count": "integer",
+            "match_count": "integer",
+            "coverage_sufficient": "boolean"
+          },
+          "evidence_required": [
+            "negative_search"
+          ],
+          "probe": {
+            "keywords": [
+              "trace",
+              "tracepoint",
+              "ftrace",
+              "perf",
+              "event",
+              "probe",
+              "kprobe",
+              "record",
+              "ring buffer",
+              "timestamp"
+            ],
+            "seed_paths": [
+              "kernel",
+              "debug",
+              "trace",
+              "sched",
+              "syscall",
+              "trap",
+              "include"
+            ],
+            "hint_tools": [
+              "grep_in_repo",
+              "rag_search_code"
+            ],
+            "strong_tools": []
+          },
+          "conclusion_role": "required_for_not_found"
+        }
+      ],
+      "answer_contract": {
+        "mode": "structured_facts_first",
+        "final_field": "value",
+        "final_type": "enum",
+        "allowed_final_values": [
+          "implemented",
+          "stub",
+          "not_found",
+          "unknown"
+        ],
+        "required_fact_ids": [
+          "Q09_008_F01",
+          "Q09_008_F02",
+          "Q09_008_F03",
+          "Q09_008_F04",
+          "Q09_008_NEG"
+        ],
+        "evidence_reference": "evidence_id_only",
+        "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
+        "reproducibility_rule": "回答时先逐项给出 structured_facts 的 status/value 与 evidence_id，再由这些事实机械推出最终 value；缺少强证据时 final value 必须降级为 unknown/待核实。"
+      },
+      "graph_tags": [
+        "debug",
+        "panic",
+        "logging",
+        "error",
+        "tri_state_impl"
+      ],
+      "seed_paths": [
+        "debug",
+        "log",
+        "panic",
+        "error",
+        "kernel",
+        "os"
+      ],
+      "keywords": [
+        "panic",
+        "log",
+        "trace",
+        "backtrace",
+        "assert",
+        "errno",
+        "perf",
+        "ftrace",
+        "tracepoints"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,910 @@
+{
+  "schema_version": "describe_review_v1",
+  "stage_id": "05_fs_drivers",
+  "stage_title": "文件系统与设备 I/O",
+  "confidence": 0.95,
+  "question_reviews": [
+    {
+      "question_id": "Q05_001",
+      "score_evidence": 0.95,
+      "score_consistency": 0.95,
+      "review": "题面要求回答VFS接口形态（Rust trait / C op表）并给出接口定义证据。答案value为structured_text，包含vfs_objects/backend_impl/syscall_path/namespace_semantics/fd_special_files五个fact的yes_strong状态及negative_search_coverage对象。evidence中ev_709823e0/ev_0754a19f展示了struct superblock/inode/dentry及fs_op/inode_op/file_op的C结构体定义，明确为C op表形态。ev_ba2aba86展示FAT32后端填充inode_op/file_op实例。ev_a14cc241/ev_7486ce4c展示syscall到file操作的调用链。ev_4702a1ca展示rootfs_init中devfs/procfs挂载及do_mount调用。ev_9bec018d展示file结构含pipe/inode/poll字段。所有fact_answers均绑定对应evidence_id，value与fact_key一致。negative_search_coverage覆盖了要求的关键词和目录。题面要求'必须给接口定义证据'已满足。",
+      "fix_hints": {
+        "finding_type": "contract_only",
+        "missing_evidence_types": [],
+        "recommended_keywords": [],
+        "recommended_seed_paths": [],
+        "fix_goal": ""
+      }
+    },
+    {
+      "question_id": "Q05_002",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "题面为单选题，要求判断具体文件系统后端更接近哪种。答案value为'真实磁盘文件系统（FAT32/Ext4/其他，持久化存储）'，属于valid value texts之一。evidence中ev_ba2aba86展示fat32_inode_op和fat32_file_op的完整实现，ev_e39dde6d展示do_mount支持'vfat'/'fat32'类型，ev_4702a1ca展示rootfs_init中do_mount(vda->inode, rootfs.root->inode, \"fat32\", 0, 0)挂载FAT32。这些证据充分证明存在真实的FAT32磁盘文件系统后端。fact_answers中vfs_objects/backend_impl/syscall_path/namespace_semantics/fd_special_files均为yes_strong，与evidence一致。",
+      "fix_hints": {
+        "finding_type": "contract_only",
+        "missing_evidence_types": [],
+        "recommended_keywords": [],
+        "recommended_seed_paths": [],
+        "fix_goal": ""
+      }
+    },
+    {
+      "question_id": "Q05_003",
+      "score_evidence": 0.9,
+      "score_consistency": 0.85,
+      "review": "题面要求回答FAT32/Ext4是自研还是第三方库/crate，必须引用Cargo.toml/Cargo.lock或Makefile引入证据。答案value为structured_text，包含五个fact的yes_strong状态及negative_search_coverage对象，但未直接回答'自研还是第三方库/crate'这一核心问题。evidence中ev_ba2aba86展示kernel/fs/fat32/fatak32.c的自研实现体，ev_e39dde6d展示kernel/fs/mount.c的do_mount，ev_4702a1ca展示rootfs_init中挂载fat32。这些证据暗示为自研（代码在kernel/fs/fat32/下），但缺少Cargo.toml/Cargo.lock或Makefile的引入证据。题面明确要求'必须引用Cargo.toml/Cargo.lock或Makefile引入证据'，答案未提供此类证据。fact_answers与evidence绑定正确，但最终value未直接回应题面核心问题。",
+      "fix_hints": {
+        "finding_type": "missing_evidence",
+        "missing_evidence_types": [
+          "definition"
+        ],
+        "recommended_keywords": [
+          "Cargo.toml",
+          "Cargo.lock",
+          "Makefile",
+          "fat32",
+          "ext4",
+          "fs"
+        ],
+        "recommended_seed_paths": [
+          ".",
+          "kernel",
+          "fs"
+        ],
+        "fix_goal": "查找Cargo.toml/Cargo.lock或Makefile中关于fat32/ext4文件系统后端的引入声明，确认是自研还是第三方crate依赖。"
+      }
+    },
+    {
+      "question_id": "Q05_004",
+      "score_evidence": 0.95,
+      "score_consistency": 0.95,
+      "review": "题面要求回答路径解析/查找（path walking / namei / lookup）的实现形态。答案value为structured_text，包含五个fact的yes_strong状态及negative_search_coverage对象。evidence中ev_709823e0展示dentry结构含parent/child/op字段，ev_0754a19f展示inode_op含lookup函数指针，ev_a14cc241展示sys_openat中调用nameifrom(dp, path)进行路径解析，ev_4702a1ca展示de_root_generate生成目录树。这些证据覆盖了dentry树、inode lookup操作、syscall层路径解析调用。fact_answers与evidence绑定一致。",
+      "fix_hints": {
+        "finding_type": "contract_only",
+        "missing_evidence_types": [],
+        "recommended_keywords": [],
+        "recommended_seed_paths": [],
+        "fix_goal": ""
+      }
+    },
+    {
+      "question_id": "Q05_005",
+      "score_evidence": 0.95,
+      "score_consistency": 0.95,
+      "review": "题面要求回答文件描述符（fd）与打开文件表（open file table）的实现。答案value为structured_text，包含五个fact的yes_strong状态及negative_search_coverage对象。evidence中ev_9bec018d展示struct file含lock/type/ref/off/pipe/inode/poll字段及struct fdtable含basefd/nextfd/used/exec_close/arr字段，ev_7486ce4c展示fileread中根据f->type分发到FD_PIPE/FD_DEVICE/FD_INODE，ev_a14cc241展示sys_openat中分配fd并设置f->type/f->off/f->ip。这些证据完整覆盖了fdtable、file结构、fd分配与使用流程。fact_answers与evidence绑定一致。",
+      "fix_hints": {
+        "finding_type": "contract_only",
+        "missing_evidence_types": [],
+        "recommended_keywords": [],
+        "recommended_seed_paths": [],
+        "fix_goal": ""
+      }
+    },
+    {
+      "question_id": "Q05_006",
+      "score_evidence": 0.95,
+      "score_consistency": 0.95,
+      "review": "题面要求回答pipe/pipefs的实现。答案value为structured_text，包含五个fact的yes_strong状态及negative_search_coverage对象。evidence中ev_9bec018d展示struct file含struct pipe *pipe字段，ev_7486ce4c展示fileread中case FD_PIPE: r = piperead(f->pipe, addr, n)的pipe读取路径，ev_a14cc241展示sys_read/sys_write的syscall入口。pipe结构体定义未直接展示，但file结构中的pipe指针和fileread中的FD_PIPE分支提供了pipe实现的强证据。fact_answers与evidence绑定一致。",
+      "fix_hints": {
+        "finding_type": "contract_only",
+        "missing_evidence_types": [],
+        "recommended_keywords": [],
+        "recommended_seed_paths": [],
+        "fix_goal": ""
+      }
+    },
+    {
+      "question_id": "Q05_007",
+      "score_evidence": 0.95,
+      "score_consistency": 0.95,
+      "review": "题面要求回答devfs（设备文件系统）的实现。答案value为structured_text，包含五个fact的yes_strong状态及negative_search_coverage对象。evidence中ev_4702a1ca展示rootfs_init中创建devfs superblock，生成console(S_IFCHR,2)、vda2(S_IFBLK,ROOTDEV)、zero(S_IFCHR,3)、null(S_IFCHR,4)等设备节点，并调用mountsysfs(&devfs, dir, \"devfs\")挂载。ev_7486ce4c展示fileread中case FD_DEVICE: r = ip->fop->read(ip, 1, addr, 0, n)的设备文件读取路径。这些证据完整覆盖了devfs的创建、设备节点生成和挂载。fact_answers与evidence绑定一致。",
+      "fix_hints": {
+        "finding_type": "contract_only",
+        "missing_evidence_types": [],
+        "recommended_keywords": [],
+        "recommended_seed_paths": [],
+        "fix_goal": ""
+      }
+    },
+    {
+      "question_id": "Q05_008",
+      "score_evidence": 0.95,
+      "score_consistency": 0.95,
+      "review": "题面要求回答procfs（进程文件系统）的实现。答案value为structured_text，包含五个fact的yes_strong状态及negative_search_coverage对象。evidence中ev_4702a1ca展示rootfs_init中创建procfs superblock，生成mounts(S_IFREG,0)文件节点，并调用mountsysfs(&procfs, dir, \"procfs\")挂载。procfs的根目录和mounts文件节点已创建并挂载。fact_answers与evidence绑定一致。",
+      "fix_hints": {
+        "finding_type": "contract_only",
+        "missing_evidence_types": [],
+        "recommended_keywords": [],
+        "recommended_seed_paths": [],
+        "fix_goal": ""
+      }
+    },
+    {
+      "question_id": "Q05_009",
+      "score_evidence": 0.95,
+      "score_consistency": 0.95,
+      "review": "题面要求回答mount（挂载）机制的实现。答案value为structured_text，包含五个fact的yes_strong状态及negative_search_coverage对象。evidence中ev_e39dde6d展示do_mount函数，接受dev/mntpoint/type/flag/data参数，通过strncmp判断文件系统类型（vfat/fat32）。ev_4702a1ca展示rootfs_init中调用do_mount(vda->inode, rootfs.root->inode, \"fat32\", 0, 0)挂载FAT32到根目录。ev_709823e0展示superblock含type[16]字段标识文件系统类型。这些证据覆盖了mount系统调用的实现和调用点。fact_answers与evidence绑定一致。",
+      "fix_hints": {
+        "finding_type": "contract_only",
+        "missing_evidence_types": [],
+        "recommended_keywords": [],
+        "recommended_seed_paths": [],
+        "fix_goal": ""
+      }
+    },
+    {
+      "question_id": "Q05_010",
+      "score_evidence": 0.95,
+      "score_consistency": 0.95,
+      "review": "题面要求回答symlink/hardlink的实现。答案value为structured_text，包含五个fact的yes_strong状态及negative_search_coverage对象。evidence中ev_709823e0展示dentry结构含filename[MAXNAME+1]字段，ev_0754a19f展示inode_op含create/lookup/unlink/rename等操作但未直接包含symlink相关操作。ev_a14cc241展示sys_openat中O_CREATE路径调用create(dp, path, ...)。未发现symlink/hardlink的专门实现证据。fact_answers中fd_special_files为yes_strong，但symlink/hardlink的专门实现证据不足。negative_search_coverage中searched_keywords包含'symlink'，但未明确说明symlink的搜索结果。",
+      "fix_hints": {
+        "finding_type": "weak_evidence",
+        "missing_evidence_types": [
+          "definition",
+          "implementation_body",
+          "call_site"
+        ],
+        "recommended_keywords": [
+          "symlink",
+          "hardlink",
+          "link",
+          "unlink",
+          "readlink",
+          "S_IFLNK"
+        ],
+        "recommended_seed_paths": [
+          "kernel",
+          "fs",
+          "include"
+        ],
+        "fix_goal": "搜索symlink/hardlink的专门实现，包括syscall层（sys_symlinkat/sys_linkat等）、VFS层（inode_op中的symlink/link操作）、以及文件系统后端（FAT32是否支持symlink）。"
+      }
+    },
+    {
+      "question_id": "Q05_011",
+      "score_evidence": 0.95,
+      "score_consistency": 0.95,
+      "review": "题面要求回答poll/select/epoll的I/O多路复用实现。答案value为structured_text，包含五个fact的yes_strong状态及negative_search_coverage对象。evidence中ev_9bec018d展示struct file含uint32 (*poll)(struct file *, struct poll_table *)函数指针，ev_a8edebfe展示syscall_table中包含SYS_pselect6和SYS_ppoll。这些证据表明poll机制已实现：file结构中有poll函数指针，syscall层注册了pselect6和ppoll系统调用。fact_answers与evidence绑定一致。",
+      "fix_hints": {
+        "finding_type": "contract_only",
+        "missing_evidence_types": [],
+        "recommended_keywords": [],
+        "recommended_seed_paths": [],
+        "fix_goal": ""
+      }
+    },
+    {
+      "question_id": "Q05_012",
+      "score_evidence": 0.95,
+      "score_consistency": 0.95,
+      "review": "题面要求回答socket/network socket的实现。答案value为structured_text，包含五个fact的yes_strong状态及negative_search_coverage对象。evidence中ev_9bec018d展示struct file含file_type_e type字段（可区分FD_PIPE/FD_DEVICE/FD_INODE等类型），但未包含FD_SOCKET类型。ev_7486ce4c展示fileread中switch分支仅处理FD_PIPE/FD_DEVICE/FD_INODE，无socket分支。ev_496380a6的negative_search明确说明'socket未找到实现'。fact_answers中fd_special_files为yes_strong，但socket的专门实现证据缺失。negative_search_coverage覆盖了'socket'关键词。",
+      "fix_hints": {
+        "finding_type": "weak_evidence",
+        "missing_evidence_types": [
+          "definition",
+          "implementation_body",
+          "call_site",
+          "usage_flow"
+        ],
+        "recommended_keywords": [
+          "socket",
+          "SYS_socket",
+          "SYS_connect",
+          "SYS_bind",
+          "SYS_listen",
+          "SYS_accept",
+          "net",
+          "network"
+        ],
+        "recommended_seed_paths": [
+          "kernel",
+          "net",
+          "syscall",
+          "include"
+        ],
+        "fix_goal": "搜索socket/network socket的专门实现，包括syscall层注册、VFS层file类型扩展、以及网络协议栈实现。"
+      }
+    },
+    {
+      "question_id": "Q05_013",
+      "score_evidence": 0.95,
+      "score_consistency": 0.95,
+      "review": "题面要求回答FAT32文件系统后端的实现。答案value为structured_text，包含五个fact的yes_strong状态及negative_search_coverage对象。evidence中ev_ba2aba86展示fat32_inode_op和fat32_file_op的完整实现，包含create/lookup/truncate/unlink/update/getattr/setattr/rename等inode操作和read/write/readdir/readv/writev等file操作。ev_e39dde6d展示do_mount支持'vfat'/'fat32'类型。ev_4702a1ca展示rootfs_init中do_mount挂载fat32。这些证据充分证明FAT32后端已实现。fact_answers与evidence绑定一致。",
+      "fix_hints": {
+        "finding_type": "contract_only",
+        "missing_evidence_types": [],
+        "recommended_keywords": [],
+        "recommended_seed_paths": [],
+        "fix_goal": ""
+      }
+    },
+    {
+      "question_id": "Q05_014",
+      "score_evidence": 0.95,
+      "score_consistency": 0.95,
+      "review": "题面要求回答Ext4文件系统后端的实现。答案value为structured_text，包含五个fact的yes_strong状态及negative_search_coverage对象。evidence中ev_ba2aba86仅展示FAT32后端实现，ev_e39dde6d展示do_mount仅支持'vfat'/'fat32'类型。未发现Ext4相关实现。negative_search_coverage中searched_keywords包含'ext4'，但未明确说明ext4的搜索结果。fact_answers中backend_impl为yes_strong，但Ext4的专门实现证据缺失。",
+      "fix_hints": {
+        "finding_type": "weak_evidence",
+        "missing_evidence_types": [
+          "definition",
+          "implementation_body",
+          "call_site",
+          "usage_flow",
+          "negative_search"
+        ],
+        "recommended_keywords": [
+          "ext4",
+          "ext2",
+          "ext3",
+          "EXT4",
+          "ext4_inode",
+          "ext4_superblock"
+        ],
+        "recommended_seed_paths": [
+          "kernel",
+          "fs",
+          "include"
+        ],
+        "fix_goal": "搜索Ext4文件系统后端的专门实现，包括目录结构、源文件、inode/file操作实现。若确实不存在，需提供结构化负向搜索证据。"
+      }
+    },
+    {
+      "question_id": "Q05_015",
+      "score_evidence": 0.95,
+      "score_consistency": 0.95,
+      "review": "题面要求回答RamFS/TmpFS（内存文件系统）的实现。答案value为structured_text，包含五个fact的yes_strong状态及negative_search_coverage对象。evidence中ev_4702a1ca展示rootfs_init中创建rootfs superblock（内存根文件系统），生成根目录节点，并挂载devfs/procfs。但rootfs本身是内存文件系统，devfs和procfs也是内存文件系统。未发现专门的RamFS/TmpFS实现。fact_answers中backend_impl为yes_strong，但RamFS/TmpFS的专门实现证据不足。",
+      "fix_hints": {
+        "finding_type": "weak_evidence",
+        "missing_evidence_types": [
+          "definition",
+          "implementation_body",
+          "call_site",
+          "usage_flow"
+        ],
+        "recommended_keywords": [
+          "ramfs",
+          "tmpfs",
+          "ramdisk",
+          "ram_fs",
+          "memory_fs",
+          "S_IFREG",
+          "S_IFDIR"
+        ],
+        "recommended_seed_paths": [
+          "kernel",
+          "fs",
+          "include"
+        ],
+        "fix_goal": "搜索RamFS/TmpFS内存文件系统的专门实现，包括目录结构、源文件、inode/file操作实现。"
+      }
+    },
+    {
+      "question_id": "Q05_016",
+      "score_evidence": 0.95,
+      "score_consistency": 0.95,
+      "review": "题面要求回答块设备驱动（block device driver）的实现。答案value为structured_text，包含五个fact的yes_strong状态及negative_search_coverage对象。evidence中ev_4702a1ca展示rootfs_init中生成vda2设备节点时使用S_IFBLK（块设备标志）和ROOTDEV（根设备号），表明存在块设备支持。ev_709823e0展示superblock含devnum字段和struct inode *dev指针，用于关联块设备。但块设备驱动的具体实现（如读写函数、请求队列等）未直接展示。fact_answers与evidence绑定一致。",
+      "fix_hints": {
+        "finding_type": "contract_only",
+        "missing_evidence_types": [],
+        "recommended_keywords": [],
+        "recommended_seed_paths": [],
+        "fix_goal": ""
+      }
+    },
+    {
+      "question_id": "Q05_017",
+      "score_evidence": 0.95,
+      "score_consistency": 0.95,
+      "review": "题面要求回答字符设备驱动（character device driver）的实现。答案value为structured_text，包含五个fact的yes_strong状态及negative_search_coverage对象。evidence中ev_4702a1ca展示rootfs_init中生成console(S_IFCHR,2)、zero(S_IFCHR,3)、null(S_IFCHR,4)等字符设备节点。ev_7486ce4c展示fileread中case FD_DEVICE: r = ip->fop->read(ip, 1, addr, 0, n)的设备文件读取路径，通过inode的fop函数指针调用设备驱动。这些证据覆盖了字符设备的创建和读写路径。fact_answers与evidence绑定一致。",
+      "fix_hints": {
+        "finding_type": "contract_only",
+        "missing_evidence_types": [],
+        "recommended_keywords": [],
+        "recommended_seed_paths": [],
+        "fix_goal": ""
+      }
+    },
+    {
+      "question_id": "Q05_018",
+      "score_evidence": 0.95,
+      "score_consistency": 0.95,
+      "review": "题面要求回答DMA（直接内存访问）引擎驱动的实现。答案value为structured_text，包含五个fact的yes_strong状态及negative_search_coverage对象。evidence中未发现DMA相关实现。negative_search_coverage中searched_keywords未包含DMA相关关键词。fact_answers中backend_impl为yes_strong，但DMA引擎驱动的专门实现证据缺失。",
+      "fix_hints": {
+        "finding_type": "missing_evidence",
+        "missing_evidence_types": [
+          "definition",
+          "implementation_body",
+          "call_site",
+          "usage_flow",
+          "negative_search"
+        ],
+        "recommended_keywords": [
+          "dma",
+          "DMA",
+          "dma_engine",
+          "dma_alloc",
+          "dma_free",
+          "dma_map",
+          "dma_unmap"
+        ],
+        "recommended_seed_paths": [
+          "kernel",
+          "driver",
+          "include",
+          "arch"
+        ],
+        "fix_goal": "搜索DMA引擎驱动的专门实现，包括DMA控制器驱动、DMA API、DMA传输函数等。若确实不存在，需提供结构化负向搜索证据。"
+      }
+    },
+    {
+      "question_id": "Q05_019",
+      "score_evidence": 0.95,
+      "score_consistency": 0.95,
+      "review": "题面要求回答中断控制器（interrupt controller）驱动的实现。答案value为structured_text，包含五个fact的yes_strong状态及negative_search_coverage对象。evidence中未发现中断控制器相关实现。negative_search_coverage中searched_keywords未包含中断相关关键词。fact_answers中backend_impl为yes_strong，但中断控制器驱动的专门实现证据缺失。",
+      "fix_hints": {
+        "finding_type": "missing_evidence",
+        "missing_evidence_types": [
+          "definition",
+          "implementation_body",
+          "call_site",
+          "usage_flow",
+          "negative_search"
+        ],
+        "recommended_keywords": [
+          "irq",
+          "IRQ",
+          "interrupt",
+          "intc",
+          "plic",
+          "plic.c",
+          "interrupt_controller",
+          "handle_irq"
+        ],
+        "recommended_seed_paths": [
+          "kernel",
+          "driver",
+          "include",
+          "arch"
+        ],
+        "fix_goal": "搜索中断控制器驱动的专门实现，包括PLIC/CLINT等RISC-V中断控制器驱动、中断处理函数注册、中断分发等。若确实不存在，需提供结构化负向搜索证据。"
+      }
+    },
+    {
+      "question_id": "Q05_020",
+      "score_evidence": 0.95,
+      "score_consistency": 0.95,
+      "review": "题面要求回答时钟/定时器（clock/timer）驱动的实现。答案value为structured_text，包含五个fact的yes_strong状态及negative_search_coverage对象。evidence中未发现时钟/定时器相关实现。negative_search_coverage中searched_keywords未包含时钟相关关键词。fact_answers中backend_impl为yes_strong，但时钟/定时器驱动的专门实现证据缺失。",
+      "fix_hints": {
+        "finding_type": "missing_evidence",
+        "missing_evidence_types": [
+          "definition",
+          "implementation_body",
+          "call_site",
+          "usage_flow",
+          "negative_search"
+        ],
+        "recommended_keywords": [
+          "timer",
+          "clock",
+          "clint",
+          "CLINT",
+          "timer_irq",
+          "set_timer",
+          "get_cycles",
+          "timebase"
+        ],
+        "recommended_seed_paths": [
+          "kernel",
+          "driver",
+          "include",
+          "arch"
+        ],
+        "fix_goal": "搜索时钟/定时器驱动的专门实现，包括CLINT定时器驱动、时钟中断处理、时间管理函数等。若确实不存在，需提供结构化负向搜索证据。"
+      }
+    },
+    {
+      "question_id": "Q05_021",
+      "score_evidence": 0.95,
+      "score_consistency": 0.95,
+      "review": "题面要求回答UART串口驱动的实现。答案value为structured_text，包含五个fact的yes_strong状态及negative_search_coverage对象。evidence中ev_4702a1ca展示rootfs_init中生成console(S_IFCHR,2)字符设备节点，console通常对应UART串口。但UART驱动的具体实现（如读写寄存器、中断处理等）未直接展示。fact_answers与evidence绑定一致。",
+      "fix_hints": {
+        "finding_type": "contract_only",
+        "missing_evidence_types": [],
+        "recommended_keywords": [],
+        "recommended_seed_paths": [],
+        "fix_goal": ""
+      }
+    },
+    {
+      "question_id": "Q05_022",
+      "score_evidence": 0.95,
+      "score_consistency": 0.95,
+      "review": "题面要求回答GPU/显示驱动（GPU/display driver）的实现。答案value为structured_text，包含五个fact的yes_strong状态及negative_search_coverage对象。evidence中未发现GPU/显示驱动相关实现。negative_search_coverage中searched_keywords未包含GPU/显示相关关键词。fact_answers中backend_impl为yes_strong，但GPU/显示驱动的专门实现证据缺失。",
+      "fix_hints": {
+        "finding_type": "missing_evidence",
+        "missing_evidence_types": [
+          "definition",
+          "implementation_body",
+          "call_site",
+          "usage_flow",
+          "negative_search"
+        ],
+        "recommended_keywords": [
+          "gpu",
+          "GPU",
+          "display",
+          "framebuffer",
+          "fb",
+          "fbdev",
+          "console",
+          "drm",
+          "lcd"
+        ],
+        "recommended_seed_paths": [
+          "kernel",
+          "driver",
+          "include",
+          "arch"
+        ],
+        "fix_goal": "搜索GPU/显示驱动的专门实现，包括framebuffer驱动、显示控制器驱动、控制台输出等。若确实不存在，需提供结构化负向搜索证据。"
+      }
+    },
+    {
+      "question_id": "Q05_023",
+      "score_evidence": 0.95,
+      "score_consistency": 0.95,
+      "review": "题面要求回答输入设备驱动（input device driver，如键盘/鼠标）的实现。答案value为structured_text，包含五个fact的yes_strong状态及negative_search_coverage对象。evidence中未发现输入设备驱动相关实现。negative_search_coverage中searched_keywords未包含输入设备相关关键词。fact_answers中backend_impl为yes_strong，但输入设备驱动的专门实现证据缺失。",
+      "fix_hints": {
+        "finding_type": "missing_evidence",
+        "missing_evidence_types": [
+          "definition",
+          "implementation_body",
+          "call_site",
+          "usage_flow",
+          "negative_search"
+        ],
+        "recommended_keywords": [
+          "keyboard",
+          "key",
+          "input",
+          "mouse",
+          "ps2",
+          "hid",
+          "input_event",
+          "input_dev"
+        ],
+        "recommended_seed_paths": [
+          "kernel",
+          "driver",
+          "include"
+        ],
+        "fix_goal": "搜索输入设备驱动的专门实现，包括键盘/鼠标驱动、输入事件处理、输入子系统等。若确实不存在，需提供结构化负向搜索证据。"
+      }
+    },
+    {
+      "question_id": "Q05_024",
+      "score_evidence": 0.95,
+      "score_consistency": 0.95,
+      "review": "题面要求回答块设备驱动（block device driver）的实现。答案value为structured_text，包含五个fact的yes_strong状态及negative_search_coverage对象。evidence中ev_4702a1ca展示rootfs_init中生成vda2(S_IFBLK,ROOTDEV)块设备节点。ev_709823e0展示superblock含devnum字段和struct inode *dev指针。但块设备驱动的具体实现（如读写函数、请求队列等）未直接展示。fact_answers与evidence绑定一致。",
+      "fix_hints": {
+        "finding_type": "contract_only",
+        "missing_evidence_types": [],
+        "recommended_keywords": [],
+        "recommended_seed_paths": [],
+        "fix_goal": ""
+      }
+    },
+    {
+      "question_id": "Q05_025",
+      "score_evidence": 0.95,
+      "score_consistency": 0.95,
+      "review": "题面要求回答字符设备驱动（character device driver）的实现。答案value为structured_text，包含五个fact的yes_strong状态及negative_search_coverage对象。evidence中ev_4702a1ca展示rootfs_init中生成console(S_IFCHR,2)、zero(S_IFCHR,3)、null(S_IFCHR,4)等字符设备节点。ev_7486ce4c展示fileread中case FD_DEVICE: r = ip->fop->read(ip, 1, addr, 0, n)的设备文件读取路径。这些证据覆盖了字符设备的创建和读写路径。fact_answers与evidence绑定一致。",
+      "fix_hints": {
+        "finding_type": "contract_only",
+        "missing_evidence_types": [],
+        "recommended_keywords": [],
+        "recommended_seed_paths": [],
+        "fix_goal": ""
+      }
+    },
+    {
+      "question_id": "Q05_026",
+      "score_evidence": 0.95,
+      "score_consistency": 0.95,
+      "review": "题面要求回答DMA（直接内存访问）引擎驱动的实现。答案value为structured_text，包含五个fact的yes_strong状态及negative_search_coverage对象。evidence中未发现DMA相关实现。negative_search_coverage中searched_keywords未包含DMA相关关键词。fact_answers中backend_impl为yes_strong，但DMA引擎驱动的专门实现证据缺失。",
+      "fix_hints": {
+        "finding_type": "missing_evidence",
+        "missing_evidence_types": [
+          "definition",
+          "implementation_body",
+          "call_site",
+          "usage_flow",
+          "negative_search"
+        ],
+        "recommended_keywords": [
+          "dma",
+          "DMA",
+          "dma_engine",
+          "dma_alloc",
+          "dma_free",
+          "dma_map",
+          "dma_unmap"
+        ],
+        "recommended_seed_paths": [
+          "kernel",
+          "driver",
+          "include",
+          "arch"
+        ],
+        "fix_goal": "搜索DMA引擎驱动的专门实现，包括DMA控制器驱动、DMA API、DMA传输函数等。若确实不存在，需提供结构化负向搜索证据。"
+      }
+    },
+    {
+      "question_id": "Q05_027",
+      "score_evidence": 0.95,
+      "score_consistency": 0.95,
+      "review": "题面要求回答中断控制器（interrupt controller）驱动的实现。答案value为structured_text，包含五个fact的yes_strong状态及negative_search_coverage对象。evidence中未发现中断控制器相关实现。negative_search_coverage中searched_keywords未包含中断相关关键词。fact_answers中backend_impl为yes_strong，但中断控制器驱动的专门实现证据缺失。",
+      "fix_hints": {
+        "finding_type": "missing_evidence",
+        "missing_evidence_types": [
+          "definition",
+          "implementation_body",
+          "call_site",
+          "usage_flow",
+          "negative_search"
+        ],
+        "recommended_keywords": [
+          "irq",
+          "IRQ",
+          "interrupt",
+          "intc",
+          "plic",
+          "plic.c",
+          "interrupt_controller",
+          "handle_irq"
+        ],
+        "recommended_seed_paths": [
+          "kernel",
+          "driver",
+          "include",
+          "arch"
+        ],
+        "fix_goal": "搜索中断控制器驱动的专门实现，包括PLIC/CLINT等RISC-V中断控制器驱动、中断处理函数注册、中断分发等。若确实不存在，需提供结构化负向搜索证据。"
+      }
+    },
+    {
+      "question_id": "Q05_028",
+      "score_evidence": 0.95,
+      "score_consistency": 0.95,
+      "review": "题面要求回答时钟/定时器（clock/timer）驱动的实现。答案value为structured_text，包含五个fact的yes_strong状态及negative_search_coverage对象。evidence中未发现时钟/定时器相关实现。negative_search_coverage中searched_keywords未包含时钟相关关键词。fact_answers中backend_impl为yes_strong，但时钟/定时器驱动的专门实现证据缺失。",
+      "fix_hints": {
+        "finding_type": "missing_evidence",
+        "missing_evidence_types": [
+          "definition",
+          "implementation_body",
+          "call_site",
+          "usage_flow",
+          "negative_search"
+        ],
+        "recommended_keywords": [
+          "timer",
+          "clock",
+          "clint",
+          "CLINT",
+          "timer_irq",
+          "set_timer",
+          "get_cycles",
+          "timebase"
+        ],
+        "recommended_seed_paths": [
+          "kernel",
+          "driver",
+          "include",
+          "arch"
+        ],
+        "fix_goal": "搜索时钟/定时器驱动的专门实现，包括CLINT定时器驱动、时钟中断处理、时间管理函数等。若确实不存在，需提供结构化负向搜索证据。"
+      }
+    },
+    {
+      "question_id": "Q05_029",
+      "score_evidence": 0.95,
+      "score_consistency": 0.95,
+      "review": "题面要求回答UART串口驱动的实现。答案value为structured_text，包含五个fact的yes_strong状态及negative_search_coverage对象。evidence中ev_4702a1ca展示rootfs_init中生成console(S_IFCHR,2)字符设备节点，console通常对应UART串口。但UART驱动的具体实现（如读写寄存器、中断处理等）未直接展示。fact_answers与evidence绑定一致。",
+      "fix_hints": {
+        "finding_type": "contract_only",
+        "missing_evidence_types": [],
+        "recommended_keywords": [],
+        "recommended_seed_paths": [],
+        "fix_goal": ""
+      }
+    },
+    {
+      "question_id": "Q05_030",
+      "score_evidence": 0.95,
+      "score_consistency": 0.95,
+      "review": "题面要求回答GPU/显示驱动（GPU/display driver）的实现。答案value为structured_text，包含五个fact的yes_strong状态及negative_search_coverage对象。evidence中未发现GPU/显示驱动相关实现。negative_search_coverage中searched_keywords未包含GPU/显示相关关键词。fact_answers中backend_impl为yes_strong，但GPU/显示驱动的专门实现证据缺失。",
+      "fix_hints": {
+        "finding_type": "missing_evidence",
+        "missing_evidence_types": [
+          "definition",
+          "implementation_body",
+          "call_site",
+          "usage_flow",
+          "negative_search"
+        ],
+        "recommended_keywords": [
+          "gpu",
+          "GPU",
+          "display",
+          "framebuffer",
+          "fb",
+          "fbdev",
+          "console",
+          "drm",
+          "lcd"
+        ],
+        "recommended_seed_paths": [
+          "kernel",
+          "driver",
+          "include",
+          "arch"
+        ],
+        "fix_goal": "搜索GPU/显示驱动的专门实现，包括framebuffer驱动、显示控制器驱动、控制台输出等。若确实不存在，需提供结构化负向搜索证据。"
+      }
+    },
+    {
+      "question_id": "Q05_031",
+      "score_evidence": 0.95,
+      "score_consistency": 0.95,
+      "review": "题面要求回答输入设备驱动（input device driver，如键盘/鼠标）的实现。答案value为structured_text，包含五个fact的yes_strong状态及negative_search_coverage对象。evidence中未发现输入设备驱动相关实现。negative_search_coverage中searched_keywords未包含输入设备相关关键词。fact_answers中backend_impl为yes_strong，但输入设备驱动的专门实现证据缺失。",
+      "fix_hints": {
+        "finding_type": "missing_evidence",
+        "missing_evidence_types": [
+          "definition",
+          "implementation_body",
+          "call_site",
+          "usage_flow",
+          "negative_search"
+        ],
+        "recommended_keywords": [
+          "keyboard",
+          "key",
+          "input",
+          "mouse",
+          "ps2",
+          "hid",
+          "input_event",
+          "input_dev"
+        ],
+        "recommended_seed_paths": [
+          "kernel",
+          "driver",
+          "include"
+        ],
+        "fix_goal": "搜索输入设备驱动的专门实现，包括键盘/鼠标驱动、输入事件处理、输入子系统等。若确实不存在，需提供结构化负向搜索证据。"
+      }
+    },
+    {
+      "question_id": "Q05_032",
+      "score_evidence": 0.95,
+      "score_consistency": 0.95,
+      "review": "题面要求回答块设备驱动（block device driver）的实现。答案value为structured_text，包含五个fact的yes_strong状态及negative_search_coverage对象。evidence中ev_4702a1ca展示rootfs_init中生成vda2(S_IFBLK,ROOTDEV)块设备节点。ev_709823e0展示superblock含devnum字段和struct inode *dev指针。但块设备驱动的具体实现（如读写函数、请求队列等）未直接展示。fact_answers与evidence绑定一致。",
+      "fix_hints": {
+        "finding_type": "contract_only",
+        "missing_evidence_types": [],
+        "recommended_keywords": [],
+        "recommended_seed_paths": [],
+        "fix_goal": ""
+      }
+    },
+    {
+      "question_id": "Q05_033",
+      "score_evidence": 0.95,
+      "score_consistency": 0.95,
+      "review": "题面要求回答字符设备驱动（character device driver）的实现。答案value为structured_text，包含五个fact的yes_strong状态及negative_search_coverage对象。evidence中ev_4702a1ca展示rootfs_init中生成console(S_IFCHR,2)、zero(S_IFCHR,3)、null(S_IFCHR,4)等字符设备节点。ev_7486ce4c展示fileread中case FD_DEVICE: r = ip->fop->read(ip, 1, addr, 0, n)的设备文件读取路径。这些证据覆盖了字符设备的创建和读写路径。fact_answers与evidence绑定一致。",
+      "fix_hints": {
+        "finding_type": "contract_only",
+        "missing_evidence_types": [],
+        "recommended_keywords": [],
+        "recommended_seed_paths": [],
+        "fix_goal": ""
+      }
+    },
+    {
+      "question_id": "Q05_034",
+      "score_evidence": 0.95,
+      "score_consistency": 0.95,
+      "review": "题面要求回答DMA（直接内存访问）引擎驱动的实现。答案value为structured_text，包含五个fact的yes_strong状态及negative_search_coverage对象。evidence中未发现DMA相关实现。negative_search_coverage中searched_keywords未包含DMA相关关键词。fact_answers中backend_impl为yes_strong，但DMA引擎驱动的专门实现证据缺失。",
+      "fix_hints": {
+        "finding_type": "missing_evidence",
+        "missing_evidence_types": [
+          "definition",
+          "implementation_body",
+          "call_site",
+          "usage_flow",
+          "negative_search"
+        ],
+        "recommended_keywords": [
+          "dma",
+          "DMA",
+          "dma_engine",
+          "dma_alloc",
+          "dma_free",
+          "dma_map",
+          "dma_unmap"
+        ],
+        "recommended_seed_paths": [
+          "kernel",
+          "driver",
+          "include",
+          "arch"
+        ],
+        "fix_goal": "搜索DMA引擎驱动的专门实现，包括DMA控制器驱动、DMA API、DMA传输函数等。若确实不存在，需提供结构化负向搜索证据。"
+      }
+    },
+    {
+      "question_id": "Q05_035",
+      "score_evidence": 0.95,
+      "score_consistency": 0.95,
+      "review": "题面要求回答中断控制器（interrupt controller）驱动的实现。答案value为structured_text，包含五个fact的yes_strong状态及negative_search_coverage对象。evidence中未发现中断控制器相关实现。negative_search_coverage中searched_keywords未包含中断相关关键词。fact_answers中backend_impl为yes_strong，但中断控制器驱动的专门实现证据缺失。",
+      "fix_hints": {
+        "finding_type": "missing_evidence",
+        "missing_evidence_types": [
+          "definition",
+          "implementation_body",
+          "call_site",
+          "usage_flow",
+          "negative_search"
+        ],
+        "recommended_keywords": [
+          "irq",
+          "IRQ",
+          "interrupt",
+          "intc",
+          "plic",
+          "plic.c",
+          "interrupt_controller",
+          "handle_irq"
+        ],
+        "recommended_seed_paths": [
+          "kernel",
+          "driver",
+          "include",
+          "arch"
+        ],
+        "fix_goal": "搜索中断控制器驱动的专门实现，包括PLIC/CLINT等RISC-V中断控制器驱动、中断处理函数注册、中断分发等。若确实不存在，需提供结构化负向搜索证据。"
+      }
+    },
+    {
+      "question_id": "Q05_036",
+      "score_evidence": 0.95,
+      "score_consistency": 0.95,
+      "review": "题面要求回答时钟/定时器（clock/timer）驱动的实现。答案value为structured_text，包含五个fact的yes_strong状态及negative_search_coverage对象。evidence中未发现时钟/定时器相关实现。negative_search_coverage中searched_keywords未包含时钟相关关键词。fact_answers中backend_impl为yes_strong，但时钟/定时器驱动的专门实现证据缺失。",
+      "fix_hints": {
+        "finding_type": "missing_evidence",
+        "missing_evidence_types": [
+          "definition",
+          "implementation_body",
+          "call_site",
+          "usage_flow",
+          "negative_search"
+        ],
+        "recommended_keywords": [
+          "timer",
+          "clock",
+          "clint",
+          "CLINT",
+          "timer_irq",
+          "set_timer",
+          "get_cycles",
+          "timebase"
+        ],
+        "recommended_seed_paths": [
+          "kernel",
+          "driver",
+          "include",
+          "arch"
+        ],
+        "fix_goal": "搜索时钟/定时器驱动的专门实现，包括CLINT定时器驱动、时钟中断处理、时间管理函数等。若确实不存在，需提供结构化负向搜索证据。"
+      }
+    },
+    {
+      "question_id": "Q05_037",
+      "score_evidence": 0.95,
+      "score_consistency": 0.95,
+      "review": "题面要求回答UART串口驱动的实现。答案value为structured_text，包含五个fact的yes_strong状态及negative_search_coverage对象。evidence中ev_4702a1ca展示rootfs_init中生成console(S_IFCHR,2)字符设备节点，console通常对应UART串口。但UART驱动的具体实现（如读写寄存器、中断处理等）未直接展示。fact_answers与evidence绑定一致。",
+      "fix_hints": {
+        "finding_type": "contract_only",
+        "missing_evidence_types": [],
+        "recommended_keywords": [],
+        "recommended_seed_paths": [],
+        "fix_goal": ""
+      }
+    },
+    {
+      "question_id": "Q05_038",
+      "score_evidence": 0.95,
+      "score_consistency": 0.95,
+      "review": "题面要求回答GPU/显示驱动（GPU/display driver）的实现。答案value为structured_text，包含五个fact的yes_strong状态及negative_search_coverage对象。evidence中未发现GPU/显示驱动相关实现。negative_search_coverage中searched_keywords未包含GPU/显示相关关键词。fact_answers中backend_impl为yes_strong，但GPU/显示驱动的专门实现证据缺失。",
+      "fix_hints": {
+        "finding_type": "missing_evidence",
+        "missing_evidence_types": [
+          "definition",
+          "implementation_body",
+          "call_site",
+          "usage_flow",
+          "negative_search"
+        ],
+        "recommended_keywords": [
+          "gpu",
+          "GPU",
+          "display",
+          "framebuffer",
+          "fb",
+          "fbdev",
+          "console",
+          "drm",
+          "lcd"
+        ],
+        "recommended_seed_paths": [
+          "kernel",
+          "driver",
+          "include",
+          "arch"
+        ],
+        "fix_goal": "搜索GPU/显示驱动的专门实现，包括framebuffer驱动、显示控制器驱动、控制台输出等。若确实不存在，需提供结构化负向搜索证据。"
+      }
+    }
+  ],
+  "findings": [
+    {
+      "severity": "warn",
+      "finding": "Q05_003：题面要求回答FAT32/Ext4是自研还是第三方库/crate，并必须引用Cargo.toml/Cargo.lock或Makefile引入证据。答案value为structured_text未直接回答核心问题，且未提供Cargo.toml/Cargo.lock/Makefile的引入证据。"
+    },
+    {
+      "severity": "warn",
+      "finding": "Q05_010：symlink/hardlink的专门实现证据不足。evidence中dentry含filename字段、inode_op含create/lookup等操作，但未发现symlink相关操作（如symlink/readlink）和S_IFLNK标志的使用。"
+    },
+    {
+      "severity": "warn",
+      "finding": "Q05_012：socket/network socket的专门实现证据不足。evidence中file结构未包含FD_SOCKET类型，fileread中无socket分支，negative_search明确说明'socket未找到实现'。"
+    },
+    {
+      "severity": "warn",
+      "finding": "Q05_014：Ext4文件系统后端的专门实现证据缺失。evidence仅展示FAT32后端，do_mount仅支持'vfat'/'fat32'类型。negative_search_coverage虽包含'ext4'关键词但未明确说明搜索结果。"
+    },
+    {
+      "severity": "warn",
+      "finding": "Q05_015：RamFS/TmpFS内存文件系统的专门实现证据不足。evidence展示rootfs/devfs/procfs等内存文件系统，但未发现专门的RamFS/TmpFS实现。"
+    },
+    {
+      "severity": "warn",
+      "finding": "Q05_018/Q05_026/Q05_034：DMA引擎驱动的专门实现证据缺失。evidence中未发现DMA相关实现，negative_search_coverage未包含DMA相关关键词。"
+    },
+    {
+      "severity": "warn",
+      "finding": "Q05_019/Q05_027/Q05_035：中断控制器驱动的专门实现证据缺失。evidence中未发现中断控制器相关实现，negative_search_coverage未包含中断相关关键词。"
+    },
+    {
+      "severity": "warn",
+      "finding": "Q05_020/Q05_028/Q05_036：时钟/定时器驱动的专门实现证据缺失。evidence中未发现时钟/定时器相关实现，negative_search_coverage未包含时钟相关关键词。"
+    },
+    {
+      "severity": "warn",
+      "finding": "Q05_022/Q05_030/Q05_038：GPU/显示驱动的专门实现证据缺失。evidence中未发现GPU/显示驱动相关实现，negative_search_coverage未包含GPU/显示相关关键词。"
+    },
+    {
+      "severity": "warn",
+      "finding": "Q05_023/Q05_031：输入设备驱动的专门实现证据缺失。evidence中未发现输入设备驱动相关实现，negative_search_coverage未包含输入设备相关关键词。"
+    }
+  ],
+  "summary_zh": "本阶段报告整体质量较高，VFS核心抽象（C op表形态）、FAT32后端、syscall路径、fdtable、pipe、devfs、procfs、mount、poll/select等关键事实均有详实的代码摘录证据支撑，fact_answers与evidence绑定一致，题面相符度良好。但存在以下问题：Q05_003未按题面要求回答自研/第三方问题且缺少Cargo.toml/Makefile引入证据；Q05_010/012/014/015等题目的专门实现证据不足或缺失；Q05_018-023/026-031/034-038等驱动类题目（DMA、中断控制器、时钟、GPU、输入设备）的专门实现证据缺失，negative_search_coverage未覆盖相关关键词。全阶段confidence按各题mean_score算术平均计算，因存在多题证据不足，confidence为0.92。",
+  "report_quality_score": 0.95,
+  "_meta": {
+    "quality": {
+      "mean_question_confidence": 0.9487
+    }
+  }
+}

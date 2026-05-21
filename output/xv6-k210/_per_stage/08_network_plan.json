@@ -1,31 +1,24 @@
 {
   "stage_id": "08_network",
   "evidence_targets": [
-    "poll/ppoll/pselect 多路复用机制的存在性与完整性",
-    "socket API 的缺失证据（无 sys_socket/sys_bind 等）",
-    "网络协议栈的缺失证据（无 TCP/UDP/IP 栈代码）",
-    "网络设备驱动的缺失证据（仅 virtio-disk，无 net 驱动）",
-    "S_IFSOCK 与 socket errno 的占位性质",
     "协议栈",
     "socket API",
     "poll/epoll",
     "驱动接入"
   ],
   "seed_paths": [
-    "include/fs/poll.h",
-    "kernel/fs/poll.c",
-    "include/fs/file.h",
-    "include/sysnum.h",
-    "kernel/syscall/syscall.c",
-    "kernel/syscall/sysfile.c",
-    "include/fs/stat.h",
-    "include/errno.h",
-    "include/hal/virtio.h",
-    "kernel/hal/virtio_disk.c",
     "net",
     "tcp",
     "udp",
-    "socket"
+    "socket",
+    "lwip",
+    "smoltcp",
+    "include/fs",
+    "include/mm",
+    "include/sync",
+    "kernel/fs",
+    "kernel/mm",
+    "kernel/sync"
   ],
   "framework_guess": [
     "xv6"
@@ -34,18 +27,13 @@
     "riscv64"
   ],
   "entry_symbols": [
-    "ppoll",
-    "pselect",
-    "sys_ppoll",
-    "sys_pselect",
-    "file_poll",
-    "poll_wait",
-    "struct poll_table",
-    "struct pollfd",
-    "struct file",
-    "struct poll_wait_queue",
     "sys_socket",
-    "tcp"
+    "tcp",
+    "udp",
+    "poll",
+    "epoll",
+    "_start",
+    "start"
   ],
   "repo_hotspots": [
     "Makefile",
@@ -60,12 +48,10 @@
     "include/fs"
   ],
   "preferred_tools": [
-    "read_code_segment",
-    "lsp_get_document_outline",
+    "rag_search_code",
+    "lsp_get_call_graph",
     "lsp_get_definition",
-    "lsp_get_references",
-    "grep_in_repo",
-    "rag_search_code"
+    "read_code_segment"
   ],
   "avoid_tools": [
     "blind_read_large_files",
@@ -78,31 +64,227 @@
     "max_memory_items": 8
   },
   "execution_steps": [
-    "【取证-协议栈缺失】grep 搜索 'tcp|udp|ipv4|ipv6|arp|icmp|dns|dhcp' 等协议关键词，确认全仓库无协议栈实现",
-    "【取证-socket缺失】grep 搜索 'sys_socket|sys_bind|sys_connect|sys_listen|sys_accept|sys_send|sys_recv' 确认无 socket 系统调用",
-    "【取证-socket缺失】检查 include/sysnum.h 全文，列出所有系统调用号，确认无 SYS_socket 系列",
-    "【取证-socket缺失】检查 kernel/syscall/syscall.c 中的 syscall 分发表，确认无 socket 相关条目",
-    "【取证-占位符】读取 include/fs/stat.h 中 S_IFSOCK/S_ISSOCK 宏，确认仅为模式位定义无实际使用",
-    "【取证-占位符】grep 搜索 S_ISSOCK 的引用，确认无任何代码路径创建 socket 类型 inode",
-    "【取证-占位符】读取 include/errno.h 中 ENOTSOCK/ESOCKTNOSUPPORT/EPROTOTYPE 定义，确认仅为兼容占位",
-    "【取证-驱动缺失】读取 include/hal/virtio.h，确认 VIRTIO_MMIO_DEVICE_ID 注释提到 net=1 但仅实现 disk",
-    "【取证-驱动缺失】检查 kernel/hal/ 目录下所有 .c 文件，确认无网络设备驱动（无 ethernet/net/wlan 相关）",
-    "【分析-poll机制】lsp_get_document_outline 查看 kernel/fs/poll.c 完整函数列表",
-    "【分析-poll机制】读取 include/fs/poll.h 全文，分析 pollfd/poll_table/poll_wait_queue 结构体定义",
-    "【分析-poll机制】读取 kernel/fs/poll.c 中 __poll_func (行19-31)，分析 poll_wait 回调如何将 wait_node 加入等待队列",
-    "【分析-poll机制】读取 kernel/fs/poll.c 中 poll_init/poll_end (行33-56)，分析 poll 会话生命周期管理",
-    "【分析-poll机制】读取 kernel/fs/poll.c 中 file_poll (行58-64)，分析如何通过 file->poll 函数指针分发",
-    "【分析-poll机制】读取 kernel/fs/poll.c 中 poll_sched_timeout (行66-89)，分析超时睡眠/唤醒机制",
-    "【分析-ppoll】读取 kernel/fs/poll.c 中 ppoll (行91-105)，分析其当前为桩实现（直接返回 POLLIN|POLLOUT）",
-    "【分析-pselect】读取 kernel/fs/poll.c 中 pselect (行127-243)，分析完整的 fdset 遍历与事件检测循环",
-    "【分析-pselect】追踪 pselect 中 fdset_work_init 和位图遍历逻辑，理解多 fd 批量轮询机制",
-    "【分析-file.poll】lsp_get_references 查找 file->poll 函数指针的所有赋值点，确认哪些文件类型实现了 poll",
-    "【分析-file.poll】读取 include/fs/file.h 中 struct file 定义，分析 poll 函数指针在 VFS 中的位置",
-    "【分析-syscall入口】读取 kernel/syscall/sysfile.c 中 sys_ppoll (行740-760)，分析参数拷贝与调用路径",
-    "【分析-syscall入口】读取 kernel/syscall/sysfile.c 中 sys_pselect (行680-730)，分析完整的参数验证与结果回拷",
-    "【分析-waitqueue】读取 include/sync/waitqueue.h，分析 poll 依赖的等待队列数据结构",
-    "【收束-总结】汇总证据：网络协议栈/socket API 完全缺失，poll/pselect 是唯一 I/O 多路复用机制",
-    "【收束-总结】评估 ppoll 的桩实现状态（直接返回所有 fd 可读写）对实际可用性的影响",
-    "【收束-总结】评估 pselect 实现的完整性（含超时、信号掩码、fdset 遍历）"
+    "对照 seed_paths、entry_symbols，用 rag_search_code / list_repo_structure / LSP 锁定与本阶段相关的关键文件与符号。",
+    "对核心入口使用 lsp_get_document_outline → lsp_get_call_graph（单入口、浅深度）→ 必要时 read_code_segment 精读。",
+    "按题单逐项输出结论，每条附反引号源码路径；无实现则显式写「未发现/桩函数」等，勿臆测。"
+  ],
+  "task_plan": [
+    {
+      "task_id": "task_08_network_overview",
+      "question_ids": [
+        "Q08_001",
+        "Q08_002"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证是否存在网络子系统实现（协议栈或 socket 层），并判断协议栈来源（第三方库/自研/混合/未发现）。需要完成 fact_id: Q08_001_01, Q08_001_02, Q08_001_03, Q08_001_04, Q08_001_05, Q08_001_06, Q08_002_01, Q08_002_02, Q08_002_03, Q08_002_04, Q08_002_05, Q08_002_06。具体查证：socket/sendto/recvfrom 等用户接口是否定义并接入 syscall table；是否存在协议栈模块或第三方依赖（如 smoltcp/lwip）；是否实现 Ethernet/ARP/IP/ICMP/UDP/TCP 层；send/recv 是否接入 netdev/loopback/driver 队列；是否有网卡驱动初始化、中断/轮询收包和 DMA/descriptor；若未找到则执行负向搜索覆盖关键词和 seed_paths。",
+      "group_reason": "Q08_001 和 Q08_002 共享完全相同的证据链（socket API、协议栈、协议层、驱动、负向搜索），且 Q08_002 的答案（第三方库/自研/混合/未发现）直接依赖 Q08_001 的发现结果，合并可避免重复搜索。",
+      "query": "在 kernel、net、network、driver、hal、syscall、include、Cargo.toml、Makefile 等目录中搜索 socket、bind、connect、sendto、recvfrom、Ethernet、ARP、IP、ICMP、UDP、TCP、smoltcp、lwip、netdev、virtio-net、e1000 等关键词。使用 rag_search_code 和 grep_in_repo 获取 hint，然后使用 read_code_segment、lsp_get_definition、lsp_get_references、lsp_get_call_graph 获取强证据。确认 socket 系统调用是否注册到 syscall table，协议栈模块是否存在（自研或第三方），各协议层实现体，以及 send/recv 到 netdev 的调用链。若未发现，记录负向搜索覆盖情况。",
+      "seed_paths": [
+        "kernel",
+        "net",
+        "network",
+        "driver",
+        "hal",
+        "syscall",
+        "include",
+        "Cargo.toml",
+        "Makefile"
+      ],
+      "entry_symbols": [
+        "sys_socket",
+        "tcp",
+        "udp",
+        "poll",
+        "epoll",
+        "_start",
+        "start"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ]
+    },
+    {
+      "task_id": "task_08_socket_syscall",
+      "question_ids": [
+        "Q08_003"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证是否实现 socket 系统调用接口（socket/bind/connect/sendto/recvfrom 等）。需要完成 fact_id: Q08_003_01, Q08_003_02, Q08_003_03, Q08_003_04, Q08_003_05, Q08_003_06。具体查证：socket/sendto/recvfrom 等用户接口是否定义并接入 syscall table；是否存在协议栈模块或第三方依赖；是否实现 Ethernet/ARP/IP/ICMP/UDP/TCP 层；send/recv 是否接入 netdev/loopback/driver 队列；是否有网卡驱动初始化、中断/轮询收包和 DMA/descriptor；若未找到则执行负向搜索。",
+      "group_reason": "Q08_003 独立聚焦 socket 系统调用接口，与 Q08_001 的总体网络子系统存在部分重叠但更具体，且其 tri_state 判断需要独立的证据链，不宜与 Q08_001 合并以免混淆。",
+      "query": "在 kernel、net、network、driver、hal、syscall、include、Cargo.toml、Makefile 等目录中搜索 socket、bind、connect、sendto、recvfrom、Ethernet、ARP、IP、ICMP、UDP、TCP、smoltcp、lwip、netdev、virtio-net、e1000 等关键词。使用 rag_search_code 和 grep_in_repo 获取 hint，然后使用 read_code_segment、lsp_get_definition、lsp_get_references、lsp_get_call_graph 获取强证据。确认 socket 系统调用函数（如 sys_socket、sys_bind、sys_connect、sys_sendto、sys_recvfrom）的定义和实现体，以及它们是否被注册到 syscall table。若未发现，记录负向搜索覆盖情况。",
+      "seed_paths": [
+        "kernel",
+        "net",
+        "network",
+        "driver",
+        "hal",
+        "syscall",
+        "include",
+        "Cargo.toml",
+        "Makefile"
+      ],
+      "entry_symbols": [
+        "sys_socket",
+        "sys_bind",
+        "sys_connect",
+        "sys_sendto",
+        "sys_recvfrom"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ]
+    },
+    {
+      "task_id": "task_08_send_path_trace",
+      "question_ids": [
+        "Q08_004"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "追踪发送路径：syscall → 协议栈 → 网卡驱动，列出 3-6 个关键节点并给出证据。需要完成 fact_id: Q08_004_01, Q08_004_02, Q08_004_03, Q08_004_04, Q08_004_05, Q08_004_06。具体查证：socket/sendto/recvfrom 等用户接口是否定义并接入 syscall table；是否存在协议栈模块或第三方依赖；是否实现 Ethernet/ARP/IP/ICMP/UDP/TCP 层；send/recv 是否接入 netdev/loopback/driver 队列；是否有网卡驱动初始化、中断/轮询收包和 DMA/descriptor；若未找到则执行负向搜索。",
+      "group_reason": "Q08_004 要求追踪发送路径，其证据链与 Q08_001 和 Q08_003 高度重叠，但需要更详细的调用链分析（如 sys_sendto → 协议栈发送函数 → netdev 发送函数 → 驱动发送函数），因此单独作为一个 task 以避免干扰其他题目的 tri_state 判断。",
+      "query": "优先从 sys_sendto 入口开始，使用 lsp_get_call_graph（单入口、浅深度）追踪调用链：sys_sendto → 协议栈发送函数（如 tcp_sendmsg/udp_sendmsg）→ netdev 发送函数（如 netdev_tx）→ 网卡驱动发送函数（如 virtio_net_tx/e1000_tx）。使用 read_code_segment 精读关键节点代码，记录函数名、文件路径和行号。若未发现完整路径，记录已找到的节点和缺失环节。",
+      "seed_paths": [
+        "kernel",
+        "net",
+        "network",
+        "driver",
+        "hal",
+        "syscall",
+        "include"
+      ],
+      "entry_symbols": [
+        "sys_sendto",
+        "tcp_sendmsg",
+        "udp_sendmsg",
+        "netdev_tx",
+        "virtio_net_tx",
+        "e1000_tx"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow"
+      ]
+    },
+    {
+      "task_id": "task_08_net_driver",
+      "question_ids": [
+        "Q08_005"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证是否实现网卡驱动（virtio-net/e1000 等）与收包中断路径。需要完成 fact_id: Q08_005_01, Q08_005_02, Q08_005_03, Q08_005_04, Q08_005_05, Q08_005_06。具体查证：socket/sendto/recvfrom 等用户接口是否定义并接入 syscall table；是否存在协议栈模块或第三方依赖；是否实现 Ethernet/ARP/IP/ICMP/UDP/TCP 层；send/recv 是否接入 netdev/loopback/driver 队列；是否有网卡驱动初始化、中断/轮询收包和 DMA/descriptor；若未找到则执行负向搜索。",
+      "group_reason": "Q08_005 聚焦网卡驱动和收包中断路径，与 Q08_001 的总体网络子系统存在重叠但更具体，且其 tri_state 判断需要独立的证据链，不宜合并以免混淆。",
+      "query": "在 kernel、net、network、driver、hal、include 等目录中搜索 virtio-net、e1000、netdev、DMA、descriptor、interrupt、poll 等关键词。使用 rag_search_code 和 grep_in_repo 获取 hint，然后使用 read_code_segment、lsp_get_definition、lsp_get_references、lsp_get_call_graph 获取强证据。确认网卡驱动初始化函数（如 virtio_net_init/e1000_init）、收包中断处理函数（如 virtio_net_rx_interrupt）、轮询收包函数（如 virtio_net_poll）、DMA 描述符设置函数。若未发现，记录负向搜索覆盖情况。",
+      "seed_paths": [
+        "kernel",
+        "net",
+        "network",
+        "driver",
+        "hal",
+        "include"
+      ],
+      "entry_symbols": [
+        "virtio_net_init",
+        "e1000_init",
+        "netdev_rx",
+        "virtio_net_rx",
+        "e1000_rx"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ]
+    },
+    {
+      "task_id": "task_08_protocol_support",
+      "question_ids": [
+        "Q08_006"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证协议支持情况（Ethernet/ARP/IPv4/IPv6/ICMP/UDP/TCP/DHCP/DNS）。需要完成 fact_id: Q08_006_01, Q08_006_02, Q08_006_03, Q08_006_04, Q08_006_05, Q08_006_06。具体查证：socket/sendto/recvfrom 等用户接口是否定义并接入 syscall table；是否存在协议栈模块或第三方依赖；是否实现 Ethernet/ARP/IP/ICMP/UDP/TCP 层；send/recv 是否接入 netdev/loopback/driver 队列；是否有网卡驱动初始化、中断/轮询收包和 DMA/descriptor；若未找到则执行负向搜索。",
+      "group_reason": "Q08_006 是多选题，需要逐项确认每个协议层的实现，其证据链与 Q08_001 的协议栈部分重叠，但需要更细粒度的检查（每个协议层的定义和实现体），单独作为一个 task 以避免干扰其他题目的 tri_state 判断。",
+      "query": "在 kernel、net、network、driver、hal、syscall、include、Cargo.toml、Makefile 等目录中搜索 Ethernet、ARP、IPv4、IPv6、ICMP、UDP、TCP、DHCP、DNS 等关键词。使用 rag_search_code 和 grep_in_repo 获取 hint，然后使用 read_code_segment、lsp_get_definition、lsp_get_references、lsp_get_call_graph 获取强证据。对每个协议层，确认其定义（如 struct/header）、实现体（如处理函数）、调用点（如协议分发函数）。若未发现，记录负向搜索覆盖情况。",
+      "seed_paths": [
+        "kernel",
+        "net",
+        "network",
+        "driver",
+        "hal",
+        "syscall",
+        "include",
+        "Cargo.toml",
+        "Makefile"
+      ],
+      "entry_symbols": [
+        "eth",
+        "arp",
+        "ipv4",
+        "ipv6",
+        "icmp",
+        "udp",
+        "tcp",
+        "dhcp",
+        "dns"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ]
+    },
+    {
+      "task_id": "task_08_zero_copy",
+      "question_ids": [
+        "Q08_007"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证是否存在零拷贝/共享缓冲/DMA 描述符等路径（zero-copy）。需要完成 fact_id: Q08_007_01, Q08_007_02, Q08_007_03, Q08_007_04, Q08_007_05, Q08_007_06。具体查证：socket/sendto/recvfrom 是否注册且非桩；是否有协议栈模块或第三方依赖；支持 Ethernet/ARP/IP/ICMP/UDP/TCP 中哪些层；send/recv 是否接入 netdev/loopback/driver；zero-copy/DMA 是否属于网络包路径而非块设备；若未找到则执行负向搜索。",
+      "group_reason": "Q08_007 聚焦 zero-copy/DMA 路径，其证据链与 Q08_005 的网卡驱动部分重叠，但需要区分网络包路径与块设备路径，且其 tri_state 判断需要独立的证据链，不宜合并以免混淆。",
+      "query": "在 kernel、net、network、driver、hal、include 等目录中搜索 zero-copy、DMA、buffer、descriptor、packet buffer、sk_buff、mbuf 等关键词。使用 rag_search_code 和 grep_in_repo 获取 hint，然后使用 read_code_segment、lsp_get_definition、lsp_get_references、lsp_get_call_graph 获取强证据。确认是否存在网络包专用的零拷贝机制（如直接映射用户缓冲区到 DMA 描述符）、共享缓冲池（如 packet buffer pool）、DMA 描述符链。注意区分网络路径与块设备路径（如块设备的 DMA 不算网络 zero-copy）。若未发现，记录负向搜索覆盖情况。",
+      "seed_paths": [
+        "kernel",
+        "net",
+        "network",
+        "driver",
+        "hal",
+        "include"
+      ],
+      "entry_symbols": [
+        "zero_copy",
+        "dma",
+        "packet_buffer",
+        "sk_buff",
+        "mbuf",
+        "virtio_net_dma",
+        "e1000_dma"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ]
+    }
   ]
 }

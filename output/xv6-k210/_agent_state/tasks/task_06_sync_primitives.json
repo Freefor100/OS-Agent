@@ -1,0 +1,53 @@
+{
+  "task_id": "task_06_sync_primitives",
+  "stage_id": "06_sync_ipc",
+  "question_id": "Q06_001",
+  "question_ids": [
+    "Q06_001",
+    "Q06_002",
+    "Q06_003",
+    "Q06_004",
+    "Q06_012",
+    "Q06_013",
+    "Q06_017",
+    "Q06_020",
+    "Q06_021"
+  ],
+  "status": "done",
+  "evidence_ids": [
+    "ev_task_06_sync_primitives_6b7c0427",
+    "ev_task_06_sync_primitives_babd6483",
+    "ev_task_06_sync_primitives_81a64d71",
+    "ev_task_06_sync_primitives_2ce6216b",
+    "ev_task_06_sync_primitives_a073e7e2",
+    "ev_task_06_sync_primitives_ed416ec8",
+    "ev_task_06_sync_primitives_798ac952",
+    "ev_task_06_sync_primitives_28a78edf",
+    "ev_task_06_sync_primitives_daae8ab0",
+    "ev_task_06_sync_primitives_62b92f1f",
+    "ev_task_06_sync_primitives_8e6adce7",
+    "ev_task_06_sync_primitives_c0cba01c",
+    "ev_task_06_sync_primitives_f9d6455e"
+  ],
+  "draft_answer_ids": [
+    "draft_task_06_sync_primitives_Q06_001_1d4e9ae4",
+    "draft_task_06_sync_primitives_Q06_002_707c13ca",
+    "draft_task_06_sync_primitives_Q06_003_6fb11e56",
+    "draft_task_06_sync_primitives_Q06_004_9c537071",
+    "draft_task_06_sync_primitives_Q06_012_1c2e04f3",
+    "draft_task_06_sync_primitives_Q06_013_1e3978c6",
+    "draft_task_06_sync_primitives_Q06_017_82619231",
+    "draft_task_06_sync_primitives_Q06_020_c6e86c8e",
+    "draft_task_06_sync_primitives_Q06_021_ab067e9c"
+  ],
+  "findings": [],
+  "confidence": "high",
+  "errors": [],
+  "token_usage": {},
+  "metadata": {
+    "evidence_count": 13,
+    "mode": "react",
+    "summary": "查证了 xv6-k210 内核同步原语。SpinLock (struct spinlock + acquire/release 使用 __sync_lock_test_and_set/amoswap) 和 Sleeplock (struct sleeplock + acquiresleep/releasesleep 使用 sleep/wakeup) 已实现。WaitQueue (struct wait_queue + dlist) 已实现并被 pipe 使用。Pipe IPC 已实现。未发现 Semaphore、Condvar/Monitor、Barrier、RwLock、futex、自定义原子操作。死锁防护仅通过注释约定的锁顺序和 push_off() 中断禁用，无形式化死锁检测。",
+    "raw_output_excerpt": "Good, no custom atomic operations. Now let me produce the final JSON:\n\n```json\n{\n  \"status\": \"done\",\n  \"summary\": \"查证了 xv6-k210 内核同步原语。SpinLock (struct spinlock + acquire/release 使用 __sync_lock_test_and_set/amoswap) 和 Sleeplock (struct sleeplock + acquiresleep/releasesleep 使用 sleep/wakeup) 已实现。WaitQueue (struct wait_queue + dlist) 已实现并被 pipe 使用。Pipe IPC 已实现。未发现 Semaphore、Condvar/Monitor、Barrier、RwLock、futex、自定义原子操作。死锁防护仅通过注释约定的锁顺序和 push_off() 中断禁用，无形式化死锁检测。\",\n  \"claim\": \"xv6-k210 实现了 SpinLock、Sleeplock (Mutex-like)、WaitQueue 和 Pipe IPC。未实现 Semaphore、Condvar/Monitor、Barrier、RwLock、futex。原子操作使用 GCC __sync 内置函数 (amoswap/fence)。死锁防护通过 push_off() 和注释约定的锁顺序 (proc_lock 最后获取)，无 lockdep 或形式化检测。\",\n  \"structured_fact_results\": [\n    {\n      \"fact_id\": \"Q06_001_01\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [0, 1],\n      \"notes\": \"struct spinlock 定义在 include/sync/spinlock.h:7-13，包含 locked、name、cpu 字段。\"\n    },\n    {\n      \"fact_id\": \"Q06_001_02\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [2],\n      \"notes\": \"acquire() 使用 __sync_lock_test_and_set (amoswap.w.aq) 原子交换，release() 使用 __sync_lock_release (amoswap.w zero)，initlock() 初始化 locked=0。\"\n    },\n    {\n      \"fact_id\": \"Q06_001_03\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [2, 3],\n      \"notes\": \"acquire() 调用 push_off() 关中断防止死锁；release() 调用 pop_off() 恢复中断。不涉及调度器阻塞（忙等）。\"\n    },\n    {\n      \"fact_id\": \"Q06_001_04\",\n      \"status_or_value\": \"yes_weak\",\n      \"evidence_candidate_indexes\": [2, 4],\n      \"notes\": \"push_off() 防止中断导致的死锁。注释约定 proc_lock 最后获取避免死锁。无形式化死锁检测（lockdep）。\"\n    },\n    {\n      \"fact_id\": \"Q06_001_05\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [0, 2],\n      \"notes\": \"SpinLock 是内核内部互斥原语，忙等（spin），关中断运行。与 Sleeplock（阻塞等待）不同。\"\n    },\n    {\n      \"fact_id\": \"Q06_001_06\",\n      \"status_or_value\": \"no_after_negative_search\",\n      \"evidence_candidate_indexes\": [5],\n      \"notes\": \"已完成 negative"
+  }
+}

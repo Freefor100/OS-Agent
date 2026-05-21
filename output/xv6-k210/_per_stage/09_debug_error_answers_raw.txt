@@ -1,268 +1,581 @@
-Now I have all the evidence needed. Let me compile the final JSON answer.
-
-Let me verify one more thing - the `trapframedump` function is defined but commented out in `usertrap`:
-
-Looking at `kernel/trap/trap.c:128`:
-```c
-// trapframedump(p->trapframe);
-```
-
-So `trapframedump` exists as a function but is NOT called in the panic path. The panic path in `__panic` calls `backtrace()` but not `trapframedump`.
-
-Now let me also verify the `consoleintr` control-key commands more carefully - these are the kernel monitor commands:
-
-From `kernel/console.c:237-259`:
-- `C('P')` → `procdump()` — print process list
-- `C('E')` → `rootfs_print()` — print file tree
-- `C('K')` → `kmview()` — print mem-alloc list
-- `C('B')` → `bprint()` — print buffer cache
-- `C('Q')` → `pm_dump()` — print physical memory status
-- `C('U')` → kill line
-- `C('H')` / `\x7f` → backspace
-
-These are control-key sequences processed in `consoleintr()` which runs in kernel context (called from interrupt handler). This is a kernel-resident interactive monitor in the Stallings sense.
-
-Now let me construct the final JSON:
-
+--- Q09_001 ---
+attempt=1
 ```json
 {
-  "schema_version": "v1",
-  "stage_id": "09_debug_error",
-  "stage_title": "调试机制与错误处理",
-  "terminology_profile": "stallings_en_zh",
-  "answers": [
+  "question_id": "Q09_001",
+  "question_type": "tri_state_impl",
+  "stem": "是否存在日志系统（log/printk/println 宏）与日志级别控制？（必须三态）",
+  "fact_answers": [
     {
-      "question_id": "Q09_001",
-      "question_type": "tri_state_impl",
-      "stem": "是否存在日志系统（log/printk/println 宏）与日志级别控制？",
-      "value": "implemented",
-      "evidence": [
-        {
-          "path": "include/utils/debug.h",
-          "symbol_kind": "macro",
-          "symbol_name": "__debug_info / __debug_warn / __debug_error",
-          "excerpt": "三级日志宏：__debug_info (绿色INFO)、__debug_warn (黄色WARN)、__debug_error (红色ERROR)。通过 #ifdef DEBUG 条件编译控制是否输出。模块级调试通过 __DEBUG_module 宏控制，Makefile 支持 make module=xxx 按模块启用。"
-        },
-        {
-          "path": "include/printf.h",
-          "symbol_kind": "macro",
-          "symbol_name": "panic",
-          "excerpt": "#define panic(s) do { printf(__ERROR(__module_name__)\": hart %d at %s: %d\\n\", cpuid(), __FILE__, __LINE__); __panic(s); } while (0)"
-        },
-        {
-          "path": "kernel/printf.c",
-          "symbol_kind": "function",
-          "symbol_name": "printf",
-          "excerpt": "void printf(char *fmt, ...) — 内核格式化输出函数，支持 %d/%x/%p/%s，通过自旋锁保护并发输出，最终调用 consputc → sbi_console_putchar。"
-        }
-      ]
+      "fact_id": "Q09_001_01",
+      "fact_key": "debug_entry",
+      "value": "yes_strong",
+      "used_evidence_ids": ["ev_task_09_logging_3d4e40ca", "ev_task_09_logging_30a41ab9", "ev_task_09_logging_d9adb52a"],
+      "notes": "include/utils/debug.h 定义了 __debug_msg/__debug_info/__debug_warn/__debug_error/__debug_assert 宏；include/printf.h 定义了 printf/panic/backtrace 声明；kernel/printf.c 提供了 printf/__panic/backtrace 完整实现体。"
     },
     {
-      "question_id": "Q09_002",
-      "question_type": "tri_state_impl",
-      "stem": "是否存在 panic/崩溃处理路径（panic_handler/oom/abort 等）？",
-      "value": "implemented",
-      "evidence": [
-        {
-          "path": "kernel/printf.c:122-133",
-          "symbol_kind": "function",
-          "symbol_name": "__panic",
-          "excerpt": "void __panic(char *s) { printf(__ERROR(\"panic\")\": \"); printf(s); printf(\"\\n\"); backtrace(); panicked = 1; intr_off(); for(;;) ; } — 输出 panic 信息、调用 backtrace()、设置 panicked 标志、关中断、无限循环停机。"
-        },
-        {
-          "path": "include/printf.h:13-18",
-          "symbol_kind": "macro",
-          "symbol_name": "panic",
-          "excerpt": "#define panic(s) do { printf(__ERROR(__module_name__)\": hart %d at %s: %d\\n\", cpuid(), __FILE__, __LINE__); __panic(s); } while (0) — 宏封装，先输出 hart/文件/行号，再调用 __panic。"
-        },
-        {
-          "path": "kernel/trap/trap.c:230-234",
-          "symbol_kind": "call_site",
-          "symbol_name": "kerneltrap → panic",
-          "excerpt": "kerneltrap() 中未处理 trap 时：printf(\"\\nscause %p\\n\", scause); printf(\"sepc=%p stval=%p hart=%d\\n\", ...); panic(\"kerneltrap\");"
-        }
-      ]
+      "fact_id": "Q09_001_02",
+      "fact_key": "specialized_mechanism",
+      "value": "yes_weak",
+      "used_evidence_ids": ["ev_task_09_logging_ddc8ca59", "ev_task_09_logging_bdea6a70"],
+      "notes": "Makefile 支持编译时 DEBUG 门控（mode=debug 时添加 -DDEBUG），但无运行时日志级别过滤（无 LOG_LEVEL/printk 级别），无 gdbstub/ftrace/tracepoint/monitor。仅编译时条件编译。"
     },
     {
-      "question_id": "Q09_003",
-      "question_type": "short_answer",
-      "stem": "panic 路径会输出哪些诊断？（寄存器 dump/栈回溯/停机；必须引用实现证据）",
-      "value": "panic 路径输出：(1) 模块名/hart ID/文件名/行号（panic 宏，include/printf.h:13-18）；(2) panic 消息字符串（__panic，kernel/printf.c:124-126）；(3) 基于帧指针 (Frame Pointer) 的栈回溯——逐帧打印返回地址 ra（backtrace()，kernel/printf.c:135-143）；(4) 设置 panicked=1 冻结其他 CPU 的 UART 输出；(5) 关中断 (intr_off()) 后无限循环停机。注意：panic 路径不输出通用寄存器 dump（trapframedump 函数存在但被注释掉，kernel/trap/trap.c:128 处 // trapframedump(p->trapframe)），也不输出 sepc/scause/stval（这些仅在 kerneltrap 的 panic 前单独 printf 输出）。",
-      "evidence": [
-        {
-          "path": "kernel/printf.c:122-133",
-          "symbol_kind": "function",
-          "symbol_name": "__panic",
-          "excerpt": "printf(__ERROR(\"panic\")\": \"); printf(s); printf(\"\\n\"); backtrace(); panicked = 1; intr_off(); for(;;) ;"
-        },
-        {
-          "path": "kernel/printf.c:135-143",
-          "symbol_kind": "function",
-          "symbol_name": "backtrace",
-          "excerpt": "void backtrace() { uint64 *fp = (uint64 *)r_fp(); uint64 *bottom = (uint64 *)PGROUNDUP((uint64)fp); printf(\"backtrace:\\n\"); while (fp < bottom) { uint64 ra = *(fp - 1); printf(\"%p\\n\", ra - 4); fp = (uint64 *)*(fp - 2); } } — 基于 RISC-V s0/fp 帧指针链遍历栈帧，打印返回地址。"
-        },
-        {
-          "path": "kernel/trap/trap.c:128",
-          "symbol_kind": "call_site",
-          "symbol_name": "trapframedump (commented out)",
-          "excerpt": "// trapframedump(p->trapframe); — trapframedump 函数已定义（trap.c:345-370）可 dump 全部通用寄存器，但在 usertrap 异常路径中被注释掉，panic 路径也不调用。"
-        }
-      ]
+      "fact_id": "Q09_001_03",
+      "fact_key": "runtime_integration",
+      "value": "yes_strong",
+      "used_evidence_ids": ["ev_task_09_logging_8a3d1407", "ev_task_09_logging_ddfbf8d0", "ev_task_09_logging_03c3ba9a", "ev_task_09_logging_9eb099d2"],
+      "notes": "printf/panic/__debug_* 在 trap.c、syscall.c、sched/proc.c 等主路径中调用；syscall.c 中 trace 标志实现系统调用追踪。"
     },
     {
-      "question_id": "Q09_004",
-      "question_type": "tri_state_impl",
-      "stem": "是否实现栈回溯 (backtrace/unwind/stack_trace)？（必须三态；仅打印 ra 不算）",
-      "value": "implemented",
-      "evidence": [
-        {
-          "path": "kernel/printf.c:135-143",
-          "symbol_kind": "function",
-          "symbol_name": "backtrace",
-          "excerpt": "void backtrace() { uint64 *fp = (uint64 *)r_fp(); uint64 *bottom = (uint64 *)PGROUNDUP((uint64)fp); printf(\"backtrace:\\n\"); while (fp < bottom) { uint64 ra = *(fp - 1); printf(\"%p\\n\", ra - 4); fp = (uint64 *)*(fp - 2); } } — 基于 RISC-V Frame Pointer (s0/fp) 的栈回溯：从当前 fp 开始，沿帧指针链逐帧读取返回地址 ra（fp-1）并打印，直到栈顶 PGROUNDUP(fp)。非仅打印 ra，而是完整遍历调用链。"
-        },
-        {
-          "path": "include/hal/riscv.h:353-358",
-          "symbol_kind": "inline_function",
-          "symbol_name": "r_fp",
-          "excerpt": "static inline uint64 r_fp() { uint64 x; asm volatile(\"mv %0, s0\" : \"=r\" (x)); return x; } — 读取 RISC-V s0 寄存器（帧指针）。"
-        },
-        {
-          "path": "doc/构建调试-调试指南.md",
-          "symbol_kind": "doc",
-          "symbol_name": "backtrace_info",
-          "excerpt": "文档说明 panic 时打印的地址序列可通过 addr2line -e target/kernel 转换为源码位置。"
-        }
-      ]
+      "fact_id": "Q09_001_04",
+      "fact_key": "output_or_storage",
+      "value": "yes_strong",
+      "used_evidence_ids": ["ev_task_09_logging_d9adb52a"],
+      "notes": "printf 通过 consputc -> sbi_console_putchar 输出；sprintf() 支持字符串格式化。无日志缓冲区/环形缓冲区。"
     },
     {
-      "question_id": "Q09_005",
-      "question_type": "tri_state_impl",
-      "stem": "是否存在内核驻留的交互式监视器（kernel monitor）？",
-      "value": "implemented",
-      "evidence": [
-        {
-          "path": "kernel/console.c:237-259",
-          "symbol_kind": "function",
-          "symbol_name": "consoleintr",
-          "excerpt": "consoleintr() 在内核态中断上下文中处理控制键：C('P')→procdump() 打印进程列表；C('E')→rootfs_print() 打印文件树；C('K')→kmview() 打印内核内存分配器状态；C('B')→bprint() 打印缓冲区缓存；C('Q')→pm_dump() 打印物理页帧分配器状态；C('U') 清除输入行；C('H')/0x7f 退格。这些命令在内核态执行，直接探查内核数据结构。"
-        },
-        {
-          "path": "kernel/sched/proc.c:901-910",
-          "symbol_kind": "function",
-          "symbol_name": "procdump",
-          "excerpt": "void procdump(void) — 打印所有进程的 PID/PPID/STATE/KILLED/NAME/MEM_LOAD/MEM_HEAP，遍历 pid_hash 哈希表。"
-        },
-        {
-          "path": "kernel/mm/pm.c:283-296",
-          "symbol_kind": "function",
-          "symbol_name": "pm_dump",
-          "excerpt": "void pm_dump(void) — 打印物理页帧分配器的 freelist 状态（multiple 和 single 可用页数及链表）。"
-        },
-        {
-          "path": "kernel/mm/kmalloc.c:320-338",
-          "symbol_kind": "function",
-          "symbol_name": "kmview",
-          "excerpt": "void kmview(void) — 遍历 kmem_table 打印所有内核内存分配器状态。"
-        },
-        {
-          "path": "kernel/fs/bio.c:285-300",
-          "symbol_kind": "function",
-          "symbol_name": "bprint",
-          "excerpt": "void bprint() — 打印缓冲区缓存哈希表各桶的扇区号分布。"
-        },
-        {
-          "path": "kernel/fs/fs.c:297-303",
-          "symbol_kind": "function",
-          "symbol_name": "rootfs_print",
-          "excerpt": "void rootfs_print() — 递归打印根文件系统目录树（含挂载点）。"
-        }
-      ]
+      "fact_id": "Q09_001_05",
+      "fact_key": "external_or_userland_boundary",
+      "value": "yes_strong",
+      "used_evidence_ids": ["ev_task_09_logging_ddfbf8d0", "ev_task_09_logging_9eb099d2"],
+      "notes": "日志系统为内核内部；用户程序通过 write() 系统调用输出；strace 通过 sys_trace() 触发内核侧追踪。"
     },
     {
-      "question_id": "Q09_006",
-      "question_type": "tri_state_impl",
-      "stem": "是否实现 GDB stub（需数据包解析循环，如 handle_gdb_packet）？",
-      "value": "not_found",
-      "evidence": [
-        {
-          "path": "repos/xv6-k210",
-          "symbol_kind": "search",
-          "symbol_name": "gdbstub_grep",
-          "excerpt": "全仓库搜索 gdbstub|handle_gdb_packet|gdb_packet|gdb_stub，0 命中。不存在 GDB 远程串行协议数据包解析循环。"
-        },
-        {
-          "path": "debug/.gdbinit.tmpl-riscv",
-          "symbol_kind": "config",
-          "symbol_name": "gdbinit_template",
-          "excerpt": "仅提供 GDB 客户端配置模板（target remote 127.0.0.1:1234），依赖外部 OpenOCD/JTAG 硬件调试器，非内核内 GDB stub。"
-        },
-        {
-          "path": "debug/openocd_cfg/k210.cfg",
-          "symbol_kind": "config",
-          "symbol_name": "openocd_config",
-          "excerpt": "OpenOCD 配置文件用于 K210 板级 JTAG 调试，GDB 通过 OpenOCD 连接硬件，非内核内 stub。"
-        }
-      ]
-    },
-    {
-      "question_id": "Q09_007",
-      "question_type": "short_answer",
-      "stem": "错误码/错误类型体系是什么？（errno/Result/Error enum；给类型定义与传播点证据）",
-      "value": "采用 POSIX errno 风格的 C 宏定义体系。错误码定义于 include/errno.h（107 行），涵盖 EPERM(1) 到 EAFNOSUPPORT(97) 共约 90+ 个标准 errno 宏。系统调用通过返回负 errno 值传播错误（如 return -EINVAL），用户态通过 trapframe->a0 获取返回值。典型传播点：syscall.c:syscall() 中 p->trapframe->a0 = syscalls[num]()，各 sys_* 函数返回负 errno；usertrap() 中 p->killed = SIGTERM 终止异常进程。",
-      "evidence": [
-        {
-          "path": "include/errno.h",
-          "symbol_kind": "macro_definitions",
-          "symbol_name": "EPERM/ENOENT/ENOMEM/EINVAL/...",
-          "excerpt": "#define EPERM 1, #define ENOENT 2, #define ENOMEM 12, #define EACCES 13, #define EINVAL 22, #define ENOSYS 38 ... 共约 90+ 个标准 POSIX errno 宏。"
-        },
-        {
-          "path": "kernel/syscall/syscall.c:351-358",
-          "symbol_kind": "call_site",
-          "symbol_name": "syscall dispatch",
-          "excerpt": "p->trapframe->a0 = syscalls[num](); — 系统调用返回值写入 trapframe->a0，负值表示 errno。"
-        },
-        {
-          "path": "kernel/syscall/sysproc.c:295",
-          "symbol_kind": "call_site",
-          "symbol_name": "return -EINVAL",
-          "excerpt": "sys_getrusage() 中 default: return -EINVAL; — 典型 errno 传播模式。"
-        }
-      ]
-    },
-    {
-      "question_id": "Q09_008",
-      "question_type": "tri_state_impl",
-      "stem": "是否存在 trace/perf/ftrace 等跟踪机制或 tracepoints？",
-      "value": "implemented",
-      "evidence": [
-        {
-          "path": "kernel/syscall/syscall.c:351-358",
-          "symbol_kind": "inline_trace",
-          "symbol_name": "syscall trace (tmask)",
-          "excerpt": "int trace = p->tmask; if (trace) { printf(\"pid %d: %s(\", p->pid, sysnames[num]); } ... if (trace) { printf(\") -> %d\\n\", p->trapframe->a0); } — 基于进程 tmask 字段的系统调用追踪，输出系统调用名、参数和返回值。"
-        },
-        {
-          "path": "kernel/syscall/sysproc.c:255-263",
-          "symbol_kind": "function",
-          "symbol_name": "sys_trace",
-          "excerpt": "uint64 sys_trace(void) { myproc()->tmask = 1; return 0; } — SYS_trace 系统调用（号 18），设置当前进程的 trace mask 为 1 以启用追踪。"
-        },
-        {
-          "path": "kernel/syscall/syscall.c:78-95",
-          "symbol_kind": "inline_trace",
-          "symbol_name": "argint/argaddr/argstr trace",
-          "excerpt": "argint()/argaddr()/argstr() 中检查 p->tmask，若启用则打印每个系统调用参数的值。"
-        },
-        {
-          "path": "xv6-user/strace.c",
-          "symbol_kind": "user_program",
-          "symbol_name": "strace",
-          "excerpt": "用户态 strace 程序调用 trace() 系统调用启用追踪，然后 execve 目标程序。内核直接输出追踪信息。"
-        }
-      ]
+      "fact_id": "Q09_001_06",
+      "fact_key": "negative_search_coverage",
+      "value": {
+        "searched_keywords": ["log", "printk", "println", "panic", "backtrace", "unwind", "gdb", "gdbstub", "monitor", "trace", "ftrace", "perf", "errno", "Error", "Result"],
+        "searched_directories": ["kernel", "debug", "console", "trap", "syscall", "include", "Makefile"],
+        "file_count": 207,
+        "match_count": 160,
+        "coverage_sufficient": true
+      },
+      "used_evidence_ids": ["ev_task_09_logging_bdea6a70"],
+      "notes": "负向搜索覆盖 207 个文件，关键词和目录覆盖充分。未发现运行时日志级别过滤、gdbstub、ftrace、tracepoint、monitor。"
     }
-  ]
+  ],
+  "value": "stub",
+  "used_evidence_ids": ["ev_task_09_logging_3d4e40ca", "ev_task_09_logging_30a41ab9", "ev_task_09_logging_d9adb52a", "ev_task_09_logging_ddc8ca59", "ev_task_09_logging_bdea6a70", "ev_task_09_logging_8a3d1407", "ev_task_09_logging_ddfbf8d0", "ev_task_09_logging_03c3ba9a", "ev_task_09_logging_9eb099d2"],
+  "notes": "系统具有可工作的 printf/panic/backtrace 及编译时 DEBUG 门控，但缺少运行时日志级别过滤（无 LOG_LEVEL/printk 级别），无 gdbstub/ftrace/tracepoint/monitor。调试机制仅为编译时条件编译，整体日志/调试系统存在但原始，判定为 stub。"
+}
+```
+
+--- Q09_002 ---
+attempt=1
+```json
+{
+  "question_id": "Q09_002",
+  "question_type": "tri_state_impl",
+  "stem": "是否存在 panic/崩溃处理路径（panic_handler/oom/abort 等）？（必须三态）",
+  "fact_answers": [
+    {
+      "fact_id": "Q09_002_01",
+      "fact_key": "debug_entry",
+      "value": "yes_strong",
+      "used_evidence_ids": ["ev_task_09_panic_5dfdcd51", "ev_task_09_panic_4aa4ed6b"],
+      "notes": "panic 宏和 __panic 函数有完整定义和实现体，定义在 include/printf.h，实现体在 kernel/printf.c"
+    },
+    {
+      "fact_id": "Q09_002_02",
+      "fact_key": "specialized_mechanism",
+      "value": "yes_strong",
+      "used_evidence_ids": ["ev_task_09_panic_5dfdcd51", "ev_task_09_panic_93c7fdbf", "ev_task_09_panic_4aa4ed6b"],
+      "notes": "panic 有专门宏和实现体；backtrace 有专门实现体；trapframedump 已定义但注释；无 gdbstub/monitor/unwind"
+    },
+    {
+      "fact_id": "Q09_002_03",
+      "fact_key": "runtime_integration",
+      "value": "yes_strong",
+      "used_evidence_ids": ["ev_task_09_panic_c5aabd13", "ev_task_09_panic_2eb37d2c"],
+      "notes": "panic 被集成到 trap 处理（kerneltrap、usertrap）等主路径"
+    },
+    {
+      "fact_id": "Q09_002_04",
+      "fact_key": "output_or_storage",
+      "value": "yes_strong",
+      "used_evidence_ids": ["ev_task_09_panic_5dfdcd51", "ev_task_09_panic_4aa4ed6b", "ev_task_09_panic_93c7fdbf"],
+      "notes": "panic 输出通过 printf 到控制台，含红色标记、消息、backtrace"
+    },
+    {
+      "fact_id": "Q09_002_05",
+      "fact_key": "external_or_userland_boundary",
+      "value": "no_after_negative_search",
+      "used_evidence_ids": ["ev_task_09_panic_039aff22"],
+      "notes": "无 gdbstub/monitor 等外部调试接口；sbi_shutdown 存在但未被 panic 使用"
+    },
+    {
+      "fact_id": "Q09_002_06",
+      "fact_key": "negative_search_coverage",
+      "value": {
+        "searched_keywords": ["log", "printk", "println", "panic", "backtrace", "unwind", "gdb", "gdbstub", "monitor", "trace", "ftrace", "perf", "errno", "Error", "Result"],
+        "searched_directories": ["kernel", "debug", "console", "trap", "syscall", "include", "Makefile"],
+        "file_count": 142,
+        "match_count": 376,
+        "coverage_sufficient": true
+      },
+      "used_evidence_ids": ["ev_task_09_panic_039aff22"],
+      "notes": "负向搜索覆盖充分，142 个文件，376 个匹配"
+    }
+  ],
+  "value": "implemented",
+  "used_evidence_ids": ["ev_task_09_panic_5dfdcd51", "ev_task_09_panic_93c7fdbf", "ev_task_09_panic_c5aabd13", "ev_task_09_panic_2eb37d2c", "ev_task_09_panic_039aff22", "ev_task_09_panic_4aa4ed6b"],
+  "notes": "panic/崩溃处理路径完整实现：panic 宏 -> __panic -> printf(panic消息) -> backtrace(栈回溯) -> 关中断 -> 死循环 halt。有完整的定义、实现体、调用点、运行时集成。无 gdbstub/monitor/unwind 等高级调试机制，但基本 panic 路径已 implemented。"
+}
+```
+
+--- Q09_003 ---
+attempt=1
+```json
+{
+  "question_id": "Q09_003",
+  "question_type": "short_answer",
+  "stem": "panic 路径会输出哪些诊断？（寄存器 dump/栈回溯/停机；必须引用实现证据）",
+  "fact_answers": [
+    {
+      "fact_id": "Q09_003_01",
+      "fact_key": "debug_entry",
+      "value": "yes_strong",
+      "used_evidence_ids": ["ev_task_09_panic_5dfdcd51", "ev_task_09_panic_4aa4ed6b"],
+      "notes": "panic 宏和 __panic 函数是调试/错误入口，有定义和实现体强证据。"
+    },
+    {
+      "fact_id": "Q09_003_02",
+      "fact_key": "specialized_mechanism",
+      "value": "yes_strong",
+      "used_evidence_ids": ["ev_task_09_panic_93c7fdbf", "ev_task_09_panic_4aa4ed6b"],
+      "notes": "panic 路径输出：红色 '[panic]' 标记、消息、backtrace 返回地址列表、死循环 halt。"
+    },
+    {
+      "fact_id": "Q09_003_03",
+      "fact_key": "runtime_integration",
+      "value": "yes_strong",
+      "used_evidence_ids": ["ev_task_09_panic_c5aabd13", "ev_task_09_panic_2eb37d2c"],
+      "notes": "kerneltrap 中 unsupported trap 调用 panic，先打印 scause/sepc/stval/hart/pid/name。"
+    },
+    {
+      "fact_id": "Q09_003_04",
+      "fact_key": "output_or_storage",
+      "value": "yes_strong",
+      "used_evidence_ids": ["ev_task_09_panic_4aa4ed6b"],
+      "notes": "输出通过 printf->sbi_console_putchar 到控制台，无文件存储。"
+    },
+    {
+      "fact_id": "Q09_003_05",
+      "fact_key": "external_or_userland_boundary",
+      "value": "no_after_negative_search",
+      "used_evidence_ids": ["ev_task_09_panic_039aff22"],
+      "notes": "无外部调试接口（gdbstub/monitor/unwind/ftrace/perf 均未找到）。"
+    },
+    {
+      "fact_id": "Q09_003_06",
+      "fact_key": "negative_search_coverage",
+      "value": {
+        "searched_keywords": ["log", "printk", "println", "panic", "backtrace", "unwind", "gdb", "gdbstub", "monitor", "trace", "ftrace", "perf", "errno", "Error", "Result"],
+        "searched_directories": ["kernel", "debug", "console", "trap", "syscall", "include", "Makefile"],
+        "file_count": 142,
+        "match_count": 376,
+        "coverage_sufficient": true
+      },
+      "used_evidence_ids": ["ev_task_09_panic_039aff22"],
+      "notes": "负向搜索覆盖充分，关键词和目录均满足最低覆盖率要求。"
+    }
+  ],
+  "value": {
+    "debug_entry": "yes_strong",
+    "specialized_mechanism": "yes_strong",
+    "runtime_integration": "yes_strong",
+    "output_or_storage": "yes_strong",
+    "external_or_userland_boundary": "no_after_negative_search",
+    "negative_search_coverage": {
+      "searched_keywords": ["log", "printk", "println", "panic", "backtrace", "unwind", "gdb", "gdbstub", "monitor", "trace", "ftrace", "perf", "errno", "Error", "Result"],
+      "searched_directories": ["kernel", "debug", "console", "trap", "syscall", "include", "Makefile"],
+      "file_count": 142,
+      "match_count": 376,
+      "coverage_sufficient": true
+    }
+  },
+  "used_evidence_ids": ["ev_task_09_panic_5dfdcd51", "ev_task_09_panic_93c7fdbf", "ev_task_09_panic_c5aabd13", "ev_task_09_panic_2eb37d2c", "ev_task_09_panic_039aff22", "ev_task_09_panic_4aa4ed6b"],
+  "notes": "panic 路径输出的诊断信息包括：1. 入口：panic 宏先打印模块名、hart ID、文件名、行号，再调用 __panic。2. __panic 函数输出红色 '[panic]: ' 标记 + panic 消息字符串 + 换行。3. backtrace 函数输出 'backtrace:' 标题 + 每行一个返回地址（%p 十六进制格式，ra-4）。4. 终止：设置 panicked=1，关中断，然后 for(;;) 死循环 halt。5. 在 kerneltrap 中，unsupported trap 先打印 scause、sepc、stval、hart ID、pid、name 等诊断信息，再调用 panic('kerneltrap')。6. trapframedump 函数已定义但被注释，未实际激活。7. 未实现：寄存器 dump（trapframedump 被注释）、gdbstub、monitor、unwind、ftrace、perf 等高级调试机制。"
+}
+```
+
+--- Q09_004 ---
+attempt=1
+```json
+{
+  "question_id": "Q09_004",
+  "question_type": "tri_state_impl",
+  "stem": "是否实现栈回溯 (backtrace/unwind/stack_trace)？（必须三态；仅打印 ra 不算）",
+  "fact_answers": [
+    {
+      "fact_id": "Q09_004_01",
+      "fact_key": "debug_entry",
+      "value": "yes_strong",
+      "used_evidence_ids": ["ev_task_09_backtrace_8e88f215", "ev_task_09_backtrace_11d8ba30"],
+      "notes": "backtrace() 在 printf.h 中有声明，在 printf.c 中有完整实现体，证据强且可复现。"
+    },
+    {
+      "fact_id": "Q09_004_02",
+      "fact_key": "specialized_mechanism",
+      "value": "yes_strong",
+      "used_evidence_ids": ["ev_task_09_backtrace_8e88f215"],
+      "notes": "backtrace() 通过读取帧指针 (s0) 遍历栈帧，读取 ra 和下一帧 fp，实现栈回溯专用机制，非仅打印 ra。"
+    },
+    {
+      "fact_id": "Q09_004_03",
+      "fact_key": "runtime_integration",
+      "value": "yes_strong",
+      "used_evidence_ids": ["ev_task_09_backtrace_f9852021"],
+      "notes": "backtrace() 在 __panic() 中被调用，__panic() 由 panic() 宏触发，集成到内核 panic 主路径。"
+    },
+    {
+      "fact_id": "Q09_004_04",
+      "fact_key": "output_or_storage",
+      "value": "yes_strong",
+      "used_evidence_ids": ["ev_task_09_backtrace_8e88f215"],
+      "notes": "backtrace() 通过 printf() 将栈帧地址输出到控制台，实现了输出/存储。"
+    },
+    {
+      "fact_id": "Q09_004_05",
+      "fact_key": "external_or_userland_boundary",
+      "value": "no_after_negative_search",
+      "used_evidence_ids": ["ev_task_09_backtrace_2071fce5"],
+      "notes": "负向搜索未发现 monitor/gdbstub 等外部调试接口；backtrace 仅为内核内部 panic 路径调用。"
+    },
+    {
+      "fact_id": "Q09_004_06",
+      "fact_key": "negative_search_coverage",
+      "value": {
+        "searched_keywords": ["monitor", "gdbstub", "gdb_stub"],
+        "searched_directories": ["kernel", "debug", "console", "trap", "syscall", "include", "Makefile"],
+        "file_count": 207,
+        "match_count": 0,
+        "coverage_sufficient": true
+      },
+      "used_evidence_ids": ["ev_task_09_backtrace_2071fce5"],
+      "notes": "负向搜索覆盖了指定关键词和目录，未发现相关实现，覆盖充分。"
+    }
+  ],
+  "value": "implemented",
+  "used_evidence_ids": ["ev_task_09_backtrace_8e88f215", "ev_task_09_backtrace_11d8ba30", "ev_task_09_backtrace_f9852021", "ev_task_09_backtrace_2071fce5"],
+  "notes": "backtrace() 有完整实现体（遍历栈帧读取 ra 和 fp），通过 printf 输出，集成到 panic 路径；负向搜索未发现外部调试接口。满足 implemented 条件。"
+}
+
+--- Q09_005 ---
+attempt=1
+```json
+{
+  "question_id": "Q09_005",
+  "question_type": "tri_state_impl",
+  "stem": "是否存在 **内核驻留的交互式调试监视器（kernel debug monitor）**？（本题指内核态命令解释器/调试控制台；不要与 Stallings Ch5 的 Monitor/Condition Variable 同步构造混淆；不包括仅在用户态运行的常规 shell。必须三态；若 implemented，须给出 3-10 个用户可键入的 monitor 命令名及对应内核内解析/分发入口证据。）",
+  "fact_answers": [
+    {
+      "fact_id": "Q09_005_01",
+      "fact_key": "debug_entry",
+      "value": "no_after_negative_search",
+      "used_evidence_ids": ["ev_task_09_monitor_03dc9ddd", "ev_task_09_monitor_52958765"],
+      "notes": "未发现内核调试监视器入口。consoleintr() 是控制键快捷键处理函数，不是命令解析循环入口。"
+    },
+    {
+      "fact_id": "Q09_005_02",
+      "fact_key": "specialized_mechanism",
+      "value": "no_after_negative_search",
+      "used_evidence_ids": ["ev_task_09_monitor_52958765"],
+      "notes": "未发现命令分发表、命令解析循环或 cmd_* 命令处理函数。"
+    },
+    {
+      "fact_id": "Q09_005_03",
+      "fact_key": "runtime_integration",
+      "value": "no_after_negative_search",
+      "used_evidence_ids": ["ev_task_09_monitor_03dc9ddd", "ev_task_09_monitor_52958765"],
+      "notes": "未发现调试监视器接入主路径。consoleintr() 通过 uart 中断调用但仅处理快捷键。"
+    },
+    {
+      "fact_id": "Q09_005_04",
+      "fact_key": "output_or_storage",
+      "value": "yes_weak",
+      "used_evidence_ids": ["ev_task_09_monitor_167ea907", "ev_task_09_monitor_c5d71bef"],
+      "notes": "存在 printf/backtrace 等输出机制，但 backtrace() 仅从 __panic() 调用，不构成交互式监视器。"
+    },
+    {
+      "fact_id": "Q09_005_05",
+      "fact_key": "external_or_userland_boundary",
+      "value": "yes_strong",
+      "used_evidence_ids": ["ev_task_09_monitor_03dc9ddd", "ev_task_09_monitor_852350ce"],
+      "notes": "xv6-user/sh.c 是用户态 shell，非内核态。consoleintr() 运行在内核态但仅处理快捷键。"
+    },
+    {
+      "fact_id": "Q09_005_06",
+      "fact_key": "negative_search_coverage",
+      "value": {
+        "searched_keywords": ["monitor", "debug_console", "cmd_help", "cmd_backtrace", "cmd_mem", "cmd_regs", "cmd_dump", "kmon", "kdb", "kgdb", "command_table", "cmd_table", "struct command", "debug monitor", "interactive", "while.*getchar", "while.*read.*char"],
+        "searched_directories": ["kernel", "debug", "console", "trap", "include", "Makefile", "kernel/console.c", "kernel/printf.c", "kernel/trap", "xv6-user"],
+        "file_count": 207,
+        "match_count": 0,
+        "coverage_sufficient": true
+      },
+      "used_evidence_ids": ["ev_task_09_monitor_52958765", "ev_task_09_monitor_1bd8a4d3"],
+      "notes": "按 negative_search_policy 覆盖了所有关键词和目录，未发现内核调试监视器相关代码。"
+    }
+  ],
+  "value": "not_found",
+  "used_evidence_ids": ["ev_task_09_monitor_03dc9ddd", "ev_task_09_monitor_167ea907", "ev_task_09_monitor_52958765", "ev_task_09_monitor_1bd8a4d3", "ev_task_09_monitor_5c4a0474", "ev_task_09_monitor_c5d71bef", "ev_task_09_monitor_852350ce"],
+  "notes": "xv6-k210 未实现内核驻留的交互式调试监视器。存在 consoleintr() 控制键快捷键调试功能（Ctrl+P/E/K/B/Q），但缺少命令解析循环、命令分发表和文本命令处理函数，不符合 implemented 要求。backtrace() 仅从 __panic() 调用。用户态 shell (xv6-user/sh.c) 是用户程序。debug/ 目录为空。负向搜索覆盖充分，可判 not_found。"
+}
+```
+
+--- Q09_006 ---
+attempt=1
+```json
+{
+  "question_id": "Q09_006",
+  "question_type": "tri_state_impl",
+  "stem": "是否实现 GDB stub（需数据包解析循环，如 handle_gdb_packet）？（必须三态）",
+  "fact_answers": [
+    {
+      "fact_id": "Q09_006_01",
+      "fact_key": "packet_loop",
+      "value": "no_after_negative_search",
+      "used_evidence_ids": [
+        "ev_task_09_gdbstub_5cab328a",
+        "ev_task_09_gdbstub_81cf908a",
+        "ev_task_09_gdbstub_67fb4ee1"
+      ],
+      "notes": "在 kernel/、include/ 及全仓库搜索后，未发现 GDB/RSP packet 接收解析循环或 handle_gdb_packet 相关实现。"
+    },
+    {
+      "fact_id": "Q09_006_02",
+      "fact_key": "checksum_ack",
+      "value": "no_after_negative_search",
+      "used_evidence_ids": [
+        "ev_task_09_gdbstub_5cab328a",
+        "ev_task_09_gdbstub_81cf908a",
+        "ev_task_09_gdbstub_67fb4ee1"
+      ],
+      "notes": "未发现任何 checksum 校验或 ACK 回复逻辑。"
+    },
+    {
+      "fact_id": "Q09_006_03",
+      "fact_key": "command_handlers",
+      "value": "no_after_negative_search",
+      "used_evidence_ids": [
+        "ev_task_09_gdbstub_5cab328a",
+        "ev_task_09_gdbstub_81cf908a",
+        "ev_task_09_gdbstub_67fb4ee1"
+      ],
+      "notes": "未发现 $g/$m/$c/$s/$Z 等命令处理代码。"
+    },
+    {
+      "fact_id": "Q09_006_04",
+      "fact_key": "trap_integration",
+      "value": "no_after_negative_search",
+      "used_evidence_ids": [
+        "ev_task_09_gdbstub_5cab328a",
+        "ev_task_09_gdbstub_81cf908a",
+        "ev_task_09_gdbstub_67fb4ee1"
+      ],
+      "notes": "trap 处理中无 GDB stub 集成痕迹。"
+    },
+    {
+      "fact_id": "Q09_006_05",
+      "fact_key": "not_external_config",
+      "value": "yes_strong",
+      "used_evidence_ids": [
+        "ev_task_09_gdbstub_67fb4ee1"
+      ],
+      "notes": "仅有的 GDB 相关内容是 debug/openocd_cfg/ 下的 OpenOCD 配置文件（gdb_port 3333）和文档中的 GDB 使用说明，属于外部调试工具配置，非内核 GDB stub。"
+    },
+    {
+      "fact_id": "Q09_006_06",
+      "fact_key": "negative_search_coverage",
+      "value": {
+        "searched_keywords": [
+          "gdb",
+          "gdbstub",
+          "handle_gdb_packet",
+          "RSP",
+          "remote serial protocol",
+          "$m",
+          "$g",
+          "$c",
+          "$s",
+          "breakpoint",
+          "qSupported",
+          "gdb_putchar",
+          "gdb_getchar",
+          "gdb_regs",
+          "gdb_mem",
+          "ebreak"
+        ],
+        "searched_directories": [
+          "kernel",
+          "include",
+          "debug",
+          "console",
+          "driver",
+          "trap",
+          "sbi",
+          "tools",
+          "bootloader"
+        ],
+        "file_count": 207,
+        "match_count": 3,
+        "coverage_sufficient": true
+      },
+      "used_evidence_ids": [
+        "ev_task_09_gdbstub_5cab328a",
+        "ev_task_09_gdbstub_81cf908a",
+        "ev_task_09_gdbstub_67fb4ee1"
+      ],
+      "notes": "负向搜索覆盖了所有指定关键词和目录，文件覆盖充分，匹配结果仅限外部配置和文档。"
+    }
+  ],
+  "value": "not_found",
+  "used_evidence_ids": [
+    "ev_task_09_gdbstub_5cab328a",
+    "ev_task_09_gdbstub_81cf908a",
+    "ev_task_09_gdbstub_67fb4ee1"
+  ],
+  "notes": "所有 structured_facts 均指向 not_found。内核源码中无任何 GDB stub 实现（无 handle_gdb_packet、RSP 数据包解析循环、checksum 校验、命令分发或 trap 集成）。仅有的 GDB 相关内容是 debug/openocd_cfg/ 下的 OpenOCD 配置文件和文档中的 GDB 使用说明，这些属于外部调试工具配置，不是内核 GDB stub。根据 concept_boundary，GDB stub 需要内核侧 Remote Serial Protocol 数据包解析循环和命令处理，仅有 GDB 调试脚本、OpenOCD 配置或 Makefile gdb 目标不算内核 GDB stub。"
+}
+```
+
+--- Q09_007 ---
+attempt=1
+```json
+{
+  "question_id": "Q09_007",
+  "question_type": "short_answer",
+  "stem": "错误码/错误类型体系是什么？（errno/Result/Error enum；给类型定义与传播点证据）",
+  "fact_answers": [
+    {
+      "fact_id": "Q09_007_01",
+      "fact_key": "debug_entry",
+      "value": "yes_strong",
+      "used_evidence_ids": ["ev_task_09_error_code_3417f008"],
+      "notes": "include/errno.h defines POSIX errno macros (EPERM=1..EADDRINUSE=98). This is the definition of the error code system entry point."
+    },
+    {
+      "fact_id": "Q09_007_02",
+      "fact_key": "specialized_mechanism",
+      "value": "yes_strong",
+      "used_evidence_ids": ["ev_task_09_error_code_1d1cf081", "ev_task_09_error_code_348bd36d", "ev_task_09_error_code_59e514a4", "ev_task_09_error_code_47610e84", "ev_task_09_error_code_15f447e6", "ev_task_09_error_code_9b30c7e7", "ev_task_09_error_code_e53285fd", "ev_task_09_error_code_3cf8c992"],
+      "notes": "Multiple kernel modules (console.c, file.c, sysproc.c, exec.c, sysmem.c, fs.c, mount.c) use negative errno values as return codes, demonstrating a specialized error propagation mechanism."
+    },
+    {
+      "fact_id": "Q09_007_03",
+      "fact_key": "runtime_integration",
+      "value": "yes_strong",
+      "used_evidence_ids": ["ev_task_09_error_code_59e514a4", "ev_task_09_error_code_15f447e6"],
+      "notes": "sys_sleep and sys_nanosleep in sysproc.c show errno values (-EINTR, -EFAULT, -EINVAL) being returned from syscall handlers, indicating runtime integration with the syscall path."
+    },
+    {
+      "fact_id": "Q09_007_04",
+      "fact_key": "output_or_storage",
+      "value": "yes_weak",
+      "used_evidence_ids": ["ev_task_09_error_code_0efd1845"],
+      "notes": "Negative search mentions panic/backtrace in printf.c, but no direct evidence_id for panic/backtrace implementation is provided in Bound Evidence. Only weak evidence from negative search summary."
+    },
+    {
+      "fact_id": "Q09_007_05",
+      "fact_key": "external_or_userland_boundary",
+      "value": "yes_strong",
+      "used_evidence_ids": ["ev_task_09_error_code_59e514a4", "ev_task_09_error_code_15f447e6"],
+      "notes": "errno values propagate through syscall handlers (sys_sleep, sys_nanosleep) which return to user space via trapframe->a0, demonstrating the kernel-to-user boundary."
+    },
+    {
+      "fact_id": "Q09_007_06",
+      "fact_key": "negative_search_coverage",
+      "value": {
+        "searched_keywords": ["errno", "Error", "Result", "EINVAL", "ENOMEM", "EFAULT", "panic", "backtrace", "log", "printk", "println", "gdb", "gdbstub", "monitor", "trace", "ftrace", "perf"],
+        "searched_directories": ["kernel", "include", "syscall", "fs", "mm", "debug", "console", "trap", "Makefile"],
+        "file_count": 142,
+        "match_count": 228,
+        "coverage_sufficient": true
+      },
+      "used_evidence_ids": ["ev_task_09_error_code_0efd1845"],
+      "notes": "Negative search coverage sufficient. No Rust Result/Error enum in kernel C code. No gdb/gdbstub/ftrace/perf found."
+    }
+  ],
+  "value": {
+    "debug_entry": "yes_strong",
+    "specialized_mechanism": "yes_strong",
+    "runtime_integration": "yes_strong",
+    "output_or_storage": "yes_weak",
+    "external_or_userland_boundary": "yes_strong",
+    "negative_search_coverage": {
+      "searched_keywords": ["errno", "Error", "Result", "EINVAL", "ENOMEM", "EFAULT", "panic", "backtrace", "log", "printk", "println", "gdb", "gdbstub", "monitor", "trace", "ftrace", "perf"],
+      "searched_directories": ["kernel", "include", "syscall", "fs", "mm", "debug", "console", "trap", "Makefile"],
+      "file_count": 142,
+      "match_count": 228,
+      "coverage_sufficient": true
+    }
+  },
+  "used_evidence_ids": ["ev_task_09_error_code_1d1cf081", "ev_task_09_error_code_348bd36d", "ev_task_09_error_code_59e514a4", "ev_task_09_error_code_0efd1845", "ev_task_09_error_code_3417f008", "ev_task_09_error_code_47610e84", "ev_task_09_error_code_15f447e6", "ev_task_09_error_code_9b30c7e7", "ev_task_09_error_code_e53285fd", "ev_task_09_error_code_3cf8c992"],
+  "notes": "xv6-k210 implements a POSIX-style errno error code system. Error codes are defined as macros in include/errno.h (EPERM=1 through EADDRINUSE=98). Kernel functions return negative errno values (e.g., -EINVAL, -EFAULT, -ENOMEM) which propagate through syscall handlers. Error codes are used extensively in console.c, file.c, sysproc.c, exec.c, sysmem.c, fs.c, mount.c. No Rust-style Result/Error enum exists in kernel C code. output_or_storage downgraded to yes_weak because no direct evidence_id for panic/backtrace implementation was provided in Bound Evidence."
+}
+```
+
+--- Q09_008 ---
+attempt=1
+```json
+{
+  "question_id": "Q09_008",
+  "question_type": "tri_state_impl",
+  "stem": "是否存在 trace/perf/ftrace 等跟踪机制或 tracepoints？（必须三态）",
+  "fact_answers": [
+    {
+      "fact_id": "Q09_008_01",
+      "fact_key": "trace_abstraction",
+      "value": "stub_or_declaration_only",
+      "used_evidence_ids": ["ev_task_09_trace_4bcad803", "ev_task_09_trace_9091b6c9", "ev_task_09_trace_ccc59dac", "ev_task_09_trace_6cfe6938"],
+      "notes": "存在 SYS_trace 系统调用号和 tmask 字段，以及 sys_trace 实现体，但无 trace event/tracepoint/probe 类型或宏定义，属于声明加简单实现形态。"
+    },
+    {
+      "fact_id": "Q09_008_02",
+      "fact_key": "event_storage",
+      "value": "no_after_negative_search",
+      "used_evidence_ids": ["ev_task_09_trace_7ef0c1ee", "ev_task_09_trace_ccc59dac"],
+      "notes": "事件通过 printf() 直接输出，未使用 ring buffer/list/log store；负向搜索在 207 个文件中未发现 ring buffer 或 trace event 存储结构。"
+    },
+    {
+      "fact_id": "Q09_008_03",
+      "fact_key": "instrumentation_sites",
+      "value": "stub_or_declaration_only",
+      "used_evidence_ids": ["ev_task_09_trace_ccc59dac", "ev_task_09_trace_546aca9d"],
+      "notes": "仅在 syscall 分发路径插桩（syscall.c 和 sys_exit），未在 sched/trap/mm/fs 等关键路径发现 trace 插桩。"
+    },
+    {
+      "fact_id": "Q09_008_04",
+      "fact_key": "control_readout",
+      "value": "stub_or_declaration_only",
+      "used_evidence_ids": ["ev_task_09_trace_6cfe6938", "ev_task_09_trace_5bfaaa68"],
+      "notes": "仅有 SYS_trace 系统调用作为控制接口，无 sysfs/procfs/tracefs 接口，无过滤/读取功能。"
+    },
+    {
+      "fact_id": "Q09_008_05",
+      "fact_key": "not_logging",
+      "value": "no_after_negative_search",
+      "used_evidence_ids": ["ev_task_09_trace_ccc59dac", "ev_task_09_trace_42eb4757"],
+      "notes": "trace 输出仅包含 pid、系统调用名和返回值，未记录时间戳、CPU、任务或事件参数等结构化元数据。"
+    },
+    {
+      "fact_id": "Q09_008_06",
+      "fact_key": "negative_search_coverage",
+      "value": {
+        "searched_keywords": ["trace", "tracepoint", "ftrace", "perf", "event", "probe", "kprobe", "record", "ring buffer", "timestamp", "TRACE_EVENT", "DEFINE_TRACE", "trace_array", "trace_event", "ring_buffer", "perf_event", "kprobe", "uprobe", "trace_hook", "trace_syscall", "trace_sched", "trace_mm", "sysfs", "debugfs", "tracefs"],
+        "searched_directories": ["kernel", "debug", "trace", "sched", "syscall", "trap", "include", "kernel/syscall", "kernel/sched", "kernel/trap", "kernel/mm", "kernel/fs", "kernel/printf.c", "include/sched", "include/utils"],
+        "file_count": 207,
+        "match_count": 0,
+        "coverage_sufficient": true
+      },
+      "used_evidence_ids": ["ev_task_09_trace_7ef0c1ee", "ev_task_09_trace_42eb4757"],
+      "notes": "负向搜索覆盖了所有指定关键词和目录，在 207 个文件中未发现 tracepoint/ftrace/perf 基础设施。"
+    }
+  ],
+  "value": "stub",
+  "used_evidence_ids": ["ev_task_09_trace_4bcad803", "ev_task_09_trace_9091b6c9", "ev_task_09_trace_ccc59dac", "ev_task_09_trace_6cfe6938", "ev_task_09_trace_7ef0c1ee", "ev_task_09_trace_42eb4757", "ev_task_09_trace_546aca9d", "ev_task_09_trace_5bfaaa68"],
+  "notes": "存在 SYS_trace 系统调用和 tmask 字段构成的 syscall 跟踪机制，但缺乏 trace event 类型/宏、ring buffer、关键路径插桩、sysfs 控制接口和结构化事件记录等核心特征，属于最小 syscall 跟踪桩，符合 stub 判定。"
 }
 ```

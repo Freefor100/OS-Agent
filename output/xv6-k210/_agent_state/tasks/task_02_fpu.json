@@ -1,0 +1,38 @@
+{
+  "task_id": "task_02_fpu",
+  "stage_id": "02_boot_trap",
+  "question_id": "Q02_008",
+  "question_ids": [
+    "Q02_008"
+  ],
+  "status": "done",
+  "evidence_ids": [
+    "ev_task_02_fpu_f4548a97",
+    "ev_task_02_fpu_1cf3df13",
+    "ev_task_02_fpu_2ea05c24",
+    "ev_task_02_fpu_5b9276f7",
+    "ev_task_02_fpu_5e86557c",
+    "ev_task_02_fpu_5d1e119c",
+    "ev_task_02_fpu_4102fa40",
+    "ev_task_02_fpu_3e8261ab",
+    "ev_task_02_fpu_56506c95",
+    "ev_task_02_fpu_7b92ac7c",
+    "ev_task_02_fpu_2c9f5b70",
+    "ev_task_02_fpu_25d8e787",
+    "ev_task_02_fpu_27a1810a",
+    "ev_task_02_fpu_d9a26e79"
+  ],
+  "draft_answer_ids": [
+    "draft_task_02_fpu_Q02_008_6a0a0108"
+  ],
+  "findings": [],
+  "confidence": "high",
+  "errors": [],
+  "token_usage": {},
+  "metadata": {
+    "evidence_count": 14,
+    "mode": "react",
+    "summary": "FPU 初始化/启用已实现：sstatus.fs 定义在 include/hal/riscv.h，floatinithart() 在 main.c 中被调用（hart0 和 hart1），FPU 上下文保存/恢复通过 fcntxt.S（二进制数组形式）在 proc.c 的 fork/schedule 中使用。",
+    "raw_output_excerpt": "Now I have all the evidence. Let me produce the final JSON output.\n\n```json\n{\n  \"status\": \"done\",\n  \"summary\": \"FPU 初始化/启用已实现：sstatus.fs 定义在 include/hal/riscv.h，floatinithart() 在 main.c 中被调用（hart0 和 hart1），FPU 上下文保存/恢复通过 fcntxt.S（二进制数组形式）在 proc.c 的 fork/schedule 中使用。\",\n  \"claim\": \"xv6-k210 实现了 FPU 初始化（sstatus.fs 设置）和 FPU 上下文保存/恢复，在 main.c 中调用 floatinithart() 初始化，在 proc.c 中通过 floatstore/floatload 保存/恢复 FPU 寄存器。\",\n  \"structured_fact_results\": [\n    {\n      \"fact_id\": \"Q02_008_01\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [0, 1, 2],\n      \"notes\": \"linker/k210.ld 使用 ENTRY(_start)，linker/linker64.ld 使用 ENTRY(_entry)。kernel/entry_k210.S 定义 _start，kernel/entry.S 和 kernel/entry_qemu.S 定义 _entry。Makefile 默认使用 kernel/entry.S（_entry）和 linker/linker64.ld。链接脚本和入口标签均已读取到完整定义。\"\n    },\n    {\n      \"fact_id\": \"Q02_008_02\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [3, 4, 5],\n      \"notes\": \"入口汇编（entry.S/entry_k210.S/entry_qemu.S）设置栈（la sp, boot_stack + hartid*16KB），然后直接 call main。没有清 BSS 的显式代码（BSS 由 bootloader/SBI 或链接脚本处理），没有早期串口初始化。控制流直接从 _entry/_start -> main。\"\n    },\n    {\n      \"fact_id\": \"Q02_008_03\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [6, 7, 8, 9],\n      \"notes\": \"main.c 中 hart0 调用 floatinithart() 初始化 FPU（设置 sstatus.fs=INIT 然后 CLEAN），同时进行 cpuinit、consoleinit、printfinit、kpminit、kvminit、trapinithart、procinit 等。hart1 也调用 floatinithart()。FPU 初始化是早期 init 工作的一部分。\"\n    },\n    {\n      \"fact_id\": \"Q02_008_04\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [6, 10, 11],\n      \"notes\": \"入口汇编直接 call main，main 完成初始化后调用 scheduler()。控制流：_entry/_start -> main -> scheduler。没有额外的 C/Rust 主入口跳转逻辑。\"\n    },\n    {\n      \"fact_id\": \"Q02_008_05\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [12, 13],\n      \"notes\": \"Makefile 通过 platform 变量选择 k210（默认）或 qemu。k210 使用 linker/k210.ld（ENTRY _start）和 kernel/entry_k210.S；qemu 使用 linker/linker64.l"
+  }
+}

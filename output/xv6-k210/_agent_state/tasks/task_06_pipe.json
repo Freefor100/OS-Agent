@@ -1,0 +1,37 @@
+{
+  "task_id": "task_06_pipe",
+  "stage_id": "06_sync_ipc",
+  "question_id": "Q06_005",
+  "question_ids": [
+    "Q06_005",
+    "Q06_006",
+    "Q06_007"
+  ],
+  "status": "done",
+  "evidence_ids": [
+    "ev_task_06_pipe_caa5c27c",
+    "ev_task_06_pipe_3c92d001",
+    "ev_task_06_pipe_1ce9e282",
+    "ev_task_06_pipe_726b5a40",
+    "ev_task_06_pipe_2e7afc96",
+    "ev_task_06_pipe_68f77bfa",
+    "ev_task_06_pipe_87459e22",
+    "ev_task_06_pipe_256e5550",
+    "ev_task_06_pipe_7bd4247a"
+  ],
+  "draft_answer_ids": [
+    "draft_task_06_pipe_Q06_005_86e92bf4",
+    "draft_task_06_pipe_Q06_006_7e105b4d",
+    "draft_task_06_pipe_Q06_007_5cf98d6b"
+  ],
+  "findings": [],
+  "confidence": "medium",
+  "errors": [],
+  "token_usage": {},
+  "metadata": {
+    "evidence_count": 9,
+    "mode": "react",
+    "summary": "Found complete pipe implementation in xv6-k210: struct pipe definition in include/fs/pipe.h, full pipewrite/piperead implementations in kernel/fs/pipe.c with circular buffer (512B base, extendable via size_shift), blocking semantics using wait_queue + sleep/wakeup scheduler integration, spinlock-based mutual exclusion, and sys_pipe syscall interface.",
+    "raw_output_excerpt": "I now have comprehensive evidence. Let me compile the structured JSON output.\n\nBased on my thorough investigation, here's what I found:\n\n1. **Pipe structure definition**: `struct pipe` in `include/fs/pipe.h` (lines 13-25) - fully defined with spinlock, wait queues, read/write counts, data buffer\n2. **pipe_write/pipe_read**: Full implementations in `kernel/fs/pipe.c` (lines 241-298 for pipewrite, lines 302-347 for piperead)\n3. **Buffer**: Circular buffer using `data[PIPE_SIZE]` (512 bytes) with `pdata` pointer and `size_shift` for extended pages; modulo arithmetic for circular access\n4. **Blocking semantics**: Uses `sleep()`/`wakeup()` scheduler integration via wait_queue mechanism; `pipelock`/`pipeunlock` for writer/reader mutual exclusion; `pipewritable`/`pipereadable` for condition waiting\n5. **Syscall**: `sys_pipe` in `kernel/syscall/sysfile.c` (line 318) using `SYS_pipe2` (59)\n6. **File integration**: `FD_PIPE` type in `include/fs/file.h`, pipe operations called from `kernel/fs/file.c`\n\nNow let me produce the final JSON:\n\n```json\n{\n  \"status\": \"done\",\n  \"summary\": \"Found complete pipe implementation in xv6-k210: struct pipe definition in include/fs/pipe.h, full pipewrite/piperead implementations in kernel/fs/pipe.c with circular buffer (512B base, extendable via size_shift), blocking semantics using wait_queue + sleep/wakeup scheduler integration, spinlock-based mutual exclusion, and sys_pipe syscall interface.\",\n  \"claim\": \"Pipe (管道) is fully implemented in xv6-k210 with struct pipe definition, pipewrite/piperead implementation bodies, circular buffer data structure, and blocking semantics via wait_queue + sleep/wakeup scheduler integration.\",\n  \"structured_fact_results\": [\n    {\n      \"fact_id\": \"Q06_005_01\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [0, 1],\n      \"notes\": \"struct pipe fully defined in include/fs/pipe.h with spinlock, wait_queue (wqueue/rqueue), nread/nwrite counters, readopen/writeopen flags, size_shift, pdata"
+  }
+}

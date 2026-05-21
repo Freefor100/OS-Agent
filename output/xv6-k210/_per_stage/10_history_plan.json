@@ -1,11 +1,6 @@
 {
   "stage_id": "10_history",
   "evidence_targets": [
-    "作者贡献与分工",
-    "重大里程碑提交",
-    "模块演进轨迹（fs/mm/sched/syscall）",
-    "当前缺口与TODO",
-    "CI/自测/产物名相关演进",
     "作者贡献",
     "重大提交",
     "模块演进",
@@ -13,20 +8,18 @@
     "CI/产物名/自测相关演进(有工具证据时)"
   ],
   "seed_paths": [
-    "doc/总言.md",
-    "Makefile",
-    "README.md",
-    "kernel/main.c",
-    "kernel/fs/fat32/fat32.c",
-    "kernel/mm/mmap.c",
-    "kernel/sched/proc.c",
-    "kernel/syscall/syscall.c",
-    "xv6-user/ostest.c",
-    ".gitmodules",
-    ".gitignore",
-    "include/sysnum.h",
     "git",
-    "history"
+    "history",
+    "README.md",
+    "Makefile",
+    "scripts",
+    ".github",
+    "include/fs",
+    "include/mm",
+    "include/sync",
+    "kernel/fs",
+    "kernel/mm",
+    "kernel/sync"
   ],
   "framework_guess": [
     "xv6"
@@ -35,18 +28,9 @@
     "riscv64"
   ],
   "entry_symbols": [
-    "main",
-    "fat32_init",
-    "syscall",
-    "fork",
-    "exec",
-    "mmap",
-    "kmalloc",
-    "scheduler",
-    "trap",
-    "plicinit",
     "git",
-    "_start"
+    "_start",
+    "start"
   ],
   "repo_hotspots": [
     "Makefile",
@@ -61,14 +45,10 @@
     "include/fs"
   ],
   "preferred_tools": [
-    "get_git_history_summary",
-    "analyze_authors_contribution",
-    "analyze_git_history",
-    "get_commit_diff_summary",
-    "trace_file_evolution",
-    "find_symbol_first_commit",
-    "read_code_segment",
-    "grep_in_repo"
+    "rag_search_code",
+    "lsp_get_call_graph",
+    "lsp_get_definition",
+    "read_code_segment"
   ],
   "avoid_tools": [
     "blind_read_large_files",
@@ -81,35 +61,9 @@
     "max_memory_items": 8
   },
   "execution_steps": [
-    "1. 用 get_git_history_summary 获取全局 200 提交概览，识别开发时间线（2020-10 ~ 2021-08）与高频变更模块",
-    "2. 用 analyze_authors_contribution(days=9999) 获取贡献者分工全貌，交叉验证 doc/总言.md 中的分工描述",
-    "3. 用 find_symbol_first_commit 批量查询核心符号（_start, main, kmalloc, spinlock, fork, exec, mmap, fat32, sdcard, signal, pipe, syscall, plic, virtio）的首次引入时间",
-    "4. 用 read_code_segment 读 doc/总言.md 全文，提取官方声明的里程碑列表与分工信息",
-    "5. 用 get_commit_diff_summary 查看 first commit (754610f2) 的 diff，确认初始代码骨架（源自 xv6-riscv 的哪些模块）",
-    "6. 用 get_commit_diff_summary 查看 FAT32 引入提交 (2aac809a)，确认文件系统从 xv6 原生 fs 切换到 FAT32 的变更范围",
-    "7. 用 get_commit_diff_summary 查看 busybox 启动提交 (3e1d0165)，确认用户态支持的关键转折",
-    "8. 用 get_commit_diff_summary 查看 signal 大合并 (f6753c87)，确认信号机制引入的变更范围",
-    "9. 用 get_commit_diff_summary 查看 doc 更新提交 (9331e6eb / 5b6b717e)，确认文档与代码同步的里程碑",
-    "10. 用 trace_file_evolution 追踪 kernel/main.c 的演进（30 commits），分析启动流程的变更节点",
-    "11. 用 trace_file_evolution 追踪 Makefile 的演进（25 commits），分析构建系统变化（工具链切换、SBI 替换、平台支持）",
-    "12. 用 trace_file_evolution 追踪 kernel/fs/fat32/fat32.c 的演进（20 commits），分析 FAT32 驱动的迭代过程",
-    "13. 用 analyze_git_history(path_filter='kernel/mm') 获取内存管理模块的提交历史，识别 COW/LazyAlloc/kmalloc 引入节点",
-    "14. 用 analyze_git_history(path_filter='kernel/sched') 获取调度模块的提交历史，识别调度器重写与信号机制引入",
-    "15. 用 analyze_git_history(path_filter='kernel/syscall') 获取系统调用模块的提交历史，识别 syscall 数量增长轨迹",
-    "16. 用 analyze_git_history(path_filter='kernel/fs') 获取文件系统模块的提交历史，识别 VFS/FAT32/管道/poll 的演进",
-    "17. 用 read_code_segment 读 xv6-user/ostest.c，分析自测覆盖的 32 个 syscall 测试项列表",
-    "18. 用 read_code_segment 读 .gitmodules，确认 psicasbi 子模块信息",
-    "19. 用 read_code_segment 读 .gitignore，确认构建产物（k210.bin, fs.img）与忽略规则",
-    "20. 用 grep_in_repo 搜索 'TODO|FIXME|HACK|XXX' 在 kernel/ 和 include/ 中，识别代码中的缺口标记",
-    "21. 用 read_code_segment 读 README.md 的 Progress 与 TODO 段落，提取官方声明的完成/未完成项",
-    "22. 用 get_commit_diff_summary 查看 sched 合并提交 (6eeb714a)，确认调度器重写的变更范围",
-    "23. 用 get_commit_diff_summary 查看 psicasbi 引入提交 (8839ace 或 a4b0c38)，确认 SBI 从 RustSBI 迁移到 PsicaSBI",
-    "24. 用 analyze_git_history(path_filter='kernel/hal') 获取硬件抽象层提交历史，识别 SD 卡驱动与 PLIC 演进",
-    "25. 用 analyze_git_history(path_filter='kernel/trap') 获取 trap 处理模块提交历史，识别中断/异常处理演进",
-    "26. 用 trace_file_evolution 追踪 kernel/sched/proc.c（20 commits），分析进程管理演进",
-    "27. 用 trace_file_evolution 追踪 kernel/mm/mmap.c（20 commits），分析 mmap 机制演进",
-    "28. 用 trace_file_evolution 追踪 kernel/syscall/syscall.c（20 commits），分析 syscall 分发表演进",
-    "29. 用 read_code_segment 读 include/sysnum.h，获取最终 syscall 号列表作为功能完成度证据",
-    "30. 汇总：按时间线整理里程碑 → 按模块整理演进轨迹 → 按作者整理贡献分工 → 识别当前缺口 → 输出最终分析"
-  ]
+    "对照 seed_paths、entry_symbols，用 rag_search_code / list_repo_structure / LSP 锁定与本阶段相关的关键文件与符号。",
+    "对核心入口使用 lsp_get_document_outline → lsp_get_call_graph（单入口、浅深度）→ 必要时 read_code_segment 精读。",
+    "按题单逐项输出结论，每条附反引号源码路径；无实现则显式写「未发现/桩函数」等，勿臆测。"
+  ],
+  "task_plan": []
 }

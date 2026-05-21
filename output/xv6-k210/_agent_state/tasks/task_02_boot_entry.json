@@ -1,0 +1,49 @@
+{
+  "task_id": "task_02_boot_entry",
+  "stage_id": "02_boot_trap",
+  "question_id": "Q02_001",
+  "question_ids": [
+    "Q02_001",
+    "Q02_002",
+    "Q02_003",
+    "Q02_004",
+    "Q02_006",
+    "Q02_010",
+    "Q02_011",
+    "Q02_014"
+  ],
+  "status": "done",
+  "evidence_ids": [
+    "ev_task_02_boot_entry_6ff1ebe8",
+    "ev_task_02_boot_entry_105b1223",
+    "ev_task_02_boot_entry_5383ef1c",
+    "ev_task_02_boot_entry_384cd85d",
+    "ev_task_02_boot_entry_886262c2",
+    "ev_task_02_boot_entry_556f1647",
+    "ev_task_02_boot_entry_3a245cba",
+    "ev_task_02_boot_entry_624384c6",
+    "ev_task_02_boot_entry_e423f2dd",
+    "ev_task_02_boot_entry_1fb652d6",
+    "ev_task_02_boot_entry_82999305"
+  ],
+  "draft_answer_ids": [
+    "draft_task_02_boot_entry_Q02_001_ddfdadf9",
+    "draft_task_02_boot_entry_Q02_002_dcca0a83",
+    "draft_task_02_boot_entry_Q02_003_570199f5",
+    "draft_task_02_boot_entry_Q02_004_2717ddda",
+    "draft_task_02_boot_entry_Q02_006_72e34a6e",
+    "draft_task_02_boot_entry_Q02_010_838f320c",
+    "draft_task_02_boot_entry_Q02_011_e0cd3ac0",
+    "draft_task_02_boot_entry_Q02_014_d9efaa18"
+  ],
+  "findings": [],
+  "confidence": "high",
+  "errors": [],
+  "token_usage": {},
+  "metadata": {
+    "evidence_count": 11,
+    "mode": "react",
+    "summary": "查证了 xv6-k210 的启动入口链：链接脚本 ENTRY 符号、入口汇编文件、早期初始化（栈设置）、主入口跳转、平台选择机制、SBI 固件链及特权级切换。",
+    "raw_output_excerpt": "Good - no visionfive/jh7110/loongarch support. Now let me compile the final output.\n\nBased on my thorough investigation, here's the comprehensive JSON output:\n\n```json\n{\n  \"status\": \"done\",\n  \"summary\": \"查证了 xv6-k210 的启动入口链：链接脚本 ENTRY 符号、入口汇编文件、早期初始化（栈设置）、主入口跳转、平台选择机制、SBI 固件链及特权级切换。\",\n  \"claim\": \"xv6-k210 使用 linker/k210.ld (ENTRY=_start) 或 linker/qemu.ld (ENTRY=_entry) 指定入口；kernel/entry_k210.S (_start) 和 kernel/entry_qemu.S (_entry) 设置栈并调用 main()；SBI (rustsbi-k210/rustsbi-qemu) 在 M 态完成 BSS 清零、设置 mstatus.MPP=Supervisor 后通过 mret 进入 S 态内核；Makefile 通过 platform 变量选择 k210/qemu 平台及对应链接脚本和入口文件；无 visionfive/jh7110/loongarch 支持。\",\n  \"structured_fact_results\": [\n    {\n      \"fact_id\": \"Q02_001_01\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [0, 1, 2],\n      \"notes\": \"linker/k210.ld 第2行 ENTRY(_start)，linker/qemu.ld 第2行 ENTRY(_entry)，linker/linker64.ld 第2行 ENTRY(_entry)，均读取到完整定义。\"\n    },\n    {\n      \"fact_id\": \"Q02_001_02\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [3, 4, 5],\n      \"notes\": \"kernel/entry_k210.S 定义 _start（k210平台），kernel/entry_qemu.S 定义 _entry（qemu平台），kernel/entry.S 定义 _entry（通用），均读取到完整实现体。\"\n    },\n    {\n      \"fact_id\": \"Q02_001_03\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [3, 4, 5, 6],\n      \"notes\": \"入口汇编设置栈指针(sp)：la sp, boot_stack + add sp, sp, t0（按hart id偏移）。未在入口汇编中显式清BSS（BSS清零由SBI在M态完成）。未在入口汇编中初始化UART。未在入口汇编中处理hart状态（仅通过a0传递hartid）。\"\n    },\n    {\n      \"fact_id\": \"Q02_001_04\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [3, 4, 5, 6],\n      \"notes\": \"所有入口汇编文件均通过 call main 跳转到 kernel/main.c 的 main(unsigned long hartid, unsigned long dtb_pa) 函数。\"\n    },\n    {\n      \"fact_id\": \"Q02_001_05\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [7, 8, 9],\n      \"notes\": \"Makefile 通过 platform := k210 或 platform := qemu 选择平台；k210 使用 linker/k210.ld + kernel/entry_k210.S，qemu 使用 linker/qemu.ld + kernel/entry_qemu.S；li"
+  }
+}

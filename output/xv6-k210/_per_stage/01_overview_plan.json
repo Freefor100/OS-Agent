@@ -1,12 +1,6 @@
 {
   "stage_id": "01_overview",
   "evidence_targets": [
-    "语言与框架来源：C 内核 + Rust SBI (PsicaSBI)，源自 MIT xv6-riscv",
-    "支持架构：riscv64 (K210 真机 + QEMU virt)",
-    "入口函数：_entry (entry.S/linker64.ld) → main() (kernel/main.c)",
-    "关键目录：kernel/ (内核)、include/ (头文件)、xv6-user/ (用户程序)、sbi/psicasbi (Rust SBI)、linker/ (链接脚本)、bootloader/ (预编译 SBI)",
-    "README 构建与运行命令：make build / make run platform=qemu|k210 / make fs / make sdcard",
-    "评测/交付产物信号：k210.bin (烧录)、kernel (ELF)、fs.img (FAT32 磁盘镜像)",
     "语言与框架来源",
     "支持架构",
     "入口函数",
@@ -16,19 +10,17 @@
   ],
   "seed_paths": [
     "README.md",
-    "README_cn.md",
-    "doc/总言.md",
-    "Makefile",
-    "kernel/main.c",
-    "kernel/entry.S",
-    "kernel/entry_k210.S",
-    "kernel/entry_qemu.S",
-    "linker/linker64.ld",
-    "linker/k210.ld",
-    "include/sysnum.h",
-    "kernel/syscall/syscall.c",
     "docs",
-    "Cargo.toml"
+    "Cargo.toml",
+    "Makefile",
+    "build.rs",
+    ".cargo",
+    "scripts",
+    ".github",
+    "arch",
+    "platform",
+    "kernel",
+    "os"
   ],
   "framework_guess": [
     "xv6"
@@ -37,18 +29,11 @@
     "riscv64"
   ],
   "entry_symbols": [
-    "_entry",
-    "_start",
     "main",
-    "start (xv6-user/initcode.S)",
-    "syscall",
-    "usertrap",
-    "kerneltrap",
-    "scheduler",
-    "userinit",
-    "trampoline",
     "kernel_main",
-    "rust_main"
+    "rust_main",
+    "_start",
+    "start"
   ],
   "repo_hotspots": [
     "Makefile",
@@ -63,13 +48,10 @@
     "include/fs"
   ],
   "preferred_tools": [
-    "lsp_get_document_outline",
-    "lsp_get_definition",
-    "lsp_get_references",
-    "lsp_get_call_graph",
     "rag_search_code",
-    "read_code_segment",
-    "grep_in_repo"
+    "lsp_get_call_graph",
+    "lsp_get_definition",
+    "read_code_segment"
   ],
   "avoid_tools": [
     "blind_read_large_files",
@@ -82,27 +64,9 @@
     "max_memory_items": 8
   },
   "execution_steps": [
-    "【入口链】用 lsp_get_definition 确认 _entry (kernel/entry.S) → main (kernel/main.c) 的调用关系，再读 entry.S 全段理解启动栈设置",
-    "【入口链】用 lsp_get_call_graph 对 main() 做 outgoing、max_depth=2，获取内核初始化调用拓扑",
-    "【架构确认】对比 linker/k210.ld (ENTRY=_start) 与 linker/linker64.ld (ENTRY=_entry)，确认双平台入口差异",
-    "【架构确认】grep Makefile 中 platform 条件分支 (k210 vs qemu)，列出两平台编译源文件差异",
-    "【SBI 层】检查 sbi/psicasbi 子模块是否存在 (git submodule status)，若缺失则记录为外部依赖",
-    "【SBI 层】读 bootloader/SBI/ 下预编译二进制用途说明，确认 rustsbi-k210/rustsbi-qemu 与 psicasbi 的关系",
-    "【系统调用表】用 read_code_segment 读 kernel/syscall/syscall.c 中 syscalls[] 数组 (约 L188-L260)，统计已实现 syscall 数量",
-    "【系统调用表】用 lsp_get_document_outline 对 kernel/syscall/syscall.c 获取完整函数列表，与 include/sysnum.h 宏定义交叉验证",
-    "【trap 路径】用 lsp_get_document_outline 对 kernel/trap/trap.c，确认 usertrap/kerneltrap/handle_intr/handle_excp 结构",
-    "【trap 路径】读 kernel/trap/trampoline.S 全段 (147行)，理解 uservec/userret 的上下文切换机制",
-    "【内存管理】用 lsp_get_document_outline 对 kernel/mm/vm.c 和 kernel/mm/pm.c，确认 kvminit/kpminit/kmallocinit 等关键函数",
-    "【进程管理】用 lsp_get_document_outline 对 kernel/sched/proc.c，确认 procinit/userinit/scheduler 等核心函数",
-    "【文件系统】用 lsp_get_document_outline 对 kernel/fs/fs.c 和 kernel/fs/fat32/fat32.c，确认 VFS 与 FAT32 驱动分层",
-    "【文件系统】读 kernel/fs/ 目录结构，确认 bio.c/blkdev.c/pipe.c/poll.c/mount.c/rootfs.c 各模块职责",
-    "【硬件抽象】用 lsp_get_document_outline 对 kernel/hal/sdcard.c 和 kernel/hal/virtio_disk.c，确认双平台磁盘驱动差异",
-    "【用户空间】读 xv6-user/initcode.S 和 xv6-user/user.h，确认用户程序入口 (start) 和系统调用封装 (usys.pl 生成)",
-    "【用户空间】grep Makefile 中 UPROGS 列表，统计用户程序数量并列出关键测试程序 (usertests/mmaptests/cowtest 等)",
-    "【构建产物】grep Makefile 中 all/target 规则，确认最终产物：kernel ELF、k210.bin (dd 合并)、fs.img",
-    "【构建产物】读 tools/flash-list.json 和 tools/kflash.py 头部注释，确认烧录工具链",
-    "【文档交叉验证】读 doc/总言.md 第3-5节，提取开发里程碑和目录描述，与当前代码结构对比验证一致性",
-    "【技术栈收束】汇总：语言 (C + Rust SBI + Perl 代码生成)、构建 (Make + riscv64-unknown-elf-gcc)、目标 (riscv64imafdc)、平台 (K210/QEMU virt)、文件系统 (FAT32)、SBI (PsicaSBI/RustSBI)",
-    "【收束】整理交付产物清单：k210.bin (烧录镜像)、kernel (ELF)、fs.img (FAT32 磁盘)、xv6-user/_* (用户程序)"
-  ]
+    "对照 seed_paths、entry_symbols，用 rag_search_code / list_repo_structure / LSP 锁定与本阶段相关的关键文件与符号。",
+    "对核心入口使用 lsp_get_document_outline → lsp_get_call_graph（单入口、浅深度）→ 必要时 read_code_segment 精读。",
+    "按题单逐项输出结论，每条附反引号源码路径；无实现则显式写「未发现/桩函数」等，勿臆测。"
+  ],
+  "task_plan": []
 }

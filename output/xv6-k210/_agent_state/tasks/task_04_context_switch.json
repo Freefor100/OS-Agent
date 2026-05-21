@@ -1,0 +1,45 @@
+{
+  "task_id": "task_04_context_switch",
+  "stage_id": "04_process_smp",
+  "question_id": "Q04_003",
+  "question_ids": [
+    "Q04_003",
+    "Q04_004",
+    "Q04_020"
+  ],
+  "status": "done",
+  "evidence_ids": [
+    "ev_task_04_context_switch_5ca91378",
+    "ev_task_04_context_switch_0edfd659",
+    "ev_task_04_context_switch_a50b0ec4",
+    "ev_task_04_context_switch_e7457123",
+    "ev_task_04_context_switch_01a7d6ad",
+    "ev_task_04_context_switch_9a0835a0",
+    "ev_task_04_context_switch_c8bef9b1",
+    "ev_task_04_context_switch_1a81836c",
+    "ev_task_04_context_switch_41a7dbd0",
+    "ev_task_04_context_switch_df2ee9d3",
+    "ev_task_04_context_switch_9b214933",
+    "ev_task_04_context_switch_44083ac5",
+    "ev_task_04_context_switch_62d47607",
+    "ev_task_04_context_switch_70c8f787",
+    "ev_task_04_context_switch_18fc1853"
+  ],
+  "draft_answer_ids": [
+    "draft_task_04_context_switch_Q04_003_e857b2a7",
+    "draft_task_04_context_switch_Q04_004_dd1323d0",
+    "draft_task_04_context_switch_Q04_020_c8ec16d8"
+  ],
+  "findings": [
+    "Q04_020_05 (mp_rt_extensions): 有每核 cpu 结构但未发现显式的处理器亲和性、负载均衡或实时调度扩展，标记为 yes_weak"
+  ],
+  "confidence": "high",
+  "errors": [],
+  "token_usage": {},
+  "metadata": {
+    "evidence_count": 15,
+    "mode": "react",
+    "summary": "查证了 xv6-k210 的上下文切换实现（swtch.S/swtch）、保存/恢复的寄存器集合（ra, sp, s0-s11），以及调度切换路径上的页表切换（w_satp/sfence.vma）。",
+    "raw_output_excerpt": "Now I have all the evidence. Let me compile the final structured JSON output.\n\n{\n  \"status\": \"done\",\n  \"summary\": \"查证了 xv6-k210 的上下文切换实现（swtch.S/swtch）、保存/恢复的寄存器集合（ra, sp, s0-s11），以及调度切换路径上的页表切换（w_satp/sfence.vma）。\",\n  \"claim\": \"xv6-k210 实现了完整的上下文切换机制：swtch.S 中的 swtch 函数保存/恢复 ra, sp, s0-s11 共 14 个寄存器；scheduler() 在 swtch 前后执行 w_satp/sfence_vma 进行页表切换；sched() 通过 swtch(&p->context, &mycpu()->context) 从进程切换到调度器。\",\n  \"structured_fact_results\": [\n    {\n      \"fact_id\": \"Q04_003_01\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [0, 1, 2],\n      \"notes\": \"struct context 定义在 include/sched/proc.h:55-72，包含 ra, sp, s0-s11 共 14 个寄存器；swtch.S 实现了完整的保存/恢复汇编代码。\"\n    },\n    {\n      \"fact_id\": \"Q04_003_02\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [2, 3, 4],\n      \"notes\": \"scheduler() 和 sched() 是内核调度路径的入口；sched() 由 yield()/sleep()/exit() 调用，swtch 是核心切换函数。\"\n    },\n    {\n      \"fact_id\": \"Q04_003_03\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [2, 3, 4, 5],\n      \"notes\": \"scheduler() 中设置 tmp->state = RUNNING, c->proc = tmp；sched() 中保存浮点寄存器、更新 stime；yield() 中设置 timer 并重新插入 runqueue。\"\n    },\n    {\n      \"fact_id\": \"Q04_003_04\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [1, 2, 6],\n      \"notes\": \"struct proc 包含 parent/child/sibling_next/sibling_pprev 父子关系字段；clone() 设置 np->parent = p 并维护兄弟链表。\"\n    },\n    {\n      \"fact_id\": \"Q04_003_05\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [2, 7],\n      \"notes\": \"exit() 将进程置为 ZOMBIE 状态，重新挂载子进程到 init，调用 sched() 切换出去；wait4() 搜索 ZOMBIE 子进程并调用 freeproc() 回收。\"\n    },\n    {\n      \"fact_id\": \"Q04_003_06\",\n      \"status_or_value\": \"no_after_negative_search\",\n      \"evidence_candidate_indexes\": [8],\n      \"notes\": \"已搜索所有指定关键词和目录，上下文切换机制已找到，无需 negative_search。\"\n    },\n    {\n      \"fact_id\": \"Q04_004_01\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [0, 1],\n      \"notes\": "
+  }
+}

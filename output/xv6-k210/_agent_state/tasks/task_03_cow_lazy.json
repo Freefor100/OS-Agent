@@ -1,0 +1,53 @@
+{
+  "task_id": "task_03_cow_lazy",
+  "stage_id": "03_mem_mgmt",
+  "question_id": "Q03_012",
+  "question_ids": [
+    "Q03_012",
+    "Q03_013"
+  ],
+  "status": "done",
+  "evidence_ids": [
+    "ev_task_03_cow_lazy_31c379ca",
+    "ev_task_03_cow_lazy_975975c9",
+    "ev_task_03_cow_lazy_5f978e6f",
+    "ev_task_03_cow_lazy_0d750924",
+    "ev_task_03_cow_lazy_10c1cff8",
+    "ev_task_03_cow_lazy_b8118e8c",
+    "ev_task_03_cow_lazy_41724b24",
+    "ev_task_03_cow_lazy_c60b6504",
+    "ev_task_03_cow_lazy_6d73f6ee",
+    "ev_task_03_cow_lazy_e3ccd69c",
+    "ev_task_03_cow_lazy_63679351",
+    "ev_task_03_cow_lazy_66db7b54",
+    "ev_task_03_cow_lazy_18ea015c",
+    "ev_task_03_cow_lazy_696b205e",
+    "ev_task_03_cow_lazy_5eab4a05",
+    "ev_task_03_cow_lazy_2f90400b",
+    "ev_task_03_cow_lazy_a5808ea2",
+    "ev_task_03_cow_lazy_c26a6105",
+    "ev_task_03_cow_lazy_1b872145",
+    "ev_task_03_cow_lazy_b055465c",
+    "ev_task_03_cow_lazy_aa2dc02a",
+    "ev_task_03_cow_lazy_a1032f58",
+    "ev_task_03_cow_lazy_059d3f4b",
+    "ev_task_03_cow_lazy_41fc136b",
+    "ev_task_03_cow_lazy_09f2ac20",
+    "ev_task_03_cow_lazy_b40a59a8",
+    "ev_task_03_cow_lazy_bcde58bd"
+  ],
+  "draft_answer_ids": [
+    "draft_task_03_cow_lazy_Q03_012_c2f18ca0",
+    "draft_task_03_cow_lazy_Q03_013_be70d2ef"
+  ],
+  "findings": [],
+  "confidence": "high",
+  "errors": [],
+  "token_usage": {},
+  "metadata": {
+    "evidence_count": 27,
+    "mode": "react",
+    "summary": "在 xv6-k210 中找到了完整的 CoW (Copy-on-Write) 和 Lazy Allocation 实现。CoW 在 fork/clone 时通过 uvmcopy() 设置 PTE_COW 标志，缺页时由 handle_store_page_fault_cow() 处理。Lazy Allocation 通过 sbrk/brk 仅更新堆边界（不分配物理页），缺页时由 handle_page_fault_lazy() 调用 uvmalloc() 分配。",
+    "raw_output_excerpt": "Now I have all the information. Let me compile the final JSON output.\n\n```json\n{\n  \"status\": \"done\",\n  \"summary\": \"在 xv6-k210 中找到了完整的 CoW (Copy-on-Write) 和 Lazy Allocation 实现。CoW 在 fork/clone 时通过 uvmcopy() 设置 PTE_COW 标志，缺页时由 handle_store_page_fault_cow() 处理。Lazy Allocation 通过 sbrk/brk 仅更新堆边界（不分配物理页），缺页时由 handle_page_fault_lazy() 调用 uvmalloc() 分配。\",\n  \"claim\": \"xv6-k210 实现了写时复制 (CoW) 和惰性分配 (Lazy Allocation)。CoW 触发点在 fork (uvmcopy 设置 PTE_COW) 和缺页 (handle_store_page_fault_cow) 中；Lazy Allocation 在 sbrk/brk 中仅记录堆范围，缺页时在 handle_page_fault_lazy 中分配物理页。\",\n  \"structured_fact_results\": [\n    {\n      \"fact_id\": \"Q03_012_01\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [0, 1, 2],\n      \"notes\": \"memory_constants: PGSIZE=4096 定义于 include/hal/riscv.h:378; MAXVA 定义于 riscv.h:408; MAXUVA 定义于 memlayout.h:130; PHYSTOP=0x80600000 定义于 memlayout.h:102; KERNBASE=0x80020000 定义于 memlayout.h:100。所有常量均有强定义。\"\n    },\n    {\n      \"fact_id\": \"Q03_012_02\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [3, 4],\n      \"notes\": \"allocator_state: 物理页分配器为 freelist 类型（kernel/mm/pm.c），分为 multiple（大块连续页）和 single（单页链表）两个 freelist 分配器。使用 spinlock 保护。\"\n    },\n    {\n      \"fact_id\": \"Q03_012_03\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [5, 6, 7],\n      \"notes\": \"map_unmap_api: walk() 真实遍历三级页表并修改 PTE (vm.c:200-225); mappages() 真实设置 PTE 并调用 pagedup() 增加引用计数 (vm.c:290-325); unmappages() 真实清除 PTE 并释放页 (vm.c:340-375)。\"\n    },\n    {\n      \"fact_id\": \"Q03_012_04\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [8, 9],\n      \"notes\": \"protection_relocation: 地址转换由 MMU 运行时完成（satp 寄存器设置，见 usertrapret 中 MAKE_SATP）。PTE 保护位包括 PTE_V/R/W/X/U (riscv.h:386-391)。用户/内核隔离通过 SSTATUS_PUM/SSTATUS_SUM 控制 (vm.h:12-30)。\"\n    },\n    {\n      \"fact_id\": \"Q03_012_05\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [10, 11, 12, 13],\n      \"notes\": \"call_path: CoW 完整调用链：fork/clone → copysegs() "
+  }
+}

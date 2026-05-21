@@ -1,0 +1,40 @@
+{
+  "task_id": "task_07_hardening_maintenance",
+  "stage_id": "07_security",
+  "question_id": "Q07_016",
+  "question_ids": [
+    "Q07_016"
+  ],
+  "status": "done",
+  "evidence_ids": [
+    "ev_task_07_hardening_maintenance_15b0c8a0",
+    "ev_task_07_hardening_maintenance_c7693790",
+    "ev_task_07_hardening_maintenance_e717b69e",
+    "ev_task_07_hardening_maintenance_b7484caf",
+    "ev_task_07_hardening_maintenance_a6583f6b",
+    "ev_task_07_hardening_maintenance_313028a6",
+    "ev_task_07_hardening_maintenance_07a971fe",
+    "ev_task_07_hardening_maintenance_c8214c04",
+    "ev_task_07_hardening_maintenance_45a6de0b",
+    "ev_task_07_hardening_maintenance_42165c24",
+    "ev_task_07_hardening_maintenance_7933427e",
+    "ev_task_07_hardening_maintenance_2dbf3166",
+    "ev_task_07_hardening_maintenance_5595a255",
+    "ev_task_07_hardening_maintenance_8c3e3ac1",
+    "ev_task_07_hardening_maintenance_c2478293",
+    "ev_task_07_hardening_maintenance_9f966dd2"
+  ],
+  "draft_answer_ids": [
+    "draft_task_07_hardening_maintenance_Q07_016_4f5fdd2d"
+  ],
+  "findings": [],
+  "confidence": "high",
+  "errors": [],
+  "token_usage": {},
+  "metadata": {
+    "evidence_count": 16,
+    "mode": "react",
+    "summary": "对 xv6-k210 仓库进行了全面搜索，检查了 kernel、include、doc、tools、scripts、config 等目录。未发现任何系统硬化与安全维护措施（服务裁剪、权限最小化、安全审计日志、备份/恢复、补丁/签名策略）的实现。仅有内存保护（protect_usr_mem/permit_usr_mem）和 mprotect 系统调用等基础内存权限控制，但不构成完整的最小权限策略。SYS_syslog 仅声明未实现。",
+    "raw_output_excerpt": "Now I have enough information to produce the final structured JSON output. Let me compile everything.\n\n```json\n{\n  \"status\": \"done\",\n  \"summary\": \"对 xv6-k210 仓库进行了全面搜索，检查了 kernel、include、doc、tools、scripts、config 等目录。未发现任何系统硬化与安全维护措施（服务裁剪、权限最小化、安全审计日志、备份/恢复、补丁/签名策略）的实现。仅有内存保护（protect_usr_mem/permit_usr_mem）和 mprotect 系统调用等基础内存权限控制，但不构成完整的最小权限策略。SYS_syslog 仅声明未实现。\",\n  \"claim\": \"xv6-k210 是一个教学型 xv6 移植到 RISC-V K210 的操作系统，未实现任何系统硬化与安全维护措施。\",\n  \"structured_fact_results\": [\n    {\n      \"fact_id\": \"Q07_016_01\",\n      \"status_or_value\": \"no_after_negative_search\",\n      \"evidence_candidate_indexes\": [0, 1, 2],\n      \"notes\": \"未发现任何服务裁剪机制。无 Kconfig、无服务/守护进程管理、无可配置的 syscall surface。Makefile 仅有 platform(k210/qemu) 和 mode(debug/release) 两个编译选项，不能裁剪不必要服务、协议或驱动。所有 syscall 均静态编译进内核，无模块化加载机制。\"\n    },\n    {\n      \"fact_id\": \"Q07_016_02\",\n      \"status_or_value\": \"no_after_negative_search\",\n      \"evidence_candidate_indexes\": [3, 4, 5, 6],\n      \"notes\": \"存在基础内存保护机制（protect_usr_mem/permit_usr_mem 控制 SSTATUS_PUM/SUM）和 mprotect 系统调用，但无完整的最小权限策略。getuid/geteuid/getgid/getegid 均返回 0（单用户 root）。prlimit64 是空实现（return 0）。无 capability 机制、无用户/组隔离、无权限分离策略。\"\n    },\n    {\n      \"fact_id\": \"Q07_016_03\",\n      \"status_or_value\": \"no_after_negative_search\",\n      \"evidence_candidate_indexes\": [7, 8, 9],\n      \"notes\": \"未发现安全审计日志。printf 是通用控制台输出，非安全审计。SYS_syslog (116) 在 sysnum.h 中定义但从未实现（无 sys_syslog 函数体）。sys_trace 是调试用的系统调用跟踪，不记录权限拒绝、登录变更或策略违规等安全事件。\"\n    },\n    {\n      \"fact_id\": \"Q07_016_04\",\n      \"status_or_value\": \"no_after_negative_search\",\n      \"evidence_candidate_indexes\": [10, 11, 12],\n      \"notes\": \"未发现备份/恢复/checkpoint 机制。FAT32 文件系统无日志功能（文档明确说明去掉了 log 层）。仅有 syncfs() 在 panic 时调用，但无备份、恢复或文件系统一致性恢复策略。\"\n    },\n    {\n      \"fact_id\": \"Q07_016_05\",\n      \"status_or_value\": \"no_after_negative_search\",\n      \"evidence_candidate_indexes\": [13, 14, 15],\n      \"notes\": \"未发现补丁版本、镜像签名、模块签名或安全启动策略。ELF 加载器（exec.c）不验证签名。无 secure boot 实现。文档中提到的 'secure' 仅作为辅助向量中的一个字段设为 0。无模块签名或版本校验机制。\"\n    }\n  ],\n  \"evidenc"
+  }
+}

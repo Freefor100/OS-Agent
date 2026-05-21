@@ -1,0 +1,34 @@
+{
+  "task_id": "task_06_sync_ipc_Q06_015_definition_assembler_fix_de28e5",
+  "stage_id": "06_sync_ipc",
+  "question_id": "Q06_015",
+  "question_ids": [
+    "Q06_015"
+  ],
+  "status": "done",
+  "evidence_ids": [
+    "ev_task_06_sync_ipc_Q06_015_definition_assembler_fix_de28e5_b6a20488",
+    "ev_task_06_sync_ipc_Q06_015_definition_assembler_fix_de28e5_3c5bb870",
+    "ev_task_06_sync_ipc_Q06_015_definition_assembler_fix_de28e5_d0001458",
+    "ev_task_06_sync_ipc_Q06_015_definition_assembler_fix_de28e5_c8752557",
+    "ev_task_06_sync_ipc_Q06_015_definition_assembler_fix_de28e5_f027dd19",
+    "ev_task_06_sync_ipc_Q06_015_definition_assembler_fix_de28e5_8a72b1f9",
+    "ev_task_06_sync_ipc_Q06_015_definition_assembler_fix_de28e5_ccd97bbd",
+    "ev_task_06_sync_ipc_Q06_015_definition_assembler_fix_de28e5_86626d86",
+    "ev_task_06_sync_ipc_Q06_015_definition_assembler_fix_de28e5_9dbc2724",
+    "ev_task_06_sync_ipc_Q06_015_definition_assembler_fix_de28e5_0a960829"
+  ],
+  "draft_answer_ids": [
+    "draft_task_06_sync_ipc_Q06_015_definition_assembler_fix_de28e5_Q06_015_d777f357"
+  ],
+  "findings": [],
+  "confidence": "high",
+  "errors": [],
+  "token_usage": {},
+  "metadata": {
+    "evidence_count": 10,
+    "mode": "react",
+    "summary": "调查了 xv6-k210 内核的锁实现、嵌套调用和注释规范，确认了死锁四条件的存在情况以及死锁处理策略。内核通过显式锁顺序注释（proc_lock 最后获取、parent->lk 先于 proc_lock 获取）和 trysleeplock 来预防死锁，没有 lockdep/ABBA 检测或超时机制。",
+    "raw_output_excerpt": "Good, no Coffman/banker algorithm references. Now let me produce the final output.\n\n```json\n{\n  \"status\": \"done\",\n  \"summary\": \"调查了 xv6-k210 内核的锁实现、嵌套调用和注释规范，确认了死锁四条件的存在情况以及死锁处理策略。内核通过显式锁顺序注释（proc_lock 最后获取、parent->lk 先于 proc_lock 获取）和 trysleeplock 来预防死锁，没有 lockdep/ABBA 检测或超时机制。\",\n  \"claim\": \"xv6-k210 内核的死锁处理策略更接近死锁预防（deadlock prevention），主要通过锁顺序（lock ordering）来防止循环等待条件，同时使用 trysleeplock 作为辅助手段。没有死锁避免、检测/恢复或显式忽略策略。\",\n  \"structured_fact_results\": [\n    {\n      \"fact_id\": \"Q06_015_01\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [0, 1, 2],\n      \"notes\": \"spinlock 和 sleeplock 都提供互斥访问。spinlock 使用原子 swap 实现忙等互斥；sleeplock 在 spinlock 基础上增加睡眠等待。代码中有明确的 'Mutual exclusion spin locks' 注释。\"\n    },\n    {\n      \"fact_id\": \"Q06_015_02\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [3, 4, 5, 6],\n      \"notes\": \"内核允许持有锁的同时等待其他资源。典型场景：acquiresleep() 持有内层 spinlock 时 sleep() 等待条件变量；exit() 持有 parent->lk 时获取 proc_lock；sleep() 函数持有 proc_lock 时释放调用者锁。注释明确提到 'avoid deadlock' 说明开发者意识到 hold-and-wait 的存在。\"\n    },\n    {\n      \"fact_id\": \"Q06_015_03\",\n      \"status_or_value\": \"yes_weak\",\n      \"evidence_candidate_indexes\": [0, 2, 7],\n      \"notes\": \"spinlock 在 acquire 时通过 push_off() 关闭中断，不可被抢占，满足不可剥夺条件。但 sleeplock 在 acquiresleep() 中通过 sleep() 主动让出 CPU，可被调度走。没有强制剥夺锁的机制。trysleeplock 是非阻塞尝试而非剥夺。综合判断为 weak。\"\n    },\n    {\n      \"fact_id\": \"Q06_015_04\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [3, 4, 5, 6, 8],\n      \"notes\": \"内核通过显式锁顺序（lock ordering）来防止循环等待。proc.c 注释明确要求 'proc_lock should be acquired last'、'acquire proc_lock after parent\\\\'s lock'。exit() 中先获取 parent->lk 再获取 proc_lock。do_rename 使用 trysleeplock 避免死锁。这些是 circular wait prevention 的证据。\"\n    },\n    {\n      \"fact_id\": \"Q06_015_05\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [3, 4, 5, 6, 8, 9],\n      \"notes\": \"死锁处理策略是预防（prevention），具体通过锁顺序（lock ordering）防止循环等待条件。没有 lockdep/ABBA 检测（无检测恢复），没有 Banker 算法（无避免），没有超时机制。trys"
+  }
+}
