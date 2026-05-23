@@ -5,7 +5,7 @@ import re
 from typing import Any, Dict, Iterable, List, Optional
 
 from core.agent_graph_state import EvidenceRecord
-from core.feature_schema_bank import HINT_EVIDENCE_TYPES, STRONG_EVIDENCE_TYPES
+from core.qa_contract import HINT_EVIDENCE_TYPES, STRONG_EVIDENCE_TYPES
 
 
 _DECLARATION_HINT_RE = re.compile(r"\b(trait|typedef|struct\s+\w+\s*;|extern\s+|fn\s+\w+\s*\([^)]*\)\s*;)")
@@ -151,8 +151,9 @@ def verify_evidence(
     tool_name = (record.tool_name or "").strip()
     required_evidence_types = required_evidence_types or []
     parsed_negative_search = _parse_negative_search_metadata(record)
+    synthetic_negative_search = bool(parsed_negative_search.get("synthetic") or record.metadata.get("synthesized_from_structured_fact_results"))
     negative_search = bool(parsed_negative_search) or _looks_like_negative_search((record.excerpt or "") + "\n" + (record.notes or ""))
-    negative_search_structured = negative_search and _negative_search_covers_policy(record, negative_search_policy)
+    negative_search_structured = negative_search and not synthetic_negative_search and _negative_search_covers_policy(record, negative_search_policy)
 
     if path_exists:
         score += 0.25
@@ -247,6 +248,7 @@ def verify_evidence(
             "line_readable": line_readable,
             "excerpt_matches_file": excerpt_matches,
             "negative_search": parsed_negative_search if negative_search else {},
+            "negative_search_synthetic": synthetic_negative_search,
             "negative_search_structured": negative_search_structured,
             "can_support_implemented": "implemented" in supports,
         }

@@ -55,13 +55,13 @@ conda run -n os_agent python os_agent_d_describe.py
 
 Multi-Agent 模式采用 **程序化 Supervisor + LLM ReAct Task Agents + 结构化证据黑板**：
 
-- **结构化题单本体**：`core/describe_stage_qa/02-09*.json` 已直接写入 `feature_id`、结构化事实、证据要求、负向搜索策略、三态规则和反例；运行时只读题单本体，不做自动补齐或生成。
+- **结构化题单本体**：`core/describe_stage_qa/02-09*.json` 是唯一题单真源，已直接写入 `feature_ids`、结构化事实、证据要求、负向搜索策略、三态规则和反例；运行时只读题单本体，不做自动补齐、生成或修补。
 - **Supervisor / Repo Profile / Task Builder / Evidence Verifier / Publisher**：程序节点，负责调度、状态、断点、证据校验、schema guard、图谱和产物写入。
 - **Stage Plan Agent**：基于结构化题单、`PlanSpec` 和 repo profile 生成 grouped `task_plan[]`；相近题可以合并到一个 task。
-- **Task Builder**：程序校验 Plan Agent 的任务，注入题单本体中的 evidence policy / structured facts，修正非法 `question_ids` 并去重；任务怎么合并由 LLM Plan Agent 决定，规则不再替代规划。
+- **Task Builder**：程序校验 Plan Agent 的任务，注入题单本体中的 evidence policy / structured facts，修正非法 `question_ids` 并去重；只在明显跨主题或命中高风险错分组（如缓存驱逐、UART 地址切换、空闲空间管理、网络/socket、安全权限）时拆分 task，并在 task metadata 写入 `plan_lint`。
 - **Task ReAct Agents**：每个 task 都是受限工具集的小 ReAct Agent，主动调用 RAG/LSP/read/build/git 工具查证据；最终输出 evidence candidates 和草稿，系统再生成 `EvidenceRecord`。
 - **Evidence Verifier**：校验 path、line、excerpt、证据类型和负向搜索覆盖，输出 `strength` 与 `supports_claim_types`；RAG/grep 默认只是 hint，不能单独支撑 `implemented`。
-- **Stage Assembler Agent**：不从零查源码，只消费 task 草稿与绑定证据，逐题统一格式、去重、修正过度表述；三态证据不足会降级为 `unknown`。
+- **Stage Assembler Agent**：不从零查源码，只消费 task 草稿与绑定证据，逐题统一格式、去重、修正过度表述；三态证据不足时保留原 `value`，但写入 blocker 级 guardrail 与 recommended_value。
 - **Review Agent**：默认无源码工具，只读审计题单、最终答案 JSON 与 evidence 摘要；重点检查回答 claim 是否被证据支撑，低分时生成 fix task，再交回 Task Agent 补证据。
 
 并行调度策略：
@@ -112,6 +112,45 @@ output/<repo>/_agent_state/debug_events.jsonl
 ```
 
 其中 `debug_events.jsonl` 保留完整 `metadata`、工具参数、工具结果 excerpt、token usage 和 warning/error 信息，不受终端预览长度影响，方便复盘某个 task agent 的循环、卡顿或证据查找问题。
+
+**程序规则、字段覆写与打分来源**
+
+Describe 管线允许 LLM 作答，但以下位置会有程序性校验、兜底、覆写或打分；这些规则应被视为“报告生成管线的一部分”，不是参赛 OS 事实：
+
+| 位置 | 程序动作 | 可能影响的字段 | 追踪方式 |
+|------|----------|----------------|----------|
+| `core/describe_json_qa.py` | JSON-QA 默认值与题单契约 coerce：补齐 `fact_answers`，单/多选 A/B/C/D 转选项原文；仅当 `answer_contract.value_shape` 存在时才把 short/fill `value` 规整为固定字段对象 | `value`, `fact_answers` | answer 的 `_meta.programmatic_mutations[]`，以及 `answer_candidate_mutated` 事件 |
+| `core/describe_graph.py` | Evidence ref guard：只允许引用本题 Bound Evidence；未知或跨题 evidence id 会被丢弃；fallback_unusable 不自动绑定前几条证据 | `used_evidence_ids`, `evidence`, `fact_answers[*].used_evidence_ids`, `notes` | `_meta.programmatic_mutations[]`，`answer_evidence_refs_dropped` / `answer_evidence_refs_fallback` 事件 |
+| `core/describe_graph.py` | Tri-state schema guard：`tri_state_impl.value` 只能是 `implemented/stub/not_found/unknown`；缺少可支撑证据时保留原 `value`，只写风险标识和 recommended_value | `notes`, `_meta.guardrails.tri_state`, `_meta.audit` | `_meta.guardrails.tri_state`、`answer_guardrail_flagged` blocker 事件 |
+| `core/describe_graph.py` | Assembler fallback：解析失败、重试失败或证据不足时生成 `answer_status=fallback_unusable`，不猜单选/多选答案 | `answer_status`, `value`, `fact_answers`, `notes`, `_meta.fallback` | `_meta.fallback`、`_meta.programmatic_mutations[].phase=fallback_answer` |
+| `core/task_agents.py` / `core/evidence_verifier.py` | 从 `structured_fact_results` 合成 negative_search evidence 时，会标记 `synthetic=true`；synthetic negative_search 最高只作弱证据，不能单独支撑 `not_found` | `EvidenceRecord.metadata.negative_search`, `strength`, `supports_claim_types` | `negative_search_synthesized` 事件，`negative_search_synthetic=true` |
+| `core/task_builder.py` | Plan lint 只拆明显错分组或高风险跨主题组合 | `TaskSpec.question_ids`, `TaskSpec.metadata.plan_lint` | `metadata.plan_lint.split/reason/topic_tags_by_question` |
+| `core/describe_stage_review.py` | Review LLM 给逐题 `score_evidence` / `score_consistency`；程序按方案 A 重算全阶段 `confidence`，并写 `report_quality_score` 与 `_meta.quality` | `confidence`, `report_quality_score`, `_meta.quality` | `_per_stage/*_review.json` 与 `_agent_state/reviews/*_review.json` |
+| `core/describe_graph.py` | Review 低分或证据 finding 会触发 targeted fix task，重新补证据后再组装 | Task 列表、证据集合、草稿、answer `_meta.review_fix` | `review_fix_*` task metadata、`_meta.review_fix` 和事件日志 |
+
+凡是程序改过的 answer 字段，最终 JSON 中应带 `_meta.programmatic_mutations[]`，包含 `phase/source/reason/fields/diff`。三态证据不足不再改写 `value`，而是写 `_meta.guardrails.tri_state` 与 `_meta.audit[]`，便于区分 LLM 原答、程序标记和程序实际覆写。
+
+**高影响环境变量**
+
+`.env` 里建议至少显式记录这些会显著改变运行结果、成本或审计行为的变量：
+
+| 变量 | 默认值 | 影响 |
+|------|--------|------|
+| `OS_AGENT_MAX_PARALLEL_STAGES` | `2` | stage 并发数，影响速度、API 并发压力和日志交错 |
+| `OS_AGENT_MAX_PARALLEL_TASKS_PER_STAGE` | `3` | 单 stage 内 task agent 并发数 |
+| `OS_AGENT_TASK_AGENT_BUDGET` | `30` | 单 task ReAct 递归/工具预算，过低会欠查证据，过高会增加成本 |
+| `OS_AGENT_ANSWER_JSON_MAX_ATTEMPTS` | `3` | 单题 answer JSON 修复重试次数 |
+| `DESCRIBE_STAGE_REVIEW` | `0` | 是否启用 Review Agent 和 review_score |
+| `DESCRIBE_REVIEW_MAX_CHARS` | `50000` | 单次 review 输入预算；当前按题 review，若单题仍超预算会截断 |
+| `DESCRIBE_REVIEW_MAX_ATTEMPTS` | `3` | review JSON 解析/契约失败后的重试次数 |
+| `DESCRIBE_REVIEW_MODEL` | 空，沿用 `MODEL_NAME` | 单独指定 Review Agent 模型 |
+| `DESCRIBE_MAX_OUTPUT_TOKENS` | 模型默认 | Describe/JSON-QA 长输出上限 |
+| `OS_AGENT_TERMINAL_MODE` | `compact` | 终端渲染模式，不影响产物事实 |
+| `CODE_EMBEDDING_MODEL` | `jinaai/jina-embeddings-v2-base-code` | RAG 向量模型，影响语义搜索召回 |
+| `CODE_EMBEDDING_ENCODE_BATCH` | `8` | RAG 建索引批大小，影响显存/速度 |
+| `CODE_EMBEDDING_QUERY_PROMPT_NAME` | 空 | 查询向量 prompt 名，影响检索分布 |
+| `OS_AGENT_USE_HF_MIRROR` | `true` | 是否默认使用 HF 镜像 |
+| `OS_AGENT_HF_ENDPOINT` / `HF_ENDPOINT` | `https://hf-mirror.com` 或外部配置 | Hugging Face 下载源 |
 
 **v4.0 受限外部背景补充**
 
@@ -377,7 +416,7 @@ output/
     │   ├── repo_profile.json
     │   ├── 03_mem_mgmt_plan.json
     │   └── ...
-    ├── features/               # 每阶段 Feature Schema Bank 展开结果
+    ├── features/               # 每阶段题单 JSON 中人工维护的 feature 摘要
     ├── feature_graph.json      # Feature/Question/Evidence/File/Symbol/Claim 图谱
     ├── feature_graph.cypher    # Neo4j 导入用 Cypher
     ├── feature_graph.graphml   # 通用图工具导入格式
@@ -393,7 +432,7 @@ output/
 
 #### 🆕 **v4.0 / v4.1 Describe Multi-Agent 图模式**（2026-03-27；后续迭代）
 - **Describe 默认 Multi-Agent**：`os_agent_d_describe.py` 直接进入 `core.describe_graph.MultiAgentRuntime`；旧串行 Describe Plan→Execute→Review 链路已移除，`--multi-agent` 仅作为兼容旧脚本的 no-op。
-- **结构化题单定稿**：02-09 题单 JSON 本体已直接 materialize 为可人工评审的结构化题单，运行时不再自动扩展或补齐；`tri_state_impl` 的 `implemented / stub / not_found / unknown` 判定边界、证据要求和反例都写在题单文件里。
+- **结构化题单定稿**：02-09 题单 JSON 本体是可人工评审的结构化题单，运行时不自动扩展、补齐或修补；`tri_state_impl` 的 `implemented / stub / not_found / unknown` 判定边界、证据要求和反例都写在题单文件里。
 - **程序化图调度**：Supervisor 负责仓库准备、RAG 预索引、并行 stage/task 调度、锁、断点续传与发布；`Stage Plan Agent` 只生成 grouped task plan，`Task Builder` 会程序化校验并限流。
 - **结构化证据黑板**：Task ReAct Agents 产出候选证据与 `DraftAnswerRecord`，系统生成并校验 `EvidenceRecord`；Evidence Verifier 会区分 hint/weak/strong/invalid，并输出可支撑的 claim 类型。
 - **Feature Graph 输出**：最终发布 `feature_graph.json`、`feature_graph.cypher`、`feature_graph.graphml`，以 Feature/Question/Evidence/File/Symbol/Claim 节点展示 OS 机制 DAG 与证据追溯。
@@ -571,7 +610,7 @@ OS-Agent/
 
 **Describe JSON-QA 生成**：02~09 题单阶段由 Task Agents 收集候选证据，系统生成并校验 `EvidenceRecord`，Stage Assembler 逐题生成 `_per_stage/<stage_id>_answers.json` 并渲染章节 Markdown。`tri_state_impl` 只能输出 `implemented / stub / not_found / unknown`；RAG/grep 不能单独支撑 `implemented`，负向搜索覆盖不足会降级为 `unknown` 或触发补证据 task。旧串行链路的整章 JSON repair 侧车已删除。
 
-**Describe 无工具 Review（可选）**：`DESCRIBE_STAGE_REVIEW=1` 时，仅对 **JSON-QA 且校验成功** 的阶段在落盘前送审：材料为 **`core/describe_stage_qa` 题单 + feature schema** + **`coerce_answers_payload_by_stage_qa` 覆写题面前的答案 JSON**（证据以答案 JSON 内 `evidence` 为准）。`01_overview`、`10_history` 不审。结果 `_per_stage/<stage_id>_review.json`：细粒度规则见系统提示**详细分档（0.95+ 为优秀，<0.80 为证据单薄，<0.50 为严重问题）**；后处理会写入 **`report_quality_score`（0~1，完全由 LLM 逐题置信度与维度分合成，摒弃纯代码统计）**、**`_meta.quality`**，并按**方案 A** 重算全阶段 **`confidence`（与各题 `confidence` 一致）**；另含逐题 `question_reviews[]`、`summary_zh` 等。默认可选 `DESCRIBE_REVIEW_MODEL`。合并总报告时，会在 **`output/<os-name>/review_score.json`** 汇总 **02~09 题库各章**（8 个 `stage_id`）的 0~100 分与 **总分校验（有分章的算术平均）**，并在最终报告文首写引用行；若各章无可用 review 则写“未统计”类占位。
+**Describe 无工具 Review（可选）**：`DESCRIBE_STAGE_REVIEW=1` 时，仅对 **JSON-QA 且校验成功** 的阶段在落盘前送审：材料为 **`core/describe_stage_qa` 题单内 QA contract / feature context** + **`coerce_answers_payload_by_stage_qa` 覆写题面前的答案 JSON**（证据以答案 JSON 内 `evidence` 为准）。`01_overview`、`10_history` 不审。结果 `_per_stage/<stage_id>_review.json`：细粒度规则见系统提示**详细分档（0.95+ 为优秀，<0.80 为证据单薄，<0.50 为严重问题）**；后处理会写入 **`report_quality_score`（0~1，完全由 LLM 逐题置信度与维度分合成，摒弃纯代码统计）**、**`_meta.quality`**，并按**方案 A** 重算全阶段 **`confidence`（与各题 `confidence` 一致）**；另含逐题 `question_reviews[]`、`summary_zh` 等。默认可选 `DESCRIBE_REVIEW_MODEL`。合并总报告时，会在 **`output/<os-name>/review_score.json`** 汇总 **02~09 题库各章**（8 个 `stage_id`）的 0~100 分与 **总分校验（有分章的算术平均）**，并在最终报告文首写引用行；若各章无可用 review 则写“未统计”类占位。
 
 审阅侧车若 **JSON 解析或结构不合规**（如缺题、乱序），会按 **`DESCRIBE_REVIEW_MAX_ATTEMPTS`**（默认 `3`，最大 `8`）对同一审阅模型追加「修复重发」轮次；仍失败则写入 `*_review_error.json`。
 

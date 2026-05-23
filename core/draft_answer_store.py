@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 from typing import Dict, Iterable, List, Optional
 
 from core.agent_graph_state import DraftAnswerRecord
@@ -12,6 +13,7 @@ class DraftAnswerStore:
 
     def __init__(self, path: str):
         self.path = path
+        self._lock = threading.Lock()
         self._by_id: Dict[str, DraftAnswerRecord] = {}
         os.makedirs(os.path.dirname(path), exist_ok=True)
         self._load()
@@ -31,12 +33,13 @@ class DraftAnswerStore:
                     continue
 
     def append(self, record: DraftAnswerRecord) -> DraftAnswerRecord:
-        if record.draft_answer_id in self._by_id:
-            return self._by_id[record.draft_answer_id]
-        with open(self.path, "a", encoding="utf-8") as f:
-            f.write(json.dumps(record.to_dict(), ensure_ascii=False) + "\n")
-        self._by_id[record.draft_answer_id] = record
-        return record
+        with self._lock:
+            if record.draft_answer_id in self._by_id:
+                return self._by_id[record.draft_answer_id]
+            with open(self.path, "a", encoding="utf-8") as f:
+                f.write(json.dumps(record.to_dict(), ensure_ascii=False) + "\n")
+            self._by_id[record.draft_answer_id] = record
+            return record
 
     def extend(self, records: Iterable[DraftAnswerRecord]) -> List[DraftAnswerRecord]:
         return [self.append(r) for r in records]

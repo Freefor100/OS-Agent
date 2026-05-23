@@ -1,0 +1,51 @@
+==============================================================
+OS-Agent TODO: 待办事项
+==============================================================
+
+--------------------------------------------------------------
+[P3] Stage 间依赖传递（跨阶段数据共享）
+--------------------------------------------------------------
+背景：
+  - Q02_026（Stage02）需要 Stage04 SMP 数据才能完整回答
+  - Q04_036（Stage04）需要 Stage06 SpinLock 数据才能回答关中断行为
+  - 当前架构所有 Stage 并发运行，无法等待其他 Stage 的结果
+  - 题单修复后用 `unknown + pending_cross_stage` 占位，但无自动回填机制
+
+现状：
+  - MultiAgentRuntime._run_stage() 通过 ThreadPoolExecutor 并发执行
+  - 各 Stage 之间没有等待/通知机制
+  - DescribeGraphState 没有 stage_deps 字段
+
+需要做的：
+  1. 在 DescribeGraphState 中添加 stage_deps: Dict[str, List[str]]
+     表示 stage_id -> 依赖的其他 stage_id 列表
+
+  2. 修改 ThreadPoolExecutor 调度逻辑：
+     当前：submit_all -> as_completed
+     改为：拓扑排序后，依赖满足时才 submit
+
+  3. 在 build_tasks_from_llm_plan() 中支持 depends_on_stage 字段：
+     Task Agent 可标注 "此答案等待 StageXX 完成后回填"
+
+  4. 在 precheck 阶段，若发现 pending_cross_stage 标注：
+     - 自动从已完成的 stage 结果中查找对应数据
+     - 生成 fix_task 进行回填
+
+  5. 短期 workaround（不重构调度器）：
+     - Stage 并发照旧
+     - 所有 Stage 完成后，新增一个 cross_stage_reconcile 阶段
+     - 专门处理有 pending_cross_stage 标注的 answers
+     - 用完整的 StageXX 结果生成补充答案
+
+相关文件：
+  - core/describe_graph.py (MultiAgentRuntime, _run_stage, _run_tasks)
+  - core/agent_graph_state.py (DescribeGraphState)
+  - core/task_builder.py (build_tasks_from_llm_plan)
+  - core/describe_stage_review.py (precheck logic)
+
+优先级：P3（当前 pending_cross_stage 用 unknown 占位不影响基本功能）
+估时：2-3 天
+
+--------------------------------------------------------------
+（其他 TODO 项可继续追加到此文件）
+--------------------------------------------------------------

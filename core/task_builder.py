@@ -5,7 +5,7 @@ import re
 from typing import Any, Dict, Iterable, List, Set
 
 from core.agent_graph_state import TaskSpec
-from core.feature_schema_bank import (
+from core.qa_contract import (
     collect_feature_ids,
     feature_context_for_question,
     negative_search_policy_for_question,
@@ -75,38 +75,18 @@ def build_tasks_for_stage(
 
     if not questions:
         base = _slug(stage_id)
-        tasks.extend(
-            [
-                TaskSpec(
-                    task_id=f"task_{base}_discovery",
-                    stage_id=stage_id,
-                    task_type="discovery",
-                    query=f"{stage_title} 相关核心模块和入口",
-                    seed_paths=stage_seed_paths,
-                    entry_symbols=stage_entry_symbols,
-                    expected_evidence_types=["search"],
-                ),
-                TaskSpec(
-                    task_id=f"task_{base}_build_platform",
-                    stage_id=stage_id,
-                    task_type="build_platform",
-                    query=f"{stage_title} 相关构建、平台、文档线索",
-                    seed_paths=stage_seed_paths,
-                    entry_symbols=stage_entry_symbols,
-                    expected_evidence_types=["documentation", "build_config"],
-                ),
-            ]
-        )
-        if "10_history" in stage_id:
-            tasks.append(
-                TaskSpec(
-                    task_id=f"task_{base}_git_history",
-                    stage_id=stage_id,
-                    task_type="git_history",
-                    query="开发历史、作者贡献和关键文件演进",
-                    expected_evidence_types=["git_history"],
-                )
+        task_type = "react_history" if "10_history" in stage_id else "react_code"
+        tasks.append(
+            TaskSpec(
+                task_id=f"task_{base}_{task_type}",
+                stage_id=stage_id,
+                task_type=task_type,
+                query=f"{stage_title} 相关核心模块、实现状态与构建配置",
+                seed_paths=stage_seed_paths,
+                entry_symbols=stage_entry_symbols,
+                expected_evidence_types=["search", "build_config"] if task_type == "react_code" else ["git_history"],
             )
+        )
         return tasks
 
     for q in questions:
@@ -141,20 +121,7 @@ def build_tasks_for_stage(
         )
         base = f"task_{stage_id}_{qid}"
 
-        task_types = list(hinted_types)
-        if not task_types:
-            # Keep v1 task fanout conservative. One semantic discovery task per
-            # question usually yields enough evidence for Writer/Review; add one
-            # specialized task only when the question clearly needs it.
-            task_types.append("discovery")
-            if any(x in stem for x in ("构建", "平台", "架构", "Makefile", "Cargo", "QEMU")):
-                task_types.append("build_platform")
-            elif any(x.lower() in stem.lower() for x in ("调用链", "跳转链", "路径", "call graph", "flow")):
-                task_types.append("flow")
-            elif "definition" in expected_types or any(x in stem for x in ("结构体", "字段", "类型", "接口")):
-                task_types.append("definition")
-            elif qtype == "tri_state_impl" and any(x in stem for x in ("桩", "stub", "todo", "ENOSYS")):
-                task_types.append("implementation_state")
+        task_types = list(hinted_types) or ["react_code"]
 
         for task_type in dict.fromkeys(task_types):
             tasks.append(
@@ -219,7 +186,9 @@ def build_tasks_from_llm_plan(
         qids = [str(x).strip() for x in raw_qids if str(x).strip() in valid_qids]
         if not qids:
             continue
-        for chunk_i, qchunk in enumerate([_dedupe(qids)], 1):
+        deduped_qids = _dedupe(qids)
+        qchunks = _lint_task_question_chunks(stage_id, qmap, deduped_qids)
+        for chunk_i, qchunk in enumerate(qchunks, 1):
             task_type = _normalize_task_type(str(raw.get("task_type") or raw.get("agent_type") or "react_code"))
             seed_paths = _list_str(raw.get("seed_paths"), 20) or stage_seed_paths[:20]
             entry_symbols = _list_str(raw.get("entry_symbols"), 20) or stage_entry_symbols[:20]
@@ -281,6 +250,7 @@ def build_tasks_from_llm_plan(
                     metadata={
                         "source": "llm_task_plan",
                         "group_reason": str(raw.get("group_reason") or ""),
+                        "plan_lint": _plan_lint_metadata(qmap, deduped_qids, qchunk, qchunks),
                         "keywords": _dedupe(keywords)[:12],
                         "feature_ids": _dedupe(feature_ids),
                         "feature_context_by_question": feature_contexts,
@@ -298,6 +268,106 @@ def build_tasks_from_llm_plan(
     if tasks:
         return tasks
     return []
+
+
+_ISOLATED_TOPIC_TAGS = {
+    "cache_eviction",
+    "uart_address_switch",
+    "free_space_management",
+    "network_socket",
+    "security_permission",
+}
+
+
+_DOMAIN_TOPIC_TAGS = {
+    "vfs",
+    "cache_eviction",
+    "uart_address_switch",
+    "free_space_management",
+    "network_socket",
+    "security_permission",
+    "smp",
+    "scheduler",
+    "context_switch",
+    "sync_ipc",
+}
+
+
+def _question_topic_tags(q: Dict[str, Any]) -> Set[str]:
+    stem = str(q.get("stem") or "")
+    hints = q.get("task_hints") if isinstance(q.get("task_hints"), dict) else {}
+    hay = " ".join(
+        [
+            stem,
+            str(q.get("concept_boundary") or ""),
+            " ".join(str(x) for x in hints.get("keywords", []) if isinstance(hints.get("keywords"), list)),
+            " ".join(str(x.get("fact_key") or x.get("fact_id") or "") for x in _list_dict(hints.get("structured_facts"), 20)),
+            " ".join(str(x.get("fact_key") or x.get("fact_id") or "") for x in _list_dict(q.get("structured_facts"), 20)),
+        ]
+    ).lower()
+    tags: Set[str] = set()
+    checks = [
+        ("cache_eviction", ("cache eviction", "evict", "缓存驱逐", "缓存淘汰", "lru")),
+        ("uart_address_switch", ("uart", "串口", "serial", "16550", "地址切换", "mmio")),
+        ("free_space_management", ("free space", "bitmap", "空闲空间", "空闲块", "balloc", "bfree")),
+        ("network_socket", ("socket", "bind", "connect", "sendto", "recvfrom", "网络", "tcp", "udp")),
+        ("security_permission", ("permission", "权限", "capability", "安全", "access control", "uid", "gid")),
+        ("vfs", ("vfs", "inode", "file system", "文件系统", "目录项", "dentry", "fs/")),
+        ("smp", ("smp", "多核", "ipi", "hart", "cpu local")),
+        ("scheduler", ("schedule", "scheduler", "调度", "runqueue", "yield")),
+        ("context_switch", ("context switch", "swtch", "上下文切换")),
+        ("sync_ipc", ("futex", "信号量", "semaphore", "mutex", "spinlock", "ipc", "pipe")),
+    ]
+    for tag, needles in checks:
+        if any(needle in hay for needle in needles):
+            tags.add(tag)
+    return tags or {"general"}
+
+
+def _primary_topic_signature(q: Dict[str, Any]) -> str:
+    tags = _question_topic_tags(q)
+    for tag in sorted(_ISOLATED_TOPIC_TAGS):
+        if tag in tags:
+            return tag
+    domains = sorted(tags & _DOMAIN_TOPIC_TAGS)
+    return domains[0] if domains else "general"
+
+
+def _lint_task_question_chunks(stage_id: str, qmap: Dict[str, Dict[str, Any]], qids: List[str]) -> List[List[str]]:
+    if len(qids) <= 1:
+        return [qids]
+    signatures: Dict[str, List[str]] = {}
+    for qid in qids:
+        sig = _primary_topic_signature(qmap.get(qid, {}))
+        signatures.setdefault(sig, []).append(qid)
+    if len(signatures) <= 1 and not any(sig in _ISOLATED_TOPIC_TAGS for sig in signatures):
+        return [qids]
+
+    chunks: List[List[str]] = []
+    for sig, grouped in signatures.items():
+        if sig in _ISOLATED_TOPIC_TAGS:
+            chunks.extend([[qid] for qid in grouped])
+        else:
+            chunks.append(grouped)
+    return chunks or [qids]
+
+
+def _plan_lint_metadata(
+    qmap: Dict[str, Dict[str, Any]],
+    original_qids: List[str],
+    current_qids: List[str],
+    all_chunks: List[List[str]],
+) -> Dict[str, Any]:
+    split = len(all_chunks) > 1 or current_qids != original_qids
+    if not split:
+        return {"split": False}
+    return {
+        "split": True,
+        "reason": "question_topic_or_known_high_risk_schema_mismatch",
+        "original_question_ids": original_qids,
+        "current_question_ids": current_qids,
+        "topic_tags_by_question": {qid: sorted(_question_topic_tags(qmap.get(qid, {}))) for qid in original_qids},
+    }
 
 
 def _list_str(value: Any, limit: int) -> List[str]:

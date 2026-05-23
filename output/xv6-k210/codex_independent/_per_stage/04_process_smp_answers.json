@@ -1,0 +1,4771 @@
+{
+  "stage_id": "04_process_smp",
+  "stage_title": "进程/线程/调度与多核",
+  "source_scope": {
+    "allowed_inputs": [
+      "core/describe_stage_qa/04_process_smp.json",
+      "repos/xv6-k210 源码/文档"
+    ],
+    "excluded_inputs_not_read": [
+      "output/xv6-k210/_per_stage",
+      "baseline_output",
+      "baseline_vs_agent_review_audit",
+      "旧答案"
+    ]
+  },
+  "answers": [
+    {
+      "question_id": "Q04_001",
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q04_001_proc_struct_01",
+          "evidence_type": "definition",
+          "file_path": "repos/xv6-k210/include/sched/proc.h",
+          "line_start": 17,
+          "line_end": 102,
+          "excerpt": "struct context 保存 ra/sp/s0-s11；enum procstate 为 RUNNABLE/RUNNING/SLEEPING/ZOMBIE；struct proc 含 pid/state/trapframe/pagetable/fds/context/parent/child。",
+          "interpretation": "执行实体顶层结构是 struct proc，注释称 Process Control Block，内嵌内核 context 和用户 trapframe。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_001_alloc_clone_wait_02",
+          "evidence_type": "implementation_body",
+          "file_path": "repos/xv6-k210/kernel/sched/proc.c",
+          "line_start": 166,
+          "line_end": 367,
+          "excerpt": "allocproc 分配 kstack/trapframe/pagetable 并 p->pid = __pid++；clone 复制 segment/fdtable/trapframe，建立 parent/child/sibling，并插入 RUNNABLE。",
+          "interpretation": "内核创建路径真实初始化 proc 的标识、地址空间、文件表、父子关系和就绪状态。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_001_cleanup_wait_03",
+          "evidence_type": "usage_flow",
+          "file_path": "repos/xv6-k210/kernel/sched/proc.c",
+          "line_start": 397,
+          "line_end": 522,
+          "excerpt": "exit 释放用户段/文件表、设置 ZOMBIE 并唤醒父进程；wait4 找到 ZOMBIE 子进程后摘链并 freeproc。",
+          "interpretation": "存在阻塞/唤醒/资源回收闭环。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_001_no_tcb_04",
+          "evidence_type": "negative_search",
+          "searched_keywords": [
+            "TCB",
+            "Thread Control Block",
+            "struct thread",
+            "pthread",
+            "task_struct"
+          ],
+          "searched_directories": [
+            "repos/xv6-k210/kernel",
+            "repos/xv6-k210/include"
+          ],
+          "file_count": 113,
+          "match_count": 0,
+          "coverage_sufficient": true,
+          "interpretation": "未发现独立 TCB/线程控制块结构；clone 仍分配 struct proc。"
+        }
+      ],
+      "fact_answers": [
+        {
+          "fact_id": "Q04_001_01",
+          "fact_key": "entity_state",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_001_proc_struct_01"
+          ],
+          "notes": "proc/state/context/trapframe 定义齐全。"
+        },
+        {
+          "fact_id": "Q04_001_02",
+          "fact_key": "syscall_or_kernel_entry",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_001_alloc_clone_wait_02"
+          ],
+          "notes": "allocproc/clone 真实创建执行实体。"
+        },
+        {
+          "fact_id": "Q04_001_03",
+          "fact_key": "state_resource_update",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_001_alloc_clone_wait_02",
+            "codex_ev_Q04_001_cleanup_wait_03"
+          ],
+          "notes": "创建、退出、等待路径都会改状态/资源。"
+        },
+        {
+          "fact_id": "Q04_001_04",
+          "fact_key": "relationship_or_mapping",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_001_proc_struct_01",
+            "codex_ev_Q04_001_alloc_clone_wait_02"
+          ],
+          "notes": "parent/child/sibling 与地址空间/文件表在 proc 中维护。"
+        },
+        {
+          "fact_id": "Q04_001_05",
+          "fact_key": "cleanup_or_wait",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_001_cleanup_wait_03"
+          ],
+          "notes": "exit/wait4 闭合回收。"
+        },
+        {
+          "fact_id": "Q04_001_06",
+          "fact_key": "negative_search_coverage",
+          "status_or_value": {
+            "searched_keywords": [
+              "TCB",
+              "Thread Control Block",
+              "struct thread",
+              "pthread",
+              "task_struct"
+            ],
+            "searched_directories": [
+              "repos/xv6-k210/kernel",
+              "repos/xv6-k210/include"
+            ],
+            "file_count": 113,
+            "match_count": 0,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [
+            "codex_ev_Q04_001_no_tcb_04"
+          ],
+          "notes": "未发现独立 TCB。"
+        }
+      ],
+      "answer": {
+        "value": "顶层类型名: struct proc / Process Control Block\n结构体路径: repos/xv6-k210/include/sched/proc.h\n关键字段: Context=context, State=state(enum procstate), PID=pid, TrapFrame=trapframe, Pagetable=pagetable, FileTable=fds, Parent/Child=parent/child/sibling_next\n是否区分 PCB 与 TCB: 否；只有统一 struct proc，未发现独立 TCB。",
+        "used_evidence_ids": [
+          "codex_ev_Q04_001_proc_struct_01",
+          "codex_ev_Q04_001_alloc_clone_wait_02",
+          "codex_ev_Q04_001_cleanup_wait_03",
+          "codex_ev_Q04_001_no_tcb_04"
+        ],
+        "confidence": "high",
+        "notes": "最终答案由 struct proc 定义、clone/exit/wait4 使用流和 TCB 负向搜索推出。"
+      }
+    },
+    {
+      "question_id": "Q04_002",
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q04_002_states_01",
+          "evidence_type": "definition",
+          "file_path": "repos/xv6-k210/include/sched/proc.h",
+          "line_start": 34,
+          "line_end": 37,
+          "excerpt": "enum procstate { RUNNABLE, RUNNING, SLEEPING, ZOMBIE };",
+          "interpretation": "生命周期状态枚举只有四种。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_002_transitions_02",
+          "evidence_type": "implementation_body",
+          "file_path": "repos/xv6-k210/kernel/sched/proc.c",
+          "line_start": 279,
+          "line_end": 288,
+          "excerpt": "__insert_runnable 设置 RUNNABLE；__insert_sleep 设置 SLEEPING；__remove 从调度链表摘除。",
+          "interpretation": "宏封装了 ready/blocked 状态转换。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_002_run_sleep_exit_wait_03",
+          "evidence_type": "usage_flow",
+          "file_path": "repos/xv6-k210/kernel/sched/proc.c",
+          "line_start": 570,
+          "line_end": 691,
+          "excerpt": "sleep 将当前进程从 runnable 移到 proc_sleep 并 sched；scheduler 取 runnable 后置 RUNNING；exit 置 ZOMBIE；wait4 回收 ZOMBIE。",
+          "interpretation": "主路径覆盖 RUNNABLE->RUNNING、RUNNING->SLEEPING/RUNNABLE/ZOMBIE、ZOMBIE->free。"
+        }
+      ],
+      "fact_answers": [
+        {
+          "fact_id": "Q04_002_01",
+          "fact_key": "entity_state",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_002_states_01"
+          ],
+          "notes": "枚举定义完整。"
+        },
+        {
+          "fact_id": "Q04_002_02",
+          "fact_key": "syscall_or_kernel_entry",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_002_run_sleep_exit_wait_03"
+          ],
+          "notes": "sleep/yield/exit/wait4 等内核入口触发转换。"
+        },
+        {
+          "fact_id": "Q04_002_03",
+          "fact_key": "state_resource_update",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_002_transitions_02",
+            "codex_ev_Q04_002_run_sleep_exit_wait_03"
+          ],
+          "notes": "转换会修改 state 和调度链表。"
+        },
+        {
+          "fact_id": "Q04_002_04",
+          "fact_key": "relationship_or_mapping",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_002_run_sleep_exit_wait_03"
+          ],
+          "notes": "wait4 依赖父子关系回收。"
+        },
+        {
+          "fact_id": "Q04_002_05",
+          "fact_key": "cleanup_or_wait",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_002_run_sleep_exit_wait_03"
+          ],
+          "notes": "ZOMBIE 到 free 由 wait4 完成。"
+        },
+        {
+          "fact_id": "Q04_002_06",
+          "fact_key": "negative_search_coverage",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_002_states_01"
+          ],
+          "notes": "正向证据足够。"
+        }
+      ],
+      "answer": {
+        "value": "状态: RUNNABLE、RUNNING、SLEEPING、ZOMBIE。主要流转: clone/userinit 插入 RUNNABLE；scheduler 选择后置 RUNNING；sleep 置 SLEEPING；wakeup/proc_tick 重新置 RUNNABLE；yield 把运行中进程重新入 RUNNABLE；exit 置 ZOMBIE；wait4 回收 ZOMBIE。",
+        "used_evidence_ids": [
+          "codex_ev_Q04_002_states_01",
+          "codex_ev_Q04_002_transitions_02",
+          "codex_ev_Q04_002_run_sleep_exit_wait_03"
+        ],
+        "confidence": "high",
+        "notes": ""
+      }
+    },
+    {
+      "question_id": "Q04_003",
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q04_003_swtch_asm_01",
+          "evidence_type": "implementation_body",
+          "file_path": "repos/xv6-k210/kernel/sched/swtch.S",
+          "line_start": 8,
+          "line_end": 41,
+          "excerpt": "全局符号 swtch 保存 old 的 ra/sp/s0-s11，再从 new 恢复同一组寄存器并 ret。",
+          "interpretation": "存在真实汇编上下文切换实现。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_003_callsites_02",
+          "evidence_type": "call_site",
+          "file_path": "repos/xv6-k210/kernel/sched/proc.c",
+          "line_start": 654,
+          "line_end": 730,
+          "excerpt": "scheduler 调 swtch(&c->context,&tmp->context)；sched 调 swtch(&p->context,&mycpu()->context)。",
+          "interpretation": "调度器和进程返回调度器路径都接入 swtch。"
+        }
+      ],
+      "fact_answers": [
+        {
+          "fact_id": "Q04_003_01",
+          "fact_key": "entity_state",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_003_swtch_asm_01"
+          ],
+          "notes": "context switch 汇编定义存在。"
+        },
+        {
+          "fact_id": "Q04_003_02",
+          "fact_key": "syscall_or_kernel_entry",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_003_callsites_02"
+          ],
+          "notes": "scheduler/sched 主路径调用。"
+        },
+        {
+          "fact_id": "Q04_003_03",
+          "fact_key": "state_resource_update",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_003_callsites_02"
+          ],
+          "notes": "切换前后配合 RUNNING/调度上下文。"
+        },
+        {
+          "fact_id": "Q04_003_04",
+          "fact_key": "relationship_or_mapping",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_003_callsites_02"
+          ],
+          "notes": "cpu.context 与 proc.context 对应。"
+        },
+        {
+          "fact_id": "Q04_003_05",
+          "fact_key": "cleanup_or_wait",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_003_callsites_02"
+          ],
+          "notes": "exit 后 sched 也走同一切换路径。"
+        },
+        {
+          "fact_id": "Q04_003_06",
+          "fact_key": "negative_search_coverage",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_003_swtch_asm_01"
+          ],
+          "notes": "正向实现足够。"
+        }
+      ],
+      "answer": {
+        "value": "implemented",
+        "used_evidence_ids": [
+          "codex_ev_Q04_003_swtch_asm_01",
+          "codex_ev_Q04_003_callsites_02"
+        ],
+        "confidence": "high",
+        "notes": ""
+      }
+    },
+    {
+      "question_id": "Q04_004",
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q04_004_context_struct_01",
+          "evidence_type": "definition",
+          "file_path": "repos/xv6-k210/include/sched/proc.h",
+          "line_start": 17,
+          "line_end": 32,
+          "excerpt": "struct context 字段为 ra、sp、s0 到 s11。",
+          "interpretation": "C 结构体声明了内核上下文保存集合。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_004_swtch_regs_02",
+          "evidence_type": "implementation_body",
+          "file_path": "repos/xv6-k210/kernel/sched/swtch.S",
+          "line_start": 11,
+          "line_end": 39,
+          "excerpt": "swtch 对 ra/sp/s0-s11 执行 sd 保存和 ld 恢复。",
+          "interpretation": "汇编实际保存/恢复与 struct context 一致。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_004_trapframe_regs_03",
+          "evidence_type": "definition",
+          "file_path": "repos/xv6-k210/include/trap.h",
+          "line_start": 19,
+          "line_end": 91,
+          "excerpt": "struct trapframe 保存用户通用寄存器 ra/sp/gp/tp/t0-t6/s0-s11/a0-a7 以及浮点寄存器和 fcsr。",
+          "interpretation": "用户态陷入保存的是更大的 trapframe 集合。"
+        }
+      ],
+      "fact_answers": [
+        {
+          "fact_id": "Q04_004_01",
+          "fact_key": "entity_state",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_004_context_struct_01",
+            "codex_ev_Q04_004_trapframe_regs_03"
+          ],
+          "notes": "context/trapframe 定义可复现。"
+        },
+        {
+          "fact_id": "Q04_004_02",
+          "fact_key": "syscall_or_kernel_entry",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_004_swtch_regs_02"
+          ],
+          "notes": "汇编实现保存/恢复寄存器。"
+        },
+        {
+          "fact_id": "Q04_004_03",
+          "fact_key": "state_resource_update",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_004_swtch_regs_02"
+          ],
+          "notes": "寄存器写入 old/new context。"
+        },
+        {
+          "fact_id": "Q04_004_04",
+          "fact_key": "relationship_or_mapping",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_004_context_struct_01",
+            "codex_ev_Q04_004_swtch_regs_02"
+          ],
+          "notes": "结构体偏移与汇编保存顺序匹配。"
+        },
+        {
+          "fact_id": "Q04_004_05",
+          "fact_key": "cleanup_or_wait",
+          "status_or_value": "unknown",
+          "used_evidence_ids": [
+            "codex_ev_Q04_004_swtch_regs_02"
+          ],
+          "notes": "本题关注寄存器集合。"
+        },
+        {
+          "fact_id": "Q04_004_06",
+          "fact_key": "negative_search_coverage",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_004_swtch_regs_02"
+          ],
+          "notes": "正向实现足够。"
+        }
+      ],
+      "answer": {
+        "value": "上下文切换 swtch 保存/恢复内核 callee-saved 集合: ra、sp、s0-s11。用户陷入/返回的 trapframe 另保存通用寄存器和浮点寄存器，但 swtch.S 本身不保存 a/t/gp/tp/fp 寄存器。",
+        "used_evidence_ids": [
+          "codex_ev_Q04_004_context_struct_01",
+          "codex_ev_Q04_004_swtch_regs_02",
+          "codex_ev_Q04_004_trapframe_regs_03"
+        ],
+        "confidence": "high",
+        "notes": ""
+      }
+    },
+    {
+      "question_id": "Q04_005",
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q04_005_queues_01",
+          "evidence_type": "definition",
+          "file_path": "repos/xv6-k210/kernel/sched/proc.c",
+          "line_start": 238,
+          "line_end": 247,
+          "excerpt": "定义 PRIORITY_TIMEOUT=0、PRIORITY_IRQ=1、PRIORITY_NORMAL=2、proc_runnable[PRIORITY_NUMBER] 和 proc_sleep。",
+          "interpretation": "就绪队列是三个固定优先级链表。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_005_select_02",
+          "evidence_type": "implementation_body",
+          "file_path": "repos/xv6-k210/kernel/sched/proc.c",
+          "line_start": 596,
+          "line_end": 612,
+          "excerpt": "__get_runnable_no_lock 从 i=0 到 PRIORITY_NUMBER 顺序扫描，返回第一个 RUNNABLE。",
+          "interpretation": "选择逻辑优先选低编号高优先级队列，队列内按链表顺序。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_005_preempt_age_03",
+          "evidence_type": "usage_flow",
+          "file_path": "repos/xv6-k210/kernel/sched/proc.c",
+          "line_start": 615,
+          "line_end": 760,
+          "excerpt": "yield 将进程放回 PRIORITY_NORMAL；proc_tick 递减 runnable timer，归零后移入 PRIORITY_TIMEOUT。",
+          "interpretation": "时钟/主动让出与 timer 共同影响队列位置。"
+        }
+      ],
+      "fact_answers": [
+        {
+          "fact_id": "Q04_005_01",
+          "fact_key": "ready_queue",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_005_queues_01"
+          ],
+          "notes": "三类 runnable 队列。"
+        },
+        {
+          "fact_id": "Q04_005_02",
+          "fact_key": "selection_logic",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_005_select_02"
+          ],
+          "notes": "按固定优先级扫描。"
+        },
+        {
+          "fact_id": "Q04_005_03",
+          "fact_key": "policy_fields",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_005_queues_01",
+            "codex_ev_Q04_005_preempt_age_03"
+          ],
+          "notes": "timer 和队列编号是策略字段。"
+        },
+        {
+          "fact_id": "Q04_005_04",
+          "fact_key": "preemption_path",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_005_preempt_age_03"
+          ],
+          "notes": "yield/proc_tick 接入。"
+        },
+        {
+          "fact_id": "Q04_005_05",
+          "fact_key": "mp_rt_extensions",
+          "status_or_value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q04_005_queues_01"
+          ],
+          "notes": "未见 RT/CFS 等扩展。"
+        },
+        {
+          "fact_id": "Q04_005_06",
+          "fact_key": "negative_search_coverage",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_005_queues_01"
+          ],
+          "notes": "正向算法证据足够。"
+        }
+      ],
+      "answer": {
+        "value": "算法名称: Priority Scheduling（固定 3 级优先级队列，队内近似 FIFO/RR）\n证据: proc_runnable[PRIORITY_NUMBER] 三队列；__get_runnable_no_lock 按 PRIORITY_TIMEOUT、PRIORITY_IRQ、PRIORITY_NORMAL 顺序取第一个 RUNNABLE；yield/proc_tick 会重新入队或超时提升。\n是否抢占: 部分抢占，用户态中断会 yield，内核路径未见完全抢占。",
+        "used_evidence_ids": [
+          "codex_ev_Q04_005_queues_01",
+          "codex_ev_Q04_005_select_02",
+          "codex_ev_Q04_005_preempt_age_03"
+        ],
+        "confidence": "high",
+        "notes": ""
+      }
+    },
+    {
+      "question_id": "Q04_006",
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q04_006_scheduler_01",
+          "evidence_type": "implementation_body",
+          "file_path": "repos/xv6-k210/kernel/sched/proc.c",
+          "line_start": 654,
+          "line_end": 691,
+          "excerpt": "scheduler 循环打开中断、锁 proc_lock、取 runnable、置 RUNNING、切页表并 swtch；无任务时 wfi。",
+          "interpretation": "核心调度入口。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_006_yield_sched_02",
+          "evidence_type": "implementation_body",
+          "file_path": "repos/xv6-k210/kernel/sched/proc.c",
+          "line_start": 615,
+          "line_end": 730,
+          "excerpt": "yield 把当前进程重新插入 runnable 后 sched；sched 保存浮点/时间并 swtch 回 cpu.context。",
+          "interpretation": "让出 CPU 和回调度器入口。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_006_tick_03",
+          "evidence_type": "implementation_body",
+          "file_path": "repos/xv6-k210/kernel/sched/proc.c",
+          "line_start": 733,
+          "line_end": 760,
+          "excerpt": "proc_tick 更新 runnable timer 和睡眠到期进程。",
+          "interpretation": "时钟相关调度维护入口。"
+        }
+      ],
+      "fact_answers": [
+        {
+          "fact_id": "Q04_006_01",
+          "fact_key": "ready_queue",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_006_scheduler_01",
+            "codex_ev_Q04_006_tick_03"
+          ],
+          "notes": "入口使用 runnable/sleep 队列。"
+        },
+        {
+          "fact_id": "Q04_006_02",
+          "fact_key": "selection_logic",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_006_scheduler_01"
+          ],
+          "notes": "scheduler 调 pick 逻辑。"
+        },
+        {
+          "fact_id": "Q04_006_03",
+          "fact_key": "policy_fields",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_006_tick_03"
+          ],
+          "notes": "timer/sleep_expire 被维护。"
+        },
+        {
+          "fact_id": "Q04_006_04",
+          "fact_key": "preemption_path",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_006_yield_sched_02"
+          ],
+          "notes": "yield/sched 是抢占/让出后的切换入口。"
+        },
+        {
+          "fact_id": "Q04_006_05",
+          "fact_key": "mp_rt_extensions",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_006_scheduler_01"
+          ],
+          "notes": "scheduler 每 CPU 运行但共享队列。"
+        },
+        {
+          "fact_id": "Q04_006_06",
+          "fact_key": "negative_search_coverage",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_006_scheduler_01"
+          ],
+          "notes": "正向证据足够。"
+        }
+      ],
+      "answer": {
+        "value": "关键入口: scheduler()、yield()/sched()、proc_tick()。scheduler 负责 pick/run/swtch；yield/sched 负责当前进程让出并切回 CPU 调度上下文；proc_tick 负责时间片/睡眠超时维护。",
+        "used_evidence_ids": [
+          "codex_ev_Q04_006_scheduler_01",
+          "codex_ev_Q04_006_yield_sched_02",
+          "codex_ev_Q04_006_tick_03"
+        ],
+        "confidence": "high",
+        "notes": ""
+      }
+    },
+    {
+      "question_id": "Q04_007",
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q04_007_sys_fork_clone_01",
+          "evidence_type": "call_site",
+          "file_path": "repos/xv6-k210/kernel/syscall/sysproc.c",
+          "line_start": 84,
+          "line_end": 99,
+          "excerpt": "sys_fork 返回 clone(0,NULL)；sys_clone 读取 flag/stack 后返回 clone(flag,stack)。",
+          "interpretation": "fork/clone 系统调用接入同一创建实现。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_007_clone_impl_02",
+          "evidence_type": "implementation_body",
+          "file_path": "repos/xv6-k210/kernel/sched/proc.c",
+          "line_start": 291,
+          "line_end": 367,
+          "excerpt": "clone 调 allocproc，复制 segment/sigaction/fdtable/cwd/elf/trapframe，设置 parent/child，并插入 RUNNABLE。",
+          "interpretation": "创建新执行实体是真实现。"
+        }
+      ],
+      "fact_answers": [
+        {
+          "fact_id": "Q04_007_01",
+          "fact_key": "entity_state",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_007_clone_impl_02"
+          ],
+          "notes": "allocproc/clone 分配 struct proc。"
+        },
+        {
+          "fact_id": "Q04_007_02",
+          "fact_key": "syscall_or_kernel_entry",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_007_sys_fork_clone_01"
+          ],
+          "notes": "sys_fork/sys_clone 接入。"
+        },
+        {
+          "fact_id": "Q04_007_03",
+          "fact_key": "state_resource_update",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_007_clone_impl_02"
+          ],
+          "notes": "新进程进入 RUNNABLE。"
+        },
+        {
+          "fact_id": "Q04_007_04",
+          "fact_key": "relationship_or_mapping",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_007_clone_impl_02"
+          ],
+          "notes": "复制地址空间/文件表并建立父子关系。"
+        },
+        {
+          "fact_id": "Q04_007_05",
+          "fact_key": "cleanup_or_wait",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_007_clone_impl_02"
+          ],
+          "notes": "失败路径 freeproc，成功后由 wait/exit 回收。"
+        },
+        {
+          "fact_id": "Q04_007_06",
+          "fact_key": "negative_search_coverage",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_007_sys_fork_clone_01"
+          ],
+          "notes": "正向实现足够。"
+        }
+      ],
+      "answer": {
+        "value": "implemented",
+        "used_evidence_ids": [
+          "codex_ev_Q04_007_sys_fork_clone_01",
+          "codex_ev_Q04_007_clone_impl_02"
+        ],
+        "confidence": "high",
+        "notes": ""
+      }
+    },
+    {
+      "question_id": "Q04_008",
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q04_008_clone_copy_01",
+          "evidence_type": "implementation_body",
+          "file_path": "repos/xv6-k210/kernel/sched/proc.c",
+          "line_start": 303,
+          "line_end": 345,
+          "excerpt": "clone 用 copysegs 复制内存布局，copyfdtable 复制文件表，idup cwd/elf，复制 trapframe 并可替换 sp。",
+          "interpretation": "fork/clone 复制地址空间、文件表和 trapframe。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_008_clone_parent_02",
+          "evidence_type": "implementation_body",
+          "file_path": "repos/xv6-k210/kernel/sched/proc.c",
+          "line_start": 348,
+          "line_end": 367,
+          "excerpt": "clone 将 np->parent=p，插入 p->child/sibling 链，并把 np 插入 runnable。",
+          "interpretation": "复制后接入父子树和调度。"
+        }
+      ],
+      "fact_answers": [
+        {
+          "fact_id": "Q04_008_01",
+          "fact_key": "entity_state",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_008_clone_copy_01"
+          ],
+          "notes": "复制对象明确。"
+        },
+        {
+          "fact_id": "Q04_008_02",
+          "fact_key": "syscall_or_kernel_entry",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_008_clone_copy_01"
+          ],
+          "notes": "clone 实现体执行复制。"
+        },
+        {
+          "fact_id": "Q04_008_03",
+          "fact_key": "state_resource_update",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_008_clone_parent_02"
+          ],
+          "notes": "复制后进入 RUNNABLE。"
+        },
+        {
+          "fact_id": "Q04_008_04",
+          "fact_key": "relationship_or_mapping",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_008_clone_parent_02"
+          ],
+          "notes": "父子关系建立。"
+        },
+        {
+          "fact_id": "Q04_008_05",
+          "fact_key": "cleanup_or_wait",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_008_clone_copy_01"
+          ],
+          "notes": "失败时 freeproc。"
+        },
+        {
+          "fact_id": "Q04_008_06",
+          "fact_key": "negative_search_coverage",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_008_clone_copy_01"
+          ],
+          "notes": "正向证据足够。"
+        }
+      ],
+      "answer": {
+        "value": "是。clone/fork 会复制 segment/page table 映射描述（copysegs）、复制 fdtable（copyfdtable）、复制 cwd/elf 引用和 trapframe；clone 的 flag 基本未参与共享语义，stack 非空时只替换子进程 sp。",
+        "used_evidence_ids": [
+          "codex_ev_Q04_008_clone_copy_01",
+          "codex_ev_Q04_008_clone_parent_02"
+        ],
+        "confidence": "high",
+        "notes": ""
+      }
+    },
+    {
+      "question_id": "Q04_009",
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q04_009_sys_exec_01",
+          "evidence_type": "call_site",
+          "file_path": "repos/xv6-k210/kernel/syscall/sysproc.c",
+          "line_start": 26,
+          "line_end": 49,
+          "excerpt": "sys_exec/sys_execve 取 path/argv/envp 后调用 execve。",
+          "interpretation": "系统调用入口接入 execve。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_009_exec_load_02",
+          "evidence_type": "implementation_body",
+          "file_path": "repos/xv6-k210/kernel/exec.c",
+          "line_start": 96,
+          "line_end": 185,
+          "excerpt": "execve namei 打开文件，读 ELF header/program header，为 LOAD 段 newseg 并 loadseg。",
+          "interpretation": "ELF 装载实现存在。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_009_exec_commit_03",
+          "evidence_type": "implementation_body",
+          "file_path": "repos/xv6-k210/kernel/exec.c",
+          "line_start": 187,
+          "line_end": 300,
+          "excerpt": "execve 建 heap/stack，压入 argv/envp/auxvec，替换 p->pagetable/segment/pbrk/epc/sp，fdcloexec，w_satp+sfence_vma，释放旧地址空间。",
+          "interpretation": "exec 重建并提交新地址空间。"
+        }
+      ],
+      "fact_answers": [
+        {
+          "fact_id": "Q04_009_01",
+          "fact_key": "entity_state",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_009_exec_commit_03"
+          ],
+          "notes": "更新 proc 的 pagetable/segment/trapframe。"
+        },
+        {
+          "fact_id": "Q04_009_02",
+          "fact_key": "syscall_or_kernel_entry",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_009_sys_exec_01"
+          ],
+          "notes": "sys_exec/sys_execve 调 execve。"
+        },
+        {
+          "fact_id": "Q04_009_03",
+          "fact_key": "state_resource_update",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_009_exec_commit_03"
+          ],
+          "notes": "替换地址空间和入口栈。"
+        },
+        {
+          "fact_id": "Q04_009_04",
+          "fact_key": "relationship_or_mapping",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_009_exec_load_02",
+            "codex_ev_Q04_009_exec_commit_03"
+          ],
+          "notes": "ELF 段映射到新页表。"
+        },
+        {
+          "fact_id": "Q04_009_05",
+          "fact_key": "cleanup_or_wait",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_009_exec_commit_03"
+          ],
+          "notes": "释放旧地址空间和失败清理。"
+        },
+        {
+          "fact_id": "Q04_009_06",
+          "fact_key": "negative_search_coverage",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_009_exec_load_02"
+          ],
+          "notes": "正向实现足够。"
+        }
+      ],
+      "answer": {
+        "value": "implemented",
+        "used_evidence_ids": [
+          "codex_ev_Q04_009_sys_exec_01",
+          "codex_ev_Q04_009_exec_load_02",
+          "codex_ev_Q04_009_exec_commit_03"
+        ],
+        "confidence": "high",
+        "notes": ""
+      }
+    },
+    {
+      "question_id": "Q04_010",
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q04_010_sys_wait_01",
+          "evidence_type": "call_site",
+          "file_path": "repos/xv6-k210/kernel/syscall/sysproc.c",
+          "line_start": 101,
+          "line_end": 145,
+          "excerpt": "sys_wait 调 wait4(-1,p,0)；sys_wait4 取 pid/status/options 后调 wait4。",
+          "interpretation": "wait/wait4 系统调用接入。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_010_wait4_impl_02",
+          "evidence_type": "implementation_body",
+          "file_path": "repos/xv6-k210/kernel/sched/proc.c",
+          "line_start": 462,
+          "line_end": 522,
+          "excerpt": "wait4 扫描 p->child；找到 ZOMBIE 则摘 sibling、copyout xstate、freeproc；有子未退出时 sleep(p,&p->lk)，WNOHANG 返回 0。",
+          "interpretation": "父子回收同步完整实现。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_010_exit_wakeup_03",
+          "evidence_type": "usage_flow",
+          "file_path": "repos/xv6-k210/kernel/sched/proc.c",
+          "line_start": 397,
+          "line_end": 457,
+          "excerpt": "exit 设置 ZOMBIE，给父进程 SIGCHLD，并 __wakeup_no_lock(p->parent)。",
+          "interpretation": "子进程退出会唤醒等待父进程。"
+        }
+      ],
+      "fact_answers": [
+        {
+          "fact_id": "Q04_010_01",
+          "fact_key": "entity_state",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_010_wait4_impl_02"
+          ],
+          "notes": "基于 child/ZOMBIE 状态。"
+        },
+        {
+          "fact_id": "Q04_010_02",
+          "fact_key": "syscall_or_kernel_entry",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_010_sys_wait_01"
+          ],
+          "notes": "sys_wait/sys_wait4 接入。"
+        },
+        {
+          "fact_id": "Q04_010_03",
+          "fact_key": "state_resource_update",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_010_wait4_impl_02",
+            "codex_ev_Q04_010_exit_wakeup_03"
+          ],
+          "notes": "exit/wait 修改状态和链表。"
+        },
+        {
+          "fact_id": "Q04_010_04",
+          "fact_key": "relationship_or_mapping",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_010_wait4_impl_02"
+          ],
+          "notes": "按父子链扫描。"
+        },
+        {
+          "fact_id": "Q04_010_05",
+          "fact_key": "cleanup_or_wait",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_010_wait4_impl_02"
+          ],
+          "notes": "freeproc 回收。"
+        },
+        {
+          "fact_id": "Q04_010_06",
+          "fact_key": "negative_search_coverage",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_010_sys_wait_01"
+          ],
+          "notes": "正向实现足够。"
+        }
+      ],
+      "answer": {
+        "value": "implemented",
+        "used_evidence_ids": [
+          "codex_ev_Q04_010_sys_wait_01",
+          "codex_ev_Q04_010_wait4_impl_02",
+          "codex_ev_Q04_010_exit_wakeup_03"
+        ],
+        "confidence": "high",
+        "notes": ""
+      }
+    },
+    {
+      "question_id": "Q04_011",
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q04_011_wait_block_01",
+          "evidence_type": "implementation_body",
+          "file_path": "repos/xv6-k210/kernel/sched/proc.c",
+          "line_start": 462,
+          "line_end": 522,
+          "excerpt": "wait4 在有子进程但未找到 ZOMBIE 时 sleep(p,&p->lk)；WNOHANG 时返回 0。",
+          "interpretation": "wait4 是基于 channel 的阻塞，而不是忙等。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_011_sleep_wakeup_02",
+          "evidence_type": "usage_flow",
+          "file_path": "repos/xv6-k210/kernel/sched/proc.c",
+          "line_start": 570,
+          "line_end": 594,
+          "excerpt": "sleep 设置 p->chan=chan，从 runnable 移除并插入 sleep 队列，sched 后被唤醒再取回锁。",
+          "interpretation": "阻塞会移出就绪队列。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_011_exit_wakeup_parent_03",
+          "evidence_type": "usage_flow",
+          "file_path": "repos/xv6-k210/kernel/sched/proc.c",
+          "line_start": 447,
+          "line_end": 455,
+          "excerpt": "exit 设置 ZOMBIE 后 __wakeup_no_lock(p->parent)。",
+          "interpretation": "退出路径唤醒等待父进程。"
+        }
+      ],
+      "fact_answers": [
+        {
+          "fact_id": "Q04_011_01",
+          "fact_key": "entity_state",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_011_sleep_wakeup_02"
+          ],
+          "notes": "sleep 使用 chan 和 SLEEPING。"
+        },
+        {
+          "fact_id": "Q04_011_02",
+          "fact_key": "syscall_or_kernel_entry",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_011_wait_block_01"
+          ],
+          "notes": "wait4 调 sleep。"
+        },
+        {
+          "fact_id": "Q04_011_03",
+          "fact_key": "state_resource_update",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_011_sleep_wakeup_02"
+          ],
+          "notes": "移出 runnable 进入 sleep。"
+        },
+        {
+          "fact_id": "Q04_011_04",
+          "fact_key": "relationship_or_mapping",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_011_wait_block_01",
+            "codex_ev_Q04_011_exit_wakeup_parent_03"
+          ],
+          "notes": "父进程以自身指针为 channel 等待子退出。"
+        },
+        {
+          "fact_id": "Q04_011_05",
+          "fact_key": "cleanup_or_wait",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_011_wait_block_01"
+          ],
+          "notes": "唤醒后回收 ZOMBIE。"
+        },
+        {
+          "fact_id": "Q04_011_06",
+          "fact_key": "negative_search_coverage",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_011_wait_block_01"
+          ],
+          "notes": "正向阻塞证据足够。"
+        }
+      ],
+      "answer": {
+        "value": "真正阻塞：使用 channel/future/async 等异步机制",
+        "used_evidence_ids": [
+          "codex_ev_Q04_011_wait_block_01",
+          "codex_ev_Q04_011_sleep_wakeup_02",
+          "codex_ev_Q04_011_exit_wakeup_parent_03"
+        ],
+        "confidence": "high",
+        "notes": ""
+      }
+    },
+    {
+      "question_id": "Q04_012",
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q04_012_pid_globals_01",
+          "evidence_type": "definition",
+          "file_path": "repos/xv6-k210/kernel/sched/proc.c",
+          "line_start": 38,
+          "line_end": 42,
+          "excerpt": "int __pid; HASH_SIZE=17; pid_hash[HASH_SIZE]; hash_lock。",
+          "interpretation": "PID 分配状态是全局递增计数和哈希表。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_012_pid_alloc_02",
+          "evidence_type": "implementation_body",
+          "file_path": "repos/xv6-k210/kernel/sched/proc.c",
+          "line_start": 228,
+          "line_end": 232,
+          "excerpt": "allocproc 在 hash_lock 临界区执行 p->pid = __pid++ 并 hash_insert_no_lock(p)。",
+          "interpretation": "PID 自增分配且受 spinlock 保护。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_012_pid_remove_03",
+          "evidence_type": "implementation_body",
+          "file_path": "repos/xv6-k210/kernel/sched/proc.c",
+          "line_start": 139,
+          "line_end": 163,
+          "excerpt": "freeproc 释放资源并 hash_remove_no_lock(p)，但没有把 pid 放回空闲池。",
+          "interpretation": "回收只从哈希表删除，不复用 PID。"
+        }
+      ],
+      "fact_answers": [
+        {
+          "fact_id": "Q04_012_01",
+          "fact_key": "entity_state",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_012_pid_globals_01"
+          ],
+          "notes": "PID 状态定义。"
+        },
+        {
+          "fact_id": "Q04_012_02",
+          "fact_key": "syscall_or_kernel_entry",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_012_pid_alloc_02"
+          ],
+          "notes": "allocproc 分配。"
+        },
+        {
+          "fact_id": "Q04_012_03",
+          "fact_key": "state_resource_update",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_012_pid_alloc_02",
+            "codex_ev_Q04_012_pid_remove_03"
+          ],
+          "notes": "分配/删除哈希记录。"
+        },
+        {
+          "fact_id": "Q04_012_04",
+          "fact_key": "relationship_or_mapping",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_012_pid_globals_01"
+          ],
+          "notes": "pid_hash 映射 pid 到 proc。"
+        },
+        {
+          "fact_id": "Q04_012_05",
+          "fact_key": "cleanup_or_wait",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_012_pid_remove_03"
+          ],
+          "notes": "freeproc 删除 hash。"
+        },
+        {
+          "fact_id": "Q04_012_06",
+          "fact_key": "negative_search_coverage",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_012_pid_alloc_02"
+          ],
+          "notes": "正向实现足够。"
+        }
+      ],
+      "answer": {
+        "value": "PID 分配器: 全局 int __pid 单调自增，在 hash_lock 保护下分配并插入 pid_hash；freeproc 只从 hash 表删除，不维护 bitmap/空闲栈复用。",
+        "used_evidence_ids": [
+          "codex_ev_Q04_012_pid_globals_01",
+          "codex_ev_Q04_012_pid_alloc_02",
+          "codex_ev_Q04_012_pid_remove_03"
+        ],
+        "confidence": "high",
+        "notes": ""
+      }
+    },
+    {
+      "question_id": "Q04_013",
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q04_013_parent_fields_01",
+          "evidence_type": "definition",
+          "file_path": "repos/xv6-k210/include/sched/proc.h",
+          "line_start": 65,
+          "line_end": 70,
+          "excerpt": "struct proc 含 child、parent、sibling_next、sibling_pprev。",
+          "interpretation": "父子树使用 first-child + sibling 链表。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_013_clone_link_02",
+          "evidence_type": "implementation_body",
+          "file_path": "repos/xv6-k210/kernel/sched/proc.c",
+          "line_start": 348,
+          "line_end": 357,
+          "excerpt": "clone 设置 np->parent=p、np->sibling_pprev=&p->child、np->sibling_next=p->child，并更新 p->child。",
+          "interpretation": "创建时插入父进程 child 链。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_013_exit_wait_link_03",
+          "evidence_type": "usage_flow",
+          "file_path": "repos/xv6-k210/kernel/sched/proc.c",
+          "line_start": 410,
+          "line_end": 489,
+          "excerpt": "exit 将子进程 re-parent 到 init；wait4 从 p->child/sibling_next 扫描并摘除。",
+          "interpretation": "退出和等待路径维护父子链。"
+        }
+      ],
+      "fact_answers": [
+        {
+          "fact_id": "Q04_013_01",
+          "fact_key": "entity_state",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_013_parent_fields_01"
+          ],
+          "notes": "字段定义。"
+        },
+        {
+          "fact_id": "Q04_013_02",
+          "fact_key": "syscall_or_kernel_entry",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_013_clone_link_02"
+          ],
+          "notes": "clone 建立关系。"
+        },
+        {
+          "fact_id": "Q04_013_03",
+          "fact_key": "state_resource_update",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_013_clone_link_02",
+            "codex_ev_Q04_013_exit_wait_link_03"
+          ],
+          "notes": "创建/退出/等待更新链。"
+        },
+        {
+          "fact_id": "Q04_013_04",
+          "fact_key": "relationship_or_mapping",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_013_parent_fields_01",
+            "codex_ev_Q04_013_exit_wait_link_03"
+          ],
+          "notes": "first-child/sibling 映射。"
+        },
+        {
+          "fact_id": "Q04_013_05",
+          "fact_key": "cleanup_or_wait",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_013_exit_wait_link_03"
+          ],
+          "notes": "wait4 摘链回收。"
+        },
+        {
+          "fact_id": "Q04_013_06",
+          "fact_key": "negative_search_coverage",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_013_parent_fields_01"
+          ],
+          "notes": "正向证据足够。"
+        }
+      ],
+      "answer": {
+        "value": "父子进程树: struct proc 内 parent 指针 + child 首子指针 + sibling_next/sibling_pprev 兄弟链。clone 插入父进程 child 链；exit 将孤儿子进程改挂 init；wait4 扫描并摘除子链。",
+        "used_evidence_ids": [
+          "codex_ev_Q04_013_parent_fields_01",
+          "codex_ev_Q04_013_clone_link_02",
+          "codex_ev_Q04_013_exit_wait_link_03"
+        ],
+        "confidence": "high",
+        "notes": ""
+      }
+    },
+    {
+      "question_id": "Q04_014",
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q04_014_signal_fields_01",
+          "evidence_type": "definition",
+          "file_path": "repos/xv6-k210/include/sched/proc.h",
+          "line_start": 92,
+          "line_end": 99,
+          "excerpt": "struct proc 含 sig_act、sig_set、sig_pending、sig_frame、killed。",
+          "interpretation": "进程结构包含信号状态。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_014_signal_syscalls_02",
+          "evidence_type": "call_site",
+          "file_path": "repos/xv6-k210/kernel/syscall/syssignal.c",
+          "line_start": 17,
+          "line_end": 142,
+          "excerpt": "sys_rt_sigaction 调 set_sigaction；sys_rt_sigprocmask 调 sigprocmask；sys_kill 调 kill(pid,sig)。",
+          "interpretation": "信号系统调用接入。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_014_signal_impl_03",
+          "evidence_type": "implementation_body",
+          "file_path": "repos/xv6-k210/kernel/sched/signal.c",
+          "line_start": 43,
+          "line_end": 283,
+          "excerpt": "set_sigaction/sigprocmask/sighandle/sigreturn 管理 handler、mask、pending 和 trapframe 替换/恢复。",
+          "interpretation": "信号处理有实现体。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_014_no_futex_04",
+          "evidence_type": "negative_search",
+          "searched_keywords": [
+            "futex",
+            "FUTEX_WAIT",
+            "FUTEX_WAKE"
+          ],
+          "searched_directories": [
+            "repos/xv6-k210/kernel",
+            "repos/xv6-k210/include"
+          ],
+          "file_count": 113,
+          "match_count": 0,
+          "coverage_sufficient": true,
+          "interpretation": "未发现 futex 相关 syscall 或实现。"
+        }
+      ],
+      "fact_answers": [
+        {
+          "fact_id": "Q04_014_01",
+          "fact_key": "entity_state",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_014_signal_fields_01"
+          ],
+          "notes": "proc 有信号字段。"
+        },
+        {
+          "fact_id": "Q04_014_02",
+          "fact_key": "syscall_or_kernel_entry",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_014_signal_syscalls_02"
+          ],
+          "notes": "信号 syscall 接入。"
+        },
+        {
+          "fact_id": "Q04_014_03",
+          "fact_key": "state_resource_update",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_014_signal_impl_03"
+          ],
+          "notes": "pending/mask/trapframe 被修改。"
+        },
+        {
+          "fact_id": "Q04_014_04",
+          "fact_key": "relationship_or_mapping",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_014_signal_impl_03"
+          ],
+          "notes": "handler 与进程 pending 状态关联。"
+        },
+        {
+          "fact_id": "Q04_014_05",
+          "fact_key": "cleanup_or_wait",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_014_signal_impl_03"
+          ],
+          "notes": "sigreturn 恢复 trapframe；freeproc 释放 sig_frame/sig_act。"
+        },
+        {
+          "fact_id": "Q04_014_06",
+          "fact_key": "negative_search_coverage",
+          "status_or_value": {
+            "searched_keywords": [
+              "futex",
+              "FUTEX_WAIT",
+              "FUTEX_WAKE"
+            ],
+            "searched_directories": [
+              "repos/xv6-k210/kernel",
+              "repos/xv6-k210/include"
+            ],
+            "file_count": 113,
+            "match_count": 0,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [
+            "codex_ev_Q04_014_no_futex_04"
+          ],
+          "notes": "futex 未发现。"
+        }
+      ],
+      "answer": {
+        "value": "implemented: 实现 signal，未发现 futex。信号覆盖 rt_sigaction、rt_sigprocmask、kill、sighandle/sigreturn；futex 关键词负向搜索无命中。",
+        "used_evidence_ids": [
+          "codex_ev_Q04_014_signal_fields_01",
+          "codex_ev_Q04_014_signal_syscalls_02",
+          "codex_ev_Q04_014_signal_impl_03",
+          "codex_ev_Q04_014_no_futex_04"
+        ],
+        "confidence": "high",
+        "notes": ""
+      }
+    },
+    {
+      "question_id": "Q04_015",
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q04_015_ncpu_cpu_01",
+          "evidence_type": "definition",
+          "file_path": "repos/xv6-k210/include/param.h",
+          "line_start": 4,
+          "line_end": 5,
+          "excerpt": "#define NPROC 50；#define NCPU 2。",
+          "interpretation": "系统声明最多 2 个 CPU。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_015_percpu_global_queue_02",
+          "evidence_type": "definition",
+          "file_path": "repos/xv6-k210/kernel/sched/proc.c",
+          "line_start": 94,
+          "line_end": 100,
+          "excerpt": "struct cpu cpus[NCPU]；mycpu 通过 cpuid() 返回 &cpus[id]。",
+          "interpretation": "存在 per-CPU 状态数组。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_015_global_runq_03",
+          "evidence_type": "definition",
+          "file_path": "repos/xv6-k210/kernel/sched/proc.c",
+          "line_start": 238,
+          "line_end": 247,
+          "excerpt": "proc_runnable[PRIORITY_NUMBER] 和 proc_sleep 是全局队列，不是 per-CPU 队列。",
+          "interpretation": "调度队列全局共享。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_015_ipi_wakeup_04",
+          "evidence_type": "usage_flow",
+          "file_path": "repos/xv6-k210/kernel/sched/proc.c",
+          "line_start": 371,
+          "line_end": 395,
+          "excerpt": "wakeup 若唤醒了进程且另一个 hart 空闲，则 sbi_send_ipi(1 << id,0)。",
+          "interpretation": "有 IPI 唤醒空闲 hart。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_015_no_migration_05",
+          "evidence_type": "negative_search",
+          "searched_keywords": [
+            "per-CPU queue",
+            "affinity",
+            "migrate",
+            "migration",
+            "load balance"
+          ],
+          "searched_directories": [
+            "repos/xv6-k210/kernel",
+            "repos/xv6-k210/include"
+          ],
+          "file_count": 113,
+          "match_count": 0,
+          "coverage_sufficient": true,
+          "interpretation": "未发现每核运行队列、亲和性或迁移/负载均衡实现。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_015_ap_startup_06",
+          "evidence_type": "usage_flow",
+          "file_path": "repos/xv6-k210/kernel/main.c",
+          "line_start": 65,
+          "line_end": 86,
+          "excerpt": "hart0 发送 sbi_send_ipi 唤醒其他 hart；hart1 等 started 后初始化并进入后续 scheduler。",
+          "interpretation": "SMP 启动链存在，但本题重点仍是调度队列/IPI 交叉。"
+        }
+      ],
+      "fact_answers": [
+        {
+          "fact_id": "Q04_015_01",
+          "fact_key": "cpu_topology_constants",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_015_ncpu_cpu_01"
+          ],
+          "notes": "NCPU=2。"
+        },
+        {
+          "fact_id": "Q04_015_02",
+          "fact_key": "ap_startup",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_015_ap_startup_06"
+          ],
+          "notes": "AP 启动在 main.c 中由 hart0 IPI 唤醒 hart1。"
+        },
+        {
+          "fact_id": "Q04_015_03",
+          "fact_key": "percpu_storage",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_015_percpu_global_queue_02"
+          ],
+          "notes": "cpus[NCPU]。"
+        },
+        {
+          "fact_id": "Q04_015_04",
+          "fact_key": "ipi_path",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_015_ipi_wakeup_04"
+          ],
+          "notes": "wakeup 发送 IPI。"
+        },
+        {
+          "fact_id": "Q04_015_05",
+          "fact_key": "scheduler_tlb_mp",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_015_global_runq_03"
+          ],
+          "notes": "全局调度队列。"
+        },
+        {
+          "fact_id": "Q04_015_06",
+          "fact_key": "negative_search_coverage",
+          "status_or_value": {
+            "searched_keywords": [
+              "per-CPU queue",
+              "affinity",
+              "migrate",
+              "migration",
+              "load balance"
+            ],
+            "searched_directories": [
+              "repos/xv6-k210/kernel",
+              "repos/xv6-k210/include"
+            ],
+            "file_count": 113,
+            "match_count": 0,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [
+            "codex_ev_Q04_015_no_migration_05"
+          ],
+          "notes": "未发现迁移/亲和性。"
+        }
+      ],
+      "answer": {
+        "value": "交叉一致性: 有 per-CPU 状态 cpus[NCPU]，但 runnable/sleep 队列是全局共享；wakeup 会在另一个 hart 空闲时发送 IPI。未发现每核队列、任务迁移或亲和性实现。",
+        "used_evidence_ids": [
+          "codex_ev_Q04_015_ncpu_cpu_01",
+          "codex_ev_Q04_015_percpu_global_queue_02",
+          "codex_ev_Q04_015_global_runq_03",
+          "codex_ev_Q04_015_ipi_wakeup_04",
+          "codex_ev_Q04_015_no_migration_05",
+          "codex_ev_Q04_015_ap_startup_06"
+        ],
+        "confidence": "medium",
+        "notes": "AP 启动细节在 Q04_029 展开；本题回答调度与 SMP 交叉。"
+      }
+    },
+    {
+      "question_id": "Q04_016",
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q04_016_sys_exit_01",
+          "evidence_type": "call_site",
+          "file_path": "repos/xv6-k210/kernel/syscall/sysproc.c",
+          "line_start": 52,
+          "line_end": 63,
+          "excerpt": "sys_exit 读取退出码后调用 exit(n)，随后 return 0 not reached。",
+          "interpretation": "exit 系统调用入口。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_016_exit_impl_02",
+          "evidence_type": "implementation_body",
+          "file_path": "repos/xv6-k210/kernel/sched/proc.c",
+          "line_start": 397,
+          "line_end": 457,
+          "excerpt": "exit delsegs/uvmfree，dropfdtable，iput cwd/elf，保存 xstate，reparent children，设置 SIGCHLD/killed，置 ZOMBIE，wakeup init/parent，sched。",
+          "interpretation": "退出路径释放资源、通知父进程、进入 ZOMBIE。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_016_wait_free_03",
+          "evidence_type": "usage_flow",
+          "file_path": "repos/xv6-k210/kernel/sched/proc.c",
+          "line_start": 462,
+          "line_end": 522,
+          "excerpt": "wait4 找到 ZOMBIE 子进程，copyout xstate，freeproc(np)，返回 child_pid。",
+          "interpretation": "父进程等待路径完成最终回收。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_016_freeproc_04",
+          "evidence_type": "implementation_body",
+          "file_path": "repos/xv6-k210/kernel/sched/proc.c",
+          "line_start": 139,
+          "line_end": 163,
+          "excerpt": "freeproc 释放 pagetable、trapframe、kstack、signal frame/action、pid hash，并 kfree proc。",
+          "interpretation": "最终释放内核对象。"
+        }
+      ],
+      "fact_answers": [
+        {
+          "fact_id": "Q04_016_01",
+          "fact_key": "entity_state",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_016_exit_impl_02"
+          ],
+          "notes": "exit 改 ZOMBIE/xstate。"
+        },
+        {
+          "fact_id": "Q04_016_02",
+          "fact_key": "syscall_or_kernel_entry",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_016_sys_exit_01"
+          ],
+          "notes": "sys_exit 调 exit。"
+        },
+        {
+          "fact_id": "Q04_016_03",
+          "fact_key": "state_resource_update",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_016_exit_impl_02"
+          ],
+          "notes": "释放地址空间/文件表/父子关系。"
+        },
+        {
+          "fact_id": "Q04_016_04",
+          "fact_key": "relationship_or_mapping",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_016_exit_impl_02",
+            "codex_ev_Q04_016_wait_free_03"
+          ],
+          "notes": "父子关系和 SIGCHLD 通知。"
+        },
+        {
+          "fact_id": "Q04_016_05",
+          "fact_key": "cleanup_or_wait",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_016_wait_free_03",
+            "codex_ev_Q04_016_freeproc_04"
+          ],
+          "notes": "wait4/freeproc 最终回收。"
+        },
+        {
+          "fact_id": "Q04_016_06",
+          "fact_key": "negative_search_coverage",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_016_exit_impl_02"
+          ],
+          "notes": "正向证据足够。"
+        }
+      ],
+      "answer": {
+        "value": "调用链: sys_exit -> exit -> sched；父进程 wait/sys_wait4 -> wait4 -> freeproc。exit 释放用户地址空间和文件表、reparent 子进程、设置 ZOMBIE 并唤醒父进程；wait4 复制退出码并释放 trapframe/kstack/pagetable/proc。",
+        "used_evidence_ids": [
+          "codex_ev_Q04_016_sys_exit_01",
+          "codex_ev_Q04_016_exit_impl_02",
+          "codex_ev_Q04_016_wait_free_03",
+          "codex_ev_Q04_016_freeproc_04"
+        ],
+        "confidence": "high",
+        "notes": ""
+      }
+    },
+    {
+      "question_id": "Q04_017",
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q04_017_pgid_session_01",
+          "evidence_type": "negative_search",
+          "searched_keywords": [
+            "pgid",
+            "session",
+            "setsid",
+            "setpgid",
+            "set_sid",
+            "process group"
+          ],
+          "searched_directories": [
+            "repos/xv6-k210/kernel",
+            "repos/xv6-k210/include"
+          ],
+          "file_count": 113,
+          "match_count": 0,
+          "coverage_sufficient": true,
+          "interpretation": "kernel/include 搜索未发现进程组、会话、setpgid/setsid 相关字段、syscall 或实现。"
+        }
+      ],
+      "fact_answers": [
+        {
+          "fact_id": "Q04_017_01",
+          "fact_key": "entity_state",
+          "status_or_value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q04_017_pgid_session_01"
+          ],
+          "notes": "无 pgid/session 字段。"
+        },
+        {
+          "fact_id": "Q04_017_02",
+          "fact_key": "syscall_or_kernel_entry",
+          "status_or_value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q04_017_pgid_session_01"
+          ],
+          "notes": "无 setpgid/setsid syscall。"
+        },
+        {
+          "fact_id": "Q04_017_03",
+          "fact_key": "state_resource_update",
+          "status_or_value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q04_017_pgid_session_01"
+          ],
+          "notes": "无相关状态更新。"
+        },
+        {
+          "fact_id": "Q04_017_04",
+          "fact_key": "relationship_or_mapping",
+          "status_or_value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q04_017_pgid_session_01"
+          ],
+          "notes": "无进程组/会话映射。"
+        },
+        {
+          "fact_id": "Q04_017_05",
+          "fact_key": "cleanup_or_wait",
+          "status_or_value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q04_017_pgid_session_01"
+          ],
+          "notes": "无相关回收链。"
+        },
+        {
+          "fact_id": "Q04_017_06",
+          "fact_key": "negative_search_coverage",
+          "status_or_value": {
+            "searched_keywords": [
+              "pgid",
+              "session",
+              "setsid",
+              "setpgid",
+              "set_sid",
+              "process group"
+            ],
+            "searched_directories": [
+              "repos/xv6-k210/kernel",
+              "repos/xv6-k210/include"
+            ],
+            "file_count": 113,
+            "match_count": 0,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [
+            "codex_ev_Q04_017_pgid_session_01"
+          ],
+          "notes": "覆盖 kernel/include。"
+        }
+      ],
+      "answer": {
+        "value": "not_found",
+        "used_evidence_ids": [
+          "codex_ev_Q04_017_pgid_session_01"
+        ],
+        "confidence": "high",
+        "notes": ""
+      }
+    },
+    {
+      "question_id": "Q04_018",
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q04_018_prlimit_sysnum_01",
+          "evidence_type": "definition",
+          "file_path": "repos/xv6-k210/include/sysnum.h",
+          "line_start": 75,
+          "line_end": 76,
+          "excerpt": "#define SYS_wait4 260；#define SYS_prlimit64 261。",
+          "interpretation": "prlimit64 有 syscall 号。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_018_prlimit_stub_02",
+          "evidence_type": "implementation_body",
+          "file_path": "repos/xv6-k210/kernel/syscall/sysproc.c",
+          "line_start": 272,
+          "line_end": 277,
+          "excerpt": "sys_prlimit64 注释 for now not very necessary / may be implemented later；直接 return 0。",
+          "interpretation": "rlimit/prlimit 是固定返回占位实现。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_018_prlimit_table_03",
+          "evidence_type": "call_site",
+          "file_path": "repos/xv6-k210/kernel/syscall/syscall.c",
+          "line_start": 249,
+          "line_end": 249,
+          "excerpt": "[SYS_prlimit64] sys_prlimit64。",
+          "interpretation": "syscall 表接入占位函数。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_018_no_rlimit_fields_04",
+          "evidence_type": "negative_search",
+          "searched_keywords": [
+            "RLIMIT",
+            "rlimit",
+            "getrlimit",
+            "setrlimit",
+            "resource limit"
+          ],
+          "searched_directories": [
+            "repos/xv6-k210/kernel",
+            "repos/xv6-k210/include"
+          ],
+          "file_count": 113,
+          "match_count": 3,
+          "coverage_sufficient": true,
+          "interpretation": "除 SYS_prlimit64 和 stub 外未发现资源限制表、软/硬限制字段或检查路径。"
+        }
+      ],
+      "fact_answers": [
+        {
+          "fact_id": "Q04_018_01",
+          "fact_key": "entity_state",
+          "status_or_value": "stub_or_declaration_only",
+          "used_evidence_ids": [
+            "codex_ev_Q04_018_prlimit_stub_02",
+            "codex_ev_Q04_018_no_rlimit_fields_04"
+          ],
+          "notes": "无 rlimit 状态字段。"
+        },
+        {
+          "fact_id": "Q04_018_02",
+          "fact_key": "syscall_or_kernel_entry",
+          "status_or_value": "stub_or_declaration_only",
+          "used_evidence_ids": [
+            "codex_ev_Q04_018_prlimit_sysnum_01",
+            "codex_ev_Q04_018_prlimit_table_03"
+          ],
+          "notes": "只有 syscall 号/表项和固定返回。"
+        },
+        {
+          "fact_id": "Q04_018_03",
+          "fact_key": "state_resource_update",
+          "status_or_value": "stub_or_declaration_only",
+          "used_evidence_ids": [
+            "codex_ev_Q04_018_prlimit_stub_02"
+          ],
+          "notes": "未更新资源限制。"
+        },
+        {
+          "fact_id": "Q04_018_04",
+          "fact_key": "relationship_or_mapping",
+          "status_or_value": "stub_or_declaration_only",
+          "used_evidence_ids": [
+            "codex_ev_Q04_018_no_rlimit_fields_04"
+          ],
+          "notes": "无资源类型映射。"
+        },
+        {
+          "fact_id": "Q04_018_05",
+          "fact_key": "cleanup_or_wait",
+          "status_or_value": "stub_or_declaration_only",
+          "used_evidence_ids": [
+            "codex_ev_Q04_018_prlimit_stub_02"
+          ],
+          "notes": "无回收语义。"
+        },
+        {
+          "fact_id": "Q04_018_06",
+          "fact_key": "negative_search_coverage",
+          "status_or_value": {
+            "searched_keywords": [
+              "RLIMIT",
+              "rlimit",
+              "getrlimit",
+              "setrlimit",
+              "resource limit"
+            ],
+            "searched_directories": [
+              "repos/xv6-k210/kernel",
+              "repos/xv6-k210/include"
+            ],
+            "file_count": 113,
+            "match_count": 3,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [
+            "codex_ev_Q04_018_no_rlimit_fields_04"
+          ],
+          "notes": "只有 stub 命中。"
+        }
+      ],
+      "answer": {
+        "value": "stub",
+        "used_evidence_ids": [
+          "codex_ev_Q04_018_prlimit_sysnum_01",
+          "codex_ev_Q04_018_prlimit_stub_02",
+          "codex_ev_Q04_018_prlimit_table_03",
+          "codex_ev_Q04_018_no_rlimit_fields_04"
+        ],
+        "confidence": "high",
+        "notes": "支持的资源类型数量: 0；prlimit64 固定返回 0，不能判 implemented。"
+      }
+    },
+    {
+      "question_id": "Q04_019",
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q04_019_proc_only_01",
+          "evidence_type": "definition",
+          "file_path": "repos/xv6-k210/include/sched/proc.h",
+          "line_start": 44,
+          "line_end": 102,
+          "excerpt": "注释 Process Control Block；struct proc 同时含调度 context、pid/state、地址空间、文件表、trapframe、信号字段。",
+          "interpretation": "一个结构体同时承担 PCB/执行上下文职责。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_019_no_tcb_02",
+          "evidence_type": "negative_search",
+          "searched_keywords": [
+            "TCB",
+            "Thread Control Block",
+            "struct thread",
+            "pthread",
+            "task_struct"
+          ],
+          "searched_directories": [
+            "repos/xv6-k210/kernel",
+            "repos/xv6-k210/include"
+          ],
+          "file_count": 113,
+          "match_count": 0,
+          "coverage_sufficient": true,
+          "interpretation": "未发现独立 TCB 或 thread 控制块。"
+        }
+      ],
+      "fact_answers": [
+        {
+          "fact_id": "Q04_019_01",
+          "fact_key": "entity_state",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_019_proc_only_01"
+          ],
+          "notes": "统一 struct proc。"
+        },
+        {
+          "fact_id": "Q04_019_02",
+          "fact_key": "syscall_or_kernel_entry",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_019_proc_only_01"
+          ],
+          "notes": "syscalls 操作 myproc()/struct proc。"
+        },
+        {
+          "fact_id": "Q04_019_03",
+          "fact_key": "state_resource_update",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_019_proc_only_01"
+          ],
+          "notes": "state 在 proc 内。"
+        },
+        {
+          "fact_id": "Q04_019_04",
+          "fact_key": "relationship_or_mapping",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_019_proc_only_01"
+          ],
+          "notes": "地址空间和文件表也在 proc 内。"
+        },
+        {
+          "fact_id": "Q04_019_05",
+          "fact_key": "cleanup_or_wait",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_019_proc_only_01"
+          ],
+          "notes": "回收对象是 proc。"
+        },
+        {
+          "fact_id": "Q04_019_06",
+          "fact_key": "negative_search_coverage",
+          "status_or_value": {
+            "searched_keywords": [
+              "TCB",
+              "Thread Control Block",
+              "struct thread",
+              "pthread",
+              "task_struct"
+            ],
+            "searched_directories": [
+              "repos/xv6-k210/kernel",
+              "repos/xv6-k210/include"
+            ],
+            "file_count": 113,
+            "match_count": 0,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [
+            "codex_ev_Q04_019_no_tcb_02"
+          ],
+          "notes": "无 TCB。"
+        }
+      ],
+      "answer": {
+        "value": "仅有统一 Task 结构（无区分）",
+        "used_evidence_ids": [
+          "codex_ev_Q04_019_proc_only_01",
+          "codex_ev_Q04_019_no_tcb_02"
+        ],
+        "confidence": "high",
+        "notes": ""
+      }
+    },
+    {
+      "question_id": "Q04_020",
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q04_020_scheduler_satp_01",
+          "evidence_type": "implementation_body",
+          "file_path": "repos/xv6-k210/kernel/sched/proc.c",
+          "line_start": 666,
+          "line_end": 677,
+          "excerpt": "scheduler 在 swtch 前 w_satp(MAKE_SATP(tmp->pagetable)); sfence_vma(); swtch 后 w_satp(MAKE_SATP(kernel_pagetable)); sfence_vma()。",
+          "interpretation": "调度切换路径写 satp 并刷新 TLB。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_020_exec_satp_02",
+          "evidence_type": "implementation_body",
+          "file_path": "repos/xv6-k210/kernel/exec.c",
+          "line_start": 278,
+          "line_end": 298,
+          "excerpt": "execve 提交新 p->pagetable 后 fdcloexec，w_satp(MAKE_SATP(p->pagetable)); sfence_vma(); 释放旧地址空间。",
+          "interpretation": "exec 路径也切换当前页表。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_020_sfence_def_03",
+          "evidence_type": "definition",
+          "file_path": "repos/xv6-k210/include/hal/riscv.h",
+          "line_start": 209,
+          "line_end": 367,
+          "excerpt": "MAKE_SATP 构造 satp；sfence_vma 内联执行 sfence.vma。",
+          "interpretation": "页表切换原语定义存在。"
+        }
+      ],
+      "fact_answers": [
+        {
+          "fact_id": "Q04_020_01",
+          "fact_key": "ready_queue",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_020_scheduler_satp_01"
+          ],
+          "notes": "scheduler 选择进程后切页表。"
+        },
+        {
+          "fact_id": "Q04_020_02",
+          "fact_key": "selection_logic",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_020_scheduler_satp_01"
+          ],
+          "notes": "页表切换位于 swtch 前后。"
+        },
+        {
+          "fact_id": "Q04_020_03",
+          "fact_key": "policy_fields",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_020_sfence_def_03"
+          ],
+          "notes": "MAKE_SATP/sfence_vma 原语。"
+        },
+        {
+          "fact_id": "Q04_020_04",
+          "fact_key": "preemption_path",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_020_scheduler_satp_01"
+          ],
+          "notes": "调度切换路径接入。"
+        },
+        {
+          "fact_id": "Q04_020_05",
+          "fact_key": "mp_rt_extensions",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_020_scheduler_satp_01"
+          ],
+          "notes": "每个 CPU scheduler 使用当前进程页表。"
+        },
+        {
+          "fact_id": "Q04_020_06",
+          "fact_key": "negative_search_coverage",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_020_scheduler_satp_01"
+          ],
+          "notes": "正向证据足够。"
+        }
+      ],
+      "answer": {
+        "value": "implemented",
+        "used_evidence_ids": [
+          "codex_ev_Q04_020_scheduler_satp_01",
+          "codex_ev_Q04_020_exec_satp_02",
+          "codex_ev_Q04_020_sfence_def_03"
+        ],
+        "confidence": "high",
+        "notes": ""
+      }
+    },
+    {
+      "question_id": "Q04_021",
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q04_021_clone_proc_01",
+          "evidence_type": "implementation_body",
+          "file_path": "repos/xv6-k210/kernel/sched/proc.c",
+          "line_start": 291,
+          "line_end": 367,
+          "excerpt": "clone 总是 allocproc 并 copysegs/copyfdtable/trapframe，flag 未用于共享地址空间或线程组。",
+          "interpretation": "clone 创建的是新的 proc，而非独立 TCB 或共享地址空间线程。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_021_proc_struct_02",
+          "evidence_type": "definition",
+          "file_path": "repos/xv6-k210/include/sched/proc.h",
+          "line_start": 44,
+          "line_end": 102,
+          "excerpt": "struct proc 是唯一执行实体，含地址空间和文件表。",
+          "interpretation": "无线程/用户线程映射模型证据。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_021_no_user_threads_03",
+          "evidence_type": "negative_search",
+          "searched_keywords": [
+            "pthread",
+            "uthread",
+            "user thread",
+            "thread library",
+            "M:N",
+            "thread_create"
+          ],
+          "searched_directories": [
+            "repos/xv6-k210/kernel",
+            "repos/xv6-k210/include",
+            "repos/xv6-k210/xv6-user"
+          ],
+          "file_count": 113,
+          "match_count": 0,
+          "coverage_sufficient": true,
+          "interpretation": "未发现用户线程库或内核线程映射实现。"
+        }
+      ],
+      "fact_answers": [
+        {
+          "fact_id": "Q04_021_01",
+          "fact_key": "entity_state",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_021_proc_struct_02"
+          ],
+          "notes": "只有 proc。"
+        },
+        {
+          "fact_id": "Q04_021_02",
+          "fact_key": "syscall_or_kernel_entry",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_021_clone_proc_01"
+          ],
+          "notes": "clone 仍创建 proc。"
+        },
+        {
+          "fact_id": "Q04_021_03",
+          "fact_key": "state_resource_update",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_021_clone_proc_01"
+          ],
+          "notes": "clone 复制地址空间而非共享线程组。"
+        },
+        {
+          "fact_id": "Q04_021_04",
+          "fact_key": "relationship_or_mapping",
+          "status_or_value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q04_021_no_user_threads_03"
+          ],
+          "notes": "无用户线程到内核线程映射。"
+        },
+        {
+          "fact_id": "Q04_021_05",
+          "fact_key": "cleanup_or_wait",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_021_clone_proc_01"
+          ],
+          "notes": "回收按进程父子关系。"
+        },
+        {
+          "fact_id": "Q04_021_06",
+          "fact_key": "negative_search_coverage",
+          "status_or_value": {
+            "searched_keywords": [
+              "pthread",
+              "uthread",
+              "user thread",
+              "thread library",
+              "M:N",
+              "thread_create"
+            ],
+            "searched_directories": [
+              "repos/xv6-k210/kernel",
+              "repos/xv6-k210/include",
+              "repos/xv6-k210/xv6-user"
+            ],
+            "file_count": 113,
+            "match_count": 0,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [
+            "codex_ev_Q04_021_no_user_threads_03"
+          ],
+          "notes": "无线程库。"
+        }
+      ],
+      "answer": {
+        "value": "无线程（仅进程/Task 不可再分）",
+        "used_evidence_ids": [
+          "codex_ev_Q04_021_clone_proc_01",
+          "codex_ev_Q04_021_proc_struct_02",
+          "codex_ev_Q04_021_no_user_threads_03"
+        ],
+        "confidence": "medium",
+        "notes": "虽然有 clone syscall，但实现更像 fork-with-stack，不构成 1:1 用户线程。"
+      }
+    },
+    {
+      "question_id": "Q04_022",
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q04_022_tp_hart_01",
+          "evidence_type": "definition",
+          "file_path": "repos/xv6-k210/kernel/main.c",
+          "line_start": 28,
+          "line_end": 29,
+          "excerpt": "inithartid 将 hartid&1 写入 tp。",
+          "interpretation": "tp 用于 hart id，不是 TLS。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_022_trap_tp_02",
+          "evidence_type": "definition",
+          "file_path": "repos/xv6-k210/include/trap.h",
+          "line_start": 24,
+          "line_end": 28,
+          "excerpt": "trapframe 含 kernel_hartid 和 tp 保存槽。",
+          "interpretation": "trapframe 保存 tp 寄存器，但无 TLS API。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_022_tls_exact_03",
+          "evidence_type": "negative_search",
+          "searched_keywords": [
+            "thread_local",
+            "TLS",
+            "__thread",
+            "set_tls",
+            "get_tls"
+          ],
+          "searched_directories": [
+            "repos/xv6-k210/kernel",
+            "repos/xv6-k210/include"
+          ],
+          "file_count": 113,
+          "match_count": 0,
+          "coverage_sufficient": true,
+          "interpretation": "精确 TLS 关键词未命中；tp 命中均为 hartid/trapframe 保存。"
+        }
+      ],
+      "fact_answers": [
+        {
+          "fact_id": "Q04_022_01",
+          "fact_key": "entity_state",
+          "status_or_value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q04_022_tls_exact_03"
+          ],
+          "notes": "无 TLS 字段/API。"
+        },
+        {
+          "fact_id": "Q04_022_02",
+          "fact_key": "syscall_or_kernel_entry",
+          "status_or_value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q04_022_tls_exact_03"
+          ],
+          "notes": "无 set_tls/get_tls syscall。"
+        },
+        {
+          "fact_id": "Q04_022_03",
+          "fact_key": "state_resource_update",
+          "status_or_value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q04_022_tls_exact_03"
+          ],
+          "notes": "无 TLS 状态更新。"
+        },
+        {
+          "fact_id": "Q04_022_04",
+          "fact_key": "relationship_or_mapping",
+          "status_or_value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q04_022_tp_hart_01",
+            "codex_ev_Q04_022_trap_tp_02"
+          ],
+          "notes": "tp 用作 hartid/保存寄存器，不是 TLS 映射。"
+        },
+        {
+          "fact_id": "Q04_022_05",
+          "fact_key": "cleanup_or_wait",
+          "status_or_value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q04_022_tls_exact_03"
+          ],
+          "notes": "无 TLS 回收。"
+        },
+        {
+          "fact_id": "Q04_022_06",
+          "fact_key": "negative_search_coverage",
+          "status_or_value": {
+            "searched_keywords": [
+              "thread_local",
+              "TLS",
+              "__thread",
+              "set_tls",
+              "get_tls"
+            ],
+            "searched_directories": [
+              "repos/xv6-k210/kernel",
+              "repos/xv6-k210/include"
+            ],
+            "file_count": 113,
+            "match_count": 0,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [
+            "codex_ev_Q04_022_tls_exact_03"
+          ],
+          "notes": "覆盖精确关键词。"
+        }
+      ],
+      "answer": {
+        "value": "not_found",
+        "used_evidence_ids": [
+          "codex_ev_Q04_022_tp_hart_01",
+          "codex_ev_Q04_022_trap_tp_02",
+          "codex_ev_Q04_022_tls_exact_03"
+        ],
+        "confidence": "high",
+        "notes": ""
+      }
+    },
+    {
+      "question_id": "Q04_023",
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q04_023_rusage_01",
+          "evidence_type": "implementation_body",
+          "file_path": "repos/xv6-k210/kernel/syscall/sysproc.c",
+          "line_start": 279,
+          "line_end": 315,
+          "excerpt": "sys_getrusage 返回 ru_utime/ru_stime、ru_nvcsw/ru_nivcsw，children 返回 cutime/cstime。",
+          "interpretation": "系统追踪 CPU 时间和上下文切换次数。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_023_time_update_02",
+          "evidence_type": "usage_flow",
+          "file_path": "repos/xv6-k210/kernel/trap/trap.c",
+          "line_start": 86,
+          "line_end": 115,
+          "excerpt": "usertrap 更新 p->proc_tms.utime，时钟/中断 yield 后 p->ivswtch++。",
+          "interpretation": "运行时维护用户时间和非自愿切换。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_023_sched_time_03",
+          "evidence_type": "usage_flow",
+          "file_path": "repos/xv6-k210/kernel/sched/proc.c",
+          "line_start": 694,
+          "line_end": 730,
+          "excerpt": "sched 保存浮点状态，累加 p->proc_tms.stime，并 swtch。",
+          "interpretation": "内核时间和上下文切换路径维护。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_023_criteria_04",
+          "evidence_type": "negative_search",
+          "searched_keywords": [
+            "throughput",
+            "turnaround",
+            "waiting time",
+            "response time",
+            "CPU utilization",
+            "sched metric"
+          ],
+          "searched_directories": [
+            "repos/xv6-k210/kernel",
+            "repos/xv6-k210/include"
+          ],
+          "file_count": 113,
+          "match_count": 0,
+          "coverage_sufficient": true,
+          "interpretation": "未发现对题目列出的 Stallings 调度指标进行选择/优化的统计字段或调度决策。"
+        }
+      ],
+      "fact_answers": [
+        {
+          "fact_id": "Q04_023_01",
+          "fact_key": "ready_queue",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_023_sched_time_03"
+          ],
+          "notes": "调度路径维护时间。"
+        },
+        {
+          "fact_id": "Q04_023_02",
+          "fact_key": "selection_logic",
+          "status_or_value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q04_023_criteria_04"
+          ],
+          "notes": "选择逻辑不用吞吐/等待/响应等指标。"
+        },
+        {
+          "fact_id": "Q04_023_03",
+          "fact_key": "policy_fields",
+          "status_or_value": "yes_weak",
+          "used_evidence_ids": [
+            "codex_ev_Q04_023_rusage_01",
+            "codex_ev_Q04_023_time_update_02",
+            "codex_ev_Q04_023_sched_time_03"
+          ],
+          "notes": "有 CPU 时间和上下文切换统计，但不等同于题目列出的调度准则。"
+        },
+        {
+          "fact_id": "Q04_023_04",
+          "fact_key": "preemption_path",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_023_time_update_02"
+          ],
+          "notes": "中断 yield 记录 ivswtch。"
+        },
+        {
+          "fact_id": "Q04_023_05",
+          "fact_key": "mp_rt_extensions",
+          "status_or_value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q04_023_criteria_04"
+          ],
+          "notes": "无公平/实时指标。"
+        },
+        {
+          "fact_id": "Q04_023_06",
+          "fact_key": "negative_search_coverage",
+          "status_or_value": {
+            "searched_keywords": [
+              "throughput",
+              "turnaround",
+              "waiting time",
+              "response time",
+              "CPU utilization",
+              "sched metric"
+            ],
+            "searched_directories": [
+              "repos/xv6-k210/kernel",
+              "repos/xv6-k210/include"
+            ],
+            "file_count": 113,
+            "match_count": 0,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [
+            "codex_ev_Q04_023_criteria_04"
+          ],
+          "notes": "未发现列出的指标。"
+        }
+      ],
+      "answer": {
+        "value": [],
+        "used_evidence_ids": [
+          "codex_ev_Q04_023_rusage_01",
+          "codex_ev_Q04_023_time_update_02",
+          "codex_ev_Q04_023_sched_time_03",
+          "codex_ev_Q04_023_criteria_04"
+        ],
+        "confidence": "medium",
+        "notes": "留空：源码追踪 CPU 时间/上下文切换，但未发现 CPU 利用率、吞吐量、周转时间、等待时间或响应时间用于调度统计/优化。"
+      }
+    },
+    {
+      "question_id": "Q04_024",
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q04_024_prio_queues_01",
+          "evidence_type": "definition",
+          "file_path": "repos/xv6-k210/kernel/sched/proc.c",
+          "line_start": 238,
+          "line_end": 247,
+          "excerpt": "定义 PRIORITY_TIMEOUT、PRIORITY_IRQ、PRIORITY_NORMAL 和 proc_runnable[3]。",
+          "interpretation": "存在固定优先级队列。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_024_tick_promote_02",
+          "evidence_type": "implementation_body",
+          "file_path": "repos/xv6-k210/kernel/sched/proc.c",
+          "line_start": 733,
+          "line_end": 760,
+          "excerpt": "proc_tick 遍历 PRIORITY_IRQ..PRIORITY_NORMAL 的 runnable 进程，timer--，为 0 时移除并 __insert_runnable(PRIORITY_TIMEOUT,p)。",
+          "interpretation": "等待中的 runnable 进程会随时间提升到最高 timeout 队列。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_024_select_prio_03",
+          "evidence_type": "implementation_body",
+          "file_path": "repos/xv6-k210/kernel/sched/proc.c",
+          "line_start": 596,
+          "line_end": 612,
+          "excerpt": "__get_runnable_no_lock 从低编号优先级开始扫描，返回第一个 RUNNABLE。",
+          "interpretation": "提升到 PRIORITY_TIMEOUT 会优先被选中。"
+        }
+      ],
+      "fact_answers": [
+        {
+          "fact_id": "Q04_024_01",
+          "fact_key": "ready_queue",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_024_prio_queues_01"
+          ],
+          "notes": "三优先级队列。"
+        },
+        {
+          "fact_id": "Q04_024_02",
+          "fact_key": "selection_logic",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_024_select_prio_03"
+          ],
+          "notes": "高优先级先选。"
+        },
+        {
+          "fact_id": "Q04_024_03",
+          "fact_key": "policy_fields",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_024_tick_promote_02"
+          ],
+          "notes": "timer 是 aging/提升依据。"
+        },
+        {
+          "fact_id": "Q04_024_04",
+          "fact_key": "preemption_path",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_024_tick_promote_02"
+          ],
+          "notes": "proc_tick 接入时钟维护。"
+        },
+        {
+          "fact_id": "Q04_024_05",
+          "fact_key": "mp_rt_extensions",
+          "status_or_value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q04_024_prio_queues_01"
+          ],
+          "notes": "不是 RT aging。"
+        },
+        {
+          "fact_id": "Q04_024_06",
+          "fact_key": "negative_search_coverage",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_024_tick_promote_02"
+          ],
+          "notes": "虽未命名 aging，但实现了等待超时提升。"
+        }
+      ],
+      "answer": {
+        "value": "implemented",
+        "used_evidence_ids": [
+          "codex_ev_Q04_024_prio_queues_01",
+          "codex_ev_Q04_024_tick_promote_02",
+          "codex_ev_Q04_024_select_prio_03"
+        ],
+        "confidence": "medium",
+        "notes": "这是隐式 aging：低队列 runnable 等待 timer 归零后提升到 PRIORITY_TIMEOUT。"
+      }
+    },
+    {
+      "question_id": "Q04_025",
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q04_025_prio_only_01",
+          "evidence_type": "definition",
+          "file_path": "repos/xv6-k210/kernel/sched/proc.c",
+          "line_start": 238,
+          "line_end": 247,
+          "excerpt": "调度状态只有三优先级 runnable 队列和 sleep 队列。",
+          "interpretation": "调度器不是 fair-share/cgroup/quota 结构。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_025_fair_quota_02",
+          "evidence_type": "negative_search",
+          "searched_keywords": [
+            "fair",
+            "fair-share",
+            "quota",
+            "cgroup",
+            "cpu quota",
+            "share"
+          ],
+          "searched_directories": [
+            "repos/xv6-k210/kernel",
+            "repos/xv6-k210/include"
+          ],
+          "file_count": 113,
+          "match_count": 0,
+          "coverage_sufficient": true,
+          "interpretation": "未发现 fair-share、CPU quota 或 cgroup 相关结构/实现。"
+        }
+      ],
+      "fact_answers": [
+        {
+          "fact_id": "Q04_025_01",
+          "fact_key": "ready_queue",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_025_prio_only_01"
+          ],
+          "notes": "只有优先级队列。"
+        },
+        {
+          "fact_id": "Q04_025_02",
+          "fact_key": "selection_logic",
+          "status_or_value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q04_025_fair_quota_02"
+          ],
+          "notes": "无公平份额选择逻辑。"
+        },
+        {
+          "fact_id": "Q04_025_03",
+          "fact_key": "policy_fields",
+          "status_or_value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q04_025_fair_quota_02"
+          ],
+          "notes": "无 quota/share 字段。"
+        },
+        {
+          "fact_id": "Q04_025_04",
+          "fact_key": "preemption_path",
+          "status_or_value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q04_025_fair_quota_02"
+          ],
+          "notes": "无配额扣减路径。"
+        },
+        {
+          "fact_id": "Q04_025_05",
+          "fact_key": "mp_rt_extensions",
+          "status_or_value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q04_025_fair_quota_02"
+          ],
+          "notes": "无 cgroup/CPU quota。"
+        },
+        {
+          "fact_id": "Q04_025_06",
+          "fact_key": "negative_search_coverage",
+          "status_or_value": {
+            "searched_keywords": [
+              "fair",
+              "fair-share",
+              "quota",
+              "cgroup",
+              "cpu quota",
+              "share"
+            ],
+            "searched_directories": [
+              "repos/xv6-k210/kernel",
+              "repos/xv6-k210/include"
+            ],
+            "file_count": 113,
+            "match_count": 0,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [
+            "codex_ev_Q04_025_fair_quota_02"
+          ],
+          "notes": "覆盖相关关键词。"
+        }
+      ],
+      "answer": {
+        "value": "not_found",
+        "used_evidence_ids": [
+          "codex_ev_Q04_025_prio_only_01",
+          "codex_ev_Q04_025_fair_quota_02"
+        ],
+        "confidence": "high",
+        "notes": ""
+      }
+    },
+    {
+      "question_id": "Q04_026",
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q04_026_usertrap_yield_01",
+          "evidence_type": "usage_flow",
+          "file_path": "repos/xv6-k210/kernel/trap/trap.c",
+          "line_start": 99,
+          "line_end": 117,
+          "excerpt": "usertrap 处理 syscall/interrupt；handle_intr 成功后调用 yield()，并在成功时 ivswtch++。",
+          "interpretation": "用户态中断后可抢占当前进程。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_026_kerneltrap_ipi_02",
+          "evidence_type": "usage_flow",
+          "file_path": "repos/xv6-k210/kernel/trap/trap.c",
+          "line_start": 280,
+          "line_end": 319,
+          "excerpt": "中断处理完成/软件中断清 IPI 后返回；该片段未在 kerneltrap 展示直接调度抢占。",
+          "interpretation": "内核路径不是完全抢占。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_026_yield_sched_03",
+          "evidence_type": "implementation_body",
+          "file_path": "repos/xv6-k210/kernel/sched/proc.c",
+          "line_start": 615,
+          "line_end": 635,
+          "excerpt": "yield 若存在 runnable，则当前进程移回 PRIORITY_NORMAL 并 sched。",
+          "interpretation": "抢占/让出落到调度器。"
+        }
+      ],
+      "fact_answers": [
+        {
+          "fact_id": "Q04_026_01",
+          "fact_key": "ready_queue",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_026_yield_sched_03"
+          ],
+          "notes": "yield 重新入队。"
+        },
+        {
+          "fact_id": "Q04_026_02",
+          "fact_key": "selection_logic",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_026_yield_sched_03"
+          ],
+          "notes": "sched 后重新选择。"
+        },
+        {
+          "fact_id": "Q04_026_03",
+          "fact_key": "policy_fields",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_026_usertrap_yield_01"
+          ],
+          "notes": "ivswtch 记录非自愿切换。"
+        },
+        {
+          "fact_id": "Q04_026_04",
+          "fact_key": "preemption_path",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_026_usertrap_yield_01",
+            "codex_ev_Q04_026_yield_sched_03"
+          ],
+          "notes": "用户中断路径调 yield。"
+        },
+        {
+          "fact_id": "Q04_026_05",
+          "fact_key": "mp_rt_extensions",
+          "status_or_value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q04_026_kerneltrap_ipi_02"
+          ],
+          "notes": "未见完全内核抢占/RT。"
+        },
+        {
+          "fact_id": "Q04_026_06",
+          "fact_key": "negative_search_coverage",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_026_usertrap_yield_01"
+          ],
+          "notes": "正向判定足够。"
+        }
+      ],
+      "answer": {
+        "value": "部分抢占（内核路径不可抢占，用户路径可抢占）",
+        "used_evidence_ids": [
+          "codex_ev_Q04_026_usertrap_yield_01",
+          "codex_ev_Q04_026_kerneltrap_ipi_02",
+          "codex_ev_Q04_026_yield_sched_03"
+        ],
+        "confidence": "high",
+        "notes": ""
+      }
+    },
+    {
+      "question_id": "Q04_027",
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q04_027_select_no_sjf_01",
+          "evidence_type": "implementation_body",
+          "file_path": "repos/xv6-k210/kernel/sched/proc.c",
+          "line_start": 596,
+          "line_end": 612,
+          "excerpt": "__get_runnable_no_lock 按优先级链表顺序返回第一个 RUNNABLE。",
+          "interpretation": "选择逻辑不计算 burst/最短作业。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_027_sjf_02",
+          "evidence_type": "negative_search",
+          "searched_keywords": [
+            "SJF",
+            "SRTF",
+            "shortest job",
+            "shortest remaining",
+            "cpu burst",
+            "burst time"
+          ],
+          "searched_directories": [
+            "repos/xv6-k210/kernel",
+            "repos/xv6-k210/include"
+          ],
+          "file_count": 113,
+          "match_count": 0,
+          "coverage_sufficient": true,
+          "interpretation": "未发现 SJF/SRTF 或 burst 预测字段/实现。"
+        }
+      ],
+      "fact_answers": [
+        {
+          "fact_id": "Q04_027_01",
+          "fact_key": "ready_queue",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_027_select_no_sjf_01"
+          ],
+          "notes": "有优先级队列。"
+        },
+        {
+          "fact_id": "Q04_027_02",
+          "fact_key": "selection_logic",
+          "status_or_value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q04_027_sjf_02"
+          ],
+          "notes": "无最短作业选择。"
+        },
+        {
+          "fact_id": "Q04_027_03",
+          "fact_key": "policy_fields",
+          "status_or_value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q04_027_sjf_02"
+          ],
+          "notes": "无 burst 字段。"
+        },
+        {
+          "fact_id": "Q04_027_04",
+          "fact_key": "preemption_path",
+          "status_or_value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q04_027_sjf_02"
+          ],
+          "notes": "无 SRTF 抢占逻辑。"
+        },
+        {
+          "fact_id": "Q04_027_05",
+          "fact_key": "mp_rt_extensions",
+          "status_or_value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q04_027_sjf_02"
+          ],
+          "notes": "无相关扩展。"
+        },
+        {
+          "fact_id": "Q04_027_06",
+          "fact_key": "negative_search_coverage",
+          "status_or_value": {
+            "searched_keywords": [
+              "SJF",
+              "SRTF",
+              "shortest job",
+              "shortest remaining",
+              "cpu burst",
+              "burst time"
+            ],
+            "searched_directories": [
+              "repos/xv6-k210/kernel",
+              "repos/xv6-k210/include"
+            ],
+            "file_count": 113,
+            "match_count": 0,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [
+            "codex_ev_Q04_027_sjf_02"
+          ],
+          "notes": "覆盖 SJF 关键词。"
+        }
+      ],
+      "answer": {
+        "value": "not_found",
+        "used_evidence_ids": [
+          "codex_ev_Q04_027_select_no_sjf_01",
+          "codex_ev_Q04_027_sjf_02"
+        ],
+        "confidence": "high",
+        "notes": ""
+      }
+    },
+    {
+      "question_id": "Q04_028",
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q04_028_ncpu_01",
+          "evidence_type": "definition",
+          "file_path": "repos/xv6-k210/include/param.h",
+          "line_start": 4,
+          "line_end": 5,
+          "excerpt": "#define NCPU 2。",
+          "interpretation": "系统面向双核。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_028_main_both_02",
+          "evidence_type": "usage_flow",
+          "file_path": "repos/xv6-k210/kernel/main.c",
+          "line_start": 39,
+          "line_end": 97,
+          "excerpt": "hart0 初始化后给其他 hart 发送 IPI；hart1 等 started 后初始化；两条路径最后都 scheduler()。",
+          "interpretation": "多个 hart 都进入调度器。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_028_shared_sched_03",
+          "evidence_type": "implementation_body",
+          "file_path": "repos/xv6-k210/kernel/sched/proc.c",
+          "line_start": 94,
+          "line_end": 100,
+          "excerpt": "cpus[NCPU] per-CPU 状态；mycpu 按 cpuid 返回当前 CPU。",
+          "interpretation": "每核有状态，调度代码对称运行。"
+        }
+      ],
+      "fact_answers": [
+        {
+          "fact_id": "Q04_028_01",
+          "fact_key": "cpu_topology_constants",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_028_ncpu_01"
+          ],
+          "notes": "NCPU=2。"
+        },
+        {
+          "fact_id": "Q04_028_02",
+          "fact_key": "ap_startup",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_028_main_both_02"
+          ],
+          "notes": "hart1 被启动并进入 scheduler。"
+        },
+        {
+          "fact_id": "Q04_028_03",
+          "fact_key": "percpu_storage",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_028_shared_sched_03"
+          ],
+          "notes": "cpus[NCPU]。"
+        },
+        {
+          "fact_id": "Q04_028_04",
+          "fact_key": "ipi_path",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_028_main_both_02"
+          ],
+          "notes": "hart0 用 IPI 唤醒其他 hart。"
+        },
+        {
+          "fact_id": "Q04_028_05",
+          "fact_key": "scheduler_tlb_mp",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_028_main_both_02"
+          ],
+          "notes": "所有 hart 进入 scheduler。"
+        },
+        {
+          "fact_id": "Q04_028_06",
+          "fact_key": "negative_search_coverage",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_028_main_both_02"
+          ],
+          "notes": "正向 SMP 证据足够。"
+        }
+      ],
+      "answer": {
+        "value": "SMP（对称多处理）",
+        "used_evidence_ids": [
+          "codex_ev_Q04_028_ncpu_01",
+          "codex_ev_Q04_028_main_both_02",
+          "codex_ev_Q04_028_shared_sched_03"
+        ],
+        "confidence": "high",
+        "notes": ""
+      }
+    },
+    {
+      "question_id": "Q04_029",
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q04_029_ap_start_01",
+          "evidence_type": "usage_flow",
+          "file_path": "repos/xv6-k210/kernel/main.c",
+          "line_start": 65,
+          "line_end": 86,
+          "excerpt": "hart0 for i=1..NCPU-1 调 sbi_send_ipi；非 0 hart 等 started，然后 float/kvminithart/trapinithart，打印 hart1 init done。",
+          "interpretation": "存在 secondary CPU/AP 启动链。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_029_enter_sched_02",
+          "evidence_type": "usage_flow",
+          "file_path": "repos/xv6-k210/kernel/main.c",
+          "line_start": 87,
+          "line_end": 97,
+          "excerpt": "所有 hart 完成初始化后释放 boot stack 页并 scheduler()。",
+          "interpretation": "AP 上线后进入调度器。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_029_entry_stack_03",
+          "evidence_type": "definition",
+          "file_path": "repos/xv6-k210/kernel/entry_k210.S",
+          "line_start": 3,
+          "line_end": 20,
+          "excerpt": "_start 根据 a0(hartid) 计算 sp；boot_stack .space 4096*4*2。",
+          "interpretation": "入口为多 hart 准备独立启动栈区域。"
+        }
+      ],
+      "fact_answers": [
+        {
+          "fact_id": "Q04_029_01",
+          "fact_key": "cpu_topology_constants",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_029_entry_stack_03"
+          ],
+          "notes": "启动栈按 2 hart 配置。"
+        },
+        {
+          "fact_id": "Q04_029_02",
+          "fact_key": "ap_startup",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_029_ap_start_01",
+            "codex_ev_Q04_029_enter_sched_02"
+          ],
+          "notes": "hart0 唤醒 hart1，hart1 初始化后进 scheduler。"
+        },
+        {
+          "fact_id": "Q04_029_03",
+          "fact_key": "percpu_storage",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_029_ap_start_01"
+          ],
+          "notes": "inithartid/tp 支持每 hart 身份。"
+        },
+        {
+          "fact_id": "Q04_029_04",
+          "fact_key": "ipi_path",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_029_ap_start_01"
+          ],
+          "notes": "sbi_send_ipi 唤醒 AP。"
+        },
+        {
+          "fact_id": "Q04_029_05",
+          "fact_key": "scheduler_tlb_mp",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_029_enter_sched_02"
+          ],
+          "notes": "AP 进入 scheduler。"
+        },
+        {
+          "fact_id": "Q04_029_06",
+          "fact_key": "negative_search_coverage",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_029_ap_start_01"
+          ],
+          "notes": "正向实现足够。"
+        }
+      ],
+      "answer": {
+        "value": "implemented",
+        "used_evidence_ids": [
+          "codex_ev_Q04_029_ap_start_01",
+          "codex_ev_Q04_029_enter_sched_02",
+          "codex_ev_Q04_029_entry_stack_03"
+        ],
+        "confidence": "high",
+        "notes": ""
+      }
+    },
+    {
+      "question_id": "Q04_030",
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q04_030_sbi_ipi_01",
+          "evidence_type": "definition",
+          "file_path": "repos/xv6-k210/include/sbi.h",
+          "line_start": 36,
+          "line_end": 102,
+          "excerpt": "sbi_clear_ipi 清 SIP_SSIP；sbi_send_ipi 调 SBI IPI_EID/IPI_SEND_IPI。",
+          "interpretation": "IPI 发送/清除原语存在。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_030_ipi_send_sites_02",
+          "evidence_type": "call_site",
+          "file_path": "repos/xv6-k210/kernel/main.c",
+          "line_start": 65,
+          "line_end": 70,
+          "excerpt": "hart0 初始化后循环 sbi_send_ipi(mask,0) 唤醒其他 hart。",
+          "interpretation": "AP 启动发送 IPI。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_030_ipi_wakeup_site_03",
+          "evidence_type": "call_site",
+          "file_path": "repos/xv6-k210/kernel/sched/proc.c",
+          "line_start": 371,
+          "line_end": 395,
+          "excerpt": "wakeup 在唤醒进程且另一个 hart idle 时 sbi_send_ipi(1 << id,0)。",
+          "interpretation": "调度唤醒路径发送 IPI。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_030_ipi_handle_04",
+          "evidence_type": "implementation_body",
+          "file_path": "repos/xv6-k210/kernel/trap/trap.c",
+          "line_start": 299,
+          "line_end": 318,
+          "excerpt": "外部中断路径和 INTR_SOFTWARE 分支调用 sbi_clear_ipi 并返回 0。",
+          "interpretation": "IPI/软件中断处理会清 pending。"
+        }
+      ],
+      "fact_answers": [
+        {
+          "fact_id": "Q04_030_01",
+          "fact_key": "cpu_topology_constants",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_030_sbi_ipi_01"
+          ],
+          "notes": "IPI SBI 原语。"
+        },
+        {
+          "fact_id": "Q04_030_02",
+          "fact_key": "ap_startup",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_030_ipi_send_sites_02"
+          ],
+          "notes": "启动 AP 使用 IPI。"
+        },
+        {
+          "fact_id": "Q04_030_03",
+          "fact_key": "percpu_storage",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_030_ipi_wakeup_site_03"
+          ],
+          "notes": "按 cpuid 选择另一个 hart。"
+        },
+        {
+          "fact_id": "Q04_030_04",
+          "fact_key": "ipi_path",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_030_sbi_ipi_01",
+            "codex_ev_Q04_030_ipi_send_sites_02",
+            "codex_ev_Q04_030_ipi_wakeup_site_03",
+            "codex_ev_Q04_030_ipi_handle_04"
+          ],
+          "notes": "发送与处理闭合。"
+        },
+        {
+          "fact_id": "Q04_030_05",
+          "fact_key": "scheduler_tlb_mp",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_030_ipi_wakeup_site_03"
+          ],
+          "notes": "wakeup IPI 可通知调度。"
+        },
+        {
+          "fact_id": "Q04_030_06",
+          "fact_key": "negative_search_coverage",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_030_sbi_ipi_01"
+          ],
+          "notes": "正向实现足够。"
+        }
+      ],
+      "answer": {
+        "value": "implemented",
+        "used_evidence_ids": [
+          "codex_ev_Q04_030_sbi_ipi_01",
+          "codex_ev_Q04_030_ipi_send_sites_02",
+          "codex_ev_Q04_030_ipi_wakeup_site_03",
+          "codex_ev_Q04_030_ipi_handle_04"
+        ],
+        "confidence": "high",
+        "notes": ""
+      }
+    },
+    {
+      "question_id": "Q04_031",
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q04_031_send_main_01",
+          "evidence_type": "call_site",
+          "file_path": "repos/xv6-k210/kernel/main.c",
+          "line_start": 65,
+          "line_end": 70,
+          "excerpt": "main: for i=1..NCPU-1 调 sbi_send_ipi(mask,0)。",
+          "interpretation": "IPI 发送路径 1: BSP 唤醒 AP。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_031_send_wakeup_02",
+          "evidence_type": "call_site",
+          "file_path": "repos/xv6-k210/kernel/sched/proc.c",
+          "line_start": 371,
+          "line_end": 395,
+          "excerpt": "wakeup: flag && other hart idle 时 sbi_send_ipi(1 << id,0)。",
+          "interpretation": "IPI 发送路径 2: 唤醒空闲 hart。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_031_handle_trap_03",
+          "evidence_type": "implementation_body",
+          "file_path": "repos/xv6-k210/kernel/trap/trap.c",
+          "line_start": 299,
+          "line_end": 318,
+          "excerpt": "handle_intr 中清 IPI；INTR_SOFTWARE 分支 sbi_clear_ipi。",
+          "interpretation": "IPI 处理路径: trap.c 软件中断/清 pending。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_031_sbi_def_04",
+          "evidence_type": "definition",
+          "file_path": "repos/xv6-k210/include/sbi.h",
+          "line_start": 36,
+          "line_end": 102,
+          "excerpt": "sbi_clear_ipi 写 sip 清 SSIP；sbi_send_ipi 调 SBI。",
+          "interpretation": "底层 SBI 原语。"
+        }
+      ],
+      "fact_answers": [
+        {
+          "fact_id": "Q04_031_01",
+          "fact_key": "cpu_topology_constants",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_031_send_main_01"
+          ],
+          "notes": "NCPU 循环发送。"
+        },
+        {
+          "fact_id": "Q04_031_02",
+          "fact_key": "ap_startup",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_031_send_main_01"
+          ],
+          "notes": "AP 启动发送路径。"
+        },
+        {
+          "fact_id": "Q04_031_03",
+          "fact_key": "percpu_storage",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_031_send_wakeup_02"
+          ],
+          "notes": "wakeup 依据 cpuid 选择目标。"
+        },
+        {
+          "fact_id": "Q04_031_04",
+          "fact_key": "ipi_path",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_031_send_main_01",
+            "codex_ev_Q04_031_send_wakeup_02",
+            "codex_ev_Q04_031_handle_trap_03",
+            "codex_ev_Q04_031_sbi_def_04"
+          ],
+          "notes": "发送/处理闭合。"
+        },
+        {
+          "fact_id": "Q04_031_05",
+          "fact_key": "scheduler_tlb_mp",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_031_send_wakeup_02"
+          ],
+          "notes": "IPI 与调度唤醒相关。"
+        },
+        {
+          "fact_id": "Q04_031_06",
+          "fact_key": "negative_search_coverage",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_031_sbi_def_04"
+          ],
+          "notes": "正向证据足够。"
+        }
+      ],
+      "answer": {
+        "value": "发送路径: kernel/main.c: main() 启动 AP 时 sbi_send_ipi；kernel/sched/proc.c: wakeup() 唤醒到 runnable 且另一个 hart idle 时 sbi_send_ipi。处理路径: kernel/trap/trap.c: handle_intr/INTR_SOFTWARE 调 sbi_clear_ipi；底层定义在 include/sbi.h。",
+        "used_evidence_ids": [
+          "codex_ev_Q04_031_send_main_01",
+          "codex_ev_Q04_031_send_wakeup_02",
+          "codex_ev_Q04_031_handle_trap_03",
+          "codex_ev_Q04_031_sbi_def_04"
+        ],
+        "confidence": "high",
+        "notes": ""
+      }
+    },
+    {
+      "question_id": "Q04_032",
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q04_032_cpu_struct_01",
+          "evidence_type": "definition",
+          "file_path": "repos/xv6-k210/include/sched/proc.h",
+          "line_start": 134,
+          "line_end": 144,
+          "excerpt": "struct cpu 包含 proc、context、noff、intena；声明 mycpu/myproc/cpuinit。",
+          "interpretation": "per-CPU 结构定义。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_032_cpus_array_02",
+          "evidence_type": "implementation_body",
+          "file_path": "repos/xv6-k210/kernel/sched/proc.c",
+          "line_start": 94,
+          "line_end": 107,
+          "excerpt": "struct cpu cpus[NCPU]；cpuinit 清零；mycpu 根据 cpuid 返回 &cpus[id]；myproc 取 c->proc。",
+          "interpretation": "per-CPU 数组实现。"
+        }
+      ],
+      "fact_answers": [
+        {
+          "fact_id": "Q04_032_01",
+          "fact_key": "cpu_topology_constants",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_032_cpus_array_02"
+          ],
+          "notes": "cpus[NCPU]。"
+        },
+        {
+          "fact_id": "Q04_032_02",
+          "fact_key": "ap_startup",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_032_cpus_array_02"
+          ],
+          "notes": "每 hart 通过 cpuid 获取自己的 cpu。"
+        },
+        {
+          "fact_id": "Q04_032_03",
+          "fact_key": "percpu_storage",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_032_cpu_struct_01",
+            "codex_ev_Q04_032_cpus_array_02"
+          ],
+          "notes": "struct cpu + cpus 数组。"
+        },
+        {
+          "fact_id": "Q04_032_04",
+          "fact_key": "ipi_path",
+          "status_or_value": "unknown",
+          "used_evidence_ids": [
+            "codex_ev_Q04_032_cpus_array_02"
+          ],
+          "notes": "本题关注 per-CPU。"
+        },
+        {
+          "fact_id": "Q04_032_05",
+          "fact_key": "scheduler_tlb_mp",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_032_cpu_struct_01"
+          ],
+          "notes": "cpu.context 用于调度切换。"
+        },
+        {
+          "fact_id": "Q04_032_06",
+          "fact_key": "negative_search_coverage",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_032_cpu_struct_01"
+          ],
+          "notes": "正向实现足够。"
+        }
+      ],
+      "answer": {
+        "value": "implemented",
+        "used_evidence_ids": [
+          "codex_ev_Q04_032_cpu_struct_01",
+          "codex_ev_Q04_032_cpus_array_02"
+        ],
+        "confidence": "high",
+        "notes": ""
+      }
+    },
+    {
+      "question_id": "Q04_033",
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q04_033_tp_init_01",
+          "evidence_type": "implementation_body",
+          "file_path": "repos/xv6-k210/kernel/main.c",
+          "line_start": 28,
+          "line_end": 37,
+          "excerpt": "inithartid 使用 asm mv tp, hartid&0x1；main 开始调用 inithartid(hartid)。",
+          "interpretation": "tp 寄存器保存 hart id。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_033_cpuid_02",
+          "evidence_type": "definition",
+          "file_path": "repos/xv6-k210/include/sched/proc.h",
+          "line_start": 142,
+          "line_end": 144,
+          "excerpt": "static inline int cpuid(void) { return r_tp(); }",
+          "interpretation": "cpuid 从 tp 读取 hart id。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_033_mycpu_03",
+          "evidence_type": "implementation_body",
+          "file_path": "repos/xv6-k210/kernel/sched/proc.c",
+          "line_start": 94,
+          "line_end": 100,
+          "excerpt": "mycpu: int id=cpuid(); return &cpus[id];",
+          "interpretation": "per-CPU 通过 cpus 数组 + hartid 索引实现。"
+        }
+      ],
+      "fact_answers": [
+        {
+          "fact_id": "Q04_033_01",
+          "fact_key": "cpu_topology_constants",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_033_mycpu_03"
+          ],
+          "notes": "数组按 NCPU。"
+        },
+        {
+          "fact_id": "Q04_033_02",
+          "fact_key": "ap_startup",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_033_tp_init_01"
+          ],
+          "notes": "main 初始化 tp。"
+        },
+        {
+          "fact_id": "Q04_033_03",
+          "fact_key": "percpu_storage",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_033_tp_init_01",
+            "codex_ev_Q04_033_cpuid_02",
+            "codex_ev_Q04_033_mycpu_03"
+          ],
+          "notes": "tp/hartid/数组索引闭合。"
+        },
+        {
+          "fact_id": "Q04_033_04",
+          "fact_key": "ipi_path",
+          "status_or_value": "unknown",
+          "used_evidence_ids": [
+            "codex_ev_Q04_033_cpuid_02"
+          ],
+          "notes": "本题关注实现方式。"
+        },
+        {
+          "fact_id": "Q04_033_05",
+          "fact_key": "scheduler_tlb_mp",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_033_mycpu_03"
+          ],
+          "notes": "scheduler 使用 mycpu。"
+        },
+        {
+          "fact_id": "Q04_033_06",
+          "fact_key": "negative_search_coverage",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_033_tp_init_01"
+          ],
+          "notes": "正向证据足够。"
+        }
+      ],
+      "answer": {
+        "value": "per-CPU 实现方式: tp 寄存器保存 hartid；cpuid() 读 r_tp()；mycpu() 用 hartid 作为 cpus[NCPU] 数组索引。",
+        "used_evidence_ids": [
+          "codex_ev_Q04_033_tp_init_01",
+          "codex_ev_Q04_033_cpuid_02",
+          "codex_ev_Q04_033_mycpu_03"
+        ],
+        "confidence": "high",
+        "notes": ""
+      }
+    },
+    {
+      "question_id": "Q04_034",
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q04_034_global_runq_01",
+          "evidence_type": "definition",
+          "file_path": "repos/xv6-k210/kernel/sched/proc.c",
+          "line_start": 238,
+          "line_end": 247,
+          "excerpt": "proc_runnable[PRIORITY_NUMBER] 是全局队列；未定义 per-CPU runqueue。",
+          "interpretation": "调度是共享全局队列，而非迁移/负载均衡机制。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_034_scheduler_global_pick_02",
+          "evidence_type": "implementation_body",
+          "file_path": "repos/xv6-k210/kernel/sched/proc.c",
+          "line_start": 596,
+          "line_end": 691,
+          "excerpt": "所有 scheduler 都从全局 __get_runnable_no_lock 取 runnable。",
+          "interpretation": "多核通过全局队列自然共享任务，但没有显式迁移/亲和性。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_034_migration_affinity_03",
+          "evidence_type": "negative_search",
+          "searched_keywords": [
+            "affinity",
+            "migrate",
+            "migration",
+            "load balance",
+            "load_balance",
+            "per-CPU queue"
+          ],
+          "searched_directories": [
+            "repos/xv6-k210/kernel",
+            "repos/xv6-k210/include"
+          ],
+          "file_count": 113,
+          "match_count": 0,
+          "coverage_sufficient": true,
+          "interpretation": "未发现跨核负载均衡、任务迁移或 CPU 亲和性接口/实现。"
+        }
+      ],
+      "fact_answers": [
+        {
+          "fact_id": "Q04_034_01",
+          "fact_key": "cpu_topology_constants",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_034_global_runq_01"
+          ],
+          "notes": "NCPU 场景下使用全局队列。"
+        },
+        {
+          "fact_id": "Q04_034_02",
+          "fact_key": "ap_startup",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_034_scheduler_global_pick_02"
+          ],
+          "notes": "多个 scheduler 可取全局队列。"
+        },
+        {
+          "fact_id": "Q04_034_03",
+          "fact_key": "percpu_storage",
+          "status_or_value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q04_034_migration_affinity_03"
+          ],
+          "notes": "未发现 per-CPU runqueue。"
+        },
+        {
+          "fact_id": "Q04_034_04",
+          "fact_key": "ipi_path",
+          "status_or_value": "unknown",
+          "used_evidence_ids": [
+            "codex_ev_Q04_034_migration_affinity_03"
+          ],
+          "notes": "IPI 唤醒不等同迁移。"
+        },
+        {
+          "fact_id": "Q04_034_05",
+          "fact_key": "scheduler_tlb_mp",
+          "status_or_value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q04_034_migration_affinity_03"
+          ],
+          "notes": "无显式 balance/migrate/affinity。"
+        },
+        {
+          "fact_id": "Q04_034_06",
+          "fact_key": "negative_search_coverage",
+          "status_or_value": {
+            "searched_keywords": [
+              "affinity",
+              "migrate",
+              "migration",
+              "load balance",
+              "load_balance",
+              "per-CPU queue"
+            ],
+            "searched_directories": [
+              "repos/xv6-k210/kernel",
+              "repos/xv6-k210/include"
+            ],
+            "file_count": 113,
+            "match_count": 0,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [
+            "codex_ev_Q04_034_migration_affinity_03"
+          ],
+          "notes": "全局队列不按本题判作负载均衡实现。"
+        }
+      ],
+      "answer": {
+        "value": "not_found",
+        "used_evidence_ids": [
+          "codex_ev_Q04_034_global_runq_01",
+          "codex_ev_Q04_034_scheduler_global_pick_02",
+          "codex_ev_Q04_034_migration_affinity_03"
+        ],
+        "confidence": "medium",
+        "notes": "存在全局共享 runqueue，但未发现显式跨核负载均衡/迁移/亲和性。"
+      }
+    },
+    {
+      "question_id": "Q04_035",
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q04_035_local_sfence_01",
+          "evidence_type": "implementation_body",
+          "file_path": "repos/xv6-k210/kernel/sched/proc.c",
+          "line_start": 666,
+          "line_end": 677,
+          "excerpt": "scheduler 在当前 hart 切换页表前后执行 w_satp 和 sfence_vma。",
+          "interpretation": "有本地 TLB flush。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_035_ipi_no_shoot_02",
+          "evidence_type": "implementation_body",
+          "file_path": "repos/xv6-k210/kernel/trap/trap.c",
+          "line_start": 299,
+          "line_end": 318,
+          "excerpt": "IPI/软件中断处理仅 sbi_clear_ipi 并返回，没有页表地址或 sfence_vma。",
+          "interpretation": "IPI 处理不执行 TLB shootdown。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_035_shootdown_03",
+          "evidence_type": "negative_search",
+          "searched_keywords": [
+            "shootdown",
+            "tlb shootdown",
+            "remote sfence",
+            "IPI sfence",
+            "sbi_send_ipi sfence"
+          ],
+          "searched_directories": [
+            "repos/xv6-k210/kernel",
+            "repos/xv6-k210/include"
+          ],
+          "file_count": 113,
+          "match_count": 0,
+          "coverage_sufficient": true,
+          "interpretation": "未发现 TLB shootdown 关键词或 IPI+远程 sfence 逻辑。"
+        }
+      ],
+      "fact_answers": [
+        {
+          "fact_id": "Q04_035_01",
+          "fact_key": "cpu_topology_constants",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_035_local_sfence_01"
+          ],
+          "notes": "本地 hart 可 sfence。"
+        },
+        {
+          "fact_id": "Q04_035_02",
+          "fact_key": "ap_startup",
+          "status_or_value": "unknown",
+          "used_evidence_ids": [
+            "codex_ev_Q04_035_shootdown_03"
+          ],
+          "notes": "shootdown 不涉及 AP 启动。"
+        },
+        {
+          "fact_id": "Q04_035_03",
+          "fact_key": "percpu_storage",
+          "status_or_value": "unknown",
+          "used_evidence_ids": [
+            "codex_ev_Q04_035_shootdown_03"
+          ],
+          "notes": "未见 per-CPU shootdown 状态。"
+        },
+        {
+          "fact_id": "Q04_035_04",
+          "fact_key": "ipi_path",
+          "status_or_value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q04_035_ipi_no_shoot_02",
+            "codex_ev_Q04_035_shootdown_03"
+          ],
+          "notes": "IPI 不承载 shootdown。"
+        },
+        {
+          "fact_id": "Q04_035_05",
+          "fact_key": "scheduler_tlb_mp",
+          "status_or_value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q04_035_local_sfence_01",
+            "codex_ev_Q04_035_shootdown_03"
+          ],
+          "notes": "只有本地 sfence，无跨核一致性刷新。"
+        },
+        {
+          "fact_id": "Q04_035_06",
+          "fact_key": "negative_search_coverage",
+          "status_or_value": {
+            "searched_keywords": [
+              "shootdown",
+              "tlb shootdown",
+              "remote sfence",
+              "IPI sfence",
+              "sbi_send_ipi sfence"
+            ],
+            "searched_directories": [
+              "repos/xv6-k210/kernel",
+              "repos/xv6-k210/include"
+            ],
+            "file_count": 113,
+            "match_count": 0,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [
+            "codex_ev_Q04_035_shootdown_03"
+          ],
+          "notes": "覆盖 shootdown 相关词。"
+        }
+      ],
+      "answer": {
+        "value": "not_found",
+        "used_evidence_ids": [
+          "codex_ev_Q04_035_local_sfence_01",
+          "codex_ev_Q04_035_ipi_no_shoot_02",
+          "codex_ev_Q04_035_shootdown_03"
+        ],
+        "confidence": "high",
+        "notes": ""
+      }
+    },
+    {
+      "question_id": "Q04_036",
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q04_036_mm_switch_01",
+          "evidence_type": "usage_flow",
+          "file_path": "repos/xv6-k210/kernel/sched/proc.c",
+          "line_start": 666,
+          "line_end": 677,
+          "excerpt": "scheduler 切到进程页表并 sfence_vma，切回 kernel_pagetable 并 sfence_vma。",
+          "interpretation": "03 内存管理交叉: 调度切换页表。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_036_trap_preempt_02",
+          "evidence_type": "usage_flow",
+          "file_path": "repos/xv6-k210/kernel/trap/trap.c",
+          "line_start": 99,
+          "line_end": 117,
+          "excerpt": "usertrap 系统调用/中断路径，interrupt 后 yield。",
+          "interpretation": "02 trap 交叉: 中断可触发调度。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_036_process_wait_exit_03",
+          "evidence_type": "usage_flow",
+          "file_path": "repos/xv6-k210/kernel/sched/proc.c",
+          "line_start": 397,
+          "line_end": 522,
+          "excerpt": "exit 设置 ZOMBIE 并唤醒父进程；wait4 sleep 等待并 freeproc。",
+          "interpretation": "04 进程交叉: exit/wait 闭环。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_036_sync_locks_04",
+          "evidence_type": "implementation_body",
+          "file_path": "repos/xv6-k210/kernel/sync/spinlock.c",
+          "line_start": 23,
+          "line_end": 73,
+          "excerpt": "acquire push_off 并原子交换；release 清锁并 pop_off。",
+          "interpretation": "06 同步交叉: spinlock 获取时关中断。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_036_sleeplock_sleep_05",
+          "evidence_type": "implementation_body",
+          "file_path": "repos/xv6-k210/kernel/sync/sleeplock.c",
+          "line_start": 21,
+          "line_end": 40,
+          "excerpt": "acquiresleep 在 locked 时 sleep(lk,&lk->lk)；releasesleep 清 locked 并 wakeup(lk)。",
+          "interpretation": "06 同步交叉: sleep lock 使用 sleep/wakeup。"
+        }
+      ],
+      "fact_answers": [
+        {
+          "fact_id": "Q04_036_01",
+          "fact_key": "cpu_topology_constants",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_036_mm_switch_01"
+          ],
+          "notes": "多核下每 hart 切本地页表。"
+        },
+        {
+          "fact_id": "Q04_036_02",
+          "fact_key": "ap_startup",
+          "status_or_value": "unknown",
+          "used_evidence_ids": [
+            "codex_ev_Q04_036_trap_preempt_02"
+          ],
+          "notes": "本题为交叉一致性。"
+        },
+        {
+          "fact_id": "Q04_036_03",
+          "fact_key": "percpu_storage",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_036_mm_switch_01"
+          ],
+          "notes": "scheduler 使用每 CPU context。"
+        },
+        {
+          "fact_id": "Q04_036_04",
+          "fact_key": "ipi_path",
+          "status_or_value": "unknown",
+          "used_evidence_ids": [
+            "codex_ev_Q04_036_process_wait_exit_03"
+          ],
+          "notes": "IPI 非四项核心。"
+        },
+        {
+          "fact_id": "Q04_036_05",
+          "fact_key": "scheduler_tlb_mp",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_036_mm_switch_01",
+            "codex_ev_Q04_036_trap_preempt_02",
+            "codex_ev_Q04_036_process_wait_exit_03",
+            "codex_ev_Q04_036_sync_locks_04",
+            "codex_ev_Q04_036_sleeplock_sleep_05"
+          ],
+          "notes": "内存/trap/process/sync 证据互相闭合。"
+        },
+        {
+          "fact_id": "Q04_036_06",
+          "fact_key": "negative_search_coverage",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_036_mm_switch_01"
+          ],
+          "notes": "正向交叉证据足够。"
+        }
+      ],
+      "answer": {
+        "value": "03 内存: scheduler/exec 有 w_satp + sfence_vma 页表切换。\n02 trap: usertrap 处理中断后调用 yield，形成抢占调度入口。\n04 进程: exit 置 ZOMBIE/唤醒父进程，wait4 阻塞等待并 freeproc。\n06 同步: spinlock acquire/release 关/开中断；sleeplock 通过 sleep/wakeup 阻塞等待。",
+        "used_evidence_ids": [
+          "codex_ev_Q04_036_mm_switch_01",
+          "codex_ev_Q04_036_trap_preempt_02",
+          "codex_ev_Q04_036_process_wait_exit_03",
+          "codex_ev_Q04_036_sync_locks_04",
+          "codex_ev_Q04_036_sleeplock_sleep_05"
+        ],
+        "confidence": "high",
+        "notes": ""
+      }
+    },
+    {
+      "question_id": "Q04_037",
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q04_037_spin_acquire_01",
+          "evidence_type": "implementation_body",
+          "file_path": "repos/xv6-k210/kernel/sync/spinlock.c",
+          "line_start": 23,
+          "line_end": 45,
+          "excerpt": "acquire 开头 push_off(); 注释 disable interrupts to avoid deadlock；随后原子 test_and_set 并记录 lk->cpu。",
+          "interpretation": "获取 spinlock 时禁用中断。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_037_spin_release_02",
+          "evidence_type": "implementation_body",
+          "file_path": "repos/xv6-k210/kernel/sync/spinlock.c",
+          "line_start": 47,
+          "line_end": 73,
+          "excerpt": "release 清 lk->cpu，__sync_lock_release(&lk->locked)，最后 pop_off()。",
+          "interpretation": "释放 spinlock 时恢复中断嵌套状态。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_037_spin_struct_03",
+          "evidence_type": "definition",
+          "file_path": "repos/xv6-k210/include/sync/spinlock.h",
+          "line_start": 7,
+          "line_end": 13,
+          "excerpt": "struct spinlock 含 locked/name/cpu。",
+          "interpretation": "锁结构记录持有 CPU。"
+        }
+      ],
+      "fact_answers": [
+        {
+          "fact_id": "Q04_037_01",
+          "fact_key": "entity_state",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_037_spin_struct_03"
+          ],
+          "notes": "spinlock 定义。"
+        },
+        {
+          "fact_id": "Q04_037_02",
+          "fact_key": "syscall_or_kernel_entry",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_037_spin_acquire_01",
+            "codex_ev_Q04_037_spin_release_02"
+          ],
+          "notes": "acquire/release 实现。"
+        },
+        {
+          "fact_id": "Q04_037_03",
+          "fact_key": "state_resource_update",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_037_spin_acquire_01",
+            "codex_ev_Q04_037_spin_release_02"
+          ],
+          "notes": "locked/cpu 与中断状态更新。"
+        },
+        {
+          "fact_id": "Q04_037_04",
+          "fact_key": "relationship_or_mapping",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_037_spin_struct_03"
+          ],
+          "notes": "记录持有 CPU。"
+        },
+        {
+          "fact_id": "Q04_037_05",
+          "fact_key": "cleanup_or_wait",
+          "status_or_value": "unknown",
+          "used_evidence_ids": [
+            "codex_ev_Q04_037_spin_release_02"
+          ],
+          "notes": "锁释放恢复。"
+        },
+        {
+          "fact_id": "Q04_037_06",
+          "fact_key": "negative_search_coverage",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_037_spin_acquire_01"
+          ],
+          "notes": "正向证据足够。"
+        }
+      ],
+      "answer": {
+        "value": "是，获取时关中断、释放时恢复",
+        "used_evidence_ids": [
+          "codex_ev_Q04_037_spin_acquire_01",
+          "codex_ev_Q04_037_spin_release_02",
+          "codex_ev_Q04_037_spin_struct_03"
+        ],
+        "confidence": "high",
+        "notes": ""
+      }
+    },
+    {
+      "question_id": "Q04_038",
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q04_038_ncpu_01",
+          "evidence_type": "definition",
+          "file_path": "repos/xv6-k210/include/param.h",
+          "line_start": 4,
+          "line_end": 5,
+          "excerpt": "#define NCPU 2。",
+          "interpretation": "CPU 数为 2。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_038_entry_stack_02",
+          "evidence_type": "definition",
+          "file_path": "repos/xv6-k210/kernel/entry_k210.S",
+          "line_start": 3,
+          "line_end": 20,
+          "excerpt": "_start: add t0,a0,1; slli t0,t0,14; la sp,boot_stack; add sp,sp,t0；boot_stack .space 4096*4*2。",
+          "interpretation": "每 hart 预留 4 页启动栈，2 个 hart。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_038_main_stack_free_03",
+          "evidence_type": "usage_flow",
+          "file_path": "repos/xv6-k210/kernel/main.c",
+          "line_start": 89,
+          "line_end": 95,
+          "excerpt": "main 根据 boot_stack + hartid*4*PGSIZE 释放该 hart 启动栈低 3 页。",
+          "interpretation": "运行后按 hartid 回收启动栈部分页面。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_038_max_hart_04",
+          "evidence_type": "negative_search",
+          "searched_keywords": [
+            "_max_hart_id",
+            "MAXCPU",
+            "max_hart"
+          ],
+          "searched_directories": [
+            "repos/xv6-k210/kernel",
+            "repos/xv6-k210/include",
+            "repos/xv6-k210/linker"
+          ],
+          "file_count": 113,
+          "match_count": 0,
+          "coverage_sufficient": true,
+          "interpretation": "未发现 _max_hart_id/MAXCPU；使用 NCPU 与 boot_stack 大小对应。"
+        }
+      ],
+      "fact_answers": [
+        {
+          "fact_id": "Q04_038_01",
+          "fact_key": "cpu_topology_constants",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_038_ncpu_01",
+            "codex_ev_Q04_038_entry_stack_02"
+          ],
+          "notes": "NCPU 与栈空间对应。"
+        },
+        {
+          "fact_id": "Q04_038_02",
+          "fact_key": "ap_startup",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_038_entry_stack_02"
+          ],
+          "notes": "入口按 hartid 设置栈。"
+        },
+        {
+          "fact_id": "Q04_038_03",
+          "fact_key": "percpu_storage",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_038_entry_stack_02",
+            "codex_ev_Q04_038_main_stack_free_03"
+          ],
+          "notes": "每 hart 栈布局。"
+        },
+        {
+          "fact_id": "Q04_038_04",
+          "fact_key": "ipi_path",
+          "status_or_value": "unknown",
+          "used_evidence_ids": [
+            "codex_ev_Q04_038_ncpu_01"
+          ],
+          "notes": "本题关注栈/常量。"
+        },
+        {
+          "fact_id": "Q04_038_05",
+          "fact_key": "scheduler_tlb_mp",
+          "status_or_value": "unknown",
+          "used_evidence_ids": [
+            "codex_ev_Q04_038_main_stack_free_03"
+          ],
+          "notes": "进入 main 后释放启动栈。"
+        },
+        {
+          "fact_id": "Q04_038_06",
+          "fact_key": "negative_search_coverage",
+          "status_or_value": {
+            "searched_keywords": [
+              "_max_hart_id",
+              "MAXCPU",
+              "max_hart"
+            ],
+            "searched_directories": [
+              "repos/xv6-k210/kernel",
+              "repos/xv6-k210/include",
+              "repos/xv6-k210/linker"
+            ],
+            "file_count": 113,
+            "match_count": 0,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [
+            "codex_ev_Q04_038_max_hart_04"
+          ],
+          "notes": "未发现 _max_hart_id。"
+        }
+      ],
+      "answer": {
+        "value": "NCPU=2；entry_k210.S/entry_qemu.S 的 boot_stack 为 4096*4*2，每个 hart 入口按 (hartid+1)<<14 选择 4 页栈顶；main 按 hartid*4*PGSIZE 回收该 hart 启动栈低 3 页。未发现 _max_hart_id/MAXCPU。",
+        "used_evidence_ids": [
+          "codex_ev_Q04_038_ncpu_01",
+          "codex_ev_Q04_038_entry_stack_02",
+          "codex_ev_Q04_038_main_stack_free_03",
+          "codex_ev_Q04_038_max_hart_04"
+        ],
+        "confidence": "high",
+        "notes": ""
+      }
+    },
+    {
+      "question_id": "Q04_039",
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q04_039_pid_lock_01",
+          "evidence_type": "implementation_body",
+          "file_path": "repos/xv6-k210/kernel/sched/proc.c",
+          "line_start": 38,
+          "line_end": 42,
+          "excerpt": "int __pid；pid_hash；hash_lock。",
+          "interpretation": "PID 状态是普通 int 与 spinlock。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_039_pid_alloc_02",
+          "evidence_type": "implementation_body",
+          "file_path": "repos/xv6-k210/kernel/sched/proc.c",
+          "line_start": 228,
+          "line_end": 232,
+          "excerpt": "allocproc 在 hash_lock 临界区 p->pid = __pid++。",
+          "interpretation": "PID 分配依赖锁保护的普通自增。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_039_atomic_pid_03",
+          "evidence_type": "negative_search",
+          "searched_keywords": [
+            "AtomicUsize",
+            "__atomic",
+            "atomic_fetch",
+            "atomic_add",
+            "pid_atomic",
+            "tid_atomic"
+          ],
+          "searched_directories": [
+            "repos/xv6-k210/kernel",
+            "repos/xv6-k210/include"
+          ],
+          "file_count": 113,
+          "match_count": 0,
+          "coverage_sufficient": true,
+          "interpretation": "未发现 AtomicUsize/原子变量 PID/TID 池。"
+        }
+      ],
+      "fact_answers": [
+        {
+          "fact_id": "Q04_039_01",
+          "fact_key": "cpu_topology_constants",
+          "status_or_value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q04_039_atomic_pid_03"
+          ],
+          "notes": "无 atomic PID 池。"
+        },
+        {
+          "fact_id": "Q04_039_02",
+          "fact_key": "ap_startup",
+          "status_or_value": "unknown",
+          "used_evidence_ids": [
+            "codex_ev_Q04_039_pid_lock_01"
+          ],
+          "notes": "PID 分配与 AP 启动无关。"
+        },
+        {
+          "fact_id": "Q04_039_03",
+          "fact_key": "percpu_storage",
+          "status_or_value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q04_039_atomic_pid_03"
+          ],
+          "notes": "无 per-CPU atomic id。"
+        },
+        {
+          "fact_id": "Q04_039_04",
+          "fact_key": "ipi_path",
+          "status_or_value": "unknown",
+          "used_evidence_ids": [
+            "codex_ev_Q04_039_pid_lock_01"
+          ],
+          "notes": "无关。"
+        },
+        {
+          "fact_id": "Q04_039_05",
+          "fact_key": "scheduler_tlb_mp",
+          "status_or_value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q04_039_pid_lock_01",
+            "codex_ev_Q04_039_pid_alloc_02"
+          ],
+          "notes": "实际是 spinlock 保护普通 int。"
+        },
+        {
+          "fact_id": "Q04_039_06",
+          "fact_key": "negative_search_coverage",
+          "status_or_value": {
+            "searched_keywords": [
+              "AtomicUsize",
+              "__atomic",
+              "atomic_fetch",
+              "atomic_add",
+              "pid_atomic",
+              "tid_atomic"
+            ],
+            "searched_directories": [
+              "repos/xv6-k210/kernel",
+              "repos/xv6-k210/include"
+            ],
+            "file_count": 113,
+            "match_count": 0,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [
+            "codex_ev_Q04_039_atomic_pid_03"
+          ],
+          "notes": "按题意原子变量未发现。"
+        }
+      ],
+      "answer": {
+        "value": "not_found",
+        "used_evidence_ids": [
+          "codex_ev_Q04_039_pid_lock_01",
+          "codex_ev_Q04_039_pid_alloc_02",
+          "codex_ev_Q04_039_atomic_pid_03"
+        ],
+        "confidence": "high",
+        "notes": "有全局唯一 PID 分配，但不是 AtomicUsize/原子变量实现。"
+      }
+    },
+    {
+      "question_id": "Q04_040",
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q04_040_prio_basic_01",
+          "evidence_type": "definition",
+          "file_path": "repos/xv6-k210/kernel/sched/proc.c",
+          "line_start": 238,
+          "line_end": 247,
+          "excerpt": "仅定义 PRIORITY_TIMEOUT/IRQ/NORMAL 三类队列。",
+          "interpretation": "调度优先级不是 POSIX 实时调度类。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_040_rt_sched_02",
+          "evidence_type": "negative_search",
+          "searched_keywords": [
+            "SCHED_FIFO",
+            "SCHED_RR",
+            "real-time",
+            "realtime",
+            "deadline",
+            "rt_sched"
+          ],
+          "searched_directories": [
+            "repos/xv6-k210/kernel",
+            "repos/xv6-k210/include"
+          ],
+          "file_count": 113,
+          "match_count": 0,
+          "coverage_sufficient": true,
+          "interpretation": "未发现 SCHED_FIFO/SCHED_RR/deadline/实时调度相关接口或实现。"
+        }
+      ],
+      "fact_answers": [
+        {
+          "fact_id": "Q04_040_01",
+          "fact_key": "ready_queue",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_040_prio_basic_01"
+          ],
+          "notes": "只有普通固定队列。"
+        },
+        {
+          "fact_id": "Q04_040_02",
+          "fact_key": "selection_logic",
+          "status_or_value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q04_040_rt_sched_02"
+          ],
+          "notes": "无 RT 选择规则。"
+        },
+        {
+          "fact_id": "Q04_040_03",
+          "fact_key": "policy_fields",
+          "status_or_value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q04_040_rt_sched_02"
+          ],
+          "notes": "无实时优先级/deadline 字段。"
+        },
+        {
+          "fact_id": "Q04_040_04",
+          "fact_key": "preemption_path",
+          "status_or_value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q04_040_rt_sched_02"
+          ],
+          "notes": "无 RT 抢占路径。"
+        },
+        {
+          "fact_id": "Q04_040_05",
+          "fact_key": "mp_rt_extensions",
+          "status_or_value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q04_040_rt_sched_02"
+          ],
+          "notes": "无实时调度扩展。"
+        },
+        {
+          "fact_id": "Q04_040_06",
+          "fact_key": "negative_search_coverage",
+          "status_or_value": {
+            "searched_keywords": [
+              "SCHED_FIFO",
+              "SCHED_RR",
+              "real-time",
+              "realtime",
+              "deadline",
+              "rt_sched"
+            ],
+            "searched_directories": [
+              "repos/xv6-k210/kernel",
+              "repos/xv6-k210/include"
+            ],
+            "file_count": 113,
+            "match_count": 0,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [
+            "codex_ev_Q04_040_rt_sched_02"
+          ],
+          "notes": "覆盖实时关键词。"
+        }
+      ],
+      "answer": {
+        "value": "not_found",
+        "used_evidence_ids": [
+          "codex_ev_Q04_040_prio_basic_01",
+          "codex_ev_Q04_040_rt_sched_02"
+        ],
+        "confidence": "high",
+        "notes": ""
+      }
+    },
+    {
+      "question_id": "Q04_041",
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q04_041_numa_01",
+          "evidence_type": "negative_search",
+          "searched_keywords": [
+            "numa",
+            "node_id",
+            "memory node",
+            "local memory",
+            "remote memory"
+          ],
+          "searched_directories": [
+            "repos/xv6-k210/kernel",
+            "repos/xv6-k210/include"
+          ],
+          "file_count": 113,
+          "match_count": 0,
+          "coverage_sufficient": true,
+          "interpretation": "kernel/include 精确搜索未发现 NUMA node、local/remote memory 或 NUMA 调度/分配策略。"
+        }
+      ],
+      "fact_answers": [
+        {
+          "fact_id": "Q04_041_01",
+          "fact_key": "cpu_topology_constants",
+          "status_or_value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q04_041_numa_01"
+          ],
+          "notes": "无 NUMA 拓扑常量。"
+        },
+        {
+          "fact_id": "Q04_041_02",
+          "fact_key": "ap_startup",
+          "status_or_value": "unknown",
+          "used_evidence_ids": [
+            "codex_ev_Q04_041_numa_01"
+          ],
+          "notes": "无 NUMA 节点启动。"
+        },
+        {
+          "fact_id": "Q04_041_03",
+          "fact_key": "percpu_storage",
+          "status_or_value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q04_041_numa_01"
+          ],
+          "notes": "无 per-node storage。"
+        },
+        {
+          "fact_id": "Q04_041_04",
+          "fact_key": "ipi_path",
+          "status_or_value": "unknown",
+          "used_evidence_ids": [
+            "codex_ev_Q04_041_numa_01"
+          ],
+          "notes": "无关。"
+        },
+        {
+          "fact_id": "Q04_041_05",
+          "fact_key": "scheduler_tlb_mp",
+          "status_or_value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q04_041_numa_01"
+          ],
+          "notes": "无 NUMA-aware 调度/分配。"
+        },
+        {
+          "fact_id": "Q04_041_06",
+          "fact_key": "negative_search_coverage",
+          "status_or_value": {
+            "searched_keywords": [
+              "numa",
+              "node_id",
+              "memory node",
+              "local memory",
+              "remote memory"
+            ],
+            "searched_directories": [
+              "repos/xv6-k210/kernel",
+              "repos/xv6-k210/include"
+            ],
+            "file_count": 113,
+            "match_count": 0,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [
+            "codex_ev_Q04_041_numa_01"
+          ],
+          "notes": "覆盖 NUMA 关键词。"
+        }
+      ],
+      "answer": {
+        "value": "not_found",
+        "used_evidence_ids": [
+          "codex_ev_Q04_041_numa_01"
+        ],
+        "confidence": "high",
+        "notes": ""
+      }
+    },
+    {
+      "question_id": "Q04_042",
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q04_042_short_sched_01",
+          "evidence_type": "implementation_body",
+          "file_path": "repos/xv6-k210/kernel/sched/proc.c",
+          "line_start": 596,
+          "line_end": 691,
+          "excerpt": "__get_runnable_no_lock 选择 RUNNABLE；scheduler 置 RUNNING 并 swtch；无任务则 wfi。",
+          "interpretation": "实现短程 CPU 调度。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_042_states_02",
+          "evidence_type": "definition",
+          "file_path": "repos/xv6-k210/include/sched/proc.h",
+          "line_start": 34,
+          "line_end": 37,
+          "excerpt": "进程状态为 RUNNABLE/RUNNING/SLEEPING/ZOMBIE。",
+          "interpretation": "状态模型只覆盖就绪/运行/阻塞/退出。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_042_mid_long_03",
+          "evidence_type": "negative_search",
+          "searched_keywords": [
+            "swapout",
+            "suspend",
+            "resume",
+            "long-term scheduler",
+            "admission control",
+            "job queue",
+            "multiprogramming"
+          ],
+          "searched_directories": [
+            "repos/xv6-k210/kernel",
+            "repos/xv6-k210/include"
+          ],
+          "file_count": 113,
+          "match_count": 0,
+          "coverage_sufficient": true,
+          "interpretation": "未发现中程换出/挂起恢复或长程作业准入控制。"
+        }
+      ],
+      "fact_answers": [
+        {
+          "fact_id": "Q04_042_01",
+          "fact_key": "short_term_scheduler",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_042_short_sched_01"
+          ],
+          "notes": "CPU 选择 runnable。"
+        },
+        {
+          "fact_id": "Q04_042_02",
+          "fact_key": "process_state_model",
+          "status_or_value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q04_042_states_02"
+          ],
+          "notes": "状态模型支持短程调度。"
+        },
+        {
+          "fact_id": "Q04_042_03",
+          "fact_key": "medium_term_swapout",
+          "status_or_value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q04_042_mid_long_03"
+          ],
+          "notes": "无 suspend/swapout。"
+        },
+        {
+          "fact_id": "Q04_042_04",
+          "fact_key": "long_term_admission",
+          "status_or_value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q04_042_mid_long_03"
+          ],
+          "notes": "无 job/admission 控制。"
+        },
+        {
+          "fact_id": "Q04_042_05",
+          "fact_key": "degree_of_multiprogramming_control",
+          "status_or_value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q04_042_mid_long_03"
+          ],
+          "notes": "无多道程度控制。"
+        }
+      ],
+      "answer": {
+        "value": "仅短程调度：已有进程/线程在 ready/running/blocked 间切换",
+        "used_evidence_ids": [
+          "codex_ev_Q04_042_short_sched_01",
+          "codex_ev_Q04_042_states_02",
+          "codex_ev_Q04_042_mid_long_03"
+        ],
+        "confidence": "high",
+        "notes": ""
+      }
+    },
+    {
+      "question_id": "Q04_043",
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q04_043_prio_sched_01",
+          "evidence_type": "definition",
+          "file_path": "repos/xv6-k210/kernel/sched/proc.c",
+          "line_start": 238,
+          "line_end": 247,
+          "excerpt": "调度只有 PRIORITY_TIMEOUT/IRQ/NORMAL 队列，没有 per-process dynamic/base priority 字段。",
+          "interpretation": "优先级调度存在但不含锁等待优先级联动字段。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_043_sleeplock_owner_02",
+          "evidence_type": "definition",
+          "file_path": "repos/xv6-k210/include/sync/sleeplock.h",
+          "line_start": 9,
+          "line_end": 17,
+          "excerpt": "struct sleeplock 含 locked、spinlock lk、name、pid。",
+          "interpretation": "sleep lock 只记录持有进程 pid，不记录 owner priority/waiters priority。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_043_sleeplock_impl_03",
+          "evidence_type": "implementation_body",
+          "file_path": "repos/xv6-k210/kernel/sync/sleeplock.c",
+          "line_start": 21,
+          "line_end": 40,
+          "excerpt": "acquiresleep 在 locked 时 sleep(lk,&lk->lk)；releasesleep 清 locked/pid 并 wakeup(lk)。",
+          "interpretation": "锁等待/释放路径没有提升或恢复优先级。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_043_spinlock_impl_04",
+          "evidence_type": "implementation_body",
+          "file_path": "repos/xv6-k210/kernel/sync/spinlock.c",
+          "line_start": 23,
+          "line_end": 73,
+          "excerpt": "spinlock acquire push_off 并自旋；release pop_off。",
+          "interpretation": "关中断临界区不是 priority inheritance/ceiling。"
+        },
+        {
+          "evidence_id": "codex_ev_Q04_043_pi_05",
+          "evidence_type": "negative_search",
+          "searched_keywords": [
+            "priority inheritance",
+            "priority ceiling",
+            "priority inversion",
+            "pi_mutex",
+            "inherit_priority",
+            "boost_priority",
+            "rt_mutex",
+            "ceiling",
+            "waiter"
+          ],
+          "searched_directories": [
+            "repos/xv6-k210/kernel",
+            "repos/xv6-k210/include"
+          ],
+          "file_count": 113,
+          "match_count": 0,
+          "coverage_sufficient": true,
+          "interpretation": "未发现优先级继承、优先级天花板、rt_mutex/pi_mutex 或 waiter priority 逻辑。"
+        }
+      ],
+      "fact_answers": [
+        {
+          "fact_id": "Q04_043_01",
+          "fact_key": "priority_scheduler",
+          "status_or_value": "yes_weak",
+          "used_evidence_ids": [
+            "codex_ev_Q04_043_prio_sched_01"
+          ],
+          "notes": "有固定优先级队列，但非动态 PI 调度字段。"
+        },
+        {
+          "fact_id": "Q04_043_02",
+          "fact_key": "lock_owner_tracking",
+          "status_or_value": "stub_or_declaration_only",
+          "used_evidence_ids": [
+            "codex_ev_Q04_043_sleeplock_owner_02",
+            "codex_ev_Q04_043_sleeplock_impl_03"
+          ],
+          "notes": "sleeplock 只记录 pid；spinlock 只记录 cpu。"
+        },
+        {
+          "fact_id": "Q04_043_03",
+          "fact_key": "inheritance_or_ceiling_logic",
+          "status_or_value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q04_043_sleeplock_impl_03",
+            "codex_ev_Q04_043_pi_05"
+          ],
+          "notes": "等待路径不提升 owner priority，也无 ceiling。"
+        },
+        {
+          "fact_id": "Q04_043_04",
+          "fact_key": "restore_on_unlock",
+          "status_or_value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q04_043_sleeplock_impl_03",
+            "codex_ev_Q04_043_pi_05"
+          ],
+          "notes": "unlock 只清 locked/pid 并 wakeup，无优先级恢复。"
+        },
+        {
+          "fact_id": "Q04_043_05",
+          "fact_key": "negative_search_coverage",
+          "status_or_value": {
+            "searched_keywords": [
+              "priority inheritance",
+              "priority ceiling",
+              "priority inversion",
+              "pi_mutex",
+              "inherit_priority",
+              "boost_priority",
+              "rt_mutex",
+              "ceiling",
+              "waiter"
+            ],
+            "searched_directories": [
+              "repos/xv6-k210/kernel",
+              "repos/xv6-k210/include"
+            ],
+            "file_count": 113,
+            "match_count": 0,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [
+            "codex_ev_Q04_043_pi_05"
+          ],
+          "notes": "覆盖 PI 关键词。"
+        }
+      ],
+      "answer": {
+        "value": "not_found",
+        "used_evidence_ids": [
+          "codex_ev_Q04_043_prio_sched_01",
+          "codex_ev_Q04_043_sleeplock_owner_02",
+          "codex_ev_Q04_043_sleeplock_impl_03",
+          "codex_ev_Q04_043_spinlock_impl_04",
+          "codex_ev_Q04_043_pi_05"
+        ],
+        "confidence": "high",
+        "notes": "SpinLock 关中断和 SleepLock 普通 sleep/wakeup 不能按题意判作优先级反转处理。"
+      }
+    }
+  ]
+}

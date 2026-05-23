@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
+from core.agent_events import emit_task_debug_event, emit_task_tool_event
 from core.agent_graph_state import DraftAnswerRecord, EvidenceRecord, TaskResult, TaskSpec
 from core.evidence_verifier import verify_evidence
 
@@ -25,7 +26,8 @@ def _run_react_task_agent(task: TaskSpec, *, repo_path: str) -> Tuple[TaskResult
     from core.agent_builder import build_task_agent_with_tools, get_task_agent_tools
     from core.per_llm_stages import extract_json_object
 
-    budget = _env_int("OS_AGENT_TASK_AGENT_BUDGET", 30)
+    budget = _env_int("OS_AGENT_TASK_AGENT_BUDGET", 50)
+    recursion_limit = _env_int("OS_AGENT_TASK_AGENT_RECURSION_LIMIT", 60)
     tools = _tools_for_task_policy(task, get_task_agent_tools(task.task_type, task.stage_id))
     tool_names = [getattr(t, "name", getattr(t, "__name__", "")) for t in tools]
     prompt = _react_task_prompt(task, repo_path=repo_path, tool_names=tool_names)
@@ -33,9 +35,10 @@ def _run_react_task_agent(task: TaskSpec, *, repo_path: str) -> Tuple[TaskResult
         agent = build_task_agent_with_tools(stage_id=task.stage_id, tools=tools)
         final_state = agent.invoke(
             {"messages": [SystemMessage(content=_TASK_AGENT_SYSTEM), HumanMessage(content=prompt)]},
-            config={"recursion_limit": budget},
+            config={"recursion_limit": recursion_limit},
         )
         text = _last_ai_text(final_state)
+        _emit_tool_trace_debug(final_state)
         parsed = extract_json_object(text) or {}
         if not parsed:
             raise ValueError("Task Agent did not return parseable JSON")
@@ -69,6 +72,30 @@ def _run_react_task_agent(task: TaskSpec, *, repo_path: str) -> Tuple[TaskResult
         )
 
 
+def _emit_tool_trace_debug(final_state: Any) -> None:
+    """Emit tool call sequence and any reasoning_content to debug log."""
+    messages = (final_state or {}).get("messages") or [] if isinstance(final_state, dict) else []
+    tool_calls_trace = []
+    cot_parts = []
+    for msg in messages:
+        if not isinstance(msg, AIMessage):
+            continue
+        rc = (getattr(msg, "additional_kwargs", {}) or {}).get("reasoning_content") or ""
+        if rc:
+            cot_parts.append(rc)
+        for tc in getattr(msg, "tool_calls", None) or []:
+            tool_calls_trace.append({
+                "name": tc.get("name") if isinstance(tc, dict) else getattr(tc, "name", ""),
+                "args_preview": str(tc.get("args", {}) if isinstance(tc, dict) else getattr(tc, "args", {}))[:300],
+            })
+    if tool_calls_trace:
+        emit_task_debug_event("task_tool_trace", f"{len(tool_calls_trace)} tool calls",
+            metadata={"tool_calls": tool_calls_trace})
+    if cot_parts:
+        emit_task_debug_event("task_reasoning", f"reasoning_content ({sum(len(p) for p in cot_parts)} chars)",
+            metadata={"reasoning_content": "\n---\n".join(cot_parts)})
+
+
 def _tools_for_task_policy(task: TaskSpec, tools: List[Any]) -> List[Any]:
     allowed = task.tool_policy.get("allowed_tools") if isinstance(task.tool_policy, dict) else None
     if not isinstance(allowed, list) or not allowed:
@@ -91,8 +118,9 @@ _TASK_AGENT_SYSTEM = """你是 OS-Agent D 的 question-bound Task ReAct Agent。
 - evidence_candidates 只是候选工具结果，不能直接作为答案证据；系统会验证候选并生成真正 EvidenceRecord/evidence_id。
 - draft_answers 不得用候选下标、路径或 excerpt 冒充证据；若尚无系统 evidence_id，used_evidence_ids 留空并写 missing_evidence_requests。
 - 候选证据不得直接支撑 implemented/not_found；证据不足时明确 status=blocked 或 draft value 写 unknown/待核实。
-- 对 tri_state_impl 题，如果结论是 not_found/未发现，必须至少产出一条 evidence_type="negative_search" 的候选证据；候选 evidence.metadata.negative_search 必须包含 searched_keywords、searched_directories、match_count、coverage_sufficient=true。
-- negative_search 的 excerpt/claim 必须写清“searched ...; no matches/no implementation found”，不要只写一句自然语言结论。
+- 对 tri_state_impl 题，如果结论是 not_found/未发现，必须先调用 confirm_symbol_absent 工具对所有关键词做全目录扫描；只有 confirm_symbol_absent 返回 [CONFIRMED_ABSENT] 后，才能产出 not_found 结论。
+- not_found 结论必须至少产出一条 evidence_type=”negative_search” 的候选证据；候选 evidence.metadata.negative_search 必须包含 searched_keywords、searched_directories、match_count。只有真实工具搜索覆盖充分时 coverage_sufficient 才能为 true。
+- negative_search 的 excerpt/claim 必须写清”searched ...; no matches/no implementation found”，不要只写一句自然语言结论。
 - 不要编造路径、行号、符号名；无法确认就写 open_issues。
 """
 
@@ -122,8 +150,9 @@ def _react_task_prompt(task: TaskSpec, *, repo_path: str, tool_names: List[str])
         "执行方式：先按 structured_facts 逐项查证可复现事实，再用 diagnostic_checks 补足局部判断，最后给最小 claim；不要跳过事实表直接回答 implemented/not_found。\n"
         "你在本 task 中能看到的证据，是你调用工具后整理出的 evidence_candidates 列表；structured_fact_results 只能用 evidence_candidate_indexes 指向这个候选列表。\n"
         "注意：evidence_candidates 还没有系统 evidence_id，不能被当成最终证据引用；used_evidence_ids 通常留空，等待系统验证候选并生成 Bound Evidence。\n"
-        "三态题特别规则：若 draft value 是 not_found，必须给出结构化 negative_search 候选证据，metadata.negative_search.searched_keywords / searched_directories / coverage_sufficient=true 要完整；否则 precheck 会判 weak。\n"
-        "每个 draft_answer 应携带 fact_answers 或 structured_fact_results，notes 应列出已完成的 fact_id 与缺失的 fact_id；short_answer/fill_in 的草稿 value 尽量用 fact_key 固定字段对象；证据不足时请求 missing_evidence_requests。\n\n"
+        "三态题特别规则：若 draft value 是 not_found，必须给出结构化 negative_search 候选证据，metadata.negative_search.searched_keywords / searched_directories / match_count 要完整；只有真实工具搜索覆盖充分时 coverage_sufficient 才能为 true，否则 precheck 会判 weak。\n"
+        "每个 draft_answer 应携带 fact_answers 或 structured_fact_results，notes 应列出已完成的 fact_id 与缺失的 fact_id；"
+        "short_answer/fill_in 只有在 answer_contract.value_shape 明确给出字段时才必须按固定字段对象输出，否则 value 应直接回答题干；证据不足时请求 missing_evidence_requests。\n\n"
         "请用工具查证后输出如下 JSON（不要 Markdown 围栏）：\n"
         "{\n"
         '  "status": "done|blocked|failed",\n'
@@ -286,13 +315,16 @@ def _negative_search_records_from_structured_facts(
             or q_negative_search_policy.get("seed_paths")
             or task.seed_paths
         )
+        has_real_counts = "match_count" in coverage or "file_count" in coverage
         neg = {
             "keywords": keywords,
             "searched_keywords": keywords,
             "searched_directories": directories,
             "match_count": coverage.get("match_count", 0),
             "file_count": coverage.get("file_count"),
-            "coverage_sufficient": bool(coverage.get("coverage_sufficient", True)),
+            "coverage_sufficient": bool(coverage.get("coverage_sufficient", False)) if has_real_counts else False,
+            "synthetic": True,
+            "source": "structured_fact_results",
         }
         excerpt = (
             "searched keywords: "
@@ -322,6 +354,17 @@ def _negative_search_records_from_structured_facts(
                 "negative_search": neg,
                 "llm_candidate": True,
                 "synthesized_from_structured_fact_results": True,
+                "negative_search_source": "structured_fact_results",
+            },
+        )
+        emit_task_tool_event(
+            "negative_search_synthesized",
+            f"{qid} synthetic negative search from structured_fact_results",
+            level="warn",
+            metadata={
+                "question_id": qid,
+                "negative_search": neg,
+                "source": "structured_fact_results",
             },
         )
         new_records.append(

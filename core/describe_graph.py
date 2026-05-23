@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import os
 import re
@@ -39,7 +40,7 @@ from core.describe_stage_review import (
 from core.evidence_store import EvidenceStore
 from core.draft_answer_store import DraftAnswerStore
 from core.evidence_verifier import verify_evidence
-from core.feature_schema_bank import (
+from core.qa_contract import (
     collect_feature_ids,
     evidence_can_support_claim,
     feature_by_question,
@@ -48,7 +49,6 @@ from core.feature_schema_bank import (
     normalize_tri_state_answer_value,
     required_evidence_types_for_question,
     strongest_evidence_strength,
-    tri_state_value_allowed_by_evidence,
 )
 from core.feature_graph import publish_feature_graph
 from core.per_planner import build_repo_profile, ensure_execution_steps, plan_stage
@@ -156,6 +156,19 @@ def _questions_for_stage(stage_id: str) -> Tuple[List[Dict[str, Any]], List[str]
     return questions, list_question_ids(qa)
 
 
+def _question_digest(question: Dict[str, Any]) -> str:
+    view = {
+        "question_id": question.get("question_id"),
+        "question_type": question.get("question_type"),
+        "stem": question.get("stem"),
+        "choices": question.get("choices"),
+        "answer_contract": question.get("answer_contract"),
+        "structured_facts": question.get("structured_facts"),
+    }
+    blob = json.dumps(view, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha1(blob.encode("utf-8", errors="ignore")).hexdigest()[:12]
+
+
 def _group_evidence_records(records: List[EvidenceRecord], stage_id: str = "") -> Dict[str, List[EvidenceRecord]]:
     grouped: Dict[str, List[EvidenceRecord]] = {}
     for rec in records:
@@ -223,6 +236,167 @@ def _is_good_negative_search_evidence(record: EvidenceRecord) -> bool:
         and ("已搜索" in text or "searched" in text)
         and not _is_bad_negative_search_evidence(record)
     )
+
+
+def _json_stable(value: Any) -> str:
+    try:
+        return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    except Exception:
+        return repr(value)
+
+
+def _brief_diff(before: Any, after: Any) -> Dict[str, Any]:
+    if _json_stable(before) == _json_stable(after):
+        return {}
+    if isinstance(before, dict) and isinstance(after, dict):
+        changed: Dict[str, Any] = {}
+        keys = sorted(set(before.keys()) | set(after.keys()))
+        for key in keys:
+            b = before.get(key)
+            a = after.get(key)
+            if _json_stable(b) != _json_stable(a):
+                changed[key] = {"before": b, "after": a}
+        return changed
+    return {"before": before, "after": after}
+
+
+def _answer_audit_meta(question: Dict[str, Any], phase: str, before: Any, after: Any) -> Dict[str, Any]:
+    qid = str(question.get("question_id") or "").strip()
+    return {
+        "question_id": qid,
+        "phase": phase,
+        "diff": _brief_diff(before, after),
+    }
+
+
+def _append_programmatic_mutation(
+    answer: Dict[str, Any],
+    phase: str,
+    before: Any,
+    after: Any,
+    *,
+    reason: str,
+) -> None:
+    if not isinstance(answer, dict):
+        return
+    diff = _brief_diff(before, after)
+    if not diff:
+        return
+    meta = dict(answer.get("_meta")) if isinstance(answer.get("_meta"), dict) else {}
+    mutations = list(meta.get("programmatic_mutations") or []) if isinstance(meta.get("programmatic_mutations"), list) else []
+    fields = sorted(diff.keys()) if isinstance(diff, dict) else []
+    mutations.append(
+        {
+            "phase": phase,
+            "source": "program",
+            "reason": reason,
+            "fields": fields,
+            "diff": diff,
+        }
+    )
+    meta["programmatic_mutations"] = mutations
+    answer["_meta"] = meta
+
+
+def _evidence_audit(records: List[EvidenceRecord]) -> List[Dict[str, Any]]:
+    out: List[Dict[str, Any]] = []
+    for rec in records:
+        out.append(
+            {
+                "evidence_id": rec.evidence_id,
+                "path": rec.path,
+                "evidence_type": rec.evidence_type,
+                "strength": rec.strength,
+                "validity": rec.validity,
+                "supports_claim_types": list(rec.supports_claim_types or []),
+                "verifier_score": rec.verifier_score,
+            }
+        )
+    return out
+
+
+def _set_meta_path(answer: Dict[str, Any], path: List[str], value: Any) -> None:
+    meta = dict(answer.get("_meta")) if isinstance(answer.get("_meta"), dict) else {}
+    cursor: Dict[str, Any] = meta
+    for key in path[:-1]:
+        child = cursor.get(key)
+        if not isinstance(child, dict):
+            child = {}
+        cursor[key] = child
+        cursor = child
+    cursor[path[-1]] = value
+    answer["_meta"] = meta
+
+
+def _evidence_type(record: EvidenceRecord) -> str:
+    return str(record.evidence_type or "").strip()
+
+
+def _is_positive_implementation_evidence(record: EvidenceRecord) -> bool:
+    et = _evidence_type(record)
+    if et == "negative_search" or "not_found" in (record.supports_claim_types or []):
+        return False
+    if "stub" in (record.supports_claim_types or []):
+        return False
+    if record.validity == "invalid":
+        return False
+    if "implemented" in (record.supports_claim_types or []):
+        return True
+    return record.strength == "strong" and et in {
+        "definition",
+        "implementation_body",
+        "function_body",
+        "call_site",
+        "usage_flow",
+        "call_graph",
+        "read_code_segment",
+    }
+
+
+def _fact_answers_support_stub(answer: Dict[str, Any]) -> bool:
+    facts = answer.get("fact_answers")
+    if not isinstance(facts, list):
+        return False
+    for fact in facts:
+        if not isinstance(fact, dict):
+            continue
+        if str(fact.get("value") or "").strip() == "stub_or_declaration_only":
+            return True
+        notes = str(fact.get("notes") or "").lower()
+        if any(marker in notes for marker in ("stub", "declaration only", "桩", "声明", "固定返回", "占位")):
+            return True
+    return False
+
+
+def _fact_answers_support_implemented(answer: Dict[str, Any]) -> bool:
+    facts = answer.get("fact_answers")
+    if not isinstance(facts, list):
+        return False
+    strong = 0
+    for fact in facts:
+        if not isinstance(fact, dict):
+            continue
+        if str(fact.get("value") or "").strip() == "yes_strong":
+            strong += 1
+    return strong >= 2
+
+
+def _tri_state_value_allowed(value: str, evidence: List[EvidenceRecord], answer: Dict[str, Any]) -> bool:
+    value = normalize_tri_state_answer_value(value)
+    if value == "unknown":
+        return True
+    if evidence_can_support_claim(evidence, value):
+        return True
+    if value == "implemented":
+        return any(_is_positive_implementation_evidence(rec) for rec in evidence) or (
+            _fact_answers_support_implemented(answer)
+            and any(_evidence_type(rec) != "negative_search" and rec.validity != "invalid" for rec in evidence)
+        )
+    if value == "stub":
+        return any("stub" in (rec.supports_claim_types or []) for rec in evidence) or _fact_answers_support_stub(answer)
+    if value == "not_found":
+        return evidence_can_support_claim(evidence, "not_found")
+    return False
 
 
 def _stage_by_id(stages: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
@@ -506,8 +680,8 @@ class MultiAgentRuntime:
             self.events.emit("stage_skip", "already reviewed", stage_id=stage_id)
             self._render_existing_answers_to_markdown(stage_id, title, stage)
             return
-        self.events.emit("stage_start", title, stage_id=stage_id)
         questions, expected_question_ids = _questions_for_stage(stage_id)
+        self.events.emit("stage_start", title, stage_id=stage_id, metadata={"total_questions": len(questions)})
         existing_state = self._stage_state(stage_id)
         if (
             existing_state.get("status") == "blocked"
@@ -547,24 +721,7 @@ class MultiAgentRuntime:
         evidence_by_question = self._group_records_by_question(stage_id, records) if force_stage else self._store_evidence_by_question(stage_id)
         precheck: Dict[str, Any] = {}
         if questions:
-            precheck_round = 0
             precheck = self._assembler_precheck(stage_id, title, questions, evidence_by_question)
-            while precheck.get("status") == "blocked" and precheck_round < self.max_review_fix_rounds:
-                precheck_round += 1
-                self.events.emit("assembler_fix_start", f"round={precheck_round}", stage_id=stage_id, agent_name="stage_assembler")
-                precheck_tasks = self._build_precheck_fix_tasks(stage_id, title, precheck, questions)
-                if not precheck_tasks:
-                    break
-                pre_results, pre_records, pre_drafts = self._run_tasks(stage_id, precheck_tasks)
-                task_results.extend(pre_results)
-                records.extend(pre_records)
-                drafts.extend(pre_drafts)
-                for rec in pre_records:
-                    self.evidence_store.append(rec)
-                for draft in pre_drafts:
-                    self.draft_store.append(draft)
-                evidence_by_question = self._group_records_by_question(stage_id, records) if force_stage else self._store_evidence_by_question(stage_id)
-                precheck = self._assembler_precheck(stage_id, title, questions, evidence_by_question)
         if questions:
             payload, markdown = self._assemble_stage(stage_id, title, questions, expected_question_ids, evidence_by_question)
         else:
@@ -594,7 +751,15 @@ class MultiAgentRuntime:
             if stage_id in self.force_stages:
                 evidence_by_question = self._group_records_by_question(stage_id, records)
             precheck = self._assembler_precheck(stage_id, title, questions, evidence_by_question)
-            payload, markdown = self._assemble_stage(stage_id, title, questions, expected_question_ids, evidence_by_question)
+            payload, markdown = self._assemble_stage(
+                stage_id,
+                title,
+                questions,
+                expected_question_ids,
+                evidence_by_question,
+                review_fix_records=fix_records,
+                review_fix_round=fix_round,
+            )
             if markdown and not stage.get("skip_in_report", False):
                 with FileLock(lock_path(self.state_dir, "output_write")):
                     with open(section_path, "w", encoding="utf-8") as f:
@@ -890,11 +1055,14 @@ class MultiAgentRuntime:
             expected_evidence_types=expected,
             metadata={
                 "fix_reason": "review_targeted_evidence",
+                "trigger_review_id": f"{stage_id}:{qid}:review_fix",
                 "review_score_evidence": score_evidence,
                 "review_score_consistency": score_consistency,
                 "review_text": review_text,
                 "finding_messages": finding_messages,
                 "fix_hints": fix_hints,
+                "finding_type": finding_type,
+                "fix_goal": goal,
                 "keywords": keywords,
             },
         )
@@ -1063,16 +1231,17 @@ class MultiAgentRuntime:
             "- 按共享 seed_paths、entry_symbols、证据类型、同一实现链路来合并。\n"
             "- 高风险或互斥判断题不要合并过大。\n"
             "- task_goal 必须具体到要查什么证据，不要写泛泛的“分析代码”。\n"
-            "- agent_type 使用 react_code / react_lsp / react_rag / react_build / react_history。\n"
+            "- agent_type 只能是 react_code（通用，支持代码搜索/LSP/RAG/构建系统分析）或 react_history（仅限 Git 历史题）。\n"
+            "- 绝大多数题用 react_code；只有 stage_id 含 '10_history' 或题目明确要求 Git 提交历史时才用 react_history。\n"
             "- expected_evidence_types 使用 definition / implementation_body / call_site / usage_flow / build_config / git_history / search。\n\n"
-            "Feature Schema 约束：\n"
+            "QA Contract 约束：\n"
             "- tri_state_impl 题需要按 feature 的 required_evidence_types 和 negative_search_policy 规划任务。\n"
             "- 字段含义：structured_facts 是必须完成的事实表；answer_contract 是最终 value 的约束；concept_boundary 是概念边界；llm_answer_steps 是弱模型作答顺序。\n"
             "- 每个 task 必须能填充相关题目的 structured_facts；task_goal/query 需要写明要完成哪些 fact_id/fact_key。\n"
             "- concept_boundary 是概念边界，规划时必须防止把近似概念混同（例如 Page Cache vs Buffer Cache）。\n"
             "- 对包含 diagnostic_checks 的复杂题，必须把局部判断步骤反映到 task_goal/query 中，不能只问“是否实现”。\n"
             "- RAG/grep 命中只能作为 hint；若要证明 implemented，必须规划 read/LSP/function body/call-site 强证据。\n"
-            "- 若要证明 not_found，必须规划覆盖 feature keywords 和 seed_paths 的负向搜索。\n\n"
+            "- 若要证明 not_found，必须规划覆盖题单 evidence_policy/structured_facts 中 keywords 和 seed_paths 的负向搜索。\n\n"
             f"stage_id={stage_id}\nstage_title={title}\n\n"
             "## Heuristic PlanSpec\n"
             f"{json.dumps(plan.to_dict() if hasattr(plan, 'to_dict') else {}, ensure_ascii=False, indent=2)}\n\n"
@@ -1130,6 +1299,7 @@ class MultiAgentRuntime:
         return results, records, drafts
 
     def _run_one_task_with_limits(self, task: TaskSpec) -> Tuple[TaskResult, List[EvidenceRecord], List[DraftAnswerRecord]]:
+        max_retries = int(os.environ.get("OS_AGENT_TASK_RETRIES", "1"))
         with task_event_context(
             self.events,
             stage_id=task.stage_id,
@@ -1144,7 +1314,21 @@ class MultiAgentRuntime:
                 agent_name=f"{task.task_type}_agent",
                 metadata={"question_ids": task.question_ids or ([task.question_id] if task.question_id else [])},
             )
-            return run_task_agent(task, repo_path=self.repo_path)
+            result: Tuple[TaskResult, List[EvidenceRecord], List[DraftAnswerRecord]] | None = None
+            for attempt in range(max_retries + 1):
+                result = run_task_agent(task, repo_path=self.repo_path)
+                if result[0].status == "done" or attempt == max_retries:
+                    break
+                self.events.emit(
+                    "task_retry",
+                    f"attempt {attempt + 1}/{max_retries} failed ({', '.join(result[0].errors or ['unknown'])}), retrying",
+                    stage_id=task.stage_id,
+                    task_id=task.task_id,
+                    agent_name=f"{task.task_type}_agent",
+                    level="warn",
+                )
+                time.sleep(2 ** attempt)
+            return result
 
     def _assembler_precheck(
         self,
@@ -1209,33 +1393,6 @@ class MultiAgentRuntime:
             for e in evidence
         )
 
-    def _build_precheck_fix_tasks(
-        self,
-        stage_id: str,
-        title: str,
-        precheck: Dict[str, Any],
-        questions: List[Dict[str, Any]],
-    ) -> List[TaskSpec]:
-        qmap = {str(q.get("question_id")): q for q in questions if isinstance(q, dict)}
-        qids = list(precheck.get("missing_question_ids") or []) + list(precheck.get("weak_question_ids") or [])
-        fix_questions = [qmap[qid] for qid in qids[:6] if qid in qmap]
-        if not fix_questions:
-            return []
-        tasks = build_tasks_for_stage(
-            stage_id=stage_id,
-            stage_title=title,
-            questions=fix_questions,
-            plan=StageState(stage_id=stage_id, stage_title=title, stage_type="describe", stage_prompt="").plan,
-        )
-        for task in tasks:
-            task.task_id = f"{task.task_id}_assembler_fix_{uuid.uuid4().hex[:6]}"
-            task.task_type = "react_code"
-            task.agent_type = "react_code"
-            task.task_goal = f"补足 Assembler precheck 发现的缺失/弱证据：{task.query}"
-            task.question_ids = task.question_ids or ([task.question_id] if task.question_id else [])
-            task.metadata["fix_reason"] = "assembler_precheck"
-        return tasks
-
     def _assemble_stage(
         self,
         stage_id: str,
@@ -1243,6 +1400,8 @@ class MultiAgentRuntime:
         questions: List[Dict[str, Any]],
         expected_question_ids: List[str],
         evidence_by_question: Dict[str, List[EvidenceRecord]],
+        review_fix_records: Optional[List[EvidenceRecord]] = None,
+        review_fix_round: int = 0,
     ) -> Tuple[Dict[str, Any], str]:
         self.events.emit("assembler_start", "assembling task drafts", stage_id=stage_id, agent_name="stage_assembler")
         draft_by_question = self.draft_store.grouped_by_question(stage_id)
@@ -1270,6 +1429,7 @@ class MultiAgentRuntime:
             "terminology_profile": "stallings_en_zh",
             "answers": answers,
         }
+        self._annotate_review_fix_effect(payload, review_fix_records or [], review_fix_round)
         
         stage_qa = None
         try:
@@ -1295,6 +1455,48 @@ class MultiAgentRuntime:
             with open(os.path.join(sidecar, f"{stage_id}_answers_raw.txt"), "w", encoding="utf-8") as f:
                 f.write("\n\n".join(raw_parts).strip() + "\n")
         return payload, markdown
+
+    def _annotate_review_fix_effect(
+        self,
+        payload: Dict[str, Any],
+        review_fix_records: List[EvidenceRecord],
+        review_fix_round: int,
+    ) -> None:
+        if not review_fix_records or not isinstance(payload.get("answers"), list):
+            return
+        by_qid: Dict[str, Dict[str, Any]] = {}
+        for rec in review_fix_records:
+            if "_review_fix_" not in str(rec.task_id or ""):
+                continue
+            for qid in rec.question_ids or []:
+                item = by_qid.setdefault(
+                    str(qid),
+                    {
+                        "round": review_fix_round,
+                        "task_ids": [],
+                        "new_evidence_ids": [],
+                    },
+                )
+                if rec.task_id and rec.task_id not in item["task_ids"]:
+                    item["task_ids"].append(rec.task_id)
+                if rec.evidence_id and rec.evidence_id not in item["new_evidence_ids"]:
+                    item["new_evidence_ids"].append(rec.evidence_id)
+        if not by_qid:
+            return
+        for answer in payload.get("answers") or []:
+            if not isinstance(answer, dict):
+                continue
+            qid = str(answer.get("question_id") or "")
+            fix = by_qid.get(qid)
+            if not fix:
+                continue
+            used = set(str(x) for x in answer.get("used_evidence_ids", []) if str(x))
+            for fact in answer.get("fact_answers", []) if isinstance(answer.get("fact_answers"), list) else []:
+                if isinstance(fact, dict) and isinstance(fact.get("used_evidence_ids"), list):
+                    used.update(str(x) for x in fact.get("used_evidence_ids") if str(x))
+            new_ids = set(fix.get("new_evidence_ids") or [])
+            fix["affected_final_value"] = bool(used & new_ids)
+            _set_meta_path(answer, ["review_fix"], dict(fix))
 
     def _one_question_assembler_prompt(
         self,
@@ -1339,7 +1541,7 @@ class MultiAgentRuntime:
             "字段含义：structured_facts 是题单给出的必答事实表；fact_answers 是你逐 fact 的交账；answer_contract 是汇总 value 的约束；concept_boundary 是概念边界。\n"
             "必须为 Question.structured_facts 中每个 fact_id 输出一个 fact_answers item，字段为 fact_id, fact_key, value, used_evidence_ids, notes。\n"
             "若该 fact 定义了 allowed_values，fact_answers[*].value 必须使用其中一个枚举值；若未定义 allowed_values，则按该 fact 的 answer_type/fields 输出结构化值或 unknown。\n"
-            "如果 question_type 是 short_answer 或 fill_in 且 Question.structured_facts 非空，value 必须是固定字段 JSON object，字段名必须且只能来自 structured_facts[].fact_key；每个字段填该 fact 的实际答案，未知填 unknown。\n"
+            "如果 Question.answer_contract.value_shape 明确给出字段，value 必须按该 value_shape 输出固定字段 JSON object；否则 short_answer/fill_in 的 value 应直接回答题干，不能只重复 fact 状态对象。\n"
             "tri_state_impl 的 value 只能是 implemented / stub / not_found / unknown。\n"
             "tri_state_impl 判定必须遵守 Question 中的 tri_state_rule 和 anti_examples：没有 strong implementation evidence 时不能写 implemented；负向搜索覆盖不足时不能写 not_found。\n"
             "used_evidence_ids 与 fact_answers[*].used_evidence_ids 只能填当前 Bound Evidence 中的 evidence_id；不要输出 path、line、excerpt，系统会按 ID 回填证据快照。\n"
@@ -1390,8 +1592,9 @@ class MultiAgentRuntime:
         from core.agent_builder import build_chat_model
         from core.utils import safe_llm_invoke
 
+        role = "planner" if agent_name == "stage_plan_agent" else "task"
         self.events.emit("llm_start", agent_name, stage_id=stage_id, agent_name=agent_name)
-        llm = build_chat_model(temperature=0)
+        llm = build_chat_model(temperature=0, role=role)
         try:
             msg = safe_llm_invoke(llm, [HumanMessage(content=prompt)])
         except Exception as e:
@@ -1399,6 +1602,11 @@ class MultiAgentRuntime:
             raise e
         usage = getattr(msg, "response_metadata", {}).get("token_usage", {}) or {}
         self.events.emit("llm_done", agent_name, stage_id=stage_id, agent_name=agent_name, token_usage=usage)
+        cot = (getattr(msg, "additional_kwargs", {}) or {}).get("reasoning_content") or ""
+        if cot:
+            self.events.emit_debug("llm_reasoning", agent_name,
+                stage_id=stage_id, agent_name=agent_name,
+                metadata={"reasoning_content": cot})
         return (getattr(msg, "content", "") or "").strip()
 
 
@@ -1415,7 +1623,7 @@ class MultiAgentRuntime:
             "answers 必须按题单顺序逐题回答，每题包含 question_id, question_type, stem, fact_answers, value, used_evidence_ids, notes。\n"
             "若题目含 structured_facts/answer_contract，必须逐项输出 fact_answers；自然语言只能作为 notes，不得替代事实字段。\n"
             "每个 fact_answers item 必须包含 fact_id, fact_key, value, used_evidence_ids, notes；value 只能由 fact_answers 推出。\n"
-            "short_answer/fill_in 且 Question.structured_facts 非空时，value 必须是固定字段 JSON object，字段名必须且只能来自 structured_facts[].fact_key；不要输出整段自然语言作为 value。\n"
+            "只有 Question.answer_contract.value_shape 明确给出字段时，short_answer/fill_in 的 value 才必须是固定字段 JSON object；否则 value 应直接回答题干，不能只输出 fact 状态对象。\n"
             "tri_state_impl 的 value 只能是 implemented / stub / not_found / unknown。\n"
             "used_evidence_ids 与 fact_answers[*].used_evidence_ids 只能引用 Evidence By Question 中对应题目的 evidence_id；不要输出 path、line、excerpt，系统会按 ID 回填证据快照。\n"
             "你能看到并引用的证据列表只有下方 ## Evidence By Question；每个 answer 只能引用本 question_id 分组下的 evidence_id。\n"
@@ -1506,7 +1714,7 @@ class MultiAgentRuntime:
             "字段含义：structured_facts 是题单给出的必答事实表；fact_answers 是你逐 fact 的交账；answer_contract 是汇总 value 的约束；concept_boundary 是概念边界。\n"
             "必须为 Question.structured_facts 中每个 fact_id 输出一个 fact_answers item，字段为 fact_id, fact_key, value, used_evidence_ids, notes。\n"
             "若该 fact 定义了 allowed_values，fact_answers[*].value 必须使用其中一个枚举值；若未定义 allowed_values，则按该 fact 的 answer_type/fields 输出结构化值或 unknown。\n"
-            "如果 question_type 是 short_answer 或 fill_in 且 Question.structured_facts 非空，value 必须是固定字段 JSON object，字段名必须且只能来自 structured_facts[].fact_key；每个字段填该 fact 的实际答案，未知填 unknown。\n"
+            "如果 Question.answer_contract.value_shape 明确给出字段，value 必须按该 value_shape 输出固定字段 JSON object；否则 short_answer/fill_in 的 value 应直接回答题干，不能只重复 fact 状态对象。\n"
             "tri_state_impl 的 value 只能是 implemented / stub / not_found / unknown。\n"
             "tri_state_impl 不能由 RAG/grep hint 直接判 implemented；证据不足写 unknown。\n"
             "used_evidence_ids 与 fact_answers[*].used_evidence_ids 只能填当前 Bound Evidence 中的 evidence_id；不要输出 path、line、excerpt，系统会按 ID 回填证据快照。\n"
@@ -1531,7 +1739,14 @@ class MultiAgentRuntime:
         answer, _issues = self._parse_one_answer_candidate(stage_id, title, question, raw, evidence)
         if answer is not None:
             return answer
-        return self._fallback_answer(question, evidence)
+        return self._fallback_answer(
+            question,
+            evidence,
+            reason="single_answer_parse_failed",
+            last_issues=_issues,
+            attempts=1,
+            raw_model_answer_excerpt=raw or "",
+        )
 
     def _ask_one_question_json_with_retry(
         self,
@@ -1577,7 +1792,14 @@ class MultiAgentRuntime:
                     issues=issues,
                 )
 
-        fallback = self._fallback_answer(question, evidence)
+        fallback = self._fallback_answer(
+            question,
+            evidence,
+            reason="answer_json_retry_exhausted",
+            last_issues=last_issues,
+            attempts=max_attempts,
+            raw_model_answer_excerpt="\n\n".join(attempts_raw),
+        )
         note = f"Answer retry exhausted after {max_attempts} attempts; last issues: {last_issues[:6]}."
         existing = fallback.get("notes")
         fallback["notes"] = f"{existing}\n{note}".strip() if isinstance(existing, str) and existing.strip() else note
@@ -1596,7 +1818,7 @@ class MultiAgentRuntime:
             "- fact_answers 必须覆盖 Question.structured_facts 中每个 fact_id，不能多也不能漏。\n"
             "- 每个 fact_answers item 必须包含 fact_id, fact_key, value, used_evidence_ids, notes。\n"
             "- 若该 fact 定义了 allowed_values，fact_answers[*].value 必须使用其中一个枚举值；若未定义 allowed_values，则按该 fact 的 answer_type/fields 输出结构化值或 unknown。\n"
-            "- 如果 question_type 是 short_answer 或 fill_in 且 Question.structured_facts 非空，value 必须是固定字段 JSON object，字段名必须且只能来自 structured_facts[].fact_key。\n"
+            "- 只有 Question.answer_contract.value_shape 明确给出字段时，short_answer/fill_in 的 value 才必须是固定字段 JSON object；否则 value 应直接回答题干。\n"
             "- used_evidence_ids 只能引用 Bound Evidence 中的 evidence_id；没有证据就填 []，不要编 path/line/excerpt。\n"
             "- value 只是 fact_answers 推出的汇总结论。\n\n"
             "## 上一次原始输出\n"
@@ -1624,6 +1846,7 @@ class MultiAgentRuntime:
             else:
                 parsed = json.loads(text)
             if isinstance(parsed, dict):
+                raw_answer = copy.deepcopy(parsed)
                 candidate = {
                     "schema_version": JSON_QA_SCHEMA_VERSION,
                     "stage_id": stage_id,
@@ -1647,9 +1870,48 @@ class MultiAgentRuntime:
                 if unknown_ids:
                     return None, [f"used_evidence_ids contains non-Bound Evidence id(s): {unknown_ids[:8]}"]
                 candidate = coerce_answers_payload_by_stage_qa(candidate, stage_qa={"questions": [question]})
-                answer = candidate["answers"][0]
-                answer = self._resolve_answer_evidence_refs(answer, evidence, fallback_to_bound=False)
-                answer = self._enforce_answer_schema(question, answer, evidence)
+                coerced_answer = copy.deepcopy(candidate["answers"][0])
+                if _brief_diff(raw_answer, coerced_answer):
+                    _append_programmatic_mutation(
+                        coerced_answer,
+                        "stage_qa_coerce",
+                        raw_answer,
+                        coerced_answer,
+                        reason="choice_normalization_or_schema_backfill",
+                    )
+                    self.events.emit(
+                        "answer_candidate_mutated",
+                        f"{question.get('question_id', '')} mutated during stage_qa_coerce",
+                        stage_id=stage_id,
+                        agent_name="stage_assembler",
+                        metadata=_answer_audit_meta(question, "stage_qa_coerce", raw_answer, coerced_answer),
+                    )
+                before_resolve = copy.deepcopy(coerced_answer)
+                resolved_answer = self._resolve_answer_evidence_refs(
+                    coerced_answer,
+                    evidence,
+                    fallback_to_bound=False,
+                    stage_id=stage_id,
+                )
+                if _brief_diff(before_resolve, resolved_answer):
+                    self.events.emit(
+                        "answer_candidate_mutated",
+                        f"{question.get('question_id', '')} mutated during evidence_ref_resolution",
+                        stage_id=stage_id,
+                        agent_name="stage_assembler",
+                        metadata=_answer_audit_meta(question, "evidence_ref_resolution", before_resolve, resolved_answer),
+                    )
+                before_schema = copy.deepcopy(resolved_answer)
+                answer = self._enforce_answer_schema(question, resolved_answer, evidence, stage_id=stage_id)
+                if _brief_diff(before_schema, answer):
+                    self.events.emit(
+                        "answer_candidate_mutated",
+                        f"{question.get('question_id', '')} mutated during schema_guard",
+                        stage_id=stage_id,
+                        agent_name="stage_assembler",
+                        level="warn",
+                        metadata=_answer_audit_meta(question, "schema_guard", before_schema, answer),
+                    )
                 candidate["answers"] = [answer]
                 post_issues = validate_answers_payload(
                     candidate,
@@ -1714,15 +1976,43 @@ class MultiAgentRuntime:
         evidence: List[EvidenceRecord],
         *,
         fallback_to_bound: bool,
+        stage_id: str = "",
     ) -> Dict[str, Any]:
+        before = copy.deepcopy(answer)
         source = list(evidence or [])
         by_id = {r.evidence_id: r for r in source}
         requested = self._extract_requested_evidence_ids(answer)
+        used_fallback = False
         if fallback_to_bound and not requested:
             requested = [r.evidence_id for r in source[:3]]
+            used_fallback = bool(requested)
         valid_ids = [evid for evid in requested if evid in by_id]
         dropped_ids = [evid for evid in requested if evid not in by_id]
         answer["used_evidence_ids"] = valid_ids
+        if used_fallback and valid_ids:
+            self.events.emit(
+                "answer_evidence_refs_fallback",
+                f"{answer.get('question_id', '')} attached {len(valid_ids)} fallback evidence id(s)",
+                stage_id=stage_id or str(answer.get("stage_id") or ""),
+                agent_name="stage_assembler",
+                metadata={
+                    "question_id": answer.get("question_id"),
+                    "fallback_evidence_ids": valid_ids,
+                },
+            )
+        if dropped_ids:
+            self.events.emit(
+                "answer_evidence_refs_dropped",
+                f"{answer.get('question_id', '')} dropped {len(dropped_ids)} non-bound evidence id(s)",
+                stage_id=stage_id or str(answer.get("stage_id") or ""),
+                agent_name="stage_assembler",
+                level="warn",
+                metadata={
+                    "question_id": answer.get("question_id"),
+                    "dropped_evidence_ids": dropped_ids,
+                    "bound_evidence_ids": list(by_id.keys()),
+                },
+            )
         facts = answer.get("fact_answers")
         if isinstance(facts, list):
             for fact in facts:
@@ -1738,13 +2028,36 @@ class MultiAgentRuntime:
             note = f"Evidence guard: 丢弃非本题 Bound Evidence 或未知 evidence_id: {dropped_ids[:8]}。"
             existing = answer.get("notes")
             answer["notes"] = f"{existing}\n{note}".strip() if isinstance(existing, str) and existing.strip() else note
+        _append_programmatic_mutation(
+            answer,
+            "evidence_ref_resolution",
+            before,
+            answer,
+            reason="bind_answer_to_verified_evidence_ids",
+        )
         return answer
 
-    def _enforce_answer_schema(self, question: Dict[str, Any], answer: Dict[str, Any], evidence: List[EvidenceRecord]) -> Dict[str, Any]:
+    def _enforce_answer_schema(
+        self,
+        question: Dict[str, Any],
+        answer: Dict[str, Any],
+        evidence: List[EvidenceRecord],
+        *,
+        stage_id: str = "",
+    ) -> Dict[str, Any]:
+        before = copy.deepcopy(answer)
+        answer.setdefault("answer_status", "answered")
         answer = ensure_fact_answers_for_question(answer, question)
         answer = ensure_structured_value_for_question(answer, question)
         qtype = str(question.get("question_type") or "").strip()
         if qtype != "tri_state_impl":
+            _append_programmatic_mutation(
+                answer,
+                "schema_enforce",
+                before,
+                answer,
+                reason="fact_answers_or_value_shape_guard",
+            )
             return answer
         value = normalize_tri_state_answer_value(answer.get("value"))
         used_ids = set(answer.get("used_evidence_ids") if isinstance(answer.get("used_evidence_ids"), list) else [])
@@ -1757,43 +2070,112 @@ class MultiAgentRuntime:
                 if isinstance(fact_used, list):
                     used_ids.update(str(eid).strip() for eid in fact_used if str(eid).strip())
         scoped_evidence = [r for r in evidence if r.evidence_id in used_ids]
-        if not tri_state_value_allowed_by_evidence(value, scoped_evidence):
-            original = value
-            value = "unknown"
+        if not _tri_state_value_allowed(value, scoped_evidence, answer):
+            recommended_value = "unknown"
             note = (
-                f"Schema guard: 原答案 {original!r} 缺少可支撑的强证据；"
-                f"当前引用证据最强 strength={strongest_evidence_strength(scoped_evidence)}。"
+                f"Schema guard: 原答案 {value!r} 缺少可支撑的强证据；"
+                f"当前引用证据最强 strength={strongest_evidence_strength(scoped_evidence)}；"
+                f"保留原 value，但建议人工审阅时视为 {recommended_value!r}。"
             )
             existing = answer.get("notes")
             answer["notes"] = f"{existing}\n{note}".strip() if isinstance(existing, str) and existing.strip() else note
+            guardrail = {
+                "support_status": "unsupported",
+                "value": value,
+                "recommended_value": recommended_value,
+                "reason": "tri_state_not_supported_by_referenced_evidence",
+                "used_evidence_ids": sorted(used_ids),
+                "strongest_evidence_strength": strongest_evidence_strength(scoped_evidence),
+                "evidence_summary": _evidence_audit(scoped_evidence),
+            }
+            _set_meta_path(answer, ["guardrails", "tri_state"], guardrail)
+            meta = dict(answer.get("_meta")) if isinstance(answer.get("_meta"), dict) else {}
+            audit_items = list(meta.get("audit") or []) if isinstance(meta.get("audit"), list) else []
+            audit_items.append(
+                {
+                    "phase": "schema_guard",
+                    "field": "value",
+                    "value": value,
+                    "recommended_value": recommended_value,
+                    "reason": "tri_state_not_supported_by_referenced_evidence",
+                    "used_evidence_ids": sorted(used_ids),
+                    "evidence": _evidence_audit(scoped_evidence),
+                }
+            )
+            meta["audit"] = audit_items
+            answer["_meta"] = meta
+            self.events.emit(
+                "answer_guardrail_flagged",
+                f"{answer.get('question_id', '')} value {value!r} lacks supporting evidence; recommended {recommended_value!r}",
+                stage_id=stage_id or str(question.get("stage_id") or ""),
+                agent_name="stage_assembler",
+                level="blocker",
+                metadata={
+                    "question_id": answer.get("question_id"),
+                    "value": value,
+                    "recommended_value": recommended_value,
+                    "reason": "tri_state_not_supported_by_referenced_evidence",
+                    "used_evidence_ids": sorted(used_ids),
+                    "evidence": _evidence_audit(scoped_evidence),
+                },
+            )
         answer["value"] = value
+        _append_programmatic_mutation(
+            answer,
+            "schema_enforce",
+            before,
+            answer,
+            reason="fact_answers_or_value_shape_guard",
+        )
         return answer
 
-    def _fallback_answer(self, question: Dict[str, Any], evidence: List[EvidenceRecord]) -> Dict[str, Any]:
+    def _fallback_answer(
+        self,
+        question: Dict[str, Any],
+        evidence: List[EvidenceRecord],
+        *,
+        reason: str = "assembler_failed_or_evidence_insufficient_fallback",
+        last_issues: Optional[List[str]] = None,
+        attempts: int = 0,
+        raw_model_answer_excerpt: str = "",
+    ) -> Dict[str, Any]:
         qid = str(question.get("question_id", "")).strip()
         qtype = str(question.get("question_type", "")).strip()
         if qtype == "tri_state_impl":
             value: Any = "unknown"
-        elif qtype == "multi_choice":
-            choices = question.get("choices") if isinstance(question.get("choices"), list) else []
-            value = [choices[-1]] if choices else []
-        elif qtype == "single_choice":
-            choices = question.get("choices") if isinstance(question.get("choices"), list) else []
-            value = choices[-1] if choices else "待核实"
         else:
-            value = "待核实：当前证据不足，需结合 evidence 继续确认。"
+            value = "待核实：当前证据不足，需人工核验原始模型输出。"
         answer = {
             "question_id": qid,
             "question_type": qtype,
             "stem": question.get("stem", ""),
+            "answer_status": "fallback_unusable",
             "fact_answers": [],
             "value": value,
             "used_evidence_ids": [],
             "evidence": [],
+            "notes": "Fallback unusable: 模型输出未通过 JSON/契约校验；本答案不可视为真实结论。",
         }
         answer = ensure_fact_answers_for_question(answer, question)
         answer = ensure_structured_value_for_question(answer, question)
-        return self._resolve_answer_evidence_refs(answer, evidence, fallback_to_bound=True)
+        _set_meta_path(
+            answer,
+            ["fallback"],
+            {
+                "reason": reason,
+                "last_issues": list(last_issues or []),
+                "attempts": attempts,
+                "raw_model_answer_excerpt": raw_model_answer_excerpt[:4000],
+            },
+        )
+        _append_programmatic_mutation(
+            answer,
+            "fallback_answer",
+            {},
+            answer,
+            reason=reason,
+        )
+        return self._resolve_answer_evidence_refs(answer, evidence, fallback_to_bound=False)
 
     def _markdown_writer_prompt(self, stage_id: str, title: str, evidence_summary: str) -> str:
         stage_prompt = ""
@@ -1852,8 +2234,8 @@ class MultiAgentRuntime:
                     continue
                 qid = str(answer.get("question_id") or "").strip()
                 evs = evidence_by_question.get(qid, [])
-                resolved = self._resolve_answer_evidence_refs(answer, evs, fallback_to_bound=False)
-                resolved_answers.append(self._enforce_answer_schema(qmap.get(qid, {}), resolved, evs))
+                resolved = self._resolve_answer_evidence_refs(answer, evs, fallback_to_bound=False, stage_id=stage_id)
+                resolved_answers.append(self._enforce_answer_schema(qmap.get(qid, {}), resolved, evs, stage_id=stage_id))
             payload["answers"] = resolved_answers
             issues = validate_answers_payload(
                 payload,
@@ -1870,32 +2252,14 @@ class MultiAgentRuntime:
         answers = []
         for q in questions:
             qid = str(q.get("question_id", "")).strip()
-            qtype = str(q.get("question_type", "")).strip()
             evs = evidence_by_question.get(qid, [])
-            if qtype == "tri_state_impl":
-                value: Any = "unknown"
-            elif qtype == "multi_choice":
-                choices = q.get("choices") if isinstance(q.get("choices"), list) else []
-                value = [choices[-1]] if choices else []
-            elif qtype == "single_choice":
-                choices = q.get("choices") if isinstance(q.get("choices"), list) else []
-                value = choices[-1] if choices else "待核实"
-            else:
-                value = "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。"
-            fallback_answer = ensure_fact_answers_for_question({
-                    "question_id": qid,
-                    "question_type": qtype,
-                    "stem": q.get("stem", ""),
-                    "fact_answers": [],
-                    "value": value,
-                    "used_evidence_ids": [],
-                    "evidence": [],
-                }, q)
-            fallback_answer = ensure_structured_value_for_question(fallback_answer, q)
-            answers.append(self._resolve_answer_evidence_refs(
-                fallback_answer,
+            answers.append(self._fallback_answer(
+                q,
                 evs,
-                fallback_to_bound=True,
+                reason="stage_writer_json_fallback",
+                last_issues=[],
+                attempts=1,
+                raw_model_answer_excerpt=raw or "",
             ))
         payload = {
             "schema_version": JSON_QA_SCHEMA_VERSION,
@@ -1915,33 +2279,152 @@ class MultiAgentRuntime:
         if not payload or not describe_stage_review_enabled() or not describe_stage_review_applies(stage_id, expected_question_ids=expected_question_ids):
             return {}
         self.events.emit("review_start", "review stage answers", stage_id=stage_id, agent_name="review_agent")
-        if _env_bool("DESCRIBE_REVIEW_COMPACT", False):
-            question_sheet = self._compact_review_question_sheet(stage_id, title)
-            review_payload = self._compact_review_payload(payload)
-            model_json = json.dumps(review_payload, ensure_ascii=False, separators=(",", ":"))
-        else:
-            question_sheet = build_stage_qa_question_sheet(stage_id, title)
-            model_json = json.dumps(payload, ensure_ascii=False, indent=2)
-        parsed_review, raw, err, tokens = run_describe_stage_review(
-            stage_id=stage_id,
-            stage_title=title,
-            question_sheet=question_sheet,
-            model_json_before_stage_qa_coerce=model_json,
-            expected_question_ids=expected_question_ids,
-        )
         sidecar = os.path.join(self.repo_output_dir, "_per_stage")
+        reviews_dir = os.path.join(self.state_dir, "reviews")
+        os.makedirs(reviews_dir, exist_ok=True)
+
+        parsed_review: Optional[Dict[str, Any]] = None
+        raw = ""
+        err: Optional[str] = None
+        tokens = 0
+        manifest: Dict[str, Any] = {
+            "stage_id": stage_id,
+            "stage_title": title,
+            "mode": "per_question",
+            "batches": [],
+            "truncated": False,
+        }
+        question_by_id = self._stage_question_map(stage_id)
+        answer_by_id = {
+            str(a.get("question_id") or "").strip(): a
+            for a in payload.get("answers", []) if isinstance(a, dict)
+        }
+        batch_reviews: List[Dict[str, Any]] = []
+        findings: List[Any] = []
+        summaries: List[str] = []
+        for qid in expected_question_ids:
+            question = question_by_id.get(qid)
+            answer = answer_by_id.get(qid)
+            if not question or not answer:
+                continue
+            digest = _question_digest(question)
+            question_sheet = self._single_question_review_sheet(stage_id, title, question, digest)
+            model_json = json.dumps(
+                {
+                    "schema_version": payload.get("schema_version"),
+                    "stage_id": stage_id,
+                    "stage_title": title,
+                    "answers": [answer],
+                },
+                ensure_ascii=False,
+                separators=(",", ":"),
+            )
+            manifest["batches"].append(
+                {
+                    "question_ids": [qid],
+                    "question_digest": digest,
+                    "question_sheet_chars": len(question_sheet),
+                    "answer_json_chars": len(model_json),
+                    "truncated": False,
+                }
+            )
+            one_review, one_raw, one_err, one_tokens = run_describe_stage_review(
+                stage_id=stage_id,
+                stage_title=title,
+                question_sheet=question_sheet,
+                model_json_before_stage_qa_coerce=model_json,
+                expected_question_ids=[qid],
+                expected_question_digests={qid: digest},
+            )
+            tokens += one_tokens
+            raw += f"--- {qid} digest={digest} ---\n{one_raw}\n\n"
+            if one_review is None:
+                err = one_err or err or "unknown"
+                batch_reviews.append(
+                    {
+                        "question_id": qid,
+                        "question_digest": digest,
+                        "score_evidence": None,
+                        "score_consistency": None,
+                        "review": f"（审计失败：{one_err or 'unknown'}）",
+                    }
+                )
+                continue
+            batch_reviews.extend(one_review.get("question_reviews") or [])
+            if isinstance(one_review.get("findings"), list):
+                findings.extend(one_review.get("findings") or [])
+            if one_review.get("summary_zh"):
+                summaries.append(str(one_review.get("summary_zh")))
+        if batch_reviews:
+            parsed_review = {
+                "schema_version": "describe_review_v1",
+                "stage_id": stage_id,
+                "stage_title": title,
+                "confidence": None,
+                "question_reviews": batch_reviews,
+                "findings": findings,
+                "summary_zh": "；".join(summaries[:8]),
+            }
+
         if parsed_review is not None:
             parsed_review = enrich_review_with_report_quality(parsed_review, payload)
             with FileLock(lock_path(self.state_dir, "output_write")):
                 _atomic_save_json(os.path.join(sidecar, f"{stage_id}_review.json"), parsed_review)
                 _atomic_save_json(os.path.join(self.state_dir, "reviews", f"{stage_id}_review.json"), parsed_review)
-            self.events.emit("review_done", f"confidence={parsed_review.get('confidence')}", stage_id=stage_id, agent_name="review_agent", token_usage={"total_tokens": tokens})
+                with open(os.path.join(reviews_dir, f"{stage_id}_review_raw.txt"), "w", encoding="utf-8") as f:
+                    f.write(raw.strip() + "\n")
+                _atomic_save_json(os.path.join(reviews_dir, f"{stage_id}_review_input_manifest.json"), manifest)
+            self.events.emit("review_done", f"confidence={parsed_review.get('confidence')}", stage_id=stage_id, agent_name="review_agent", token_usage={"total_tokens": tokens}, metadata={"score": parsed_review.get("confidence")})
             return parsed_review
         err_payload = {"error": err or "unknown", "raw_model_output_excerpt": (raw or "")[:4000]}
         with FileLock(lock_path(self.state_dir, "output_write")):
             _atomic_save_json(os.path.join(sidecar, f"{stage_id}_review_error.json"), err_payload)
         self.events.emit("review_error", err_payload["error"], stage_id=stage_id, agent_name="review_agent", level="warn")
         return {}
+
+    def _stage_question_map(self, stage_id: str) -> Dict[str, Dict[str, Any]]:
+        try:
+            stage_qa = load_stage_qa(stage_id)
+        except Exception:
+            return {}
+        questions = stage_qa.get("questions", []) if isinstance(stage_qa, dict) else []
+        if not isinstance(questions, list):
+            return {}
+        return {
+            str(q.get("question_id") or "").strip(): q
+            for q in questions if isinstance(q, dict) and str(q.get("question_id") or "").strip()
+        }
+
+    def _single_question_review_sheet(self, stage_id: str, title: str, question: Dict[str, Any], digest: str) -> str:
+        qid = str(question.get("question_id") or "").strip()
+        lines = [
+            f"## 题库文件\n`core/describe_stage_qa/{stage_id}.json`\n\n",
+            f"**stage_id**: `{stage_id}`  \n**stage_title**: {title}\n\n",
+            "## 题单（本批仅 1 题，禁止评价其他题）\n\n",
+            f"### {qid}（{question.get('question_type', '')}）\n\n",
+            f"question_digest: `{digest}`\n\n",
+            f"{question.get('stem', '')}\n\n",
+        ]
+        feature_view = {
+            "feature_ids": question.get("feature_ids"),
+            "evidence_policy": question.get("evidence_policy"),
+            "tri_state_rule": question.get("tri_state_rule"),
+            "anti_examples": question.get("anti_examples"),
+            "structured_facts": question.get("structured_facts"),
+            "answer_contract": question.get("answer_contract"),
+        }
+        feature_view = {k: v for k, v in feature_view.items() if v is not None}
+        if feature_view:
+            lines.append(f"**feature_context**: {json.dumps(feature_view, ensure_ascii=False, separators=(',', ':'))}\n\n")
+        choices = question.get("choices")
+        if isinstance(choices, list) and choices:
+            lines.append("**choices**（答案 `value` 应使用选项原文）:\n")
+            for i, c in enumerate(choices[:12]):
+                label = chr(ord("A") + i) if i < 26 else str(i)
+                lines.append(f"- {label}. {str(c).strip()}\n")
+            lines.append(f"\n**valid value texts**: {json.dumps([str(c).strip() for c in choices], ensure_ascii=False, separators=(',', ':'))}\n\n")
+        lines.append("评审输出中对应 question_reviews item 必须包含相同的 question_digest。\n")
+        return "".join(lines)
 
     def _compact_review_question_sheet(self, stage_id: str, title: str) -> str:
         try:

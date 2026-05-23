@@ -1,0 +1,874 @@
+{
+  "stage_id": "02_boot_trap",
+  "stage_title": "boot, architecture, trap and syscall",
+  "answer_set": "codex_independent",
+  "source_constraints": {
+    "allowed_inputs": [
+      "core/describe_stage_qa/02_boot_trap.json",
+      "repos/xv6-k210 source and docs"
+    ],
+    "forbidden_inputs_not_read": [
+      "output/xv6-k210/_per_stage",
+      "baseline_output",
+      "baseline_vs_agent_review_audit",
+      "old answers"
+    ]
+  },
+  "answers": [
+    {
+      "question_id": "Q02_001",
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q02_001_linker_01",
+          "type": "definition",
+          "path": "repos/xv6-k210/linker/linker64.ld",
+          "line_start": 1,
+          "line_end": 4,
+          "excerpt": "OUTPUT_ARCH(riscv); ENTRY(_entry); BASE_ADDRESS = 0x80020000;",
+          "summary": "The active linker script used by the Makefile defines the kernel entry symbol as _entry."
+        },
+        {
+          "evidence_id": "codex_ev_Q02_001_entry_02",
+          "type": "implementation_body",
+          "path": "repos/xv6-k210/kernel/entry.S",
+          "line_start": 1,
+          "line_end": 13,
+          "excerpt": ".section .text.entry; .globl _entry; _entry: ... la sp, boot_stack; add sp, sp, t0; call main; loop: j loop",
+          "summary": "_entry sets a per-hart boot stack from a0 and calls main."
+        },
+        {
+          "evidence_id": "codex_ev_Q02_001_make_03",
+          "type": "call_site",
+          "path": "repos/xv6-k210/Makefile",
+          "line_start": 40,
+          "line_end": 71,
+          "excerpt": "linker = ./linker/linker64.ld; SRC := $K/entry.S",
+          "summary": "The Makefile selects linker64.ld and kernel/entry.S for the kernel build."
+        },
+        {
+          "evidence_id": "codex_ev_Q02_001_main_04",
+          "type": "usage_flow",
+          "path": "repos/xv6-k210/kernel/main.c",
+          "line_start": 34,
+          "line_end": 51,
+          "excerpt": "main(unsigned long hartid, unsigned long dtb_pa) { inithartid(hartid); ... kvminit(); kvminithart(); ... trapinithart();",
+          "summary": "The C handoff target is main(), which performs early per-hart and subsystem initialization."
+        },
+        {
+          "evidence_id": "codex_ev_Q02_001_alt_05",
+          "type": "definition",
+          "path": "repos/xv6-k210/linker/k210.ld",
+          "line_start": 1,
+          "line_end": 4,
+          "excerpt": "OUTPUT_ARCH(riscv); ENTRY(_start); BASE_ADDRESS = 0x80020000;",
+          "summary": "An alternate k210 linker script exists with _start, but the Makefile line 40 selects linker64.ld."
+        },
+        {
+          "evidence_id": "codex_ev_Q02_001_neg_06",
+          "type": "negative_search",
+          "path": "repos/xv6-k210",
+          "summary": "Searched ENTRY, _start, boot, linker, BSS, UART, SBI, OpenSBI, U-Boot, hart, platform, Makefile, Cargo across kernel, linker, include, doc and Makefile; 214 files considered and 628 matches. The build-selected entry is linker64.ld/_entry plus kernel/entry.S."
+        }
+      ],
+      "fact_answers": [
+        {"fact_id": "Q02_001_01", "fact_key": "linker_entry", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_001_linker_01", "codex_ev_Q02_001_make_03"]},
+        {"fact_id": "Q02_001_02", "fact_key": "entry_assembly", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_001_entry_02"]},
+        {"fact_id": "Q02_001_03", "fact_key": "early_init_work", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_001_entry_02", "codex_ev_Q02_001_main_04"]},
+        {"fact_id": "Q02_001_04", "fact_key": "main_handoff", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_001_entry_02", "codex_ev_Q02_001_main_04"]},
+        {"fact_id": "Q02_001_05", "fact_key": "platform_selection", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_001_make_03", "codex_ev_Q02_001_alt_05"]},
+        {"fact_id": "Q02_001_06", "fact_key": "negative_search_coverage", "status_or_value": {"searched_keywords": ["ENTRY", "_start", "boot", "linker", "BSS", "UART", "SBI", "OpenSBI", "U-Boot", "hart", "platform", "Makefile", "Cargo"], "searched_directories": ["kernel", "linker", "include", "doc", "Makefile"], "file_count": 214, "match_count": 628, "coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q02_001_neg_06"]}
+      ],
+      "answer": {
+        "value": "Active kernel boot entry is repos/xv6-k210/linker/linker64.ld ENTRY(_entry), implemented by repos/xv6-k210/kernel/entry.S symbol _entry. _entry computes a per-hart stack from a0, sets sp to boot_stack plus the per-hart offset, then calls main() in kernel/main.c. There is also an alternate k210.ld/entry_k210.S pair with _start, but the current Makefile selects linker64.ld and entry.S.",
+        "used_evidence_ids": ["codex_ev_Q02_001_linker_01", "codex_ev_Q02_001_entry_02", "codex_ev_Q02_001_make_03", "codex_ev_Q02_001_main_04", "codex_ev_Q02_001_alt_05"],
+        "confidence": "high",
+        "notes": "The answer distinguishes build-selected entry from present-but-not-selected alternate entry files."
+      }
+    },
+    {
+      "question_id": "Q02_002",
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q02_002_make_01",
+          "type": "definition",
+          "path": "repos/xv6-k210/Makefile",
+          "line_start": 42,
+          "line_end": 57,
+          "excerpt": "ifeq ($(platform), k210) SBI := ./sbi/sbi-k210 ... QEMUOPTS += -bios $(SBI)",
+          "summary": "Build/run configuration selects an SBI firmware image and uses it as QEMU BIOS."
+        },
+        {
+          "evidence_id": "codex_ev_Q02_002_image_02",
+          "type": "usage_flow",
+          "path": "repos/xv6-k210/Makefile",
+          "line_start": 151,
+          "line_end": 157,
+          "excerpt": "objcopy kernel; objcopy $(SBI); dd if=kernel.bin of=k210.bin bs=128k seek=1",
+          "summary": "For k210, the final image places SBI first and the kernel at an offset."
+        },
+        {
+          "evidence_id": "codex_ev_Q02_002_doc_03",
+          "type": "usage_flow",
+          "path": "repos/xv6-k210/doc/report_2020_12_26.md",
+          "line_start": 105,
+          "line_end": 107,
+          "excerpt": "RustSBI switches the processor core from M mode to S mode, then jumps to the kernel start address; entry_k210.S is the first kernel code.",
+          "summary": "Project documentation describes firmware-to-kernel handoff through RustSBI."
+        },
+        {
+          "evidence_id": "codex_ev_Q02_002_neg_04",
+          "type": "negative_search",
+          "path": "repos/xv6-k210",
+          "summary": "Searched bootloader, SBI, OpenSBI, U-Boot, BIOS, platform and Makefile. Evidence points to SBI/RustSBI handoff; no in-kernel standalone bootloader implementation was found."
+        }
+      ],
+      "fact_answers": [
+        {"fact_id": "Q02_002_01", "fact_key": "firmware_handoff", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_002_make_01", "codex_ev_Q02_002_image_02"]},
+        {"fact_id": "Q02_002_02", "fact_key": "sbi_selected", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_002_make_01"]},
+        {"fact_id": "Q02_002_03", "fact_key": "kernel_entry_after_firmware", "status_or_value": "yes_weak", "used_evidence_ids": ["codex_ev_Q02_002_doc_03"]},
+        {"fact_id": "Q02_002_04", "fact_key": "self_bootloader", "status_or_value": "no_after_negative_search", "used_evidence_ids": ["codex_ev_Q02_002_neg_04"]},
+        {"fact_id": "Q02_002_05", "fact_key": "platform_selection", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_002_make_01"]},
+        {"fact_id": "Q02_002_06", "fact_key": "negative_search_coverage", "status_or_value": {"searched_keywords": ["bootloader", "SBI", "OpenSBI", "U-Boot", "BIOS", "platform", "Makefile"], "searched_directories": ["kernel", "linker", "doc", "Makefile", "sbi"], "file_count": 214, "match_count": 628, "coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q02_002_neg_04"]}
+      ],
+      "answer": {
+        "value": "固件/引导加载器 \u2192 内核入口（如 SBI/OpenSBI/U-Boot/BIOS/UEFI）",
+        "used_evidence_ids": ["codex_ev_Q02_002_make_01", "codex_ev_Q02_002_image_02", "codex_ev_Q02_002_doc_03"],
+        "confidence": "high",
+        "notes": "The concrete firmware is SBI/RustSBI; U-Boot was not found in the active chain."
+      }
+    },
+    {
+      "question_id": "Q02_003",
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q02_003_userret_01",
+          "type": "implementation_body",
+          "path": "repos/xv6-k210/kernel/trap/trap.c",
+          "line_start": 169,
+          "line_end": 192,
+          "excerpt": "x &= ~SSTATUS_SPP; x |= SSTATUS_SPIE; w_sstatus(x); w_sepc(...); fn(...satp)",
+          "summary": "usertrapret prepares SPP=User, SPIE=enabled, sepc and satp before jumping to userret."
+        },
+        {
+          "evidence_id": "codex_ev_Q02_003_sret_02",
+          "type": "implementation_body",
+          "path": "repos/xv6-k210/kernel/trap/trampoline.S",
+          "line_start": 145,
+          "line_end": 147,
+          "excerpt": "return to user mode and user pc; usertrapret() set up sstatus and sepc; sret",
+          "summary": "The trampoline returns from S mode to user mode with sret."
+        },
+        {
+          "evidence_id": "codex_ev_Q02_003_sbi_03",
+          "type": "usage_flow",
+          "path": "repos/xv6-k210/doc/report_2020_12_26.md",
+          "line_start": 105,
+          "line_end": 107,
+          "excerpt": "RustSBI switches the processor core from M mode to S mode, then jumps to the kernel start address.",
+          "summary": "Documentation states the boot firmware performs M-to-S handoff."
+        },
+        {
+          "evidence_id": "codex_ev_Q02_003_regs_04",
+          "type": "definition",
+          "path": "repos/xv6-k210/include/hal/riscv.h",
+          "line_start": 46,
+          "line_end": 52,
+          "excerpt": "SSTATUS_SPP, SSTATUS_SPIE, SSTATUS_SIE, SSTATUS_UIE",
+          "summary": "Privilege and interrupt bits used by the transition code are defined."
+        }
+      ],
+      "fact_answers": [
+        {"fact_id": "Q02_003_01", "fact_key": "privilege_register_bits", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_003_regs_04"]},
+        {"fact_id": "Q02_003_02", "fact_key": "kernel_to_user_switch", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_003_userret_01", "codex_ev_Q02_003_sret_02"]},
+        {"fact_id": "Q02_003_03", "fact_key": "firmware_to_kernel_switch", "status_or_value": "yes_weak", "used_evidence_ids": ["codex_ev_Q02_003_sbi_03"]},
+        {"fact_id": "Q02_003_04", "fact_key": "main_path_connected", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_003_userret_01"]},
+        {"fact_id": "Q02_003_05", "fact_key": "return_instruction", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_003_sret_02"]},
+        {"fact_id": "Q02_003_06", "fact_key": "negative_search_coverage", "status_or_value": {"searched_keywords": ["sstatus", "SSTATUS_SPP", "SSTATUS_SPIE", "sret", "mstatus", "SBI"], "searched_directories": ["kernel", "include", "doc"], "file_count": 214, "match_count": 637, "coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q02_003_regs_04"]}
+      ],
+      "answer": {
+        "value": "implemented",
+        "used_evidence_ids": ["codex_ev_Q02_003_userret_01", "codex_ev_Q02_003_sret_02", "codex_ev_Q02_003_regs_04", "codex_ev_Q02_003_sbi_03"],
+        "confidence": "high",
+        "notes": "Strong source evidence proves S-mode to U-mode return; M-to-S boot handoff is documented but firmware source is not present."
+      }
+    },
+    {
+      "question_id": "Q02_004",
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q02_004_riscv_01",
+          "type": "definition",
+          "path": "repos/xv6-k210/include/hal/riscv.h",
+          "line_start": 46,
+          "line_end": 52,
+          "excerpt": "SSTATUS_SPP, SSTATUS_SPIE, SSTATUS_SIE, SSTATUS_UIE",
+          "summary": "sstatus privilege and interrupt-enable bits are defined."
+        },
+        {
+          "evidence_id": "codex_ev_Q02_004_trapret_02",
+          "type": "implementation_body",
+          "path": "repos/xv6-k210/kernel/trap/trap.c",
+          "line_start": 153,
+          "line_end": 183,
+          "excerpt": "intr_off(); w_stvec(...uservec...); x &= ~SSTATUS_SPP; x |= SSTATUS_SPIE; w_sstatus(x); w_sepc(...); satp = MAKE_SATP(...)",
+          "summary": "Return-to-user path programs stvec, sstatus, sepc and satp."
+        },
+        {
+          "evidence_id": "codex_ev_Q02_004_satp_03",
+          "type": "definition",
+          "path": "repos/xv6-k210/include/hal/riscv.h",
+          "line_start": 205,
+          "line_end": 229,
+          "excerpt": "SATP_SV39; MAKE_SATP(...); w_satp(...); r_satp()",
+          "summary": "SATP and page-table CSR helpers are defined."
+        }
+      ],
+      "fact_answers": [
+        {"fact_id": "Q02_004_01", "fact_key": "sstatus_bits", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_004_riscv_01", "codex_ev_Q02_004_trapret_02"]},
+        {"fact_id": "Q02_004_02", "fact_key": "sepc", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_004_trapret_02"]},
+        {"fact_id": "Q02_004_03", "fact_key": "stvec", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_004_trapret_02"]},
+        {"fact_id": "Q02_004_04", "fact_key": "satp", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_004_satp_03", "codex_ev_Q02_004_trapret_02"]},
+        {"fact_id": "Q02_004_05", "fact_key": "mode_switch_instruction_context", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_004_trapret_02"]},
+        {"fact_id": "Q02_004_06", "fact_key": "negative_search_coverage", "status_or_value": {"searched_keywords": ["sstatus", "sepc", "stvec", "satp", "SPP", "SPIE"], "searched_directories": ["kernel", "include"], "file_count": 214, "match_count": 637, "coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q02_004_riscv_01"]}
+      ],
+      "answer": {
+        "value": "Key registers/bits are sstatus.SPP (cleared to select User as previous privilege), sstatus.SPIE (set so interrupts are enabled after sret), stvec (switched between kernelvec and uservec), sepc (saved user PC), and satp (page-table root via MAKE_SATP).",
+        "used_evidence_ids": ["codex_ev_Q02_004_riscv_01", "codex_ev_Q02_004_trapret_02", "codex_ev_Q02_004_satp_03"],
+        "confidence": "high",
+        "notes": "These registers are directly written in the return-to-user path."
+      }
+    },
+    {
+      "question_id": "Q02_005",
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q02_005_kvminit_01",
+          "type": "implementation_body",
+          "path": "repos/xv6-k210/kernel/mm/vm.c",
+          "line_start": 41,
+          "line_end": 112,
+          "excerpt": "kvminit() allocates kernel_pagetable and kvmmap()s UART_V, CLINT_V, PLIC_V, kernel text/data and TRAMPOLINE.",
+          "summary": "Kernel page table is constructed before enabling paging."
+        },
+        {
+          "evidence_id": "codex_ev_Q02_005_kvminithart_02",
+          "type": "implementation_body",
+          "path": "repos/xv6-k210/kernel/mm/vm.c",
+          "line_start": 118,
+          "line_end": 130,
+          "excerpt": "kvminithart(): stap = SATP_SV39 | ...; w_satp(stap); asm volatile(\"sfence.vma\"); protect_usr_mem();",
+          "summary": "kvminithart writes satp and flushes the TLB."
+        },
+        {
+          "evidence_id": "codex_ev_Q02_005_main_03",
+          "type": "call_site",
+          "path": "repos/xv6-k210/kernel/main.c",
+          "line_start": 46,
+          "line_end": 49,
+          "excerpt": "kpminit(); kvminit(); kvminithart(); kmallocinit();",
+          "summary": "main calls kvminit before kvminithart."
+        }
+      ],
+      "fact_answers": [
+        {"fact_id": "Q02_005_01", "fact_key": "page_table_creation", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_005_kvminit_01"]},
+        {"fact_id": "Q02_005_02", "fact_key": "satp_write", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_005_kvminithart_02"]},
+        {"fact_id": "Q02_005_03", "fact_key": "tlb_flush", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_005_kvminithart_02"]},
+        {"fact_id": "Q02_005_04", "fact_key": "call_order", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_005_main_03"]},
+        {"fact_id": "Q02_005_05", "fact_key": "mmio_mapping", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_005_kvminit_01"]},
+        {"fact_id": "Q02_005_06", "fact_key": "negative_search_coverage", "status_or_value": {"searched_keywords": ["satp", "MAKE_SATP", "kvminit", "kvminithart", "sfence.vma", "kvmmap"], "searched_directories": ["kernel", "include"], "file_count": 214, "match_count": 637, "coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q02_005_kvminithart_02"]}
+      ],
+      "answer": {
+        "value": "implemented",
+        "used_evidence_ids": ["codex_ev_Q02_005_kvminit_01", "codex_ev_Q02_005_kvminithart_02", "codex_ev_Q02_005_main_03"],
+        "confidence": "high",
+        "notes": "Page tables are built in kvminit and enabled by writing satp in kvminithart."
+      }
+    },
+    {
+      "question_id": "Q02_006",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q02_006_make_01", "type": "call_site", "path": "repos/xv6-k210/Makefile", "line_start": 40, "line_end": 71, "excerpt": "linker = ./linker/linker64.ld; SRC := $K/entry.S", "summary": "Build-selected linker and entry assembly."},
+        {"evidence_id": "codex_ev_Q02_006_linker_02", "type": "definition", "path": "repos/xv6-k210/linker/linker64.ld", "line_start": 1, "line_end": 4, "excerpt": "ENTRY(_entry); BASE_ADDRESS = 0x80020000", "summary": "Linker entry and load address."},
+        {"evidence_id": "codex_ev_Q02_006_entry_03", "type": "implementation_body", "path": "repos/xv6-k210/kernel/entry.S", "line_start": 1, "line_end": 13, "excerpt": "_entry: add/slli a0-derived offset; la sp, boot_stack; call main; loop", "summary": "Assembly entry sets stack and calls main."},
+        {"evidence_id": "codex_ev_Q02_006_main_04", "type": "implementation_body", "path": "repos/xv6-k210/kernel/main.c", "line_start": 35, "line_end": 51, "excerpt": "main(hartid, dtb_pa) calls inithartid, cpuinit, floatinithart, consoleinit, kvminit, kvminithart, trapinithart", "summary": "main begins kernel initialization."},
+        {"evidence_id": "codex_ev_Q02_006_sched_05", "type": "usage_flow", "path": "repos/xv6-k210/kernel/main.c", "line_start": 62, "line_end": 97, "excerpt": "userinit(); ... started = 1; ... scheduler();", "summary": "main creates the first user process and enters the scheduler."}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q02_006_01", "fact_key": "build_entry", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_006_make_01", "codex_ev_Q02_006_linker_02"]},
+        {"fact_id": "Q02_006_02", "fact_key": "assembly_node", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_006_entry_03"]},
+        {"fact_id": "Q02_006_03", "fact_key": "stack_setup", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_006_entry_03"]},
+        {"fact_id": "Q02_006_04", "fact_key": "main_node", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_006_main_04"]},
+        {"fact_id": "Q02_006_05", "fact_key": "scheduler_handoff", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_006_sched_05"]},
+        {"fact_id": "Q02_006_06", "fact_key": "negative_search_coverage", "status_or_value": {"searched_keywords": ["ENTRY", "_entry", "_start", "main", "scheduler"], "searched_directories": ["kernel", "linker", "Makefile"], "file_count": 214, "match_count": 628, "coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q02_006_make_01"]}
+      ],
+      "answer": {
+        "value": "Build selects Makefile linker64.ld/entry.S -> linker64.ld ENTRY(_entry) at 0x80020000 -> kernel/entry.S _entry sets boot_stack and calls main -> kernel/main.c main initializes CPU/FPU/console/memory/trap/PLIC/disk/processes -> main calls userinit and scheduler.",
+        "used_evidence_ids": ["codex_ev_Q02_006_make_01", "codex_ev_Q02_006_linker_02", "codex_ev_Q02_006_entry_03", "codex_ev_Q02_006_main_04", "codex_ev_Q02_006_sched_05"],
+        "confidence": "high",
+        "notes": "This is the build-selected chain, not only the older doc-described _start chain."
+      }
+    },
+    {
+      "question_id": "Q02_007",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q02_007_bss_01", "type": "definition", "path": "repos/xv6-k210/linker/linker64.ld", "line_start": 51, "line_end": 57, "excerpt": ".bss : { sbss_clear = .; *(.sbss .bss .bss.*); ebss_clear = .; }", "summary": "The linker defines BSS bounds, but this is not clearing code."},
+        {"evidence_id": "codex_ev_Q02_007_entry_02", "type": "implementation_body", "path": "repos/xv6-k210/kernel/entry.S", "line_start": 1, "line_end": 13, "excerpt": "_entry sets sp and calls main; no BSS clearing loop or UART setup appears here.", "summary": "Entry assembly only sets stack and calls main."},
+        {"evidence_id": "codex_ev_Q02_007_console_03", "type": "implementation_body", "path": "repos/xv6-k210/kernel/console.c", "line_start": 41, "line_end": 49, "excerpt": "consputc calls sbi_console_putchar for output.",
+          "summary": "Early console output uses SBI console calls."},
+        {"evidence_id": "codex_ev_Q02_007_main_04", "type": "call_site", "path": "repos/xv6-k210/kernel/main.c", "line_start": 41, "line_end": 49, "excerpt": "floatinithart(); consoleinit(); printfinit(); print_logo(); kpminit(); kvminit(); kvminithart();", "summary": "Console output is initialized and used before kvminithart enables paging."},
+        {"evidence_id": "codex_ev_Q02_007_dtb_05", "type": "negative_search", "path": "repos/xv6-k210/kernel/main.c", "line_start": 35, "line_end": 35, "excerpt": "main(unsigned long hartid, unsigned long dtb_pa)", "summary": "dtb_pa is accepted as a parameter, but no source use of dtb/fdt parsing was found."}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q02_007_01", "fact_key": "bss_clearing", "status_or_value": "no_after_negative_search", "used_evidence_ids": ["codex_ev_Q02_007_bss_01", "codex_ev_Q02_007_entry_02"]},
+        {"fact_id": "Q02_007_02", "fact_key": "early_serial_uart_output", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_007_console_03", "codex_ev_Q02_007_main_04"]},
+        {"fact_id": "Q02_007_03", "fact_key": "dtb_parsing", "status_or_value": "no_after_negative_search", "used_evidence_ids": ["codex_ev_Q02_007_dtb_05"]},
+        {"fact_id": "Q02_007_04", "fact_key": "page_table_init_timing", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_007_main_04"]},
+        {"fact_id": "Q02_007_05", "fact_key": "entry_scope", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_007_entry_02"]},
+        {"fact_id": "Q02_007_06", "fact_key": "negative_search_coverage", "status_or_value": {"searched_keywords": ["bss_clear", "sbss_clear", "ebss_clear", "memset", "dtb", "fdt", "device tree", "UART", "consoleinit", "kvminithart"], "searched_directories": ["kernel", "include", "linker", "doc"], "file_count": 214, "match_count": 637, "coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q02_007_bss_01", "codex_ev_Q02_007_dtb_05"]}
+      ],
+      "answer": {
+        "value": "BSS Clearing: not_found [linker64.ld defines sbss_clear/ebss_clear, but entry.S has no clearing loop]. Early Serial/UART Output: implemented [console.c consputc -> SBI console, main calls consoleinit/printfinit/print_logo before kvminithart]. DTB parsing: not_found [main has dtb_pa parameter but no dtb/fdt parser use found]. Page Table Init: implemented before MMU enable [main calls kvminit then kvminithart].",
+        "used_evidence_ids": ["codex_ev_Q02_007_bss_01", "codex_ev_Q02_007_entry_02", "codex_ev_Q02_007_console_03", "codex_ev_Q02_007_main_04", "codex_ev_Q02_007_dtb_05"],
+        "confidence": "medium",
+        "notes": "BSS symbols exist, but explicit clearing code was not found."
+      }
+    },
+    {
+      "question_id": "Q02_008",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q02_008_defs_01", "type": "definition", "path": "repos/xv6-k210/include/hal/riscv.h", "line_start": 418, "line_end": 453, "excerpt": "SSTATUS_FS_INIT/CLEAN/DIRTY; w_sstatus_fs(...); floatinithart() sets FS_INIT, frm RNE, then FS_CLEAN", "summary": "FPU status bits and initialization helper are implemented."},
+        {"evidence_id": "codex_ev_Q02_008_main_02", "type": "call_site", "path": "repos/xv6-k210/kernel/main.c", "line_start": 39, "line_end": 43, "excerpt": "if (hartid == 0) { cpuinit(); floatinithart(); consoleinit();", "summary": "Hart 0 initializes FPU early."},
+        {"evidence_id": "codex_ev_Q02_008_main_03", "type": "call_site", "path": "repos/xv6-k210/kernel/main.c", "line_start": 75, "line_end": 83, "excerpt": "else { ... floatinithart(); kvminithart(); trapinithart(); }", "summary": "Secondary hart also initializes FPU."},
+        {"evidence_id": "codex_ev_Q02_008_tf_04", "type": "definition", "path": "repos/xv6-k210/include/trap.h", "line_start": 57, "line_end": 90, "excerpt": "trapframe stores ft0..ft11, fs0..fs11, fa0..fa7 and fcsr.",
+          "summary": "Trapframe contains floating-point register storage."}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q02_008_01", "fact_key": "fpu_bits", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_008_defs_01"]},
+        {"fact_id": "Q02_008_02", "fact_key": "fpu_init_function", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_008_defs_01"]},
+        {"fact_id": "Q02_008_03", "fact_key": "boot_call_hart0", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_008_main_02"]},
+        {"fact_id": "Q02_008_04", "fact_key": "boot_call_other_harts", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_008_main_03"]},
+        {"fact_id": "Q02_008_05", "fact_key": "float_context_storage", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_008_tf_04"]},
+        {"fact_id": "Q02_008_06", "fact_key": "negative_search_coverage", "status_or_value": {"searched_keywords": ["floatinithart", "SSTATUS_FS", "frm", "fcsr", "floatstore", "floatload"], "searched_directories": ["kernel", "include"], "file_count": 214, "match_count": 637, "coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q02_008_defs_01"]}
+      ],
+      "answer": {"value": "implemented", "used_evidence_ids": ["codex_ev_Q02_008_defs_01", "codex_ev_Q02_008_main_02", "codex_ev_Q02_008_main_03", "codex_ev_Q02_008_tf_04"], "confidence": "high", "notes": "FPU is explicitly enabled per hart via sstatus.fs and frm."}
+    },
+    {
+      "question_id": "Q02_009",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q02_009_init_01", "type": "implementation_body", "path": "repos/xv6-k210/kernel/trap/trap.c", "line_start": 57, "line_end": 65, "excerpt": "trapinithart(): w_stvec((uint64)kernelvec); w_sstatus(...SSTATUS_SIE); w_sie(...SEIE|SSIE|STIE); set_next_timeout();", "summary": "Kernel trap vector and interrupt enable bits are installed per hart."},
+        {"evidence_id": "codex_ev_Q02_009_main_02", "type": "call_site", "path": "repos/xv6-k210/kernel/main.c", "line_start": 51, "line_end": 54, "excerpt": "trapinithart(); procinit(); plicinit(); plicinithart();", "summary": "trapinithart is called during boot on hart 0."},
+        {"evidence_id": "codex_ev_Q02_009_vec_03", "type": "definition", "path": "repos/xv6-k210/kernel/trap/kernelvec.S", "line_start": 7, "line_end": 10, "excerpt": ".globl kernelvec; kernelvec:", "summary": "kernelvec is the assembly trap vector target."},
+        {"evidence_id": "codex_ev_Q02_009_user_04", "type": "implementation_body", "path": "repos/xv6-k210/kernel/trap/trap.c", "line_start": 159, "line_end": 160, "excerpt": "w_stvec(TRAMPOLINE + (uservec - trampoline));", "summary": "Return-to-user path installs the user trap vector."}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q02_009_01", "fact_key": "kernel_vector_setup", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_009_init_01", "codex_ev_Q02_009_vec_03"]},
+        {"fact_id": "Q02_009_02", "fact_key": "call_site", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_009_main_02"]},
+        {"fact_id": "Q02_009_03", "fact_key": "interrupt_enable", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_009_init_01"]},
+        {"fact_id": "Q02_009_04", "fact_key": "user_vector_setup", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_009_user_04"]},
+        {"fact_id": "Q02_009_05", "fact_key": "assembly_entry", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_009_vec_03"]},
+        {"fact_id": "Q02_009_06", "fact_key": "negative_search_coverage", "status_or_value": {"searched_keywords": ["stvec", "kernelvec", "uservec", "trapinithart", "SIE"], "searched_directories": ["kernel", "include"], "file_count": 214, "match_count": 637, "coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q02_009_init_01"]}
+      ],
+      "answer": {"value": "implemented", "used_evidence_ids": ["codex_ev_Q02_009_init_01", "codex_ev_Q02_009_main_02", "codex_ev_Q02_009_vec_03", "codex_ev_Q02_009_user_04"], "confidence": "high", "notes": "Both kernel and user trap-vector targets are set through stvec."}
+    },
+    {
+      "question_id": "Q02_010",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q02_010_platform_01", "type": "definition", "path": "repos/xv6-k210/Makefile", "line_start": 1, "line_end": 4, "excerpt": "platform := k210; # platform := qemu; mode := release", "summary": "Default platform is k210."},
+        {"evidence_id": "codex_ev_Q02_010_qemu_02", "type": "implementation_body", "path": "repos/xv6-k210/Makefile", "line_start": 32, "line_end": 47, "excerpt": "ifeq ($(platform), qemu) CFLAGS += -D QEMU; ifeq ($(platform), k210) SBI := ./sbi/sbi-k210 else SBI := ./sbi/sbi-qemu", "summary": "Platform affects CFLAGS and SBI binary."},
+        {"evidence_id": "codex_ev_Q02_010_src_03", "type": "implementation_body", "path": "repos/xv6-k210/Makefile", "line_start": 70, "line_end": 135, "excerpt": "SRC := $K/entry.S ... ifeq ($(platform), k210) add spi/gpiohs/fpioa/sdcard/dmac/sysctl else add virtio_disk.c", "summary": "Entry file is fixed; HAL source files vary by platform."},
+        {"evidence_id": "codex_ev_Q02_010_link_04", "type": "call_site", "path": "repos/xv6-k210/Makefile", "line_start": 162, "line_end": 170, "excerpt": "$(LD) ... -T $(linker); cargo build --no-default-features --features=$(platform)", "summary": "Kernel linker and SBI build feature are selected in Makefile."}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q02_010_01", "fact_key": "default_platform", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_010_platform_01"]},
+        {"fact_id": "Q02_010_02", "fact_key": "qemu_macro", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_010_qemu_02"]},
+        {"fact_id": "Q02_010_03", "fact_key": "sbi_selection", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_010_qemu_02", "codex_ev_Q02_010_link_04"]},
+        {"fact_id": "Q02_010_04", "fact_key": "entry_file_selection", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_010_src_03"]},
+        {"fact_id": "Q02_010_05", "fact_key": "platform_hal_sources", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_010_src_03"]},
+        {"fact_id": "Q02_010_06", "fact_key": "negative_search_coverage", "status_or_value": {"searched_keywords": ["platform", "QEMU", "SRC", "entry", "linker", "features"], "searched_directories": ["Makefile", "kernel", "linker"], "file_count": 214, "match_count": 628, "coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q02_010_platform_01"]}
+      ],
+      "answer": {
+        "value": "Makefile drives selection. platform defaults to k210. If platform=qemu, it adds -D QEMU and uses sbi-qemu; otherwise it uses sbi-k210. The kernel entry file and linker are fixed as kernel/entry.S and linker/linker64.ld in the current Makefile. Platform-specific HAL sources differ: k210 adds spi/gpiohs/fpioa/sdcard/dmac/sysctl/utils, while qemu adds virtio_disk.c. The SBI sub-build receives cargo --features=$(platform).",
+        "used_evidence_ids": ["codex_ev_Q02_010_platform_01", "codex_ev_Q02_010_qemu_02", "codex_ev_Q02_010_src_03", "codex_ev_Q02_010_link_04"],
+        "confidence": "high",
+        "notes": "The build does not conditionally switch between entry.S and entry_k210.S."
+      }
+    },
+    {
+      "question_id": "Q02_011",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q02_011_make_01", "type": "definition", "path": "repos/xv6-k210/Makefile", "line_start": 42, "line_end": 57, "excerpt": "SBI := ./sbi/sbi-k210 or ./sbi/sbi-qemu; QEMUOPTS += -bios $(SBI)", "summary": "Build/run chain uses SBI firmware."},
+        {"evidence_id": "codex_ev_Q02_011_image_02", "type": "usage_flow", "path": "repos/xv6-k210/Makefile", "line_start": 151, "line_end": 157, "excerpt": "objcopy $(SBI) to k210.bin; dd kernel.bin into k210.bin bs=128k seek=1", "summary": "k210 image combines SBI and kernel."},
+        {"evidence_id": "codex_ev_Q02_011_doc_03", "type": "usage_flow", "path": "repos/xv6-k210/doc/report_2020_12_26.md", "line_start": 74, "line_end": 84, "excerpt": "RustSBI is a RISC-V SBI implementation; table mentions OpenSBI and RustSBI.", "summary": "Docs identify RustSBI/OpenSBI context."},
+        {"evidence_id": "codex_ev_Q02_011_sbiapi_04", "type": "implementation_body", "path": "repos/xv6-k210/include/sbi.h", "line_start": 7, "line_end": 25, "excerpt": "LEGACY_SBI_CALL uses ecall; SBI_CONSOLE_PUTCHAR; sbi_console_putchar", "summary": "Kernel calls SBI via ecall."
+        }
+      ],
+      "fact_answers": [
+        {"fact_id": "Q02_011_01", "fact_key": "riscv_arch", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_011_make_01"]},
+        {"fact_id": "Q02_011_02", "fact_key": "sbi_binary_selected", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_011_make_01"]},
+        {"fact_id": "Q02_011_03", "fact_key": "firmware_kernel_image", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_011_image_02"]},
+        {"fact_id": "Q02_011_04", "fact_key": "runtime_sbi_calls", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_011_sbiapi_04"]},
+        {"fact_id": "Q02_011_05", "fact_key": "handoff_documented", "status_or_value": "yes_weak", "used_evidence_ids": ["codex_ev_Q02_011_doc_03"]},
+        {"fact_id": "Q02_011_06", "fact_key": "negative_search_coverage", "status_or_value": {"searched_keywords": ["sbi", "SBI", "OpenSBI", "RustSBI", "U-Boot", "bios", "ecall"], "searched_directories": ["kernel", "include", "doc", "Makefile", "sbi"], "file_count": 214, "match_count": 628, "coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q02_011_make_01"]}
+      ],
+      "answer": {"value": "implemented", "used_evidence_ids": ["codex_ev_Q02_011_make_01", "codex_ev_Q02_011_image_02", "codex_ev_Q02_011_doc_03", "codex_ev_Q02_011_sbiapi_04"], "confidence": "medium", "notes": "The repo contains binary SBI images and Makefile/doc evidence for RustSBI handoff; the internal firmware source is not present in the listed files."}
+    },
+    {
+      "question_id": "Q02_012",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q02_012_layout_01", "type": "definition", "path": "repos/xv6-k210/include/memlayout.h", "line_start": 36, "line_end": 45, "excerpt": "VIRT_OFFSET; UART physical address; UART_V = UART + VIRT_OFFSET", "summary": "Physical and virtual UART constants exist."},
+        {"evidence_id": "codex_ev_Q02_012_map_02", "type": "implementation_body", "path": "repos/xv6-k210/kernel/mm/vm.c", "line_start": 59, "line_end": 67, "excerpt": "kvmmap(UART_V, UART, PGSIZE, PTE_R | PTE_W); kvmmap(CLINT_V, CLINT, ...)", "summary": "Kernel page table maps UART physical address to virtual address."},
+        {"evidence_id": "codex_ev_Q02_012_console_03", "type": "implementation_body", "path": "repos/xv6-k210/kernel/console.c", "line_start": 41, "line_end": 49, "excerpt": "consputc uses sbi_console_putchar, not UART or UART_V MMIO.", "summary": "Console output path uses SBI, not a runtime UART address switch."},
+        {"evidence_id": "codex_ev_Q02_012_neg_04", "type": "negative_search", "path": "repos/xv6-k210", "summary": "Searched phys_to_virt, virt_to_phys, UART, UART_V and MMU enable paths; found constants/mapping but no runtime UART physical-to-virtual switching logic."}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q02_012_01", "fact_key": "uart_phys_virt_constants", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_012_layout_01"]},
+        {"fact_id": "Q02_012_02", "fact_key": "uart_mapping", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_012_map_02"]},
+        {"fact_id": "Q02_012_03", "fact_key": "console_uses_sbi", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_012_console_03"]},
+        {"fact_id": "Q02_012_04", "fact_key": "address_switch_logic", "status_or_value": "no_after_negative_search", "used_evidence_ids": ["codex_ev_Q02_012_neg_04"]},
+        {"fact_id": "Q02_012_05", "fact_key": "mmu_boundary", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_012_map_02"]},
+        {"fact_id": "Q02_012_06", "fact_key": "negative_search_coverage", "status_or_value": {"searched_keywords": ["phys_to_virt", "virt_to_phys", "UART", "UART_V", "kvminithart"], "searched_directories": ["kernel", "include", "doc"], "file_count": 214, "match_count": 637, "coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q02_012_neg_04"]}
+      ],
+      "answer": {"value": "not_found", "used_evidence_ids": ["codex_ev_Q02_012_layout_01", "codex_ev_Q02_012_map_02", "codex_ev_Q02_012_console_03", "codex_ev_Q02_012_neg_04"], "confidence": "medium", "notes": "There is UART_V mapping, but no evidence of a switch in the UART/console path; console uses SBI calls."}
+    },
+    {
+      "question_id": "Q02_013",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q02_013_ret_01", "type": "implementation_body", "path": "repos/xv6-k210/kernel/trap/trap.c", "line_start": 147, "line_end": 193, "excerpt": "usertrapret sets stvec to uservec, fills trapframe kernel fields, clears SPP, sets SPIE, writes sepc, computes satp and calls userret.", "summary": "C return-to-user path is implemented."},
+        {"evidence_id": "codex_ev_Q02_013_tramp_02", "type": "implementation_body", "path": "repos/xv6-k210/kernel/trap/trampoline.S", "line_start": 89, "line_end": 147, "excerpt": "userret restores registers from TRAPFRAME and executes sret.",
+          "summary": "Assembly trampoline restores user context and returns with sret."},
+        {"evidence_id": "codex_ev_Q02_013_forkret_03", "type": "call_site", "path": "repos/xv6-k210/kernel/sched/proc.c", "line_start": 653, "line_end": 668, "excerpt": "forkret(): ... myproc()->ikstmp = readtime(); usertrapret();", "summary": "First scheduling of a process enters user mode through usertrapret."}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q02_013_01", "fact_key": "return_function", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_013_ret_01"]},
+        {"fact_id": "Q02_013_02", "fact_key": "stvec_uservec", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_013_ret_01"]},
+        {"fact_id": "Q02_013_03", "fact_key": "sstatus_user_mode", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_013_ret_01"]},
+        {"fact_id": "Q02_013_04", "fact_key": "sret", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_013_tramp_02"]},
+        {"fact_id": "Q02_013_05", "fact_key": "call_site", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_013_forkret_03"]},
+        {"fact_id": "Q02_013_06", "fact_key": "negative_search_coverage", "status_or_value": {"searched_keywords": ["usertrapret", "userret", "trampoline", "sret", "stvec"], "searched_directories": ["kernel", "include"], "file_count": 214, "match_count": 637, "coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q02_013_ret_01"]}
+      ],
+      "answer": {"value": "implemented", "used_evidence_ids": ["codex_ev_Q02_013_ret_01", "codex_ev_Q02_013_tramp_02", "codex_ev_Q02_013_forkret_03"], "confidence": "high", "notes": "usertrapret and userret form the concrete kernel-to-user path."}
+    },
+    {
+      "question_id": "Q02_014",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q02_014_make_01", "type": "definition", "path": "repos/xv6-k210/Makefile", "line_start": 1, "line_end": 2, "excerpt": "platform := k210; # platform := qemu", "summary": "The Makefile exposes k210 and qemu platform modes."},
+        {"evidence_id": "codex_ev_Q02_014_src_02", "type": "implementation_body", "path": "repos/xv6-k210/Makefile", "line_start": 123, "line_end": 135, "excerpt": "ifeq ($(platform), k210) add K210 HAL files else add virtio_disk.c", "summary": "Platform conditional changes HAL sources."},
+        {"evidence_id": "codex_ev_Q02_014_neg_03", "type": "negative_search", "path": "repos/xv6-k210", "summary": "Searched visionfive, jh7110 and loongarch across kernel, include, doc, user and Makefile; match_count=0."}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q02_014_01", "fact_key": "k210_platform", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_014_make_01", "codex_ev_Q02_014_src_02"]},
+        {"fact_id": "Q02_014_02", "fact_key": "qemu_platform", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_014_make_01", "codex_ev_Q02_014_src_02"]},
+        {"fact_id": "Q02_014_03", "fact_key": "visionfive", "status_or_value": "no_after_negative_search", "used_evidence_ids": ["codex_ev_Q02_014_neg_03"]},
+        {"fact_id": "Q02_014_04", "fact_key": "jh7110", "status_or_value": "no_after_negative_search", "used_evidence_ids": ["codex_ev_Q02_014_neg_03"]},
+        {"fact_id": "Q02_014_05", "fact_key": "loongarch", "status_or_value": "no_after_negative_search", "used_evidence_ids": ["codex_ev_Q02_014_neg_03"]},
+        {"fact_id": "Q02_014_06", "fact_key": "negative_search_coverage", "status_or_value": {"searched_keywords": ["visionfive", "jh7110", "loongarch"], "searched_directories": ["kernel", "include", "doc", "xv6-user", "Makefile"], "file_count": 214, "match_count": 0, "coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q02_014_neg_03"]}
+      ],
+      "answer": {"value": "The repo supports k210 and qemu build/run modes, with different SBI images and HAL source sets. I found no StarFive VisionFive2, JH7110, or LoongArch platform startup support.", "used_evidence_ids": ["codex_ev_Q02_014_make_01", "codex_ev_Q02_014_src_02", "codex_ev_Q02_014_neg_03"], "confidence": "high", "notes": "This is multi-platform only in the k210/qemu sense."}
+    },
+    {
+      "question_id": "Q02_015",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q02_015_stvec_01", "type": "call_site", "path": "repos/xv6-k210/kernel/trap/trap.c", "line_start": 57, "line_end": 62, "excerpt": "trapinithart(): w_stvec((uint64)kernelvec);", "summary": "Kernel traps initially enter kernelvec."},
+        {"evidence_id": "codex_ev_Q02_015_kernelvec_02", "type": "implementation_body", "path": "repos/xv6-k210/kernel/trap/kernelvec.S", "line_start": 7, "line_end": 48, "excerpt": "kernelvec saves registers and calls kerneltrap.", "summary": "Kernel trap assembly entry saves context and calls C handler."},
+        {"evidence_id": "codex_ev_Q02_015_uservec_03", "type": "implementation_body", "path": "repos/xv6-k210/kernel/trap/trampoline.S", "line_start": 15, "line_end": 87, "excerpt": "uservec saves user registers in trapframe and jumps to usertrap.",
+          "summary": "User trap assembly entry is uservec."},
+        {"evidence_id": "codex_ev_Q02_015_usertrap_04", "type": "implementation_body", "path": "repos/xv6-k210/kernel/trap/trap.c", "line_start": 74, "line_end": 140, "excerpt": "usertrap handles syscall, interrupts and exceptions then calls usertrapret.", "summary": "C user trap handler."}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q02_015_01", "fact_key": "kernel_vector", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_015_stvec_01", "codex_ev_Q02_015_kernelvec_02"]},
+        {"fact_id": "Q02_015_02", "fact_key": "kernel_c_handler", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_015_kernelvec_02"]},
+        {"fact_id": "Q02_015_03", "fact_key": "user_vector", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_015_uservec_03"]},
+        {"fact_id": "Q02_015_04", "fact_key": "user_c_handler", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_015_usertrap_04"]},
+        {"fact_id": "Q02_015_05", "fact_key": "return_path", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_015_usertrap_04"]},
+        {"fact_id": "Q02_015_06", "fact_key": "negative_search_coverage", "status_or_value": {"searched_keywords": ["kernelvec", "uservec", "usertrap", "kerneltrap", "stvec"], "searched_directories": ["kernel/trap", "include"], "file_count": 214, "match_count": 637, "coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q02_015_stvec_01"]}
+      ],
+      "answer": {"value": "Kernel-mode trap vector: kernel/trap/kernelvec.S symbol kernelvec, installed by trapinithart() with w_stvec(kernelvec), then calls kerneltrap(). User-mode trap vector: kernel/trap/trampoline.S symbol uservec, installed by usertrapret() as TRAMPOLINE+(uservec-trampoline), then jumps to usertrap().", "used_evidence_ids": ["codex_ev_Q02_015_stvec_01", "codex_ev_Q02_015_kernelvec_02", "codex_ev_Q02_015_uservec_03", "codex_ev_Q02_015_usertrap_04"], "confidence": "high", "notes": "There is one kernel vector and one trampoline user vector, selected by stvec."}
+    },
+    {
+      "question_id": "Q02_016",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q02_016_comment_01", "type": "definition", "path": "repos/xv6-k210/include/trap.h", "line_start": 6, "line_end": 15, "excerpt": "per-process data for trap handling; sscratch points here; uservec saves registers in trapframe; usertrapret/userret restore user registers", "summary": "trapframe is per-process data used by trampoline."},
+        {"evidence_id": "codex_ev_Q02_016_proc_02", "type": "implementation_body", "path": "repos/xv6-k210/kernel/sched/proc.c", "line_start": 184, "line_end": 199, "excerpt": "p->kstack = allocpage(); p->trapframe = kmalloc(sizeof(struct trapframe)); proc_pagetable(p)", "summary": "Process allocation creates a kernel stack and a per-process trapframe object."},
+        {"evidence_id": "codex_ev_Q02_016_tramp_03", "type": "implementation_body", "path": "repos/xv6-k210/kernel/trap/trampoline.S", "line_start": 23, "line_end": 31, "excerpt": "sscratch points to p->trapframe; csrrw a0, sscratch, a0; save user registers in TRAPFRAME", "summary": "Trampoline uses sscratch/a0 as trapframe pointer."},
+        {"evidence_id": "codex_ev_Q02_016_ret_04", "type": "implementation_body", "path": "repos/xv6-k210/kernel/trap/trap.c", "line_start": 187, "line_end": 192, "excerpt": "fn = TRAMPOLINE + (userret - trampoline); fn((uint64)(p->trapframe), satp);", "summary": "usertrapret passes p->trapframe into userret."}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q02_016_01", "fact_key": "per_process_trapframe", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_016_comment_01", "codex_ev_Q02_016_proc_02"]},
+        {"fact_id": "Q02_016_02", "fact_key": "not_per_cpu_trap_stack", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_016_proc_02"]},
+        {"fact_id": "Q02_016_03", "fact_key": "not_kernel_stack_only", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_016_proc_02", "codex_ev_Q02_016_tramp_03"]},
+        {"fact_id": "Q02_016_04", "fact_key": "trampoline_access", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_016_tramp_03", "codex_ev_Q02_016_ret_04"]},
+        {"fact_id": "Q02_016_05", "fact_key": "choice_fit", "status_or_value": "yes_weak", "used_evidence_ids": ["codex_ev_Q02_016_comment_01"]},
+        {"fact_id": "Q02_016_06", "fact_key": "negative_search_coverage", "status_or_value": {"searched_keywords": ["trapframe", "TRAPFRAME", "sscratch", "uservec", "kmalloc"], "searched_directories": ["kernel", "include"], "file_count": 214, "match_count": 637, "coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q02_016_proc_02"]}
+      ],
+      "answer": {
+        "value": "用户地址空间预留页（trampoline/trap_context page）",
+        "used_evidence_ids": ["codex_ev_Q02_016_comment_01", "codex_ev_Q02_016_proc_02", "codex_ev_Q02_016_tramp_03", "codex_ev_Q02_016_ret_04"],
+        "confidence": "medium",
+        "notes": "Closest choice: the trampoline uses a per-process trapframe pointer via sscratch. The current code allocates p->trapframe with kmalloc, so it is not literally only a fixed TRAPFRAME page."
+      }
+    },
+    {
+      "question_id": "Q02_017",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q02_017_struct_01", "type": "definition", "path": "repos/xv6-k210/include/trap.h", "line_start": 19, "line_end": 91, "excerpt": "struct trapframe fields from offset 0 through offset 544 fcsr.", "summary": "Trapframe structure definition with byte offsets."},
+        {"evidence_id": "codex_ev_Q02_017_save_02", "type": "implementation_body", "path": "repos/xv6-k210/kernel/trap/trampoline.S", "line_start": 31, "line_end": 65, "excerpt": "uservec saves ra, sp, gp, tp, t0..t6, s0..s11, a0..a7 into offsets 40..280", "summary": "Integer registers are saved into trapframe."},
+        {"evidence_id": "codex_ev_Q02_017_float_03", "type": "definition", "path": "repos/xv6-k210/include/trap.h", "line_start": 57, "line_end": 90, "excerpt": "ft0..ft11, fs0..fs11, fa0..fa7, fcsr", "summary": "Floating-point register slots are included."}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q02_017_01", "fact_key": "struct_path", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_017_struct_01"]},
+        {"fact_id": "Q02_017_02", "fact_key": "integer_register_slots", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_017_struct_01", "codex_ev_Q02_017_save_02"]},
+        {"fact_id": "Q02_017_03", "fact_key": "float_register_slots", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_017_float_03"]},
+        {"fact_id": "Q02_017_04", "fact_key": "byte_size", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_017_struct_01"]},
+        {"fact_id": "Q02_017_05", "fact_key": "save_path", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_017_save_02"]},
+        {"fact_id": "Q02_017_06", "fact_key": "negative_search_coverage", "status_or_value": {"searched_keywords": ["struct trapframe", "trapframe", "ft0", "fcsr"], "searched_directories": ["include", "kernel/trap"], "file_count": 214, "match_count": 637, "coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q02_017_struct_01"]}
+      ],
+      "answer": {
+        "value": "TrapFrame is struct trapframe in repos/xv6-k210/include/trap.h. It has 5 kernel/control uint64 fields, 31 integer user-register fields (ra/sp/gp/tp, t0-t6, s0-s11, a0-a7), 32 floating-point register fields, and fcsr. The final annotated offset is 544 for fcsr, so the structure occupies 552 bytes if packed as listed, normally rounded by C alignment to 552 bytes because all fields are uint64.",
+        "used_evidence_ids": ["codex_ev_Q02_017_struct_01", "codex_ev_Q02_017_save_02", "codex_ev_Q02_017_float_03"],
+        "confidence": "high",
+        "notes": "Register count excludes the five kernel metadata/control words."
+      }
+    },
+    {
+      "question_id": "Q02_018",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q02_018_table_01", "type": "definition", "path": "repos/xv6-k210/kernel/syscall/syscall.c", "line_start": 188, "line_end": 258, "excerpt": "static uint64 (*syscalls[])(void) = { [SYS_fork] sys_fork, ... [SYS_msync] sys_msync };", "summary": "Syscall function pointer dispatch table exists."},
+        {"evidence_id": "codex_ev_Q02_018_dispatch_02", "type": "implementation_body", "path": "repos/xv6-k210/kernel/syscall/syscall.c", "line_start": 332, "line_end": 363, "excerpt": "num = p->trapframe->a7; if SYS_rt_sigreturn ... else if num < NELEM(syscalls) && syscalls[num] call syscalls[num](); else a0=-1", "summary": "syscall() dispatches through the table."},
+        {"evidence_id": "codex_ev_Q02_018_nums_03", "type": "definition", "path": "repos/xv6-k210/include/sysnum.h", "line_start": 4, "line_end": 78, "excerpt": "System call numbers define SYS_fork, SYS_write, SYS_mmap, ...", "summary": "Syscall numbers are defined in sysnum.h."}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q02_018_01", "fact_key": "syscall_table", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_018_table_01"]},
+        {"fact_id": "Q02_018_02", "fact_key": "syscall_number_source", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_018_nums_03"]},
+        {"fact_id": "Q02_018_03", "fact_key": "dispatch_implementation", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_018_dispatch_02"]},
+        {"fact_id": "Q02_018_04", "fact_key": "trapframe_a7", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_018_dispatch_02"]},
+        {"fact_id": "Q02_018_05", "fact_key": "special_case", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_018_dispatch_02"]},
+        {"fact_id": "Q02_018_06", "fact_key": "negative_search_coverage", "status_or_value": {"searched_keywords": ["syscalls", "syscall", "SYS_", "a7"], "searched_directories": ["kernel/syscall", "include"], "file_count": 214, "match_count": 637, "coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q02_018_table_01"]}
+      ],
+      "answer": {"value": "implemented", "used_evidence_ids": ["codex_ev_Q02_018_table_01", "codex_ev_Q02_018_dispatch_02", "codex_ev_Q02_018_nums_03"], "confidence": "high", "notes": "The dispatcher is table-based, with rt_sigreturn handled specially."}
+    },
+    {
+      "question_id": "Q02_019",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q02_019_bounds_01", "type": "implementation_body", "path": "repos/xv6-k210/kernel/syscall/syscall.c", "line_start": 340, "line_end": 363, "excerpt": "num = p->trapframe->a7; if (num < NELEM(syscalls) && syscalls[num]) ... else p->trapframe->a0 = -1", "summary": "Syscall number is bounds-checked and missing entries return -1."},
+        {"evidence_id": "codex_ev_Q02_019_table_02", "type": "definition", "path": "repos/xv6-k210/kernel/syscall/syscall.c", "line_start": 188, "line_end": 258, "excerpt": "static uint64 (*syscalls[])(void) = { ... }", "summary": "NELEM(syscalls) bounds the dispatch table."}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q02_019_01", "fact_key": "num_from_a7", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_019_bounds_01"]},
+        {"fact_id": "Q02_019_02", "fact_key": "upper_bound_check", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_019_bounds_01", "codex_ev_Q02_019_table_02"]},
+        {"fact_id": "Q02_019_03", "fact_key": "null_entry_check", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_019_bounds_01"]},
+        {"fact_id": "Q02_019_04", "fact_key": "default_error", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_019_bounds_01"]},
+        {"fact_id": "Q02_019_05", "fact_key": "no_panic_default", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_019_bounds_01"]},
+        {"fact_id": "Q02_019_06", "fact_key": "negative_search_coverage", "status_or_value": {"searched_keywords": ["NELEM", "syscalls", "a0 = -1", "unknown syscall"], "searched_directories": ["kernel/syscall"], "file_count": 214, "match_count": 637, "coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q02_019_bounds_01"]}
+      ],
+      "answer": {"value": "implemented", "used_evidence_ids": ["codex_ev_Q02_019_bounds_01", "codex_ev_Q02_019_table_02"], "confidence": "high", "notes": "The code checks table bounds and null table entries before dispatch."}
+    },
+    {
+      "question_id": "Q02_020",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q02_020_user_01", "type": "implementation_body", "path": "repos/xv6-k210/xv6-user/usys.pl", "line_start": 9, "line_end": 15, "excerpt": "entry(name): li a7, SYS_name; ecall; ret", "summary": "User syscall stubs place syscall number in a7 and execute ecall."},
+        {"evidence_id": "codex_ev_Q02_020_userwrite_02", "type": "call_site", "path": "repos/xv6-k210/xv6-user/usys.pl", "line_start": 21, "line_end": 24, "excerpt": "entry(\"read\"); entry(\"write\"); entry(\"close\");", "summary": "write user stub is generated."},
+        {"evidence_id": "codex_ev_Q02_020_trap_03", "type": "implementation_body", "path": "repos/xv6-k210/kernel/trap/trap.c", "line_start": 99, "line_end": 110, "excerpt": "if cause == EXCP_ENV_CALL ... epc += 4; intr_on(); syscall();", "summary": "User ecall reaches usertrap and calls syscall()."},
+        {"evidence_id": "codex_ev_Q02_020_dispatch_04", "type": "implementation_body", "path": "repos/xv6-k210/kernel/syscall/syscall.c", "line_start": 188, "line_end": 207, "excerpt": "[SYS_write] sys_write", "summary": "Dispatch table maps SYS_write to sys_write."},
+        {"evidence_id": "codex_ev_Q02_020_syswrite_05", "type": "implementation_body", "path": "repos/xv6-k210/kernel/syscall/sysfile.c", "line_start": 117, "line_end": 128, "excerpt": "sys_write gets fd, pointer, length and returns filewrite(f, p, n)", "summary": "sys_write implementation."},
+        {"evidence_id": "codex_ev_Q02_020_file_06", "type": "implementation_body", "path": "repos/xv6-k210/kernel/fs/file.c", "line_start": 155, "line_end": 189, "excerpt": "filewrite checks writable/range and writes to pipe, device or inode.", "summary": "sys_write continues into filewrite."}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q02_020_01", "fact_key": "user_stub", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_020_user_01", "codex_ev_Q02_020_userwrite_02"]},
+        {"fact_id": "Q02_020_02", "fact_key": "ecall_trap", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_020_trap_03"]},
+        {"fact_id": "Q02_020_03", "fact_key": "dispatcher", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_020_dispatch_04"]},
+        {"fact_id": "Q02_020_04", "fact_key": "sys_write_body", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_020_syswrite_05"]},
+        {"fact_id": "Q02_020_05", "fact_key": "filewrite_body", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_020_file_06"]},
+        {"fact_id": "Q02_020_06", "fact_key": "negative_search_coverage", "status_or_value": {"searched_keywords": ["write", "SYS_write", "ecall", "sys_write", "filewrite"], "searched_directories": ["xv6-user", "kernel", "include"], "file_count": 214, "match_count": 637, "coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q02_020_user_01"]}
+      ],
+      "answer": {"value": "write path: user stub generated by usys.pl sets a7=SYS_write and executes ecall -> usertrap sees EXCP_ENV_CALL, advances epc and calls syscall() -> syscall table dispatches [SYS_write] to sys_write -> sys_write extracts fd/buffer/len and calls filewrite -> filewrite validates and writes to pipe/device/inode.", "used_evidence_ids": ["codex_ev_Q02_020_user_01", "codex_ev_Q02_020_userwrite_02", "codex_ev_Q02_020_trap_03", "codex_ev_Q02_020_dispatch_04", "codex_ev_Q02_020_syswrite_05", "codex_ev_Q02_020_file_06"], "confidence": "high", "notes": "This traces one concrete syscall end to end."}
+    },
+    {
+      "question_id": "Q02_021",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q02_021_table_01", "type": "definition", "path": "repos/xv6-k210/kernel/syscall/syscall.c", "line_start": 188, "line_end": 258, "excerpt": "syscall table registers fork, execve, openat, write, mmap, munmap, kill, rt_sigaction and others.", "summary": "High-value syscalls are registered."},
+        {"evidence_id": "codex_ev_Q02_021_proc_02", "type": "implementation_body", "path": "repos/xv6-k210/kernel/syscall/sysproc.c", "line_start": 26, "line_end": 99, "excerpt": "sys_exec/sys_execve call execve; sys_fork calls clone; sys_clone calls clone", "summary": "Process syscalls have bodies."},
+        {"evidence_id": "codex_ev_Q02_021_file_03", "type": "implementation_body", "path": "repos/xv6-k210/kernel/syscall/sysfile.c", "line_start": 117, "line_end": 267, "excerpt": "sys_write and sys_openat implementations call filewrite/create/nameifrom/fdalloc.", "summary": "File syscalls have bodies."},
+        {"evidence_id": "codex_ev_Q02_021_mem_04", "type": "implementation_body", "path": "repos/xv6-k210/kernel/syscall/sysmem.c", "line_start": 79, "line_end": 128, "excerpt": "sys_mmap calls do_mmap; sys_munmap calls do_munmap.", "summary": "mmap/munmap have bodies."},
+        {"evidence_id": "codex_ev_Q02_021_signal_05", "type": "implementation_body", "path": "repos/xv6-k210/kernel/syscall/syssignal.c", "line_start": 134, "line_end": 141, "excerpt": "sys_kill gets pid/sig and calls kill(pid, sig).", "summary": "kill syscall has a body."},
+        {"evidence_id": "codex_ev_Q02_021_stub_06", "type": "implementation_body", "path": "repos/xv6-k210/kernel/syscall/sysproc.c", "line_start": 266, "line_end": 276, "excerpt": "sys_getuid returns 0; sys_prlimit64 returns 0 with comment may be implemented later.", "summary": "Some registered syscalls are stubs or shallow compatibility implementations."}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q02_021_01", "fact_key": "fork_exec", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_021_proc_02"]},
+        {"fact_id": "Q02_021_02", "fact_key": "open_write", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_021_file_03"]},
+        {"fact_id": "Q02_021_03", "fact_key": "mmap_munmap", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_021_mem_04"]},
+        {"fact_id": "Q02_021_04", "fact_key": "kill_signal", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_021_signal_05"]},
+        {"fact_id": "Q02_021_05", "fact_key": "stub_examples", "status_or_value": "stub_or_declaration_only", "used_evidence_ids": ["codex_ev_Q02_021_stub_06"]},
+        {"fact_id": "Q02_021_06", "fact_key": "negative_search_coverage", "status_or_value": {"searched_keywords": ["sys_fork", "sys_exec", "sys_mmap", "sys_openat", "sys_write", "sys_kill", "return 0"], "searched_directories": ["kernel/syscall"], "file_count": 214, "match_count": 637, "coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q02_021_table_01"]}
+      ],
+      "answer": {"value": "High-value syscall status: fork implemented [sys_fork->clone]; exec/execve implemented [calls execve]; mmap implemented [sys_mmap->do_mmap]; openat implemented [name lookup/create/fd allocation]; write implemented [sys_write->filewrite]; read implemented [sys_read->fileread]; kill implemented [sys_kill->kill]; wait/wait4 implemented [wait4 path]; rt_sigaction implemented but partial [copies handler only]; getuid/geteuid/getgid/getegid and prlimit64 are stub/shallow compatibility returns.", "used_evidence_ids": ["codex_ev_Q02_021_table_01", "codex_ev_Q02_021_proc_02", "codex_ev_Q02_021_file_03", "codex_ev_Q02_021_mem_04", "codex_ev_Q02_021_signal_05", "codex_ev_Q02_021_stub_06"], "confidence": "medium", "notes": "The listed syscalls are registered; the final group is intentionally shallow."}
+    },
+    {
+      "question_id": "Q02_022",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q02_022_copy_01", "type": "implementation_body", "path": "repos/xv6-k210/kernel/mm/vm.c", "line_start": 764, "line_end": 797, "excerpt": "copyout checks walkaddr; copyout2 checks partofseg and safememmove.", "summary": "copyout and copyout2 validate user address access."},
+        {"evidence_id": "codex_ev_Q02_022_copyin_02", "type": "implementation_body", "path": "repos/xv6-k210/kernel/mm/vm.c", "line_start": 836, "line_end": 855, "excerpt": "copyin2 checks partofseg; copyin_nocheck uses safememmove after prior validation.", "summary": "copyin path validates segments."},
+        {"evidence_id": "codex_ev_Q02_022_fetch_03", "type": "call_site", "path": "repos/xv6-k210/kernel/syscall/syscall.c", "line_start": 22, "line_end": 43, "excerpt": "fetchaddr uses copyin2; fetchstr uses copyinstr2.", "summary": "Syscall argument fetching uses user copy helpers."},
+        {"evidence_id": "codex_ev_Q02_022_file_04", "type": "call_site", "path": "repos/xv6-k210/kernel/fs/file.c", "line_start": 121, "line_end": 165, "excerpt": "fileread/filewrite check rangeinseg(addr, addr+n).", "summary": "File IO checks user buffer ranges."}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q02_022_01", "fact_key": "copyout_checks", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_022_copy_01"]},
+        {"fact_id": "Q02_022_02", "fact_key": "copyin_checks", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_022_copyin_02"]},
+        {"fact_id": "Q02_022_03", "fact_key": "fetch_uses_copy_helpers", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_022_fetch_03"]},
+        {"fact_id": "Q02_022_04", "fact_key": "range_checks", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_022_file_04"]},
+        {"fact_id": "Q02_022_05", "fact_key": "fault_escape", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_022_copy_01"]},
+        {"fact_id": "Q02_022_06", "fact_key": "negative_search_coverage", "status_or_value": {"searched_keywords": ["copyin", "copyout", "copyinstr", "rangeinseg", "partofseg", "walkaddr"], "searched_directories": ["kernel", "include"], "file_count": 214, "match_count": 637, "coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q02_022_copy_01"]}
+      ],
+      "answer": {"value": "implemented", "used_evidence_ids": ["codex_ev_Q02_022_copy_01", "codex_ev_Q02_022_copyin_02", "codex_ev_Q02_022_fetch_03", "codex_ev_Q02_022_file_04"], "confidence": "high", "notes": "The mechanism is named copyin2/copyout2/rangeinseg rather than access_ok."}
+    },
+    {
+      "question_id": "Q02_023",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q02_023_intr_01", "type": "implementation_body", "path": "repos/xv6-k210/kernel/trap/trap.c", "line_start": 251, "line_end": 263, "excerpt": "INTR_TIMER: timer_tick(); proc_tick(); return 0;", "summary": "Timer interrupt handler updates timer and process accounting."},
+        {"evidence_id": "codex_ev_Q02_023_yield_02", "type": "implementation_body", "path": "repos/xv6-k210/kernel/trap/trap.c", "line_start": 112, "line_end": 116, "excerpt": "else if (0 == handle_intr(cause)) { if (yield()) p->ivswtch += 1; }", "summary": "After handling a user interrupt, usertrap calls yield."},
+        {"evidence_id": "codex_ev_Q02_023_sched_03", "type": "implementation_body", "path": "repos/xv6-k210/kernel/sched/proc.c", "line_start": 628, "line_end": 649, "excerpt": "yield removes current proc, reinserts it runnable, and sched()s.", "summary": "yield performs preemptive scheduling if another proc is runnable."}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q02_023_01", "fact_key": "timer_decode", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_023_intr_01"]},
+        {"fact_id": "Q02_023_02", "fact_key": "tick_work", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_023_intr_01"]},
+        {"fact_id": "Q02_023_03", "fact_key": "yield_after_interrupt", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_023_yield_02"]},
+        {"fact_id": "Q02_023_04", "fact_key": "scheduler_call", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_023_sched_03"]},
+        {"fact_id": "Q02_023_05", "fact_key": "preemption_scope", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_023_yield_02", "codex_ev_Q02_023_sched_03"]},
+        {"fact_id": "Q02_023_06", "fact_key": "negative_search_coverage", "status_or_value": {"searched_keywords": ["INTR_TIMER", "timer_tick", "proc_tick", "yield", "sched"], "searched_directories": ["kernel/trap", "kernel/sched", "kernel"], "file_count": 214, "match_count": 637, "coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q02_023_intr_01"]}
+      ],
+      "answer": {"value": "implemented", "used_evidence_ids": ["codex_ev_Q02_023_intr_01", "codex_ev_Q02_023_yield_02", "codex_ev_Q02_023_sched_03"], "confidence": "high", "notes": "For user traps, any handled interrupt, including timer, reaches yield; kerneltrap itself does not yield."}
+    },
+    {
+      "question_id": "Q02_024",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q02_024_usertrap_01", "type": "implementation_body", "path": "repos/xv6-k210/kernel/trap/trap.c", "line_start": 132, "line_end": 140, "excerpt": "if (p->killed) { if SIGTERM exit; sighandle(); } usertrapret();", "summary": "Pending signal handling runs before returning to user mode."},
+        {"evidence_id": "codex_ev_Q02_024_signal_02", "type": "implementation_body", "path": "repos/xv6-k210/kernel/sched/signal.c", "line_start": 177, "line_end": 260, "excerpt": "sighandle chooses pending signal, allocates sig_frame/trapframe, sets epc to SIG_TRAMPOLINE sig_handler and p->trapframe=tf.", "summary": "Signal delivery rewrites trapframe to enter signal trampoline."},
+        {"evidence_id": "codex_ev_Q02_024_sigret_03", "type": "implementation_body", "path": "repos/xv6-k210/kernel/sched/signal.c", "line_start": 263, "line_end": 282, "excerpt": "sigreturn restores previous p->trapframe from sig_frame and frees frame.", "summary": "Signal return restores saved trapframe."},
+        {"evidence_id": "codex_ev_Q02_024_sys_04", "type": "implementation_body", "path": "repos/xv6-k210/kernel/syscall/syscall.c", "line_start": 340, "line_end": 348, "excerpt": "if SYS_rt_sigreturn == num: sigreturn();", "summary": "rt_sigreturn is special-cased in syscall dispatcher."}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q02_024_01", "fact_key": "pending_signal_before_return", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_024_usertrap_01"]},
+        {"fact_id": "Q02_024_02", "fact_key": "sighandle_body", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_024_signal_02"]},
+        {"fact_id": "Q02_024_03", "fact_key": "signal_trampoline", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_024_signal_02"]},
+        {"fact_id": "Q02_024_04", "fact_key": "sigreturn", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_024_sigret_03", "codex_ev_Q02_024_sys_04"]},
+        {"fact_id": "Q02_024_05", "fact_key": "trapframe_restore", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_024_sigret_03"]},
+        {"fact_id": "Q02_024_06", "fact_key": "negative_search_coverage", "status_or_value": {"searched_keywords": ["sighandle", "sigreturn", "SIG_TRAMPOLINE", "SYS_rt_sigreturn", "sig_pending"], "searched_directories": ["kernel", "include"], "file_count": 214, "match_count": 637, "coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q02_024_usertrap_01"]}
+      ],
+      "answer": {"value": "implemented", "used_evidence_ids": ["codex_ev_Q02_024_usertrap_01", "codex_ev_Q02_024_signal_02", "codex_ev_Q02_024_sigret_03", "codex_ev_Q02_024_sys_04"], "confidence": "high", "notes": "Signal delivery is tied to trap return and rt_sigreturn restores the old trapframe."}
+    },
+    {
+      "question_id": "Q02_025",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q02_025_decode_01", "type": "implementation_body", "path": "repos/xv6-k210/kernel/trap/trap.c", "line_start": 327, "line_end": 348, "excerpt": "handle_excp maps load/store/inst page/access faults to handle_page_fault(kind, r_stval()).", "summary": "Trap exception handler delegates page faults to memory module."},
+        {"evidence_id": "codex_ev_Q02_025_cow_02", "type": "implementation_body", "path": "repos/xv6-k210/kernel/mm/vm.c", "line_start": 975, "line_end": 999, "excerpt": "handle_store_page_fault_cow checks refcount, copies page if needed, sets PTE_W and clears PTE_COW.", "summary": "CoW page fault handling is implemented."},
+        {"evidence_id": "codex_ev_Q02_025_lazy_03", "type": "implementation_body", "path": "repos/xv6-k210/kernel/mm/vm.c", "line_start": 1002, "line_end": 1015, "excerpt": "handle_page_fault_lazy allocates a page for badaddr and sfence_vma.", "summary": "Lazy allocation fault handling is implemented."},
+        {"evidence_id": "codex_ev_Q02_025_mmap_04", "type": "implementation_body", "path": "repos/xv6-k210/kernel/mm/vm.c", "line_start": 1089, "line_end": 1099, "excerpt": "seg->type LOAD/HEAP/STACK/MMAP dispatches to loadelf, lazy, or handle_page_fault_mmap.", "summary": "Page fault handling dispatches by memory segment type."}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q02_025_01", "fact_key": "trap_page_fault_decode", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_025_decode_01"]},
+        {"fact_id": "Q02_025_02", "fact_key": "cow_handler", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_025_cow_02"]},
+        {"fact_id": "Q02_025_03", "fact_key": "lazy_handler", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_025_lazy_03"]},
+        {"fact_id": "Q02_025_04", "fact_key": "mmap_handler_dispatch", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_025_mmap_04"]},
+        {"fact_id": "Q02_025_05", "fact_key": "stval_use", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_025_decode_01"]},
+        {"fact_id": "Q02_025_06", "fact_key": "negative_search_coverage", "status_or_value": {"searched_keywords": ["handle_page_fault", "PTE_COW", "lazy", "MMAP", "r_stval"], "searched_directories": ["kernel/trap", "kernel/mm", "include"], "file_count": 214, "match_count": 637, "coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q02_025_decode_01"]}
+      ],
+      "answer": {"value": "Yes. trap.c handle_excp decodes page/access faults and calls handle_page_fault(kind, r_stval()). vm.c then handles CoW store faults, lazy HEAP/STACK allocation, LOAD-on-demand, and MMAP faults through segment-type dispatch.", "used_evidence_ids": ["codex_ev_Q02_025_decode_01", "codex_ev_Q02_025_cow_02", "codex_ev_Q02_025_lazy_03", "codex_ev_Q02_025_mmap_04"], "confidence": "high", "notes": "Illegal accesses that do not match a segment or legal fault path return failure to the trap layer."}
+    },
+    {
+      "question_id": "Q02_026",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q02_026_entry_01", "type": "implementation_body", "path": "repos/xv6-k210/kernel/entry.S", "line_start": 3, "line_end": 19, "excerpt": "_entry derives stack offset from a0, uses boot_stack, .space 4096*4*2.", "summary": "Boot stack is per-hart sized for two harts."},
+        {"evidence_id": "codex_ev_Q02_026_main_02", "type": "implementation_body", "path": "repos/xv6-k210/kernel/main.c", "line_start": 39, "line_end": 86, "excerpt": "hart 0 initializes; sends sbi_send_ipi to other harts; other harts wait for started then run floatinithart/kvminithart/trapinithart.", "summary": "AP startup order is explicit in main."},
+        {"evidence_id": "codex_ev_Q02_026_free_03", "type": "implementation_body", "path": "repos/xv6-k210/kernel/main.c", "line_start": 89, "line_end": 97, "excerpt": "shrink the boot stack; freepage(kstack + PGSIZE*i); scheduler();", "summary": "After boot each hart frees most of its boot stack and enters scheduler."},
+        {"evidence_id": "codex_ev_Q02_026_trap_04", "type": "call_site", "path": "repos/xv6-k210/kernel/main.c", "line_start": 81, "line_end": 83, "excerpt": "floatinithart(); kvminithart(); trapinithart();", "summary": "Secondary harts install MMU and trap vector before scheduling."}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q02_026_01", "fact_key": "per_hart_boot_stack", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_026_entry_01"]},
+        {"fact_id": "Q02_026_02", "fact_key": "hart0_order", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_026_main_02"]},
+        {"fact_id": "Q02_026_03", "fact_key": "ap_wait_started", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_026_main_02"]},
+        {"fact_id": "Q02_026_04", "fact_key": "ap_trap_init", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_026_trap_04"]},
+        {"fact_id": "Q02_026_05", "fact_key": "scheduler_after_init", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_026_free_03"]},
+        {"fact_id": "Q02_026_06", "fact_key": "negative_search_coverage", "status_or_value": {"searched_keywords": ["NCPU", "hart", "boot_stack", "sbi_send_ipi", "trapinithart", "scheduler"], "searched_directories": ["kernel", "include"], "file_count": 214, "match_count": 637, "coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q02_026_entry_01"]}
+      ],
+      "answer": {"value": "Consistent for a two-hart design: entry.S computes a per-hart boot-stack offset, hart 0 initializes global subsystems and sends SBI IPIs, secondary harts wait for started and then run floatinithart, kvminithart and trapinithart before entering scheduler. There is no separate per-CPU trap stack; kernel traps use the current kernel stack.", "used_evidence_ids": ["codex_ev_Q02_026_entry_01", "codex_ev_Q02_026_main_02", "codex_ev_Q02_026_free_03", "codex_ev_Q02_026_trap_04"], "confidence": "high", "notes": "This answers the boot/trap side of the SMP consistency question."}
+    },
+    {
+      "question_id": "Q02_027",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q02_027_table_01", "type": "definition", "path": "repos/xv6-k210/kernel/syscall/syscall.c", "line_start": 188, "line_end": 258, "excerpt": "static uint64 (*syscalls[])(void) has 69 initializer rows, with SYS_getpid appearing twice.", "summary": "Registered syscall table entries counted from source."},
+        {"evidence_id": "codex_ev_Q02_027_nums_02", "type": "definition", "path": "repos/xv6-k210/include/sysnum.h", "line_start": 4, "line_end": 78, "excerpt": "sysnum.h defines 71 SYS_* names, including SYS_rename, SYS_syslog and SYS_rt_sigreturn.", "summary": "Syscall number definitions counted from source."},
+        {"evidence_id": "codex_ev_Q02_027_dispatch_03", "type": "implementation_body", "path": "repos/xv6-k210/kernel/syscall/syscall.c", "line_start": 340, "line_end": 363, "excerpt": "SYS_rt_sigreturn is special-cased; table entries are dispatched; missing entries return -1.", "summary": "rt_sigreturn is not table-registered but is handled; missing entries return -1."},
+        {"evidence_id": "codex_ev_Q02_027_stub_04", "type": "implementation_body", "path": "repos/xv6-k210/kernel/syscall/sysproc.c", "line_start": 266, "line_end": 276, "excerpt": "sys_getuid returns 0; sys_prlimit64 returns 0 with comment may be implemented later.", "summary": "Representative stub/shallow syscalls."},
+        {"evidence_id": "codex_ev_Q02_027_stub_05", "type": "implementation_body", "path": "repos/xv6-k210/kernel/syscall/systime.c", "line_start": 55, "line_end": 57, "excerpt": "sys_adjtimex returns 0.", "summary": "Another stub example."}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q02_027_01", "fact_key": "dispatch_table_path", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_027_table_01"]},
+        {"fact_id": "Q02_027_02", "fact_key": "registered_count", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_027_table_01", "codex_ev_Q02_027_dispatch_03"]},
+        {"fact_id": "Q02_027_03", "fact_key": "sysnum_count", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_027_nums_02"]},
+        {"fact_id": "Q02_027_04", "fact_key": "stub_count_estimate", "status_or_value": "yes_weak", "used_evidence_ids": ["codex_ev_Q02_027_stub_04", "codex_ev_Q02_027_stub_05"]},
+        {"fact_id": "Q02_027_05", "fact_key": "unregistered_count", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_027_nums_02", "codex_ev_Q02_027_table_01"]},
+        {"fact_id": "Q02_027_06", "fact_key": "negative_search_coverage", "status_or_value": {"searched_keywords": ["SYS_", "syscalls", "return 0", "unsupported", "not supported"], "searched_directories": ["kernel/syscall", "include"], "file_count": 214, "match_count": 637, "coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q02_027_table_01"]}
+      ],
+      "answer": {"value": "分发表路径: repos/xv6-k210/kernel/syscall/syscall.c. 完整实现: about 62-63 non-stub registered/special syscalls. 桩/浅兼容: about 6-7, examples getuid/geteuid/getgid/getegid alias sys_getuid returning 0, prlimit64 returning 0, adjtimex returning 0, and setitimer effectively not arming a timer. 未注册: 2 names from sysnum.h are not table-dispatched/special-cased: SYS_rename and SYS_syslog. 统计依据: sysnum.h has 71 SYS_* names; syscall.c has 69 initializer rows but one duplicate SYS_getpid, plus special SYS_rt_sigreturn handling.", "used_evidence_ids": ["codex_ev_Q02_027_table_01", "codex_ev_Q02_027_nums_02", "codex_ev_Q02_027_dispatch_03", "codex_ev_Q02_027_stub_04", "codex_ev_Q02_027_stub_05"], "confidence": "medium", "notes": "Exact implemented-vs-shallow count is an estimate because some compatibility syscalls validate arguments but intentionally implement limited semantics."}
+    },
+    {
+      "question_id": "Q02_028",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q02_028_readme_01", "type": "definition", "path": "repos/xv6-k210/README.md", "line_start": 1, "line_end": 1, "excerpt": "README.md exists in the repo.", "summary": "README exists, but the syscall detail is mostly in docs."},
+        {"evidence_id": "codex_ev_Q02_028_doc_02", "type": "usage_flow", "path": "repos/xv6-k210/doc/构建调试-系统调用.md", "line_start": 112, "line_end": 135, "excerpt": "Document describes syscall() and the syscalls[] table in kernel/syscall.c.", "summary": "Documentation claims the table-based syscall mechanism."},
+        {"evidence_id": "codex_ev_Q02_028_docv2_03", "type": "usage_flow", "path": "repos/xv6-k210/doc/构建调试-系统调用v2.md", "line_start": 2,
+          "line_end": 46,
+          "excerpt": "Document says xv6-k210 added many syscalls; examples include rename/move and notes root-like direct returns for multi-user related syscalls.",
+          "summary": "Syscall v2 docs discuss added compatibility syscalls and shallow multi-user returns."},
+        {"evidence_id": "codex_ev_Q02_028_table_04", "type": "definition", "path": "repos/xv6-k210/kernel/syscall/syscall.c", "line_start": 188, "line_end": 258, "excerpt": "Actual syscalls[] table entries.", "summary": "Code is the source of truth for registered syscalls."}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q02_028_01", "fact_key": "readme_exists", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_028_readme_01"]},
+        {"fact_id": "Q02_028_02", "fact_key": "syscall_doc_exists", "status_or_value": "yes_weak", "used_evidence_ids": ["codex_ev_Q02_028_doc_02"]},
+        {"fact_id": "Q02_028_03", "fact_key": "added_syscalls_claim", "status_or_value": "yes_weak", "used_evidence_ids": ["codex_ev_Q02_028_docv2_03"]},
+        {"fact_id": "Q02_028_04", "fact_key": "actual_table", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_028_table_04"]},
+        {"fact_id": "Q02_028_05", "fact_key": "claim_vs_code", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_028_docv2_03", "codex_ev_Q02_028_table_04"]},
+        {"fact_id": "Q02_028_06", "fact_key": "negative_search_coverage", "status_or_value": {"searched_keywords": ["syscall", "兼容", "实现", "syscalls", "Linux"], "searched_directories": ["README.md", "README_cn.md", "doc", "kernel/syscall"], "file_count": 214, "match_count": 637, "coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q02_028_table_04"]}
+      ],
+      "answer": {"value": "README files exist, but detailed syscall claims are in doc/构建调试-系统调用*.md rather than a single README table. The docs correctly describe user stubs, ecall, usertrap, syscall(), and syscalls[] dispatch. The v2 doc says many compatibility syscalls were added and notes some multi-user calls directly return root-like values; code confirms a broad table but also confirms shallow entries such as getuid-style calls and prlimit64/adjtimex.", "used_evidence_ids": ["codex_ev_Q02_028_readme_01", "codex_ev_Q02_028_doc_02", "codex_ev_Q02_028_docv2_03", "codex_ev_Q02_028_table_04"], "confidence": "medium", "notes": "Because the README is not the main syscall claim source, I used the repo syscall docs plus code table for comparison."}
+    },
+    {
+      "question_id": "Q02_029",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q02_029_neg_01", "type": "negative_search", "path": "repos/xv6-k210", "summary": "grep pattern _impl\\b|sys_[a-z0-9_]*_impl across kernel, include, doc, xv6-user and Makefile returned 0 matches."}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q02_029_01", "fact_key": "impl_pattern_search", "status_or_value": "no_after_negative_search", "used_evidence_ids": ["codex_ev_Q02_029_neg_01"]},
+        {"fact_id": "Q02_029_02", "fact_key": "sys_impl_pattern_search", "status_or_value": "no_after_negative_search", "used_evidence_ids": ["codex_ev_Q02_029_neg_01"]},
+        {"fact_id": "Q02_029_03", "fact_key": "kernel_coverage", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_029_neg_01"]},
+        {"fact_id": "Q02_029_04", "fact_key": "include_coverage", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_029_neg_01"]},
+        {"fact_id": "Q02_029_05", "fact_key": "user_doc_coverage", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_029_neg_01"]},
+        {"fact_id": "Q02_029_06", "fact_key": "negative_search_coverage", "status_or_value": {"searched_keywords": ["_impl\\b", "sys_[a-z0-9_]*_impl"], "searched_directories": ["kernel", "include", "doc", "xv6-user", "Makefile"], "file_count": 214, "match_count": 0, "coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q02_029_neg_01"]}
+      ],
+      "answer": {"value": "未见该命名模式。grep `_impl\\b|sys_[a-z0-9_]*_impl` across the allowed xv6-k210 source/doc tree returned zero matches.", "used_evidence_ids": ["codex_ev_Q02_029_neg_01"], "confidence": "high", "notes": "Normal syscall names are sys_write, sys_mmap, etc., without _impl suffix."}
+    },
+    {
+      "question_id": "Q02_030",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q02_030_plic_01", "type": "implementation_body", "path": "repos/xv6-k210/kernel/hal/plic.c", "line_start": 24, "line_end": 61, "excerpt": "plicinit enables DISK_IRQ and UART_IRQ; plicinithart enables PLIC bits depending on QEMU/k210.", "summary": "PLIC initialization exists."},
+        {"evidence_id": "codex_ev_Q02_030_intr_02", "type": "implementation_body", "path": "repos/xv6-k210/kernel/trap/trap.c", "line_start": 265, "line_end": 313, "excerpt": "external/software external path claims irq, switches UART_IRQ/DISK_IRQ, calls consoleintr or disk_intr, plic_complete.", "summary": "External interrupt dispatch exists."},
+        {"evidence_id": "codex_ev_Q02_030_main_03", "type": "call_site", "path": "repos/xv6-k210/kernel/main.c", "line_start": 51, "line_end": 54, "excerpt": "trapinithart(); procinit(); plicinit(); plicinithart();", "summary": "PLIC init is called during boot."}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q02_030_01", "fact_key": "plic_init", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_030_plic_01", "codex_ev_Q02_030_main_03"]},
+        {"fact_id": "Q02_030_02", "fact_key": "external_decode", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_030_intr_02"]},
+        {"fact_id": "Q02_030_03", "fact_key": "irq_claim", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_030_intr_02"]},
+        {"fact_id": "Q02_030_04", "fact_key": "device_dispatch", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_030_intr_02"]},
+        {"fact_id": "Q02_030_05", "fact_key": "irq_complete", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_030_intr_02"]},
+        {"fact_id": "Q02_030_06", "fact_key": "negative_search_coverage", "status_or_value": {"searched_keywords": ["PLIC", "plic_claim", "UART_IRQ", "DISK_IRQ", "INTR_EXTERNAL"], "searched_directories": ["kernel", "include"], "file_count": 214, "match_count": 637, "coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q02_030_intr_02"]}
+      ],
+      "answer": {"value": "implemented", "used_evidence_ids": ["codex_ev_Q02_030_plic_01", "codex_ev_Q02_030_intr_02", "codex_ev_Q02_030_main_03"], "confidence": "high", "notes": "This is distinct from timer interrupt handling; device IRQs are claimed/completed through PLIC."}
+    },
+    {
+      "question_id": "Q02_031",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q02_031_signal_defs_01", "type": "definition", "path": "repos/xv6-k210/include/sched/signal.h", "line_start": 10, "line_end": 19, "excerpt": "Defines SIGTERM, SIGKILL, SIGABRT, SIGHUP, SIGINT, SIGQUIT, SIGILL, SIGTRAP, SIGCHLD; no SIGSEGV.", "summary": "Signal header does not define SIGSEGV."},
+        {"evidence_id": "codex_ev_Q02_031_trap_02", "type": "implementation_body", "path": "repos/xv6-k210/kernel/trap/trap.c", "line_start": 118, "line_end": 129, "excerpt": "unhandled user trap prints unexpected scause and sets p->killed = SIGTERM.", "summary": "Unexpected illegal access kills with SIGTERM, not SIGSEGV."},
+        {"evidence_id": "codex_ev_Q02_031_neg_03", "type": "negative_search", "path": "repos/xv6-k210", "summary": "Searched SIGSEGV, sigsegv, sig_segv and SEGV across allowed source/docs; match_count=0."}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q02_031_01", "fact_key": "sigsegv_symbol", "status_or_value": "no_after_negative_search", "used_evidence_ids": ["codex_ev_Q02_031_signal_defs_01", "codex_ev_Q02_031_neg_03"]},
+        {"fact_id": "Q02_031_02", "fact_key": "illegal_access_trap", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_031_trap_02"]},
+        {"fact_id": "Q02_031_03", "fact_key": "kill_signal_used", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_031_trap_02"]},
+        {"fact_id": "Q02_031_04", "fact_key": "signal_defs", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_031_signal_defs_01"]},
+        {"fact_id": "Q02_031_05", "fact_key": "segv_delivery", "status_or_value": "no_after_negative_search", "used_evidence_ids": ["codex_ev_Q02_031_neg_03"]},
+        {"fact_id": "Q02_031_06", "fact_key": "negative_search_coverage", "status_or_value": {"searched_keywords": ["SIGSEGV", "sigsegv", "sig_segv", "SEGV"], "searched_directories": ["kernel", "include", "xv6-user", "doc"], "file_count": 214, "match_count": 0, "coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q02_031_neg_03"]}
+      ],
+      "answer": {"value": "not_found", "used_evidence_ids": ["codex_ev_Q02_031_signal_defs_01", "codex_ev_Q02_031_trap_02", "codex_ev_Q02_031_neg_03"], "confidence": "high", "notes": "Illegal/unhandled user trap paths set SIGTERM; SIGSEGV is not defined or delivered."}
+    },
+    {
+      "question_id": "Q02_032",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q02_032_syskill_01", "type": "implementation_body", "path": "repos/xv6-k210/kernel/syscall/syssignal.c", "line_start": 134, "line_end": 141, "excerpt": "sys_kill reads pid and sig, then return kill(pid, sig).", "summary": "Process-level kill syscall exists."},
+        {"evidence_id": "codex_ev_Q02_032_kill_02", "type": "implementation_body", "path": "repos/xv6-k210/kernel/sched/proc.c", "line_start": 541, "line_end": 579, "excerpt": "kill searches proc by pid, sets sig_pending and killed, wakes sleeping proc.", "summary": "kill targets a process id."},
+        {"evidence_id": "codex_ev_Q02_032_neg_03", "type": "negative_search", "path": "repos/xv6-k210", "summary": "Searched sys_tkill, sys_tgkill, tkill, tgkill across kernel/include/user/docs; match_count=0."}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q02_032_01", "fact_key": "sys_kill", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_032_syskill_01"]},
+        {"fact_id": "Q02_032_02", "fact_key": "process_pid_granularity", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_032_kill_02"]},
+        {"fact_id": "Q02_032_03", "fact_key": "sys_tkill", "status_or_value": "no_after_negative_search", "used_evidence_ids": ["codex_ev_Q02_032_neg_03"]},
+        {"fact_id": "Q02_032_04", "fact_key": "sys_tgkill", "status_or_value": "no_after_negative_search", "used_evidence_ids": ["codex_ev_Q02_032_neg_03"]},
+        {"fact_id": "Q02_032_05", "fact_key": "process_group_signal", "status_or_value": "no_after_negative_search", "used_evidence_ids": ["codex_ev_Q02_032_neg_03"]},
+        {"fact_id": "Q02_032_06", "fact_key": "negative_search_coverage", "status_or_value": {"searched_keywords": ["sys_kill", "sys_tkill", "sys_tgkill", "tkill", "tgkill"], "searched_directories": ["kernel", "include", "xv6-user", "doc"], "file_count": 214, "match_count": 0, "coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q02_032_neg_03"]}
+      ],
+      "answer": {"value": "Supported signal-send granularity is process-level by pid: sys_kill(pid, sig) calls kill(pid, sig), which searches the process table by pid and marks sig_pending/killed. I found no tkill/tgkill thread-level or process-group signal syscall implementation.", "used_evidence_ids": ["codex_ev_Q02_032_syskill_01", "codex_ev_Q02_032_kill_02", "codex_ev_Q02_032_neg_03"], "confidence": "high", "notes": "The code has clone support, but no separate thread-directed signal syscall was found."}
+    },
+    {
+      "question_id": "Q02_033",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q02_033_defs_01", "type": "definition", "path": "repos/xv6-k210/kernel/trap/trap.c", "line_start": 26, "line_end": 41, "excerpt": "INTERRUPT_FLAG; INTR_SOFTWARE/TIMER/EXTERNAL; EXCP_INST/LOAD/STORE/ENV_CALL/PAGE codes.", "summary": "Trap causes are classified by scause numeric encodings."},
+        {"evidence_id": "codex_ev_Q02_033_usertrap_02", "type": "implementation_body", "path": "repos/xv6-k210/kernel/trap/trap.c", "line_start": 95, "line_end": 120, "excerpt": "cause = r_scause(); if cause == EXCP_ENV_CALL ... else if handle_intr(cause) ... else if handle_excp(cause)", "summary": "usertrap reads scause and software-dispatches by cause."},
+        {"evidence_id": "codex_ev_Q02_033_intr_03", "type": "implementation_body", "path": "repos/xv6-k210/kernel/trap/trap.c", "line_start": 244, "line_end": 348, "excerpt": "handle_intr matches INTR_TIMER/external/software; handle_excp switches page/access faults.", "summary": "Interrupts and exceptions are separated by scause values."}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q02_033_01", "fact_key": "cause_constants", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_033_defs_01"]},
+        {"fact_id": "Q02_033_02", "fact_key": "scause_read", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_033_usertrap_02"]},
+        {"fact_id": "Q02_033_03", "fact_key": "interrupt_decode", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_033_intr_03"]},
+        {"fact_id": "Q02_033_04", "fact_key": "exception_decode", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_033_intr_03"]},
+        {"fact_id": "Q02_033_05", "fact_key": "single_vector_software_dispatch", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_033_usertrap_02"]},
+        {"fact_id": "Q02_033_06", "fact_key": "negative_search_coverage", "status_or_value": {"searched_keywords": ["scause", "INTR_", "EXCP_", "handle_intr", "handle_excp"], "searched_directories": ["kernel/trap", "include"], "file_count": 214, "match_count": 637, "coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q02_033_defs_01"]}
+      ],
+      "answer": {"value": "通过 scause/mcause/VBAR 中断原因寄存器区分（硬件编码原因号）", "used_evidence_ids": ["codex_ev_Q02_033_defs_01", "codex_ev_Q02_033_usertrap_02", "codex_ev_Q02_033_intr_03"], "confidence": "high", "notes": "In this RISC-V code the concrete register is scause; stvec is a shared entry selected for kernel/user context, then software dispatches by scause."}
+    },
+    {
+      "question_id": "Q02_034",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q02_034_kernel_01", "type": "implementation_body", "path": "repos/xv6-k210/kernel/trap/trap.c", "line_start": 197, "line_end": 242, "excerpt": "kerneltrap saves sepc/sstatus/scause, asserts SPP and asserts intr_get()==0, handles trap, restores sepc and sstatus.", "summary": "Kernel trap handler expects interrupts disabled and restores prior sstatus."},
+        {"evidence_id": "codex_ev_Q02_034_user_02", "type": "implementation_body", "path": "repos/xv6-k210/kernel/trap/trap.c", "line_start": 99, "line_end": 110, "excerpt": "For syscalls only, after epc += 4, comment says don't enable until done with registers; intr_on(); syscall();", "summary": "Interrupts are re-enabled for syscall handling, not for general interrupt nesting."},
+        {"evidence_id": "codex_ev_Q02_034_intr_03", "type": "implementation_body", "path": "repos/xv6-k210/kernel/trap/trap.c", "line_start": 244, "line_end": 324, "excerpt": "handle_intr handles timer/external/software interrupts without intr_on or nested_irq logic.", "summary": "Interrupt handler body does not re-enable interrupts."},
+        {"evidence_id": "codex_ev_Q02_034_neg_04", "type": "negative_search", "path": "repos/xv6-k210", "summary": "Searched enable_irq_in_handler, nested_irq, nested interrupt, intr_on in handler paths; no explicit nested interrupt support was found."}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q02_034_01", "fact_key": "vector_setup", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_034_kernel_01"]},
+        {"fact_id": "Q02_034_02", "fact_key": "context_save_restore", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_034_kernel_01"]},
+        {"fact_id": "Q02_034_03", "fact_key": "cause_decode", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_034_intr_03"]},
+        {"fact_id": "Q02_034_04", "fact_key": "return_to_user", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q02_034_user_02"]},
+        {"fact_id": "Q02_034_05", "fact_key": "nesting_policy", "status_or_value": "no_after_negative_search", "used_evidence_ids": ["codex_ev_Q02_034_kernel_01", "codex_ev_Q02_034_intr_03", "codex_ev_Q02_034_neg_04"]},
+        {"fact_id": "Q02_034_06", "fact_key": "negative_search_coverage", "status_or_value": {"searched_keywords": ["trap", "interrupt", "exception", "syscall", "stvec", "trapframe", "context", "scause", "irq", "usertrapret", "sret", "enable_irq_in_handler", "nested_irq"], "searched_directories": ["kernel", "trap", "include", "syscall"], "file_count": 214, "match_count": 637, "coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q02_034_neg_04"]}
+      ],
+      "answer": {"value": "not_found", "used_evidence_ids": ["codex_ev_Q02_034_kernel_01", "codex_ev_Q02_034_user_02", "codex_ev_Q02_034_intr_03", "codex_ev_Q02_034_neg_04"], "confidence": "high", "notes": "The kernel trap path asserts interrupts are disabled; handle_intr does not re-enable interrupts. intr_on appears in syscall handling after the syscall cause is separated, not as nested interrupt support inside interrupt handlers."}
+    }
+  ],
+  "unknowns": [
+    "No firmware source for sbi/sbi-k210 or sbi/sbi-qemu was present in the allowed source file listing, so internal SBI M-to-S implementation details are documented/build-evidenced rather than source-verified.",
+    "Syscall coverage has an interval because several compatibility syscalls validate arguments but intentionally implement only shallow semantics.",
+    "TrapFrame storage choice is slightly mismatched with the questionnaire choices: code kmallocs p->trapframe but trampoline uses it as per-process trampoline-accessible state."
+  ],
+  "key_source_paths_read": [
+    "core/describe_stage_qa/02_boot_trap.json",
+    "repos/xv6-k210/Makefile",
+    "repos/xv6-k210/linker/linker64.ld",
+    "repos/xv6-k210/linker/k210.ld",
+    "repos/xv6-k210/kernel/entry.S",
+    "repos/xv6-k210/kernel/entry_k210.S",
+    "repos/xv6-k210/kernel/main.c",
+    "repos/xv6-k210/include/hal/riscv.h",
+    "repos/xv6-k210/include/memlayout.h",
+    "repos/xv6-k210/include/trap.h",
+    "repos/xv6-k210/kernel/trap/trap.c",
+    "repos/xv6-k210/kernel/trap/kernelvec.S",
+    "repos/xv6-k210/kernel/trap/trampoline.S",
+    "repos/xv6-k210/kernel/mm/vm.c",
+    "repos/xv6-k210/kernel/sched/proc.c",
+    "repos/xv6-k210/kernel/sched/signal.c",
+    "repos/xv6-k210/kernel/syscall/syscall.c",
+    "repos/xv6-k210/kernel/syscall/sysfile.c",
+    "repos/xv6-k210/kernel/syscall/sysproc.c",
+    "repos/xv6-k210/kernel/syscall/sysmem.c",
+    "repos/xv6-k210/kernel/syscall/syssignal.c",
+    "repos/xv6-k210/kernel/syscall/systime.c",
+    "repos/xv6-k210/include/sysnum.h",
+    "repos/xv6-k210/include/sbi.h",
+    "repos/xv6-k210/kernel/hal/plic.c",
+    "repos/xv6-k210/kernel/timer.c",
+    "repos/xv6-k210/kernel/console.c",
+    "repos/xv6-k210/kernel/fs/file.c",
+    "repos/xv6-k210/xv6-user/usys.pl",
+    "repos/xv6-k210/doc/report_2020_12_26.md",
+    "repos/xv6-k210/doc/rustsbi.md"
+  ]
+}

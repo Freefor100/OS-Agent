@@ -3,11 +3,12 @@ from __future__ import annotations
 import json
 import os
 import threading
+import time
 import uuid
 from collections import deque
 from contextlib import contextmanager
 from contextvars import ContextVar
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 from core.agent_graph_state import AgentEvent, utcnow_iso
 
@@ -80,6 +81,35 @@ class EventLogger:
             self._render(event)
         return event
 
+    def emit_debug(
+        self,
+        event_type: str,
+        message: str,
+        *,
+        stage_id: str = "",
+        task_id: str = "",
+        agent_name: str = "",
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Write a debug-only event to debug_events.jsonl; does NOT touch events.jsonl or the dashboard."""
+        event = AgentEvent(
+            event_id=str(uuid.uuid4()),
+            timestamp=utcnow_iso(),
+            run_id=self.run_id,
+            stage_id=stage_id,
+            task_id=task_id,
+            agent_name=agent_name,
+            event_type=event_type,
+            level="debug",
+            message=message,
+            metadata=metadata or {},
+        )
+        with self._lock:
+            with open(self.debug_events_path, "a", encoding="utf-8") as f:
+                debug_payload = event.to_dict()
+                debug_payload["_debug"] = {"state_dir": self.state_dir}
+                f.write(json.dumps(debug_payload, ensure_ascii=False) + "\n")
+
     def _render(self, event: AgentEvent) -> None:
         if self.mode == "dashboard":
             self._dashboard.update(event)
@@ -139,6 +169,14 @@ class _DashboardState:
             "reviews_done": 0,
         }
         self.last_errors: deque[str] = deque(maxlen=5)
+        # Token tracking
+        self.token_counters: Dict[str, int] = {
+            "prompt": 0, "completion": 0, "thinking": 0, "total": 0,
+        }
+        self._token_timestamps: deque = deque(maxlen=60)  # (monotonic_ts, delta_tokens)
+        # Per-stage progress (done_tasks, total_questions) and review scores
+        self.stage_progress: Dict[str, Tuple[int, int]] = {}
+        self.stage_scores: Dict[str, float] = {}
 
     def update(self, event: AgentEvent) -> None:
         self.recent_events.append(event)
@@ -204,8 +242,33 @@ class _DashboardState:
 
         if et == "llm_done":
             self.counters["llm_calls"] += 1
+            u = event.token_usage or {}
+            delta = u.get("total_tokens", 0)
+            if delta:
+                self.token_counters["prompt"] += u.get("prompt_tokens", 0)
+                self.token_counters["completion"] += u.get("completion_tokens", 0)
+                # DeepSeek thinking tokens appear in completion_tokens_details.reasoning_tokens
+                self.token_counters["thinking"] += u.get("reasoning_tokens", 0)
+                self.token_counters["total"] += delta
+                self._token_timestamps.append((time.monotonic(), delta))
+
+        if et == "stage_start" and event.stage_id:
+            total_q = (event.metadata or {}).get("total_questions", 0)
+            self.stage_progress[event.stage_id] = (0, int(total_q))
+
+        if et in {"task_done", "task_error"} and event.stage_id:
+            done, total = self.stage_progress.get(event.stage_id, (0, 0))
+            self.stage_progress[event.stage_id] = (done + 1, total)
+
         if et == "review_done":
             self.counters["reviews_done"] += 1
+            if event.stage_id:
+                score = (event.metadata or {}).get("score")
+                if score is not None:
+                    try:
+                        self.stage_scores[event.stage_id] = float(score)
+                    except (TypeError, ValueError):
+                        pass
 
     def render(self, *, preview_chars: int) -> None:
         self._frame += 1
@@ -213,6 +276,11 @@ class _DashboardState:
             self._render_rich(preview_chars=preview_chars)
             return
         self._render_plain(preview_chars=preview_chars)
+
+    def _tokens_per_min(self) -> int:
+        now = time.monotonic()
+        window = [(ts, d) for ts, d in self._token_timestamps if now - ts <= 60]
+        return sum(d for _, d in window)
 
     def _render_rich(self, *, preview_chars: int) -> None:
         assert self._console is not None
@@ -228,22 +296,44 @@ class _DashboardState:
             self._metric("Tools", f"{self.counters['tools_done']} done / {self.counters['tools_blocked']} blocked", "yellow"),
             self._metric("LLM/Review", f"{self.counters['llm_calls']} / {self.counters['reviews_done']}", "magenta"),
         )
+        # Token row
+        tc = self.token_counters
+        tok_total_k = tc["total"] // 1000
+        tok_prompt_k = tc["prompt"] // 1000
+        tok_comp_k = tc["completion"] // 1000
+        tok_think_k = tc["thinking"] // 1000
+        tok_rate = self._tokens_per_min()
+        think_part = f"  \U0001f9e0{tok_think_k}k" if tok_think_k > 0 else ""
+        token_line = Text.assemble(
+            ("Tokens  ", "bold blue"),
+            (f"total={tok_total_k}k  P={tok_prompt_k}k  C={tok_comp_k}k{think_part}  ~{tok_rate}/min", "bright_white"),
+        ) if Text is not None else f"Tokens total={tok_total_k}k P={tok_prompt_k}k C={tok_comp_k}k{think_part} ~{tok_rate}/min"
 
         stages = Table(box=box.SIMPLE_HEAVY, expand=True)
         stages.add_column("Stage", style="bold cyan", no_wrap=True)
         stages.add_column("Phase", style="yellow", no_wrap=True)
-        stages.add_column("Status", style="green", no_wrap=True)
+        stages.add_column("Progress", no_wrap=True)
+        stages.add_column("Score", no_wrap=True)
         stages.add_column("Message", overflow="fold")
         if self.active_stages:
             for sid, item in sorted(self.active_stages.items()):
+                done, total = self.stage_progress.get(sid, (0, 0))
+                progress_str = f"{done}/{total}" if total else f"{done}"
+                score_val = self.stage_scores.get(sid)
+                if score_val is not None:
+                    score_color = "green" if score_val >= 0.7 else ("yellow" if score_val >= 0.4 else "red")
+                    score_cell = Text(f"{score_val:.2f}", style=score_color) if Text else f"{score_val:.2f}"
+                else:
+                    score_cell = Text("-", style="dim") if Text else "-"
                 stages.add_row(
                     sid,
                     str(item.get("phase") or "running"),
-                    str(item.get("status") or "running"),
+                    progress_str,
+                    score_cell,
                     self._truncate(str(item.get("message") or ""), preview_chars)
                 )
         else:
-            stages.add_row("-", "-", "idle", "none")
+            stages.add_row("-", "-", "-", "-", "idle")
 
         tasks = Table(box=box.SIMPLE_HEAVY, expand=True)
         tasks.add_column("Stage", style="cyan", no_wrap=True)
@@ -272,11 +362,17 @@ class _DashboardState:
         recent.add_column("Message", overflow="fold")
         for event in list(self.recent_events)[-10:]:
             scope = "/".join([x for x in [event.stage_id, event.task_id, event.agent_name] if x]) or "run"
+            msg = self._truncate((event.message or "").replace("\n", " "), preview_chars)
+            # Append token count for llm_done events
+            if event.event_type == "llm_done" and event.token_usage:
+                n = event.token_usage.get("total_tokens", 0)
+                if n:
+                    msg = f"{msg} (+{n}tok)"
             recent.add_row(
                 Text(event.level, style=self._level_style(event.level)),
                 scope,
                 Text(event.event_type, style=self._event_style(event.event_type)),
-                self._truncate((event.message or "").replace("\n", " "), preview_chars),
+                msg,
             )
 
         header = Table.grid(padding=(0, 1))
@@ -288,6 +384,7 @@ class _DashboardState:
                     header,
                     Text(f"run_id={self.run_id}", style="dim"),
                     summary,
+                    token_line,
                 ),
                 border_style="bright_blue",
             ),
@@ -296,7 +393,7 @@ class _DashboardState:
             Panel(recent, title="Recent Events", border_style="green"),
         ]
         if self.last_errors:
-            error_text = "\n".join(self._truncate(err, preview_chars) for err in self.last_errors)
+            error_text = "\n".join(self._truncate(err, 300) for err in self.last_errors)
             panels.append(Panel(error_text, title="Last 5 Warnings/Errors", border_style="red"))
 
         group = Group(*panels)
@@ -453,5 +550,28 @@ def emit_task_tool_event(
         task_id=str(ctx.get("task_id") or ""),
         agent_name=str(ctx.get("agent_name") or ""),
         level=level,
+        metadata=metadata or {},
+    )
+
+
+def emit_task_debug_event(
+    event_type: str,
+    message: str,
+    *,
+    metadata: Optional[Dict[str, Any]] = None,
+) -> None:
+    """Emit a debug-only event (debug_events.jsonl only) using current task context."""
+    ctx = current_task_event_context()
+    if not ctx:
+        return
+    logger = ctx.get("logger")
+    if not isinstance(logger, EventLogger):
+        return
+    logger.emit_debug(
+        event_type,
+        message,
+        stage_id=str(ctx.get("stage_id") or ""),
+        task_id=str(ctx.get("task_id") or ""),
+        agent_name=str(ctx.get("agent_name") or ""),
         metadata=metadata or {},
     )

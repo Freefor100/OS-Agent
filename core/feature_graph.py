@@ -7,7 +7,7 @@ from typing import Any, Dict, Iterable, List, Tuple
 
 from core.agent_graph_state import EvidenceRecord
 from core.describe_stage_qa import load_stage_qa
-from core.feature_schema_bank import TECH_STAGE_IDS, features_for_stage_qa
+from core.qa_contract import TECH_STAGE_IDS, features_for_stage_qa
 
 
 def _safe_id(value: str) -> str:

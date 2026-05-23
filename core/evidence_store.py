@@ -56,8 +56,12 @@ class EvidenceStore:
         return [r for r in records if question_id in (r.question_ids or [])]
 
     def grouped_by_question(self, stage_id: str) -> Dict[str, List[EvidenceRecord]]:
+        with self._lock:
+            all_records = list(self._by_id.values())
         grouped: Dict[str, List[EvidenceRecord]] = {}
-        for rec in self.by_stage(stage_id):
+        for rec in all_records:
+            if rec.stage_id != stage_id:
+                continue
             for qid in rec.question_ids or [""]:
                 grouped.setdefault(qid, []).append(rec)
         return grouped

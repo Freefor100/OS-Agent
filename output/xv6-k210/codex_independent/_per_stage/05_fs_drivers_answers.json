@@ -1,0 +1,763 @@
+{
+  "stage_id": "05_fs_drivers",
+  "generated_by": "codex_independent",
+  "source_scope": {
+    "allowed": [
+      "core/describe_stage_qa/05_fs_drivers.json",
+      "repos/xv6-k210"
+    ],
+    "excluded": [
+      "output/xv6-k210/_per_stage",
+      "baseline_output",
+      "baseline_vs_agent_review_audit"
+    ]
+  },
+  "answers": [
+    {
+      "question_id": "Q05_001",
+      "question_type": "short_answer",
+      "value": "VFS 是 C 结构体函数指针 op 表形态，不是 Rust trait。接口定义包括 struct fs_op、inode_op、dentry_op、file_op；VFS 对象包括 superblock、inode、dentry，inode 中挂 inode_op/file_op 指针。",
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q05_001_vfs_defs_01",
+          "type": "definition",
+          "path": "repos/xv6-k210/include/fs/fs.h",
+          "lines": "41-77",
+          "summary": "定义 fs_op、inode_op、dentry_op、file_op，成员均为 C 函数指针，例如 read/write/lookup/create。"
+        },
+        {
+          "evidence_id": "codex_ev_Q05_001_vfs_objs_02",
+          "type": "definition",
+          "path": "repos/xv6-k210/include/fs/fs.h",
+          "lines": "80-137",
+          "summary": "定义 superblock、inode、dentry；inode 保存 mode、锁、struct inode_op *op、struct file_op *fop、dentry 指针。"
+        },
+        {
+          "evidence_id": "codex_ev_Q05_001_syscall_flow_03",
+          "type": "usage_flow",
+          "path": "repos/xv6-k210/kernel/syscall/sysfile.c",
+          "lines": "195-266",
+          "summary": "sys_openat 通过 create/nameifrom 获得 inode，分配 struct file/fd，并按 inode mode 设置 FD_INODE/FD_DEVICE。"
+        },
+        {
+          "evidence_id": "codex_ev_Q05_001_neg_04",
+          "type": "negative_search",
+          "path": "repos/xv6-k210",
+          "lines": "search",
+          "summary": "在 include、kernel、kernel/fs、kernel/syscall、kernel/hal、kernel/mm、doc、xv6-user 中检索 VFS 题关键词 19 个，共 243 个文件、6596 处命中；命中的是 C 结构体/函数指针与 FAT32/devfs/procfs，未发现 Rust trait 或 ext4。"
+        }
+      ],
+      "fact_answers": [
+        {"fact_id": "Q05_001_01", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_001_vfs_objs_02"]},
+        {"fact_id": "Q05_001_02", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_001_vfs_defs_01"]},
+        {"fact_id": "Q05_001_03", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_001_syscall_flow_03"]},
+        {"fact_id": "Q05_001_04", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_001_vfs_objs_02"]},
+        {"fact_id": "Q05_001_05", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_001_syscall_flow_03"]},
+        {"fact_id": "Q05_001_06", "status_or_value": {"searched_keywords": ["VFS", "inode", "dentry", "file", "fd", "open", "read", "write", "path", "namei", "lookup", "symlink", "pipe", "socket", "devfs", "procfs", "mount", "FAT32", "ext4"], "searched_directories": ["include", "kernel", "kernel/fs", "kernel/syscall", "kernel/hal", "kernel/mm", "doc", "xv6-user"], "file_count": 243, "match_count": 6596, "coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q05_001_neg_04"]}
+      ],
+      "answer": {"used_evidence_ids": ["codex_ev_Q05_001_vfs_defs_01", "codex_ev_Q05_001_vfs_objs_02", "codex_ev_Q05_001_syscall_flow_03"], "confidence": "high"}
+    },
+    {
+      "question_id": "Q05_002",
+      "question_type": "single_choice",
+      "value": "混合挂载（磁盘 FS + 内存 FS 均支持）",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q05_002_rootfs_01", "type": "implementation_body", "path": "repos/xv6-k210/kernel/fs/rootfs.c", "lines": "18-35", "summary": "定义 rootfs、procfs、devfs；rootfs 注释说明是 virtual in-memory file system，dummy op 多数拒绝。"},
+        {"evidence_id": "codex_ev_Q05_002_mount_02", "type": "implementation_body", "path": "repos/xv6-k210/kernel/fs/rootfs.c", "lines": "244-303", "summary": "初始化 devfs/procfs，创建 /dev、/proc，并把 /dev/vda2 以 fat32 挂载到根，再 mountsysfs 挂载 devfs/procfs。"},
+        {"evidence_id": "codex_ev_Q05_002_fat_03", "type": "implementation_body", "path": "repos/xv6-k210/kernel/fs/blkdev.c", "lines": "169-220", "summary": "fs_install 为块设备或镜像文件创建 FAT32 superblock，接入 disk_read_block/disk_write_block 或 img_read_block/img_write_block。"}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q05_002_01", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_002_rootfs_01"]},
+        {"fact_id": "Q05_002_02", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_002_fat_03"]},
+        {"fact_id": "Q05_002_03", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_002_mount_02"]},
+        {"fact_id": "Q05_002_04", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_002_mount_02"]},
+        {"fact_id": "Q05_002_05", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_002_rootfs_01"]},
+        {"fact_id": "Q05_002_06", "status_or_value": {"coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q05_002_fat_03"]}
+      ],
+      "answer": {"used_evidence_ids": ["codex_ev_Q05_002_rootfs_01", "codex_ev_Q05_002_mount_02", "codex_ev_Q05_002_fat_03"], "confidence": "high"}
+    },
+    {
+      "question_id": "Q05_003",
+      "question_type": "short_answer",
+      "value": "支持 FAT32，形态是仓库内 C 源码自研实现；未发现 Ext4 后端或第三方 FS crate。Makefile 直接编译 kernel/fs/fat32/cluster.c、dirent.c、fat.c、fat32.c，没有 Cargo.toml/Cargo.lock 引入文件系统库。",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q05_003_make_01", "type": "definition", "path": "repos/xv6-k210/Makefile", "lines": "83-94", "summary": "SRC 直接列入 bio.c、blkdev.c、fat32/cluster.c、fat32/dirent.c、fat32/fat.c、fat32/fat32.c、fs.c、mount.c 等 C 源码。"},
+        {"evidence_id": "codex_ev_Q05_003_fat_init_02", "type": "implementation_body", "path": "repos/xv6-k210/kernel/fs/fat32/fat32.c", "lines": "47-138", "summary": "fat32_init 读取 FAT32 启动扇区、校验 'FAT32'、解析 BPB/FSINFO，并创建 FAT32 根 inode。"},
+        {"evidence_id": "codex_ev_Q05_003_neg_03", "type": "negative_search", "path": "repos/xv6-k210", "lines": "search", "summary": "VFS 题关键词检索中 FAT32 命中 344、ext4 命中 0；仓库根没有 Cargo.toml/Cargo.lock 用于 kernel FS 后端。"}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q05_003_01", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_003_fat_init_02"]},
+        {"fact_id": "Q05_003_02", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_003_make_01"]},
+        {"fact_id": "Q05_003_03", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_003_fat_init_02"]},
+        {"fact_id": "Q05_003_04", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_003_fat_init_02"]},
+        {"fact_id": "Q05_003_05", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_003_make_01"]},
+        {"fact_id": "Q05_003_06", "status_or_value": {"searched_keywords": ["FAT32", "ext4", "Cargo.toml", "Cargo.lock"], "searched_directories": ["repos/xv6-k210"], "file_count": 243, "match_count": 344, "coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q05_003_neg_03"]}
+      ],
+      "answer": {"used_evidence_ids": ["codex_ev_Q05_003_make_01", "codex_ev_Q05_003_fat_init_02", "codex_ev_Q05_003_neg_03"], "confidence": "high"}
+    },
+    {
+      "question_id": "Q05_004",
+      "question_type": "short_answer",
+      "value": "打开链路是 sys_openat -> create/nameifrom -> lookup_path/dirlookup -> 后端 inode_op.create 或 inode_op.lookup -> filealloc/fdalloc -> 设置 struct file。这里没有单独的 concrete FS open op；具体 FS 参与点是 FAT32 的 create/lookup op 表。",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q05_004_open_01", "type": "usage_flow", "path": "repos/xv6-k210/kernel/syscall/sysfile.c", "lines": "195-266", "summary": "sys_openat 解析 dirfd/path/flags；O_CREATE 调 create，否则 nameifrom；随后 filealloc、fdalloc，并设置 FD_DEVICE/FD_INODE、offset/readable/writable。"},
+        {"evidence_id": "codex_ev_Q05_004_namex_02", "type": "implementation_body", "path": "repos/xv6-k210/kernel/fs/fs.c", "lines": "412-483", "summary": "lookup_path 根据绝对/相对路径选 rootfs.root 或 cwd，循环 skipelem 后调用 dirlookup；namei/nameifrom/nameiparentfrom 都包装 lookup_path。"},
+        {"evidence_id": "codex_ev_Q05_004_backend_03", "type": "definition", "path": "repos/xv6-k210/kernel/fs/fat32/fat32.c", "lines": "22-40", "summary": "FAT32 inode_op 接入 fat_alloc_entry、fat_lookup_dir、fat_truncate_file 等；file_op 接入 fat_read_file/fat_write_file/fat_read_dir。"}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q05_004_01", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_004_backend_03"]},
+        {"fact_id": "Q05_004_02", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_004_backend_03"]},
+        {"fact_id": "Q05_004_03", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_004_open_01", "codex_ev_Q05_004_namex_02"]},
+        {"fact_id": "Q05_004_04", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_004_namex_02"]},
+        {"fact_id": "Q05_004_05", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_004_open_01"]},
+        {"fact_id": "Q05_004_06", "status_or_value": {"coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q05_004_backend_03"]}
+      ],
+      "answer": {"used_evidence_ids": ["codex_ev_Q05_004_open_01", "codex_ev_Q05_004_namex_02", "codex_ev_Q05_004_backend_03"], "confidence": "high"}
+    },
+    {
+      "question_id": "Q05_005",
+      "question_type": "short_answer",
+      "value": "FD table 是每进程持有的链表式固定数组分段：struct fdtable 内有 struct file *arr[NOFILE] 和 next 指针；struct proc 内嵌 struct fdtable fds。fork/clone 时 copyfdtable 会复制 fdtable 并 filedup 共享 struct file。",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q05_005_fddef_01", "type": "definition", "path": "repos/xv6-k210/include/fs/file.h", "lines": "18-39", "summary": "struct file 定义类型、引用计数、readable/writable、pipe/ip/poll；struct fdtable 定义 basefd、nextfd、used、exec_close、arr[NOFILE]、next。"},
+        {"evidence_id": "codex_ev_Q05_005_proc_02", "type": "definition", "path": "repos/xv6-k210/include/sched/proc.h", "lines": "88-91", "summary": "struct proc 的 file system 字段包含 struct fdtable fds、cwd、elf。"},
+        {"evidence_id": "codex_ev_Q05_005_copy_03", "type": "implementation_body", "path": "repos/xv6-k210/kernel/fs/file.c", "lines": "312-345", "summary": "copyfdtable 遍历 fdtable 链，复制 basefd/nextfd/used/exec_close，对每个非空 arr[i] 调 filedup。"}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q05_005_01", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_005_fddef_01"]},
+        {"fact_id": "Q05_005_02", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_005_proc_02"]},
+        {"fact_id": "Q05_005_03", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_005_copy_03"]},
+        {"fact_id": "Q05_005_04", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_005_fddef_01"]},
+        {"fact_id": "Q05_005_05", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_005_fddef_01"]},
+        {"fact_id": "Q05_005_06", "status_or_value": {"coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q05_005_fddef_01"]}
+      ],
+      "answer": {"used_evidence_ids": ["codex_ev_Q05_005_fddef_01", "codex_ev_Q05_005_proc_02", "codex_ev_Q05_005_copy_03"], "confidence": "high"}
+    },
+    {
+      "question_id": "Q05_006",
+      "question_type": "tri_state_impl",
+      "value": "implemented",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q05_006_bufdef_01", "type": "definition", "path": "repos/xv6-k210/include/fs/buf.h", "lines": "13-43", "summary": "struct buf 保存 dev、sectorno、refcnt、valid、dirty、disk、hash/list、sleeplock 和 512 字节 data；声明 binit/bget/bread/bwrite/brelse/bsync。"},
+        {"evidence_id": "codex_ev_Q05_006_bio_02", "type": "implementation_body", "path": "repos/xv6-k210/kernel/fs/bio.c", "lines": "67-103", "summary": "bio.c 定义 bcachelock、lru_head、哈希表 bcache、静态 bufs[BNUM]，binit 初始化缓冲池。"},
+        {"evidence_id": "codex_ev_Q05_006_readwrite_03", "type": "usage_flow", "path": "repos/xv6-k210/kernel/fs/blkdev.c", "lines": "90-154", "summary": "disk_write_block/disk_read_block 通过 bget/bread/bwrite/brelse 访问块缓存。"}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q05_006_01", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_006_readwrite_03"]},
+        {"fact_id": "Q05_006_02", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_006_bufdef_01"]},
+        {"fact_id": "Q05_006_03", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_006_readwrite_03"]},
+        {"fact_id": "Q05_006_04", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_006_bio_02"]},
+        {"fact_id": "Q05_006_05", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_006_readwrite_03"]},
+        {"fact_id": "Q05_006_06", "status_or_value": {"coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q05_006_bio_02"]}
+      ],
+      "answer": {"used_evidence_ids": ["codex_ev_Q05_006_bufdef_01", "codex_ev_Q05_006_bio_02", "codex_ev_Q05_006_readwrite_03"], "confidence": "high"}
+    },
+    {
+      "question_id": "Q05_007",
+      "question_type": "short_answer",
+      "value": "块缓存使用 LRU：bget 在缓存命中时把 hash 节点移到表头，miss 时从 lru_head 尾部取 victim；brelse/bput 把 refcnt 归零的 buf 加回 lru_head 头部。FAT 表缓存也有 lrucnt 字段并以最大 lrucnt 选 victim。",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q05_007_bget_01", "type": "implementation_body", "path": "repos/xv6-k210/kernel/fs/bio.c", "lines": "121-166", "summary": "bget 命中时把 hash 节点移到头部；miss 时从 lru_head.prev 取可复用 buf，并注释说明 get one from tail of @lru_head list。"},
+        {"evidence_id": "codex_ev_Q05_007_bput_02", "type": "implementation_body", "path": "repos/xv6-k210/kernel/fs/bio.c", "lines": "270-280", "summary": "bput 在 refcnt 变为 0 时将 buf 加到 lru_head 后面，供后续复用/淘汰。"},
+        {"evidence_id": "codex_ev_Q05_007_fatlru_03", "type": "implementation_body", "path": "repos/xv6-k210/kernel/fs/fat32/fat.c", "lines": "107-153", "summary": "FAT cache 的 get_cache_fat 使用 lrucnt，命中清零，不命中时选择 lrucnt 最大的 victim。"}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q05_007_01", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_007_bget_01"]},
+        {"fact_id": "Q05_007_02", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_007_fatlru_03"]},
+        {"fact_id": "Q05_007_03", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_007_bget_01"]},
+        {"fact_id": "Q05_007_04", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_007_bput_02"]},
+        {"fact_id": "Q05_007_05", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_007_bget_01"]},
+        {"fact_id": "Q05_007_06", "status_or_value": {"coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q05_007_fatlru_03"]}
+      ],
+      "answer": {"used_evidence_ids": ["codex_ev_Q05_007_bget_01", "codex_ev_Q05_007_bput_02", "codex_ev_Q05_007_fatlru_03"], "confidence": "high"}
+    },
+    {
+      "question_id": "Q05_008",
+      "question_type": "tri_state_impl",
+      "value": "implemented",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q05_008_struct_01", "type": "definition", "path": "repos/xv6-k210/include/mm/mmap.h", "lines": "38-55", "summary": "mmap_page 记录 f_off、f_len、pa、ref、valid、rb；宏区分 MAP_SHARED/MAP_ANONYMOUS 和 seg->mmap 标志。"},
+        {"evidence_id": "codex_ev_Q05_008_inode_mapping_02", "type": "definition", "path": "repos/xv6-k210/include/fs/fs.h", "lines": "105-123", "summary": "struct inode 包含 struct rb_root mapping，用于文件映射页树。"},
+        {"evidence_id": "codex_ev_Q05_008_fault_03", "type": "implementation_body", "path": "repos/xv6-k210/kernel/mm/mmap.c", "lines": "999-1120", "summary": "handle_file_mmap 对 MAP_SHARED 在 inode->mapping 查找/插入 mmap_page，分配 pa，读取文件页并映射；private 映射则分配私有页。"}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q05_008_01", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_008_struct_01", "codex_ev_Q05_008_inode_mapping_02"]},
+        {"fact_id": "Q05_008_02", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_008_fault_03"]},
+        {"fact_id": "Q05_008_03", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_008_struct_01"]},
+        {"fact_id": "Q05_008_04", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_008_fault_03"]},
+        {"fact_id": "Q05_008_05", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_008_fault_03"]},
+        {"fact_id": "Q05_008_06", "status_or_value": "yes_weak", "used_evidence_ids": ["codex_ev_Q05_008_fault_03"]},
+        {"fact_id": "Q05_008_07", "status_or_value": {"coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q05_008_struct_01"]}
+      ],
+      "answer": {"used_evidence_ids": ["codex_ev_Q05_008_struct_01", "codex_ev_Q05_008_inode_mapping_02", "codex_ev_Q05_008_fault_03"], "confidence": "medium", "notes": "强证据支持 mmap 文件共享页缓存；普通 read/write 仍走块缓存，不是统一 page cache。"}
+    },
+    {
+      "question_id": "Q05_009",
+      "question_type": "tri_state_impl",
+      "value": "implemented",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q05_009_syscall_01", "type": "call_site", "path": "repos/xv6-k210/kernel/syscall/sysmem.c", "lines": "79-113", "summary": "sys_mmap 解析 start/len/prot/flags/fd/off，检查 MAP_ANONYMOUS、MAP_SHARED/MAP_PRIVATE 和 fd 类型，然后调用 do_mmap。"},
+        {"evidence_id": "codex_ev_Q05_009_dommap_02", "type": "implementation_body", "path": "repos/xv6-k210/kernel/mm/mmap.c", "lines": "710-770", "summary": "do_mmap 检查文件、寻找/创建 MMAP seg，设置 prot 对应 PTE 标志，根据是否有 file 调 mmap_file 或 mmap_anonymous，并接入进程 segment 链。"},
+        {"evidence_id": "codex_ev_Q05_009_fault_03", "type": "implementation_body", "path": "repos/xv6-k210/kernel/mm/mmap.c", "lines": "1126-1158", "summary": "handle_page_fault_mmap 检查访问权限，处理匿名私有/匿名共享，文件映射交给 handle_file_mmap。"}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q05_009_01", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_009_syscall_01"]},
+        {"fact_id": "Q05_009_02", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_009_syscall_01"]},
+        {"fact_id": "Q05_009_03", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_009_dommap_02"]},
+        {"fact_id": "Q05_009_04", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_009_fault_03"]},
+        {"fact_id": "Q05_009_05", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_009_dommap_02"]},
+        {"fact_id": "Q05_009_06", "status_or_value": {"coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q05_009_syscall_01"]}
+      ],
+      "answer": {"used_evidence_ids": ["codex_ev_Q05_009_syscall_01", "codex_ev_Q05_009_dommap_02", "codex_ev_Q05_009_fault_03"], "confidence": "high"}
+    },
+    {
+      "question_id": "Q05_010",
+      "question_type": "tri_state_impl",
+      "value": "implemented",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q05_010_defs_01", "type": "definition", "path": "repos/xv6-k210/include/fs/poll.h", "lines": "13-87", "summary": "定义 POLLIN/POLLOUT 等事件、pollfd、fdset、poll_table、poll_wait_queue，并声明 ppoll/pselect。"},
+        {"evidence_id": "codex_ev_Q05_010_pselect_02", "type": "implementation_body", "path": "repos/xv6-k210/kernel/fs/poll.c", "lines": "127-243", "summary": "pselect 遍历 fdset，调用 fd2file 和 file_poll，把等待节点加入 wait_queue，必要时 sleep 到事件或超时。"},
+        {"evidence_id": "codex_ev_Q05_010_sys_03", "type": "call_site", "path": "repos/xv6-k210/kernel/syscall/sysfile.c", "lines": "679-780", "summary": "sys_pselect 调 pselect；sys_ppoll 复制 pollfd 数组后调 ppoll 并写回。"}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q05_010_01", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_010_defs_01"]},
+        {"fact_id": "Q05_010_02", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_010_pselect_02"]},
+        {"fact_id": "Q05_010_03", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_010_sys_03"]},
+        {"fact_id": "Q05_010_04", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_010_pselect_02"]},
+        {"fact_id": "Q05_010_05", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_010_defs_01"]},
+        {"fact_id": "Q05_010_06", "status_or_value": {"coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q05_010_defs_01"]}
+      ],
+      "answer": {"used_evidence_ids": ["codex_ev_Q05_010_defs_01", "codex_ev_Q05_010_pselect_02", "codex_ev_Q05_010_sys_03"], "confidence": "medium", "notes": "pselect 有等待队列主路径；ppoll 实现较弱，会直接置 POLLIN|POLLOUT。"}
+    },
+    {
+      "question_id": "Q05_011",
+      "question_type": "tri_state_impl",
+      "value": "implemented",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q05_011_dot_01", "type": "implementation_body", "path": "repos/xv6-k210/kernel/fs/fs.c", "lines": "320-386", "summary": "dirlookup 特判 '.' 返回当前 dentry，特判 '..' 穿越 mount/root 找父目录；否则先查 dentry cache，再调用后端 lookup。"},
+        {"evidence_id": "codex_ev_Q05_011_absrel_02", "type": "implementation_body", "path": "repos/xv6-k210/kernel/fs/fs.c", "lines": "412-483", "summary": "lookup_path 对绝对路径从 rootfs.root 开始，对相对路径从参数 ip 或 myproc()->cwd 开始，并循环解析路径元素。"},
+        {"evidence_id": "codex_ev_Q05_011_decl_03", "type": "definition", "path": "repos/xv6-k210/include/fs/fs.h", "lines": "167-171", "summary": "声明 namei、nameiparent、nameifrom、nameiparentfrom、namepath。"}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q05_011_01", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_011_decl_03"]},
+        {"fact_id": "Q05_011_02", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_011_dot_01"]},
+        {"fact_id": "Q05_011_03", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_011_absrel_02"]},
+        {"fact_id": "Q05_011_04", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_011_dot_01", "codex_ev_Q05_011_absrel_02"]},
+        {"fact_id": "Q05_011_05", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_011_absrel_02"]},
+        {"fact_id": "Q05_011_06", "status_or_value": {"coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q05_011_decl_03"]}
+      ],
+      "answer": {"used_evidence_ids": ["codex_ev_Q05_011_dot_01", "codex_ev_Q05_011_absrel_02", "codex_ev_Q05_011_decl_03"], "confidence": "high"}
+    },
+    {
+      "question_id": "Q05_012",
+      "question_type": "tri_state_impl",
+      "value": "stub",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q05_012_stat_01", "type": "definition", "path": "repos/xv6-k210/include/fs/stat.h", "lines": "10-26", "summary": "仅定义 S_IFLNK/S_ISLNK 等文件类型宏，同时也有 S_IFSOCK/S_ISSOCK 宏。"},
+        {"evidence_id": "codex_ev_Q05_012_readlink_02", "type": "implementation_body", "path": "repos/xv6-k210/kernel/syscall/sysfile.c", "lines": "617-653", "summary": "sys_readlinkat 通过 nameifrom 找 inode，然后调用 namepath 返回该 inode 的路径；未检查 S_ISLNK，也未读取符号链接目标。"},
+        {"evidence_id": "codex_ev_Q05_012_neg_03", "type": "negative_search", "path": "repos/xv6-k210", "lines": "search", "summary": "在 include、kernel、doc、xv6-user 等 243 文件中检索 symlink/readlink/S_IFLNK/S_ISLNK/O_NOFOLLOW：symlink=0、readlink=11、S_IFLNK=2、S_ISLNK=1、O_NOFOLLOW=0；未发现创建或 path walk 跟随 symlink。"}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q05_012_01", "status_or_value": "stub_or_declaration_only", "used_evidence_ids": ["codex_ev_Q05_012_stat_01"]},
+        {"fact_id": "Q05_012_02", "status_or_value": "stub_or_declaration_only", "used_evidence_ids": ["codex_ev_Q05_012_readlink_02"]},
+        {"fact_id": "Q05_012_03", "status_or_value": "stub_or_declaration_only", "used_evidence_ids": ["codex_ev_Q05_012_readlink_02"]},
+        {"fact_id": "Q05_012_04", "status_or_value": "no_after_negative_search", "used_evidence_ids": ["codex_ev_Q05_012_neg_03"]},
+        {"fact_id": "Q05_012_05", "status_or_value": "no_after_negative_search", "used_evidence_ids": ["codex_ev_Q05_012_neg_03"]},
+        {"fact_id": "Q05_012_06", "status_or_value": {"coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q05_012_neg_03"]}
+      ],
+      "answer": {"used_evidence_ids": ["codex_ev_Q05_012_stat_01", "codex_ev_Q05_012_readlink_02", "codex_ev_Q05_012_neg_03"], "confidence": "high"}
+    },
+    {
+      "question_id": "Q05_013",
+      "question_type": "tri_state_impl",
+      "value": "implemented",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q05_013_pipe_struct_01", "type": "definition", "path": "repos/xv6-k210/include/fs/pipe.h", "lines": "13-36", "summary": "struct pipe 有 lock、读写 wait_queue、nread/nwrite、open 标志、循环缓冲 data；声明 pipealloc/pipeclose/pipewrite/piperead。"},
+        {"evidence_id": "codex_ev_Q05_013_pipealloc_02", "type": "implementation_body", "path": "repos/xv6-k210/kernel/fs/pipe.c", "lines": "39-91", "summary": "pipealloc 分配两个 struct file 和 struct pipe，设置 f0/f1 为 FD_PIPE、readable/writable、pipe 指针与 pipepoll。"},
+        {"evidence_id": "codex_ev_Q05_013_sys_03", "type": "call_site", "path": "repos/xv6-k210/kernel/syscall/sysfile.c", "lines": "317-352", "summary": "sys_pipe 调 pipealloc，然后 fdalloc 两个 fd，并 copyout 返回 fd 对。"}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q05_013_01", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_013_pipe_struct_01"]},
+        {"fact_id": "Q05_013_02", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_013_pipealloc_02"]},
+        {"fact_id": "Q05_013_03", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_013_sys_03"]},
+        {"fact_id": "Q05_013_04", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_013_pipealloc_02"]},
+        {"fact_id": "Q05_013_05", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_013_pipealloc_02"]},
+        {"fact_id": "Q05_013_06", "status_or_value": {"coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q05_013_pipe_struct_01"]}
+      ],
+      "answer": {"used_evidence_ids": ["codex_ev_Q05_013_pipe_struct_01", "codex_ev_Q05_013_pipealloc_02", "codex_ev_Q05_013_sys_03"], "confidence": "high", "notes": "pipe 是 struct file 的 FD_PIPE 分支，不是 inode/fop 后端。"}
+    },
+    {
+      "question_id": "Q05_014",
+      "question_type": "tri_state_impl",
+      "value": "not_found",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q05_014_stat_01", "type": "definition", "path": "repos/xv6-k210/include/fs/stat.h", "lines": "10-26", "summary": "仅有 S_IFSOCK/S_ISSOCK 类型宏，没有 socket 文件对象或 syscall 主路径。"},
+        {"evidence_id": "codex_ev_Q05_014_neg_02", "type": "negative_search", "path": "repos/xv6-k210", "lines": "search", "summary": "在 include、kernel、kernel/fs、kernel/syscall、kernel/hal、doc、xv6-user 等 243 文件中检索 socket/S_IFSOCK/S_ISSOCK/sys_socket/AF_INET/SOCK/virtio-net/e1000/rtl8139：总 12 处，均为 errno/type 宏或 virtio 注释；sys_socket、AF_INET、virtio-net、e1000、rtl8139 为 0。"}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q05_014_01", "status_or_value": "stub_or_declaration_only", "used_evidence_ids": ["codex_ev_Q05_014_stat_01"]},
+        {"fact_id": "Q05_014_02", "status_or_value": "no_after_negative_search", "used_evidence_ids": ["codex_ev_Q05_014_neg_02"]},
+        {"fact_id": "Q05_014_03", "status_or_value": "no_after_negative_search", "used_evidence_ids": ["codex_ev_Q05_014_neg_02"]},
+        {"fact_id": "Q05_014_04", "status_or_value": "no_after_negative_search", "used_evidence_ids": ["codex_ev_Q05_014_neg_02"]},
+        {"fact_id": "Q05_014_05", "status_or_value": "no_after_negative_search", "used_evidence_ids": ["codex_ev_Q05_014_neg_02"]},
+        {"fact_id": "Q05_014_06", "status_or_value": {"coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q05_014_neg_02"]}
+      ],
+      "answer": {"used_evidence_ids": ["codex_ev_Q05_014_stat_01", "codex_ev_Q05_014_neg_02"], "confidence": "high"}
+    },
+    {
+      "question_id": "Q05_015",
+      "question_type": "tri_state_impl",
+      "value": "implemented",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q05_015_globals_01", "type": "definition", "path": "repos/xv6-k210/kernel/fs/rootfs.c", "lines": "18-35", "summary": "定义 rootfs/procfs/devfs，全局虚拟内存文件系统操作中 dummy 函数拒绝大多数写操作。"},
+        {"evidence_id": "codex_ev_Q05_015_init_02", "type": "implementation_body", "path": "repos/xv6-k210/kernel/fs/rootfs.c", "lines": "244-303", "summary": "rootfs_init 创建 devfs 的 console/vda2/zero/null 和 procfs 的 mounts/meminfo，并通过 mountsysfs 挂载 /dev、/proc。"},
+        {"evidence_id": "codex_ev_Q05_015_mountinfo_03", "type": "implementation_body", "path": "repos/xv6-k210/kernel/fs/mount.c", "lines": "16-86", "summary": "procfs 的 mounts 文件使用 mountinfo_fop，mountinfo_read 遍历 superblock 列表并输出设备、挂载点、类型。"}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q05_015_01", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_015_globals_01"]},
+        {"fact_id": "Q05_015_02", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_015_init_02"]},
+        {"fact_id": "Q05_015_03", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_015_mountinfo_03"]},
+        {"fact_id": "Q05_015_04", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_015_init_02"]},
+        {"fact_id": "Q05_015_05", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_015_init_02"]},
+        {"fact_id": "Q05_015_06", "status_or_value": {"coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q05_015_init_02"]}
+      ],
+      "answer": {"used_evidence_ids": ["codex_ev_Q05_015_globals_01", "codex_ev_Q05_015_init_02", "codex_ev_Q05_015_mountinfo_03"], "confidence": "high"}
+    },
+    {
+      "question_id": "Q05_016",
+      "question_type": "single_choice",
+      "value": "Per-Process（每进程独立 fd 表，fork 时复制/共享）",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q05_016_proc_01", "type": "definition", "path": "repos/xv6-k210/include/sched/proc.h", "lines": "88-91", "summary": "struct proc 内嵌 struct fdtable fds，说明 fd 表归属进程。"},
+        {"evidence_id": "codex_ev_Q05_016_copy_02", "type": "implementation_body", "path": "repos/xv6-k210/kernel/fs/file.c", "lines": "312-345", "summary": "copyfdtable 在 fork/clone 时复制 fdtable 节点，并对每个文件调用 filedup 增加引用。"},
+        {"evidence_id": "codex_ev_Q05_016_clone_03", "type": "call_site", "path": "repos/xv6-k210/kernel/sched/proc.c", "lines": "324-325", "summary": "clone 路径调用 copyfdtable(&p->fds, &np->fds)。"}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q05_016_01", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_016_proc_01"]},
+        {"fact_id": "Q05_016_02", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_016_copy_02"]},
+        {"fact_id": "Q05_016_03", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_016_clone_03"]},
+        {"fact_id": "Q05_016_04", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_016_proc_01"]},
+        {"fact_id": "Q05_016_05", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_016_copy_02"]},
+        {"fact_id": "Q05_016_06", "status_or_value": {"coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q05_016_proc_01"]}
+      ],
+      "answer": {"used_evidence_ids": ["codex_ev_Q05_016_proc_01", "codex_ev_Q05_016_copy_02", "codex_ev_Q05_016_clone_03"], "confidence": "high"}
+    },
+    {
+      "question_id": "Q05_017",
+      "question_type": "single_choice",
+      "value": "链式分配 (Chained/Linked Allocation)：块通过指针链接",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q05_017_fat_entry_01", "type": "definition", "path": "repos/xv6-k210/kernel/fs/fat32/fat32.h", "lines": "88-104", "summary": "fat32_entry 保存 first_clus，并有 rb_clus 缓存 FAT 链定位结果。"},
+        {"evidence_id": "codex_ev_Q05_017_readfat_02", "type": "implementation_body", "path": "repos/xv6-k210/kernel/fs/fat32/cluster.c", "lines": "102-142", "summary": "fill_clus_table 通过 read_fat(sb, preclus) 获取下一个 cluster，遇到 EOC 时可 alloc_clus 并 write_fat 连接新 cluster。"},
+        {"evidence_id": "codex_ev_Q05_017_reloc_03", "type": "implementation_body", "path": "repos/xv6-k210/kernel/fs/fat32/cluster.c", "lines": "245-260", "summary": "reloc_clus 依据文件 offset 定位对应 cluster 表项，说明文件数据按 FAT cluster 链寻址。"}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q05_017_01", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_017_readfat_02"]},
+        {"fact_id": "Q05_017_02", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_017_readfat_02"]},
+        {"fact_id": "Q05_017_03", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_017_fat_entry_01"]},
+        {"fact_id": "Q05_017_04", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_017_reloc_03"]},
+        {"fact_id": "Q05_017_05", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_017_fat_entry_01"]},
+        {"fact_id": "Q05_017_06", "status_or_value": {"coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q05_017_readfat_02"]}
+      ],
+      "answer": {"used_evidence_ids": ["codex_ev_Q05_017_fat_entry_01", "codex_ev_Q05_017_readfat_02", "codex_ev_Q05_017_reloc_03"], "confidence": "high"}
+    },
+    {
+      "question_id": "Q05_018",
+      "question_type": "single_choice",
+      "value": "FAT 表内嵌空闲链（FAT32 特有）",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q05_018_sb_01", "type": "definition", "path": "repos/xv6-k210/kernel/fs/fat32/fat32.h", "lines": "53-80", "summary": "fat32_sb 保存 free_count、next_free、next_free_fat，以及 FAT cache 的 fatsec/lrucnt/dirty。"},
+        {"evidence_id": "codex_ev_Q05_018_alloc_02", "type": "implementation_body", "path": "repos/xv6-k210/kernel/fs/fat32/cluster.c", "lines": "53-78", "summary": "alloc_clus 从 fat->next_free 取空闲 cluster，并调用 fat_update_next_free 更新下一个空闲项。"},
+        {"evidence_id": "codex_ev_Q05_018_update_03", "type": "implementation_body", "path": "repos/xv6-k210/kernel/fs/fat32/fat.c", "lines": "176-291", "summary": "fat_update_next_free 在 FAT 表中扫描值为 0 的项作为空闲 cluster，维护 next_free 和 next_free_fat。"}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q05_018_01", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_018_sb_01"]},
+        {"fact_id": "Q05_018_02", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_018_alloc_02"]},
+        {"fact_id": "Q05_018_03", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_018_update_03"]},
+        {"fact_id": "Q05_018_04", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_018_update_03"]},
+        {"fact_id": "Q05_018_05", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_018_alloc_02"]},
+        {"fact_id": "Q05_018_06", "status_or_value": {"coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q05_018_update_03"]}
+      ],
+      "answer": {"used_evidence_ids": ["codex_ev_Q05_018_sb_01", "codex_ev_Q05_018_alloc_02", "codex_ev_Q05_018_update_03"], "confidence": "high"}
+    },
+    {
+      "question_id": "Q05_019",
+      "question_type": "single_choice",
+      "value": "树形层次目录 (Tree-Structured Hierarchy)（最常见）",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q05_019_dentry_01", "type": "definition", "path": "repos/xv6-k210/include/fs/fs.h", "lines": "128-137", "summary": "dentry 有 parent、next、child、mount 指针，形成目录树和挂载树。"},
+        {"evidence_id": "codex_ev_Q05_019_lookup_02", "type": "implementation_body", "path": "repos/xv6-k210/kernel/fs/fs.c", "lines": "320-386", "summary": "dirlookup 通过 parent/child dentry cache 和后端 lookup 搜索目录项，支持 . 和 ..。"},
+        {"evidence_id": "codex_ev_Q05_019_create_03", "type": "implementation_body", "path": "repos/xv6-k210/kernel/fs/fat32/dirent.c", "lines": "232-240", "summary": "创建目录时为新目录写入 '.' 和 '..' 项，连接父目录。"}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q05_019_01", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_019_dentry_01"]},
+        {"fact_id": "Q05_019_02", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_019_create_03"]},
+        {"fact_id": "Q05_019_03", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_019_dentry_01", "codex_ev_Q05_019_lookup_02"]},
+        {"fact_id": "Q05_019_04", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_019_lookup_02"]},
+        {"fact_id": "Q05_019_05", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_019_create_03"]},
+        {"fact_id": "Q05_019_06", "status_or_value": {"coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q05_019_dentry_01"]}
+      ],
+      "answer": {"used_evidence_ids": ["codex_ev_Q05_019_dentry_01", "codex_ev_Q05_019_lookup_02", "codex_ev_Q05_019_create_03"], "confidence": "high"}
+    },
+    {
+      "question_id": "Q05_020",
+      "question_type": "single_choice",
+      "value": "字节流 (Byte Stream / Unstructured)：无固定记录结构",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q05_020_fileop_01", "type": "definition", "path": "repos/xv6-k210/include/fs/fs.h", "lines": "71-77", "summary": "file_op read/write 接口以 offset 和 byte count n 读写字节范围，没有记录长度或记录类型参数。"},
+        {"evidence_id": "codex_ev_Q05_020_read_02", "type": "implementation_body", "path": "repos/xv6-k210/kernel/fs/fat32/fat32.c", "lines": "273-303", "summary": "fat_read_file 按 off/n 逐 cluster 读取，返回读到的字节数。"},
+        {"evidence_id": "codex_ev_Q05_020_write_03", "type": "implementation_body", "path": "repos/xv6-k210/kernel/fs/fat32/fat32.c", "lines": "335-389", "summary": "fat_write_file 按 off/n 写字节，必要时分配 cluster 并更新 file_size。"}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q05_020_01", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_020_read_02"]},
+        {"fact_id": "Q05_020_02", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_020_write_03"]},
+        {"fact_id": "Q05_020_03", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_020_fileop_01"]},
+        {"fact_id": "Q05_020_04", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_020_fileop_01"]},
+        {"fact_id": "Q05_020_05", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_020_read_02", "codex_ev_Q05_020_write_03"]},
+        {"fact_id": "Q05_020_06", "status_or_value": {"coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q05_020_fileop_01"]}
+      ],
+      "answer": {"used_evidence_ids": ["codex_ev_Q05_020_fileop_01", "codex_ev_Q05_020_read_02", "codex_ev_Q05_020_write_03"], "confidence": "high"}
+    },
+    {
+      "question_id": "Q05_021",
+      "question_type": "single_choice",
+      "value": "硬编码设备表/固定 MMIO 地址",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q05_021_memlayout_01", "type": "definition", "path": "repos/xv6-k210/include/memlayout.h", "lines": "36-90", "summary": "硬编码 VIRT_OFFSET、UART、VIRTIO0、CLINT、PLIC、GPIOHS、DMAC、SPI、FPIOA、SYSCTL 等物理和虚拟 MMIO 地址。"},
+        {"evidence_id": "codex_ev_Q05_021_disk_02", "type": "implementation_body", "path": "repos/xv6-k210/kernel/hal/disk.c", "lines": "22-33", "summary": "disk_init 使用 #ifdef QEMU 在 virtio_disk_init 和 sdcard_init 之间选择，没有 probe 或总线扫描。"},
+        {"evidence_id": "codex_ev_Q05_021_rootdev_03", "type": "implementation_body", "path": "repos/xv6-k210/kernel/fs/rootfs.c", "lines": "244-264", "summary": "devfs 固定生成 console、vda2、zero、null，并给 vda2 设置 ROOTDEV。"}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q05_021_01", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_021_memlayout_01"]},
+        {"fact_id": "Q05_021_02", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_021_disk_02"]},
+        {"fact_id": "Q05_021_03", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_021_memlayout_01"]},
+        {"fact_id": "Q05_021_04", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_021_rootdev_03"]},
+        {"fact_id": "Q05_021_05", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_021_disk_02"]},
+        {"fact_id": "Q05_021_06", "status_or_value": {"coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q05_021_memlayout_01"]}
+      ],
+      "answer": {"used_evidence_ids": ["codex_ev_Q05_021_memlayout_01", "codex_ev_Q05_021_disk_02", "codex_ev_Q05_021_rootdev_03"], "confidence": "high"}
+    },
+    {
+      "question_id": "Q05_022",
+      "question_type": "tri_state_impl",
+      "value": "not_found",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q05_022_main_01", "type": "definition", "path": "repos/xv6-k210/kernel/main.c", "lines": "34-36", "summary": "main 接收 unsigned long dtb_pa 参数，但函数体中未使用该参数。"},
+        {"evidence_id": "codex_ev_Q05_022_neg_02", "type": "negative_search", "path": "repos/xv6-k210", "lines": "search",
+          "summary": "在 include、kernel、kernel/fs、kernel/syscall、kernel/hal、kernel/mm、doc、xv6-user 共 243 文件中检索 dtb/DeviceTree/device tree/fdt/dtb_pa/.dtb：dtb=2、dtb_pa 只出现在 main 声明和文档片段；DeviceTree/device tree 为 0；未发现 fdt parser 或解析入口。"
+        }
+      ],
+      "fact_answers": [
+        {"fact_id": "Q05_022_01", "status_or_value": "no_after_negative_search", "used_evidence_ids": ["codex_ev_Q05_022_neg_02"]},
+        {"fact_id": "Q05_022_02", "status_or_value": "no_after_negative_search", "used_evidence_ids": ["codex_ev_Q05_022_neg_02"]},
+        {"fact_id": "Q05_022_03", "status_or_value": "no_after_negative_search", "used_evidence_ids": ["codex_ev_Q05_022_neg_02"]},
+        {"fact_id": "Q05_022_04", "status_or_value": "no_after_negative_search", "used_evidence_ids": ["codex_ev_Q05_022_neg_02"]},
+        {"fact_id": "Q05_022_05", "status_or_value": "no_after_negative_search", "used_evidence_ids": ["codex_ev_Q05_022_neg_02"]},
+        {"fact_id": "Q05_022_06", "status_or_value": {"coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q05_022_neg_02"]}
+      ],
+      "answer": {"used_evidence_ids": ["codex_ev_Q05_022_main_01", "codex_ev_Q05_022_neg_02"], "confidence": "high"}
+    },
+    {
+      "question_id": "Q05_023",
+      "question_type": "short_answer",
+      "value": "驱动接口不是 Rust Driver trait，也不是统一 driver ops 注册表；它是 C 头文件函数接口加平台条件编译的薄封装。块设备通过 disk.h 的 disk_init/disk_read/disk_submit/disk_intr 等接口统一到 virtio_disk 或 sdcard；底层 MMIO/中断控制器也是直接函数和常量地址。",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q05_023_diskh_01", "type": "definition", "path": "repos/xv6-k210/include/hal/disk.h", "lines": "1-13", "summary": "disk.h 声明 disk_init、disk_read、disk_write、disk_submit、disk_write_start、disk_intr、disk_multiple_read。"},
+        {"evidence_id": "codex_ev_Q05_023_diskc_02", "type": "implementation_body", "path": "repos/xv6-k210/kernel/hal/disk.c", "lines": "22-99", "summary": "disk.c 用 #ifdef QEMU 把统一 disk_* 接口分派到 virtio_disk_* 或 sdcard_*。"},
+        {"evidence_id": "codex_ev_Q05_023_make_03", "type": "definition", "path": "repos/xv6-k210/Makefile", "lines": "123-135", "summary": "Makefile 在 platform=k210 时编译 spi/gpiohs/fpioa/sdcard/dmac/sysctl，否则编译 virtio_disk.c。"}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q05_023_01", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_023_diskh_01"]},
+        {"fact_id": "Q05_023_02", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_023_diskc_02"]},
+        {"fact_id": "Q05_023_03", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_023_diskc_02"]},
+        {"fact_id": "Q05_023_04", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_023_make_03"]},
+        {"fact_id": "Q05_023_05", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_023_diskc_02"]},
+        {"fact_id": "Q05_023_06", "status_or_value": {"coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q05_023_make_03"]}
+      ],
+      "answer": {"used_evidence_ids": ["codex_ev_Q05_023_diskh_01", "codex_ev_Q05_023_diskc_02", "codex_ev_Q05_023_make_03"], "confidence": "high"}
+    },
+    {
+      "question_id": "Q05_024",
+      "question_type": "short_answer",
+      "value": "初始化顺序主链路：main hart0 调 consoleinit/printfinit -> kvminit/kvminithart -> trapinithart -> plicinit/plicinithart -> k210 下 fpioa_pin_init/dmac_init -> disk_init -> binit -> userinit；首个 forkret 再 rootfs_init，挂 FAT32、devfs、procfs。",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q05_024_main_01", "type": "usage_flow", "path": "repos/xv6-k210/kernel/main.c", "lines": "39-63", "summary": "hart0 初始化 console、printf、内存、trap、proc、PLIC，k210 下初始化 FPIOA/DMAC，然后 disk_init、binit、userinit。"},
+        {"evidence_id": "codex_ev_Q05_024_disk_02", "type": "implementation_body", "path": "repos/xv6-k210/kernel/hal/disk.c", "lines": "22-33", "summary": "disk_init 根据 QEMU 选择 virtio_disk_init 或 sdcard_init。"},
+        {"evidence_id": "codex_ev_Q05_024_forkret_03", "type": "usage_flow", "path": "repos/xv6-k210/kernel/sched/proc.c", "lines": "653-665", "summary": "forkret 首次调度时若 fs_first 则 rootfs_init 并设置 cwd=namei(\"/\")。"}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q05_024_01", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_024_main_01"]},
+        {"fact_id": "Q05_024_02", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_024_disk_02"]},
+        {"fact_id": "Q05_024_03", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_024_main_01"]},
+        {"fact_id": "Q05_024_04", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_024_main_01"]},
+        {"fact_id": "Q05_024_05", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_024_disk_02"]},
+        {"fact_id": "Q05_024_06", "status_or_value": {"coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q05_024_forkret_03"]}
+      ],
+      "answer": {"used_evidence_ids": ["codex_ev_Q05_024_main_01", "codex_ev_Q05_024_disk_02", "codex_ev_Q05_024_forkret_03"], "confidence": "high"}
+    },
+    {
+      "question_id": "Q05_025",
+      "question_type": "tri_state_impl",
+      "value": "implemented",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q05_025_console_01", "type": "implementation_body", "path": "repos/xv6-k210/kernel/console.c", "lines": "41-87", "summary": "consolewrite/consputc 通过 sbi_console_putchar 输出，支持用户 write 到 console。"},
+        {"evidence_id": "codex_ev_Q05_025_intr_02", "type": "implementation_body", "path": "repos/xv6-k210/kernel/trap/trap.c", "lines": "277-298", "summary": "外部中断 claim 后，UART_IRQ 分支调用 sbi_console_getchar 和 consoleintr，DISK_IRQ 分支调用 disk_intr。"},
+        {"evidence_id": "codex_ev_Q05_025_devfs_03", "type": "usage_flow", "path": "repos/xv6-k210/kernel/fs/rootfs.c", "lines": "251-264", "summary": "devfs 创建 console 字符设备，并把 inode->fop 设置为 console_op。"}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q05_025_01", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_025_console_01"]},
+        {"fact_id": "Q05_025_02", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_025_devfs_03"]},
+        {"fact_id": "Q05_025_03", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_025_console_01"]},
+        {"fact_id": "Q05_025_04", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_025_console_01"]},
+        {"fact_id": "Q05_025_05", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_025_intr_02"]},
+        {"fact_id": "Q05_025_06", "status_or_value": {"coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q05_025_intr_02"]}
+      ],
+      "answer": {"used_evidence_ids": ["codex_ev_Q05_025_console_01", "codex_ev_Q05_025_intr_02", "codex_ev_Q05_025_devfs_03"], "confidence": "high"}
+    },
+    {
+      "question_id": "Q05_026",
+      "question_type": "tri_state_impl",
+      "value": "implemented",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q05_026_disk_01", "type": "implementation_body", "path": "repos/xv6-k210/kernel/hal/disk.c", "lines": "22-99", "summary": "统一 disk_* 接口在 QEMU 调 virtio_disk_*，在 k210 调 sdcard_*；读、提交写、写启动、中断和多块读均有分派。"},
+        {"evidence_id": "codex_ev_Q05_026_virtio_02", "type": "implementation_body", "path": "repos/xv6-k210/kernel/hal/virtio_disk.c", "lines": "94-163", "summary": "virtio_disk_init 初始化 virtio MMIO 状态、队列、描述符、avail/used ring。"},
+        {"evidence_id": "codex_ev_Q05_026_sd_03", "type": "implementation_body", "path": "repos/xv6-k210/kernel/hal/sdcard.c", "lines": "441-458", "summary": "sdcard_init 执行 SD 初始化，初始化 sdcard_lock 和读写 wait_queue。"}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q05_026_01", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_026_disk_01"]},
+        {"fact_id": "Q05_026_02", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_026_disk_01"]},
+        {"fact_id": "Q05_026_03", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_026_virtio_02", "codex_ev_Q05_026_sd_03"]},
+        {"fact_id": "Q05_026_04", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_026_sd_03"]},
+        {"fact_id": "Q05_026_05", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_026_disk_01"]},
+        {"fact_id": "Q05_026_06", "status_or_value": {"coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q05_026_disk_01"]}
+      ],
+      "answer": {"used_evidence_ids": ["codex_ev_Q05_026_disk_01", "codex_ev_Q05_026_virtio_02", "codex_ev_Q05_026_sd_03"], "confidence": "high"}
+    },
+    {
+      "question_id": "Q05_027",
+      "question_type": "tri_state_impl",
+      "value": "not_found",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q05_027_neg_01", "type": "negative_search", "path": "repos/xv6-k210", "lines": "search", "summary": "在 include、kernel、kernel/hal、kernel/syscall、doc、xv6-user 等 243 文件中检索 socket/S_IFSOCK/S_ISSOCK/sys_socket/AF_INET/SOCK/virtio-net/e1000/rtl8139：sys_socket、AF_INET、virtio-net、e1000、rtl8139 均 0，只有 errno/type 宏和 virtio.h 中 device type 注释。"},
+        {"evidence_id": "codex_ev_Q05_027_make_02", "type": "definition", "path": "repos/xv6-k210/Makefile", "lines": "123-135", "summary": "平台驱动源只在 k210 编译 spi/gpiohs/fpioa/sdcard/dmac/sysctl，在 qemu 编译 virtio_disk.c；没有网络驱动源。"}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q05_027_01", "status_or_value": "no_after_negative_search", "used_evidence_ids": ["codex_ev_Q05_027_neg_01"]},
+        {"fact_id": "Q05_027_02", "status_or_value": "no_after_negative_search", "used_evidence_ids": ["codex_ev_Q05_027_make_02"]},
+        {"fact_id": "Q05_027_03", "status_or_value": "no_after_negative_search", "used_evidence_ids": ["codex_ev_Q05_027_neg_01"]},
+        {"fact_id": "Q05_027_04", "status_or_value": "no_after_negative_search", "used_evidence_ids": ["codex_ev_Q05_027_neg_01"]},
+        {"fact_id": "Q05_027_05", "status_or_value": "no_after_negative_search", "used_evidence_ids": ["codex_ev_Q05_027_neg_01"]},
+        {"fact_id": "Q05_027_06", "status_or_value": {"coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q05_027_neg_01"]}
+      ],
+      "answer": {"used_evidence_ids": ["codex_ev_Q05_027_neg_01", "codex_ev_Q05_027_make_02"], "confidence": "high"}
+    },
+    {
+      "question_id": "Q05_028",
+      "question_type": "tri_state_impl",
+      "value": "implemented",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q05_028_plic_01", "type": "implementation_body", "path": "repos/xv6-k210/kernel/hal/plic.c", "lines": "24-89", "summary": "plicinit 设置 DISK_IRQ/UART_IRQ 优先级；plicinithart 启用对应 hart 的中断；plic_claim/plic_complete 读写 claim 寄存器。"},
+        {"evidence_id": "codex_ev_Q05_028_trap_02", "type": "usage_flow", "path": "repos/xv6-k210/kernel/trap/trap.c", "lines": "265-298", "summary": "handle_intr 对外部中断调用 plic_claim，按 UART_IRQ/DISK_IRQ 分发到 consoleintr/disk_intr，最后 plic_complete。"},
+        {"evidence_id": "codex_ev_Q05_028_main_03", "type": "call_site", "path": "repos/xv6-k210/kernel/main.c", "lines": "51-55", "summary": "main 调 trapinithart、plicinit、plicinithart 初始化中断路径。"}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q05_028_01", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_028_main_03"]},
+        {"fact_id": "Q05_028_02", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_028_plic_01"]},
+        {"fact_id": "Q05_028_03", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_028_trap_02"]},
+        {"fact_id": "Q05_028_04", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_028_trap_02"]},
+        {"fact_id": "Q05_028_05", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_028_trap_02"]},
+        {"fact_id": "Q05_028_06", "status_or_value": {"coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q05_028_plic_01"]}
+      ],
+      "answer": {"used_evidence_ids": ["codex_ev_Q05_028_plic_01", "codex_ev_Q05_028_trap_02", "codex_ev_Q05_028_main_03"], "confidence": "high"}
+    },
+    {
+      "question_id": "Q05_029",
+      "question_type": "short_answer",
+      "value": "MMIO 地址来源是常量硬编码，并通过 VIRT_OFFSET 做物理到内核虚拟地址转换；没有 DTB 提供。memlayout.h 固定 UART/VIRTIO/PLIC/DMAC/SPI 等地址，kvminit 用 kvmmap 建立虚拟映射。",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q05_029_memlayout_01", "type": "definition", "path": "repos/xv6-k210/include/memlayout.h", "lines": "36-90", "summary": "VIRT_OFFSET、UART、UART_V、VIRTIO0/VIRTIO0_V、CLINT/PLIC、GPIOHS/DMAC/SPI/FPIOA/SYSCTL 等均为硬编码宏。"},
+        {"evidence_id": "codex_ev_Q05_029_kvmmap_02", "type": "implementation_body", "path": "repos/xv6-k210/kernel/mm/vm.c", "lines": "59-99", "summary": "kvminit 显式 kvmmap UART_V->UART、VIRTIO0_V->VIRTIO0、CLINT、PLIC、GPIOHS、DMAC、SPI、FPIOA、SYSCTL。"},
+        {"evidence_id": "codex_ev_Q05_029_neg_03", "type": "negative_search", "path": "repos/xv6-k210", "lines": "search", "summary": "DTB/DeviceTree 检索未发现解析入口；dtb_pa 仅作为 main 参数出现。"}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q05_029_01", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_029_memlayout_01"]},
+        {"fact_id": "Q05_029_02", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_029_kvmmap_02"]},
+        {"fact_id": "Q05_029_03", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_029_kvmmap_02"]},
+        {"fact_id": "Q05_029_04", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_029_memlayout_01"]},
+        {"fact_id": "Q05_029_05", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_029_kvmmap_02"]},
+        {"fact_id": "Q05_029_06", "status_or_value": {"coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q05_029_neg_03"]}
+      ],
+      "answer": {"used_evidence_ids": ["codex_ev_Q05_029_memlayout_01", "codex_ev_Q05_029_kvmmap_02", "codex_ev_Q05_029_neg_03"], "confidence": "high"}
+    },
+    {
+      "question_id": "Q05_030",
+      "question_type": "short_answer",
+      "value": "多平台适配由 Makefile 变量 platform 选择：platform=qemu 时 CFLAGS 加 -D QEMU，SBI 选择 sbi-qemu，驱动源码选 virtio_disk.c；platform=k210 时编译 spi/gpiohs/fpioa/sdcard/dmac/sysctl 等 K210 驱动。源码内再用 #ifdef QEMU 分派 disk 与 MMIO 地址。",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q05_030_make_flag_01", "type": "definition", "path": "repos/xv6-k210/Makefile", "lines": "1-47", "summary": "platform 默认 k210；platform=qemu 时 CFLAGS += -D QEMU；SBI 根据 platform 选择 sbi-k210 或 sbi-qemu。"},
+        {"evidence_id": "codex_ev_Q05_030_make_src_02", "type": "definition", "path": "repos/xv6-k210/Makefile", "lines": "123-135", "summary": "platform=k210 编译 spi/gpiohs/fpioa/sdcard/dmac/sysctl；否则编译 virtio_disk.c。"},
+        {"evidence_id": "codex_ev_Q05_030_disk_03", "type": "implementation_body", "path": "repos/xv6-k210/kernel/hal/disk.c", "lines": "15-30", "summary": "disk.c 根据 QEMU include virtio.h 或 sdcard/dmac.h，disk_init 选择 virtio_disk_init 或 sdcard_init。"}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q05_030_01", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_030_make_flag_01"]},
+        {"fact_id": "Q05_030_02", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_030_make_src_02"]},
+        {"fact_id": "Q05_030_03", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_030_disk_03"]},
+        {"fact_id": "Q05_030_04", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_030_make_src_02"]},
+        {"fact_id": "Q05_030_05", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_030_disk_03"]},
+        {"fact_id": "Q05_030_06", "status_or_value": {"coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q05_030_make_flag_01"]}
+      ],
+      "answer": {"used_evidence_ids": ["codex_ev_Q05_030_make_flag_01", "codex_ev_Q05_030_make_src_02", "codex_ev_Q05_030_disk_03"], "confidence": "high"}
+    },
+    {
+      "question_id": "Q05_031",
+      "question_type": "tri_state_impl",
+      "value": "not_found",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q05_031_console_01", "type": "implementation_body", "path": "repos/xv6-k210/kernel/console.c", "lines": "41-49", "summary": "console 输出通过 sbi_console_putchar，不直接访问 UART/UART_V MMIO。"},
+        {"evidence_id": "codex_ev_Q05_031_memlayout_02", "type": "definition", "path": "repos/xv6-k210/include/memlayout.h", "lines": "36-45", "summary": "UART 和 UART_V 是固定宏，UART_V=UART+VIRT_OFFSET；未见运行时切换状态。"},
+        {"evidence_id": "codex_ev_Q05_031_neg_03", "type": "negative_search", "path": "repos/xv6-k210", "lines": "search", "summary": "检索 UART/phys/virt/switch 等相关源码，仅发现固定地址宏、kvmmap 和 SBI console；未发现 MMU 启用前后串口地址切换逻辑或 uart driver 状态机。"}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q05_031_01", "status_or_value": "no_after_negative_search", "used_evidence_ids": ["codex_ev_Q05_031_neg_03"]},
+        {"fact_id": "Q05_031_02", "status_or_value": "no_after_negative_search", "used_evidence_ids": ["codex_ev_Q05_031_console_01"]},
+        {"fact_id": "Q05_031_03", "status_or_value": "no_after_negative_search", "used_evidence_ids": ["codex_ev_Q05_031_console_01"]},
+        {"fact_id": "Q05_031_04", "status_or_value": "no_after_negative_search", "used_evidence_ids": ["codex_ev_Q05_031_memlayout_02"]},
+        {"fact_id": "Q05_031_05", "status_or_value": "no_after_negative_search", "used_evidence_ids": ["codex_ev_Q05_031_neg_03"]},
+        {"fact_id": "Q05_031_06", "status_or_value": {"coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q05_031_neg_03"]}
+      ],
+      "answer": {"used_evidence_ids": ["codex_ev_Q05_031_console_01", "codex_ev_Q05_031_memlayout_02", "codex_ev_Q05_031_neg_03"], "confidence": "medium"}
+    },
+    {
+      "question_id": "Q05_032",
+      "question_type": "single_choice",
+      "value": "缓冲池 (Buffer Pool)",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q05_032_pool_01", "type": "definition", "path": "repos/xv6-k210/kernel/fs/bio.c", "lines": "67-82", "summary": "bio.c 有 bcachelock、lru_head、bcache hash 表和静态 Bufs pool: bufs[BNUM]。"},
+        {"evidence_id": "codex_ev_Q05_032_init_02", "type": "implementation_body", "path": "repos/xv6-k210/kernel/fs/bio.c", "lines": "84-103", "summary": "binit 初始化整个 buf 池并把每个 buf 加入 LRU list。"},
+        {"evidence_id": "codex_ev_Q05_032_pipe_03", "type": "definition", "path": "repos/xv6-k210/include/fs/pipe.h", "lines": "13-28", "summary": "pipe 另有循环缓冲 data 与 nread/nwrite，但块设备/文件 I/O 的主缓存是 buffer pool。"}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q05_032_01", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_032_pool_01"]},
+        {"fact_id": "Q05_032_02", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_032_init_02"]},
+        {"fact_id": "Q05_032_03", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_032_pool_01"]},
+        {"fact_id": "Q05_032_04", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_032_pipe_03"]},
+        {"fact_id": "Q05_032_05", "status_or_value": {"coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q05_032_pool_01"]}
+      ],
+      "answer": {"used_evidence_ids": ["codex_ev_Q05_032_pool_01", "codex_ev_Q05_032_init_02", "codex_ev_Q05_032_pipe_03"], "confidence": "high"}
+    },
+    {
+      "question_id": "Q05_033",
+      "question_type": "single_choice",
+      "value": "基于 virtio 环（queue 顺序提交，无显式磁盘调度）",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q05_033_virtq_01", "type": "definition", "path": "repos/xv6-k210/include/hal/virtio.h", "lines": "52-85", "summary": "virtio 定义 NUM 个描述符、avail ring、used ring，没有 SSTF/SCAN 等磁盘调度结构。"},
+        {"evidence_id": "codex_ev_Q05_033_submit_02", "type": "implementation_body", "path": "repos/xv6-k210/kernel/hal/virtio_disk.c", "lines": "314-325", "summary": "virtio_disk_rw 把描述符链头写入 avail->ring[avail->idx % NUM]，递增 idx，并写 QUEUE_NOTIFY。"},
+        {"evidence_id": "codex_ev_Q05_033_sdqueue_03", "type": "implementation_body", "path": "repos/xv6-k210/kernel/hal/sdcard.c", "lines": "897-906", "summary": "sdcard_write_start 仅合并连续 sector，未按寻道距离或电梯算法重排。"}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q05_033_01", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_033_virtq_01"]},
+        {"fact_id": "Q05_033_02", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_033_submit_02"]},
+        {"fact_id": "Q05_033_03", "status_or_value": "no_after_negative_search", "used_evidence_ids": ["codex_ev_Q05_033_sdqueue_03"]},
+        {"fact_id": "Q05_033_04", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_033_virtq_01", "codex_ev_Q05_033_submit_02"]},
+        {"fact_id": "Q05_033_05", "status_or_value": {"coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q05_033_sdqueue_03"]}
+      ],
+      "answer": {"used_evidence_ids": ["codex_ev_Q05_033_virtq_01", "codex_ev_Q05_033_submit_02", "codex_ev_Q05_033_sdqueue_03"], "confidence": "medium"}
+    },
+    {
+      "question_id": "Q05_034",
+      "question_type": "single_choice",
+      "value": "DMA (Direct Memory Access)：DMA 控制器直接在内存与设备间传输",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q05_034_virtio_dma_01", "type": "implementation_body", "path": "repos/xv6-k210/kernel/hal/virtio_disk.c", "lines": "34-92", "summary": "virtio disk 使用 RAM 中的 descriptors、avail、used ring；注释说明描述符告诉设备从哪里读写具体 disk operation。"},
+        {"evidence_id": "codex_ev_Q05_034_desc_02", "type": "implementation_body", "path": "repos/xv6-k210/kernel/hal/virtio_disk.c", "lines": "270-325", "summary": "virtio_disk_rw 设置 descriptor addr 指向请求头、buf->data、status，然后通知设备处理。"},
+        {"evidence_id": "codex_ev_Q05_034_sd_dma_03", "type": "implementation_body", "path": "repos/xv6-k210/kernel/hal/sdcard.c", "lines": "66-78", "summary": "sdcard 读写数据函数调用 spi_send_data_no_cmd_dma 和 spi_receive_data_no_cmd_dma，使用 DMAC_CHANNEL0。"}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q05_034_01", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_034_desc_02", "codex_ev_Q05_034_sd_dma_03"]},
+        {"fact_id": "Q05_034_02", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_034_virtio_dma_01"]},
+        {"fact_id": "Q05_034_03", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_034_desc_02"]},
+        {"fact_id": "Q05_034_04", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_034_virtio_dma_01"]},
+        {"fact_id": "Q05_034_05", "status_or_value": {"coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q05_034_sd_dma_03"]}
+      ],
+      "answer": {"used_evidence_ids": ["codex_ev_Q05_034_virtio_dma_01", "codex_ev_Q05_034_desc_02", "codex_ev_Q05_034_sd_dma_03"], "confidence": "high"}
+    },
+    {
+      "question_id": "Q05_035",
+      "question_type": "tri_state_impl",
+      "value": "implemented",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q05_035_virtio_desc_01", "type": "implementation_body", "path": "repos/xv6-k210/kernel/hal/virtio_disk.c", "lines": "46-65", "summary": "virtio pages 区域被分成 descriptors、avail、used；描述符供设备读写单个磁盘操作，属于 DMA 等价机制。"},
+        {"evidence_id": "codex_ev_Q05_035_submit_02", "type": "implementation_body", "path": "repos/xv6-k210/kernel/hal/virtio_disk.c", "lines": "270-325", "summary": "descriptor addr 指向内存中的请求头、buf->data、status；写 avail ring 后通知 VIRTIO_MMIO_QUEUE_NOTIFY。"},
+        {"evidence_id": "codex_ev_Q05_035_sd_03", "type": "implementation_body", "path": "repos/xv6-k210/kernel/hal/sdcard.c", "lines": "66-78", "summary": "K210 SD 路径调用 SPI DMA send/receive 函数，通道为 DMAC_CHANNEL0。"}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q05_035_01", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_035_virtio_desc_01", "codex_ev_Q05_035_sd_03"]},
+        {"fact_id": "Q05_035_02", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_035_submit_02"]},
+        {"fact_id": "Q05_035_03", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_035_submit_02"]},
+        {"fact_id": "Q05_035_04", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_035_virtio_desc_01"]},
+        {"fact_id": "Q05_035_05", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_035_sd_03"]},
+        {"fact_id": "Q05_035_06", "status_or_value": {"coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q05_035_submit_02"]}
+      ],
+      "answer": {"used_evidence_ids": ["codex_ev_Q05_035_virtio_desc_01", "codex_ev_Q05_035_submit_02", "codex_ev_Q05_035_sd_03"], "confidence": "high"}
+    },
+    {
+      "question_id": "Q05_036",
+      "question_type": "short_answer",
+      "value": "一次普通文件 read 层级：sys_read -> fileread -> inode->fop->read -> FAT32 fat_read_file -> fat_rw_clus -> superblock op disk_read_block/img_read_block -> bio bread/bget -> disk_read -> virtio_disk_read 或 sdcard_read。write 类似，经 filewrite/fat_write_file/disk_write_block/bwrite/disk_submit 到驱动队列。",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q05_036_sys_01", "type": "usage_flow", "path": "repos/xv6-k210/kernel/syscall/sysfile.c", "lines": "103-129", "summary": "sys_read/sys_write 取 fd 得 struct file，然后调用 fileread/filewrite。"},
+        {"evidence_id": "codex_ev_Q05_036_file_02", "type": "usage_flow", "path": "repos/xv6-k210/kernel/fs/file.c", "lines": "113-190", "summary": "fileread/filewrite 按 FD_PIPE/FD_DEVICE/FD_INODE 分派；普通 inode 加锁后调用 ip->fop->read/write 并更新 file offset。"},
+        {"evidence_id": "codex_ev_Q05_036_fat_03", "type": "usage_flow", "path": "repos/xv6-k210/kernel/fs/fat32/fat32.c", "lines": "273-389", "summary": "fat_read_file/fat_write_file 定位 cluster，调用 fat_rw_clus 读写字节并必要时扩展文件。"},
+        {"evidence_id": "codex_ev_Q05_036_blk_04", "type": "usage_flow", "path": "repos/xv6-k210/kernel/fs/blkdev.c", "lines": "90-154", "summary": "disk_read_block/disk_write_block 使用 bread/bget/bwrite 与 buffer cache。"},
+        {"evidence_id": "codex_ev_Q05_036_disk_05", "type": "usage_flow", "path": "repos/xv6-k210/kernel/hal/disk.c", "lines": "35-99", "summary": "disk_read/disk_submit/disk_multiple_read 根据平台调用 virtio_disk_* 或 sdcard_* 驱动。"}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q05_036_01", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_036_sys_01"]},
+        {"fact_id": "Q05_036_02", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_036_file_02"]},
+        {"fact_id": "Q05_036_03", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_036_disk_05"]},
+        {"fact_id": "Q05_036_04", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_036_blk_04"]},
+        {"fact_id": "Q05_036_05", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_036_disk_05"]}
+      ],
+      "answer": {"used_evidence_ids": ["codex_ev_Q05_036_sys_01", "codex_ev_Q05_036_file_02", "codex_ev_Q05_036_fat_03", "codex_ev_Q05_036_blk_04", "codex_ev_Q05_036_disk_05"], "confidence": "high"}
+    },
+    {
+      "question_id": "Q05_037",
+      "question_type": "single_choice",
+      "value": "混合：不同设备或路径同时支持同步与异步完成",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q05_037_read_block_01", "type": "implementation_body", "path": "repos/xv6-k210/kernel/hal/virtio_disk.c", "lines": "326-339", "summary": "virtio 读请求在 bufs[0]->disk == 1 时 sleep，等待 virtio_disk_intr 唤醒后返回。"},
+        {"evidence_id": "codex_ev_Q05_037_write_async_02", "type": "implementation_body", "path": "repos/xv6-k210/kernel/fs/bio.c", "lines": "197-226", "summary": "bwrite 注释说明提交写请求到磁盘驱动后直接返回，不等待；随后 disk_write_start 启动写。"},
+        {"evidence_id": "codex_ev_Q05_037_poll_03", "type": "implementation_body", "path": "repos/xv6-k210/kernel/fs/poll.c", "lines": "127-243", "summary": "pselect 可把进程挂到文件 wait_queue 并按事件/超时唤醒。"}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q05_037_01", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_037_read_block_01"]},
+        {"fact_id": "Q05_037_02", "status_or_value": "yes_weak", "used_evidence_ids": ["codex_ev_Q05_037_poll_03"]},
+        {"fact_id": "Q05_037_03", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_037_write_async_02"]},
+        {"fact_id": "Q05_037_04", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_037_read_block_01", "codex_ev_Q05_037_write_async_02"]},
+        {"fact_id": "Q05_037_05", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_037_poll_03"]}
+      ],
+      "answer": {"used_evidence_ids": ["codex_ev_Q05_037_read_block_01", "codex_ev_Q05_037_write_async_02", "codex_ev_Q05_037_poll_03"], "confidence": "medium"}
+    },
+    {
+      "question_id": "Q05_038",
+      "question_type": "tri_state_impl",
+      "value": "stub",
+      "evidence": [
+        {"evidence_id": "codex_ev_Q05_038_mode_01", "type": "definition", "path": "repos/xv6-k210/include/fs/fs.h", "lines": "105-123", "summary": "inode 只有 mode、dev、size、nlink 等元数据，没有 owner/ACL/capability；有 sleeplock lock 和 spinlock ilock。"},
+        {"evidence_id": "codex_ev_Q05_038_open_02", "type": "implementation_body", "path": "repos/xv6-k210/kernel/syscall/sysfile.c", "lines": "216-264", "summary": "sys_openat 只检查目录不能写、O_DIRECTORY 类型、O_TRUNC 等，没有调用权限检查函数；最后按 omode 设置 readable/writable。"},
+        {"evidence_id": "codex_ev_Q05_038_faccess_03", "type": "implementation_body", "path": "repos/xv6-k210/kernel/syscall/sysfile.c", "lines": "788-823", "summary": "sys_faccessat 注释 assume user as root，仅用 (ip->mode >> 6) & 0x7 比较 mode；这是 access 查询路径，不是 open/read/write 强制检查。"},
+        {"evidence_id": "codex_ev_Q05_038_lock_04", "type": "implementation_body", "path": "repos/xv6-k210/kernel/fs/file.c", "lines": "113-190", "summary": "fileread/filewrite 对普通 inode 使用 ilock/iunlock 包围 fop read/write，并用 file lock 更新 offset；这是并发 I/O 互斥，不是访问权模型。"},
+        {"evidence_id": "codex_ev_Q05_038_neg_05", "type": "negative_search", "path": "repos/xv6-k210", "lines": "search", "summary": "权限/锁关键词在 243 文件中：inode_permission=0、check_perm=0、chmod=0、chown=0、flock=0、file lock=0；mode/uid/gid/EACCES/EPERM 有零散命中，但未形成 open/read/write 权限检查链。"}
+      ],
+      "fact_answers": [
+        {"fact_id": "Q05_038_01", "status_or_value": "stub_or_declaration_only", "used_evidence_ids": ["codex_ev_Q05_038_mode_01"]},
+        {"fact_id": "Q05_038_02", "status_or_value": "no_after_negative_search", "used_evidence_ids": ["codex_ev_Q05_038_open_02", "codex_ev_Q05_038_neg_05"]},
+        {"fact_id": "Q05_038_03", "status_or_value": "stub_or_declaration_only", "used_evidence_ids": ["codex_ev_Q05_038_faccess_03"]},
+        {"fact_id": "Q05_038_04", "status_or_value": "yes_strong", "used_evidence_ids": ["codex_ev_Q05_038_lock_04"]},
+        {"fact_id": "Q05_038_05", "status_or_value": {"searched_keywords": ["inode_permission", "check_perm", "access", "mode", "uid", "gid", "ACL", "chmod", "chown", "flock", "fcntl", "file lock", "O_APPEND", "EACCES", "EPERM"], "searched_directories": ["include", "kernel", "kernel/fs", "kernel/syscall", "kernel/hal", "kernel/mm", "doc", "xv6-user"], "file_count": 243, "match_count": 507, "coverage_sufficient": true}, "used_evidence_ids": ["codex_ev_Q05_038_neg_05"]}
+      ],
+      "answer": {"used_evidence_ids": ["codex_ev_Q05_038_mode_01", "codex_ev_Q05_038_open_02", "codex_ev_Q05_038_faccess_03", "codex_ev_Q05_038_lock_04", "codex_ev_Q05_038_neg_05"], "confidence": "high", "notes": "有 mode 字段和 inode/file 锁，但缺少访问权元数据与 open/read/write 强制检查，因此按题单规则降为 stub。"}
+    }
+  ],
+  "unknowns": []
+}

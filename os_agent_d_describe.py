@@ -90,8 +90,7 @@ STAGES = [
 
         请按顺序完成（repo_path 为仓库根）：
         1) **通读前置报告**：完整阅读上下文中的各章 Markdown，为下面「各模块技术全景」打草稿；摘录每章出现的**具体技术名词、算法名、crate 名、关键路径/符号**（须能在该章正文中找到依据，勿臆造）。
-        2) analyze_tech_stack(repo_path)：核对/补充语言、构建、依赖与框架判断。
-        3) list_repo_structure(repo_path, max_depth=5)：核对关键目录与入口线索。
+        2) list_repo_structure(repo_path, max_depth=5)：核对关键目录与入口线索。
         4) **架构支持**：列出本仓库实际支持的架构（可与前置报告交叉验证）。
         5) **内核入口**：用 LSP/grep 等**轻量**手段确认主入口符号与文件路径即可。
         6) **评测与交付信号（轻量）**：`read_code_segment` 阅读根目录 `README.md` 前几屏（若存在则扫 `docs/*.md` 标题区）提取构建/运行/QEMU 命令与作者**声称**的评测或 CI 环境；`grep_in_repo` 检索 `kernel-rv|kernel-la|disk.img|testcode|OS COMP|autograde|gitlab-ci|\\.github/workflows` 等中性模式。仅当有命中或 README 明确描述且能与前置章节或源码锚点交叉时写入下一节；否则在该节写「未发现仓库内评测专用适配信号」。

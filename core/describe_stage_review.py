@@ -60,7 +60,7 @@ def build_stage_qa_question_sheet(stage_id: str, stage_title: str) -> str:
                 "answer_contract": q.get("answer_contract"),
             }
             feature_view = {k: v for k, v in feature_view.items() if v is not None}
-            lines.append(f"**feature_schema**: {json.dumps(feature_view, ensure_ascii=False, separators=(',', ':'))}\n\n")
+            lines.append(f"**feature_context**: {json.dumps(feature_view, ensure_ascii=False, separators=(',', ':'))}\n\n")
         choices = q.get("choices")
         if isinstance(choices, list) and choices:
             lines.append("**choices**（前缀 A/B/C/D 仅为显示标签；答案 `value` 应使用选项原文，不必包含字母前缀）:\n")
@@ -112,27 +112,33 @@ def coerce_review_payload(
     stage_id: str,
     stage_title: str,
     expected_question_ids: List[str],
+    expected_question_digests: Optional[Dict[str, str]] = None,
 ) -> Dict[str, Any]:
     raw_list = data.get("question_reviews")
     if not isinstance(raw_list, list):
         raw_list = data.get("per_question_reviews") or data.get("questions_review") or []
 
-    by_id: Dict[str, Tuple[Any, Any, str, Dict[str, Any]]] = {}
+    by_id: Dict[str, Tuple[Any, Any, str, Dict[str, Any], str]] = {}
     for item in raw_list:
         parsed = _normalize_one_question_review(item)
         if not parsed:
             continue
         qid, se, sc, rev = parsed
+        digest = str(item.get("question_digest") or "").strip() if isinstance(item, dict) else ""
+        expected_digest = (expected_question_digests or {}).get(qid, "")
+        if digest and expected_digest and digest != expected_digest:
+            continue
         fix_hints = item.get("fix_hints") if isinstance(item, dict) and isinstance(item.get("fix_hints"), dict) else {}
-        by_id[qid] = (se, sc, rev, fix_hints)
+        by_id[qid] = (se, sc, rev, fix_hints, digest or expected_digest)
 
     question_reviews: List[Dict[str, Any]] = []
     for qid in expected_question_ids:
         if qid in by_id:
-            se, sc, rev, fix_hints = by_id[qid]
+            se, sc, rev, fix_hints, digest = by_id[qid]
             question_reviews.append(
                 {
                     "question_id": qid,
+                    "question_digest": digest,
                     "score_evidence": se,
                     "score_consistency": sc,
                     "review": rev if rev else "（审计输出中本题为空白评审）",
@@ -143,6 +149,7 @@ def coerce_review_payload(
             question_reviews.append(
                 {
                     "question_id": qid,
+                    "question_digest": (expected_question_digests or {}).get(qid, ""),
                     "score_evidence": None,
                     "score_consistency": None,
                     "review": "（审计 JSON 未包含本题；视为输出不完整）",
@@ -278,6 +285,7 @@ def enrich_review_with_report_quality(
     meta: Dict[str, Any] = dict(review.get("_meta")) if isinstance(review.get("_meta"), dict) else {}
     meta["quality"] = {
         "mean_question_confidence": round(mean_q, 4),
+        "confidence_source": "program_recomputed_from_question_scores",
     }
     review["_meta"] = meta
     return review
@@ -315,6 +323,7 @@ def run_describe_stage_review(
     question_sheet: str,
     model_json_before_stage_qa_coerce: str,
     expected_question_ids: List[str],
+    expected_question_digests: Optional[Dict[str, str]] = None,
 ) -> Tuple[Optional[Dict[str, Any]], str, Optional[str], int]:
     """
     无工具 invoke。材料 A=题单，B=覆写前 JSON 字符串。
@@ -385,6 +394,7 @@ def run_describe_stage_review(
         "\n```\n\n",
         "请根据以上两份材料：**对列表中每一题**写出 `review` 与本题 `confidence`，并给出全阶段 `confidence` 与 `summary_zh` 总评。"
         " **仅**核对题面↔答案、JSON 契约、`evidence`↔`value`；**勿**评价参赛 OS 的设计好坏；`findings` 默认 `[]`。"
+        " 每个 `question_reviews[]` item 必须原样带上材料 A 中对应题目的 `question_digest`。"
         " 输出**唯一一个**符合系统说明 JSON 模式的对象（可用 ```json 围栏）。\n",
     ]
     user_text = "".join(user_parts)
@@ -392,7 +402,7 @@ def run_describe_stage_review(
         user_text = user_text[: max_user_chars - 1000] + f"\n\n...[user bundle hard truncated at {max_user_chars} chars]...\n"
 
     model = os.environ.get("DESCRIBE_REVIEW_MODEL") or get_model_name()
-    llm = build_chat_model(model=model, temperature=0, max_retries=0)
+    llm = build_chat_model(model=model, temperature=0, max_retries=0, role="review")
     max_attempts = _review_parse_max_attempts()
     messages: list = [
         SystemMessage(content=DESCRIBE_REVIEW_SYSTEM_PROMPT),
@@ -421,6 +431,7 @@ def run_describe_stage_review(
                 stage_id=stage_id,
                 stage_title=stage_title,
                 expected_question_ids=list(expected_question_ids),
+                expected_question_digests=expected_question_digests,
             )
             if attempt > 1:
                 logger.info("Describe review OK on attempt %s/%s", attempt, max_attempts)

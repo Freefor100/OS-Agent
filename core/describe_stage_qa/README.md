@@ -16,7 +16,7 @@
     - `stem`：题干（中文为主，首次出现可括注英文术语）
     - `choices`：选择题可选
 - `tri_state_impl` 的答案枚举为 `implemented | stub | not_found | unknown`；`unknown` 用于证据不足或搜索覆盖不足，不得强行归类。
-- 题单文件本体应保留 Feature Schema Bank materialize 后的字段，方便人工评审：
+- 题单文件本体应手工维护以下字段，方便人工评审；运行时不会自动生成、补齐或修补：
   - `feature_ids`
   - `evidence_policy`
   - `diagnostic_checks`
@@ -33,5 +33,7 @@
 
 注意：题库本身不含“答案”，答案由 LLM 输出并在 `_per_stage/<stage_id>_answers.json` 保存。
 
-题库当前合计 **193** 题。`10_history` 使用 `os_agent_d_describe.py` 中内联 `prompt`，无对应 JSON 题单。若你本地题量数字不符，说明题库文件未同步仓库或已被截断。
+题库当前合计 **201** 题。`10_history` 使用 `os_agent_d_describe.py` 中内联 `prompt`，无对应 JSON 题单。若你本地题量数字不符，说明题库文件未同步仓库或已被截断。
+
+逐题审计记录见 `AUDIT_02_09.md`：每题标记 `ok`、`remediated` 或 `reviewed_ok`，并记录歧义、子问题、三态判定与模块边界的处理动作。
 

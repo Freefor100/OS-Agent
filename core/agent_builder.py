@@ -21,7 +21,7 @@ except Exception:
 
 from tools.build_config_ops import parse_build_config
 from tools.describe_ops import find_os_core_modules, list_repo_structure
-from tools.file_ops import grep_in_repo, rag_search_code, read_code_segment
+from tools.file_ops import confirm_symbol_absent, grep_in_repo, rag_search_code, read_code_segment
 from tools.git_ops import (
     analyze_authors_contribution,
     analyze_git_history,
@@ -48,11 +48,11 @@ DESCRIBE_REVIEW_SYSTEM_PROMPT = """你是 OS-Agent Describe 管线的**审计员
 
 ## 唯一允许的评审对象（三者之外一律不写）
 1. **题面相符**：B 中各题 `fact_answers` 与汇总 `value` 是否与 A 中对应 `stem` / `structured_facts` / `choices` 等题面约束一致、是否跑题。
-2. **格式与契约**：B 是否满足 JSON-QA 输出契约（字段齐全、类型合理、枚举合法等），尤其每个 `structured_facts[].fact_id` 是否都有对应 `fact_answers[]`；`short_answer/fill_in` 的 `value` 是否为按 `structured_facts[].fact_key` 固定展开的对象。
+2. **格式与契约**：B 是否满足 JSON-QA 输出契约（字段齐全、类型合理、枚举合法等），尤其每个 `structured_facts[].fact_id` 是否都有对应 `fact_answers[]`；只有题单 `answer_contract.value_shape` 明确声明字段时，`short_answer/fill_in` 的 `value` 才必须是固定字段对象。
 3. **证据支撑结论**：**仅**依据 B 中 `answers[].evidence[]`、`answers[].fact_answers[].used_evidence_ids` 与对应 fact/value 是否对得上；缺证据、错引、与结论矛盾须指出。
 
-## Feature Schema / 三态规则
-- 若 A 中题目包含 `feature_schema`、`structured_facts`、`answer_contract`、`tri_state_rule`、`evidence_policy` 或 `anti_examples`，必须按这些规则审查。
+## QA Contract / 三态规则
+- 若 A 中题目包含 `feature_context`、`structured_facts`、`answer_contract`、`tri_state_rule`、`evidence_policy` 或 `anti_examples`，必须按这些题单内规则审查。
 - `tri_state_impl` 只允许 `implemented | stub | not_found | unknown`。
 - `implemented` 不能只由 RAG/grep/search 命中支撑，必须看到实现体、调用点、状态变化、数据结构读写或流程证据。
 - `not_found` 必须有结构化负向搜索证据，覆盖题目要求的关键词和目录；覆盖不足时应判为 `unknown` 或证据弱。
@@ -78,7 +78,7 @@ DESCRIBE_REVIEW_SYSTEM_PROMPT = """你是 OS-Agent Describe 管线的**审计员
    - **0.00~0.49**：无有效证据却下强结论，或证据与结论矛盾。
    - **硬约束**：若该题所有 `excerpt` 全为空，`score_evidence` 不得高于 0.90。
 
-2. **`score_consistency`（题面相符度）**：评估 `fact_answers` 是否逐项覆盖题单 `structured_facts`，以及汇总 `value` 是否严格遵守 `stem` 的要求（含数量、三态、选项等）；简答/填空题还要检查 `value` 固定字段是否与 fact_key 完全一致。
+2. **`score_consistency`（题面相符度）**：评估 `fact_answers` 是否逐项覆盖题单 `structured_facts`，以及汇总 `value` 是否严格遵守 `stem` 的要求（含数量、三态、选项等）；简答/填空题只有在 `answer_contract.value_shape` 存在时才检查固定字段。
    - **0.95~1.00**：完全符合题干要求，无跑题，数量/选项完全匹配。
    - **0.75~0.85**：基本符合，但有微小瑕疵（如要求列举 5 个只列了 4 个，或回答稍显敷衍）。
    - **0.00~0.49**：严重跑题，或完全未遵守题干的硬性约束（如单选题答了非选项内容）。
@@ -139,25 +139,50 @@ def _is_deepseek_backend(model_name: str) -> bool:
     return ("deepseek" in base_url.lower()) or model_l.startswith("deepseek-") or model_l.startswith("deepseek/")
 
 
-def _apply_deepseek_thinking_defaults(model_name: str, model_kwargs: dict | None) -> dict:
-    """
-    DeepSeek Thinking Mode 兼容处理。
+def _is_qwen_backend(model_name: str) -> bool:
+    base_url = (os.environ.get("OPENAI_API_BASE") or os.environ.get("OPENAI_BASE_URL") or "").strip().lower()
+    model_l = (model_name or "").strip().lower()
+    return "dashscope" in base_url or "aliyun" in base_url or "qwen" in model_l
 
-    LangChain 工具调用路径默认禁用 thinking；用户显式开启时应用补丁，确保
-    reasoning_content 能在后续请求中被回传。
-    """
+
+def _thinking_enabled(role: str) -> bool:
+    """Return True if thinking should be active for the given role."""
+    planner_thinking = (os.environ.get("OS_AGENT_PLANNER_THINKING") or "").strip().lower()
+    global_thinking = (
+        os.environ.get("OS_AGENT_THINKING") or
+        os.environ.get("OS_AGENT_DEEPSEEK_THINKING") or ""
+    ).strip().lower()
+    on_values = {"1", "true", "yes", "on", "enabled"}
+    if role == "planner":
+        # Planner-specific override; fall back to global
+        if planner_thinking:
+            return planner_thinking in on_values
+        return global_thinking in on_values
+    if role in ("task", "review"):
+        # Task and review agents: never use thinking to save tokens
+        return False
+    return global_thinking in on_values
+
+
+def _apply_deepseek_thinking_defaults(model_name: str, model_kwargs: dict | None, role: str = "task") -> dict:
+    """DeepSeek Thinking Mode 兼容处理，支持 per-role 开关和 budget_tokens。"""
     mk = deepcopy(model_kwargs or {})
     if not _is_deepseek_backend(model_name):
         return mk
 
-    thinking = (os.environ.get("OS_AGENT_DEEPSEEK_THINKING") or "").strip().lower()
     extra_body = dict(mk.get("extra_body") or {})
+    enabled = _thinking_enabled(role)
 
-    if thinking in ("", "0", "false", "no", "off", "disabled"):
+    if not enabled:
         extra_body.setdefault("thinking", {"type": "disabled"})
     else:
         apply_deepseek_reasoning_content_patch()
         extra_body.setdefault("thinking", {"type": "enabled"})
+        # budget_tokens: optional cap on thinking tokens
+        budget = (os.environ.get("OS_AGENT_DEEPSEEK_THINKING_BUDGET") or
+                  os.environ.get("OS_AGENT_THINKING_BUDGET") or "").strip()
+        if budget.isdigit():
+            extra_body["thinking"]["budget_tokens"] = int(budget)
         effort = (os.environ.get("OS_AGENT_DEEPSEEK_REASONING_EFFORT") or "").strip().lower()
         if effort:
             mk.setdefault("reasoning_effort", effort)
@@ -166,16 +191,39 @@ def _apply_deepseek_thinking_defaults(model_name: str, model_kwargs: dict | None
     return mk
 
 
+def _apply_qwen_thinking_defaults(model_name: str, model_kwargs: dict | None, role: str = "task") -> dict:
+    """Qwen3/DashScope Thinking Mode 支持 (enable_thinking + thinking_budget)。"""
+    mk = deepcopy(model_kwargs or {})
+    if not _is_qwen_backend(model_name):
+        return mk
+
+    extra_body = dict(mk.get("extra_body") or {})
+    enabled = _thinking_enabled(role)
+
+    if enabled:
+        extra_body["enable_thinking"] = True
+        budget = (os.environ.get("OS_AGENT_THINKING_BUDGET") or "").strip()
+        if budget.isdigit():
+            extra_body["thinking_budget"] = int(budget)
+    else:
+        extra_body["enable_thinking"] = False
+
+    mk["extra_body"] = extra_body
+    return mk
+
+
 def build_chat_model(
     model: str = None,
     *,
+    role: str = "task",
     temperature: float = 0,
     request_timeout: int = 240,
     max_retries: int = 2,
     model_kwargs: dict | None = None,
 ):
     model_name = model or get_model_name()
-    merged_kwargs = _apply_deepseek_thinking_defaults(model_name, model_kwargs)
+    merged_kwargs = _apply_deepseek_thinking_defaults(model_name, model_kwargs, role=role)
+    merged_kwargs = _apply_qwen_thinking_defaults(model_name, merged_kwargs, role=role)
     is_deepseek = _is_deepseek_backend(model_name)
 
     _mot = (os.environ.get("DESCRIBE_MAX_OUTPUT_TOKENS") or "").strip()
@@ -213,38 +261,15 @@ def build_chat_model(
 
 
 def get_task_agent_tools(task_type: str, stage_id: str = ""):
-    """Return a restricted tool set for Multi-Agent task workers."""
+    """Return tool set for Multi-Agent task workers.
+
+    Two tiers:
+      react_history — git-only tools, used for Stage 10 history tasks.
+      react_code (default) — universal set covering code search, LSP, build
+                             config, and negative-search for all other tasks.
+    All legacy task_type aliases fall through to react_code.
+    """
     task_type = (task_type or "").strip().lower()
-    if task_type in {"react_rag", "discovery", "implementation_state", "rag"}:
-        return _with_task_tool_runtime([
-            rag_search_code,
-            grep_in_repo,
-            find_os_core_modules,
-            read_code_segment,
-        ])
-    if task_type in {"react_code", "code_evidence", "code", "read"}:
-        return _with_task_tool_runtime([
-            rag_search_code,
-            grep_in_repo,
-            find_os_core_modules,
-            read_code_segment,
-            lsp_get_definition,
-            lsp_get_references,
-            lsp_get_document_outline,
-        ])
-    if task_type in {"react_lsp", "definition", "flow", "lsp"}:
-        return _with_task_tool_runtime([
-            rag_search_code,
-            grep_in_repo,
-            read_code_segment,
-            lsp_get_definition,
-            lsp_get_references,
-            lsp_get_document_outline,
-            lsp_get_call_graph,
-            lsp_set_target_arch,
-        ])
-    if task_type in {"react_build", "build_platform", "platform", "build"}:
-        return _with_task_tool_runtime([list_repo_structure, read_code_segment, grep_in_repo, parse_build_config])
     if task_type in {"react_history", "git_history", "history"}:
         return _with_task_tool_runtime([
             get_git_history_summary,
@@ -254,14 +279,19 @@ def get_task_agent_tools(task_type: str, stage_id: str = ""):
             analyze_authors_contribution,
             get_commit_diff_summary,
         ])
+    # Universal set for react_code and all legacy aliases
     return _with_task_tool_runtime([
         rag_search_code,
         grep_in_repo,
+        confirm_symbol_absent,
         find_os_core_modules,
         read_code_segment,
         lsp_get_definition,
         lsp_get_references,
         lsp_get_document_outline,
+        lsp_get_call_graph,
+        lsp_set_target_arch,
+        parse_build_config,
     ])
 
 
@@ -342,7 +372,7 @@ def _record_tool_call_or_block(tool_name: str, tool_args: dict) -> tuple[bool, s
 
     ctx["tool_call_count"] = int(ctx.get("tool_call_count") or 0) + 1
     metadata["tool_call_count"] = ctx["tool_call_count"]
-    budget = _env_int("OS_AGENT_TASK_AGENT_BUDGET", 30)
+    budget = _env_int("OS_AGENT_TASK_AGENT_BUDGET", 50)
     max_calls = budget
     if ctx["tool_call_count"] > max_calls:
         return False, f"Task Agent tool-call limit exceeded: {ctx['tool_call_count']}/{max_calls}", metadata
@@ -351,11 +381,14 @@ def _record_tool_call_or_block(tool_name: str, tool_args: dict) -> tuple[bool, s
     metadata["tool_signature"] = sig
     history = ctx.setdefault("tool_signature_history", [])
     history.append(sig)
-    del history[:-12]
+    del history[:-20]
     loop = _detect_tool_loop(history)
     if loop:
         metadata.update(loop)
-        return False, f"Repeated tool-action loop blocked: pattern={loop['pattern']} length={loop['pattern_length']}", metadata
+        return False, (
+            f"Repeated tool-action loop detected (pattern={loop['pattern']}, length={loop['pattern_length']}). "
+            "请换一个不同的搜索路径：尝试更换关键词、换用其他工具，或直接基于已有信息给出答案。"
+        ), metadata
 
     return True, "", metadata
 
@@ -414,7 +447,7 @@ def _tool_result_preview(tool_name: str, result) -> str:
 
 def build_task_agent(model: str = None, task_type: str = "", stage_id: str = ""):
     """Build a restricted ReAct agent for one Multi-Agent task type."""
-    llm = build_chat_model(model=model, temperature=0)
+    llm = build_chat_model(model=model, temperature=0, role="task")
     return create_react_agent(llm, get_task_agent_tools(task_type, stage_id))
 
 
@@ -424,5 +457,5 @@ def build_task_agent_with_tools(*, stage_id: str = "", tools: list | None = None
     Task planning decides the task type, then Task Builder may narrow the
     allowed tools per task. This entry keeps that filtered tool set intact.
     """
-    llm = build_chat_model(model=model, temperature=0)
+    llm = build_chat_model(model=model, temperature=0, role="task")
     return create_react_agent(llm, tools or get_task_agent_tools("", stage_id))

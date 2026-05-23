@@ -358,8 +358,25 @@ def _fact_field_keys(question: Dict[str, Any]) -> List[str]:
     return out
 
 
+def _value_shape_fields(question: Dict[str, Any]) -> List[str]:
+    contract = question.get("answer_contract") if isinstance(question.get("answer_contract"), dict) else {}
+    shape = contract.get("value_shape")
+    if not isinstance(shape, dict) or not shape:
+        return []
+    return [str(k).strip() for k in shape.keys() if str(k).strip()]
+
+
+def question_requires_fixed_value_shape(question: Dict[str, Any]) -> bool:
+    """Whether `value` must be an object with explicit answer_contract.value_shape keys."""
+    qtype = str(question.get("question_type") or "").strip()
+    if qtype not in {"short_answer", "fill_in"}:
+        return False
+    return bool(_value_shape_fields(question))
+
+
 def default_structured_value_for_question(question: Dict[str, Any]) -> Dict[str, Any]:
-    return {key: "unknown" for key in _fact_field_keys(question)}
+    keys = _value_shape_fields(question) or _fact_field_keys(question)
+    return {key: "unknown" for key in keys}
 
 
 def _default_fact_value(fact: Dict[str, Any]) -> Any:
@@ -423,13 +440,12 @@ def ensure_fact_answers_for_question(answer: Dict[str, Any], question: Dict[str,
 
 
 def ensure_structured_value_for_question(answer: Dict[str, Any], question: Dict[str, Any]) -> Dict[str, Any]:
-    """Backfill fixed-field value objects for short_answer/fill_in fallback paths."""
+    """Backfill fixed-field value objects only when answer_contract declares value_shape."""
     if not isinstance(answer, dict):
         return answer
-    qtype = str(question.get("question_type") or "").strip()
-    if qtype not in {"short_answer", "fill_in"}:
+    if not question_requires_fixed_value_shape(question):
         return answer
-    expected = _fact_field_keys(question)
+    expected = _value_shape_fields(question)
     if not expected:
         return answer
     value = answer.get("value")
@@ -528,6 +544,10 @@ def validate_answers_payload(
         }:
             issues.append(ValidationIssue(f"{pfx}.question_type", "invalid question_type"))
 
+        answer_status = a.get("answer_status")
+        if answer_status is not None and answer_status not in {"answered", "fallback_unusable"}:
+            issues.append(ValidationIssue(f"{pfx}.answer_status", "must be answered|fallback_unusable if provided"))
+
         stem = a.get("stem")
         if not _is_str(stem):
             issues.append(ValidationIssue(f"{pfx}.stem", "must be non-empty string"))
@@ -578,12 +598,12 @@ def validate_answers_payload(
                 issues.append(ValidationIssue(f"{pfx}.fact_answers", f"unexpected fact_id(s): {extra_facts[:12]}"))
             if len(fact_ids_seen) != len(set(fact_ids_seen)):
                 issues.append(ValidationIssue(f"{pfx}.fact_answers", "duplicate fact_id(s)"))
-            if qtype in {"short_answer", "fill_in"}:
-                expected_fields = _fact_field_keys(q)
+            if question_requires_fixed_value_shape(q):
+                expected_fields = _value_shape_fields(q)
                 if expected_fields:
                     value = a.get("value")
                     if not isinstance(value, dict):
-                        issues.append(ValidationIssue(f"{pfx}.value", "short_answer/fill_in value must be object keyed by structured_facts fact_key"))
+                        issues.append(ValidationIssue(f"{pfx}.value", "short_answer/fill_in value must be object keyed by answer_contract.value_shape"))
                     else:
                         got_fields = [str(k).strip() for k in value.keys()]
                         missing_fields = [key for key in expected_fields if key not in got_fields]

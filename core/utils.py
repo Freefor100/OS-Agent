@@ -193,8 +193,8 @@ def format_tool_call_summary(tool_name: str, tool_args: dict) -> str:
         suffix = f" in {dirname}/" if dirname else ""
         return f'"{pattern}"{suffix}' + (f" ({', '.join(extra)})" if extra else "")
 
-    # 技术栈分析 / 核心模块发现
-    elif tool_name in ("analyze_tech_stack", "find_os_core_modules"):
+    # 核心模块发现
+    elif tool_name == "find_os_core_modules":
         path = tool_args.get("repo_path", tool_args.get("path", "?"))
         dirname = os.path.basename(str(path).rstrip("/\\")) if path else "?"
         return f"{dirname}/"
@@ -272,10 +272,6 @@ def format_tool_result_summary(tool_name: str, content: str) -> str:
         return f"返回 {lines} 行关联信息"
     elif tool_name == "lsp_set_target_arch":
         return f"成功切换架构并重启 LSP" if "Successfully" in content else f"切换失败: {content[:30]}..."
-    elif tool_name == "analyze_tech_stack":
-        if "代码文件统计" in content or "Rust" in content:
-            return "返回技术栈与文件统计"
-        return f"返回 {content_len} 字符"
     elif tool_name in ("get_dev_history_by_module", "analyze_git_history_detailed", "analyze_git_history", "get_git_history_summary", "trace_file_evolution", "analyze_authors_contribution", "get_commit_diff_summary"):
         return f"返回开发历史分析 ({line_count} 行, {content_len} 字符)"
     else:
