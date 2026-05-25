@@ -248,6 +248,23 @@ def coerce_answers_payload_by_stage_qa(payload: Dict[str, Any], *, stage_qa: Dic
         aa = ensure_fact_answers_for_question(aa, q)
         aa = ensure_structured_value_for_question(aa, q)
 
+        # Coerce fact_answers[*].value by allowed_values if defined
+        facts_by_id = {
+            str(f.get("fact_id") or "").strip(): f
+            for f in (q.get("structured_facts") or [])
+            if isinstance(f, dict)
+        }
+        if facts_by_id and isinstance(aa.get("fact_answers"), list):
+            for fa in aa["fact_answers"]:
+                if not isinstance(fa, dict):
+                    continue
+                fid = str(fa.get("fact_id") or "").strip()
+                fact_spec = facts_by_id.get(fid, {})
+                fa_choices_raw = fact_spec.get("allowed_values")
+                if isinstance(fa_choices_raw, list) and fa_choices_raw:
+                    fa_choices = [str(x).strip() for x in fa_choices_raw]
+                    fa["value"] = _coerce_single_choice_value(fa.get("value"), fa_choices)
+
         new_answers.append(aa)
 
     out["answers"] = new_answers

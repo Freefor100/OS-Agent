@@ -23,7 +23,6 @@ STRONG_EVIDENCE_TYPES = {
     "call_site",
     "usage_flow",
     "call_graph",
-    "read_code_segment",
 }
 
 HINT_EVIDENCE_TYPES = {"search", "semantic_search", "rag", "grep", "outline"}

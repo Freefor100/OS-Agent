@@ -399,6 +399,17 @@ def _tri_state_value_allowed(value: str, evidence: List[EvidenceRecord], answer:
     return False
 
 
+def _stub_supported_by_drafts(drafts: List[Any]) -> bool:
+    """Task Agent 草稿中是否有 medium/high confidence 的 stub 判断。"""
+    for d in drafts:
+        answer = d.answer if isinstance(d, DraftAnswerRecord) else (d if isinstance(d, dict) else {})
+        if str(answer.get("value") or "").strip() == "stub":
+            conf = str(answer.get("confidence") or "low").strip().lower()
+            if conf in {"medium", "high"}:
+                return True
+    return False
+
+
 def _stage_by_id(stages: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
     return {str(s.get("id")): s for s in stages}
 
@@ -923,6 +934,25 @@ class MultiAgentRuntime:
                 weak.append(qid)
         return _dedupe_str(weak)
 
+    def _refresh_weak_evidence(self, stage_id: str, weak_qids: List[str], max_chars: int = 2000) -> None:
+        """fix round 前对低分题目的证据从源文件重读 excerpt，覆盖截断的快照。"""
+        for qid in weak_qids:
+            for rec in self.evidence_store.by_question(stage_id, qid):
+                if not (rec.path and rec.line_start and rec.line_end):
+                    continue
+                full_path = os.path.join(self.repo_path, rec.path)
+                if not os.path.isfile(full_path):
+                    continue
+                try:
+                    with open(full_path, encoding="utf-8", errors="ignore") as f:
+                        lines = f.readlines()
+                    chunk = "".join(lines[rec.line_start - 1 : rec.line_end])[:max_chars]
+                    if chunk and chunk != rec.excerpt:
+                        rec.excerpt = chunk
+                        self.evidence_store.append(rec)
+                except Exception:
+                    continue
+
     def _build_fix_tasks(
         self,
         stage_id: str,
@@ -979,6 +1009,8 @@ class MultiAgentRuntime:
         if not weak_qids:
             return []
 
+        self._refresh_weak_evidence(stage_id, weak_qids)
+
         tasks: List[TaskSpec] = []
         for qid in weak_qids[:6]:
             question = qmap.get(qid)
@@ -1019,6 +1051,16 @@ class MultiAgentRuntime:
             score_consistency = float(review_item.get("score_consistency"))
         except Exception:
             score_consistency = 1.0
+
+        # contract_only 是格式/schema 问题，Task Agent 无法修正，跳过生成任务
+        if finding_type == "contract_only" and score_evidence >= 0.75:
+            self.events.emit(
+                "review_fix_skipped",
+                f"{qid} contract_only finding with score_evidence={score_evidence:.2f}; skipping fix task",
+                stage_id=stage_id,
+                agent_name="stage_assembler",
+            )
+            return None
 
         review_text = str(review_item.get("review") or "")
 
@@ -1419,6 +1461,7 @@ class MultiAgentRuntime:
                 evidence=evs,
                 prompt=prompt,
                 agent_name="stage_assembler",
+                drafts=drafts,
             )
             raw_parts.append(f"--- {qid} ---\n{raw_log}")
             answers.append(answer)
@@ -1757,6 +1800,7 @@ class MultiAgentRuntime:
         evidence: List[EvidenceRecord],
         prompt: str,
         agent_name: str,
+        drafts: Optional[List[Any]] = None,
     ) -> Tuple[Dict[str, Any], str]:
         qid = str(question.get("question_id") or "").strip()
         max_attempts = _env_int("OS_AGENT_ANSWER_JSON_MAX_ATTEMPTS", 3)
@@ -1766,7 +1810,7 @@ class MultiAgentRuntime:
         for attempt in range(1, max_attempts + 1):
             raw = self._invoke_llm(current_prompt, stage_id=stage_id, agent_name=agent_name)
             attempts_raw.append(f"attempt={attempt}\n{raw}")
-            answer, issues = self._parse_one_answer_candidate(stage_id, title, question, raw, evidence)
+            answer, issues = self._parse_one_answer_candidate(stage_id, title, question, raw, evidence, drafts=drafts)
             if answer is not None:
                 if attempt > 1:
                     self.events.emit(
@@ -1832,6 +1876,7 @@ class MultiAgentRuntime:
         question: Dict[str, Any],
         raw: str,
         evidence: List[EvidenceRecord],
+        drafts: Optional[List[Any]] = None,
     ) -> Tuple[Optional[Dict[str, Any]], List[str]]:
         try:
             text = (raw or "").strip()
@@ -1902,7 +1947,7 @@ class MultiAgentRuntime:
                         metadata=_answer_audit_meta(question, "evidence_ref_resolution", before_resolve, resolved_answer),
                     )
                 before_schema = copy.deepcopy(resolved_answer)
-                answer = self._enforce_answer_schema(question, resolved_answer, evidence, stage_id=stage_id)
+                answer = self._enforce_answer_schema(question, resolved_answer, evidence, stage_id=stage_id, drafts=drafts)
                 if _brief_diff(before_schema, answer):
                     self.events.emit(
                         "answer_candidate_mutated",
@@ -1935,7 +1980,7 @@ class MultiAgentRuntime:
             "line_end": record.line_end,
             "symbol_kind": record.evidence_type or "evidence",
             "symbol_name": record.symbol or record.tool_name or record.evidence_type or "evidence",
-            "excerpt": (record.excerpt or "证据摘录为空；需结合路径继续核验。")[:1200],
+            "excerpt": (record.excerpt or "证据摘录为空；需结合路径继续核验。")[:4000],
             "evidence_type": record.evidence_type or "",
             "strength": record.strength or "",
             "validity": record.validity or "",
@@ -2044,6 +2089,7 @@ class MultiAgentRuntime:
         evidence: List[EvidenceRecord],
         *,
         stage_id: str = "",
+        drafts: Optional[List[Any]] = None,
     ) -> Dict[str, Any]:
         before = copy.deepcopy(answer)
         answer.setdefault("answer_status", "answered")
@@ -2071,54 +2117,60 @@ class MultiAgentRuntime:
                     used_ids.update(str(eid).strip() for eid in fact_used if str(eid).strip())
         scoped_evidence = [r for r in evidence if r.evidence_id in used_ids]
         if not _tri_state_value_allowed(value, scoped_evidence, answer):
-            recommended_value = "unknown"
-            note = (
-                f"Schema guard: 原答案 {value!r} 缺少可支撑的强证据；"
-                f"当前引用证据最强 strength={strongest_evidence_strength(scoped_evidence)}；"
-                f"保留原 value，但建议人工审阅时视为 {recommended_value!r}。"
-            )
-            existing = answer.get("notes")
-            answer["notes"] = f"{existing}\n{note}".strip() if isinstance(existing, str) and existing.strip() else note
-            guardrail = {
-                "support_status": "unsupported",
-                "value": value,
-                "recommended_value": recommended_value,
-                "reason": "tri_state_not_supported_by_referenced_evidence",
-                "used_evidence_ids": sorted(used_ids),
-                "strongest_evidence_strength": strongest_evidence_strength(scoped_evidence),
-                "evidence_summary": _evidence_audit(scoped_evidence),
-            }
-            _set_meta_path(answer, ["guardrails", "tri_state"], guardrail)
-            meta = dict(answer.get("_meta")) if isinstance(answer.get("_meta"), dict) else {}
-            audit_items = list(meta.get("audit") or []) if isinstance(meta.get("audit"), list) else []
-            audit_items.append(
-                {
-                    "phase": "schema_guard",
-                    "field": "value",
+            # stub 特殊救援：若 Task Agent 草稿以 medium/high confidence 判断为 stub，保留
+            if value == "stub" and _stub_supported_by_drafts(drafts or []):
+                note = "Schema guard: stub 由 Task Agent 草稿语义支撑（confidence=medium/high），保留。"
+                existing = answer.get("notes")
+                answer["notes"] = f"{existing}\n{note}".strip() if isinstance(existing, str) and existing.strip() else note
+            else:
+                recommended_value = "unknown"
+                note = (
+                    f"Schema guard: 原答案 {value!r} 缺少可支撑的强证据；"
+                    f"当前引用证据最强 strength={strongest_evidence_strength(scoped_evidence)}；"
+                    f"保留原 value，但建议人工审阅时视为 {recommended_value!r}。"
+                )
+                existing = answer.get("notes")
+                answer["notes"] = f"{existing}\n{note}".strip() if isinstance(existing, str) and existing.strip() else note
+                guardrail = {
+                    "support_status": "unsupported",
                     "value": value,
                     "recommended_value": recommended_value,
                     "reason": "tri_state_not_supported_by_referenced_evidence",
                     "used_evidence_ids": sorted(used_ids),
-                    "evidence": _evidence_audit(scoped_evidence),
+                    "strongest_evidence_strength": strongest_evidence_strength(scoped_evidence),
+                    "evidence_summary": _evidence_audit(scoped_evidence),
                 }
-            )
-            meta["audit"] = audit_items
-            answer["_meta"] = meta
-            self.events.emit(
-                "answer_guardrail_flagged",
-                f"{answer.get('question_id', '')} value {value!r} lacks supporting evidence; recommended {recommended_value!r}",
-                stage_id=stage_id or str(question.get("stage_id") or ""),
-                agent_name="stage_assembler",
-                level="blocker",
-                metadata={
-                    "question_id": answer.get("question_id"),
-                    "value": value,
-                    "recommended_value": recommended_value,
-                    "reason": "tri_state_not_supported_by_referenced_evidence",
-                    "used_evidence_ids": sorted(used_ids),
-                    "evidence": _evidence_audit(scoped_evidence),
-                },
-            )
+                _set_meta_path(answer, ["guardrails", "tri_state"], guardrail)
+                meta = dict(answer.get("_meta")) if isinstance(answer.get("_meta"), dict) else {}
+                audit_items = list(meta.get("audit") or []) if isinstance(meta.get("audit"), list) else []
+                audit_items.append(
+                    {
+                        "phase": "schema_guard",
+                        "field": "value",
+                        "value": value,
+                        "recommended_value": recommended_value,
+                        "reason": "tri_state_not_supported_by_referenced_evidence",
+                        "used_evidence_ids": sorted(used_ids),
+                        "evidence": _evidence_audit(scoped_evidence),
+                    }
+                )
+                meta["audit"] = audit_items
+                answer["_meta"] = meta
+                self.events.emit(
+                    "answer_guardrail_flagged",
+                    f"{answer.get('question_id', '')} value {value!r} lacks supporting evidence; recommended {recommended_value!r}",
+                    stage_id=stage_id or str(question.get("stage_id") or ""),
+                    agent_name="stage_assembler",
+                    level="blocker",
+                    metadata={
+                        "question_id": answer.get("question_id"),
+                        "value": value,
+                        "recommended_value": recommended_value,
+                        "reason": "tri_state_not_supported_by_referenced_evidence",
+                        "used_evidence_ids": sorted(used_ids),
+                        "evidence": _evidence_audit(scoped_evidence),
+                    },
+                )
         answer["value"] = value
         _append_programmatic_mutation(
             answer,
@@ -2234,8 +2286,9 @@ class MultiAgentRuntime:
                     continue
                 qid = str(answer.get("question_id") or "").strip()
                 evs = evidence_by_question.get(qid, [])
+                q_drafts = self.draft_store.grouped_by_question(stage_id).get(qid, [])
                 resolved = self._resolve_answer_evidence_refs(answer, evs, fallback_to_bound=False, stage_id=stage_id)
-                resolved_answers.append(self._enforce_answer_schema(qmap.get(qid, {}), resolved, evs, stage_id=stage_id))
+                resolved_answers.append(self._enforce_answer_schema(qmap.get(qid, {}), resolved, evs, stage_id=stage_id, drafts=q_drafts))
             payload["answers"] = resolved_answers
             issues = validate_answers_payload(
                 payload,
@@ -2425,93 +2478,6 @@ class MultiAgentRuntime:
             lines.append(f"\n**valid value texts**: {json.dumps([str(c).strip() for c in choices], ensure_ascii=False, separators=(',', ':'))}\n\n")
         lines.append("评审输出中对应 question_reviews item 必须包含相同的 question_digest。\n")
         return "".join(lines)
-
-    def _compact_review_question_sheet(self, stage_id: str, title: str) -> str:
-        try:
-            stage_qa = load_stage_qa(stage_id)
-        except Exception:
-            return build_stage_qa_question_sheet(stage_id, title)
-        questions = []
-        for q in stage_qa.get("questions", []) if isinstance(stage_qa.get("questions"), list) else []:
-            if not isinstance(q, dict):
-                continue
-            facts = []
-            for fact in q.get("structured_facts", []) if isinstance(q.get("structured_facts"), list) else []:
-                if not isinstance(fact, dict):
-                    continue
-                facts.append({
-                    "fact_id": fact.get("fact_id"),
-                    "fact_key": fact.get("fact_key"),
-                    "answer_type": fact.get("answer_type"),
-                    "allowed_values": fact.get("allowed_values"),
-                    "required": fact.get("required", True),
-                })
-            questions.append({
-                "question_id": q.get("question_id"),
-                "question_type": q.get("question_type"),
-                "stem": q.get("stem"),
-                "structured_facts": facts,
-                "answer_contract": q.get("answer_contract"),
-                "evidence_policy": q.get("evidence_policy"),
-            })
-        return json.dumps(
-            {
-                "stage_id": stage_id,
-                "stage_title": title,
-                "questions": questions,
-            },
-            ensure_ascii=False,
-            separators=(",", ":"),
-        )
-
-    def _compact_review_payload(self, payload: Dict[str, Any]) -> Dict[str, Any]:
-        out = {
-            "schema_version": payload.get("schema_version"),
-            "stage_id": payload.get("stage_id"),
-            "stage_title": payload.get("stage_title"),
-            "answers": [],
-        }
-        for answer in payload.get("answers", []) if isinstance(payload.get("answers"), list) else []:
-            if not isinstance(answer, dict):
-                continue
-            compact_facts = []
-            for fact in answer.get("fact_answers", []) if isinstance(answer.get("fact_answers"), list) else []:
-                if not isinstance(fact, dict):
-                    continue
-                compact_facts.append({
-                    "fact_id": fact.get("fact_id"),
-                    "fact_key": fact.get("fact_key"),
-                    "value": fact.get("value"),
-                    "used_evidence_ids": fact.get("used_evidence_ids") if isinstance(fact.get("used_evidence_ids"), list) else [],
-                    "notes": str(fact.get("notes") or "")[:120],
-                })
-            compact_evidence = []
-            for ev in answer.get("evidence", []) if isinstance(answer.get("evidence"), list) else []:
-                if not isinstance(ev, dict):
-                    continue
-                compact_evidence.append({
-                    "evidence_id": ev.get("evidence_id"),
-                    "path": ev.get("path"),
-                    "line_start": ev.get("line_start"),
-                    "line_end": ev.get("line_end"),
-                    "evidence_type": ev.get("evidence_type") or ev.get("symbol_kind"),
-                    "strength": ev.get("strength"),
-                    "validity": ev.get("validity"),
-                    "excerpt": str(ev.get("excerpt") or "")[:80],
-                })
-                if len(compact_evidence) >= 3:
-                    break
-            out["answers"].append({
-                "question_id": answer.get("question_id"),
-                "question_type": answer.get("question_type"),
-                "stem": answer.get("stem"),
-                "value": answer.get("value"),
-                "used_evidence_ids": answer.get("used_evidence_ids") if isinstance(answer.get("used_evidence_ids"), list) else [],
-                "fact_answers": compact_facts,
-                "evidence": compact_evidence,
-                "notes": str(answer.get("notes") or "")[:160],
-            })
-        return out
 
     def _load_previous_sections_text(self) -> str:
         parts = []

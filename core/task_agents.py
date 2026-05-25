@@ -121,7 +121,7 @@ _TASK_AGENT_SYSTEM = """你是 OS-Agent D 的 question-bound Task ReAct Agent。
 - 对 tri_state_impl 题，如果结论是 not_found/未发现，必须先调用 confirm_symbol_absent 工具对所有关键词做全目录扫描；只有 confirm_symbol_absent 返回 [CONFIRMED_ABSENT] 后，才能产出 not_found 结论。
 - not_found 结论必须至少产出一条 evidence_type=”negative_search” 的候选证据；候选 evidence.metadata.negative_search 必须包含 searched_keywords、searched_directories、match_count。只有真实工具搜索覆盖充分时 coverage_sufficient 才能为 true。
 - negative_search 的 excerpt/claim 必须写清”searched ...; no matches/no implementation found”，不要只写一句自然语言结论。
-- 不要编造路径、行号、符号名；无法确认就写 open_issues。
+- draft_answers 的每条记录必须填写 confidence 字段（high/medium/low），不得省略；省略时系统默认 low，stub 草稿将被 Schema Guard 拒绝。
 """
 
 
@@ -169,6 +169,7 @@ def _react_task_prompt(task: TaskSpec, *, repo_path: str, tool_names: List[str])
         '  "evidence_candidates": [\n'
         "    {\n"
         '      "evidence_type": "definition|implementation_body|call_site|search|negative_search|build_config|git_history|other",\n'
+        '      "tool_name": "调用此证据的工具名，如 read_code_segment|lsp_get_definition|confirm_symbol_absent|grep_in_repo 等",\n'
         '      "question_ids": ["Qxx_001"],\n'
         '      "path": "repo-relative/path",\n'
         '      "line_start": 1,\n'
@@ -194,6 +195,36 @@ def _react_task_prompt(task: TaskSpec, *, repo_path: str, tool_names: List[str])
         '  "open_issues": []\n'
         "}\n"
     )
+
+
+def _parse_confirm_symbol_absent_output(text: str) -> Optional[Dict[str, Any]]:
+    """从 confirm_symbol_absent 的文本输出中提取结构化 negative_search metadata。
+
+    confirm_symbol_absent 返回格式：
+      负向搜索报告 — [CONFIRMED_ABSENT]
+      仓库: ...  |  搜索文件数: N  |  patterns: M
+      ...
+    """
+    if not text or "负向搜索报告" not in text:
+        return None
+    import re as _re
+    verdict_absent = "[CONFIRMED_ABSENT]" in text
+    verdict_found = "[FOUND]" in text
+    if not verdict_absent and not verdict_found:
+        return None
+    files_searched = 0
+    m = _re.search(r"搜索文件数[：:]\s*(\d+)", text)
+    if m:
+        files_searched = int(m.group(1))
+    total_matches = 0
+    for m in _re.finditer(r"(\d+)\s*处匹配", text):
+        total_matches += int(m.group(1))
+    return {
+        "match_count": total_matches,
+        "file_count": files_searched,
+        "coverage_sufficient": verdict_absent,
+        "source": "confirm_symbol_absent",
+    }
 
 
 def _last_ai_text(final_state: Any) -> str:
@@ -236,6 +267,16 @@ def _records_from_react_output(task: TaskSpec, repo_path: str, parsed: Dict[str,
             "llm_candidate": True,
         }
         metadata.update(item_metadata)
+        # 若 evidence_type 是 negative_search 但 metadata 里没有结构化 negative_search dict，
+        # 尝试从 excerpt 中解析 confirm_symbol_absent 的输出格式
+        ev_type = str(item.get("evidence_type") or "search")
+        if ev_type == "negative_search" and not isinstance(metadata.get("negative_search"), dict):
+            parsed_neg = _parse_confirm_symbol_absent_output(excerpt)
+            if parsed_neg:
+                parsed_neg["keywords"] = list(task.metadata.get("keywords") or [])
+                parsed_neg["searched_keywords"] = parsed_neg["keywords"]
+                parsed_neg["searched_directories"] = list(task.seed_paths or [])
+                metadata["negative_search"] = parsed_neg
         rec = EvidenceRecord(
             evidence_id=f"ev_{task.task_id}_{uuid.uuid4().hex[:8]}",
             stage_id=task.stage_id,
@@ -246,8 +287,8 @@ def _records_from_react_output(task: TaskSpec, repo_path: str, parsed: Dict[str,
             line_start=_safe_int(item.get("line_start")),
             line_end=_safe_int(item.get("line_end")),
             source_type=str(item.get("source_type") or "source_code"),
-            evidence_type=str(item.get("evidence_type") or "search"),
-            tool_name="task_react_agent",
+            evidence_type=ev_type,
+            tool_name=str(item.get("tool_name") or "").strip() or "task_react_agent",
             excerpt=excerpt,
             notes=str(item.get("claim") or ""),
             feature_ids=list(task.metadata.get("feature_ids") or []),
@@ -340,7 +381,7 @@ def _negative_search_records_from_structured_facts(
             task_id=task.task_id,
             source_type="search",
             evidence_type="negative_search",
-            tool_name="task_react_agent",
+            tool_name="confirm_symbol_absent",
             excerpt=excerpt,
             notes="structured negative search synthesized from structured_fact_results",
             feature_ids=list(task.metadata.get("feature_ids") or []),

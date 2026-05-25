@@ -119,6 +119,10 @@ def coerce_review_payload(
         raw_list = data.get("per_question_reviews") or data.get("questions_review") or []
 
     by_id: Dict[str, Tuple[Any, Any, str, Dict[str, Any], str]] = {}
+    _VALID_FINDING_TYPES = {
+        "missing_evidence", "weak_evidence", "wrong_evidence",
+        "duplicate_evidence", "contract_only",
+    }
     for item in raw_list:
         parsed = _normalize_one_question_review(item)
         if not parsed:
@@ -129,6 +133,11 @@ def coerce_review_payload(
         if digest and expected_digest and digest != expected_digest:
             continue
         fix_hints = item.get("fix_hints") if isinstance(item, dict) and isinstance(item.get("fix_hints"), dict) else {}
+        ft = str(fix_hints.get("finding_type") or "").strip().lower()
+        if ft and ft not in _VALID_FINDING_TYPES:
+            fix_hints = dict(fix_hints)
+            fix_hints["_original_finding_type"] = fix_hints["finding_type"]
+            fix_hints["finding_type"] = "weak_evidence"
         by_id[qid] = (se, sc, rev, fix_hints, digest or expected_digest)
 
     question_reviews: List[Dict[str, Any]] = []
@@ -301,7 +310,7 @@ def _review_parse_max_attempts() -> int:
 
 
 def _review_max_chars() -> int:
-    v = (os.environ.get("DESCRIBE_REVIEW_MAX_CHARS") or "50000").strip().lower().replace("_", "")
+    v = (os.environ.get("DESCRIBE_REVIEW_MAX_CHARS") or "80000").strip().lower().replace("_", "")
     mult = 1
     if v.endswith("k"):
         mult = 1000
@@ -312,7 +321,7 @@ def _review_max_chars() -> int:
     try:
         n = int(float(v) * mult)
     except ValueError:
-        n = 50_000
+        n = 80_000
     return max(10_000, n)
 
 

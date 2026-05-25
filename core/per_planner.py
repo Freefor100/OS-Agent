@@ -511,21 +511,6 @@ def infer_entry_symbols(stage_id: str, repo_profile: Dict[str, Any]) -> List[str
     return _dedupe_keep_order(list(hints.get("entry_symbols", [])) + repo_profile.get("entry_candidates", []))[:10]
 
 
-def estimate_context_budget(stage_id: str) -> Dict[str, int]:
-    base = {
-        "max_prev_section_chars": 6000,
-        "max_seed_paths": 8,
-        "max_evidence_items": 12,
-        "max_memory_items": 8,
-    }
-    if "01_overview" in stage_id:
-        base["max_prev_section_chars"] = 12000
-        base["max_evidence_items"] = 18
-    if "10_history" in stage_id:
-        base["max_prev_section_chars"] = 4000
-    return base
-
-
 def plan_stage(state: StageState, repo_profile: Dict[str, Any], global_memory: Dict[str, Any]) -> PlanSpec:
     hints = _match_stage_hints(state.stage_id)
     return PlanSpec(
@@ -538,7 +523,6 @@ def plan_stage(state: StageState, repo_profile: Dict[str, Any], global_memory: D
         repo_hotspots=repo_profile.get("core_paths", [])[:10],
         preferred_tools=["rag_search_code", "lsp_get_call_graph", "lsp_get_definition", "read_code_segment"],
         avoid_tools=["blind_read_large_files", "full_repo_scan_with_read_code_segment"],
-        context_budget=estimate_context_budget(state.stage_id),
     )
 
 
@@ -607,32 +591,6 @@ def _shorten(text: str, limit: int = 400) -> str:
     if len(text) <= limit:
         return text
     return text[: limit - 3] + "..."
-
-
-def build_dynamic_context(
-    state: StageState,
-    repo_profile: Dict[str, Any],
-    global_memory: Dict[str, Any],
-) -> Dict[str, Any]:
-    related_sections = global_memory.get("section_summaries", {}) or {}
-    max_sections = state.plan.context_budget.get("max_memory_items", 8) if state.plan else 8
-    recent_sections = [
-        {"stage_id": sid, "summary": _shorten(summary, 280)}
-        for sid, summary in list(related_sections.items())[-max_sections:]
-    ]
-    return {
-        "repo_profile": {
-            "framework_guess": repo_profile.get("framework_guess", []),
-            "arch_guess": repo_profile.get("arch_guess", []),
-            "language_mix": repo_profile.get("language_mix", []),
-            "core_paths": repo_profile.get("core_paths", [])[:10],
-            "board_guess": repo_profile.get("board_guess", []),
-        },
-        "plan_summary": state.plan.to_dict() if state.plan else {},
-        "recent_sections": recent_sections,
-        "evidence_cache": [item.to_dict() for item in state.evidence_index[: state.plan.context_budget.get("max_evidence_items", 12)]],
-        "external_background": global_memory.get("external_background", {}),
-    }
 
 
 def render_plan_context(state: StageState) -> str:

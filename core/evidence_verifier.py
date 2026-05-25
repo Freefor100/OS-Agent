@@ -10,7 +10,7 @@ from core.qa_contract import HINT_EVIDENCE_TYPES, STRONG_EVIDENCE_TYPES
 
 _DECLARATION_HINT_RE = re.compile(r"\b(trait|typedef|struct\s+\w+\s*;|extern\s+|fn\s+\w+\s*\([^)]*\)\s*;)")
 _STUB_HINT_RE = re.compile(
-    r"\b(todo!|unimplemented!|panic!\s*\(|ENOSYS|ENOTSUP|unsupported|return\s+0\s*;|return\s+-1\s*;|Ok\s*\(\s*0\s*\))",
+    r"\b(todo!|unimplemented!|panic!\s*\(|ENOSYS|ENOTSUP|unsupported)",
     re.IGNORECASE,
 )
 
@@ -88,7 +88,7 @@ def _parse_negative_search_metadata(record: EvidenceRecord) -> Dict[str, Any]:
         neg = {
             "keywords": metadata.get("keywords") or metadata.get("searched_keywords") or [],
             "searched_directories": metadata.get("seed_paths") or metadata.get("searched_directories") or [],
-            "coverage_sufficient": bool(metadata.get("coverage_sufficient", True)),
+            "coverage_sufficient": bool(metadata.get("coverage_sufficient", False)),
             "match_count": metadata.get("match_count", 0),
             "file_count": metadata.get("file_count"),
         }
@@ -118,18 +118,23 @@ def _negative_search_covers_policy(record: EvidenceRecord, policy: Optional[Dict
     neg = _parse_negative_search_metadata(record)
     if not neg:
         return False
-    if neg.get("coverage_sufficient") is True:
-        return True
     policy = policy or {}
     required_keywords = policy.get("keywords") if isinstance(policy.get("keywords"), list) else []
     required_dirs = policy.get("seed_paths") if isinstance(policy.get("seed_paths"), list) else []
     min_kw = float(policy.get("minimum_keyword_coverage", 0.0) or 0.0)
     min_dir = float(policy.get("minimum_directory_coverage", 0.0) or 0.0)
+    # 只有题单未定义任何阈值时，才信任 LLM 自声明的 coverage_sufficient=True
+    if not required_keywords and not required_dirs:
+        if neg.get("coverage_sufficient") is True:
+            return True
     observed_keywords = neg.get("keywords") if isinstance(neg.get("keywords"), list) else []
     if not observed_keywords and isinstance(neg.get("searched_keywords"), list):
         observed_keywords = neg.get("searched_keywords") or []
     observed_dirs = neg.get("searched_directories") if isinstance(neg.get("searched_directories"), list) else []
-    return _coverage_ratio(observed_keywords, required_keywords) >= min_kw and _coverage_ratio(observed_dirs, required_dirs) >= min_dir
+    return (
+        _coverage_ratio(observed_keywords, required_keywords) >= min_kw
+        and _coverage_ratio(observed_dirs, required_dirs) >= min_dir
+    )
 
 
 def verify_evidence(
