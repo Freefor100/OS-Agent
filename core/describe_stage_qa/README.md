@@ -1,6 +1,6 @@
 # JSON-QA 题库（Describe 管线）
 
-本目录用于存放各阶段（`stage_id`）的“评委友好小题单”，供 `os_agent_d_describe.py` 运行时组装 prompt 并约束 LLM 输出 JSON。
+本目录用于存放各阶段（`stage_id`）的题单，供 `os_agent_d_describe.py` 运行时组装 prompt 并约束 LLM 输出 JSON。
 
 题单 JSON 本体是唯一运行来源。运行时 `load_stage_qa()` 只读取本目录 JSON，
 不会自动补全、生成、覆盖或校验任何题目字段；需要改题时直接人工编辑本目录 JSON。
@@ -34,6 +34,3 @@
 注意：题库本身不含“答案”，答案由 LLM 输出并在 `_per_stage/<stage_id>_answers.json` 保存。
 
 题库当前合计 **201** 题。`10_history` 使用 `os_agent_d_describe.py` 中内联 `prompt`，无对应 JSON 题单。若你本地题量数字不符，说明题库文件未同步仓库或已被截断。
-
-逐题审计记录见 `AUDIT_02_09.md`：每题标记 `ok`、`remediated` 或 `reviewed_ok`，并记录歧义、子问题、三态判定与模块边界的处理动作。
-
