@@ -174,12 +174,23 @@ def main() -> None:
         print('   export REPO_URL="https://github.com/example/os-project.git"')
         sys.exit(1)
 
-    # The describe pipeline is now Multi-Agent only; --multi-agent remains
-    # accepted as a compatibility no-op for older scripts.
+    repo_meta = {}
+    for env_key, meta_key in [
+        ("REPO_YEAR", "year"),
+        ("REPO_COMPETITION", "competition"),
+        ("REPO_SUB_COMPETITION", "sub_competition"),
+        ("REPO_SCHOOL", "school"),
+        ("REPO_TEAM", "team"),
+    ]:
+        val = os.environ.get(env_key, "").strip()
+        if val:
+            repo_meta[meta_key] = val
+
     from core.describe_graph import run_describe_graph
 
     try:
-        run_describe_graph(repo_url=repo_url, stages=STAGES, output_dir=OUTPUT_DIR)
+        run_describe_graph(repo_url=repo_url, stages=STAGES, output_dir=OUTPUT_DIR,
+                           repo_meta=repo_meta or None)
     except KeyboardInterrupt:
         print("\n\n⚠️  用户中断 Multi-Agent 执行")
         sys.exit(1)

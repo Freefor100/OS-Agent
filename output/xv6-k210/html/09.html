@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>第09章 调试机制与错误处理 - xv6-k210</title>
+<style>
+
+:root {
+    --bg: #f8f9fa;
+    --card-bg: #ffffff;
+    --text: #2c3e50;
+    --text-muted: #6c757d;
+    --border: #dee2e6;
+    --code-bg: #f1f3f5;
+    --link: #2980b9;
+    --accent: #3498db;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans SC", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    padding: 0;
+}
+.container { max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem; }
+h1 { font-size: 1.8rem; margin-bottom: 0.5rem; }
+h2 { font-size: 1.5rem; margin: 2rem 0 0.8rem; padding-bottom: 0.4rem; border-bottom: 2px solid var(--border); }
+h3 { font-size: 1.25rem; margin: 1.5rem 0 0.6rem; color: var(--text); }
+h4 { font-size: 1.1rem; margin: 1.2rem 0 0.4rem; }
+p { margin: 0.6rem 0; }
+ul, ol { margin: 0.6rem 0 0.6rem 1.5rem; }
+li { margin: 0.3rem 0; }
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+code {
+    background: var(--code-bg);
+    padding: 0.15em 0.4em;
+    border-radius: 3px;
+    font-size: 0.88em;
+    font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+}
+pre {
+    background: #1e1e2e;
+    color: #cdd6f4;
+    padding: 1rem 1.2rem;
+    border-radius: 8px;
+    overflow-x: auto;
+    margin: 1rem 0;
+    font-size: 0.85rem;
+    line-height: 1.5;
+}
+pre code { background: none; padding: 0; color: inherit; }
+blockquote {
+    border-left: 4px solid var(--accent);
+    padding: 0.5rem 1rem;
+    margin: 1rem 0;
+    background: #eef6fc;
+    border-radius: 0 6px 6px 0;
+}
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+    font-size: 0.9rem;
+    overflow-x: auto;
+    display: block;
+}
+thead { background: #f1f3f5; }
+th, td {
+    padding: 0.6rem 0.8rem;
+    border: 1px solid var(--border);
+    text-align: left;
+    vertical-align: top;
+}
+tr:nth-child(even) { background: #f8f9fa; }
+tr:hover { background: #e9ecef; }
+.evidence-link {
+    display: inline-block;
+    background: #fff3cd;
+    color: #856404;
+    padding: 0.1em 0.5em;
+    border-radius: 12px;
+    font-size: 0.78em;
+    font-family: monospace;
+    cursor: pointer;
+    border: 1px solid #ffc107;
+    transition: all 0.2s;
+}
+.evidence-link:hover {
+    background: #ffc107;
+    color: #1a1a1a;
+    text-decoration: none;
+    transform: scale(1.05);
+}
+.evidence-anchor {
+    display: inline-block;
+    background: #d4edda;
+    color: #155724;
+    padding: 0.1em 0.5em;
+    border-radius: 12px;
+    font-size: 0.78em;
+    font-family: monospace;
+    border: 1px solid #28a745;
+    scroll-margin-top: 80px;
+}
+.evidence-anchor:target {
+    background: #ffc107;
+    color: #1a1a1a;
+    box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.4);
+    animation: pulse 0.6s ease-out;
+}
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}
+hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+
+/* --- PLACEHOLDER_NAV --- */
+
+
+.top-nav {
+    position: sticky;
+    top: 0;
+    background: rgba(255,255,255,0.95);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border);
+    padding: 0.7rem 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    z-index: 100;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+.top-nav a {
+    padding: 0.3rem 0.8rem;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    transition: background 0.2s;
+}
+.top-nav a:hover { background: #e9ecef; text-decoration: none; }
+.top-nav .spacer { flex: 1; }
+.nav-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 1rem;
+    margin: 2rem 0;
+}
+.nav-card {
+    display: block;
+    padding: 1.2rem 1rem;
+    border-radius: 12px;
+    color: #fff;
+    font-weight: 600;
+    font-size: 1rem;
+    text-align: center;
+    transition: transform 0.2s, box-shadow 0.2s;
+    text-decoration: none;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+}
+.nav-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.18);
+    text-decoration: none;
+}
+.nav-card .chapter-num {
+    display: block;
+    font-size: 0.75rem;
+    opacity: 0.85;
+    margin-bottom: 0.3rem;
+}
+.header-info {
+    background: var(--card-bg);
+    border-radius: 12px;
+    padding: 1.5rem 2rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    border: 1px solid var(--border);
+}
+.header-info h1 { color: var(--accent); }
+.header-info .meta-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 0.5rem 2rem;
+    margin-top: 1rem;
+}
+.header-info .meta-item { font-size: 0.92rem; }
+.header-info .meta-label { color: var(--text-muted); font-weight: 500; }
+.chapter-badge {
+    display: inline-block;
+    padding: 0.3rem 1rem;
+    border-radius: 20px;
+    color: #fff;
+    font-weight: 600;
+    font-size: 0.85rem;
+    margin-bottom: 1rem;
+}
+
+.chapter-accent { color: #34495e; }
+
+.question-block {
+    margin: 1.5rem 0;
+    padding: 1.2rem 1.5rem;
+    background: var(--card-bg);
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+.question-block h3 {
+    margin: 0 0 0.8rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid var(--border);
+}
+.fact-table {
+    width: 100%;
+    font-size: 0.88rem;
+    display: table;
+}
+.fact-table th { background: #f1f3f5; font-weight: 600; }
+.fact-table td, .fact-table th { padding: 0.5rem 0.7rem; }
+.conclusion-label {
+    margin: 0.8rem 0 0.3rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+.answer-value {
+    margin: 0.4rem 0;
+    padding: 0.4rem 0;
+}
+.answer-notes {
+    margin-top: 0.5rem;
+    padding: 0.6rem 1rem;
+    background: #f8f9fa;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    line-height: 1.6;
+}
+.fact-details {
+    margin-top: 0.8rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+}
+.fact-details summary {
+    padding: 0.5rem 1rem;
+    background: #f1f3f5;
+    cursor: pointer;
+    font-size: 0.88rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    user-select: none;
+    list-style: none;
+}
+.fact-details summary::-webkit-details-marker { display: none; }
+.fact-details summary::before {
+    content: "▶ ";
+    font-size: 0.75em;
+    transition: transform 0.2s;
+    display: inline-block;
+}
+.fact-details[open] summary::before { content: "▼ "; }
+.fact-details summary:hover { background: #e9ecef; color: var(--text); }
+.fact-details .fact-table { margin: 0; border-radius: 0; }
+.fact-details .fact-table th,
+.fact-details .fact-table td { border-left: none; border-right: none; }
+.fact-details .fact-table tr:last-child td { border-bottom: none; }
+
+</style>
+</head>
+<body>
+
+<nav class="top-nav">
+<a href="../index.html">← 首页</a>
+<a href="08.html">← 网络子系统与协议</a>
+<span class="spacer"></span>
+<strong class="chapter-accent">第 09 章</strong>
+<span class="spacer"></span>
+</nav>
+<div class="container">
+<span class="chapter-badge" style="background:#34495e">第 09 章</span>
+<h1>调试机制与错误处理</h1>
+<hr>
+<section class="question-block" id="q09_001">
+<h3>Q09_001 是否存在日志系统（log/printk/println 宏）与日志级别控制？（必须三态）</h3>
+<div class="answer-value"><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#e2e3e5;color:#383d41;font-size:0.85em;font-weight:500">❓ 未知</span> <span style="color:var(--text-muted);margin-left:0.5em">证据不足/未知</span></div>
+<div class="answer-notes">系统具有可工作的 printf/panic/backtrace 及编译时 DEBUG 门控，但缺少运行时日志级别过滤（无 LOG_LEVEL/printk 级别），无 gdbstub/ftrace/tracepoint/monitor。调试机制仅为编译时条件编译，整体日志/调试系统存在但原始，判定为 stub。
+Schema guard: 原答案 'stub' 缺少可支撑的强证据；当前引用证据最强 strength=strong。</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>debug_entry</strong></td><td>“日志系统”的内核定义、入口、对象或配置开关在哪里？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>include/utils/debug.h 定义了 __debug_msg/__debug_info/__debug_warn/__debug_error/__debug_assert 宏；include/printf.h 定义了 printf/panic/backtrace 声明；kernel/printf.c 提供了 printf/__panic/backtrace 完整实现体。 <a href="#ev_task_09_logging_3d4e40ca" class="evidence-link">ev_task_09_logging_3d4e40ca</a> <a href="#ev_task_09_logging_30a41ab9" class="evidence-link">ev_task_09_logging_30a41ab9</a> <a href="#ev_task_09_logging_d9adb52a" class="evidence-link">ev_task_09_logging_d9adb52a</a></td></tr>
+<tr><td><strong>specialized_mechanism</strong></td><td>是否存在执行“日志系统”语义的真实实现体，而不是声明、空函数或固定返回？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#fff3cd;color:#856404;font-size:0.85em;font-weight:500">⚠️ 弱支撑</span></td><td>Makefile 支持编译时 DEBUG 门控（mode=debug 时添加 -DDEBUG），但无运行时日志级别过滤（无 LOG_LEVEL/printk 级别），无 gdbstub/ftrace/tracepoint/monitor。仅编译时条件编译。 <a href="#ev_task_09_logging_ddc8ca59" class="evidence-link">ev_task_09_logging_ddc8ca59</a> <a href="#ev_task_09_logging_bdea6a70" class="evidence-link">ev_task_09_logging_bdea6a70</a></td></tr>
+<tr><td><strong>runtime_integration</strong></td><td>该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>printf/panic/__debug_* 在 trap.c、syscall.c、sched/proc.c 等主路径中调用；syscall.c 中 trace 标志实现系统调用追踪。 <a href="#ev_task_09_logging_8a3d1407" class="evidence-link">ev_task_09_logging_8a3d1407</a> <a href="#ev_task_09_logging_ddfbf8d0" class="evidence-link">ev_task_09_logging_ddfbf8d0</a> <a href="#ev_task_09_logging_03c3ba9a" class="evidence-link">ev_task_09_logging_03c3ba9a</a> <a href="#ev_task_09_logging_9eb099d2" class="evidence-link">ev_task_09_logging_9eb099d2</a></td></tr>
+<tr><td><strong>output_or_storage</strong></td><td>执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>printf 通过 consputc -&gt; sbi_console_putchar 输出；sprintf() 支持字符串格式化。无日志缓冲区/环形缓冲区。 <a href="#ev_task_09_logging_d9adb52a" class="evidence-link">ev_task_09_logging_d9adb52a</a></td></tr>
+<tr><td><strong>external_or_userland_boundary</strong></td><td>是否排除与“日志系统”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>日志系统为内核内部；用户程序通过 write() 系统调用输出；strace 通过 sys_trace() 触发内核侧追踪。 <a href="#ev_task_09_logging_ddfbf8d0" class="evidence-link">ev_task_09_logging_ddfbf8d0</a> <a href="#ev_task_09_logging_9eb099d2" class="evidence-link">ev_task_09_logging_9eb099d2</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>若未确认“日志系统”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span>{"searched_keywords": ["log", "printk", "println", "panic", "backtrace", "unwind", "gdb", "gdbstub", "monitor", "trace", "ftrace", "perf", "errno", "Error", "Result"], "searched_directories": ["kernel", "debug", "console", "trap", "syscall", "include", "Makefile"], "file_count": 207, "match_count": 160, "coverage_sufficient": true}</span></td><td>负向搜索覆盖 207 个文件，关键词和目录覆盖充分。未发现运行时日志级别过滤、gdbstub、ftrace、tracepoint、monitor。 <a href="#ev_task_09_logging_bdea6a70" class="evidence-link">ev_task_09_logging_bdea6a70</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_09_logging_3d4e40ca" class="evidence-anchor">ev_task_09_logging_3d4e40ca</span> 
+<span id="ev_task_09_logging_30a41ab9" class="evidence-anchor">ev_task_09_logging_30a41ab9</span> 
+<span id="ev_task_09_logging_d9adb52a" class="evidence-anchor">ev_task_09_logging_d9adb52a</span> 
+<span id="ev_task_09_logging_ddc8ca59" class="evidence-anchor">ev_task_09_logging_ddc8ca59</span> 
+<span id="ev_task_09_logging_bdea6a70" class="evidence-anchor">ev_task_09_logging_bdea6a70</span> 
+<span id="ev_task_09_logging_8a3d1407" class="evidence-anchor">ev_task_09_logging_8a3d1407</span> 
+<span id="ev_task_09_logging_ddfbf8d0" class="evidence-anchor">ev_task_09_logging_ddfbf8d0</span> 
+<span id="ev_task_09_logging_03c3ba9a" class="evidence-anchor">ev_task_09_logging_03c3ba9a</span> 
+<span id="ev_task_09_logging_9eb099d2" class="evidence-anchor">ev_task_09_logging_9eb099d2</span> 
+</section>
+<section class="question-block" id="q09_002">
+<h3>Q09_002 是否存在 panic/崩溃处理路径（panic_handler/oom/abort 等）？（必须三态）</h3>
+<div class="answer-value"><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 已实现</span> <span style="color:var(--text-muted);margin-left:0.5em">已实现</span></div>
+<div class="answer-notes">panic/崩溃处理路径完整实现：panic 宏 -&gt; __panic -&gt; printf(panic消息) -&gt; backtrace(栈回溯) -&gt; 关中断 -&gt; 死循环 halt。有完整的定义、实现体、调用点、运行时集成。无 gdbstub/monitor/unwind 等高级调试机制，但基本 panic 路径已 implemented。</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>debug_entry</strong></td><td>“panic/崩溃处理路径”的内核定义、入口、对象或配置开关在哪里？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>panic 宏和 __panic 函数有完整定义和实现体，定义在 include/printf.h，实现体在 kernel/printf.c <a href="#ev_task_09_panic_5dfdcd51" class="evidence-link">ev_task_09_panic_5dfdcd51</a> <a href="#ev_task_09_panic_4aa4ed6b" class="evidence-link">ev_task_09_panic_4aa4ed6b</a></td></tr>
+<tr><td><strong>specialized_mechanism</strong></td><td>是否存在执行“panic/崩溃处理路径”语义的真实实现体，而不是声明、空函数或固定返回？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>panic 有专门宏和实现体；backtrace 有专门实现体；trapframedump 已定义但注释；无 gdbstub/monitor/unwind <a href="#ev_task_09_panic_5dfdcd51" class="evidence-link">ev_task_09_panic_5dfdcd51</a> <a href="#ev_task_09_panic_93c7fdbf" class="evidence-link">ev_task_09_panic_93c7fdbf</a> <a href="#ev_task_09_panic_4aa4ed6b" class="evidence-link">ev_task_09_panic_4aa4ed6b</a></td></tr>
+<tr><td><strong>runtime_integration</strong></td><td>该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>panic 被集成到 trap 处理（kerneltrap、usertrap）等主路径 <a href="#ev_task_09_panic_c5aabd13" class="evidence-link">ev_task_09_panic_c5aabd13</a> <a href="#ev_task_09_panic_2eb37d2c" class="evidence-link">ev_task_09_panic_2eb37d2c</a></td></tr>
+<tr><td><strong>output_or_storage</strong></td><td>执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>panic 输出通过 printf 到控制台，含红色标记、消息、backtrace <a href="#ev_task_09_panic_5dfdcd51" class="evidence-link">ev_task_09_panic_5dfdcd51</a> <a href="#ev_task_09_panic_4aa4ed6b" class="evidence-link">ev_task_09_panic_4aa4ed6b</a> <a href="#ev_task_09_panic_93c7fdbf" class="evidence-link">ev_task_09_panic_93c7fdbf</a></td></tr>
+<tr><td><strong>external_or_userland_boundary</strong></td><td>是否排除与“panic/崩溃处理路径”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？</td><td><span>no_after_negative_search</span></td><td>无 gdbstub/monitor 等外部调试接口；sbi_shutdown 存在但未被 panic 使用 <a href="#ev_task_09_panic_039aff22" class="evidence-link">ev_task_09_panic_039aff22</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>若未确认“panic/崩溃处理路径”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span>{"searched_keywords": ["log", "printk", "println", "panic", "backtrace", "unwind", "gdb", "gdbstub", "monitor", "trace", "ftrace", "perf", "errno", "Error", "Result"], "searched_directories": ["kernel", "debug", "console", "trap", "syscall", "include", "Makefile"], "file_count": 142, "match_count": 376, "coverage_sufficient": true}</span></td><td>负向搜索覆盖充分，142 个文件，376 个匹配 <a href="#ev_task_09_panic_039aff22" class="evidence-link">ev_task_09_panic_039aff22</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_09_panic_5dfdcd51" class="evidence-anchor">ev_task_09_panic_5dfdcd51</span> 
+<span id="ev_task_09_panic_93c7fdbf" class="evidence-anchor">ev_task_09_panic_93c7fdbf</span> 
+<span id="ev_task_09_panic_c5aabd13" class="evidence-anchor">ev_task_09_panic_c5aabd13</span> 
+<span id="ev_task_09_panic_2eb37d2c" class="evidence-anchor">ev_task_09_panic_2eb37d2c</span> 
+<span id="ev_task_09_panic_039aff22" class="evidence-anchor">ev_task_09_panic_039aff22</span> 
+<span id="ev_task_09_panic_4aa4ed6b" class="evidence-anchor">ev_task_09_panic_4aa4ed6b</span> 
+</section>
+<section class="question-block" id="q09_003">
+<h3>Q09_003 panic 路径会输出哪些诊断？（寄存器 dump/栈回溯/停机；必须引用实现证据）</h3>
+<div class="answer-value"><pre><code>{
+  "debug_entry": "yes_strong",
+  "specialized_mechanism": "yes_strong",
+  "runtime_integration": "yes_strong",
+  "output_or_storage": "yes_strong",
+  "external_or_userland_boundary": "no_after_negative_search",
+  "negative_search_coverage": {
+    "searched_keywords": [
+      "log",
+      "printk",
+      "println",
+      "panic",
+      "backtrace",
+      "unwind",
+      "gdb",
+      "gdbstub",
+      "monitor",
+      "trace",
+      "ftrace",
+      "perf",
+      "errno",
+      "Error",
+      "Result"
+    ],
+    "searched_directories": [
+      "kernel",
+      "debug",
+      "console",
+      "trap",
+      "syscall",
+      "include",
+      "Makefile"
+    ],
+    "file_count": 142,
+    "match_count": 376,
+    "coverage_sufficient": true
+  }
+}</code></pre></div>
+<div class="answer-notes">panic 路径输出的诊断信息包括：1. 入口：panic 宏先打印模块名、hart ID、文件名、行号，再调用 __panic。2. __panic 函数输出红色 '[panic]: ' 标记 + panic 消息字符串 + 换行。3. backtrace 函数输出 'backtrace:' 标题 + 每行一个返回地址（%p 十六进制格式，ra-4）。4. 终止：设置 panicked=1，关中断，然后 for(;;) 死循环 halt。5. 在 kerneltrap 中，unsupported trap 先打印 scause、sepc、stval、hart ID、pid、name 等诊断信息，再调用 panic('kerneltrap')。6. trapframedump 函数已定义但被注释，未实际激活。7. 未实现：寄存器 dump（trapframedump 被注释）、gdbstub、monitor、unwind、ftrace、perf 等高级调试机制。</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>debug_entry</strong></td><td>本题只回答“panic 路径会输出哪些诊断？（寄存器 dump/栈回溯/停机；必须引用实现证据）”，是否明确输出对象、范围、数量或状态字段？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>panic 宏和 __panic 函数是调试/错误入口，有定义和实现体强证据。 <a href="#ev_task_09_panic_5dfdcd51" class="evidence-link">ev_task_09_panic_5dfdcd51</a> <a href="#ev_task_09_panic_4aa4ed6b" class="evidence-link">ev_task_09_panic_4aa4ed6b</a></td></tr>
+<tr><td><strong>specialized_mechanism</strong></td><td>支撑答案的主要源码/配置/文档锚点在哪里（路径、符号、结构体或常量）？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>panic 路径输出：红色 '[panic]' 标记、消息、backtrace 返回地址列表、死循环 halt。 <a href="#ev_task_09_panic_93c7fdbf" class="evidence-link">ev_task_09_panic_93c7fdbf</a> <a href="#ev_task_09_panic_4aa4ed6b" class="evidence-link">ev_task_09_panic_4aa4ed6b</a></td></tr>
+<tr><td><strong>runtime_integration</strong></td><td>答案中的每个关键结论是否有实现体、调用链、状态变化或配置分支证据？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>kerneltrap 中 unsupported trap 调用 panic，先打印 scause/sepc/stval/hart/pid/name。 <a href="#ev_task_09_panic_c5aabd13" class="evidence-link">ev_task_09_panic_c5aabd13</a> <a href="#ev_task_09_panic_2eb37d2c" class="evidence-link">ev_task_09_panic_2eb37d2c</a></td></tr>
+<tr><td><strong>output_or_storage</strong></td><td>是否排除题干未要求的相邻模块、同名概念、用户态封装、README 口号或测试桩？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>输出通过 printf-&gt;sbi_console_putchar 到控制台，无文件存储。 <a href="#ev_task_09_panic_4aa4ed6b" class="evidence-link">ev_task_09_panic_4aa4ed6b</a></td></tr>
+<tr><td><strong>external_or_userland_boundary</strong></td><td>多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？</td><td><span>no_after_negative_search</span></td><td>无外部调试接口（gdbstub/monitor/unwind/ftrace/perf 均未找到）。 <a href="#ev_task_09_panic_039aff22" class="evidence-link">ev_task_09_panic_039aff22</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>若未确认“panic 路径会输出哪些诊断？（寄存器 dump/栈回溯/停机；必须引用实现证据）”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span>{"searched_keywords": ["log", "printk", "println", "panic", "backtrace", "unwind", "gdb", "gdbstub", "monitor", "trace", "ftrace", "perf", "errno", "Error", "Result"], "searched_directories": ["kernel", "debug", "console", "trap", "syscall", "include", "Makefile"], "file_count": 142, "match_count": 376, "coverage_sufficient": true}</span></td><td>负向搜索覆盖充分，关键词和目录均满足最低覆盖率要求。 <a href="#ev_task_09_panic_039aff22" class="evidence-link">ev_task_09_panic_039aff22</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_09_panic_5dfdcd51" class="evidence-anchor">ev_task_09_panic_5dfdcd51</span> 
+<span id="ev_task_09_panic_93c7fdbf" class="evidence-anchor">ev_task_09_panic_93c7fdbf</span> 
+<span id="ev_task_09_panic_c5aabd13" class="evidence-anchor">ev_task_09_panic_c5aabd13</span> 
+<span id="ev_task_09_panic_2eb37d2c" class="evidence-anchor">ev_task_09_panic_2eb37d2c</span> 
+<span id="ev_task_09_panic_039aff22" class="evidence-anchor">ev_task_09_panic_039aff22</span> 
+<span id="ev_task_09_panic_4aa4ed6b" class="evidence-anchor">ev_task_09_panic_4aa4ed6b</span> 
+</section>
+<section class="question-block" id="q09_004">
+<h3>Q09_004 是否实现栈回溯 (backtrace/unwind/stack_trace)？（必须三态；仅打印 ra 不算）</h3>
+<div class="answer-value"><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 已实现</span> <span style="color:var(--text-muted);margin-left:0.5em">已实现</span></div>
+<div class="answer-notes">backtrace() 有完整实现体（遍历栈帧读取 ra 和 fp），通过 printf 输出，集成到 panic 路径；负向搜索未发现外部调试接口。满足 implemented 条件。</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>debug_entry</strong></td><td>“栈回溯 (backtrace/unwind/stack_trace)”的内核定义、入口、对象或配置开关在哪里？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>backtrace() 在 printf.h 中有声明，在 printf.c 中有完整实现体，证据强且可复现。 <a href="#ev_task_09_backtrace_8e88f215" class="evidence-link">ev_task_09_backtrace_8e88f215</a> <a href="#ev_task_09_backtrace_11d8ba30" class="evidence-link">ev_task_09_backtrace_11d8ba30</a></td></tr>
+<tr><td><strong>specialized_mechanism</strong></td><td>是否存在执行“栈回溯 (backtrace/unwind/stack_trace)”语义的真实实现体，而不是声明、空函数或固定返回？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>backtrace() 通过读取帧指针 (s0) 遍历栈帧，读取 ra 和下一帧 fp，实现栈回溯专用机制，非仅打印 ra。 <a href="#ev_task_09_backtrace_8e88f215" class="evidence-link">ev_task_09_backtrace_8e88f215</a></td></tr>
+<tr><td><strong>runtime_integration</strong></td><td>该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>backtrace() 在 __panic() 中被调用，__panic() 由 panic() 宏触发，集成到内核 panic 主路径。 <a href="#ev_task_09_backtrace_f9852021" class="evidence-link">ev_task_09_backtrace_f9852021</a></td></tr>
+<tr><td><strong>output_or_storage</strong></td><td>执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>backtrace() 通过 printf() 将栈帧地址输出到控制台，实现了输出/存储。 <a href="#ev_task_09_backtrace_8e88f215" class="evidence-link">ev_task_09_backtrace_8e88f215</a></td></tr>
+<tr><td><strong>external_or_userland_boundary</strong></td><td>是否排除与“栈回溯 (backtrace/unwind/stack_trace)”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？</td><td><span>no_after_negative_search</span></td><td>负向搜索未发现 monitor/gdbstub 等外部调试接口；backtrace 仅为内核内部 panic 路径调用。 <a href="#ev_task_09_backtrace_2071fce5" class="evidence-link">ev_task_09_backtrace_2071fce5</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>若未确认“栈回溯 (backtrace/unwind/stack_trace)”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span>{"searched_keywords": ["monitor", "gdbstub", "gdb_stub"], "searched_directories": ["kernel", "debug", "console", "trap", "syscall", "include", "Makefile"], "file_count": 207, "match_count": 0, "coverage_sufficient": true}</span></td><td>负向搜索覆盖了指定关键词和目录，未发现相关实现，覆盖充分。 <a href="#ev_task_09_backtrace_2071fce5" class="evidence-link">ev_task_09_backtrace_2071fce5</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_09_backtrace_8e88f215" class="evidence-anchor">ev_task_09_backtrace_8e88f215</span> 
+<span id="ev_task_09_backtrace_11d8ba30" class="evidence-anchor">ev_task_09_backtrace_11d8ba30</span> 
+<span id="ev_task_09_backtrace_f9852021" class="evidence-anchor">ev_task_09_backtrace_f9852021</span> 
+<span id="ev_task_09_backtrace_2071fce5" class="evidence-anchor">ev_task_09_backtrace_2071fce5</span> 
+</section>
+<section class="question-block" id="q09_005">
+<h3>Q09_005 是否存在 **内核驻留的交互式调试监视器（kernel debug monitor）**？（本题指内核态命令解释器/调试控制台；不要与 Stallings Ch5 的 Monitor/Condition Variable 同步构造混淆；不包括仅在用户态运行的常规 shell。必须三态；若 implemented，须给出 3-10 个用户可键入的 monitor 命令名及对应内核内解析/分发入口证据。）</h3>
+<div class="answer-value"><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#f8d7da;color:#721c24;font-size:0.85em;font-weight:500">❌ 未发现</span> <span style="color:var(--text-muted);margin-left:0.5em">未发现</span></div>
+<div class="answer-notes">xv6-k210 未实现内核驻留的交互式调试监视器。存在 consoleintr() 控制键快捷键调试功能（Ctrl+P/E/K/B/Q），但缺少命令解析循环、命令分发表和文本命令处理函数，不符合 implemented 要求。backtrace() 仅从 __panic() 调用。用户态 shell (xv6-user/sh.c) 是用户程序。debug/ 目录为空。负向搜索覆盖充分，可判 not_found。</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>debug_entry</strong></td><td>“内核驻留调试监视器 (Kernel Debug Monitor)”的内核定义、入口、对象或配置开关在哪里？</td><td><span>no_after_negative_search</span></td><td>未发现内核调试监视器入口。consoleintr() 是控制键快捷键处理函数，不是命令解析循环入口。 <a href="#ev_task_09_monitor_03dc9ddd" class="evidence-link">ev_task_09_monitor_03dc9ddd</a> <a href="#ev_task_09_monitor_52958765" class="evidence-link">ev_task_09_monitor_52958765</a></td></tr>
+<tr><td><strong>specialized_mechanism</strong></td><td>是否存在执行“内核驻留调试监视器 (Kernel Debug Monitor)”语义的真实实现体，而不是声明、空函数或固定返回？</td><td><span>no_after_negative_search</span></td><td>未发现命令分发表、命令解析循环或 cmd_* 命令处理函数。 <a href="#ev_task_09_monitor_52958765" class="evidence-link">ev_task_09_monitor_52958765</a></td></tr>
+<tr><td><strong>runtime_integration</strong></td><td>该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？</td><td><span>no_after_negative_search</span></td><td>未发现调试监视器接入主路径。consoleintr() 通过 uart 中断调用但仅处理快捷键。 <a href="#ev_task_09_monitor_03dc9ddd" class="evidence-link">ev_task_09_monitor_03dc9ddd</a> <a href="#ev_task_09_monitor_52958765" class="evidence-link">ev_task_09_monitor_52958765</a></td></tr>
+<tr><td><strong>output_or_storage</strong></td><td>执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#fff3cd;color:#856404;font-size:0.85em;font-weight:500">⚠️ 弱支撑</span></td><td>存在 printf/backtrace 等输出机制，但 backtrace() 仅从 __panic() 调用，不构成交互式监视器。 <a href="#ev_task_09_monitor_167ea907" class="evidence-link">ev_task_09_monitor_167ea907</a> <a href="#ev_task_09_monitor_c5d71bef" class="evidence-link">ev_task_09_monitor_c5d71bef</a></td></tr>
+<tr><td><strong>external_or_userland_boundary</strong></td><td>是否排除与“内核驻留调试监视器 (Kernel Debug Monitor)”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>xv6-user/sh.c 是用户态 shell，非内核态。consoleintr() 运行在内核态但仅处理快捷键。 <a href="#ev_task_09_monitor_03dc9ddd" class="evidence-link">ev_task_09_monitor_03dc9ddd</a> <a href="#ev_task_09_monitor_852350ce" class="evidence-link">ev_task_09_monitor_852350ce</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>若未确认“内核驻留调试监视器 (Kernel Debug Monitor)”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span>{"searched_keywords": ["monitor", "debug_console", "cmd_help", "cmd_backtrace", "cmd_mem", "cmd_regs", "cmd_dump", "kmon", "kdb", "kgdb", "command_table", "cmd_table", "struct command", "debug monitor", "interactive", "while.*getchar", "while.*read.*char"], "searched_directories": ["kernel", "debug", "console", "trap", "include", "Makefile", "kernel/console.c", "kernel/printf.c", "kernel/trap", "xv6-user"], "file_count": 207, "match_count": 0, "coverage_sufficient": true}</span></td><td>按 negative_search_policy 覆盖了所有关键词和目录，未发现内核调试监视器相关代码。 <a href="#ev_task_09_monitor_52958765" class="evidence-link">ev_task_09_monitor_52958765</a> <a href="#ev_task_09_monitor_1bd8a4d3" class="evidence-link">ev_task_09_monitor_1bd8a4d3</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_09_monitor_03dc9ddd" class="evidence-anchor">ev_task_09_monitor_03dc9ddd</span> 
+<span id="ev_task_09_monitor_167ea907" class="evidence-anchor">ev_task_09_monitor_167ea907</span> 
+<span id="ev_task_09_monitor_52958765" class="evidence-anchor">ev_task_09_monitor_52958765</span> 
+<span id="ev_task_09_monitor_1bd8a4d3" class="evidence-anchor">ev_task_09_monitor_1bd8a4d3</span> 
+<span id="ev_task_09_monitor_5c4a0474" class="evidence-anchor">ev_task_09_monitor_5c4a0474</span> 
+<span id="ev_task_09_monitor_c5d71bef" class="evidence-anchor">ev_task_09_monitor_c5d71bef</span> 
+<span id="ev_task_09_monitor_852350ce" class="evidence-anchor">ev_task_09_monitor_852350ce</span> 
+</section>
+<section class="question-block" id="q09_006">
+<h3>Q09_006 是否实现 GDB stub（需数据包解析循环，如 handle_gdb_packet）？（必须三态）</h3>
+<div class="answer-value"><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#f8d7da;color:#721c24;font-size:0.85em;font-weight:500">❌ 未发现</span> <span style="color:var(--text-muted);margin-left:0.5em">未发现</span></div>
+<div class="answer-notes">所有 structured_facts 均指向 not_found。内核源码中无任何 GDB stub 实现（无 handle_gdb_packet、RSP 数据包解析循环、checksum 校验、命令分发或 trap 集成）。仅有的 GDB 相关内容是 debug/openocd_cfg/ 下的 OpenOCD 配置文件和文档中的 GDB 使用说明，这些属于外部调试工具配置，不是内核 GDB stub。根据 concept_boundary，GDB stub 需要内核侧 Remote Serial Protocol 数据包解析循环和命令处理，仅有 GDB 调试脚本、OpenOCD 配置或 Makefile gdb 目标不算内核 GDB stub。</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>packet_loop</strong></td><td>“GDB stub”的内核定义、入口、对象或配置开关在哪里？</td><td><span>no_after_negative_search</span></td><td>在 kernel/、include/ 及全仓库搜索后，未发现 GDB/RSP packet 接收解析循环或 handle_gdb_packet 相关实现。 <a href="#ev_task_09_gdbstub_5cab328a" class="evidence-link">ev_task_09_gdbstub_5cab328a</a> <a href="#ev_task_09_gdbstub_81cf908a" class="evidence-link">ev_task_09_gdbstub_81cf908a</a> <a href="#ev_task_09_gdbstub_67fb4ee1" class="evidence-link">ev_task_09_gdbstub_67fb4ee1</a></td></tr>
+<tr><td><strong>checksum_ack</strong></td><td>是否存在执行“GDB stub”语义的真实实现体，而不是声明、空函数或固定返回？</td><td><span>no_after_negative_search</span></td><td>未发现任何 checksum 校验或 ACK 回复逻辑。 <a href="#ev_task_09_gdbstub_5cab328a" class="evidence-link">ev_task_09_gdbstub_5cab328a</a> <a href="#ev_task_09_gdbstub_81cf908a" class="evidence-link">ev_task_09_gdbstub_81cf908a</a> <a href="#ev_task_09_gdbstub_67fb4ee1" class="evidence-link">ev_task_09_gdbstub_67fb4ee1</a></td></tr>
+<tr><td><strong>command_handlers</strong></td><td>该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？</td><td><span>no_after_negative_search</span></td><td>未发现 $g/$m/$c/$s/$Z 等命令处理代码。 <a href="#ev_task_09_gdbstub_5cab328a" class="evidence-link">ev_task_09_gdbstub_5cab328a</a> <a href="#ev_task_09_gdbstub_81cf908a" class="evidence-link">ev_task_09_gdbstub_81cf908a</a> <a href="#ev_task_09_gdbstub_67fb4ee1" class="evidence-link">ev_task_09_gdbstub_67fb4ee1</a></td></tr>
+<tr><td><strong>trap_integration</strong></td><td>执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？</td><td><span>no_after_negative_search</span></td><td>trap 处理中无 GDB stub 集成痕迹。 <a href="#ev_task_09_gdbstub_5cab328a" class="evidence-link">ev_task_09_gdbstub_5cab328a</a> <a href="#ev_task_09_gdbstub_81cf908a" class="evidence-link">ev_task_09_gdbstub_81cf908a</a> <a href="#ev_task_09_gdbstub_67fb4ee1" class="evidence-link">ev_task_09_gdbstub_67fb4ee1</a></td></tr>
+<tr><td><strong>not_external_config</strong></td><td>是否排除与“GDB stub”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>仅有的 GDB 相关内容是 debug/openocd_cfg/ 下的 OpenOCD 配置文件（gdb_port 3333）和文档中的 GDB 使用说明，属于外部调试工具配置，非内核 GDB stub。 <a href="#ev_task_09_gdbstub_67fb4ee1" class="evidence-link">ev_task_09_gdbstub_67fb4ee1</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>若未确认“GDB stub”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span>{"searched_keywords": ["gdb", "gdbstub", "handle_gdb_packet", "RSP", "remote serial protocol", "$m", "$g", "$c", "$s", "breakpoint", "qSupported", "gdb_putchar", "gdb_getchar", "gdb_regs", "gdb_mem", "ebreak"], "searched_directories": ["kernel", "include", "debug", "console", "driver", "trap", "sbi", "tools", "bootloader"], "file_count": 207, "match_count": 3, "coverage_sufficient": true}</span></td><td>负向搜索覆盖了所有指定关键词和目录，文件覆盖充分，匹配结果仅限外部配置和文档。 <a href="#ev_task_09_gdbstub_5cab328a" class="evidence-link">ev_task_09_gdbstub_5cab328a</a> <a href="#ev_task_09_gdbstub_81cf908a" class="evidence-link">ev_task_09_gdbstub_81cf908a</a> <a href="#ev_task_09_gdbstub_67fb4ee1" class="evidence-link">ev_task_09_gdbstub_67fb4ee1</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_09_gdbstub_5cab328a" class="evidence-anchor">ev_task_09_gdbstub_5cab328a</span> 
+<span id="ev_task_09_gdbstub_81cf908a" class="evidence-anchor">ev_task_09_gdbstub_81cf908a</span> 
+<span id="ev_task_09_gdbstub_67fb4ee1" class="evidence-anchor">ev_task_09_gdbstub_67fb4ee1</span> 
+</section>
+<section class="question-block" id="q09_007">
+<h3>Q09_007 错误码/错误类型体系是什么？（errno/Result/Error enum；给类型定义与传播点证据）</h3>
+<div class="answer-value"><pre><code>{
+  "debug_entry": "yes_strong",
+  "specialized_mechanism": "yes_strong",
+  "runtime_integration": "yes_strong",
+  "output_or_storage": "yes_weak",
+  "external_or_userland_boundary": "yes_strong",
+  "negative_search_coverage": {
+    "searched_keywords": [
+      "errno",
+      "Error",
+      "Result",
+      "EINVAL",
+      "ENOMEM",
+      "EFAULT",
+      "panic",
+      "backtrace",
+      "log",
+      "printk",
+      "println",
+      "gdb",
+      "gdbstub",
+      "monitor",
+      "trace",
+      "ftrace",
+      "perf"
+    ],
+    "searched_directories": [
+      "kernel",
+      "include",
+      "syscall",
+      "fs",
+      "mm",
+      "debug",
+      "console",
+      "trap",
+      "Makefile"
+    ],
+    "file_count": 142,
+    "match_count": 228,
+    "coverage_sufficient": true
+  }
+}</code></pre></div>
+<div class="answer-notes">xv6-k210 implements a POSIX-style errno error code system. Error codes are defined as macros in include/errno.h (EPERM=1 through EADDRINUSE=98). Kernel functions return negative errno values (e.g., -EINVAL, -EFAULT, -ENOMEM) which propagate through syscall handlers. Error codes are used extensively in console.c, file.c, sysproc.c, exec.c, sysmem.c, fs.c, mount.c. No Rust-style Result/Error enum exists in kernel C code. output_or_storage downgraded to yes_weak because no direct evidence_id for panic/backtrace implementation was provided in Bound Evidence.</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>debug_entry</strong></td><td>本题只回答“错误码/错误类型体系是什么？（errno/Result/Error enum；给类型定义与传播点证据）”，是否明确输出对象、范围、数量或状态字段？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>include/errno.h defines POSIX errno macros (EPERM=1..EADDRINUSE=98). This is the definition of the error code system entry point. <a href="#ev_task_09_error_code_3417f008" class="evidence-link">ev_task_09_error_code_3417f008</a></td></tr>
+<tr><td><strong>specialized_mechanism</strong></td><td>支撑答案的主要源码/配置/文档锚点在哪里（路径、符号、结构体或常量）？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>Multiple kernel modules (console.c, file.c, sysproc.c, exec.c, sysmem.c, fs.c, mount.c) use negative errno values as return codes, demonstrating a specialized error propagation mechanism. <a href="#ev_task_09_error_code_1d1cf081" class="evidence-link">ev_task_09_error_code_1d1cf081</a> <a href="#ev_task_09_error_code_348bd36d" class="evidence-link">ev_task_09_error_code_348bd36d</a> <a href="#ev_task_09_error_code_59e514a4" class="evidence-link">ev_task_09_error_code_59e514a4</a> <a href="#ev_task_09_error_code_47610e84" class="evidence-link">ev_task_09_error_code_47610e84</a> <a href="#ev_task_09_error_code_15f447e6" class="evidence-link">ev_task_09_error_code_15f447e6</a> <a href="#ev_task_09_error_code_9b30c7e7" class="evidence-link">ev_task_09_error_code_9b30c7e7</a> <a href="#ev_task_09_error_code_e53285fd" class="evidence-link">ev_task_09_error_code_e53285fd</a> <a href="#ev_task_09_error_code_3cf8c992" class="evidence-link">ev_task_09_error_code_3cf8c992</a></td></tr>
+<tr><td><strong>runtime_integration</strong></td><td>答案中的每个关键结论是否有实现体、调用链、状态变化或配置分支证据？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>sys_sleep and sys_nanosleep in sysproc.c show errno values (-EINTR, -EFAULT, -EINVAL) being returned from syscall handlers, indicating runtime integration with the syscall path. <a href="#ev_task_09_error_code_59e514a4" class="evidence-link">ev_task_09_error_code_59e514a4</a> <a href="#ev_task_09_error_code_15f447e6" class="evidence-link">ev_task_09_error_code_15f447e6</a></td></tr>
+<tr><td><strong>output_or_storage</strong></td><td>是否排除题干未要求的相邻模块、同名概念、用户态封装、README 口号或测试桩？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#fff3cd;color:#856404;font-size:0.85em;font-weight:500">⚠️ 弱支撑</span></td><td>Negative search mentions panic/backtrace in printf.c, but no direct evidence_id for panic/backtrace implementation is provided in Bound Evidence. Only weak evidence from negative search summary. <a href="#ev_task_09_error_code_0efd1845" class="evidence-link">ev_task_09_error_code_0efd1845</a></td></tr>
+<tr><td><strong>external_or_userland_boundary</strong></td><td>多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>errno values propagate through syscall handlers (sys_sleep, sys_nanosleep) which return to user space via trapframe-&gt;a0, demonstrating the kernel-to-user boundary. <a href="#ev_task_09_error_code_59e514a4" class="evidence-link">ev_task_09_error_code_59e514a4</a> <a href="#ev_task_09_error_code_15f447e6" class="evidence-link">ev_task_09_error_code_15f447e6</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>若未确认“错误码/错误类型体系是什么？（errno/Result/Error enum；给类型定义与传播点证据）”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span>{"searched_keywords": ["errno", "Error", "Result", "EINVAL", "ENOMEM", "EFAULT", "panic", "backtrace", "log", "printk", "println", "gdb", "gdbstub", "monitor", "trace", "ftrace", "perf"], "searched_directories": ["kernel", "include", "syscall", "fs", "mm", "debug", "console", "trap", "Makefile"], "file_count": 142, "match_count": 228, "coverage_sufficient": true}</span></td><td>Negative search coverage sufficient. No Rust Result/Error enum in kernel C code. No gdb/gdbstub/ftrace/perf found. <a href="#ev_task_09_error_code_0efd1845" class="evidence-link">ev_task_09_error_code_0efd1845</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_09_error_code_1d1cf081" class="evidence-anchor">ev_task_09_error_code_1d1cf081</span> 
+<span id="ev_task_09_error_code_348bd36d" class="evidence-anchor">ev_task_09_error_code_348bd36d</span> 
+<span id="ev_task_09_error_code_59e514a4" class="evidence-anchor">ev_task_09_error_code_59e514a4</span> 
+<span id="ev_task_09_error_code_0efd1845" class="evidence-anchor">ev_task_09_error_code_0efd1845</span> 
+<span id="ev_task_09_error_code_3417f008" class="evidence-anchor">ev_task_09_error_code_3417f008</span> 
+<span id="ev_task_09_error_code_47610e84" class="evidence-anchor">ev_task_09_error_code_47610e84</span> 
+<span id="ev_task_09_error_code_15f447e6" class="evidence-anchor">ev_task_09_error_code_15f447e6</span> 
+<span id="ev_task_09_error_code_9b30c7e7" class="evidence-anchor">ev_task_09_error_code_9b30c7e7</span> 
+<span id="ev_task_09_error_code_e53285fd" class="evidence-anchor">ev_task_09_error_code_e53285fd</span> 
+<span id="ev_task_09_error_code_3cf8c992" class="evidence-anchor">ev_task_09_error_code_3cf8c992</span> 
+</section>
+<section class="question-block" id="q09_008">
+<h3>Q09_008 是否存在 trace/perf/ftrace 等跟踪机制或 tracepoints？（必须三态）</h3>
+<div class="answer-value"><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#fff3cd;color:#856404;font-size:0.85em;font-weight:500">⚠️ 存根</span> <span style="color:var(--text-muted);margin-left:0.5em">桩实现</span></div>
+<div class="answer-notes">存在 SYS_trace 系统调用和 tmask 字段构成的 syscall 跟踪机制，但缺乏 trace event 类型/宏、ring buffer、关键路径插桩、sysfs 控制接口和结构化事件记录等核心特征，属于最小 syscall 跟踪桩，符合 stub 判定。</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>trace_abstraction</strong></td><td>“trace/perf/ftrace 等跟踪机制或 tracepoints”的内核定义、入口、对象或配置开关在哪里？</td><td><span>stub_or_declaration_only</span></td><td>存在 SYS_trace 系统调用号和 tmask 字段，以及 sys_trace 实现体，但无 trace event/tracepoint/probe 类型或宏定义，属于声明加简单实现形态。 <a href="#ev_task_09_trace_4bcad803" class="evidence-link">ev_task_09_trace_4bcad803</a> <a href="#ev_task_09_trace_9091b6c9" class="evidence-link">ev_task_09_trace_9091b6c9</a> <a href="#ev_task_09_trace_ccc59dac" class="evidence-link">ev_task_09_trace_ccc59dac</a> <a href="#ev_task_09_trace_6cfe6938" class="evidence-link">ev_task_09_trace_6cfe6938</a></td></tr>
+<tr><td><strong>event_storage</strong></td><td>是否存在执行“trace/perf/ftrace 等跟踪机制或 tracepoints”语义的真实实现体，而不是声明、空函数或固定返回？</td><td><span>no_after_negative_search</span></td><td>事件通过 printf() 直接输出，未使用 ring buffer/list/log store；负向搜索在 207 个文件中未发现 ring buffer 或 trace event 存储结构。 <a href="#ev_task_09_trace_7ef0c1ee" class="evidence-link">ev_task_09_trace_7ef0c1ee</a> <a href="#ev_task_09_trace_ccc59dac" class="evidence-link">ev_task_09_trace_ccc59dac</a></td></tr>
+<tr><td><strong>instrumentation_sites</strong></td><td>该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？</td><td><span>stub_or_declaration_only</span></td><td>仅在 syscall 分发路径插桩（syscall.c 和 sys_exit），未在 sched/trap/mm/fs 等关键路径发现 trace 插桩。 <a href="#ev_task_09_trace_ccc59dac" class="evidence-link">ev_task_09_trace_ccc59dac</a> <a href="#ev_task_09_trace_546aca9d" class="evidence-link">ev_task_09_trace_546aca9d</a></td></tr>
+<tr><td><strong>control_readout</strong></td><td>执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？</td><td><span>stub_or_declaration_only</span></td><td>仅有 SYS_trace 系统调用作为控制接口，无 sysfs/procfs/tracefs 接口，无过滤/读取功能。 <a href="#ev_task_09_trace_6cfe6938" class="evidence-link">ev_task_09_trace_6cfe6938</a> <a href="#ev_task_09_trace_5bfaaa68" class="evidence-link">ev_task_09_trace_5bfaaa68</a></td></tr>
+<tr><td><strong>not_logging</strong></td><td>是否排除与“trace/perf/ftrace 等跟踪机制或 tracepoints”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？</td><td><span>no_after_negative_search</span></td><td>trace 输出仅包含 pid、系统调用名和返回值，未记录时间戳、CPU、任务或事件参数等结构化元数据。 <a href="#ev_task_09_trace_ccc59dac" class="evidence-link">ev_task_09_trace_ccc59dac</a> <a href="#ev_task_09_trace_42eb4757" class="evidence-link">ev_task_09_trace_42eb4757</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>若未确认“trace/perf/ftrace 等跟踪机制或 tracepoints”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span>{"searched_keywords": ["trace", "tracepoint", "ftrace", "perf", "event", "probe", "kprobe", "record", "ring buffer", "timestamp", "TRACE_EVENT", "DEFINE_TRACE", "trace_array", "trace_event", "ring_buffer", "perf_event", "kprobe", "uprobe", "trace_hook", "trace_syscall", "trace_sched", "trace_mm", "sysfs", "debugfs", "tracefs"], "searched_directories": ["kernel", "debug", "trace", "sched", "syscall", "trap", "include", "kernel/syscall", "kernel/sched", "kernel/trap", "kernel/mm", "kernel/fs", "kernel/printf.c", "include/sched", "include/utils"], "file_count": 207, "match_count": 0, "coverage_sufficient": true}</span></td><td>负向搜索覆盖了所有指定关键词和目录，在 207 个文件中未发现 tracepoint/ftrace/perf 基础设施。 <a href="#ev_task_09_trace_7ef0c1ee" class="evidence-link">ev_task_09_trace_7ef0c1ee</a> <a href="#ev_task_09_trace_42eb4757" class="evidence-link">ev_task_09_trace_42eb4757</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_09_trace_4bcad803" class="evidence-anchor">ev_task_09_trace_4bcad803</span> 
+<span id="ev_task_09_trace_9091b6c9" class="evidence-anchor">ev_task_09_trace_9091b6c9</span> 
+<span id="ev_task_09_trace_ccc59dac" class="evidence-anchor">ev_task_09_trace_ccc59dac</span> 
+<span id="ev_task_09_trace_6cfe6938" class="evidence-anchor">ev_task_09_trace_6cfe6938</span> 
+<span id="ev_task_09_trace_7ef0c1ee" class="evidence-anchor">ev_task_09_trace_7ef0c1ee</span> 
+<span id="ev_task_09_trace_42eb4757" class="evidence-anchor">ev_task_09_trace_42eb4757</span> 
+<span id="ev_task_09_trace_546aca9d" class="evidence-anchor">ev_task_09_trace_546aca9d</span> 
+<span id="ev_task_09_trace_5bfaaa68" class="evidence-anchor">ev_task_09_trace_5bfaaa68</span> 
+</section>
+<div style="margin-top:3rem;display:flex;justify-content:space-between;flex-wrap:wrap;gap:1rem">
+<a href="08.html" style="padding:0.6rem 1.2rem;background:#5b2c6f;color:#fff;border-radius:8px;text-decoration:none">← 网络子系统与协议栈</a>
+<a href="../index.html" style="padding:0.6rem 1.2rem;background:#6c757d;color:#fff;border-radius:8px;text-decoration:none">首页</a>
+<span></span>
+</div>
+</div></body></html>

@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>第07章 安全机制与权限模型 - xv6-k210</title>
+<style>
+
+:root {
+    --bg: #f8f9fa;
+    --card-bg: #ffffff;
+    --text: #2c3e50;
+    --text-muted: #6c757d;
+    --border: #dee2e6;
+    --code-bg: #f1f3f5;
+    --link: #2980b9;
+    --accent: #3498db;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans SC", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    padding: 0;
+}
+.container { max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem; }
+h1 { font-size: 1.8rem; margin-bottom: 0.5rem; }
+h2 { font-size: 1.5rem; margin: 2rem 0 0.8rem; padding-bottom: 0.4rem; border-bottom: 2px solid var(--border); }
+h3 { font-size: 1.25rem; margin: 1.5rem 0 0.6rem; color: var(--text); }
+h4 { font-size: 1.1rem; margin: 1.2rem 0 0.4rem; }
+p { margin: 0.6rem 0; }
+ul, ol { margin: 0.6rem 0 0.6rem 1.5rem; }
+li { margin: 0.3rem 0; }
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+code {
+    background: var(--code-bg);
+    padding: 0.15em 0.4em;
+    border-radius: 3px;
+    font-size: 0.88em;
+    font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+}
+pre {
+    background: #1e1e2e;
+    color: #cdd6f4;
+    padding: 1rem 1.2rem;
+    border-radius: 8px;
+    overflow-x: auto;
+    margin: 1rem 0;
+    font-size: 0.85rem;
+    line-height: 1.5;
+}
+pre code { background: none; padding: 0; color: inherit; }
+blockquote {
+    border-left: 4px solid var(--accent);
+    padding: 0.5rem 1rem;
+    margin: 1rem 0;
+    background: #eef6fc;
+    border-radius: 0 6px 6px 0;
+}
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+    font-size: 0.9rem;
+    overflow-x: auto;
+    display: block;
+}
+thead { background: #f1f3f5; }
+th, td {
+    padding: 0.6rem 0.8rem;
+    border: 1px solid var(--border);
+    text-align: left;
+    vertical-align: top;
+}
+tr:nth-child(even) { background: #f8f9fa; }
+tr:hover { background: #e9ecef; }
+.evidence-link {
+    display: inline-block;
+    background: #fff3cd;
+    color: #856404;
+    padding: 0.1em 0.5em;
+    border-radius: 12px;
+    font-size: 0.78em;
+    font-family: monospace;
+    cursor: pointer;
+    border: 1px solid #ffc107;
+    transition: all 0.2s;
+}
+.evidence-link:hover {
+    background: #ffc107;
+    color: #1a1a1a;
+    text-decoration: none;
+    transform: scale(1.05);
+}
+.evidence-anchor {
+    display: inline-block;
+    background: #d4edda;
+    color: #155724;
+    padding: 0.1em 0.5em;
+    border-radius: 12px;
+    font-size: 0.78em;
+    font-family: monospace;
+    border: 1px solid #28a745;
+    scroll-margin-top: 80px;
+}
+.evidence-anchor:target {
+    background: #ffc107;
+    color: #1a1a1a;
+    box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.4);
+    animation: pulse 0.6s ease-out;
+}
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}
+hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+
+/* --- PLACEHOLDER_NAV --- */
+
+
+.top-nav {
+    position: sticky;
+    top: 0;
+    background: rgba(255,255,255,0.95);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border);
+    padding: 0.7rem 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    z-index: 100;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+.top-nav a {
+    padding: 0.3rem 0.8rem;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    transition: background 0.2s;
+}
+.top-nav a:hover { background: #e9ecef; text-decoration: none; }
+.top-nav .spacer { flex: 1; }
+.nav-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 1rem;
+    margin: 2rem 0;
+}
+.nav-card {
+    display: block;
+    padding: 1.2rem 1rem;
+    border-radius: 12px;
+    color: #fff;
+    font-weight: 600;
+    font-size: 1rem;
+    text-align: center;
+    transition: transform 0.2s, box-shadow 0.2s;
+    text-decoration: none;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+}
+.nav-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.18);
+    text-decoration: none;
+}
+.nav-card .chapter-num {
+    display: block;
+    font-size: 0.75rem;
+    opacity: 0.85;
+    margin-bottom: 0.3rem;
+}
+.header-info {
+    background: var(--card-bg);
+    border-radius: 12px;
+    padding: 1.5rem 2rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    border: 1px solid var(--border);
+}
+.header-info h1 { color: var(--accent); }
+.header-info .meta-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 0.5rem 2rem;
+    margin-top: 1rem;
+}
+.header-info .meta-item { font-size: 0.92rem; }
+.header-info .meta-label { color: var(--text-muted); font-weight: 500; }
+.chapter-badge {
+    display: inline-block;
+    padding: 0.3rem 1rem;
+    border-radius: 20px;
+    color: #fff;
+    font-weight: 600;
+    font-size: 0.85rem;
+    margin-bottom: 1rem;
+}
+
+.chapter-accent { color: #e67e22; }
+
+.question-block {
+    margin: 1.5rem 0;
+    padding: 1.2rem 1.5rem;
+    background: var(--card-bg);
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+.question-block h3 {
+    margin: 0 0 0.8rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid var(--border);
+}
+.fact-table {
+    width: 100%;
+    font-size: 0.88rem;
+    display: table;
+}
+.fact-table th { background: #f1f3f5; font-weight: 600; }
+.fact-table td, .fact-table th { padding: 0.5rem 0.7rem; }
+.conclusion-label {
+    margin: 0.8rem 0 0.3rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+.answer-value {
+    margin: 0.4rem 0;
+    padding: 0.4rem 0;
+}
+.answer-notes {
+    margin-top: 0.5rem;
+    padding: 0.6rem 1rem;
+    background: #f8f9fa;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    line-height: 1.6;
+}
+.fact-details {
+    margin-top: 0.8rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+}
+.fact-details summary {
+    padding: 0.5rem 1rem;
+    background: #f1f3f5;
+    cursor: pointer;
+    font-size: 0.88rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    user-select: none;
+    list-style: none;
+}
+.fact-details summary::-webkit-details-marker { display: none; }
+.fact-details summary::before {
+    content: "▶ ";
+    font-size: 0.75em;
+    transition: transform 0.2s;
+    display: inline-block;
+}
+.fact-details[open] summary::before { content: "▼ "; }
+.fact-details summary:hover { background: #e9ecef; color: var(--text); }
+.fact-details .fact-table { margin: 0; border-radius: 0; }
+.fact-details .fact-table th,
+.fact-details .fact-table td { border-left: none; border-right: none; }
+.fact-details .fact-table tr:last-child td { border-bottom: none; }
+
+</style>
+</head>
+<body>
+
+<nav class="top-nav">
+<a href="../index.html">← 首页</a>
+<a href="06.html">← 同步互斥与进程间</a>
+<span class="spacer"></span>
+<strong class="chapter-accent">第 07 章</strong>
+<span class="spacer"></span>
+<a href="08.html">网络子系统与协议 →</a>
+</nav>
+<div class="container">
+<span class="chapter-badge" style="background:#e67e22">第 07 章</span>
+<h1>安全机制与权限模型</h1>
+<hr>
+<section class="question-block" id="q07_001">
+<h3>Q07_001 特权级隔离形态更接近哪种？</h3>
+<div class="answer-value"><p>有用户态/内核态隔离（user mode/kernel mode）</p></div>
+<div class="answer-notes">代码中存在 S-mode 内核与 U-mode 用户态隔离：sstatus.SPP/PUM/SUM 位定义（ev_task_07_privilege_isolation_e625c85b）、permit_usr_mem/protect_usr_mem 实现（ev_task_07_privilege_isolation_720572d5）、usertrap/usertrapret 中调用（ev_task_07_privilege_isolation_f3f5b90f）、文件读写权限检查（ev_task_07_privilege_isolation_d87dc74f、ev_task_07_privilege_isolation_1ba89cd9）、mmap 权限检查（ev_task_07_privilege_isolation_c1638828）、系统调用表（ev_task_07_privilege_isolation_80baf780）。sys_getuid 为 stub（ev_task_07_privilege_isolation_8a24c4a5）。负向搜索未发现独立的安全结构体（ev_task_07_privilege_isolation_b0fb420f）。综合判断实现了用户态/内核态隔离，因此选择第一项。</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>security_state</strong></td><td>题目“特权级隔离形态更接近哪种？”的候选选项有哪些，是否只从题单 choices 中选择？</td><td><span>no_after_negative_search</span></td><td>负向搜索未发现独立的 security_state 结构体或定义。 <a href="#ev_task_07_privilege_isolation_b0fb420f" class="evidence-link">ev_task_07_privilege_isolation_b0fb420f</a></td></tr>
+<tr><td><strong>enforcement_callsite</strong></td><td>被选中的形态是否有源码、配置、调用链或数据结构证据直接支撑？</td><td><span>no_after_negative_search</span></td><td>负向搜索未发现独立的 enforcement_callsite 结构体或定义。 <a href="#ev_task_07_privilege_isolation_b0fb420f" class="evidence-link">ev_task_07_privilege_isolation_b0fb420f</a></td></tr>
+<tr><td><strong>deny_or_fault_path</strong></td><td>未选选项是否被源码证据、缺失证据或概念边界排除？</td><td><span>no_after_negative_search</span></td><td>负向搜索未发现独立的 deny_or_fault_path 结构体或定义。 <a href="#ev_task_07_privilege_isolation_b0fb420f" class="evidence-link">ev_task_07_privilege_isolation_b0fb420f</a></td></tr>
+<tr><td><strong>policy_scope</strong></td><td>若不能用源码确认用户态/内核态隔离或仅内核态形态，是否选择“未发现/待核实”并说明原因？</td><td><span>no_after_negative_search</span></td><td>负向搜索未发现独立的 policy_scope 结构体或定义。 <a href="#ev_task_07_privilege_isolation_b0fb420f" class="evidence-link">ev_task_07_privilege_isolation_b0fb420f</a></td></tr>
+<tr><td><strong>stub_detection</strong></td><td>若未确认“特权级隔离形态更接近哪种？”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span>stub_or_declaration_only</span></td><td>sys_getuid 实现体固定返回 0，属于 stub 形态。 <a href="#ev_task_07_privilege_isolation_8a24c4a5" class="evidence-link">ev_task_07_privilege_isolation_8a24c4a5</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>-</td><td><span>{"searched_keywords": ["uid", "gid", "cred", "permission", "access control", "ACL", "capability", "mode", "EACCES", "EPERM", "seccomp", "sandbox", "audit", "secure boot", "signature", "PMP", "SMEP", "SMAP", "KPTI", "W^X", "RAII", "unsafe"], "searched_directories": ["kernel", "security", "fs", "proc", "mm", "syscall", "arch", "include", "Makefile", "Cargo.toml"], "file_count": 207, "match_count": 0, "coverage_sufficient": true}</span></td><td>负向搜索覆盖了所有指定关键词和目录，未发现独立的安全结构体。 <a href="#ev_task_07_privilege_isolation_b0fb420f" class="evidence-link">ev_task_07_privilege_isolation_b0fb420f</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_07_privilege_isolation_80baf780" class="evidence-anchor">ev_task_07_privilege_isolation_80baf780</span> 
+<span id="ev_task_07_privilege_isolation_d87dc74f" class="evidence-anchor">ev_task_07_privilege_isolation_d87dc74f</span> 
+<span id="ev_task_07_privilege_isolation_1ba89cd9" class="evidence-anchor">ev_task_07_privilege_isolation_1ba89cd9</span> 
+<span id="ev_task_07_privilege_isolation_63bb0218" class="evidence-anchor">ev_task_07_privilege_isolation_63bb0218</span> 
+<span id="ev_task_07_privilege_isolation_b0fb420f" class="evidence-anchor">ev_task_07_privilege_isolation_b0fb420f</span> 
+<span id="ev_task_07_privilege_isolation_e625c85b" class="evidence-anchor">ev_task_07_privilege_isolation_e625c85b</span> 
+<span id="ev_task_07_privilege_isolation_720572d5" class="evidence-anchor">ev_task_07_privilege_isolation_720572d5</span> 
+<span id="ev_task_07_privilege_isolation_f3f5b90f" class="evidence-anchor">ev_task_07_privilege_isolation_f3f5b90f</span> 
+<span id="ev_task_07_privilege_isolation_8a24c4a5" class="evidence-anchor">ev_task_07_privilege_isolation_8a24c4a5</span> 
+<span id="ev_task_07_privilege_isolation_c1638828" class="evidence-anchor">ev_task_07_privilege_isolation_c1638828</span> 
+</section>
+<section class="question-block" id="q07_002">
+<h3>Q07_002 是否存在凭证/权限数据结构（UID/GID/Credential/Capability/ACL 等）？（必须三态）</h3>
+<div class="answer-value"><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#fff3cd;color:#856404;font-size:0.85em;font-weight:500">⚠️ 存根</span> <span style="color:var(--text-muted);margin-left:0.5em">桩实现</span></div>
+<div class="answer-notes">负向搜索未发现独立的凭证/权限数据结构（如 security_state、enforcement_callsite 等）。但存在 UID/GID 字段（kstat、auxvec）和 sys_getuid（固定返回 0）、faccessat（假设 root）等 stub 实现，符合 tri_state_rule 中 stub 的定义：只有声明、接口壳、固定返回、未接入主路径。因此最终三态为 stub。</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>security_state</strong></td><td>“凭证/权限数据结构”的内核定义、入口、对象或配置开关在哪里？</td><td><span>no_after_negative_search</span></td><td>负向搜索未发现独立的 security_state 结构体或相关定义。 <a href="#ev_task_07_privilege_isolation_b0fb420f" class="evidence-link">ev_task_07_privilege_isolation_b0fb420f</a></td></tr>
+<tr><td><strong>enforcement_callsite</strong></td><td>是否存在执行“凭证/权限数据结构”语义的真实实现体，而不是声明、空函数或固定返回？</td><td><span>no_after_negative_search</span></td><td>负向搜索未发现独立的 enforcement_callsite 结构体或相关实现。 <a href="#ev_task_07_privilege_isolation_b0fb420f" class="evidence-link">ev_task_07_privilege_isolation_b0fb420f</a></td></tr>
+<tr><td><strong>deny_or_fault_path</strong></td><td>该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？</td><td><span>no_after_negative_search</span></td><td>负向搜索未发现独立的 deny_or_fault_path 结构体或相关流程。 <a href="#ev_task_07_privilege_isolation_b0fb420f" class="evidence-link">ev_task_07_privilege_isolation_b0fb420f</a></td></tr>
+<tr><td><strong>policy_scope</strong></td><td>执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？</td><td><span>no_after_negative_search</span></td><td>负向搜索未发现独立的 policy_scope 结构体或相关定义。 <a href="#ev_task_07_privilege_isolation_b0fb420f" class="evidence-link">ev_task_07_privilege_isolation_b0fb420f</a></td></tr>
+<tr><td><strong>stub_detection</strong></td><td>是否排除与“凭证/权限数据结构”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？</td><td><span>stub_or_declaration_only</span></td><td>UID/GID 字段仅存在于 kstat 和 ELF auxvec 中，proc 结构体无 uid/gid/cred 字段。sys_getuid 固定返回 0，faccessat 假设用户为 root，均为 stub 实现。 <a href="#ev_task_07_privilege_isolation_8a24c4a5" class="evidence-link">ev_task_07_privilege_isolation_8a24c4a5</a> <a href="#ev_task_07_privilege_isolation_3d2a88de" class="evidence-link">ev_task_07_privilege_isolation_3d2a88de</a> <a href="#ev_task_07_privilege_isolation_ad146d18" class="evidence-link">ev_task_07_privilege_isolation_ad146d18</a> <a href="#ev_task_07_privilege_isolation_f3afb0df" class="evidence-link">ev_task_07_privilege_isolation_f3afb0df</a> <a href="#ev_task_07_privilege_isolation_db12bbae" class="evidence-link">ev_task_07_privilege_isolation_db12bbae</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>若未确认“凭证/权限数据结构”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span>{"searched_keywords": ["uid", "gid", "cred", "permission", "access control", "ACL", "capability", "mode", "EACCES", "EPERM", "seccomp", "sandbox", "audit", "secure boot", "signature", "PMP", "SMEP", "SMAP", "KPTI", "W^X", "RAII", "unsafe"], "searched_directories": ["kernel", "security", "fs", "proc", "mm", "syscall", "arch", "include", "Makefile", "Cargo.toml"], "file_count": 207, "match_count": 0, "coverage_sufficient": true}</span></td><td>全面负向搜索完成，覆盖所有指定关键词和目录，未发现相关结构。 <a href="#ev_task_07_privilege_isolation_b0fb420f" class="evidence-link">ev_task_07_privilege_isolation_b0fb420f</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_07_privilege_isolation_80baf780" class="evidence-anchor">ev_task_07_privilege_isolation_80baf780</span> 
+<span id="ev_task_07_privilege_isolation_b0fb420f" class="evidence-anchor">ev_task_07_privilege_isolation_b0fb420f</span> 
+<span id="ev_task_07_privilege_isolation_8a24c4a5" class="evidence-anchor">ev_task_07_privilege_isolation_8a24c4a5</span> 
+<span id="ev_task_07_privilege_isolation_3d2a88de" class="evidence-anchor">ev_task_07_privilege_isolation_3d2a88de</span> 
+<span id="ev_task_07_privilege_isolation_ad146d18" class="evidence-anchor">ev_task_07_privilege_isolation_ad146d18</span> 
+<span id="ev_task_07_privilege_isolation_f3afb0df" class="evidence-anchor">ev_task_07_privilege_isolation_f3afb0df</span> 
+<span id="ev_task_07_privilege_isolation_db12bbae" class="evidence-anchor">ev_task_07_privilege_isolation_db12bbae</span> 
+</section>
+<section class="question-block" id="q07_003">
+<h3>Q07_003 是否能证实在 syscall 路径上真实执行了权限检查（open/exec/write 等）？（必须三态；仅有字段不算 implemented）</h3>
+<div class="answer-value"><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#fff3cd;color:#856404;font-size:0.85em;font-weight:500">⚠️ 存根</span> <span style="color:var(--text-muted);margin-left:0.5em">桩实现</span></div>
+<div class="answer-notes">syscall 路径上存在基于文件 readable/writable 标志的简单权限检查（EPERM）和基于 inode mode 的检查（EACCES），但无基于 UID/GID/credential 的访问控制。sys_getuid 等固定返回 0，faccessat 假设用户为 root。整体权限检查为 stub 形态，未实现完整的访问控制模型。</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>security_state</strong></td><td>“能证实在 syscall 路径上真实执行了权限检查”的内核定义、入口、对象或配置开关在哪里？</td><td><span>no_after_negative_search</span></td><td>负向搜索未发现独立的 security_state 结构体或相关定义。 <a href="#ev_task_07_privilege_isolation_b0fb420f" class="evidence-link">ev_task_07_privilege_isolation_b0fb420f</a></td></tr>
+<tr><td><strong>enforcement_callsite</strong></td><td>是否存在执行“能证实在 syscall 路径上真实执行了权限检查”语义的真实实现体，而不是声明、空函数或固定返回？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#fff3cd;color:#856404;font-size:0.85em;font-weight:500">⚠️ 弱支撑</span></td><td>存在基于文件 readable/writable 标志的 EPERM 检查（fileread, filewrite）和基于 inode mode 的 EACCES 检查（unlink），以及 mmap 中的权限检查，但无基于 UID/GID/credential 的权限检查，且检查为内联实现，非独立 enforcement_callsite 结构。 <a href="#ev_task_07_privilege_isolation_d87dc74f" class="evidence-link">ev_task_07_privilege_isolation_d87dc74f</a> <a href="#ev_task_07_privilege_isolation_1ba89cd9" class="evidence-link">ev_task_07_privilege_isolation_1ba89cd9</a> <a href="#ev_task_07_privilege_isolation_63bb0218" class="evidence-link">ev_task_07_privilege_isolation_63bb0218</a> <a href="#ev_task_07_privilege_isolation_c1638828" class="evidence-link">ev_task_07_privilege_isolation_c1638828</a></td></tr>
+<tr><td><strong>deny_or_fault_path</strong></td><td>该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#fff3cd;color:#856404;font-size:0.85em;font-weight:500">⚠️ 弱支撑</span></td><td>存在 EPERM/EACCES 返回路径，但为内联错误返回，非独立 deny_or_fault_path 结构。 <a href="#ev_task_07_privilege_isolation_d87dc74f" class="evidence-link">ev_task_07_privilege_isolation_d87dc74f</a> <a href="#ev_task_07_privilege_isolation_1ba89cd9" class="evidence-link">ev_task_07_privilege_isolation_1ba89cd9</a> <a href="#ev_task_07_privilege_isolation_63bb0218" class="evidence-link">ev_task_07_privilege_isolation_63bb0218</a> <a href="#ev_task_07_privilege_isolation_c1638828" class="evidence-link">ev_task_07_privilege_isolation_c1638828</a></td></tr>
+<tr><td><strong>policy_scope</strong></td><td>执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？</td><td><span>no_after_negative_search</span></td><td>负向搜索未发现独立的 policy_scope 结构体或相关定义。 <a href="#ev_task_07_privilege_isolation_b0fb420f" class="evidence-link">ev_task_07_privilege_isolation_b0fb420f</a></td></tr>
+<tr><td><strong>stub_detection</strong></td><td>是否排除与“能证实在 syscall 路径上真实执行了权限检查”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？</td><td><span>stub_or_declaration_only</span></td><td>sys_getuid 等系统调用固定返回 0（stub），faccessat 假设用户为 root，无真实 UID/GID 检查。 <a href="#ev_task_07_privilege_isolation_80baf780" class="evidence-link">ev_task_07_privilege_isolation_80baf780</a> <a href="#ev_task_07_privilege_isolation_8a24c4a5" class="evidence-link">ev_task_07_privilege_isolation_8a24c4a5</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>若未确认“能证实在 syscall 路径上真实执行了权限检查”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span>{"searched_keywords": ["uid", "gid", "cred", "permission", "access control", "ACL", "capability", "mode", "EACCES", "EPERM", "seccomp", "sandbox", "audit", "secure boot", "signature", "PMP", "SMEP", "SMAP", "KPTI", "W^X", "RAII", "unsafe"], "searched_directories": ["kernel", "security", "fs", "proc", "mm", "syscall", "arch", "include", "Makefile", "Cargo.toml"], "file_count": 207, "match_count": 0, "coverage_sufficient": true}</span></td><td>全面负向搜索完成，覆盖所有指定关键词和目录，未发现独立的安全状态/执行点/拒绝路径/策略范围结构。 <a href="#ev_task_07_privilege_isolation_b0fb420f" class="evidence-link">ev_task_07_privilege_isolation_b0fb420f</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_07_privilege_isolation_80baf780" class="evidence-anchor">ev_task_07_privilege_isolation_80baf780</span> 
+<span id="ev_task_07_privilege_isolation_d87dc74f" class="evidence-anchor">ev_task_07_privilege_isolation_d87dc74f</span> 
+<span id="ev_task_07_privilege_isolation_1ba89cd9" class="evidence-anchor">ev_task_07_privilege_isolation_1ba89cd9</span> 
+<span id="ev_task_07_privilege_isolation_63bb0218" class="evidence-anchor">ev_task_07_privilege_isolation_63bb0218</span> 
+<span id="ev_task_07_privilege_isolation_b0fb420f" class="evidence-anchor">ev_task_07_privilege_isolation_b0fb420f</span> 
+<span id="ev_task_07_privilege_isolation_8a24c4a5" class="evidence-anchor">ev_task_07_privilege_isolation_8a24c4a5</span> 
+<span id="ev_task_07_privilege_isolation_c1638828" class="evidence-anchor">ev_task_07_privilege_isolation_c1638828</span> 
+</section>
+<section class="question-block" id="q07_004">
+<h3>Q07_004 若存在权限检查：入口点与核心检查函数链路是什么？（列 2-5 个节点并给证据）</h3>
+<div class="answer-value"><pre><code>{
+  "security_state": "no_after_negative_search",
+  "enforcement_callsite": "no_after_negative_search",
+  "deny_or_fault_path": "no_after_negative_search",
+  "policy_scope": "no_after_negative_search",
+  "stub_detection": "stub_or_declaration_only",
+  "negative_search_coverage": {
+    "searched_keywords": [
+      "uid",
+      "gid",
+      "cred",
+      "permission",
+      "access control",
+      "ACL",
+      "capability",
+      "mode",
+      "EACCES",
+      "EPERM",
+      "seccomp",
+      "sandbox",
+      "audit",
+      "secure boot",
+      "signature",
+      "PMP",
+      "SMEP",
+      "SMAP",
+      "KPTI",
+      "W^X",
+      "RAII",
+      "unsafe"
+    ],
+    "searched_directories": [
+      "kernel",
+      "security",
+      "fs",
+      "proc",
+      "mm",
+      "syscall",
+      "arch",
+      "include",
+      "Makefile",
+      "Cargo.toml"
+    ],
+    "file_count": 207,
+    "match_count": 0,
+    "coverage_sufficient": true
+  }
+}</code></pre></div>
+<div class="answer-notes">基于负向搜索证据，未发现独立的 security_state、enforcement_callsite、deny_or_fault_path、policy_scope 结构体。sys_getuid 等系统调用为 stub 实现。</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>security_state</strong></td><td>本题只回答“若存在权限检查 (Access Control Check, Stallings Ch15)：入口点与核心检查函数链路是什么？（列 2-5 个节点并给证据）”，是否明确输出对象、范围、数量或状态字段？</td><td><span>no_after_negative_search</span></td><td>负向搜索未发现独立的 security_state 结构体或定义。 <a href="#ev_task_07_privilege_isolation_b0fb420f" class="evidence-link">ev_task_07_privilege_isolation_b0fb420f</a></td></tr>
+<tr><td><strong>enforcement_callsite</strong></td><td>支撑答案的主要源码/配置/文档锚点在哪里（路径、符号、结构体或常量）？</td><td><span>no_after_negative_search</span></td><td>负向搜索未发现独立的 enforcement_callsite 结构体或定义。 <a href="#ev_task_07_privilege_isolation_b0fb420f" class="evidence-link">ev_task_07_privilege_isolation_b0fb420f</a></td></tr>
+<tr><td><strong>deny_or_fault_path</strong></td><td>答案中的每个关键结论是否有实现体、调用链、状态变化或配置分支证据？</td><td><span>no_after_negative_search</span></td><td>负向搜索未发现独立的 deny_or_fault_path 结构体或定义。 <a href="#ev_task_07_privilege_isolation_b0fb420f" class="evidence-link">ev_task_07_privilege_isolation_b0fb420f</a></td></tr>
+<tr><td><strong>policy_scope</strong></td><td>是否排除题干未要求的相邻模块、同名概念、用户态封装、README 口号或测试桩？</td><td><span>no_after_negative_search</span></td><td>负向搜索未发现独立的 policy_scope 结构体或定义。 <a href="#ev_task_07_privilege_isolation_b0fb420f" class="evidence-link">ev_task_07_privilege_isolation_b0fb420f</a></td></tr>
+<tr><td><strong>stub_detection</strong></td><td>多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？</td><td><span>stub_or_declaration_only</span></td><td>sys_getuid 等系统调用在 syscall 表中注册，但实现为 stub 返回 0。 <a href="#ev_task_07_privilege_isolation_80baf780" class="evidence-link">ev_task_07_privilege_isolation_80baf780</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>若未确认“若存在权限检查 (Access Control Check, Stallings Ch15)：入口点与核心检查函数链路是什么？（列 2-5 个节点并给证据）”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span>{"searched_keywords": ["uid", "gid", "cred", "permission", "access control", "ACL", "capability", "mode", "EACCES", "EPERM", "seccomp", "sandbox", "audit", "secure boot", "signature", "PMP", "SMEP", "SMAP", "KPTI", "W^X", "RAII", "unsafe"], "searched_directories": ["kernel", "security", "fs", "proc", "mm", "syscall", "arch", "include", "Makefile", "Cargo.toml"], "file_count": 207, "match_count": 0, "coverage_sufficient": true}</span></td><td>负向搜索覆盖了所有指定关键词和目录，未发现相关结构体。 <a href="#ev_task_07_privilege_isolation_b0fb420f" class="evidence-link">ev_task_07_privilege_isolation_b0fb420f</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_07_privilege_isolation_b0fb420f" class="evidence-anchor">ev_task_07_privilege_isolation_b0fb420f</span> 
+<span id="ev_task_07_privilege_isolation_80baf780" class="evidence-anchor">ev_task_07_privilege_isolation_80baf780</span> 
+</section>
+<section class="question-block" id="q07_005">
+<h3>Q07_005 是否实现用户指针验证（access_ok/verify_area/UserInPtr/copyin/copyout 等）？（必须三态）</h3>
+<div class="answer-value"><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 已实现</span> <span style="color:var(--text-muted);margin-left:0.5em">已实现</span></div>
+<div class="answer-notes">xv6-k210 实现了用户指针验证机制，但使用自定义命名（partofseg + safememmove + permit_usr_mem/protect_usr_mem）而非标准 access_ok/verify_area/UserInPtr。copyin/copyout 系列函数完整实现，通过段范围检查（partofseg）、页表权限检查（walkaddr PTE_U）、硬件 PUM/SUM 位切换（permit_usr_mem/protect_usr_mem）和页故障逃逸（safememmove）四层机制保护用户内存访问。negative_search 确认 access_ok/verify_area/UserInPtr 三个标准符号不存在，但等价功能已实现。</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>security_state</strong></td><td>“用户指针验证”的内核定义、入口、对象或配置开关在哪里？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>permit_usr_mem/protect_usr_mem 定义在 include/mm/vm.h，safememmove 实现体在 kernel/mm/vm.c，copyout2/copyin2 实现体在 kernel/mm/vm.c，walkaddr 实现体在 kernel/mm/vm.c，均为强证据。 <a href="#ev_task_07_user_ptr_verify_5fccfef3" class="evidence-link">ev_task_07_user_ptr_verify_5fccfef3</a> <a href="#ev_task_07_user_ptr_verify_df841527" class="evidence-link">ev_task_07_user_ptr_verify_df841527</a> <a href="#ev_task_07_user_ptr_verify_7159642b" class="evidence-link">ev_task_07_user_ptr_verify_7159642b</a> <a href="#ev_task_07_user_ptr_verify_5fb63a3d" class="evidence-link">ev_task_07_user_ptr_verify_5fb63a3d</a> <a href="#ev_task_07_user_ptr_verify_9d5a713c" class="evidence-link">ev_task_07_user_ptr_verify_9d5a713c</a> <a href="#ev_task_07_user_ptr_verify_e2d6cdc2" class="evidence-link">ev_task_07_user_ptr_verify_e2d6cdc2</a></td></tr>
+<tr><td><strong>enforcement_callsite</strong></td><td>是否存在执行“用户指针验证”语义的真实实现体，而不是声明、空函数或固定返回？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>copyout 在 kernel/exec.c 被调用，copyout2 在 kernel/fs/file.c 被调用，either_copyin_nocheck 在 kernel/fs/blkdev.c 被调用，均为强证据。 <a href="#ev_task_07_user_ptr_verify_51528a60" class="evidence-link">ev_task_07_user_ptr_verify_51528a60</a> <a href="#ev_task_07_user_ptr_verify_a0a066b3" class="evidence-link">ev_task_07_user_ptr_verify_a0a066b3</a> <a href="#ev_task_07_user_ptr_verify_cb6d9656" class="evidence-link">ev_task_07_user_ptr_verify_cb6d9656</a></td></tr>
+<tr><td><strong>deny_or_fault_path</strong></td><td>该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>copyout2/copyin2 中 partofseg 返回 NULL 时返回 -1；walkaddr 检查 PTE_U 权限，不满足时返回 NULL。 <a href="#ev_task_07_user_ptr_verify_5fb63a3d" class="evidence-link">ev_task_07_user_ptr_verify_5fb63a3d</a> <a href="#ev_task_07_user_ptr_verify_9d5a713c" class="evidence-link">ev_task_07_user_ptr_verify_9d5a713c</a> <a href="#ev_task_07_user_ptr_verify_e2d6cdc2" class="evidence-link">ev_task_07_user_ptr_verify_e2d6cdc2</a></td></tr>
+<tr><td><strong>policy_scope</strong></td><td>执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>覆盖 copyout/copyin/copyout2/copyin2/copyout_nocheck/copyin_nocheck/either_copyout_nocheck/either_copyin_nocheck 系列函数，walkaddr 检查 PTE_U 权限。 <a href="#ev_task_07_user_ptr_verify_df841527" class="evidence-link">ev_task_07_user_ptr_verify_df841527</a> <a href="#ev_task_07_user_ptr_verify_5fb63a3d" class="evidence-link">ev_task_07_user_ptr_verify_5fb63a3d</a> <a href="#ev_task_07_user_ptr_verify_9d5a713c" class="evidence-link">ev_task_07_user_ptr_verify_9d5a713c</a> <a href="#ev_task_07_user_ptr_verify_e2d6cdc2" class="evidence-link">ev_task_07_user_ptr_verify_e2d6cdc2</a></td></tr>
+<tr><td><strong>stub_detection</strong></td><td>是否排除与“用户指针验证”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>所有函数均有完整实现体，非 stub。safememmove 有完整页故障处理逻辑。 <a href="#ev_task_07_user_ptr_verify_7159642b" class="evidence-link">ev_task_07_user_ptr_verify_7159642b</a> <a href="#ev_task_07_user_ptr_verify_5fb63a3d" class="evidence-link">ev_task_07_user_ptr_verify_5fb63a3d</a> <a href="#ev_task_07_user_ptr_verify_9d5a713c" class="evidence-link">ev_task_07_user_ptr_verify_9d5a713c</a> <a href="#ev_task_07_user_ptr_verify_e2d6cdc2" class="evidence-link">ev_task_07_user_ptr_verify_e2d6cdc2</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>若未确认“用户指针验证”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span>{"searched_keywords": ["access_ok", "verify_area", "UserInPtr"], "searched_directories": ["kernel", "mm", "include", "arch", "kernel/mm", "kernel/sched", "kernel/syscall", "include/mm", "include/sched", "kernel/fs", "kernel/trap", "kernel/hal"], "file_count": 207, "match_count": 0, "coverage_sufficient": true}</span></td><td>access_ok/verify_area/UserInPtr 在全部 207 个文件中均未找到。 <a href="#ev_task_07_user_ptr_verify_1ed7c9d0" class="evidence-link">ev_task_07_user_ptr_verify_1ed7c9d0</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_07_user_ptr_verify_51528a60" class="evidence-anchor">ev_task_07_user_ptr_verify_51528a60</span> 
+<span id="ev_task_07_user_ptr_verify_a0a066b3" class="evidence-anchor">ev_task_07_user_ptr_verify_a0a066b3</span> 
+<span id="ev_task_07_user_ptr_verify_cb6d9656" class="evidence-anchor">ev_task_07_user_ptr_verify_cb6d9656</span> 
+<span id="ev_task_07_user_ptr_verify_1ed7c9d0" class="evidence-anchor">ev_task_07_user_ptr_verify_1ed7c9d0</span> 
+<span id="ev_task_07_user_ptr_verify_5fccfef3" class="evidence-anchor">ev_task_07_user_ptr_verify_5fccfef3</span> 
+<span id="ev_task_07_user_ptr_verify_df841527" class="evidence-anchor">ev_task_07_user_ptr_verify_df841527</span> 
+<span id="ev_task_07_user_ptr_verify_7159642b" class="evidence-anchor">ev_task_07_user_ptr_verify_7159642b</span> 
+<span id="ev_task_07_user_ptr_verify_5fb63a3d" class="evidence-anchor">ev_task_07_user_ptr_verify_5fb63a3d</span> 
+<span id="ev_task_07_user_ptr_verify_9d5a713c" class="evidence-anchor">ev_task_07_user_ptr_verify_9d5a713c</span> 
+<span id="ev_task_07_user_ptr_verify_e2d6cdc2" class="evidence-anchor">ev_task_07_user_ptr_verify_e2d6cdc2</span> 
+</section>
+<section class="question-block" id="q07_006">
+<h3>Q07_006 是否实现 seccomp/prctl/sandbox 等系统调用过滤/沙箱？（必须三态；stub 需说明形态：ENOSYS/return 0）</h3>
+<div class="answer-value"><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#f8d7da;color:#721c24;font-size:0.85em;font-weight:500">❌ 未发现</span> <span style="color:var(--text-muted);margin-left:0.5em">未发现</span></div>
+<div class="answer-notes">所有 structured_facts 均为 no_after_negative_search。negative_search_coverage 覆盖了全部 required_keywords（seccomp, prctl, sandbox 等）和 seed_paths（kernel, security, fs, proc, mm, syscall, arch, include 等），207 个文件零匹配。sysnum.h 无对应系统调用号。sys_getuid 返回 0（始终 root），faccessat 注释 'assume user as root'，无真实安全模型。因此最终三态值为 not_found。</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>security_state</strong></td><td>“seccomp/prctl/sandbox 等系统调用过滤/沙箱”的内核定义、入口、对象或配置开关在哪里？</td><td><span>no_after_negative_search</span></td><td>负向搜索覆盖全部 required_keywords（seccomp, prctl, sandbox, audit, secure boot, signature, PMP, SMEP, SMAP, KPTI, W^X, capability, access control, ACL）和 seed_paths（kernel, security, fs, proc, mm, syscall, arch, include 等），207 个文件零匹配。sysnum.h 无相关系统调用号。 <a href="#ev_task_07_seccomp_sandbox_db90241f" class="evidence-link">ev_task_07_seccomp_sandbox_db90241f</a> <a href="#ev_task_07_seccomp_sandbox_5b66e878" class="evidence-link">ev_task_07_seccomp_sandbox_5b66e878</a> <a href="#ev_task_07_seccomp_sandbox_0df175c6" class="evidence-link">ev_task_07_seccomp_sandbox_0df175c6</a> <a href="#ev_task_07_seccomp_sandbox_83f6d6e6" class="evidence-link">ev_task_07_seccomp_sandbox_83f6d6e6</a> <a href="#ev_task_07_seccomp_sandbox_035a968f" class="evidence-link">ev_task_07_seccomp_sandbox_035a968f</a> <a href="#ev_task_07_seccomp_sandbox_b9622075" class="evidence-link">ev_task_07_seccomp_sandbox_b9622075</a> <a href="#ev_task_07_seccomp_sandbox_44e00eea" class="evidence-link">ev_task_07_seccomp_sandbox_44e00eea</a></td></tr>
+<tr><td><strong>enforcement_callsite</strong></td><td>是否存在执行“seccomp/prctl/sandbox 等系统调用过滤/沙箱”语义的真实实现体，而不是声明、空函数或固定返回？</td><td><span>no_after_negative_search</span></td><td>负向搜索未发现任何 seccomp/prctl/sandbox 相关的执行调用点。 <a href="#ev_task_07_seccomp_sandbox_db90241f" class="evidence-link">ev_task_07_seccomp_sandbox_db90241f</a> <a href="#ev_task_07_seccomp_sandbox_5b66e878" class="evidence-link">ev_task_07_seccomp_sandbox_5b66e878</a> <a href="#ev_task_07_seccomp_sandbox_0df175c6" class="evidence-link">ev_task_07_seccomp_sandbox_0df175c6</a> <a href="#ev_task_07_seccomp_sandbox_83f6d6e6" class="evidence-link">ev_task_07_seccomp_sandbox_83f6d6e6</a> <a href="#ev_task_07_seccomp_sandbox_035a968f" class="evidence-link">ev_task_07_seccomp_sandbox_035a968f</a> <a href="#ev_task_07_seccomp_sandbox_b9622075" class="evidence-link">ev_task_07_seccomp_sandbox_b9622075</a> <a href="#ev_task_07_seccomp_sandbox_44e00eea" class="evidence-link">ev_task_07_seccomp_sandbox_44e00eea</a></td></tr>
+<tr><td><strong>deny_or_fault_path</strong></td><td>该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？</td><td><span>no_after_negative_search</span></td><td>负向搜索未发现任何拒绝路径或错误返回机制。 <a href="#ev_task_07_seccomp_sandbox_db90241f" class="evidence-link">ev_task_07_seccomp_sandbox_db90241f</a> <a href="#ev_task_07_seccomp_sandbox_5b66e878" class="evidence-link">ev_task_07_seccomp_sandbox_5b66e878</a> <a href="#ev_task_07_seccomp_sandbox_0df175c6" class="evidence-link">ev_task_07_seccomp_sandbox_0df175c6</a> <a href="#ev_task_07_seccomp_sandbox_83f6d6e6" class="evidence-link">ev_task_07_seccomp_sandbox_83f6d6e6</a> <a href="#ev_task_07_seccomp_sandbox_035a968f" class="evidence-link">ev_task_07_seccomp_sandbox_035a968f</a> <a href="#ev_task_07_seccomp_sandbox_b9622075" class="evidence-link">ev_task_07_seccomp_sandbox_b9622075</a> <a href="#ev_task_07_seccomp_sandbox_44e00eea" class="evidence-link">ev_task_07_seccomp_sandbox_44e00eea</a></td></tr>
+<tr><td><strong>policy_scope</strong></td><td>执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？</td><td><span>no_after_negative_search</span></td><td>负向搜索未发现任何 seccomp/sandbox/audit 策略对象。 <a href="#ev_task_07_seccomp_sandbox_db90241f" class="evidence-link">ev_task_07_seccomp_sandbox_db90241f</a> <a href="#ev_task_07_seccomp_sandbox_5b66e878" class="evidence-link">ev_task_07_seccomp_sandbox_5b66e878</a> <a href="#ev_task_07_seccomp_sandbox_0df175c6" class="evidence-link">ev_task_07_seccomp_sandbox_0df175c6</a> <a href="#ev_task_07_seccomp_sandbox_83f6d6e6" class="evidence-link">ev_task_07_seccomp_sandbox_83f6d6e6</a> <a href="#ev_task_07_seccomp_sandbox_035a968f" class="evidence-link">ev_task_07_seccomp_sandbox_035a968f</a> <a href="#ev_task_07_seccomp_sandbox_b9622075" class="evidence-link">ev_task_07_seccomp_sandbox_b9622075</a> <a href="#ev_task_07_seccomp_sandbox_44e00eea" class="evidence-link">ev_task_07_seccomp_sandbox_44e00eea</a></td></tr>
+<tr><td><strong>stub_detection</strong></td><td>是否排除与“seccomp/prctl/sandbox 等系统调用过滤/沙箱”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？</td><td><span>no_after_negative_search</span></td><td>负向搜索未发现任何 seccomp/prctl/sandbox 相关的 stub 声明或占位实现。 <a href="#ev_task_07_seccomp_sandbox_db90241f" class="evidence-link">ev_task_07_seccomp_sandbox_db90241f</a> <a href="#ev_task_07_seccomp_sandbox_5b66e878" class="evidence-link">ev_task_07_seccomp_sandbox_5b66e878</a> <a href="#ev_task_07_seccomp_sandbox_0df175c6" class="evidence-link">ev_task_07_seccomp_sandbox_0df175c6</a> <a href="#ev_task_07_seccomp_sandbox_83f6d6e6" class="evidence-link">ev_task_07_seccomp_sandbox_83f6d6e6</a> <a href="#ev_task_07_seccomp_sandbox_035a968f" class="evidence-link">ev_task_07_seccomp_sandbox_035a968f</a> <a href="#ev_task_07_seccomp_sandbox_b9622075" class="evidence-link">ev_task_07_seccomp_sandbox_b9622075</a> <a href="#ev_task_07_seccomp_sandbox_44e00eea" class="evidence-link">ev_task_07_seccomp_sandbox_44e00eea</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>若未确认“seccomp/prctl/sandbox 等系统调用过滤/沙箱”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span>{"searched_keywords": ["seccomp", "prctl", "sandbox", "audit", "secure boot", "signature", "PMP", "SMEP", "SMAP", "KPTI", "W^X", "capability", "access control", "ACL", "uid", "gid", "cred", "permission", "EACCES", "EPERM", "RAII", "unsafe"], "searched_directories": ["kernel", "security", "fs", "proc", "mm", "syscall", "arch", "include", "Makefile", "Cargo.toml"], "file_count": 207, "match_count": 0, "coverage_sufficient": true}</span></td><td>负向搜索覆盖了全部 required_keywords（22 个）和 seed_paths（10 个），207 个文件零匹配，coverage_sufficient=true。 <a href="#ev_task_07_seccomp_sandbox_db90241f" class="evidence-link">ev_task_07_seccomp_sandbox_db90241f</a> <a href="#ev_task_07_seccomp_sandbox_5b66e878" class="evidence-link">ev_task_07_seccomp_sandbox_5b66e878</a> <a href="#ev_task_07_seccomp_sandbox_0df175c6" class="evidence-link">ev_task_07_seccomp_sandbox_0df175c6</a> <a href="#ev_task_07_seccomp_sandbox_83f6d6e6" class="evidence-link">ev_task_07_seccomp_sandbox_83f6d6e6</a> <a href="#ev_task_07_seccomp_sandbox_035a968f" class="evidence-link">ev_task_07_seccomp_sandbox_035a968f</a> <a href="#ev_task_07_seccomp_sandbox_b9622075" class="evidence-link">ev_task_07_seccomp_sandbox_b9622075</a> <a href="#ev_task_07_seccomp_sandbox_44e00eea" class="evidence-link">ev_task_07_seccomp_sandbox_44e00eea</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_07_seccomp_sandbox_db90241f" class="evidence-anchor">ev_task_07_seccomp_sandbox_db90241f</span> 
+<span id="ev_task_07_seccomp_sandbox_5b66e878" class="evidence-anchor">ev_task_07_seccomp_sandbox_5b66e878</span> 
+<span id="ev_task_07_seccomp_sandbox_0df175c6" class="evidence-anchor">ev_task_07_seccomp_sandbox_0df175c6</span> 
+<span id="ev_task_07_seccomp_sandbox_83f6d6e6" class="evidence-anchor">ev_task_07_seccomp_sandbox_83f6d6e6</span> 
+<span id="ev_task_07_seccomp_sandbox_035a968f" class="evidence-anchor">ev_task_07_seccomp_sandbox_035a968f</span> 
+<span id="ev_task_07_seccomp_sandbox_b9622075" class="evidence-anchor">ev_task_07_seccomp_sandbox_b9622075</span> 
+<span id="ev_task_07_seccomp_sandbox_44e00eea" class="evidence-anchor">ev_task_07_seccomp_sandbox_44e00eea</span> 
+</section>
+<section class="question-block" id="q07_007">
+<h3>Q07_007 是否存在栈保护/溢出防护（stack canary/guard page）或等价机制？（必须三态）</h3>
+<div class="answer-value"><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#f8d7da;color:#721c24;font-size:0.85em;font-weight:500">❌ 未发现</span> <span style="color:var(--text-muted);margin-left:0.5em">未发现</span></div>
+<div class="answer-notes">根据 structured_facts 逐项判定：Q07_007_01~Q07_007_04 均为 no_after_negative_search（负向搜索覆盖充分，未发现实现），Q07_007_05 为 stub_or_declaration_only（仅存已注释的声明），Q07_007_06 确认 coverage_sufficient=true。综合判定 not_found：无 stack canary、无活跃 guard page、KSTACK 宏已注释、uvmclear 已废弃。sys_mprotect 和 RISC-V PTE 权限控制属于通用 MMU 机制，非栈保护专用，不改变结论。</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>security_state</strong></td><td>“栈保护/溢出防护”的内核定义、入口、对象或配置开关在哪里？</td><td><span>no_after_negative_search</span></td><td>vm.c 全扫描无 stack canary 实现；uvmclear 函数已完全注释废弃。内核栈为单页分配，无 guard page。 <a href="#ev_task_07_security_Q07_007_review_fix_751f7a_bbc95435" class="evidence-link">ev_task_07_security_Q07_007_review_fix_751f7a_bbc95435</a> <a href="#ev_task_07_security_Q07_007_review_fix_751f7a_bb382623" class="evidence-link">ev_task_07_security_Q07_007_review_fix_751f7a_bb382623</a></td></tr>
+<tr><td><strong>enforcement_callsite</strong></td><td>是否存在执行“栈保护/溢出防护”语义的真实实现体，而不是声明、空函数或固定返回？</td><td><span>no_after_negative_search</span></td><td>未发现任何栈保护机制的强制调用点。sys_mprotect 存在但属于通用页权限修改，非栈保护专用。 <a href="#ev_task_07_security_Q07_007_review_fix_751f7a_bbc95435" class="evidence-link">ev_task_07_security_Q07_007_review_fix_751f7a_bbc95435</a> <a href="#ev_task_07_security_Q07_007_review_fix_751f7a_bb382623" class="evidence-link">ev_task_07_security_Q07_007_review_fix_751f7a_bb382623</a></td></tr>
+<tr><td><strong>deny_or_fault_path</strong></td><td>该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？</td><td><span>no_after_negative_search</span></td><td>无基于栈保护触发的拒绝或故障路径。uvmclear 已废弃，无活跃的 guard page 机制。 <a href="#ev_task_07_security_Q07_007_review_fix_751f7a_bbc95435" class="evidence-link">ev_task_07_security_Q07_007_review_fix_751f7a_bbc95435</a> <a href="#ev_task_07_security_Q07_007_review_fix_751f7a_bb382623" class="evidence-link">ev_task_07_security_Q07_007_review_fix_751f7a_bb382623</a></td></tr>
+<tr><td><strong>policy_scope</strong></td><td>执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？</td><td><span>no_after_negative_search</span></td><td>未发现栈保护相关的策略对象或配置。KSTACK 宏已注释，无活跃的 guard page 策略。 <a href="#ev_task_07_security_Q07_007_review_fix_751f7a_bbc95435" class="evidence-link">ev_task_07_security_Q07_007_review_fix_751f7a_bbc95435</a> <a href="#ev_task_07_security_Q07_007_review_fix_751f7a_bb382623" class="evidence-link">ev_task_07_security_Q07_007_review_fix_751f7a_bb382623</a></td></tr>
+<tr><td><strong>stub_detection</strong></td><td>是否排除与“栈保护/溢出防护”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？</td><td><span>stub_or_declaration_only</span></td><td>uvmclear 仅有声明（vm.h），实现已注释废弃。KSTACK 宏定义已注释，仅保留 VKSTACK 常量。 <a href="#ev_task_07_security_Q07_007_review_fix_751f7a_d9b5f9bb" class="evidence-link">ev_task_07_security_Q07_007_review_fix_751f7a_d9b5f9bb</a> <a href="#ev_task_07_security_Q07_007_review_fix_751f7a_a39d7984" class="evidence-link">ev_task_07_security_Q07_007_review_fix_751f7a_a39d7984</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>若未确认“栈保护/溢出防护”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span>{"searched_keywords": ["uid", "gid", "cred", "permission", "access control", "ACL", "capability", "mode", "EACCES", "EPERM", "seccomp", "sandbox", "audit", "secure boot", "signature", "PMP", "SMEP", "SMAP", "KPTI", "W^X", "RAII", "unsafe"], "searched_directories": ["kernel", "security", "fs", "proc", "mm", "syscall", "arch", "include", "Makefile", "Cargo.toml"], "file_count": 207, "match_count": 80, "coverage_sufficient": true}</span></td><td>负向搜索覆盖了所有指定关键词和目录，vm.c 全扫描、proc.c 内核栈分配检查均未发现栈保护机制。 <a href="#ev_task_07_security_Q07_007_review_fix_751f7a_bbc95435" class="evidence-link">ev_task_07_security_Q07_007_review_fix_751f7a_bbc95435</a> <a href="#ev_task_07_security_Q07_007_review_fix_751f7a_bb382623" class="evidence-link">ev_task_07_security_Q07_007_review_fix_751f7a_bb382623</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_07_security_Q07_007_review_fix_751f7a_bbc95435" class="evidence-anchor">ev_task_07_security_Q07_007_review_fix_751f7a_bbc95435</span> 
+<span id="ev_task_07_security_Q07_007_review_fix_751f7a_bb382623" class="evidence-anchor">ev_task_07_security_Q07_007_review_fix_751f7a_bb382623</span> 
+<span id="ev_task_07_security_Q07_007_review_fix_751f7a_d9b5f9bb" class="evidence-anchor">ev_task_07_security_Q07_007_review_fix_751f7a_d9b5f9bb</span> 
+<span id="ev_task_07_security_Q07_007_review_fix_751f7a_a39d7984" class="evidence-anchor">ev_task_07_security_Q07_007_review_fix_751f7a_a39d7984</span> 
+</section>
+<section class="question-block" id="q07_008">
+<h3>Q07_008 是否存在审计/安全启动（audit/secure boot/signature）相关逻辑？（必须三态）</h3>
+<div class="answer-value"><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#f8d7da;color:#721c24;font-size:0.85em;font-weight:500">❌ 未发现</span> <span style="color:var(--text-muted);margin-left:0.5em">未发现</span></div>
+<div class="answer-notes">所有 6 个 structured_facts 均指向 no_after_negative_search。negative_search_coverage 覆盖了 31 个关键词和 9 个目录，207 个文件，匹配数为 0。不存在 audit 系统、secure boot 实现、签名验证、seccomp/sandbox、PMP/SMEP/SMAP/KPTI/W^X 等安全机制。仅存在基础 RISC-V S/U 模式特权分离和 SSTATUS_PUM/SUM 用户内存保护，但这不属于 audit/secure boot/signature 范畴。</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>security_state</strong></td><td>本题只回答“审计、Secure Boot、签名校验覆盖情况如何？请分别给 audit logging、secure boot、signature verification 的状态（implemented/stub/not_found/unknown）和证据。”，是否明确输出对象、范围、数量或状态字段？</td><td><span>no_after_negative_search</span></td><td>负向搜索未发现任何 audit/secure boot/signature 相关结构或状态定义。 <a href="#ev_task_07_audit_secureboot_8b5d5372" class="evidence-link">ev_task_07_audit_secureboot_8b5d5372</a> <a href="#ev_task_07_audit_secureboot_90bc63e0" class="evidence-link">ev_task_07_audit_secureboot_90bc63e0</a> <a href="#ev_task_07_audit_secureboot_80c9f431" class="evidence-link">ev_task_07_audit_secureboot_80c9f431</a> <a href="#ev_task_07_audit_secureboot_84cc9b07" class="evidence-link">ev_task_07_audit_secureboot_84cc9b07</a> <a href="#ev_task_07_audit_secureboot_9ba727a7" class="evidence-link">ev_task_07_audit_secureboot_9ba727a7</a> <a href="#ev_task_07_audit_secureboot_5f745d3a" class="evidence-link">ev_task_07_audit_secureboot_5f745d3a</a></td></tr>
+<tr><td><strong>enforcement_callsite</strong></td><td>支撑答案的主要源码/配置/文档锚点在哪里（路径、符号、结构体或常量）？</td><td><span>no_after_negative_search</span></td><td>负向搜索未发现任何 audit/secure boot/signature 的强制检查调用点。 <a href="#ev_task_07_audit_secureboot_8b5d5372" class="evidence-link">ev_task_07_audit_secureboot_8b5d5372</a> <a href="#ev_task_07_audit_secureboot_90bc63e0" class="evidence-link">ev_task_07_audit_secureboot_90bc63e0</a> <a href="#ev_task_07_audit_secureboot_80c9f431" class="evidence-link">ev_task_07_audit_secureboot_80c9f431</a> <a href="#ev_task_07_audit_secureboot_84cc9b07" class="evidence-link">ev_task_07_audit_secureboot_84cc9b07</a> <a href="#ev_task_07_audit_secureboot_9ba727a7" class="evidence-link">ev_task_07_audit_secureboot_9ba727a7</a> <a href="#ev_task_07_audit_secureboot_5f745d3a" class="evidence-link">ev_task_07_audit_secureboot_5f745d3a</a></td></tr>
+<tr><td><strong>deny_or_fault_path</strong></td><td>答案中的每个关键结论是否有实现体、调用链、状态变化或配置分支证据？</td><td><span>no_after_negative_search</span></td><td>负向搜索未发现 audit/secure boot/signature 相关的拒绝或错误路径。 <a href="#ev_task_07_audit_secureboot_8b5d5372" class="evidence-link">ev_task_07_audit_secureboot_8b5d5372</a> <a href="#ev_task_07_audit_secureboot_90bc63e0" class="evidence-link">ev_task_07_audit_secureboot_90bc63e0</a> <a href="#ev_task_07_audit_secureboot_80c9f431" class="evidence-link">ev_task_07_audit_secureboot_80c9f431</a> <a href="#ev_task_07_audit_secureboot_84cc9b07" class="evidence-link">ev_task_07_audit_secureboot_84cc9b07</a> <a href="#ev_task_07_audit_secureboot_9ba727a7" class="evidence-link">ev_task_07_audit_secureboot_9ba727a7</a> <a href="#ev_task_07_audit_secureboot_5f745d3a" class="evidence-link">ev_task_07_audit_secureboot_5f745d3a</a></td></tr>
+<tr><td><strong>policy_scope</strong></td><td>是否排除题干未要求的相邻模块、同名概念、用户态封装、README 口号或测试桩？</td><td><span>no_after_negative_search</span></td><td>负向搜索未发现 audit/secure boot/signature 的策略对象或执行范围。 <a href="#ev_task_07_audit_secureboot_8b5d5372" class="evidence-link">ev_task_07_audit_secureboot_8b5d5372</a> <a href="#ev_task_07_audit_secureboot_90bc63e0" class="evidence-link">ev_task_07_audit_secureboot_90bc63e0</a> <a href="#ev_task_07_audit_secureboot_80c9f431" class="evidence-link">ev_task_07_audit_secureboot_80c9f431</a> <a href="#ev_task_07_audit_secureboot_84cc9b07" class="evidence-link">ev_task_07_audit_secureboot_84cc9b07</a> <a href="#ev_task_07_audit_secureboot_9ba727a7" class="evidence-link">ev_task_07_audit_secureboot_9ba727a7</a> <a href="#ev_task_07_audit_secureboot_5f745d3a" class="evidence-link">ev_task_07_audit_secureboot_5f745d3a</a></td></tr>
+<tr><td><strong>stub_detection</strong></td><td>多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？</td><td><span>no_after_negative_search</span></td><td>负向搜索未发现任何 audit/secure boot/signature 的 stub 声明或空实现。 <a href="#ev_task_07_audit_secureboot_8b5d5372" class="evidence-link">ev_task_07_audit_secureboot_8b5d5372</a> <a href="#ev_task_07_audit_secureboot_90bc63e0" class="evidence-link">ev_task_07_audit_secureboot_90bc63e0</a> <a href="#ev_task_07_audit_secureboot_80c9f431" class="evidence-link">ev_task_07_audit_secureboot_80c9f431</a> <a href="#ev_task_07_audit_secureboot_84cc9b07" class="evidence-link">ev_task_07_audit_secureboot_84cc9b07</a> <a href="#ev_task_07_audit_secureboot_9ba727a7" class="evidence-link">ev_task_07_audit_secureboot_9ba727a7</a> <a href="#ev_task_07_audit_secureboot_5f745d3a" class="evidence-link">ev_task_07_audit_secureboot_5f745d3a</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>若未确认“审计、Secure Boot、签名校验覆盖情况如何？请分别给 audit logging、secure boot、signature verification 的状态（implemented/stub/not_found/unknown）和证据。”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span>{"searched_keywords": ["audit", "secure boot", "secure_boot", "signature", "signing", "verify", "seccomp", "sandbox", "PMP", "SMEP", "SMAP", "KPTI", "W^X", "RAII", "uid", "gid", "cred", "permission", "access control", "ACL", "capability", "EACCES", "EPERM", "security", "trust", "authentic", "hash", "sha", "rsa", "ecdsa", "certificate"], "searched_directories": ["kernel", "include", "bootloader", "sbi", "xv6-user", "doc", "tools", "linker", "debug"], "file_count": 207, "match_count": 0, "coverage_sufficient": true}</span></td><td>全面负向搜索覆盖所有 seed_paths 和扩展关键词，207 个文件中均无匹配。 <a href="#ev_task_07_audit_secureboot_8b5d5372" class="evidence-link">ev_task_07_audit_secureboot_8b5d5372</a> <a href="#ev_task_07_audit_secureboot_90bc63e0" class="evidence-link">ev_task_07_audit_secureboot_90bc63e0</a> <a href="#ev_task_07_audit_secureboot_80c9f431" class="evidence-link">ev_task_07_audit_secureboot_80c9f431</a> <a href="#ev_task_07_audit_secureboot_84cc9b07" class="evidence-link">ev_task_07_audit_secureboot_84cc9b07</a> <a href="#ev_task_07_audit_secureboot_9ba727a7" class="evidence-link">ev_task_07_audit_secureboot_9ba727a7</a> <a href="#ev_task_07_audit_secureboot_5f745d3a" class="evidence-link">ev_task_07_audit_secureboot_5f745d3a</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_07_audit_secureboot_8b5d5372" class="evidence-anchor">ev_task_07_audit_secureboot_8b5d5372</span> 
+<span id="ev_task_07_audit_secureboot_90bc63e0" class="evidence-anchor">ev_task_07_audit_secureboot_90bc63e0</span> 
+<span id="ev_task_07_audit_secureboot_80c9f431" class="evidence-anchor">ev_task_07_audit_secureboot_80c9f431</span> 
+<span id="ev_task_07_audit_secureboot_84cc9b07" class="evidence-anchor">ev_task_07_audit_secureboot_84cc9b07</span> 
+<span id="ev_task_07_audit_secureboot_9ba727a7" class="evidence-anchor">ev_task_07_audit_secureboot_9ba727a7</span> 
+<span id="ev_task_07_audit_secureboot_5f745d3a" class="evidence-anchor">ev_task_07_audit_secureboot_5f745d3a</span> 
+</section>
+<section class="question-block" id="q07_009">
+<h3>Q07_009 本项目支持哪些架构（riscv64/aarch64/x86_64/loongarch64 等）？每种架构的安全相关初始化（特权级配置、PMP/MPU/SMEP 等）是否有代码证据？（必须逐架构作答，无证据写「未发现」）</h3>
+<div class="answer-value"><pre><code>{
+  "riscv64": {
+    "support": "yes_strong",
+    "security_init": "yes_strong",
+    "notes": "riscv64 架构支持强证据。安全初始化包括：SBI 设置 MPP=Supervisor 进入 S-mode；satp/SV39 页表；SSTATUS_PUM/SUM 用户内存保护；PTE_U 位隔离；SPP 检查。"
+  },
+  "aarch64": {
+    "support": "no_after_negative_search",
+    "security_init": "no_after_negative_search",
+    "notes": "无 aarch64 架构支持证据。搜索 'aarch64|ARM64|arm64|AArch64' 无匹配。"
+  },
+  "x86_64": {
+    "support": "no_after_negative_search",
+    "security_init": "no_after_negative_search",
+    "notes": "无 x86_64 架构支持证据。搜索 'x86_64|x86|i386|SMEP|SMAP|KPTI|CR0|CR4' 无架构相关匹配。"
+  },
+  "loongarch64": {
+    "support": "no_after_negative_search",
+    "security_init": "no_after_negative_search",
+    "notes": "无 loongarch64 架构支持证据。搜索 'loongarch|loongson|LoongArch|LA64' 无匹配。"
+  },
+  "negative_search_coverage": {
+    "searched_keywords": [
+      "riscv64",
+      "aarch64",
+      "ARM64",
+      "arm64",
+      "AArch64",
+      "x86_64",
+      "x86",
+      "i386",
+      "SMEP",
+      "SMAP",
+      "KPTI",
+      "CR0",
+      "CR4",
+      "loongarch",
+      "loongson",
+      "LoongArch",
+      "LA64",
+      "PMP",
+      "pmpcfg",
+      "pmpaddr",
+      "pmp"
+    ],
+    "searched_directories": [
+      "kernel",
+      "security",
+      "fs",
+      "proc",
+      "mm",
+      "syscall",
+      "arch",
+      "include",
+      "Makefile",
+      "Cargo.toml",
+      "linker",
+      "bootloader",
+      "sbi"
+    ],
+    "file_count": 207,
+    "match_count": 0,
+    "coverage_sufficient": true
+  }
+}</code></pre></div>
+<div class="answer-notes">所有 structured_facts 已完成。riscv64 安全初始化证据充分（特权级分离、页表保护、用户内存隔离、SPP 检查）。其他架构负向搜索覆盖充分，判定未发现。</div>
+<details class="fact-details">
+<summary>子事实明细（5 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>riscv64</strong></td><td>-</td><td><span>{"support": "yes_strong", "security_init": "yes_strong", "notes": "riscv64 架构支持强证据：链接脚本 OUTPUT_ARCH(riscv) (ev_task_07_arch_support_340a239e)。安全初始化强证据：SBI bootloader 设置 MPP=Supervisor 进入 S-mode (ev_task_07_arch_support_c4ba07da)；satp/SV39 页表 (ev_task_07_arch_support_a3501742)；SSTATUS_PUM/SUM 用户内存保护 (ev_task_07_arch_support_7104313c)；PTE_U 位隔离用户/内核页 (ev_task_07_arch_support_dcdb13ef)；usertrap 检查 SSTATUS_SPP、usertrapret 清除 SPP (ev_task_07_arch_support_ed8bf52a)。"}</span></td><td>证据充分，支持和安全初始化均为 yes_strong。 <a href="#ev_task_07_arch_support_c4ba07da" class="evidence-link">ev_task_07_arch_support_c4ba07da</a> <a href="#ev_task_07_arch_support_340a239e" class="evidence-link">ev_task_07_arch_support_340a239e</a> <a href="#ev_task_07_arch_support_70231d6f" class="evidence-link">ev_task_07_arch_support_70231d6f</a> <a href="#ev_task_07_arch_support_a3501742" class="evidence-link">ev_task_07_arch_support_a3501742</a> <a href="#ev_task_07_arch_support_7104313c" class="evidence-link">ev_task_07_arch_support_7104313c</a> <a href="#ev_task_07_arch_support_ed8bf52a" class="evidence-link">ev_task_07_arch_support_ed8bf52a</a> <a href="#ev_task_07_arch_support_dcdb13ef" class="evidence-link">ev_task_07_arch_support_dcdb13ef</a></td></tr>
+<tr><td><strong>aarch64</strong></td><td>-</td><td><span>{"support": "no_after_negative_search", "security_init": "no_after_negative_search", "notes": "负向搜索 'aarch64|ARM64|arm64|AArch64' 在 207 个文件中返回 0 匹配 (ev_task_07_arch_support_392e36a3)。"}</span></td><td>负向搜索覆盖充分，判定未发现。 <a href="#ev_task_07_arch_support_392e36a3" class="evidence-link">ev_task_07_arch_support_392e36a3</a></td></tr>
+<tr><td><strong>x86_64</strong></td><td>-</td><td><span>{"support": "no_after_negative_search", "security_init": "no_after_negative_search", "notes": "负向搜索 'x86_64|x86|i386|SMEP|SMAP|KPTI|CR0|CR4' 仅返回 tools/kflash.py 中的 AES 查找表数据，无架构代码 (ev_task_07_arch_support_6351c725)。"}</span></td><td>负向搜索覆盖充分，判定未发现。 <a href="#ev_task_07_arch_support_6351c725" class="evidence-link">ev_task_07_arch_support_6351c725</a></td></tr>
+<tr><td><strong>loongarch64</strong></td><td>-</td><td><span>{"support": "no_after_negative_search", "security_init": "no_after_negative_search", "notes": "负向搜索 'loongarch|loongson|LoongArch|LA64' 在 207 个文件中返回 0 匹配 (ev_task_07_arch_support_a0f66d7d)。"}</span></td><td>负向搜索覆盖充分，判定未发现。 <a href="#ev_task_07_arch_support_a0f66d7d" class="evidence-link">ev_task_07_arch_support_a0f66d7d</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>-</td><td><span>{"searched_keywords": ["riscv64", "aarch64", "ARM64", "arm64", "AArch64", "x86_64", "x86", "i386", "SMEP", "SMAP", "KPTI", "CR0", "CR4", "loongarch", "loongson", "LoongArch", "LA64", "PMP", "pmpcfg", "pmpaddr", "pmp"], "searched_directories": ["kernel", "security", "fs", "proc", "mm", "syscall", "arch", "include", "Makefile", "Cargo.toml", "linker", "bootloader", "sbi"], "file_count": 207, "match_count": 0, "coverage_sufficient": true}</span></td><td>负向搜索覆盖充分，支持 aarch64/x86_64/loongarch64 的 not_found 判定。 <a href="#ev_task_07_arch_support_392e36a3" class="evidence-link">ev_task_07_arch_support_392e36a3</a> <a href="#ev_task_07_arch_support_6351c725" class="evidence-link">ev_task_07_arch_support_6351c725</a> <a href="#ev_task_07_arch_support_a0f66d7d" class="evidence-link">ev_task_07_arch_support_a0f66d7d</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_07_arch_support_c4ba07da" class="evidence-anchor">ev_task_07_arch_support_c4ba07da</span> 
+<span id="ev_task_07_arch_support_340a239e" class="evidence-anchor">ev_task_07_arch_support_340a239e</span> 
+<span id="ev_task_07_arch_support_70231d6f" class="evidence-anchor">ev_task_07_arch_support_70231d6f</span> 
+<span id="ev_task_07_arch_support_a3501742" class="evidence-anchor">ev_task_07_arch_support_a3501742</span> 
+<span id="ev_task_07_arch_support_7104313c" class="evidence-anchor">ev_task_07_arch_support_7104313c</span> 
+<span id="ev_task_07_arch_support_ed8bf52a" class="evidence-anchor">ev_task_07_arch_support_ed8bf52a</span> 
+<span id="ev_task_07_arch_support_dcdb13ef" class="evidence-anchor">ev_task_07_arch_support_dcdb13ef</span> 
+<span id="ev_task_07_arch_support_392e36a3" class="evidence-anchor">ev_task_07_arch_support_392e36a3</span> 
+<span id="ev_task_07_arch_support_6351c725" class="evidence-anchor">ev_task_07_arch_support_6351c725</span> 
+<span id="ev_task_07_arch_support_a0f66d7d" class="evidence-anchor">ev_task_07_arch_support_a0f66d7d</span> 
+</section>
+<section class="question-block" id="q07_010">
+<h3>Q07_010 若项目使用 Rust，是否存在 RAII/所有权/生命周期相关的内核安全机制（如不可 unsafe 直接访问用户内存、锁的 RAII 自动释放等）？（必须三态；给具体模式证据）</h3>
+<div class="answer-value"><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#f8d7da;color:#721c24;font-size:0.85em;font-weight:500">❌ 未发现</span> <span style="color:var(--text-muted);margin-left:0.5em">未发现</span></div>
+<div class="answer-notes">xv6-k210 项目内核完全使用 C 语言实现（GCC 编译），kernel/ 和 include/ 目录下没有任何 Rust 源文件。搜索 RAII/raii/Ownership/ownership/Lifetime/lifetime 在整个仓库 207 个文件中均无匹配。Makefile 确认使用 riscv64-unknown-elf-gcc 编译，无 Rust 编译器。唯一的 Rust 代码位于 bootloader/SBI/rustsbi-*（独立的 SBI 引导加载程序），不属于内核本身。因此 Rust RAII/所有权/生命周期相关的内核安全机制不存在。</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>security_state</strong></td><td>“RAII/所有权/生命周期相关的内核安全机制”的内核定义、入口、对象或配置开关在哪里？</td><td><span>no_after_negative_search</span></td><td>内核完全由 C 编写，无 Rust RAII/所有权/生命周期机制。 <a href="#ev_task_07_rust_raii_f8182d18" class="evidence-link">ev_task_07_rust_raii_f8182d18</a> <a href="#ev_task_07_rust_raii_3d72c3c6" class="evidence-link">ev_task_07_rust_raii_3d72c3c6</a> <a href="#ev_task_07_rust_raii_56d2a9b0" class="evidence-link">ev_task_07_rust_raii_56d2a9b0</a></td></tr>
+<tr><td><strong>enforcement_callsite</strong></td><td>是否存在执行“RAII/所有权/生命周期相关的内核安全机制”语义的真实实现体，而不是声明、空函数或固定返回？</td><td><span>no_after_negative_search</span></td><td>不存在 Rust RAII 相关的 enforcement 调用点。 <a href="#ev_task_07_rust_raii_f8182d18" class="evidence-link">ev_task_07_rust_raii_f8182d18</a> <a href="#ev_task_07_rust_raii_3d72c3c6" class="evidence-link">ev_task_07_rust_raii_3d72c3c6</a> <a href="#ev_task_07_rust_raii_56d2a9b0" class="evidence-link">ev_task_07_rust_raii_56d2a9b0</a></td></tr>
+<tr><td><strong>deny_or_fault_path</strong></td><td>该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？</td><td><span>no_after_negative_search</span></td><td>不存在 Rust 所有权/生命周期相关的 deny 路径。 <a href="#ev_task_07_rust_raii_f8182d18" class="evidence-link">ev_task_07_rust_raii_f8182d18</a> <a href="#ev_task_07_rust_raii_3d72c3c6" class="evidence-link">ev_task_07_rust_raii_3d72c3c6</a> <a href="#ev_task_07_rust_raii_56d2a9b0" class="evidence-link">ev_task_07_rust_raii_56d2a9b0</a></td></tr>
+<tr><td><strong>policy_scope</strong></td><td>执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？</td><td><span>no_after_negative_search</span></td><td>不存在 Rust RAII/所有权/生命周期策略作用域。 <a href="#ev_task_07_rust_raii_f8182d18" class="evidence-link">ev_task_07_rust_raii_f8182d18</a> <a href="#ev_task_07_rust_raii_3d72c3c6" class="evidence-link">ev_task_07_rust_raii_3d72c3c6</a> <a href="#ev_task_07_rust_raii_56d2a9b0" class="evidence-link">ev_task_07_rust_raii_56d2a9b0</a></td></tr>
+<tr><td><strong>stub_detection</strong></td><td>是否排除与“RAII/所有权/生命周期相关的内核安全机制”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？</td><td><span>no_after_negative_search</span></td><td>不存在 Rust RAII 相关 stub。 <a href="#ev_task_07_rust_raii_f8182d18" class="evidence-link">ev_task_07_rust_raii_f8182d18</a> <a href="#ev_task_07_rust_raii_3d72c3c6" class="evidence-link">ev_task_07_rust_raii_3d72c3c6</a> <a href="#ev_task_07_rust_raii_56d2a9b0" class="evidence-link">ev_task_07_rust_raii_56d2a9b0</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>若未确认“RAII/所有权/生命周期相关的内核安全机制”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span>{"searched_keywords": ["RAII", "raii", "Ownership", "ownership", "Lifetime", "lifetime", "unsafe", "Rust", "rust", "uid", "gid", "cred", "permission", "access control", "ACL", "capability", "mode", "EACCES", "EPERM", "seccomp", "sandbox", "audit", "secure boot", "signature", "PMP", "SMEP", "SMAP", "KPTI", "W^X"], "searched_directories": ["kernel", "include", "bootloader/SBI", "xv6-user", "sbi", "linker", "tools", "debug", "doc"], "file_count": 207, "match_count": 0, "coverage_sufficient": true}</span></td><td>已覆盖全部 required 关键词和目录。 <a href="#ev_task_07_rust_raii_f8182d18" class="evidence-link">ev_task_07_rust_raii_f8182d18</a> <a href="#ev_task_07_rust_raii_3d72c3c6" class="evidence-link">ev_task_07_rust_raii_3d72c3c6</a> <a href="#ev_task_07_rust_raii_56d2a9b0" class="evidence-link">ev_task_07_rust_raii_56d2a9b0</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_07_rust_raii_f8182d18" class="evidence-anchor">ev_task_07_rust_raii_f8182d18</span> 
+<span id="ev_task_07_rust_raii_3d72c3c6" class="evidence-anchor">ev_task_07_rust_raii_3d72c3c6</span> 
+<span id="ev_task_07_rust_raii_56d2a9b0" class="evidence-anchor">ev_task_07_rust_raii_56d2a9b0</span> 
+</section>
+<section class="question-block" id="q07_011">
+<h3>Q07_011 是否实现了内核/用户页表隔离 (Kernel/User Page Table Isolation, KPTI 或等价机制)？
+（x86: CR3 KPTI / SMEP / SMAP；RISC-V: PMP / S-mode 分离；AArch64: TTBR0/TTBR1 隔离；
+必须三态；无则写未发现并列出已搜关键字）</h3>
+<div class="answer-value"><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#f8d7da;color:#721c24;font-size:0.85em;font-weight:500">❌ 未发现</span> <span style="color:var(--text-muted);margin-left:0.5em">未发现</span></div>
+<div class="answer-notes">所有 structured_facts 均为 no_after_negative_search，negative_search_coverage 充分（覆盖 207 文件、所有关键目录和关键词）。文档明确说明用户/内核页表已合并。仅有的保护机制是 sstatus.PUM 位（protect_usr_mem/permit_usr_mem），但这属于用户内存访问保护而非页表隔离（KPTI）。因此最终判定为 not_found。</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>security_state</strong></td><td>本题只回答“内核/用户地址空间隔离与架构安全保护覆盖情况如何？请按当前支持架构分别说明 KPTI/双页表、SMEP/SMAP、PMP/MPU、TTBR0/TTBR1 或等价机制的状态与证据。”，是否明确输出对象、范围、数量或状态字段？</td><td><span>no_after_negative_search</span></td><td>文档明确说明用户/内核页表已合并；grep 搜索 KPTI/PMP/SMEP/SMAP/TTBR0/TTBR1 等关键词在 207 文件中返回 0 匹配。 <a href="#ev_task_07_kpti_0448f30c" class="evidence-link">ev_task_07_kpti_0448f30c</a> <a href="#ev_task_07_kpti_8df6d13f" class="evidence-link">ev_task_07_kpti_8df6d13f</a></td></tr>
+<tr><td><strong>enforcement_callsite</strong></td><td>支撑答案的主要源码/配置/文档锚点在哪里（路径、符号、结构体或常量）？</td><td><span>no_after_negative_search</span></td><td>trampoline.S 中 satp 切换代码被注释，未发现页表隔离的执行点。 <a href="#ev_task_07_kpti_07e71c23" class="evidence-link">ev_task_07_kpti_07e71c23</a> <a href="#ev_task_07_kpti_8df6d13f" class="evidence-link">ev_task_07_kpti_8df6d13f</a></td></tr>
+<tr><td><strong>deny_or_fault_path</strong></td><td>答案中的每个关键结论是否有实现体、调用链、状态变化或配置分支证据？</td><td><span>no_after_negative_search</span></td><td>未发现因页表隔离导致的拒绝/故障路径。 <a href="#ev_task_07_kpti_8df6d13f" class="evidence-link">ev_task_07_kpti_8df6d13f</a></td></tr>
+<tr><td><strong>policy_scope</strong></td><td>是否排除题干未要求的相邻模块、同名概念、用户态封装、README 口号或测试桩？</td><td><span>no_after_negative_search</span></td><td>未发现页表隔离策略的作用域定义。 <a href="#ev_task_07_kpti_8df6d13f" class="evidence-link">ev_task_07_kpti_8df6d13f</a></td></tr>
+<tr><td><strong>stub_detection</strong></td><td>多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？</td><td><span>no_after_negative_search</span></td><td>未发现 KPTI 相关 stub 或声明。 <a href="#ev_task_07_kpti_8df6d13f" class="evidence-link">ev_task_07_kpti_8df6d13f</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>若未确认“内核/用户地址空间隔离与架构安全保护覆盖情况如何？请按当前支持架构分别说明 KPTI/双页表、SMEP/SMAP、PMP/MPU、TTBR0/TTBR1 或等价机制的状态与证据。”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span>{"searched_keywords": ["KPTI", "PMP", "SMEP", "SMAP", "TTBR0", "TTBR1", "page table isolation", "kernel page table", "user page table", "satp switch", "pmpcfg", "pmpaddr"], "searched_directories": ["kernel", "mm", "arch", "include", "sched", "trap", "syscall", "fs", "doc"], "file_count": 207, "match_count": 0, "coverage_sufficient": true}</span></td><td>已完成全面负向搜索，覆盖所有关键目录和关键词，覆盖充分。 <a href="#ev_task_07_kpti_8df6d13f" class="evidence-link">ev_task_07_kpti_8df6d13f</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_07_kpti_0448f30c" class="evidence-anchor">ev_task_07_kpti_0448f30c</span> 
+<span id="ev_task_07_kpti_8df6d13f" class="evidence-anchor">ev_task_07_kpti_8df6d13f</span> 
+<span id="ev_task_07_kpti_07e71c23" class="evidence-anchor">ev_task_07_kpti_07e71c23</span> 
+</section>
+<section class="question-block" id="q07_012">
+<h3>Q07_012 UID/GID 字段是否在 syscall 路径上真实执行权限检查？（搜索 check_perm/inode_permission；若只有字段无检查链须标注「仅有定义但未强制执行 🔸」；给检查链证据或写「字段存在但无检查链」）</h3>
+<div class="answer-value"><pre><code>{
+  "security_state": "no_after_negative_search",
+  "enforcement_callsite": "no_after_negative_search",
+  "deny_or_fault_path": "no_after_negative_search",
+  "policy_scope": "no_after_negative_search",
+  "stub_detection": "stub_or_declaration_only",
+  "negative_search_coverage": {
+    "searched_keywords": [
+      "uid",
+      "gid",
+      "cred",
+      "permission",
+      "access control",
+      "ACL",
+      "capability",
+      "mode",
+      "EACCES",
+      "EPERM",
+      "seccomp",
+      "sandbox",
+      "audit",
+      "secure boot",
+      "signature",
+      "PMP",
+      "SMEP",
+      "SMAP",
+      "KPTI",
+      "W^X",
+      "RAII",
+      "unsafe"
+    ],
+    "searched_directories": [
+      "kernel",
+      "security",
+      "fs",
+      "proc",
+      "mm",
+      "syscall",
+      "arch",
+      "include",
+      "Makefile",
+      "Cargo.toml"
+    ],
+    "file_count": 207,
+    "match_count": 0,
+    "coverage_sufficient": true
+  }
+}</code></pre></div>
+<div class="answer-notes">UID/GID 字段仅作为数据结构字段存在（kstat 用于 stat 返回，ELF auxvec 用于进程启动信息），但未被用于任何权限检查。sys_getuid 等系统调用固定返回 0。无 credential/capability/ACL 数据结构。根据 concept_boundary，只有字段、常量、文档或固定 root 返回不算 implemented，因此判定为 stub_or_declaration_only。负向搜索覆盖充分，其余事实判为 no_after_negative_search。</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>security_state</strong></td><td>本题只回答“UID/GID 字段是否在 syscall 路径上真实执行权限检查？（搜索 check_perm/inode_permission；若只有字段无检查链须标注「仅有定义但未强制执行 🔸」；给检查链证据或写「字段存在但无检查链」）”，是否明确输出对象、范围、数量或状态字段？</td><td><span>no_after_negative_search</span></td><td>负向搜索未发现独立的 security_state 结构体或相关实现。 <a href="#ev_task_07_privilege_isolation_b0fb420f" class="evidence-link">ev_task_07_privilege_isolation_b0fb420f</a></td></tr>
+<tr><td><strong>enforcement_callsite</strong></td><td>支撑答案的主要源码/配置/文档锚点在哪里（路径、符号、结构体或常量）？</td><td><span>no_after_negative_search</span></td><td>负向搜索未发现独立的 enforcement_callsite 结构体或相关实现。 <a href="#ev_task_07_privilege_isolation_b0fb420f" class="evidence-link">ev_task_07_privilege_isolation_b0fb420f</a></td></tr>
+<tr><td><strong>deny_or_fault_path</strong></td><td>答案中的每个关键结论是否有实现体、调用链、状态变化或配置分支证据？</td><td><span>no_after_negative_search</span></td><td>负向搜索未发现独立的 deny_or_fault_path 结构体或相关实现。 <a href="#ev_task_07_privilege_isolation_b0fb420f" class="evidence-link">ev_task_07_privilege_isolation_b0fb420f</a></td></tr>
+<tr><td><strong>policy_scope</strong></td><td>是否排除题干未要求的相邻模块、同名概念、用户态封装、README 口号或测试桩？</td><td><span>no_after_negative_search</span></td><td>负向搜索未发现独立的 policy_scope 结构体或相关实现。 <a href="#ev_task_07_privilege_isolation_b0fb420f" class="evidence-link">ev_task_07_privilege_isolation_b0fb420f</a></td></tr>
+<tr><td><strong>stub_detection</strong></td><td>多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？</td><td><span>stub_or_declaration_only</span></td><td>UID/GID 字段存在于 kstat 结构体（include/fs/stat.h）和 ELF auxvec（exec.c）中，但 proc 结构体无 uid/gid/cred 字段。sys_getuid/sys_geteuid/sys_getgid/sys_getegid 均为固定返回 0 的 stub（syscall 表中 SYS_geteuid/SYS_getgid/SYS_getegid 全部映射到 sys_getuid）。faccessat 中注释 'assume user as root'。无 credential/capability/ACL 数据结构。 <a href="#ev_task_07_privilege_isolation_80baf780" class="evidence-link">ev_task_07_privilege_isolation_80baf780</a> <a href="#ev_task_07_privilege_isolation_8a24c4a5" class="evidence-link">ev_task_07_privilege_isolation_8a24c4a5</a> <a href="#ev_task_07_privilege_isolation_3d2a88de" class="evidence-link">ev_task_07_privilege_isolation_3d2a88de</a> <a href="#ev_task_07_privilege_isolation_ad146d18" class="evidence-link">ev_task_07_privilege_isolation_ad146d18</a> <a href="#ev_task_07_privilege_isolation_f3afb0df" class="evidence-link">ev_task_07_privilege_isolation_f3afb0df</a> <a href="#ev_task_07_privilege_isolation_db12bbae" class="evidence-link">ev_task_07_privilege_isolation_db12bbae</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>若未确认“在 syscall 路径上真实执行权限检查”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span>{"searched_keywords": ["uid", "gid", "cred", "permission", "access control", "ACL", "capability", "mode", "EACCES", "EPERM", "seccomp", "sandbox", "audit", "secure boot", "signature", "PMP", "SMEP", "SMAP", "KPTI", "W^X", "RAII", "unsafe"], "searched_directories": ["kernel", "security", "fs", "proc", "mm", "syscall", "arch", "include", "Makefile", "Cargo.toml"], "file_count": 207, "match_count": 0, "coverage_sufficient": true}</span></td><td>全面负向搜索完成，覆盖关键词和目录满足要求。 <a href="#ev_task_07_privilege_isolation_b0fb420f" class="evidence-link">ev_task_07_privilege_isolation_b0fb420f</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_07_privilege_isolation_80baf780" class="evidence-anchor">ev_task_07_privilege_isolation_80baf780</span> 
+<span id="ev_task_07_privilege_isolation_b0fb420f" class="evidence-anchor">ev_task_07_privilege_isolation_b0fb420f</span> 
+<span id="ev_task_07_privilege_isolation_8a24c4a5" class="evidence-anchor">ev_task_07_privilege_isolation_8a24c4a5</span> 
+<span id="ev_task_07_privilege_isolation_3d2a88de" class="evidence-anchor">ev_task_07_privilege_isolation_3d2a88de</span> 
+<span id="ev_task_07_privilege_isolation_ad146d18" class="evidence-anchor">ev_task_07_privilege_isolation_ad146d18</span> 
+<span id="ev_task_07_privilege_isolation_f3afb0df" class="evidence-anchor">ev_task_07_privilege_isolation_f3afb0df</span> 
+<span id="ev_task_07_privilege_isolation_db12bbae" class="evidence-anchor">ev_task_07_privilege_isolation_db12bbae</span> 
+</section>
+<section class="question-block" id="q07_013">
+<h3>Q07_013 访问控制模型 (Access Control Model, Stallings Ch15) 更接近哪种？</h3>
+<div class="answer-value"><p>仅有特权级隔离（ring0/ring3），无细粒度访问控制</p></div>
+<div class="answer-notes">所有 structured_facts 均指向 stub_or_declaration_only 或 no_after_negative_search，表明 xv6-k210 未实现任何标准访问控制模型（DAC/MAC/RBAC/ACL/capability）。存在 uid/gid/mode 字段定义和 sys_getuid 存根，但均无实际强制访问控制效果。唯一的安全机制是 RISC-V 硬件 S/U 模式隔离（PTE_U 页表权限位），因此选择"仅有特权级隔离（ring0/ring3），无细粒度访问控制"。</div>
+<details class="fact-details">
+<summary>子事实明细（5 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>subject_identity_model</strong></td><td>题目“访问控制模型 (Access Control Model, Stallings Ch15) 更接近哪种？”的候选选项有哪些，是否只从题单 choices 中选择？</td><td><span>stub_or_declaration_only</span></td><td>主体凭证：struct proc 无 uid/gid 字段（ev_171e5358）；sys_getuid 返回 0（ev_e2934f40）；geteuid/getgid/getegid 均映射到 sys_getuid（ev_db140168）。无 credential/capability/role 实现。 <a href="#ev_task_07_access_control_model_db140168" class="evidence-link">ev_task_07_access_control_model_db140168</a> <a href="#ev_task_07_access_control_model_e2934f40" class="evidence-link">ev_task_07_access_control_model_e2934f40</a> <a href="#ev_task_07_access_control_model_171e5358" class="evidence-link">ev_task_07_access_control_model_171e5358</a></td></tr>
+<tr><td><strong>object_permission_model</strong></td><td>被选中的形态是否有源码、配置、调用链或数据结构证据直接支撑？</td><td><span>stub_or_declaration_only</span></td><td>对象权限：struct inode 有 mode 字段（ev_6d21c122），struct kstat 有 uid/gid 字段（ev_6a649c67），但 FAT32 设 mode=type|0x1ff（ev_aac6778b, ev_eb3e6fe8），rootfs_getattr 仅传递 mode（ev_38dca2b2）。无 ACL/label 实现。 <a href="#ev_task_07_access_control_model_6d21c122" class="evidence-link">ev_task_07_access_control_model_6d21c122</a> <a href="#ev_task_07_access_control_model_6a649c67" class="evidence-link">ev_task_07_access_control_model_6a649c67</a> <a href="#ev_task_07_access_control_model_aac6778b" class="evidence-link">ev_task_07_access_control_model_aac6778b</a> <a href="#ev_task_07_access_control_model_eb3e6fe8" class="evidence-link">ev_task_07_access_control_model_eb3e6fe8</a> <a href="#ev_task_07_access_control_model_38dca2b2" class="evidence-link">ev_task_07_access_control_model_38dca2b2</a></td></tr>
+<tr><td><strong>enforcement_path</strong></td><td>未选选项是否被源码证据、缺失证据或概念边界排除？</td><td><span>stub_or_declaration_only</span></td><td>强制检查：sys_getuid 返回 0（ev_e2934f40），exec 辅助向量中 AT_UID/AT_EUID/AT_GID/AT_EGID 均为 0（ev_a93745a5）。无 open/exec/write 路径的权限检查实现。 <a href="#ev_task_07_access_control_model_db140168" class="evidence-link">ev_task_07_access_control_model_db140168</a> <a href="#ev_task_07_access_control_model_e2934f40" class="evidence-link">ev_task_07_access_control_model_e2934f40</a> <a href="#ev_task_07_access_control_model_a93745a5" class="evidence-link">ev_task_07_access_control_model_a93745a5</a></td></tr>
+<tr><td><strong>model_classification</strong></td><td>若多个访问控制线索并存或证据不足，是否只能在题单 choices 中选择“仅有特权级隔离”或“未发现访问控制机制”并说明原因？</td><td><span>no_after_negative_search</span></td><td>模型分类：负向搜索覆盖所有关键词和目录（ev_226dbf25），未发现 DAC/MAC/RBAC/ACL/capability 实现。仅有 RISC-V 硬件 S/U 模式隔离。 <a href="#ev_task_07_access_control_model_226dbf25" class="evidence-link">ev_task_07_access_control_model_226dbf25</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>若未确认“访问控制模型 (Access Control Model, Stallings Ch15) 更接近哪种？”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span>{"searched_keywords": ["DAC", "MAC", "RBAC", "ACL", "capability", "uid", "gid", "mode", "owner", "permission", "access control", "EACCES", "EPERM", "credential", "cred", "role", "selinux", "apparmor", "LSM", "security", "S_ISUID", "S_ISGID", "umask", "chmod", "chown"], "searched_directories": ["kernel", "security", "fs", "proc", "syscall", "include", "include/fs", "include/sched", "kernel/fs", "kernel/sched", "kernel/syscall", "kernel/mm"], "file_count": 142, "match_count": 31, "coverage_sufficient": true}</span></td><td>负向搜索覆盖所有关键词和目录（ev_226dbf25），未发现真正的访问控制模型实现。 <a href="#ev_task_07_access_control_model_226dbf25" class="evidence-link">ev_task_07_access_control_model_226dbf25</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_07_access_control_model_db140168" class="evidence-anchor">ev_task_07_access_control_model_db140168</span> 
+<span id="ev_task_07_access_control_model_a93745a5" class="evidence-anchor">ev_task_07_access_control_model_a93745a5</span> 
+<span id="ev_task_07_access_control_model_aac6778b" class="evidence-anchor">ev_task_07_access_control_model_aac6778b</span> 
+<span id="ev_task_07_access_control_model_eb3e6fe8" class="evidence-anchor">ev_task_07_access_control_model_eb3e6fe8</span> 
+<span id="ev_task_07_access_control_model_38dca2b2" class="evidence-anchor">ev_task_07_access_control_model_38dca2b2</span> 
+<span id="ev_task_07_access_control_model_226dbf25" class="evidence-anchor">ev_task_07_access_control_model_226dbf25</span> 
+<span id="ev_task_07_access_control_model_171e5358" class="evidence-anchor">ev_task_07_access_control_model_171e5358</span> 
+<span id="ev_task_07_access_control_model_e2934f40" class="evidence-anchor">ev_task_07_access_control_model_e2934f40</span> 
+<span id="ev_task_07_access_control_model_6a649c67" class="evidence-anchor">ev_task_07_access_control_model_6a649c67</span> 
+<span id="ev_task_07_access_control_model_6d21c122" class="evidence-anchor">ev_task_07_access_control_model_6d21c122</span> 
+</section>
+<section class="question-block" id="q07_014">
+<h3>Q07_014 是否实现完整性策略 (Integrity Policy, Stallings Ch15)？（如 Biba 模型、只读内核段、代码签名验证、W^X 内存保护等；必须三态）</h3>
+<div class="answer-value"><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#f8d7da;color:#721c24;font-size:0.85em;font-weight:500">❌ 未发现</span> <span style="color:var(--text-muted);margin-left:0.5em">未发现</span></div>
+<div class="answer-notes">All 6 structured facts point to 'not_found'. The kernel has basic DAC (file readable/writable flags, FAT32 ATTR_READ_ONLY) and page-level protections (kernel text R+X, data R+W, SSTATUS_PUM, COW), but NO integrity policy framework (Biba model, code signature verification, W^X enforcement, security labels, subject credentials, mandatory access control). uid/gid are hardcoded to 0. No chmod/chown syscalls. No seccomp/sandbox/audit/PMP/SMEP/SMAP/KPTI. The kernel text/data separation (PTE_R|PTE_X vs PTE_R|PTE_W) is a basic memory protection feature, not a W^X integrity policy as defined in Stallings Ch15. Negative search coverage is sufficient (207 files, 27 keywords, 0 relevant matches).</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>security_state</strong></td><td>“至少一条被内核强制执行的完整性策略”的内核定义、入口、对象或配置开关在哪里？</td><td><span>no_after_negative_search</span></td><td>Negative search across 207 files found no integrity policy framework (Biba model, code signature verification, W^X enforcement, security labels, subject credentials, mandatory access control). <a href="#ev_task_07_integrity_policy_1c8a9776" class="evidence-link">ev_task_07_integrity_policy_1c8a9776</a> <a href="#ev_task_07_integrity_policy_88e67968" class="evidence-link">ev_task_07_integrity_policy_88e67968</a> <a href="#ev_task_07_integrity_policy_b0acaf9d" class="evidence-link">ev_task_07_integrity_policy_b0acaf9d</a> <a href="#ev_task_07_integrity_policy_d5faa521" class="evidence-link">ev_task_07_integrity_policy_d5faa521</a> <a href="#ev_task_07_integrity_policy_f2ac78d1" class="evidence-link">ev_task_07_integrity_policy_f2ac78d1</a> <a href="#ev_task_07_integrity_policy_e0366713" class="evidence-link">ev_task_07_integrity_policy_e0366713</a></td></tr>
+<tr><td><strong>enforcement_callsite</strong></td><td>是否存在执行“至少一条被内核强制执行的完整性策略”语义的真实实现体，而不是声明、空函数或固定返回？</td><td><span>no_after_negative_search</span></td><td>No enforcement callsite for integrity policy found in any of the searched directories. <a href="#ev_task_07_integrity_policy_1c8a9776" class="evidence-link">ev_task_07_integrity_policy_1c8a9776</a> <a href="#ev_task_07_integrity_policy_88e67968" class="evidence-link">ev_task_07_integrity_policy_88e67968</a> <a href="#ev_task_07_integrity_policy_b0acaf9d" class="evidence-link">ev_task_07_integrity_policy_b0acaf9d</a> <a href="#ev_task_07_integrity_policy_d5faa521" class="evidence-link">ev_task_07_integrity_policy_d5faa521</a> <a href="#ev_task_07_integrity_policy_f2ac78d1" class="evidence-link">ev_task_07_integrity_policy_f2ac78d1</a> <a href="#ev_task_07_integrity_policy_e0366713" class="evidence-link">ev_task_07_integrity_policy_e0366713</a></td></tr>
+<tr><td><strong>deny_or_fault_path</strong></td><td>该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？</td><td><span>no_after_negative_search</span></td><td>No deny or fault path for integrity policy found. <a href="#ev_task_07_integrity_policy_1c8a9776" class="evidence-link">ev_task_07_integrity_policy_1c8a9776</a> <a href="#ev_task_07_integrity_policy_88e67968" class="evidence-link">ev_task_07_integrity_policy_88e67968</a> <a href="#ev_task_07_integrity_policy_b0acaf9d" class="evidence-link">ev_task_07_integrity_policy_b0acaf9d</a> <a href="#ev_task_07_integrity_policy_d5faa521" class="evidence-link">ev_task_07_integrity_policy_d5faa521</a> <a href="#ev_task_07_integrity_policy_f2ac78d1" class="evidence-link">ev_task_07_integrity_policy_f2ac78d1</a> <a href="#ev_task_07_integrity_policy_e0366713" class="evidence-link">ev_task_07_integrity_policy_e0366713</a></td></tr>
+<tr><td><strong>policy_scope</strong></td><td>执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？</td><td><span>no_after_negative_search</span></td><td>No policy scope for integrity policy found. <a href="#ev_task_07_integrity_policy_1c8a9776" class="evidence-link">ev_task_07_integrity_policy_1c8a9776</a> <a href="#ev_task_07_integrity_policy_88e67968" class="evidence-link">ev_task_07_integrity_policy_88e67968</a> <a href="#ev_task_07_integrity_policy_b0acaf9d" class="evidence-link">ev_task_07_integrity_policy_b0acaf9d</a> <a href="#ev_task_07_integrity_policy_d5faa521" class="evidence-link">ev_task_07_integrity_policy_d5faa521</a> <a href="#ev_task_07_integrity_policy_f2ac78d1" class="evidence-link">ev_task_07_integrity_policy_f2ac78d1</a> <a href="#ev_task_07_integrity_policy_e0366713" class="evidence-link">ev_task_07_integrity_policy_e0366713</a></td></tr>
+<tr><td><strong>stub_detection</strong></td><td>是否排除与“至少一条被内核强制执行的完整性策略”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？</td><td><span>no_after_negative_search</span></td><td>No stub or declaration for integrity policy found. <a href="#ev_task_07_integrity_policy_1c8a9776" class="evidence-link">ev_task_07_integrity_policy_1c8a9776</a> <a href="#ev_task_07_integrity_policy_88e67968" class="evidence-link">ev_task_07_integrity_policy_88e67968</a> <a href="#ev_task_07_integrity_policy_b0acaf9d" class="evidence-link">ev_task_07_integrity_policy_b0acaf9d</a> <a href="#ev_task_07_integrity_policy_d5faa521" class="evidence-link">ev_task_07_integrity_policy_d5faa521</a> <a href="#ev_task_07_integrity_policy_f2ac78d1" class="evidence-link">ev_task_07_integrity_policy_f2ac78d1</a> <a href="#ev_task_07_integrity_policy_e0366713" class="evidence-link">ev_task_07_integrity_policy_e0366713</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>若未确认“至少一条被内核强制执行的完整性策略”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span>{"searched_keywords": ["Biba", "integrity", "read_only", "code_signature", "W^X", "PMP", "SMEP", "SMAP", "KPTI", "seccomp", "sandbox", "audit", "secure_boot", "signature", "verify", "security_policy", "security_level", "label", "clearance", "capability", "ACL", "uid", "gid", "cred", "chmod", "chown", "umask"], "searched_directories": ["kernel", "include", "mm", "fs", "syscall", "sched", "trap", "hal", "bootloader", "xv6-user"], "file_count": 207, "match_count": 0, "coverage_sufficient": true}</span></td><td>Comprehensive negative search completed with sufficient coverage across 207 files and 27 keywords. <a href="#ev_task_07_integrity_policy_1c8a9776" class="evidence-link">ev_task_07_integrity_policy_1c8a9776</a> <a href="#ev_task_07_integrity_policy_88e67968" class="evidence-link">ev_task_07_integrity_policy_88e67968</a> <a href="#ev_task_07_integrity_policy_b0acaf9d" class="evidence-link">ev_task_07_integrity_policy_b0acaf9d</a> <a href="#ev_task_07_integrity_policy_d5faa521" class="evidence-link">ev_task_07_integrity_policy_d5faa521</a> <a href="#ev_task_07_integrity_policy_f2ac78d1" class="evidence-link">ev_task_07_integrity_policy_f2ac78d1</a> <a href="#ev_task_07_integrity_policy_e0366713" class="evidence-link">ev_task_07_integrity_policy_e0366713</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_07_integrity_policy_1c8a9776" class="evidence-anchor">ev_task_07_integrity_policy_1c8a9776</span> 
+<span id="ev_task_07_integrity_policy_88e67968" class="evidence-anchor">ev_task_07_integrity_policy_88e67968</span> 
+<span id="ev_task_07_integrity_policy_b0acaf9d" class="evidence-anchor">ev_task_07_integrity_policy_b0acaf9d</span> 
+<span id="ev_task_07_integrity_policy_d5faa521" class="evidence-anchor">ev_task_07_integrity_policy_d5faa521</span> 
+<span id="ev_task_07_integrity_policy_f2ac78d1" class="evidence-anchor">ev_task_07_integrity_policy_f2ac78d1</span> 
+<span id="ev_task_07_integrity_policy_e0366713" class="evidence-anchor">ev_task_07_integrity_policy_e0366713</span> 
+</section>
+<section class="question-block" id="q07_015">
+<h3>Q07_015 是否实现缓冲区溢出防护 (Buffer Overflow Defenses, Stallings Ch15)？（必须三态；区分 stack canary / guard page / NX-W^X / ASLR / bounds check）</h3>
+<div class="answer-value"><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#e2e3e5;color:#383d41;font-size:0.85em;font-weight:500">❓ 未知</span> <span style="color:var(--text-muted);margin-left:0.5em">证据不足/未知</span></div>
+<div class="answer-notes">缓冲区溢出防护状态混合：stack canary未实现（负向搜索无结果），guard page仅存注释声明（uvmclear被注释），ASLR未实现（仅硬编码常量），NX/W^X仅有弱证据（页表权限分离但无强制策略），safestrcpy有强证据。由于NX/W^X证据不足且guard page为stub，整体无法判定implemented或not_found，判unknown。</div>
+<details class="fact-details">
+<summary>子事实明细（5 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>stack_canary</strong></td><td>“至少一种可证实的缓冲区溢出防护”的内核定义、入口、对象或配置开关在哪里？</td><td><span>no_after_negative_search</span></td><td>负向搜索207个文件，未发现__stack_chk_fail、stack canary、stackprotector等关键词，判定未实现。 <a href="#ev_task_07_stack_protection_e2db71fe" class="evidence-link">ev_task_07_stack_protection_e2db71fe</a></td></tr>
+<tr><td><strong>guard_page</strong></td><td>是否存在执行“至少一种可证实的缓冲区溢出防护”语义的真实实现体，而不是声明、空函数或固定返回？</td><td><span>stub_or_declaration_only</span></td><td>uvmclear函数被注释，仅存声明和注释说明用于guard page，实际未启用。 <a href="#ev_task_07_stack_protection_25be5a06" class="evidence-link">ev_task_07_stack_protection_25be5a06</a></td></tr>
+<tr><td><strong>nx_wx_policy</strong></td><td>该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#fff3cd;color:#856404;font-size:0.85em;font-weight:500">⚠️ 弱支撑</span></td><td>页表定义了PTE_X/PTE_W/PTE_R位，execve中根据ELF段属性设置权限，但无强制W^X/NX策略，仅为基础分离。 <a href="#ev_task_07_stack_protection_3e82e364" class="evidence-link">ev_task_07_stack_protection_3e82e364</a> <a href="#ev_task_07_stack_protection_b2745e45" class="evidence-link">ev_task_07_stack_protection_b2745e45</a></td></tr>
+<tr><td><strong>aslr_randomization</strong></td><td>执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？</td><td><span>no_after_negative_search</span></td><td>负向搜索207个文件，仅发现exec.c中硬编码的random[2]常量，无真实ASLR实现。 <a href="#ev_task_07_stack_protection_92125324" class="evidence-link">ev_task_07_stack_protection_92125324</a> <a href="#ev_task_07_stack_protection_a27f9c7e" class="evidence-link">ev_task_07_stack_protection_a27f9c7e</a></td></tr>
+<tr><td><strong>bounds_or_safe_copy</strong></td><td>是否排除与“至少一种可证实的缓冲区溢出防护”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>safestrcpy在exec.c和fs.c中被调用，实现带边界检查的字符串拷贝，有强证据。 <a href="#ev_task_07_stack_protection_f20e0731" class="evidence-link">ev_task_07_stack_protection_f20e0731</a> <a href="#ev_task_07_stack_protection_81a8ee66" class="evidence-link">ev_task_07_stack_protection_81a8ee66</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_07_stack_protection_e2db71fe" class="evidence-anchor">ev_task_07_stack_protection_e2db71fe</span> 
+<span id="ev_task_07_stack_protection_25be5a06" class="evidence-anchor">ev_task_07_stack_protection_25be5a06</span> 
+<span id="ev_task_07_stack_protection_3e82e364" class="evidence-anchor">ev_task_07_stack_protection_3e82e364</span> 
+<span id="ev_task_07_stack_protection_b2745e45" class="evidence-anchor">ev_task_07_stack_protection_b2745e45</span> 
+<span id="ev_task_07_stack_protection_92125324" class="evidence-anchor">ev_task_07_stack_protection_92125324</span> 
+<span id="ev_task_07_stack_protection_a27f9c7e" class="evidence-anchor">ev_task_07_stack_protection_a27f9c7e</span> 
+<span id="ev_task_07_stack_protection_f20e0731" class="evidence-anchor">ev_task_07_stack_protection_f20e0731</span> 
+<span id="ev_task_07_stack_protection_81a8ee66" class="evidence-anchor">ev_task_07_stack_protection_81a8ee66</span> 
+</section>
+<section class="question-block" id="q07_016">
+<h3>Q07_016 系统硬化与安全维护 (OS Hardening / Security Maintenance, Stallings Ch15) 在代码或构建中有哪些可证实措施？按“服务裁剪、权限最小化、审计日志、备份/恢复、补丁/版本策略”逐项回答。</h3>
+<div class="answer-value"><pre><code>{
+  "service_minimization": "no_after_negative_search",
+  "least_privilege_defaults": "no_after_negative_search",
+  "security_audit_logging": "no_after_negative_search",
+  "backup_or_recovery_policy": "no_after_negative_search",
+  "patch_or_signature_policy": "no_after_negative_search"
+}</code></pre></div>
+<div class="answer-notes">所有 5 个 structured_facts 均通过全面负向搜索确认为未实现。搜索覆盖了所有 required keywords 和 seed_paths，minimum_keyword_coverage 和 minimum_directory_coverage 均满足。</div>
+<details class="fact-details">
+<summary>子事实明细（5 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>service_minimization</strong></td><td>本题只回答“系统硬化与安全维护 (OS Hardening / Security Maintenance, Stallings Ch15) 在代码或构建中有哪些可证实措施？按“服务裁剪、权限最小化、审计日志、备份/恢复、补丁/版本策略”逐项回答。”，是否明确输出对象、范围、数量或状态字段？</td><td><span>no_after_negative_search</span></td><td>Makefile 仅有 platform 和 mode 两个编译选项，无 Kconfig 或服务裁剪机制；syscalls[] 数组静态编译所有系统调用，无运行时裁剪或禁用机制；无 Kconfig 或类似内核配置系统。 <a href="#ev_task_07_hardening_maintenance_15b0c8a0" class="evidence-link">ev_task_07_hardening_maintenance_15b0c8a0</a> <a href="#ev_task_07_hardening_maintenance_c7693790" class="evidence-link">ev_task_07_hardening_maintenance_c7693790</a> <a href="#ev_task_07_hardening_maintenance_e717b69e" class="evidence-link">ev_task_07_hardening_maintenance_e717b69e</a></td></tr>
+<tr><td><strong>least_privilege_defaults</strong></td><td>支撑答案的主要源码/配置/文档锚点在哪里（路径、符号、结构体或常量）？</td><td><span>no_after_negative_search</span></td><td>sys_getuid 返回固定值 0，仅有基础内存保护，无完整最小权限策略，单用户 root 模式。 <a href="#ev_task_07_hardening_maintenance_07a971fe" class="evidence-link">ev_task_07_hardening_maintenance_07a971fe</a></td></tr>
+<tr><td><strong>security_audit_logging</strong></td><td>答案中的每个关键结论是否有实现体、调用链、状态变化或配置分支证据？</td><td><span>no_after_negative_search</span></td><td>SYS_syslog 116 在 sysnum.h 中定义，但 grep 搜索 sys_syslog 函数实现无结果；printf 是通用控制台输出，非安全审计日志。 <a href="#ev_task_07_hardening_maintenance_45a6de0b" class="evidence-link">ev_task_07_hardening_maintenance_45a6de0b</a> <a href="#ev_task_07_hardening_maintenance_c8214c04" class="evidence-link">ev_task_07_hardening_maintenance_c8214c04</a></td></tr>
+<tr><td><strong>backup_or_recovery_policy</strong></td><td>是否排除题干未要求的相邻模块、同名概念、用户态封装、README 口号或测试桩？</td><td><span>no_after_negative_search</span></td><td>FAT32 不支持日志系统，去掉了 xv6 文件系统的 log 层；仅有 syncfs() 在 panic 时调用，无备份/恢复策略。 <a href="#ev_task_07_hardening_maintenance_2dbf3166" class="evidence-link">ev_task_07_hardening_maintenance_2dbf3166</a> <a href="#ev_task_07_hardening_maintenance_7933427e" class="evidence-link">ev_task_07_hardening_maintenance_7933427e</a></td></tr>
+<tr><td><strong>patch_or_signature_policy</strong></td><td>多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？</td><td><span>no_after_negative_search</span></td><td>ELF 加载器仅检查 ELF_MAGIC，无签名验证；无 secure boot 实现；文档中 'secure' 仅作为辅助向量字段设为 0。 <a href="#ev_task_07_hardening_maintenance_9f966dd2" class="evidence-link">ev_task_07_hardening_maintenance_9f966dd2</a> <a href="#ev_task_07_hardening_maintenance_8c3e3ac1" class="evidence-link">ev_task_07_hardening_maintenance_8c3e3ac1</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_07_hardening_maintenance_15b0c8a0" class="evidence-anchor">ev_task_07_hardening_maintenance_15b0c8a0</span> 
+<span id="ev_task_07_hardening_maintenance_c7693790" class="evidence-anchor">ev_task_07_hardening_maintenance_c7693790</span> 
+<span id="ev_task_07_hardening_maintenance_e717b69e" class="evidence-anchor">ev_task_07_hardening_maintenance_e717b69e</span> 
+<span id="ev_task_07_hardening_maintenance_07a971fe" class="evidence-anchor">ev_task_07_hardening_maintenance_07a971fe</span> 
+<span id="ev_task_07_hardening_maintenance_45a6de0b" class="evidence-anchor">ev_task_07_hardening_maintenance_45a6de0b</span> 
+<span id="ev_task_07_hardening_maintenance_c8214c04" class="evidence-anchor">ev_task_07_hardening_maintenance_c8214c04</span> 
+<span id="ev_task_07_hardening_maintenance_2dbf3166" class="evidence-anchor">ev_task_07_hardening_maintenance_2dbf3166</span> 
+<span id="ev_task_07_hardening_maintenance_7933427e" class="evidence-anchor">ev_task_07_hardening_maintenance_7933427e</span> 
+<span id="ev_task_07_hardening_maintenance_9f966dd2" class="evidence-anchor">ev_task_07_hardening_maintenance_9f966dd2</span> 
+<span id="ev_task_07_hardening_maintenance_8c3e3ac1" class="evidence-anchor">ev_task_07_hardening_maintenance_8c3e3ac1</span> 
+</section>
+<div style="margin-top:3rem;display:flex;justify-content:space-between;flex-wrap:wrap;gap:1rem">
+<a href="06.html" style="padding:0.6rem 1.2rem;background:#1abc9c;color:#fff;border-radius:8px;text-decoration:none">← 同步互斥与进程间通信</a>
+<a href="../index.html" style="padding:0.6rem 1.2rem;background:#6c757d;color:#fff;border-radius:8px;text-decoration:none">首页</a>
+<a href="08.html" style="padding:0.6rem 1.2rem;background:#5b2c6f;color:#fff;border-radius:8px;text-decoration:none">网络子系统与协议栈 →</a>
+</div>
+</div></body></html>

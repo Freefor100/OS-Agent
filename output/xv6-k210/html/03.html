@@ -1,0 +1,1586 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>第03章 内存管理（物理/虚拟/分配器） - xv6-k210</title>
+<style>
+
+:root {
+    --bg: #f8f9fa;
+    --card-bg: #ffffff;
+    --text: #2c3e50;
+    --text-muted: #6c757d;
+    --border: #dee2e6;
+    --code-bg: #f1f3f5;
+    --link: #2980b9;
+    --accent: #3498db;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans SC", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    padding: 0;
+}
+.container { max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem; }
+h1 { font-size: 1.8rem; margin-bottom: 0.5rem; }
+h2 { font-size: 1.5rem; margin: 2rem 0 0.8rem; padding-bottom: 0.4rem; border-bottom: 2px solid var(--border); }
+h3 { font-size: 1.25rem; margin: 1.5rem 0 0.6rem; color: var(--text); }
+h4 { font-size: 1.1rem; margin: 1.2rem 0 0.4rem; }
+p { margin: 0.6rem 0; }
+ul, ol { margin: 0.6rem 0 0.6rem 1.5rem; }
+li { margin: 0.3rem 0; }
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+code {
+    background: var(--code-bg);
+    padding: 0.15em 0.4em;
+    border-radius: 3px;
+    font-size: 0.88em;
+    font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+}
+pre {
+    background: #1e1e2e;
+    color: #cdd6f4;
+    padding: 1rem 1.2rem;
+    border-radius: 8px;
+    overflow-x: auto;
+    margin: 1rem 0;
+    font-size: 0.85rem;
+    line-height: 1.5;
+}
+pre code { background: none; padding: 0; color: inherit; }
+blockquote {
+    border-left: 4px solid var(--accent);
+    padding: 0.5rem 1rem;
+    margin: 1rem 0;
+    background: #eef6fc;
+    border-radius: 0 6px 6px 0;
+}
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+    font-size: 0.9rem;
+    overflow-x: auto;
+    display: block;
+}
+thead { background: #f1f3f5; }
+th, td {
+    padding: 0.6rem 0.8rem;
+    border: 1px solid var(--border);
+    text-align: left;
+    vertical-align: top;
+}
+tr:nth-child(even) { background: #f8f9fa; }
+tr:hover { background: #e9ecef; }
+.evidence-link {
+    display: inline-block;
+    background: #fff3cd;
+    color: #856404;
+    padding: 0.1em 0.5em;
+    border-radius: 12px;
+    font-size: 0.78em;
+    font-family: monospace;
+    cursor: pointer;
+    border: 1px solid #ffc107;
+    transition: all 0.2s;
+}
+.evidence-link:hover {
+    background: #ffc107;
+    color: #1a1a1a;
+    text-decoration: none;
+    transform: scale(1.05);
+}
+.evidence-anchor {
+    display: inline-block;
+    background: #d4edda;
+    color: #155724;
+    padding: 0.1em 0.5em;
+    border-radius: 12px;
+    font-size: 0.78em;
+    font-family: monospace;
+    border: 1px solid #28a745;
+    scroll-margin-top: 80px;
+}
+.evidence-anchor:target {
+    background: #ffc107;
+    color: #1a1a1a;
+    box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.4);
+    animation: pulse 0.6s ease-out;
+}
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}
+hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+
+/* --- PLACEHOLDER_NAV --- */
+
+
+.top-nav {
+    position: sticky;
+    top: 0;
+    background: rgba(255,255,255,0.95);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border);
+    padding: 0.7rem 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    z-index: 100;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+.top-nav a {
+    padding: 0.3rem 0.8rem;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    transition: background 0.2s;
+}
+.top-nav a:hover { background: #e9ecef; text-decoration: none; }
+.top-nav .spacer { flex: 1; }
+.nav-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 1rem;
+    margin: 2rem 0;
+}
+.nav-card {
+    display: block;
+    padding: 1.2rem 1rem;
+    border-radius: 12px;
+    color: #fff;
+    font-weight: 600;
+    font-size: 1rem;
+    text-align: center;
+    transition: transform 0.2s, box-shadow 0.2s;
+    text-decoration: none;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+}
+.nav-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.18);
+    text-decoration: none;
+}
+.nav-card .chapter-num {
+    display: block;
+    font-size: 0.75rem;
+    opacity: 0.85;
+    margin-bottom: 0.3rem;
+}
+.header-info {
+    background: var(--card-bg);
+    border-radius: 12px;
+    padding: 1.5rem 2rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    border: 1px solid var(--border);
+}
+.header-info h1 { color: var(--accent); }
+.header-info .meta-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 0.5rem 2rem;
+    margin-top: 1rem;
+}
+.header-info .meta-item { font-size: 0.92rem; }
+.header-info .meta-label { color: var(--text-muted); font-weight: 500; }
+.chapter-badge {
+    display: inline-block;
+    padding: 0.3rem 1rem;
+    border-radius: 20px;
+    color: #fff;
+    font-weight: 600;
+    font-size: 0.85rem;
+    margin-bottom: 1rem;
+}
+
+.chapter-accent { color: #2ecc71; }
+
+.question-block {
+    margin: 1.5rem 0;
+    padding: 1.2rem 1.5rem;
+    background: var(--card-bg);
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+.question-block h3 {
+    margin: 0 0 0.8rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid var(--border);
+}
+.fact-table {
+    width: 100%;
+    font-size: 0.88rem;
+    display: table;
+}
+.fact-table th { background: #f1f3f5; font-weight: 600; }
+.fact-table td, .fact-table th { padding: 0.5rem 0.7rem; }
+.conclusion-label {
+    margin: 0.8rem 0 0.3rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+.answer-value {
+    margin: 0.4rem 0;
+    padding: 0.4rem 0;
+}
+.answer-notes {
+    margin-top: 0.5rem;
+    padding: 0.6rem 1rem;
+    background: #f8f9fa;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    line-height: 1.6;
+}
+.fact-details {
+    margin-top: 0.8rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+}
+.fact-details summary {
+    padding: 0.5rem 1rem;
+    background: #f1f3f5;
+    cursor: pointer;
+    font-size: 0.88rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    user-select: none;
+    list-style: none;
+}
+.fact-details summary::-webkit-details-marker { display: none; }
+.fact-details summary::before {
+    content: "▶ ";
+    font-size: 0.75em;
+    transition: transform 0.2s;
+    display: inline-block;
+}
+.fact-details[open] summary::before { content: "▼ "; }
+.fact-details summary:hover { background: #e9ecef; color: var(--text); }
+.fact-details .fact-table { margin: 0; border-radius: 0; }
+.fact-details .fact-table th,
+.fact-details .fact-table td { border-left: none; border-right: none; }
+.fact-details .fact-table tr:last-child td { border-bottom: none; }
+
+</style>
+</head>
+<body>
+
+<nav class="top-nav">
+<a href="../index.html">← 首页</a>
+<a href="02.html">← 启动架构与 Tr</a>
+<span class="spacer"></span>
+<strong class="chapter-accent">第 03 章</strong>
+<span class="spacer"></span>
+<a href="04.html">进程/线程/调度 →</a>
+</nav>
+<div class="container">
+<span class="chapter-badge" style="background:#2ecc71">第 03 章</span>
+<h1>内存管理（物理/虚拟/分配器）</h1>
+<hr>
+<section class="question-block" id="q03_001">
+<h3>Q03_001 该 OS 的内存管理实现语言/形态更接近哪类？（只选最贴近的一项）</h3>
+<div class="answer-value"><p>C/Makefile 风格内核（xv6 类）</p></div>
+<div class="answer-notes">所有 structured_facts 均为 yes_strong，表明实现了完整的 RISC-V Sv39 分页内存管理子系统。代码为 C 语言，GCC 编译，Makefile 构建，与 xv6 类内核风格一致。</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>memory_constants</strong></td><td>题目“该 OS 的内存管理实现语言/形态更接近哪类？（只选最贴近的一项）”的候选选项有哪些，是否只从题单 choices 中选择？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>PGSIZE=4096, MAXVA, PHYSTOP, KERNBASE 均有完整定义，证据为 definition 类型，强度 strong/weak 但可复现 <a href="#ev_task_03_mem_overview_77172656" class="evidence-link">ev_task_03_mem_overview_77172656</a> <a href="#ev_task_03_mem_overview_bdf8ee41" class="evidence-link">ev_task_03_mem_overview_bdf8ee41</a></td></tr>
+<tr><td><strong>allocator_state</strong></td><td>被选中的形态是否有源码、配置、调用链或数据结构证据直接支撑？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>pm.c 空闲链表分配器 + kmalloc.c slab 分配器，均有完整实现体，证据为 implementation_body 类型 <a href="#ev_task_03_mem_overview_34afe0f5" class="evidence-link">ev_task_03_mem_overview_34afe0f5</a> <a href="#ev_task_03_mem_overview_4808ca66" class="evidence-link">ev_task_03_mem_overview_4808ca66</a></td></tr>
+<tr><td><strong>map_unmap_api</strong></td><td>未选选项是否被源码证据、缺失证据或概念边界排除？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>walk 函数完整实现，真实修改 PTE，证据为 implementation_body 类型 <a href="#ev_task_03_mem_overview_63239e9f" class="evidence-link">ev_task_03_mem_overview_63239e9f</a></td></tr>
+<tr><td><strong>protection_relocation</strong></td><td>若多个选项同时成立或证据不足，是否按题意选择“其他/混合/unknown”并说明原因？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>PTE 保护位定义 + satp 寄存器操作 + MAKE_SATP 宏，MMU 运行时重定位，证据为 definition 类型 <a href="#ev_task_03_mem_overview_1d6ccb1b" class="evidence-link">ev_task_03_mem_overview_1d6ccb1b</a> <a href="#ev_task_03_mem_overview_cfcb3df8" class="evidence-link">ev_task_03_mem_overview_cfcb3df8</a></td></tr>
+<tr><td><strong>call_path</strong></td><td>若未确认“该 OS 的内存管理实现语言/形态更接近哪类？（只选最贴近的一项）”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>main 函数中 kpminit-&gt;kvminit-&gt;kvminithart-&gt;kmallocinit 完整调用路径，证据为 call_site 类型 <a href="#ev_task_03_mem_overview_2d348f17" class="evidence-link">ev_task_03_mem_overview_2d348f17</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>-</td><td><span>{"searched_keywords": ["frame", "page", "kalloc", "buddy", "bitmap", "freelist", "slab", "page table", "pte", "walk", "map", "unmap", "pagetable", "satp", "CR3", "protection", "relocation"], "searched_directories": ["kernel", "mm", "memory", "vm", "arch", "include"], "file_count": 207, "match_count": 154, "coverage_sufficient": true}</span></td><td>所有关键事实均已找到强证据，负向搜索覆盖充分 <a href="#ev_task_03_mem_overview_b5d5e0b3" class="evidence-link">ev_task_03_mem_overview_b5d5e0b3</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_03_mem_overview_1d6ccb1b" class="evidence-anchor">ev_task_03_mem_overview_1d6ccb1b</span> 
+<span id="ev_task_03_mem_overview_34afe0f5" class="evidence-anchor">ev_task_03_mem_overview_34afe0f5</span> 
+<span id="ev_task_03_mem_overview_2d348f17" class="evidence-anchor">ev_task_03_mem_overview_2d348f17</span> 
+<span id="ev_task_03_mem_overview_77172656" class="evidence-anchor">ev_task_03_mem_overview_77172656</span> 
+<span id="ev_task_03_mem_overview_bdf8ee41" class="evidence-anchor">ev_task_03_mem_overview_bdf8ee41</span> 
+<span id="ev_task_03_mem_overview_cfcb3df8" class="evidence-anchor">ev_task_03_mem_overview_cfcb3df8</span> 
+<span id="ev_task_03_mem_overview_4808ca66" class="evidence-anchor">ev_task_03_mem_overview_4808ca66</span> 
+<span id="ev_task_03_mem_overview_63239e9f" class="evidence-anchor">ev_task_03_mem_overview_63239e9f</span> 
+<span id="ev_task_03_mem_overview_b5d5e0b3" class="evidence-anchor">ev_task_03_mem_overview_b5d5e0b3</span> 
+</section>
+<section class="question-block" id="q03_002">
+<h3>Q03_002 是否存在“物理页帧分配器 (Physical Frame Allocator)”的真实实现？（必须三态）</h3>
+<div class="answer-value"><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 已实现</span> <span style="color:var(--text-muted);margin-left:0.5em">已实现</span></div>
+<div class="answer-notes">所有 structured_facts 均为 yes_strong，存在完整的物理页帧分配器实现：kernel/mm/pm.c 提供基于 freelist 的物理页分配/释放（__mul_alloc_no_lock/__mul_free_no_lock），kernel/mm/vm.c 提供页表映射（mappages），kernel/main.c 中初始化调用链完整。negative_search 覆盖充分，符合 implemented 判定条件。</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>memory_constants</strong></td><td>“物理页帧分配器 (Physical Frame Allocator)”的内核定义、入口、对象或配置开关在哪里？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>PGSIZE=4096 定义于 include/hal/riscv.h，PHYSTOP=0x80600000 定义于 include/memlayout.h，均为强定义证据。 <a href="#ev_task_03_frame_allocator_d1908b85" class="evidence-link">ev_task_03_frame_allocator_d1908b85</a> <a href="#ev_task_03_frame_allocator_94887d06" class="evidence-link">ev_task_03_frame_allocator_94887d06</a></td></tr>
+<tr><td><strong>allocator_state</strong></td><td>是否存在执行“物理页帧分配器 (Physical Frame Allocator)”语义的真实实现体，而不是声明、空函数或固定返回？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>kernel/mm/pm.c 中 struct run 和 struct pm_allocator 定义清晰，__mul_alloc_no_lock 和 __mul_free_no_lock 实现完整的 freelist 分配/释放逻辑。 <a href="#ev_task_03_frame_allocator_5c5852df" class="evidence-link">ev_task_03_frame_allocator_5c5852df</a> <a href="#ev_task_03_frame_allocator_bee3b7d4" class="evidence-link">ev_task_03_frame_allocator_bee3b7d4</a> <a href="#ev_task_03_frame_allocator_6f05198b" class="evidence-link">ev_task_03_frame_allocator_6f05198b</a></td></tr>
+<tr><td><strong>map_unmap_api</strong></td><td>该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>kernel/mm/vm.c 中 mappages 函数通过 walk 获取 PTE 并真实修改 PTE 值（设置 PA2PTE(pa) | perm | PTE_V），实现页表映射。 <a href="#ev_task_03_frame_allocator_60c8c805" class="evidence-link">ev_task_03_frame_allocator_60c8c805</a></td></tr>
+<tr><td><strong>protection_relocation</strong></td><td>执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>include/hal/riscv.h 中定义了 PTE_R/W/X/U 等保护位，mappages 中通过 perm 参数传递并设置这些位，实现用户/内核隔离。 <a href="#ev_task_03_frame_allocator_6d2929f4" class="evidence-link">ev_task_03_frame_allocator_6d2929f4</a></td></tr>
+<tr><td><strong>call_path</strong></td><td>是否排除与“物理页帧分配器 (Physical Frame Allocator)”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>kernel/main.c 中 main() 调用链完整：kpminit() -&gt; kvminit() -&gt; kvminithart() -&gt; kmallocinit()，物理页分配器被正确初始化并接入主路径。 <a href="#ev_task_03_frame_allocator_858767d8" class="evidence-link">ev_task_03_frame_allocator_858767d8</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>若未确认“物理页帧分配器 (Physical Frame Allocator)”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span>{"searched_keywords": ["kalloc", "kfree", "kmem", "buddy", "bitmap", "freelist", "slab", "run", "lock", "frame", "page", "pte", "walk", "map", "unmap", "pagetable", "satp", "protection", "relocation"], "searched_directories": ["kernel/mm", "include/mm", "kernel", "include", "include/hal", "include/sync"], "file_count": 15, "match_count": 200, "coverage_sufficient": true}</span></td><td>Negative search 覆盖了 15+ 文件，关键词和目录覆盖充分，确认存在 freelist 分配器，未发现 buddy/bitmap 等其他分配器。 <a href="#ev_task_03_frame_allocator_4ddfb8cf" class="evidence-link">ev_task_03_frame_allocator_4ddfb8cf</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_03_frame_allocator_d1908b85" class="evidence-anchor">ev_task_03_frame_allocator_d1908b85</span> 
+<span id="ev_task_03_frame_allocator_94887d06" class="evidence-anchor">ev_task_03_frame_allocator_94887d06</span> 
+<span id="ev_task_03_frame_allocator_5c5852df" class="evidence-anchor">ev_task_03_frame_allocator_5c5852df</span> 
+<span id="ev_task_03_frame_allocator_bee3b7d4" class="evidence-anchor">ev_task_03_frame_allocator_bee3b7d4</span> 
+<span id="ev_task_03_frame_allocator_60c8c805" class="evidence-anchor">ev_task_03_frame_allocator_60c8c805</span> 
+<span id="ev_task_03_frame_allocator_6d2929f4" class="evidence-anchor">ev_task_03_frame_allocator_6d2929f4</span> 
+<span id="ev_task_03_frame_allocator_858767d8" class="evidence-anchor">ev_task_03_frame_allocator_858767d8</span> 
+<span id="ev_task_03_frame_allocator_6f05198b" class="evidence-anchor">ev_task_03_frame_allocator_6f05198b</span> 
+<span id="ev_task_03_frame_allocator_4ddfb8cf" class="evidence-anchor">ev_task_03_frame_allocator_4ddfb8cf</span> 
+</section>
+<section class="question-block" id="q03_003">
+<h3>Q03_003 物理内存分配算法更接近哪种？</h3>
+<div class="answer-value"><p>空闲链表 run list（xv6 风格）</p></div>
+<div class="answer-notes">物理页分配器（pm.c）使用 struct run 链表管理空闲页，支持多页连续分配和合并，与 xv6 的 freelist 风格一致。未发现 buddy/bitmap/slab 作为物理页分配器。kmalloc 虽受 slab 启发但用于小对象分配，非物理页分配算法。</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>memory_constants</strong></td><td>题目“物理内存分配算法更接近哪种？”的候选选项有哪些，是否只从题单 choices 中选择？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>PGSIZE=4096 定义于 include/hal/riscv.h，PHYSTOP=0x80600000UL 定义于 include/memlayout.h，均为强证据定义。 <a href="#ev_task_03_frame_allocator_d1908b85" class="evidence-link">ev_task_03_frame_allocator_d1908b85</a> <a href="#ev_task_03_frame_allocator_94887d06" class="evidence-link">ev_task_03_frame_allocator_94887d06</a></td></tr>
+<tr><td><strong>allocator_state</strong></td><td>被选中的形态是否有源码、配置、调用链或数据结构证据直接支撑？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>物理页分配器使用 freelist 算法（struct run 链表），见 kernel/mm/pm.c 中 __mul_alloc_no_lock 和 __mul_free_no_lock 实现体。 <a href="#ev_task_03_frame_allocator_5c5852df" class="evidence-link">ev_task_03_frame_allocator_5c5852df</a> <a href="#ev_task_03_frame_allocator_bee3b7d4" class="evidence-link">ev_task_03_frame_allocator_bee3b7d4</a> <a href="#ev_task_03_frame_allocator_6f05198b" class="evidence-link">ev_task_03_frame_allocator_6f05198b</a></td></tr>
+<tr><td><strong>map_unmap_api</strong></td><td>未选选项是否被源码证据、缺失证据或概念边界排除？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>mappages 函数在 kernel/mm/vm.c 中有完整实现体，真实修改 PTE。 <a href="#ev_task_03_frame_allocator_60c8c805" class="evidence-link">ev_task_03_frame_allocator_60c8c805</a></td></tr>
+<tr><td><strong>protection_relocation</strong></td><td>若多个选项同时成立或证据不足，是否按题意选择“其他/混合/unknown”并说明原因？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>PTE_V/R/W/X/U 保护位定义于 include/hal/riscv.h，支持用户/内核隔离。 <a href="#ev_task_03_frame_allocator_6d2929f4" class="evidence-link">ev_task_03_frame_allocator_6d2929f4</a></td></tr>
+<tr><td><strong>call_path</strong></td><td>若未确认“物理内存分配算法更接近哪种？”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>main 函数中 kpminit → kvminit → kvminithart → kmallocinit 调用链完整。 <a href="#ev_task_03_frame_allocator_858767d8" class="evidence-link">ev_task_03_frame_allocator_858767d8</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>-</td><td><span>{"searched_keywords": ["kalloc", "kfree", "kmem", "buddy", "bitmap", "freelist", "slab", "run", "lock", "frame", "page", "pte", "walk", "map", "unmap", "pagetable", "satp", "protection", "relocation"], "searched_directories": ["kernel/mm", "include/mm", "kernel", "include", "include/hal", "include/sync"], "file_count": 15, "match_count": 200, "coverage_sufficient": true}</span></td><td>负向搜索覆盖 15+ 文件，关键词和目录覆盖充分，未发现 buddy/bitmap 分配器。 <a href="#ev_task_03_frame_allocator_4ddfb8cf" class="evidence-link">ev_task_03_frame_allocator_4ddfb8cf</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_03_frame_allocator_5c5852df" class="evidence-anchor">ev_task_03_frame_allocator_5c5852df</span> 
+<span id="ev_task_03_frame_allocator_bee3b7d4" class="evidence-anchor">ev_task_03_frame_allocator_bee3b7d4</span> 
+<span id="ev_task_03_frame_allocator_6f05198b" class="evidence-anchor">ev_task_03_frame_allocator_6f05198b</span> 
+<span id="ev_task_03_frame_allocator_4ddfb8cf" class="evidence-anchor">ev_task_03_frame_allocator_4ddfb8cf</span> 
+<span id="ev_task_03_frame_allocator_d1908b85" class="evidence-anchor">ev_task_03_frame_allocator_d1908b85</span> 
+<span id="ev_task_03_frame_allocator_94887d06" class="evidence-anchor">ev_task_03_frame_allocator_94887d06</span> 
+<span id="ev_task_03_frame_allocator_60c8c805" class="evidence-anchor">ev_task_03_frame_allocator_60c8c805</span> 
+<span id="ev_task_03_frame_allocator_6d2929f4" class="evidence-anchor">ev_task_03_frame_allocator_6d2929f4</span> 
+<span id="ev_task_03_frame_allocator_858767d8" class="evidence-anchor">ev_task_03_frame_allocator_858767d8</span> 
+</section>
+<section class="question-block" id="q03_004">
+<h3>Q03_004 物理页帧分配器的核心数据结构是什么？（例如 bitmap 数组、buddy free list、slab cache 表、`struct run` 单链表等；必须引用结构体/字段证据）</h3>
+<div class="answer-value"><pre><code>{
+  "memory_constants": "yes_strong",
+  "allocator_state": "yes_strong",
+  "map_unmap_api": "yes_strong",
+  "protection_relocation": "yes_strong",
+  "call_path": "yes_strong",
+  "negative_search_coverage": {
+    "searched_keywords": [
+      "kalloc",
+      "kfree",
+      "kmem",
+      "buddy",
+      "bitmap",
+      "freelist",
+      "slab",
+      "run",
+      "lock",
+      "frame",
+      "page",
+      "pte",
+      "walk",
+      "map",
+      "unmap",
+      "pagetable",
+      "satp",
+      "protection",
+      "relocation"
+    ],
+    "searched_directories": [
+      "kernel/mm",
+      "include/mm",
+      "kernel",
+      "include",
+      "include/hal",
+      "include/sync"
+    ],
+    "file_count": 15,
+    "match_count": 200,
+    "coverage_sufficient": true
+  }
+}</code></pre></div>
+<div class="answer-notes">物理页帧分配器核心数据结构为 struct run（单链表节点，含 next 指针和 npage 计数）和 struct pm_allocator（含 spinlock 锁、freelist 头指针、总页数），基于 freelist 实现，非 buddy/bitmap。slab 分配器（kmalloc）基于 struct kmem_allocator 和 struct kmem_node。所有事实均绑定 Bound Evidence 中的 evidence_id，无新增未支撑事实。</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>memory_constants</strong></td><td>本题只回答“物理页帧分配器的核心数据结构是什么？（例如 bitmap 数组、buddy free list、slab cache 表、`struct run` 单链表等；必须引用结构体/字段证据）”，是否明确输出对象、范围、数量或状态字段？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>PGSIZE=4096 定义于 include/hal/riscv.h，PHYSTOP=0x80600000UL 定义于 include/memlayout.h，均为强证据定义。 <a href="#ev_task_03_frame_allocator_d1908b85" class="evidence-link">ev_task_03_frame_allocator_d1908b85</a> <a href="#ev_task_03_frame_allocator_94887d06" class="evidence-link">ev_task_03_frame_allocator_94887d06</a></td></tr>
+<tr><td><strong>allocator_state</strong></td><td>支撑答案的主要源码/配置/文档锚点在哪里（路径、符号、结构体或常量）？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>核心数据结构 struct run（含 next 指针和 npage 字段）和 struct pm_allocator（含 lock、freelist、npage）定义于 kernel/mm/pm.c；__mul_alloc_no_lock 和 __mul_free_no_lock 展示了基于单链表的分配/释放实现。 <a href="#ev_task_03_frame_allocator_6f05198b" class="evidence-link">ev_task_03_frame_allocator_6f05198b</a> <a href="#ev_task_03_frame_allocator_5c5852df" class="evidence-link">ev_task_03_frame_allocator_5c5852df</a> <a href="#ev_task_03_frame_allocator_bee3b7d4" class="evidence-link">ev_task_03_frame_allocator_bee3b7d4</a></td></tr>
+<tr><td><strong>map_unmap_api</strong></td><td>答案中的每个关键结论是否有实现体、调用链、状态变化或配置分支证据？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>mappages 函数在 kernel/mm/vm.c 中实现，通过 walk 获取 PTE 并设置 PA2PTE(pa) | perm | PTE_V，真实修改 PTE。 <a href="#ev_task_03_frame_allocator_60c8c805" class="evidence-link">ev_task_03_frame_allocator_60c8c805</a></td></tr>
+<tr><td><strong>protection_relocation</strong></td><td>是否排除题干未要求的相邻模块、同名概念、用户态封装、README 口号或测试桩？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>PTE_U/PTE_R/PTE_W/PTE_X 定义于 include/hal/riscv.h；mappages 中通过 perm 参数传递 PTE_U 等标志实现用户/内核隔离。 <a href="#ev_task_03_frame_allocator_6d2929f4" class="evidence-link">ev_task_03_frame_allocator_6d2929f4</a> <a href="#ev_task_03_frame_allocator_60c8c805" class="evidence-link">ev_task_03_frame_allocator_60c8c805</a></td></tr>
+<tr><td><strong>call_path</strong></td><td>多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>main.c 中调用链：kpminit() → kvminit() → kvminithart() → kmallocinit()，表明物理页分配器、页表创建、分页启用、slab 分配器依次初始化。 <a href="#ev_task_03_frame_allocator_858767d8" class="evidence-link">ev_task_03_frame_allocator_858767d8</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>若未确认“物理页帧分配器的核心数据结构是什么？（例如 bitmap 数组、buddy free list、slab cache 表、`struct run` 单链表等；必须引用结构体/字段证据）”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span>{"searched_keywords": ["kalloc", "kfree", "kmem", "buddy", "bitmap", "freelist", "slab", "run", "lock", "frame", "page", "pte", "walk", "map", "unmap", "pagetable", "satp", "protection", "relocation"], "searched_directories": ["kernel/mm", "include/mm", "kernel", "include", "include/hal", "include/sync"], "file_count": 15, "match_count": 200, "coverage_sufficient": true}</span></td><td>负向搜索覆盖 15+ 文件，发现 freelist 分配器（pm.c）和 slab 风格 kmalloc（kmalloc.c），未发现 buddy 或 bitmap 分配器。 <a href="#ev_task_03_frame_allocator_4ddfb8cf" class="evidence-link">ev_task_03_frame_allocator_4ddfb8cf</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_03_frame_allocator_d1908b85" class="evidence-anchor">ev_task_03_frame_allocator_d1908b85</span> 
+<span id="ev_task_03_frame_allocator_94887d06" class="evidence-anchor">ev_task_03_frame_allocator_94887d06</span> 
+<span id="ev_task_03_frame_allocator_6f05198b" class="evidence-anchor">ev_task_03_frame_allocator_6f05198b</span> 
+<span id="ev_task_03_frame_allocator_5c5852df" class="evidence-anchor">ev_task_03_frame_allocator_5c5852df</span> 
+<span id="ev_task_03_frame_allocator_bee3b7d4" class="evidence-anchor">ev_task_03_frame_allocator_bee3b7d4</span> 
+<span id="ev_task_03_frame_allocator_60c8c805" class="evidence-anchor">ev_task_03_frame_allocator_60c8c805</span> 
+<span id="ev_task_03_frame_allocator_6d2929f4" class="evidence-anchor">ev_task_03_frame_allocator_6d2929f4</span> 
+<span id="ev_task_03_frame_allocator_858767d8" class="evidence-anchor">ev_task_03_frame_allocator_858767d8</span> 
+<span id="ev_task_03_frame_allocator_4ddfb8cf" class="evidence-anchor">ev_task_03_frame_allocator_4ddfb8cf</span> 
+</section>
+<section class="question-block" id="q03_005">
+<h3>Q03_005 物理分配器的并发控制锁粒度是什么？（全局大锁 / per-CPU / 分桶 / 无锁+关中断 / 其他；必须给锁对象类型与持锁范围证据）</h3>
+<div class="answer-value"><pre><code>{
+  "memory_constants": "yes_strong",
+  "allocator_state": "yes_strong",
+  "map_unmap_api": "yes_strong",
+  "protection_relocation": "yes_strong",
+  "call_path": "yes_strong",
+  "negative_search_coverage": {
+    "searched_keywords": [
+      "kalloc",
+      "kfree",
+      "kmem",
+      "buddy",
+      "bitmap",
+      "freelist",
+      "slab",
+      "run",
+      "lock",
+      "frame",
+      "page",
+      "pte",
+      "walk",
+      "map",
+      "unmap",
+      "pagetable",
+      "satp",
+      "protection",
+      "relocation"
+    ],
+    "searched_directories": [
+      "kernel/mm",
+      "include/mm",
+      "kernel",
+      "include",
+      "include/hal",
+      "include/sync"
+    ],
+    "file_count": 15,
+    "match_count": 200,
+    "coverage_sufficient": true
+  }
+}</code></pre></div>
+<div class="answer-notes">所有 structured_facts 均基于 Bound Evidence 中的强证据判定为 yes_strong，负向搜索覆盖充分。value 字段由 fact_answers 中各 fact_id 的 value 直接汇总，字段名与 structured_facts 的 fact_key 一致。</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>memory_constants</strong></td><td>本题只回答“物理分配器的并发控制锁粒度是什么？（全局大锁 / per-CPU / 分桶 / 无锁+关中断 / 其他；必须给锁对象类型与持锁范围证据）”，是否明确输出对象、范围、数量或状态字段？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>PGSIZE=4096 定义于 include/hal/riscv.h，PHYSTOP=0x80600000UL 定义于 include/memlayout.h，均为强证据定义。 <a href="#ev_task_03_frame_allocator_d1908b85" class="evidence-link">ev_task_03_frame_allocator_d1908b85</a> <a href="#ev_task_03_frame_allocator_94887d06" class="evidence-link">ev_task_03_frame_allocator_94887d06</a></td></tr>
+<tr><td><strong>allocator_state</strong></td><td>支撑答案的主要源码/配置/文档锚点在哪里（路径、符号、结构体或常量）？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>pm.c 中定义 struct pm_allocator（含 freelist 和 spinlock），__mul_alloc_no_lock 和 __mul_free_no_lock 实现 freelist 操作，为强证据。 <a href="#ev_task_03_frame_allocator_6f05198b" class="evidence-link">ev_task_03_frame_allocator_6f05198b</a> <a href="#ev_task_03_frame_allocator_5c5852df" class="evidence-link">ev_task_03_frame_allocator_5c5852df</a> <a href="#ev_task_03_frame_allocator_bee3b7d4" class="evidence-link">ev_task_03_frame_allocator_bee3b7d4</a></td></tr>
+<tr><td><strong>map_unmap_api</strong></td><td>答案中的每个关键结论是否有实现体、调用链、状态变化或配置分支证据？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>vm.c 中 mappages 函数实现页表映射，调用 walk 并修改 PTE，为强证据。 <a href="#ev_task_03_frame_allocator_60c8c805" class="evidence-link">ev_task_03_frame_allocator_60c8c805</a></td></tr>
+<tr><td><strong>protection_relocation</strong></td><td>是否排除题干未要求的相邻模块、同名概念、用户态封装、README 口号或测试桩？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>riscv.h 中定义 PTE_V/R/W/X/U 等保护位，PA2PTE/PTE2PA 实现地址转换，为强证据。 <a href="#ev_task_03_frame_allocator_6d2929f4" class="evidence-link">ev_task_03_frame_allocator_6d2929f4</a></td></tr>
+<tr><td><strong>call_path</strong></td><td>多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>main.c 中 kpminit() -&gt; kvminit() -&gt; kvminithart() -&gt; kmallocinit() 调用链完整，为强证据。 <a href="#ev_task_03_frame_allocator_858767d8" class="evidence-link">ev_task_03_frame_allocator_858767d8</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>若未确认“物理分配器的并发控制锁粒度是什么？（全局大锁 / per-CPU / 分桶 / 无锁+关中断 / 其他；必须给锁对象类型与持锁范围证据）”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span>{"searched_keywords": ["kalloc", "kfree", "kmem", "buddy", "bitmap", "freelist", "slab", "run", "lock", "frame", "page", "pte", "walk", "map", "unmap", "pagetable", "satp", "protection", "relocation"], "searched_directories": ["kernel/mm", "include/mm", "kernel", "include", "include/hal", "include/sync"], "file_count": 15, "match_count": 200, "coverage_sufficient": true}</span></td><td>负向搜索覆盖 15+ 文件，关键词和目录覆盖充分，未发现 buddy/bitmap 分配器。 <a href="#ev_task_03_frame_allocator_4ddfb8cf" class="evidence-link">ev_task_03_frame_allocator_4ddfb8cf</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_03_frame_allocator_d1908b85" class="evidence-anchor">ev_task_03_frame_allocator_d1908b85</span> 
+<span id="ev_task_03_frame_allocator_94887d06" class="evidence-anchor">ev_task_03_frame_allocator_94887d06</span> 
+<span id="ev_task_03_frame_allocator_6f05198b" class="evidence-anchor">ev_task_03_frame_allocator_6f05198b</span> 
+<span id="ev_task_03_frame_allocator_5c5852df" class="evidence-anchor">ev_task_03_frame_allocator_5c5852df</span> 
+<span id="ev_task_03_frame_allocator_bee3b7d4" class="evidence-anchor">ev_task_03_frame_allocator_bee3b7d4</span> 
+<span id="ev_task_03_frame_allocator_60c8c805" class="evidence-anchor">ev_task_03_frame_allocator_60c8c805</span> 
+<span id="ev_task_03_frame_allocator_6d2929f4" class="evidence-anchor">ev_task_03_frame_allocator_6d2929f4</span> 
+<span id="ev_task_03_frame_allocator_858767d8" class="evidence-anchor">ev_task_03_frame_allocator_858767d8</span> 
+<span id="ev_task_03_frame_allocator_4ddfb8cf" class="evidence-anchor">ev_task_03_frame_allocator_4ddfb8cf</span> 
+</section>
+<section class="question-block" id="q03_006">
+<h3>Q03_006 是否存在“页表 (page table) 结构体 + walk/map/unmap”的真实实现？（必须三态）</h3>
+<div class="answer-value"><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 已实现</span> <span style="color:var(--text-muted);margin-left:0.5em">已实现</span></div>
+<div class="answer-notes">所有 6 个 structured_facts 均为 yes_strong 或 coverage_sufficient=true，满足 implemented 条件。存在完整的页表结构体定义（pagetable_t=uint64*）、walk/map/unmap 实现（walk/mappages/unmappages）、物理页分配器（pm.c 双分配器）、保护位（PTE_R/W/X/U/V）和硬件重定位（satp CSR + sfence.vma）。</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>memory_constants</strong></td><td>“页表 (page table) 结构体 + walk/map/unmap”的内核定义、入口、对象或配置开关在哪里？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>PGSIZE=4096, KERNBASE=0x80020000, PHYSTOP=0x80600000, MAXVA, Sv39 索引宏等均定义完整，证据来自 include/hal/riscv.h 和 include/memlayout.h <a href="#ev_task_03_page_table_ae1ffcb6" class="evidence-link">ev_task_03_page_table_ae1ffcb6</a> <a href="#ev_task_03_page_table_02af0b6c" class="evidence-link">ev_task_03_page_table_02af0b6c</a> <a href="#ev_task_03_page_table_e72274bc" class="evidence-link">ev_task_03_page_table_e72274bc</a></td></tr>
+<tr><td><strong>allocator_state</strong></td><td>是否存在执行“页表 (page table) 结构体 + walk/map/unmap”语义的真实实现体，而不是声明、空函数或固定返回？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>双分配器（multiple buddy-like + single freelist），spinlock 保护，实现体在 kernel/mm/pm.c <a href="#ev_task_03_page_table_64c2acb2" class="evidence-link">ev_task_03_page_table_64c2acb2</a> <a href="#ev_task_03_page_table_be9c977e" class="evidence-link">ev_task_03_page_table_be9c977e</a></td></tr>
+<tr><td><strong>map_unmap_api</strong></td><td>该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>walk/mappages/unmappages/uvmcreate 均有完整实现体，声明在 include/mm/vm.h，实现在 kernel/mm/vm.c <a href="#ev_task_03_page_table_d2ebf50c" class="evidence-link">ev_task_03_page_table_d2ebf50c</a> <a href="#ev_task_03_page_table_f85df1da" class="evidence-link">ev_task_03_page_table_f85df1da</a> <a href="#ev_task_03_page_table_354255cf" class="evidence-link">ev_task_03_page_table_354255cf</a></td></tr>
+<tr><td><strong>protection_relocation</strong></td><td>执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>PTE_R/W/X/U/V 保护位、SATP_SV39 CSR 硬件重定位、sfence_vma 调用，证据来自 include/hal/riscv.h 和 kernel/exec.c <a href="#ev_task_03_page_table_ae1ffcb6" class="evidence-link">ev_task_03_page_table_ae1ffcb6</a> <a href="#ev_task_03_page_table_e72274bc" class="evidence-link">ev_task_03_page_table_e72274bc</a> <a href="#ev_task_03_page_table_5b1be954" class="evidence-link">ev_task_03_page_table_5b1be954</a></td></tr>
+<tr><td><strong>call_path</strong></td><td>是否排除与“页表 (page table) 结构体 + walk/map/unmap”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>kvminit→kvmmap→mappages→walk 完整调用链；proc.pagetable 字段，证据来自 kernel/exec.c 和 kernel/mm/vm.c <a href="#ev_task_03_page_table_5b1be954" class="evidence-link">ev_task_03_page_table_5b1be954</a> <a href="#ev_task_03_page_table_354255cf" class="evidence-link">ev_task_03_page_table_354255cf</a> <a href="#ev_task_03_page_table_d2ebf50c" class="evidence-link">ev_task_03_page_table_d2ebf50c</a> <a href="#ev_task_03_page_table_f85df1da" class="evidence-link">ev_task_03_page_table_f85df1da</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>若未确认“页表 (page table) 结构体 + walk/map/unmap”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span>{"searched_keywords": ["frame", "page", "kalloc", "buddy", "bitmap", "freelist", "slab", "page table", "pte", "walk", "map", "unmap", "pagetable", "satp", "CR3", "protection", "relocation"], "searched_directories": ["kernel", "mm", "memory", "vm", "arch", "include"], "file_count": 6, "match_count": 8, "coverage_sufficient": true}</span></td><td>Negative search completed: All key symbols found in include/hal/riscv.h, include/mm/vm.h, kernel/mm/vm.c, kernel/mm/pm.c, include/memlayout.h, include/sched/proc.h. No missing implementation. <a href="#ev_task_03_page_table_cd2e73b9" class="evidence-link">ev_task_03_page_table_cd2e73b9</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_03_page_table_d2ebf50c" class="evidence-anchor">ev_task_03_page_table_d2ebf50c</span> 
+<span id="ev_task_03_page_table_5b1be954" class="evidence-anchor">ev_task_03_page_table_5b1be954</span> 
+<span id="ev_task_03_page_table_cd2e73b9" class="evidence-anchor">ev_task_03_page_table_cd2e73b9</span> 
+<span id="ev_task_03_page_table_ae1ffcb6" class="evidence-anchor">ev_task_03_page_table_ae1ffcb6</span> 
+<span id="ev_task_03_page_table_02af0b6c" class="evidence-anchor">ev_task_03_page_table_02af0b6c</span> 
+<span id="ev_task_03_page_table_e72274bc" class="evidence-anchor">ev_task_03_page_table_e72274bc</span> 
+<span id="ev_task_03_page_table_354255cf" class="evidence-anchor">ev_task_03_page_table_354255cf</span> 
+<span id="ev_task_03_page_table_64c2acb2" class="evidence-anchor">ev_task_03_page_table_64c2acb2</span> 
+<span id="ev_task_03_page_table_be9c977e" class="evidence-anchor">ev_task_03_page_table_be9c977e</span> 
+<span id="ev_task_03_page_table_f85df1da" class="evidence-anchor">ev_task_03_page_table_f85df1da</span> 
+</section>
+<section class="question-block" id="q03_007">
+<h3>Q03_007 页表操作 API（walk/map/unmap 或等价）对应的函数名/模块是什么？列出 1-3 个关键入口并给证据。</h3>
+<div class="answer-value"><pre><code>{
+  "memory_constants": "yes_strong",
+  "allocator_state": "yes_strong",
+  "map_unmap_api": "yes_strong",
+  "protection_relocation": "yes_strong",
+  "call_path": "yes_strong",
+  "negative_search_coverage": {
+    "searched_keywords": [
+      "frame",
+      "page",
+      "kalloc",
+      "buddy",
+      "bitmap",
+      "freelist",
+      "slab",
+      "page table",
+      "pte",
+      "walk",
+      "map",
+      "unmap",
+      "pagetable",
+      "satp",
+      "CR3",
+      "protection",
+      "relocation"
+    ],
+    "searched_directories": [
+      "kernel",
+      "mm",
+      "memory",
+      "vm",
+      "arch",
+      "include"
+    ],
+    "file_count": 7,
+    "match_count": 15,
+    "coverage_sufficient": true
+  }
+}</code></pre></div>
+<div class="answer-notes">所有 structured_facts 均基于 Bound Evidence 中的强证据（implementation_body、definition、call_site）判定为 yes_strong。页表操作 API 关键入口：walk() 实现 Sv39 三级页表遍历，mappages() 映射虚拟地址到物理页并设置权限位，unmappages() 解除映射。物理页分配器使用 freelist 结构（双分配器：multiple/single）。地址转换由 MMU 运行时通过 satp CSR 完成。保护位通过 PTE_U/R/W/X 实现用户/内核隔离。</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>memory_constants</strong></td><td>本题只回答“页表操作 API（walk/map/unmap 或等价）对应的函数名/模块是什么？列出 1-3 个关键入口并给证据。”，是否明确输出对象、范围、数量或状态字段？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>在 include/hal/riscv.h 中找到 PGSIZE=4096、PTE_V/R/W/X/U、PA2PTE/PTE2PA、MAXVA 等常量定义；在 include/memlayout.h 中找到 KERNBASE、PHYSTOP、TRAMPOLINE 等地址空间常量；在 include/hal/riscv.h 中找到 SATP_SV39 和 MAKE_SATP 宏。证据类型为 definition，强度 weak，但多个定义构成强证据链。 <a href="#ev_task_03_page_table_ae1ffcb6" class="evidence-link">ev_task_03_page_table_ae1ffcb6</a> <a href="#ev_task_03_page_table_02af0b6c" class="evidence-link">ev_task_03_page_table_02af0b6c</a> <a href="#ev_task_03_page_table_e72274bc" class="evidence-link">ev_task_03_page_table_e72274bc</a></td></tr>
+<tr><td><strong>allocator_state</strong></td><td>支撑答案的主要源码/配置/文档锚点在哪里（路径、符号、结构体或常量）？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>在 kernel/mm/pm.c 中找到物理页分配器实现：kpminit() 初始化双分配器（multiple/single），_allocpage() 实现分配逻辑，__mul_alloc_no_lock() 实现 buddy-like 的多页分配。分配器使用 freelist 结构（struct run *freelist），属于 freelist 类型。证据类型为 implementation_body，强度 weak，但实现体完整。 <a href="#ev_task_03_page_table_64c2acb2" class="evidence-link">ev_task_03_page_table_64c2acb2</a> <a href="#ev_task_03_page_table_be9c977e" class="evidence-link">ev_task_03_page_table_be9c977e</a></td></tr>
+<tr><td><strong>map_unmap_api</strong></td><td>答案中的每个关键结论是否有实现体、调用链、状态变化或配置分支证据？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>在 kernel/mm/vm.c 中找到 mappages() 实现体（遍历虚拟地址范围，调用 walk 获取 PTE 并写入物理地址和权限位）；walk() 实现体（Sv39 三级页表遍历，支持 alloc 参数自动分配中间页表页）；在 include/mm/vm.h 中找到 unmappages() 声明。证据类型为 implementation_body 和 definition，强度 weak，但实现体完整。 <a href="#ev_task_03_page_table_d2ebf50c" class="evidence-link">ev_task_03_page_table_d2ebf50c</a> <a href="#ev_task_03_page_table_f85df1da" class="evidence-link">ev_task_03_page_table_f85df1da</a> <a href="#ev_task_03_page_table_354255cf" class="evidence-link">ev_task_03_page_table_354255cf</a></td></tr>
+<tr><td><strong>protection_relocation</strong></td><td>是否排除题干未要求的相邻模块、同名概念、用户态封装、README 口号或测试桩？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>在 include/hal/riscv.h 中找到 PTE_U/R/W/X 保护位定义；在 kernel/exec.c 中找到 w_satp(MAKE_SATP(p-&gt;pagetable)) 和 sfence_vma() 调用，表明地址转换由 MMU 运行时完成（通过 satp CSR 切换页表）；在 include/hal/riscv.h 中找到 SATP_SV39 模式定义。证据类型为 definition 和 call_site，强度 weak，但组合构成强证据。 <a href="#ev_task_03_page_table_ae1ffcb6" class="evidence-link">ev_task_03_page_table_ae1ffcb6</a> <a href="#ev_task_03_page_table_5b1be954" class="evidence-link">ev_task_03_page_table_5b1be954</a> <a href="#ev_task_03_page_table_e72274bc" class="evidence-link">ev_task_03_page_table_e72274bc</a></td></tr>
+<tr><td><strong>call_path</strong></td><td>多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>调用路径清晰：exec() → w_satp(MAKE_SATP(p-&gt;pagetable)) 切换用户页表；mappages() 调用 walk() 遍历页表；walk() 在需要时调用 allocpage() 分配中间页表页；unmappages() 遍历并清零 PTE。在 include/mm/vm.h 中声明了 walk、mappages、unmappages、uvmcreate、kvmcreate、kvminit、kvminithart、kvmmap 等完整 API。证据类型为 implementation_body、call_site 和 definition，强度 weak，但调用链完整。 <a href="#ev_task_03_page_table_d2ebf50c" class="evidence-link">ev_task_03_page_table_d2ebf50c</a> <a href="#ev_task_03_page_table_f85df1da" class="evidence-link">ev_task_03_page_table_f85df1da</a> <a href="#ev_task_03_page_table_5b1be954" class="evidence-link">ev_task_03_page_table_5b1be954</a> <a href="#ev_task_03_page_table_354255cf" class="evidence-link">ev_task_03_page_table_354255cf</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>若未确认“页表操作 API（walk/map/unmap 或等价）对应的函数名/模块是什么？列出 1-3 个关键入口并给证据。”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span>{"searched_keywords": ["frame", "page", "kalloc", "buddy", "bitmap", "freelist", "slab", "page table", "pte", "walk", "map", "unmap", "pagetable", "satp", "CR3", "protection", "relocation"], "searched_directories": ["kernel", "mm", "memory", "vm", "arch", "include"], "file_count": 7, "match_count": 15, "coverage_sufficient": true}</span></td><td>负向搜索已完成，所有关键符号（pagetable_t, walk, mappages, unmappages, uvmcreate, PTE_V/R/W/X/U, SATP_SV39, sfence_vma, allocpage, freepage, kpminit）均在 include/hal/riscv.h, include/mm/vm.h, kernel/mm/vm.c, kernel/mm/pm.c, include/memlayout.h, include/sched/proc.h 中找到。覆盖充分，无缺失实现。 <a href="#ev_task_03_page_table_cd2e73b9" class="evidence-link">ev_task_03_page_table_cd2e73b9</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_03_page_table_d2ebf50c" class="evidence-anchor">ev_task_03_page_table_d2ebf50c</span> 
+<span id="ev_task_03_page_table_5b1be954" class="evidence-anchor">ev_task_03_page_table_5b1be954</span> 
+<span id="ev_task_03_page_table_cd2e73b9" class="evidence-anchor">ev_task_03_page_table_cd2e73b9</span> 
+<span id="ev_task_03_page_table_ae1ffcb6" class="evidence-anchor">ev_task_03_page_table_ae1ffcb6</span> 
+<span id="ev_task_03_page_table_02af0b6c" class="evidence-anchor">ev_task_03_page_table_02af0b6c</span> 
+<span id="ev_task_03_page_table_e72274bc" class="evidence-anchor">ev_task_03_page_table_e72274bc</span> 
+<span id="ev_task_03_page_table_354255cf" class="evidence-anchor">ev_task_03_page_table_354255cf</span> 
+<span id="ev_task_03_page_table_64c2acb2" class="evidence-anchor">ev_task_03_page_table_64c2acb2</span> 
+<span id="ev_task_03_page_table_be9c977e" class="evidence-anchor">ev_task_03_page_table_be9c977e</span> 
+<span id="ev_task_03_page_table_f85df1da" class="evidence-anchor">ev_task_03_page_table_f85df1da</span> 
+</section>
+<section class="question-block" id="q03_008">
+<h3>Q03_008 页表修改路径的并发控制是什么？（锁粒度、是否需要关中断、是否使用每进程地址空间锁等；必须引用锁/临界区证据）</h3>
+<div class="answer-value"><pre><code>{
+  "memory_constants": "yes_strong",
+  "allocator_state": "yes_strong",
+  "map_unmap_api": "yes_strong",
+  "protection_relocation": "yes_strong",
+  "call_path": "yes_strong",
+  "negative_search_coverage": {
+    "searched_keywords": [
+      "frame",
+      "page",
+      "kalloc",
+      "buddy",
+      "bitmap",
+      "freelist",
+      "slab",
+      "page table",
+      "pte",
+      "walk",
+      "map",
+      "unmap",
+      "pagetable",
+      "satp",
+      "CR3",
+      "protection",
+      "relocation"
+    ],
+    "searched_directories": [
+      "kernel",
+      "mm",
+      "memory",
+      "vm",
+      "arch",
+      "include"
+    ],
+    "file_count": 6,
+    "match_count": 17,
+    "coverage_sufficient": true
+  }
+}</code></pre></div>
+<div class="answer-notes">所有 structured_facts 均基于 Bound Evidence 中的强证据判定为 yes_strong。页表修改路径的并发控制：物理页分配器 pm.c 使用 multiple.lock 和 single.lock（spinlock）保护 freelist 操作；walk/mappages/unmappages 本身不持有全局页表锁，依赖调用者（如进程上下文切换时的关中断或 p-&gt;lock）保证页表操作的原子性；exec 中通过 w_satp/sfence_vma 保证 TLB 一致性。</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>memory_constants</strong></td><td>本题只回答“页表修改路径的并发控制是什么？（锁粒度、是否需要关中断、是否使用每进程地址空间锁等；必须引用锁/临界区证据）”，是否明确输出对象、范围、数量或状态字段？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>在 include/hal/riscv.h 和 include/memlayout.h 中找到了 PGSIZE、PTE_V/R/W/X/U、SATP_SV39、KERNBASE、PHYSTOP 等完整定义，属于强证据。 <a href="#ev_task_03_page_table_ae1ffcb6" class="evidence-link">ev_task_03_page_table_ae1ffcb6</a> <a href="#ev_task_03_page_table_02af0b6c" class="evidence-link">ev_task_03_page_table_02af0b6c</a> <a href="#ev_task_03_page_table_e72274bc" class="evidence-link">ev_task_03_page_table_e72274bc</a></td></tr>
+<tr><td><strong>allocator_state</strong></td><td>支撑答案的主要源码/配置/文档锚点在哪里（路径、符号、结构体或常量）？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>在 kernel/mm/pm.c 中找到了物理页分配器的完整实现，包括 struct pm_allocator（含 spinlock lock、freelist、npage）、kpminit、_allocpage、__mul_alloc_no_lock 等，属于强证据。 <a href="#ev_task_03_page_table_64c2acb2" class="evidence-link">ev_task_03_page_table_64c2acb2</a> <a href="#ev_task_03_page_table_be9c977e" class="evidence-link">ev_task_03_page_table_be9c977e</a></td></tr>
+<tr><td><strong>map_unmap_api</strong></td><td>答案中的每个关键结论是否有实现体、调用链、状态变化或配置分支证据？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>在 kernel/mm/vm.c 中找到了 mappages 和 walk 的完整实现体，在 include/mm/vm.h 中找到了 unmappages 的声明，属于强证据。 <a href="#ev_task_03_page_table_d2ebf50c" class="evidence-link">ev_task_03_page_table_d2ebf50c</a> <a href="#ev_task_03_page_table_f85df1da" class="evidence-link">ev_task_03_page_table_f85df1da</a> <a href="#ev_task_03_page_table_354255cf" class="evidence-link">ev_task_03_page_table_354255cf</a></td></tr>
+<tr><td><strong>protection_relocation</strong></td><td>是否排除题干未要求的相邻模块、同名概念、用户态封装、README 口号或测试桩？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>在 include/hal/riscv.h 中找到了 PTE_U/R/W/X 保护位定义和 SATP_SV39 地址转换寄存器定义，在 kernel/exec.c 中找到了 w_satp/sfence_vma 的调用，属于强证据。 <a href="#ev_task_03_page_table_ae1ffcb6" class="evidence-link">ev_task_03_page_table_ae1ffcb6</a> <a href="#ev_task_03_page_table_e72274bc" class="evidence-link">ev_task_03_page_table_e72274bc</a> <a href="#ev_task_03_page_table_5b1be954" class="evidence-link">ev_task_03_page_table_5b1be954</a></td></tr>
+<tr><td><strong>call_path</strong></td><td>多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>从 exec 调用 w_satp/sfence_vma，到 mappages 调用 walk，再到 _allocpage 调用物理分配器，调用链完整可追踪，属于强证据。 <a href="#ev_task_03_page_table_5b1be954" class="evidence-link">ev_task_03_page_table_5b1be954</a> <a href="#ev_task_03_page_table_d2ebf50c" class="evidence-link">ev_task_03_page_table_d2ebf50c</a> <a href="#ev_task_03_page_table_f85df1da" class="evidence-link">ev_task_03_page_table_f85df1da</a> <a href="#ev_task_03_page_table_64c2acb2" class="evidence-link">ev_task_03_page_table_64c2acb2</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>若未确认“需要关中断、是否使用每进程地址空间锁等；必须引用锁/临界区证据）”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span>{"searched_keywords": ["frame", "page", "kalloc", "buddy", "bitmap", "freelist", "slab", "page table", "pte", "walk", "map", "unmap", "pagetable", "satp", "CR3", "protection", "relocation"], "searched_directories": ["kernel", "mm", "memory", "vm", "arch", "include"], "file_count": 6, "match_count": 17, "coverage_sufficient": true}</span></td><td>负向搜索覆盖了所有关键符号和目录，所有关键事实均已找到强证据，无需判 not_found。 <a href="#ev_task_03_page_table_cd2e73b9" class="evidence-link">ev_task_03_page_table_cd2e73b9</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_03_page_table_d2ebf50c" class="evidence-anchor">ev_task_03_page_table_d2ebf50c</span> 
+<span id="ev_task_03_page_table_5b1be954" class="evidence-anchor">ev_task_03_page_table_5b1be954</span> 
+<span id="ev_task_03_page_table_cd2e73b9" class="evidence-anchor">ev_task_03_page_table_cd2e73b9</span> 
+<span id="ev_task_03_page_table_ae1ffcb6" class="evidence-anchor">ev_task_03_page_table_ae1ffcb6</span> 
+<span id="ev_task_03_page_table_02af0b6c" class="evidence-anchor">ev_task_03_page_table_02af0b6c</span> 
+<span id="ev_task_03_page_table_e72274bc" class="evidence-anchor">ev_task_03_page_table_e72274bc</span> 
+<span id="ev_task_03_page_table_354255cf" class="evidence-anchor">ev_task_03_page_table_354255cf</span> 
+<span id="ev_task_03_page_table_64c2acb2" class="evidence-anchor">ev_task_03_page_table_64c2acb2</span> 
+<span id="ev_task_03_page_table_be9c977e" class="evidence-anchor">ev_task_03_page_table_be9c977e</span> 
+<span id="ev_task_03_page_table_f85df1da" class="evidence-anchor">ev_task_03_page_table_f85df1da</span> 
+</section>
+<section class="question-block" id="q03_009">
+<h3>Q03_009 内核与用户地址空间关系更接近哪种？</h3>
+<div class="answer-value"><p>内核与用户独立页表（切换 CR3/SATP）</p></div>
+<div class="answer-notes">所有 structured_facts 均为 yes_strong，表明 xv6-k210 实现了完整的内存管理机制：独立页表（每个进程通过 kvmcreate 创建独立页表并拷贝内核映射）、satp 切换（scheduler 中 w_satp 切换进程页表）、页表 walk/map/unmap、PTE 保护位隔离。因此内核与用户地址空间关系为独立页表模型，对应选项“内核与用户独立页表（切换 CR3/SATP）”。</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>memory_constants</strong></td><td>题目“内核与用户地址空间关系更接近哪种？”的候选选项有哪些，是否只从题单 choices 中选择？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>PGSIZE/PGSHIFT 定义于 riscv.h；SATP_SV39/MAKE_SATP/w_satp 定义于 riscv.h；KERNBASE/PHYSTOP/TRAMPOLINE 定义于 memlayout.h；PTE_V/R/W/X/U 定义于 riscv.h。均为强证据定义。 <a href="#ev_task_03_address_space_3e334dd4" class="evidence-link">ev_task_03_address_space_3e334dd4</a> <a href="#ev_task_03_address_space_0621c8c6" class="evidence-link">ev_task_03_address_space_0621c8c6</a> <a href="#ev_task_03_address_space_d6a8174d" class="evidence-link">ev_task_03_address_space_d6a8174d</a> <a href="#ev_task_03_address_space_6a84c347" class="evidence-link">ev_task_03_address_space_6a84c347</a></td></tr>
+<tr><td><strong>allocator_state</strong></td><td>被选中的形态是否有源码、配置、调用链或数据结构证据直接支撑？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>pm.c 中 kpminit 初始化两个 freelist 分配器（multiple/single），_allocpage/_freepage 实现基于 struct run 链表的分配释放。 <a href="#ev_task_03_address_space_21503ffb" class="evidence-link">ev_task_03_address_space_21503ffb</a> <a href="#ev_task_03_address_space_4c4ce459" class="evidence-link">ev_task_03_address_space_4c4ce459</a></td></tr>
+<tr><td><strong>map_unmap_api</strong></td><td>未选选项是否被源码证据、缺失证据或概念边界排除？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>walk 函数在 vm.c 中实现，遍历三级页表并分配中间页表，真实修改 PTE（设置 PTE_V 标志）。 <a href="#ev_task_03_address_space_fdaabfbd" class="evidence-link">ev_task_03_address_space_fdaabfbd</a></td></tr>
+<tr><td><strong>protection_relocation</strong></td><td>若多个选项同时成立或证据不足，是否按题意选择“其他/混合/unknown”并说明原因？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>PTE_U 定义于 riscv.h 用于用户/内核隔离；SSTATUS_PUM/SUM 定义于 riscv.h 用于特权级保护；MMU 运行时重定位由 satp 寄存器切换实现。 <a href="#ev_task_03_address_space_ffaa8c7c" class="evidence-link">ev_task_03_address_space_ffaa8c7c</a> <a href="#ev_task_03_address_space_6a84c347" class="evidence-link">ev_task_03_address_space_6a84c347</a></td></tr>
+<tr><td><strong>call_path</strong></td><td>若未确认“内核与用户地址空间关系更接近哪种？”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>exec.c 中 execve 调用 w_satp(MAKE_SATP(p-&gt;pagetable)) 切换进程页表，sfence_vma() 刷新 TLB，完整调用路径可复现。 <a href="#ev_task_03_address_space_953fb076" class="evidence-link">ev_task_03_address_space_953fb076</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>-</td><td><span>{"searched_keywords": ["buddy", "bitmap", "slab", "freelist"], "searched_directories": ["kernel/mm", "include/mm"], "file_count": 10, "match_count": 0, "coverage_sufficient": true}</span></td><td>负向搜索确认 kernel/mm 目录下无 buddy/bitmap/slab 分配器，物理页分配器使用 freelist。 <a href="#ev_task_03_address_space_33240dcc" class="evidence-link">ev_task_03_address_space_33240dcc</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_03_address_space_3e334dd4" class="evidence-anchor">ev_task_03_address_space_3e334dd4</span> 
+<span id="ev_task_03_address_space_0621c8c6" class="evidence-anchor">ev_task_03_address_space_0621c8c6</span> 
+<span id="ev_task_03_address_space_d6a8174d" class="evidence-anchor">ev_task_03_address_space_d6a8174d</span> 
+<span id="ev_task_03_address_space_6a84c347" class="evidence-anchor">ev_task_03_address_space_6a84c347</span> 
+<span id="ev_task_03_address_space_21503ffb" class="evidence-anchor">ev_task_03_address_space_21503ffb</span> 
+<span id="ev_task_03_address_space_4c4ce459" class="evidence-anchor">ev_task_03_address_space_4c4ce459</span> 
+<span id="ev_task_03_address_space_fdaabfbd" class="evidence-anchor">ev_task_03_address_space_fdaabfbd</span> 
+<span id="ev_task_03_address_space_ffaa8c7c" class="evidence-anchor">ev_task_03_address_space_ffaa8c7c</span> 
+<span id="ev_task_03_address_space_953fb076" class="evidence-anchor">ev_task_03_address_space_953fb076</span> 
+<span id="ev_task_03_address_space_33240dcc" class="evidence-anchor">ev_task_03_address_space_33240dcc</span> 
+</section>
+<section class="question-block" id="q03_010">
+<h3>Q03_010 是否存在缺页异常 (Page Fault) 处理逻辑并与内存分配/映射联动？（必须三态）</h3>
+<div class="answer-value"><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 已实现</span> <span style="color:var(--text-muted);margin-left:0.5em">已实现</span></div>
+<div class="answer-notes">所有 structured_facts 均为 yes_strong，负向搜索覆盖充分。缺页异常处理逻辑完整实现并与内存分配/映射联动：物理页分配器使用 freelist；页表 walk/map/unmap 真实修改 PTE；PTE 保护位实现用户/内核隔离；usertrap→handle_excp→handle_page_fault 调用路径存在。</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>memory_constants</strong></td><td>“缺页异常 (Page Fault) 处理逻辑并与内存分配/映射联动”的内核定义、入口、对象或配置开关在哪里？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>PGSIZE=4096, PGSHIFT=12, PGROUNDUP/DOWN 定义于 include/hal/riscv.h；PHYSTOP=0x80600000UL, KERNBASE=0x80020000UL, MAXVA 定义于 include/memlayout.h。 <a href="#ev_task_03_page_fault_f897fbe6" class="evidence-link">ev_task_03_page_fault_f897fbe6</a> <a href="#ev_task_03_page_fault_ce683f52" class="evidence-link">ev_task_03_page_fault_ce683f52</a></td></tr>
+<tr><td><strong>allocator_state</strong></td><td>是否存在执行“缺页异常 (Page Fault) 处理逻辑并与内存分配/映射联动”语义的真实实现体，而不是声明、空函数或固定返回？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>kernel/mm/pm.c 中实现 freelist 分配器（multiple+single 两级），包含 _allocpage/_freepage 实现体；include/mm/pm.h 提供 allocpage/freepage 宏。 <a href="#ev_task_03_page_fault_039f2e39" class="evidence-link">ev_task_03_page_fault_039f2e39</a> <a href="#ev_task_03_page_fault_5530db12" class="evidence-link">ev_task_03_page_fault_5530db12</a></td></tr>
+<tr><td><strong>map_unmap_api</strong></td><td>该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>kernel/mm/vm.c 中 walk 函数遍历页表并分配中间页表；mappages 真实修改 PTE（设置 PA2PTE|perm|PTE_V）；uvmcopy 实现 COW 映射。 <a href="#ev_task_03_page_fault_597e63aa" class="evidence-link">ev_task_03_page_fault_597e63aa</a> <a href="#ev_task_03_page_fault_cbb6bd8f" class="evidence-link">ev_task_03_page_fault_cbb6bd8f</a> <a href="#ev_task_03_page_fault_027ea7e1" class="evidence-link">ev_task_03_page_fault_027ea7e1</a></td></tr>
+<tr><td><strong>protection_relocation</strong></td><td>执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>include/hal/riscv.h 定义 PTE_V/R/W/X/U 保护位；kernel/mm/vm.c 定义 PTE_COW 标志；MMU 运行时通过 satp 寄存器进行地址转换。 <a href="#ev_task_03_page_fault_49fe7306" class="evidence-link">ev_task_03_page_fault_49fe7306</a> <a href="#ev_task_03_page_fault_692270d1" class="evidence-link">ev_task_03_page_fault_692270d1</a></td></tr>
+<tr><td><strong>call_path</strong></td><td>是否排除与“缺页异常 (Page Fault) 处理逻辑并与内存分配/映射联动”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>负向搜索确认 usertrap→handle_excp→handle_page_fault 完整调用路径存在，与 COW/lazy allocation/ELF load/mmap 联动。 <a href="#ev_task_03_page_fault_44459efa" class="evidence-link">ev_task_03_page_fault_44459efa</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>若未确认“缺页异常 (Page Fault) 处理逻辑并与内存分配/映射联动”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span>{"searched_keywords": ["frame", "page", "kalloc", "buddy", "bitmap", "freelist", "slab", "page table", "pte", "walk", "map", "unmap", "pagetable", "satp", "protection", "relocation"], "searched_directories": ["kernel", "mm", "memory", "vm", "arch", "include"], "file_count": 206, "match_count": 38, "coverage_sufficient": true}</span></td><td>负向搜索覆盖 206 个文件，38+ 匹配，所有关键结构均有强证据确认。 <a href="#ev_task_03_page_fault_44459efa" class="evidence-link">ev_task_03_page_fault_44459efa</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_03_page_fault_f897fbe6" class="evidence-anchor">ev_task_03_page_fault_f897fbe6</span> 
+<span id="ev_task_03_page_fault_49fe7306" class="evidence-anchor">ev_task_03_page_fault_49fe7306</span> 
+<span id="ev_task_03_page_fault_039f2e39" class="evidence-anchor">ev_task_03_page_fault_039f2e39</span> 
+<span id="ev_task_03_page_fault_692270d1" class="evidence-anchor">ev_task_03_page_fault_692270d1</span> 
+<span id="ev_task_03_page_fault_027ea7e1" class="evidence-anchor">ev_task_03_page_fault_027ea7e1</span> 
+<span id="ev_task_03_page_fault_44459efa" class="evidence-anchor">ev_task_03_page_fault_44459efa</span> 
+<span id="ev_task_03_page_fault_ce683f52" class="evidence-anchor">ev_task_03_page_fault_ce683f52</span> 
+<span id="ev_task_03_page_fault_5530db12" class="evidence-anchor">ev_task_03_page_fault_5530db12</span> 
+<span id="ev_task_03_page_fault_597e63aa" class="evidence-anchor">ev_task_03_page_fault_597e63aa</span> 
+<span id="ev_task_03_page_fault_cbb6bd8f" class="evidence-anchor">ev_task_03_page_fault_cbb6bd8f</span> 
+</section>
+<section class="question-block" id="q03_011">
+<h3>Q03_011 追踪一条缺页链路：trap/异常入口 → 缺页处理函数（handle_page_fault 或等价）→ 分配页帧 → 建立映射。用 3-5 个关键节点描述并给每节点证据。</h3>
+<div class="answer-value"><pre><code>{
+  "memory_constants": "yes_strong",
+  "allocator_state": "yes_strong",
+  "map_unmap_api": "yes_strong",
+  "protection_relocation": "yes_strong",
+  "call_path": "yes_strong",
+  "negative_search_coverage": {
+    "searched_keywords": [
+      "frame",
+      "page",
+      "kalloc",
+      "buddy",
+      "bitmap",
+      "freelist",
+      "slab",
+      "page table",
+      "pte",
+      "walk",
+      "map",
+      "unmap",
+      "pagetable",
+      "satp",
+      "protection",
+      "relocation"
+    ],
+    "searched_directories": [
+      "kernel",
+      "mm",
+      "memory",
+      "vm",
+      "arch",
+      "include"
+    ],
+    "file_count": 206,
+    "match_count": 38,
+    "coverage_sufficient": true
+  }
+}</code></pre></div>
+<div class="answer-notes">所有 structured_facts 均基于 Bound Evidence 中的强证据判定为 yes_strong，缺页处理完整链路（trap入口→handle_page_fault→allocpage→mappages）可复现。</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>memory_constants</strong></td><td>本题只回答“追踪一条缺页链路：trap/异常入口 → 缺页处理函数（handle_page_fault 或等价）→ 分配页帧 → 建立映射。用 3-5 个关键节点描述并给每节点证据。”，是否明确输出对象、范围、数量或状态字段？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>PGSIZE=4096、PTE_V/R/W/X/U 标志位、PHYSTOP 等内存常量在 include/hal/riscv.h 和 include/memlayout.h 中有强定义证据。 <a href="#ev_task_03_page_fault_f897fbe6" class="evidence-link">ev_task_03_page_fault_f897fbe6</a> <a href="#ev_task_03_page_fault_49fe7306" class="evidence-link">ev_task_03_page_fault_49fe7306</a> <a href="#ev_task_03_page_fault_ce683f52" class="evidence-link">ev_task_03_page_fault_ce683f52</a></td></tr>
+<tr><td><strong>allocator_state</strong></td><td>支撑答案的主要源码/配置/文档锚点在哪里（路径、符号、结构体或常量）？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>物理页分配器使用 freelist 结构（multiple+single 两级池），_allocpage/_freepage 实现体在 kernel/mm/pm.c 中，allocpage/freepage 宏在 include/mm/pm.h 中。 <a href="#ev_task_03_page_fault_039f2e39" class="evidence-link">ev_task_03_page_fault_039f2e39</a> <a href="#ev_task_03_page_fault_5530db12" class="evidence-link">ev_task_03_page_fault_5530db12</a></td></tr>
+<tr><td><strong>map_unmap_api</strong></td><td>答案中的每个关键结论是否有实现体、调用链、状态变化或配置分支证据？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>walk/mappages/unmappages 在 kernel/mm/vm.c 中有完整实现体，真实修改 PTE，支持 COW 标记。 <a href="#ev_task_03_page_fault_597e63aa" class="evidence-link">ev_task_03_page_fault_597e63aa</a> <a href="#ev_task_03_page_fault_cbb6bd8f" class="evidence-link">ev_task_03_page_fault_cbb6bd8f</a> <a href="#ev_task_03_page_fault_027ea7e1" class="evidence-link">ev_task_03_page_fault_027ea7e1</a></td></tr>
+<tr><td><strong>protection_relocation</strong></td><td>是否排除题干未要求的相邻模块、同名概念、用户态封装、README 口号或测试桩？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>PTE 保护位（R/W/X/U）定义在 include/hal/riscv.h，PTE_COW 定义在 kernel/mm/vm.c，地址转换通过 PA2PTE/PTE2PA 宏实现。 <a href="#ev_task_03_page_fault_49fe7306" class="evidence-link">ev_task_03_page_fault_49fe7306</a> <a href="#ev_task_03_page_fault_692270d1" class="evidence-link">ev_task_03_page_fault_692270d1</a></td></tr>
+<tr><td><strong>call_path</strong></td><td>多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>负向搜索确认 handle_page_fault、usertrap、handle_excp 等关键函数存在，缺页处理完整链路可复现。 <a href="#ev_task_03_page_fault_44459efa" class="evidence-link">ev_task_03_page_fault_44459efa</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>若未确认“追踪一条缺页链路：trap/异常入口 → 缺页处理函数（handle_page_fault 或等价）→ 分配页帧 → 建立映射。用 3-5 个关键节点描述并给每节点证据。”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span>{"searched_keywords": ["frame", "page", "kalloc", "buddy", "bitmap", "freelist", "slab", "page table", "pte", "walk", "map", "unmap", "pagetable", "satp", "protection", "relocation"], "searched_directories": ["kernel", "mm", "memory", "vm", "arch", "include"], "file_count": 206, "match_count": 38, "coverage_sufficient": true}</span></td><td>负向搜索覆盖 206 个文件，38+ 匹配，关键词和目录覆盖充分。 <a href="#ev_task_03_page_fault_44459efa" class="evidence-link">ev_task_03_page_fault_44459efa</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_03_page_fault_f897fbe6" class="evidence-anchor">ev_task_03_page_fault_f897fbe6</span> 
+<span id="ev_task_03_page_fault_49fe7306" class="evidence-anchor">ev_task_03_page_fault_49fe7306</span> 
+<span id="ev_task_03_page_fault_ce683f52" class="evidence-anchor">ev_task_03_page_fault_ce683f52</span> 
+<span id="ev_task_03_page_fault_039f2e39" class="evidence-anchor">ev_task_03_page_fault_039f2e39</span> 
+<span id="ev_task_03_page_fault_5530db12" class="evidence-anchor">ev_task_03_page_fault_5530db12</span> 
+<span id="ev_task_03_page_fault_597e63aa" class="evidence-anchor">ev_task_03_page_fault_597e63aa</span> 
+<span id="ev_task_03_page_fault_cbb6bd8f" class="evidence-anchor">ev_task_03_page_fault_cbb6bd8f</span> 
+<span id="ev_task_03_page_fault_027ea7e1" class="evidence-anchor">ev_task_03_page_fault_027ea7e1</span> 
+<span id="ev_task_03_page_fault_692270d1" class="evidence-anchor">ev_task_03_page_fault_692270d1</span> 
+<span id="ev_task_03_page_fault_44459efa" class="evidence-anchor">ev_task_03_page_fault_44459efa</span> 
+</section>
+<section class="question-block" id="q03_012">
+<h3>Q03_012 是否实现写时复制 (Copy-on-Write, CoW)？（必须三态；若 implemented 需说明触发点在 fault 中还是 fork 中）</h3>
+<div class="answer-value"><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 已实现</span> <span style="color:var(--text-muted);margin-left:0.5em">已实现</span></div>
+<div class="answer-notes">CoW 完整实现：fork 时 uvmcopy() 设置 PTE_COW 并清除 PTE_W，缺页时 handle_store_page_fault_cow() 处理。触发点同时在 fork 和 fault 中。所有 structured_facts 均为 yes_strong，满足 implemented 条件。</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>memory_constants</strong></td><td>“写时复制 (Copy-on-Write, CoW)”的内核定义、入口、对象或配置开关在哪里？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>PGSIZE=4096 (ev_task_03_cow_lazy_31c379ca), MAXVA (ev_task_03_cow_lazy_975975c9), KERNBASE/PHYSTOP/MAXUVA (ev_task_03_cow_lazy_5f978e6f) 均有强定义。 <a href="#ev_task_03_cow_lazy_975975c9" class="evidence-link">ev_task_03_cow_lazy_975975c9</a> <a href="#ev_task_03_cow_lazy_31c379ca" class="evidence-link">ev_task_03_cow_lazy_31c379ca</a> <a href="#ev_task_03_cow_lazy_5f978e6f" class="evidence-link">ev_task_03_cow_lazy_5f978e6f</a></td></tr>
+<tr><td><strong>allocator_state</strong></td><td>是否存在执行“写时复制 (Copy-on-Write, CoW)”语义的真实实现体，而不是声明、空函数或固定返回？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>freelist 分配器（multiple + single），使用 spinlock 保护 (ev_task_03_cow_lazy_0d750924)；_allocpage 实现体 (ev_task_03_cow_lazy_10c1cff8)。 <a href="#ev_task_03_cow_lazy_0d750924" class="evidence-link">ev_task_03_cow_lazy_0d750924</a> <a href="#ev_task_03_cow_lazy_10c1cff8" class="evidence-link">ev_task_03_cow_lazy_10c1cff8</a></td></tr>
+<tr><td><strong>map_unmap_api</strong></td><td>该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>walk (ev_task_03_cow_lazy_b8118e8c)、mappages (ev_task_03_cow_lazy_41724b24)、unmappages (ev_task_03_cow_lazy_c60b6504) 均真实修改 PTE。 <a href="#ev_task_03_cow_lazy_b8118e8c" class="evidence-link">ev_task_03_cow_lazy_b8118e8c</a> <a href="#ev_task_03_cow_lazy_41724b24" class="evidence-link">ev_task_03_cow_lazy_41724b24</a> <a href="#ev_task_03_cow_lazy_c60b6504" class="evidence-link">ev_task_03_cow_lazy_c60b6504</a></td></tr>
+<tr><td><strong>protection_relocation</strong></td><td>执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>MMU 运行时转换，PTE 保护位 + PTE_COW 标志 (ev_task_03_cow_lazy_5eab4a05)。 <a href="#ev_task_03_cow_lazy_5eab4a05" class="evidence-link">ev_task_03_cow_lazy_5eab4a05</a></td></tr>
+<tr><td><strong>call_path</strong></td><td>是否排除与“写时复制 (Copy-on-Write, CoW)”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>完整 CoW 调用链：fork→copysegs→uvmcopy(设置PTE_COW)→缺页→handle_store_page_fault_cow (ev_task_03_cow_lazy_5eab4a05)；handle_page_fault 中调用 handle_store_page_fault_cow (ev_task_03_cow_lazy_18ea015c)。 <a href="#ev_task_03_cow_lazy_5eab4a05" class="evidence-link">ev_task_03_cow_lazy_5eab4a05</a> <a href="#ev_task_03_cow_lazy_18ea015c" class="evidence-link">ev_task_03_cow_lazy_18ea015c</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>若未确认“写时复制 (Copy-on-Write, CoW)”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span>{"searched_keywords": ["frame", "page", "kalloc", "buddy", "bitmap", "freelist", "slab", "page table", "pte", "walk", "map", "unmap", "pagetable", "satp", "CR3", "protection", "relocation"], "searched_directories": ["kernel", "mm", "memory", "vm", "arch", "include"], "file_count": 207, "match_count": 38, "coverage_sufficient": true}</span></td><td>搜索覆盖充分，CoW 实现已找到 (ev_task_03_cow_lazy_5eab4a05)。 <a href="#ev_task_03_cow_lazy_5eab4a05" class="evidence-link">ev_task_03_cow_lazy_5eab4a05</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_03_cow_lazy_5eab4a05" class="evidence-anchor">ev_task_03_cow_lazy_5eab4a05</span> 
+<span id="ev_task_03_cow_lazy_975975c9" class="evidence-anchor">ev_task_03_cow_lazy_975975c9</span> 
+<span id="ev_task_03_cow_lazy_0d750924" class="evidence-anchor">ev_task_03_cow_lazy_0d750924</span> 
+<span id="ev_task_03_cow_lazy_18ea015c" class="evidence-anchor">ev_task_03_cow_lazy_18ea015c</span> 
+<span id="ev_task_03_cow_lazy_31c379ca" class="evidence-anchor">ev_task_03_cow_lazy_31c379ca</span> 
+<span id="ev_task_03_cow_lazy_5f978e6f" class="evidence-anchor">ev_task_03_cow_lazy_5f978e6f</span> 
+<span id="ev_task_03_cow_lazy_10c1cff8" class="evidence-anchor">ev_task_03_cow_lazy_10c1cff8</span> 
+<span id="ev_task_03_cow_lazy_b8118e8c" class="evidence-anchor">ev_task_03_cow_lazy_b8118e8c</span> 
+<span id="ev_task_03_cow_lazy_41724b24" class="evidence-anchor">ev_task_03_cow_lazy_41724b24</span> 
+<span id="ev_task_03_cow_lazy_c60b6504" class="evidence-anchor">ev_task_03_cow_lazy_c60b6504</span> 
+</section>
+<section class="question-block" id="q03_013">
+<h3>Q03_013 是否实现惰性分配 (Lazy Allocation)？（必须三态；若 implemented 需说明是在 brk/mmap 还是 fault 中分配）</h3>
+<div class="answer-value"><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#e2e3e5;color:#383d41;font-size:0.85em;font-weight:500">❓ 未知</span> <span style="color:var(--text-muted);margin-left:0.5em">证据不足/未知</span></div>
+<div class="answer-notes">Lazy Allocation 完整实现：brk/sbrk 通过 growproc 仅更新堆边界（heap-&gt;sz 和 p-&gt;pbrk），不分配物理页；缺页时 handle_page_fault 识别 HEAP/STACK 段类型，调用 handle_page_fault_lazy 分配物理页并建立 PTE；unmappages 跳过懒分配空洞；与 COW、普通 mmap 明确区分。
+Schema guard: 原答案 'implemented' 缺少可支撑的强证据；当前引用证据最强 strength=strong。</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>reservation_without_alloc</strong></td><td>“惰性分配 (Lazy Allocation)”的内核定义、入口、对象或配置开关在哪里？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>sys_sbrk 调用 growproc，growproc 仅更新 heap-&gt;sz 和 p-&gt;pbrk，不分配物理页。 <a href="#ev_task_03_cow_lazy_2f90400b" class="evidence-link">ev_task_03_cow_lazy_2f90400b</a> <a href="#ev_task_03_cow_lazy_a5808ea2" class="evidence-link">ev_task_03_cow_lazy_a5808ea2</a></td></tr>
+<tr><td><strong>range_metadata</strong></td><td>是否存在执行“惰性分配 (Lazy Allocation)”语义的真实实现体，而不是声明、空函数或固定返回？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>struct seg 链表管理地址空间，包含 HEAP 段类型，growproc 更新 heap-&gt;sz 记录堆范围。 <a href="#ev_task_03_cow_lazy_c26a6105" class="evidence-link">ev_task_03_cow_lazy_c26a6105</a> <a href="#ev_task_03_cow_lazy_a5808ea2" class="evidence-link">ev_task_03_cow_lazy_a5808ea2</a></td></tr>
+<tr><td><strong>fault_allocation</strong></td><td>该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>handle_page_fault 识别 HEAP/STACK 段类型后调用 handle_page_fault_lazy，该函数调用 uvmalloc 分配物理页。 <a href="#ev_task_03_cow_lazy_1b872145" class="evidence-link">ev_task_03_cow_lazy_1b872145</a> <a href="#ev_task_03_cow_lazy_b055465c" class="evidence-link">ev_task_03_cow_lazy_b055465c</a> <a href="#ev_task_03_cow_lazy_aa2dc02a" class="evidence-link">ev_task_03_cow_lazy_aa2dc02a</a></td></tr>
+<tr><td><strong>permission_bounds</strong></td><td>执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>uvmalloc 调用 mappages 建立 PTE；unmappages 跳过懒分配空洞（PTE_V 不存在的页）。 <a href="#ev_task_03_cow_lazy_a1032f58" class="evidence-link">ev_task_03_cow_lazy_a1032f58</a> <a href="#ev_task_03_cow_lazy_059d3f4b" class="evidence-link">ev_task_03_cow_lazy_059d3f4b</a></td></tr>
+<tr><td><strong>not_cow_or_plain_mmap</strong></td><td>是否排除与“惰性分配 (Lazy Allocation)”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>handle_page_fault 按 seg-&gt;type 分发：HEAP/STACK 走 lazy，MMAP 走 mmap，LOAD 走 loadelf；PTE_COW 单独定义，区分明确。 <a href="#ev_task_03_cow_lazy_b055465c" class="evidence-link">ev_task_03_cow_lazy_b055465c</a> <a href="#ev_task_03_cow_lazy_41fc136b" class="evidence-link">ev_task_03_cow_lazy_41fc136b</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>若未确认“惰性分配 (Lazy Allocation)”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span>{"searched_keywords": ["lazy", "sbrk", "brk", "mmap", "VMA", "page fault", "alloc", "heap", "demand"], "searched_directories": ["kernel", "mm", "vm", "proc", "syscall", "include"], "file_count": 207, "match_count": 30, "coverage_sufficient": true}</span></td><td>负向搜索覆盖充分，所有关键词和目录均命中，Lazy Allocation 实现已确认。 <a href="#ev_task_03_cow_lazy_bcde58bd" class="evidence-link">ev_task_03_cow_lazy_bcde58bd</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_03_cow_lazy_bcde58bd" class="evidence-anchor">ev_task_03_cow_lazy_bcde58bd</span> 
+<span id="ev_task_03_cow_lazy_1b872145" class="evidence-anchor">ev_task_03_cow_lazy_1b872145</span> 
+<span id="ev_task_03_cow_lazy_2f90400b" class="evidence-anchor">ev_task_03_cow_lazy_2f90400b</span> 
+<span id="ev_task_03_cow_lazy_a5808ea2" class="evidence-anchor">ev_task_03_cow_lazy_a5808ea2</span> 
+<span id="ev_task_03_cow_lazy_c26a6105" class="evidence-anchor">ev_task_03_cow_lazy_c26a6105</span> 
+<span id="ev_task_03_cow_lazy_b055465c" class="evidence-anchor">ev_task_03_cow_lazy_b055465c</span> 
+<span id="ev_task_03_cow_lazy_aa2dc02a" class="evidence-anchor">ev_task_03_cow_lazy_aa2dc02a</span> 
+<span id="ev_task_03_cow_lazy_a1032f58" class="evidence-anchor">ev_task_03_cow_lazy_a1032f58</span> 
+<span id="ev_task_03_cow_lazy_059d3f4b" class="evidence-anchor">ev_task_03_cow_lazy_059d3f4b</span> 
+<span id="ev_task_03_cow_lazy_41fc136b" class="evidence-anchor">ev_task_03_cow_lazy_41fc136b</span> 
+</section>
+<section class="question-block" id="q03_014">
+<h3>Q03_014 是否实现 swap（swap_in/swap_out 或等价页面置换）？（必须三态）</h3>
+<div class="answer-value"><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#f8d7da;color:#721c24;font-size:0.85em;font-weight:500">❌ 未发现</span> <span style="color:var(--text-muted);margin-left:0.5em">未发现</span></div>
+<div class="answer-notes">All 6 structured_facts are 'no_after_negative_search'. Negative search covered 16 keywords across 10 directories and 207 files with 0 matches. The only swap-related code is commented-out (__page_file_swap) and struct field definitions (totalswap/freeswap, ru_nswap) without implementation. handle_page_fault has no swap-in path. Block cache LRU and FAT cache LRU are disk caches, not swap/page replacement per concept_boundary.</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>swap_backing_store</strong></td><td>“swap”的内核定义、入口、对象或配置开关在哪里？</td><td><span>no_after_negative_search</span></td><td>Negative search across 207 files found no swap area/swapfile/backing store management. Only commented-out __page_file_swap and struct field definitions (totalswap/freeswap) exist, which are insufficient. <a href="#ev_task_03_swap_ddb1f567" class="evidence-link">ev_task_03_swap_ddb1f567</a></td></tr>
+<tr><td><strong>resident_metadata</strong></td><td>是否存在执行“swap”语义的真实实现体，而不是声明、空函数或固定返回？</td><td><span>no_after_negative_search</span></td><td>No metadata for swappable pages or resident/non-resident state found in negative search. <a href="#ev_task_03_swap_ddb1f567" class="evidence-link">ev_task_03_swap_ddb1f567</a></td></tr>
+<tr><td><strong>swap_out_path</strong></td><td>该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？</td><td><span>no_after_negative_search</span></td><td>No swap_out/pageout/reclaim path writing pages to backing store found. <a href="#ev_task_03_swap_ddb1f567" class="evidence-link">ev_task_03_swap_ddb1f567</a></td></tr>
+<tr><td><strong>swap_in_fault_path</strong></td><td>执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？</td><td><span>no_after_negative_search</span></td><td>No swap_in path to restore pages on page fault found. handle_page_fault only handles LOAD/HEAP/STACK/MMAP, no swap-in logic. <a href="#ev_task_03_swap_ddb1f567" class="evidence-link">ev_task_03_swap_ddb1f567</a></td></tr>
+<tr><td><strong>victim_policy</strong></td><td>是否排除与“swap”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？</td><td><span>no_after_negative_search</span></td><td>No replacement algorithm (LRU/Clock/FIFO) for victim selection found. <a href="#ev_task_03_swap_ddb1f567" class="evidence-link">ev_task_03_swap_ddb1f567</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>若未确认“swap”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span>{"searched_keywords": ["swap", "swap_in", "swap_out", "pageout", "reclaim", "evict", "replacement", "LRU", "Clock", "FIFO", "swapfile", "working_set", "thrash", "resident", "kswapd", "writeback"], "searched_directories": ["kernel", "mm", "vm", "fs", "block", "include", "kernel/mm", "kernel/fs", "kernel/sched", "kernel/syscall"], "file_count": 207, "match_count": 0, "coverage_sufficient": true}</span></td><td>Negative search coverage meets minimum_keyword_coverage (0.7) and minimum_directory_coverage (0.6) requirements. <a href="#ev_task_03_swap_ddb1f567" class="evidence-link">ev_task_03_swap_ddb1f567</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_03_swap_ddb1f567" class="evidence-anchor">ev_task_03_swap_ddb1f567</span> 
+<span id="ev_task_03_swap_95f5abd7" class="evidence-anchor">ev_task_03_swap_95f5abd7</span> 
+<span id="ev_task_03_swap_b9c1f73d" class="evidence-anchor">ev_task_03_swap_b9c1f73d</span> 
+<span id="ev_task_03_swap_5995c620" class="evidence-anchor">ev_task_03_swap_5995c620</span> 
+<span id="ev_task_03_swap_fd2e1594" class="evidence-anchor">ev_task_03_swap_fd2e1594</span> 
+</section>
+<section class="question-block" id="q03_015">
+<h3>Q03_015 是否实现 mmap（文件映射/匿名映射）且处理标志位（MAP_FIXED/MAP_ANON/MAP_SHARED 等）？（必须三态；stub 需说明形态如 ENOSYS/return 0）</h3>
+<div class="answer-value"><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 已实现</span> <span style="color:var(--text-muted);margin-left:0.5em">已实现</span></div>
+<div class="answer-notes">所有 6 个 structured_facts 均为 yes_strong。mmap 实现了完整闭环：syscall 入口注册且非桩（sys_mmap/sys_munmap）→ 参数/flag 解析（addr/len/prot/flags/fd/offset + MAP_FIXED/MAP_ANON/MAP_SHARED/MAP_PRIVATE）→ VMA 管理（seg 结构体 type=MMAP 挂到进程地址空间）→ page fault 路径（handle_page_fault_mmap 处理匿名/文件映射）→ munmap/exit 清理（do_munmap 释放映射和文件引用）。负向搜索覆盖充分，确认完整实现。</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>syscall_entry</strong></td><td>“mmap”的内核定义、入口、对象或配置开关在哪里？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>sys_mmap 和 sys_munmap 在 syscall 表中注册（SYS_mmap/SYS_munmap），sysmem.c 中有完整非桩实现体，包含参数解析和调用 do_mmap/do_munmap。 <a href="#ev_task_03_mem_mgmt_Q03_015_discovery_assembler_fix_75ad0a_90686ddf" class="evidence-link">ev_task_03_mem_mgmt_Q03_015_discovery_assembler_fix_75ad0a_90686ddf</a> <a href="#ev_task_03_mem_mgmt_Q03_015_discovery_assembler_fix_75ad0a_9e11f57e" class="evidence-link">ev_task_03_mem_mgmt_Q03_015_discovery_assembler_fix_75ad0a_9e11f57e</a> <a href="#ev_task_03_mem_mgmt_Q03_015_definition_assembler_fix_26de48_c09c3e1f" class="evidence-link">ev_task_03_mem_mgmt_Q03_015_definition_assembler_fix_26de48_c09c3e1f</a> <a href="#ev_task_03_mem_mgmt_Q03_015_definition_assembler_fix_26de48_f73b7b5c" class="evidence-link">ev_task_03_mem_mgmt_Q03_015_definition_assembler_fix_26de48_f73b7b5c</a></td></tr>
+<tr><td><strong>arg_flag_parse</strong></td><td>是否存在执行“mmap”语义的真实实现体，而不是声明、空函数或固定返回？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>sys_mmap 解析 start/len/prot/flags/fd/offset，检查 MAP_SHARED/MAP_PRIVATE 有效性；mmap.h 定义了 MAP_SHARED(0x01)、MAP_PRIVATE(0x02)、MAP_FIXED(0x10)、MAP_ANONYMOUS(0x20)。 <a href="#ev_task_03_mem_mgmt_Q03_015_discovery_assembler_fix_75ad0a_9e11f57e" class="evidence-link">ev_task_03_mem_mgmt_Q03_015_discovery_assembler_fix_75ad0a_9e11f57e</a> <a href="#ev_task_03_mmap_a6f7bdb3" class="evidence-link">ev_task_03_mmap_a6f7bdb3</a></td></tr>
+<tr><td><strong>vma_metadata</strong></td><td>该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>handle_page_fault 中 switch 分支 case MMAP 调用 handle_page_fault_mmap，表明存在 seg 结构体且 type=MMAP 作为 VMA 挂接到进程地址空间。 <a href="#ev_task_03_mem_mgmt_Q03_015_definition_assembler_fix_26de48_3e26fe30" class="evidence-link">ev_task_03_mem_mgmt_Q03_015_definition_assembler_fix_26de48_3e26fe30</a> <a href="#ev_task_03_mem_mgmt_Q03_015_discovery_assembler_fix_75ad0a_9ab4aaf1" class="evidence-link">ev_task_03_mem_mgmt_Q03_015_discovery_assembler_fix_75ad0a_9ab4aaf1</a></td></tr>
+<tr><td><strong>fault_path</strong></td><td>执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>handle_page_fault 对 MMAP 类型分派到 handle_page_fault_mmap，处理匿名/文件映射的缺页。 <a href="#ev_task_03_mem_mgmt_Q03_015_definition_assembler_fix_26de48_3e26fe30" class="evidence-link">ev_task_03_mem_mgmt_Q03_015_definition_assembler_fix_26de48_3e26fe30</a> <a href="#ev_task_03_mem_mgmt_Q03_015_discovery_assembler_fix_75ad0a_9ab4aaf1" class="evidence-link">ev_task_03_mem_mgmt_Q03_015_discovery_assembler_fix_75ad0a_9ab4aaf1</a></td></tr>
+<tr><td><strong>unmap_cleanup</strong></td><td>是否排除与“mmap”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>sys_munmap 调用 do_munmap 释放映射；draft 提及 delseg/mmapdel 链释放文件引用和页表，exit 调用 delsegs 清理。 <a href="#ev_task_03_mem_mgmt_Q03_015_definition_assembler_fix_26de48_c09c3e1f" class="evidence-link">ev_task_03_mem_mgmt_Q03_015_definition_assembler_fix_26de48_c09c3e1f</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>若未确认“mmap”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span>{"searched_keywords": ["mmap", "munmap", "MAP_FIXED", "MAP_ANON", "MAP_SHARED", "MAP_PRIVATE", "PROT_READ", "VMA", "page fault", "file"], "searched_directories": ["kernel/mm", "kernel/syscall", "include/mm", "include", "xv6-user", "kernel/sched", "kernel/fs", "kernel"], "file_count": 207, "match_count": 256, "coverage_sufficient": true}</span></td><td>负向搜索覆盖充分，所有关键词和目录均已搜索，发现完整实现，无需判 not_found。 <a href="#ev_task_03_mem_mgmt_Q03_015_definition_assembler_fix_26de48_fe72a25a" class="evidence-link">ev_task_03_mem_mgmt_Q03_015_definition_assembler_fix_26de48_fe72a25a</a> <a href="#ev_task_03_mmap_2bb78e2e" class="evidence-link">ev_task_03_mmap_2bb78e2e</a> <a href="#ev_task_03_mem_mgmt_Q03_015_discovery_assembler_fix_75ad0a_11bc600c" class="evidence-link">ev_task_03_mem_mgmt_Q03_015_discovery_assembler_fix_75ad0a_11bc600c</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_03_mem_mgmt_Q03_015_discovery_assembler_fix_75ad0a_90686ddf" class="evidence-anchor">ev_task_03_mem_mgmt_Q03_015_discovery_assembler_fix_75ad0a_90686ddf</span> 
+<span id="ev_task_03_mem_mgmt_Q03_015_discovery_assembler_fix_75ad0a_9e11f57e" class="evidence-anchor">ev_task_03_mem_mgmt_Q03_015_discovery_assembler_fix_75ad0a_9e11f57e</span> 
+<span id="ev_task_03_mem_mgmt_Q03_015_definition_assembler_fix_26de48_c09c3e1f" class="evidence-anchor">ev_task_03_mem_mgmt_Q03_015_definition_assembler_fix_26de48_c09c3e1f</span> 
+<span id="ev_task_03_mem_mgmt_Q03_015_definition_assembler_fix_26de48_f73b7b5c" class="evidence-anchor">ev_task_03_mem_mgmt_Q03_015_definition_assembler_fix_26de48_f73b7b5c</span> 
+<span id="ev_task_03_mmap_a6f7bdb3" class="evidence-anchor">ev_task_03_mmap_a6f7bdb3</span> 
+<span id="ev_task_03_mem_mgmt_Q03_015_definition_assembler_fix_26de48_3e26fe30" class="evidence-anchor">ev_task_03_mem_mgmt_Q03_015_definition_assembler_fix_26de48_3e26fe30</span> 
+<span id="ev_task_03_mem_mgmt_Q03_015_discovery_assembler_fix_75ad0a_9ab4aaf1" class="evidence-anchor">ev_task_03_mem_mgmt_Q03_015_discovery_assembler_fix_75ad0a_9ab4aaf1</span> 
+<span id="ev_task_03_mem_mgmt_Q03_015_definition_assembler_fix_26de48_fe72a25a" class="evidence-anchor">ev_task_03_mem_mgmt_Q03_015_definition_assembler_fix_26de48_fe72a25a</span> 
+<span id="ev_task_03_mmap_2bb78e2e" class="evidence-anchor">ev_task_03_mmap_2bb78e2e</span> 
+<span id="ev_task_03_mem_mgmt_Q03_015_discovery_assembler_fix_75ad0a_11bc600c" class="evidence-anchor">ev_task_03_mem_mgmt_Q03_015_discovery_assembler_fix_75ad0a_11bc600c</span> 
+</section>
+<section class="question-block" id="q03_016">
+<h3>Q03_016 是否存在 Page Cache（页缓存/文件页缓存）管理？（必须三态）</h3>
+<div class="answer-value"><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#f8d7da;color:#721c24;font-size:0.85em;font-weight:500">❌ 未发现</span> <span style="color:var(--text-muted);margin-left:0.5em">未发现</span></div>
+<div class="answer-notes">根据 concept_boundary，Page Cache 是按文件对象/inode + page offset 管理文件页，并与 read/write/mmap/page fault/writeback 共享。xv6-k210 存在 block-level buffer cache（以 device+blockno 为 key）和独立的 mmap page cache（以 inode+file offset 为 key），但两者分离，不符合 Page Cache 定义。负向搜索覆盖充分（207 文件，317 匹配），未发现 address_space 结构或统一 page cache 实现，故判 not_found。</div>
+<details class="fact-details">
+<summary>子事实明细（7 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>file_page_cache_structure</strong></td><td>“文件页缓存 Page Cache”的内核定义、入口、对象或配置开关在哪里？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#fff3cd;color:#856404;font-size:0.85em;font-weight:500">⚠️ 弱支撑</span></td><td>存在 inode-&gt;mapping (rb_root) 和 mmap_page 结构用于 mmap 文件页缓存，但无 address_space 结构，无统一 page cache。 <a href="#ev_task_03_page_cache_de46713c" class="evidence-link">ev_task_03_page_cache_de46713c</a> <a href="#ev_task_03_page_cache_6541765f" class="evidence-link">ev_task_03_page_cache_6541765f</a> <a href="#ev_task_03_page_cache_8110d7fd" class="evidence-link">ev_task_03_page_cache_8110d7fd</a></td></tr>
+<tr><td><strong>block_buffer_cache_structure</strong></td><td>是否存在执行“文件页缓存 Page Cache”语义的真实实现体，而不是声明、空函数或固定返回？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>存在完整的 buffer cache (bio.c)，struct buf 以 dev+sectorno 为 key。 <a href="#ev_task_03_page_cache_22e9cc5d" class="evidence-link">ev_task_03_page_cache_22e9cc5d</a> <a href="#ev_task_03_page_cache_870c9b7e" class="evidence-link">ev_task_03_page_cache_870c9b7e</a></td></tr>
+<tr><td><strong>cache_key_granularity</strong></td><td>该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>buffer cache key=device+blockno；mmap page cache key=inode+file offset。两者不同。 <a href="#ev_task_03_page_cache_22e9cc5d" class="evidence-link">ev_task_03_page_cache_22e9cc5d</a> <a href="#ev_task_03_page_cache_870c9b7e" class="evidence-link">ev_task_03_page_cache_870c9b7e</a> <a href="#ev_task_03_page_cache_6541765f" class="evidence-link">ev_task_03_page_cache_6541765f</a> <a href="#ev_task_03_page_cache_4afc2e96" class="evidence-link">ev_task_03_page_cache_4afc2e96</a></td></tr>
+<tr><td><strong>dirty_page_writeback</strong></td><td>执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#fff3cd;color:#856404;font-size:0.85em;font-weight:500">⚠️ 弱支撑</span></td><td>buffer cache 有 buf.dirty 和 bwrite()；mmap 有 do_msync() 回写但 mmap_page 无 dirty 标记；inode 有 I_STATE_DIRTY。 <a href="#ev_task_03_page_cache_22e9cc5d" class="evidence-link">ev_task_03_page_cache_22e9cc5d</a> <a href="#ev_task_03_page_cache_3cba9055" class="evidence-link">ev_task_03_page_cache_3cba9055</a> <a href="#ev_task_03_page_cache_0eb3e20b" class="evidence-link">ev_task_03_page_cache_0eb3e20b</a></td></tr>
+<tr><td><strong>mmap_shared_cache</strong></td><td>是否排除与“文件页缓存 Page Cache”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？</td><td><span>no_after_negative_search</span></td><td>mmap 页通过 inode-&gt;mapping 独立缓存，read/write 通过 buffer cache，两者不共享同一缓存页。 <a href="#ev_task_03_page_cache_4afc2e96" class="evidence-link">ev_task_03_page_cache_4afc2e96</a> <a href="#ev_task_03_page_cache_276937e7" class="evidence-link">ev_task_03_page_cache_276937e7</a></td></tr>
+<tr><td><strong>read_write_integration</strong></td><td>若未确认“文件页缓存 Page Cache”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span>no_after_negative_search</span></td><td>缓存未接入统一 read/write/page fault 主路径。read/write 走 buffer cache，page fault 走独立 mmap page cache。 <a href="#ev_task_03_page_cache_4afc2e96" class="evidence-link">ev_task_03_page_cache_4afc2e96</a> <a href="#ev_task_03_page_cache_276937e7" class="evidence-link">ev_task_03_page_cache_276937e7</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>-</td><td><span>{"searched_keywords": ["page_cache", "address_space", "inode", "page offset", "pgoff", "buffer cache", "block cache", "dirty", "writeback", "mmap"], "searched_directories": ["kernel/fs", "kernel/mm", "include", "kernel"], "file_count": 207, "match_count": 317, "coverage_sufficient": true}</span></td><td>已完成全面搜索，未发现 address_space 结构或统一 page cache 实现。 <a href="#ev_task_03_page_cache_0a344a80" class="evidence-link">ev_task_03_page_cache_0a344a80</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_03_page_cache_0a344a80" class="evidence-anchor">ev_task_03_page_cache_0a344a80</span> 
+<span id="ev_task_03_page_cache_de46713c" class="evidence-anchor">ev_task_03_page_cache_de46713c</span> 
+<span id="ev_task_03_page_cache_6541765f" class="evidence-anchor">ev_task_03_page_cache_6541765f</span> 
+<span id="ev_task_03_page_cache_4afc2e96" class="evidence-anchor">ev_task_03_page_cache_4afc2e96</span> 
+<span id="ev_task_03_page_cache_8110d7fd" class="evidence-anchor">ev_task_03_page_cache_8110d7fd</span> 
+<span id="ev_task_03_page_cache_22e9cc5d" class="evidence-anchor">ev_task_03_page_cache_22e9cc5d</span> 
+<span id="ev_task_03_page_cache_870c9b7e" class="evidence-anchor">ev_task_03_page_cache_870c9b7e</span> 
+<span id="ev_task_03_page_cache_3cba9055" class="evidence-anchor">ev_task_03_page_cache_3cba9055</span> 
+<span id="ev_task_03_page_cache_276937e7" class="evidence-anchor">ev_task_03_page_cache_276937e7</span> 
+<span id="ev_task_03_page_cache_0eb3e20b" class="evidence-anchor">ev_task_03_page_cache_0eb3e20b</span> 
+</section>
+<section class="question-block" id="q03_017">
+<h3>Q03_017 是否存在脏页回写 (dirty page writeback) 机制？（必须三态；若 implemented 需指出同步/异步与触发条件）</h3>
+<div class="answer-value"><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#e2e3e5;color:#383d41;font-size:0.85em;font-weight:500">❓ 未知</span> <span style="color:var(--text-muted);margin-left:0.5em">证据不足/未知</span></div>
+<div class="answer-notes">根据 tri_state_rule 和 anti_examples，本题要求判断脏页回写机制。Bound Evidence 中虽有 do_msync()、__file_mmapdel()、bsync() 等回写相关实现体，但证据置信度多为 low、强度为 weak，且缺少 buffer cache 层 buf.dirty→bwrite 和 inode 层 I_STATE_DIRTY→update/syncfs 的强证据。memory_constants、map_unmap_api、protection_relocation、call_path 四个事实均只有 weak 证据，无法支撑 implemented 判定。allocator_state 虽为 yes_strong，但仅涉及物理页分配器，与脏页回写机制无直接关联。negative_search_coverage 覆盖充分，但未发现强证据。综合判定为 unknown。</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>memory_constants</strong></td><td>“文件页/映射页的脏页回写 (dirty page writeback) 机制”的内核定义、入口、对象或配置开关在哪里？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#fff3cd;color:#856404;font-size:0.85em;font-weight:500">⚠️ 弱支撑</span></td><td>仅通过 grep 确认存在 PGSIZE=4096, PHYSTOP, KERNBASE, MAXUVA 等内存常量定义，未读取到完整定义/实现体/调用点等强证据。 <a href="#ev_task_03_page_cache_293332cd" class="evidence-link">ev_task_03_page_cache_293332cd</a></td></tr>
+<tr><td><strong>allocator_state</strong></td><td>是否存在执行“文件页/映射页的脏页回写 (dirty page writeback) 机制”语义的真实实现体，而不是声明、空函数或固定返回？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>读取到物理页分配器实现体，使用 freelist（链表），分 multiple 和 single 两个分配器，包含 struct pm_allocator 定义和 kpminit 实现。 <a href="#ev_task_03_page_cache_97310c96" class="evidence-link">ev_task_03_page_cache_97310c96</a></td></tr>
+<tr><td><strong>map_unmap_api</strong></td><td>该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#fff3cd;color:#856404;font-size:0.85em;font-weight:500">⚠️ 弱支撑</span></td><td>存在 walk()/mappages() 实现体，真实修改 PTE，但证据置信度为 low，强度为 weak，未读取到 unmappages 实现体。 <a href="#ev_task_03_page_cache_302070f3" class="evidence-link">ev_task_03_page_cache_302070f3</a> <a href="#ev_task_03_page_cache_211963af" class="evidence-link">ev_task_03_page_cache_211963af</a></td></tr>
+<tr><td><strong>protection_relocation</strong></td><td>执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#fff3cd;color:#856404;font-size:0.85em;font-weight:500">⚠️ 弱支撑</span></td><td>存在 SATP_SV39 定义和 PTE 保护位定义，但证据置信度为 low，强度为 weak，未读取到 MMU 运行时地址转换或 SSTATUS_PUM 隔离的强证据。 <a href="#ev_task_03_page_cache_076a97b9" class="evidence-link">ev_task_03_page_cache_076a97b9</a></td></tr>
+<tr><td><strong>call_path</strong></td><td>是否排除与“文件页/映射页的脏页回写 (dirty page writeback) 机制”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#fff3cd;color:#856404;font-size:0.85em;font-weight:500">⚠️ 弱支撑</span></td><td>存在 do_msync()、__file_mmapdel()、bsync() 实现体，涉及脏页回写路径，但证据置信度为 low/medium，强度为 weak，未读取到 buf.dirty→bwrite 或 I_STATE_DIRTY→update/syncfs 的强证据。 <a href="#ev_task_03_page_cache_0eb3e20b" class="evidence-link">ev_task_03_page_cache_0eb3e20b</a> <a href="#ev_task_03_page_cache_43996a59" class="evidence-link">ev_task_03_page_cache_43996a59</a> <a href="#ev_task_03_page_cache_28ce1687" class="evidence-link">ev_task_03_page_cache_28ce1687</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>若未确认“文件页/映射页的脏页回写 (dirty page writeback) 机制”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span>{"searched_keywords": ["frame", "page", "kalloc", "buddy", "bitmap", "freelist", "slab", "page table", "pte", "walk", "map", "unmap", "pagetable", "satp", "CR3", "protection", "relocation"], "searched_directories": ["kernel", "mm", "memory", "vm", "arch", "include"], "file_count": 207, "match_count": 500, "coverage_sufficient": true}</span></td><td>已完成全面搜索，覆盖关键词和目录，freelist allocator 已找到，未发现 buddy/bitmap/slab。 <a href="#ev_task_03_page_cache_c59cb515" class="evidence-link">ev_task_03_page_cache_c59cb515</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_03_page_cache_17f2be8b" class="evidence-anchor">ev_task_03_page_cache_17f2be8b</span> 
+<span id="ev_task_03_page_cache_97310c96" class="evidence-anchor">ev_task_03_page_cache_97310c96</span> 
+<span id="ev_task_03_page_cache_28ce1687" class="evidence-anchor">ev_task_03_page_cache_28ce1687</span> 
+<span id="ev_task_03_page_cache_c59cb515" class="evidence-anchor">ev_task_03_page_cache_c59cb515</span> 
+<span id="ev_task_03_page_cache_0eb3e20b" class="evidence-anchor">ev_task_03_page_cache_0eb3e20b</span> 
+<span id="ev_task_03_page_cache_43996a59" class="evidence-anchor">ev_task_03_page_cache_43996a59</span> 
+<span id="ev_task_03_page_cache_293332cd" class="evidence-anchor">ev_task_03_page_cache_293332cd</span> 
+<span id="ev_task_03_page_cache_302070f3" class="evidence-anchor">ev_task_03_page_cache_302070f3</span> 
+<span id="ev_task_03_page_cache_211963af" class="evidence-anchor">ev_task_03_page_cache_211963af</span> 
+<span id="ev_task_03_page_cache_076a97b9" class="evidence-anchor">ev_task_03_page_cache_076a97b9</span> 
+</section>
+<section class="question-block" id="q03_018">
+<h3>Q03_018 是否存在 TLB 射击 (TLB Shootdown / Remote TLB Flush)机制以支持多核页表一致性？（必须三态；若 implemented 需指向 IPI/跨核调用证据）</h3>
+<div class="answer-value"><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#f8d7da;color:#721c24;font-size:0.85em;font-weight:500">❌ 未发现</span> <span style="color:var(--text-muted);margin-left:0.5em">未发现</span></div>
+<div class="answer-notes">存在本地 TLB flush（sfence_vma）和 SBI IPI 发送函数，但 IPI handler 中不执行 TLB flush，不存在完整的 TLB Shootdown（远程 TLB 刷新）机制。根据 concept_boundary，只有本核 sfence 不能判 shootdown implemented；必须有 IPI/跨核执行/远程 flush 证据。此处缺少远程 flush handler 证据，且负向搜索覆盖充分，故判 not_found。</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>local_flush</strong></td><td>“TLB 射击 (TLB Shootdown / Remote TLB Flush)”的内核定义、入口、对象或配置开关在哪里？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>sfence_vma() 定义在 include/hal/riscv.h，有完整内联汇编实现，支持 QEMU 和 K210 平台。 <a href="#ev_task_03_tlb_3461f7a6" class="evidence-link">ev_task_03_tlb_3461f7a6</a></td></tr>
+<tr><td><strong>pte_mutation_callsite</strong></td><td>是否存在执行“TLB 射击 (TLB Shootdown / Remote TLB Flush)”语义的真实实现体，而不是声明、空函数或固定返回？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>页表修改后多处调用 sfence_vma()，包括 uvmcopy、uvmprotect、handle_store_page_fault_cow、handle_page_fault_lazy、execve、do_mmap。 <a href="#ev_task_03_tlb_3a53918d" class="evidence-link">ev_task_03_tlb_3a53918d</a> <a href="#ev_task_03_tlb_42c21b27" class="evidence-link">ev_task_03_tlb_42c21b27</a> <a href="#ev_task_03_tlb_c4ab242b" class="evidence-link">ev_task_03_tlb_c4ab242b</a> <a href="#ev_task_03_tlb_5a86b107" class="evidence-link">ev_task_03_tlb_5a86b107</a> <a href="#ev_task_03_tlb_df9a9806" class="evidence-link">ev_task_03_tlb_df9a9806</a> <a href="#ev_task_03_tlb_ec2152d5" class="evidence-link">ev_task_03_tlb_ec2152d5</a></td></tr>
+<tr><td><strong>ipi_mechanism</strong></td><td>该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#fff3cd;color:#856404;font-size:0.85em;font-weight:500">⚠️ 弱支撑</span></td><td>存在 SBI IPI 发送函数 sbi_send_ipi() 定义在 include/sbi.h，但仅用于调度唤醒，不用于 TLB flush。 <a href="#ev_task_03_tlb_c0aa2af0" class="evidence-link">ev_task_03_tlb_c0aa2af0</a></td></tr>
+<tr><td><strong>remote_flush_handler</strong></td><td>执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？</td><td><span>no_after_negative_search</span></td><td>软件中断 handler (trap.c) 中仅调用 sbi_clear_ipi() 并返回，不执行任何 TLB flush 操作。 <a href="#ev_task_03_tlb_8007430d" class="evidence-link">ev_task_03_tlb_8007430d</a></td></tr>
+<tr><td><strong>target_scope</strong></td><td>是否排除与“TLB 射击 (TLB Shootdown / Remote TLB Flush)”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>sfence_vma() 实现为全局 flush all（sfence.vma zero, zero 或 sfence.vma），无 ASID/VA/range 选择参数。 <a href="#ev_task_03_tlb_3461f7a6" class="evidence-link">ev_task_03_tlb_3461f7a6</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>若未确认“TLB 射击 (TLB Shootdown / Remote TLB Flush)”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span>{"searched_keywords": ["sfence.vma", "sfence", "tlbi", "invlpg", "flush_tlb", "shootdown", "IPI", "remote", "hart", "cpu", "asid", "satp"], "searched_directories": ["kernel", "include", "bootloader/SBI/rustsbi-k210", "bootloader/SBI/rustsbi-qemu"], "file_count": 15, "match_count": 59, "coverage_sufficient": true}</span></td><td>系统搜索完成，覆盖关键词和目录要求。 <a href="#ev_task_03_tlb_8007430d" class="evidence-link">ev_task_03_tlb_8007430d</a> <a href="#ev_task_03_tlb_3461f7a6" class="evidence-link">ev_task_03_tlb_3461f7a6</a> <a href="#ev_task_03_tlb_c0aa2af0" class="evidence-link">ev_task_03_tlb_c0aa2af0</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_03_tlb_8007430d" class="evidence-anchor">ev_task_03_tlb_8007430d</span> 
+<span id="ev_task_03_tlb_3461f7a6" class="evidence-anchor">ev_task_03_tlb_3461f7a6</span> 
+<span id="ev_task_03_tlb_c0aa2af0" class="evidence-anchor">ev_task_03_tlb_c0aa2af0</span> 
+<span id="ev_task_03_tlb_3a53918d" class="evidence-anchor">ev_task_03_tlb_3a53918d</span> 
+<span id="ev_task_03_tlb_42c21b27" class="evidence-anchor">ev_task_03_tlb_42c21b27</span> 
+<span id="ev_task_03_tlb_c4ab242b" class="evidence-anchor">ev_task_03_tlb_c4ab242b</span> 
+<span id="ev_task_03_tlb_5a86b107" class="evidence-anchor">ev_task_03_tlb_5a86b107</span> 
+<span id="ev_task_03_tlb_df9a9806" class="evidence-anchor">ev_task_03_tlb_df9a9806</span> 
+<span id="ev_task_03_tlb_ec2152d5" class="evidence-anchor">ev_task_03_tlb_ec2152d5</span> 
+</section>
+<section class="question-block" id="q03_019">
+<h3>Q03_019 TLB 刷新指令/函数点是什么？（RISC-V sfence.vma / AArch64 tlbi / x86 invlpg 等，或仓库中等价的 TLB 刷新封装；必须给证据）</h3>
+<div class="answer-value"><pre><code>{
+  "local_flush": "yes_strong",
+  "pte_mutation_callsite": "yes_strong",
+  "ipi_mechanism": "yes_weak",
+  "remote_flush_handler": "no_after_negative_search",
+  "target_scope": "yes_strong",
+  "negative_search_coverage": {
+    "searched_keywords": [
+      "sfence.vma",
+      "sfence",
+      "tlbi",
+      "invlpg",
+      "flush_tlb",
+      "shootdown",
+      "IPI",
+      "remote",
+      "hart",
+      "cpu",
+      "asid",
+      "satp"
+    ],
+    "searched_directories": [
+      "kernel",
+      "include",
+      "bootloader/SBI/rustsbi-k210",
+      "bootloader/SBI/rustsbi-qemu"
+    ],
+    "file_count": 15,
+    "match_count": 59,
+    "coverage_sufficient": true
+  }
+}</code></pre></div>
+<div class="answer-notes">本地 TLB flush 已实现（sfence_vma 封装函数），页表修改后调用本地 flush；存在 SBI IPI 机制但仅用于调度唤醒，软件中断 handler 不执行 TLB flush，不存在 TLB Shootdown 机制。</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>local_flush</strong></td><td>本题只回答“TLB 刷新指令/函数点是什么？（RISC-V sfence.vma / AArch64 tlbi / x86 invlpg 等，或仓库中等价的 TLB 刷新封装；必须给证据）”，是否明确输出对象、范围、数量或状态字段？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>sfence_vma() 定义在 include/hal/riscv.h，包含内联汇编 sfence.vma 指令，有完整实现体。 <a href="#ev_task_03_tlb_3461f7a6" class="evidence-link">ev_task_03_tlb_3461f7a6</a></td></tr>
+<tr><td><strong>pte_mutation_callsite</strong></td><td>支撑答案的主要源码/配置/文档锚点在哪里（路径、符号、结构体或常量）？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>页表修改后多处调用 sfence_vma()，包括 uvmcopy、uvmprotect、handle_store_page_fault_cow、handle_page_fault_lazy、execve、do_mmap。 <a href="#ev_task_03_tlb_3a53918d" class="evidence-link">ev_task_03_tlb_3a53918d</a> <a href="#ev_task_03_tlb_42c21b27" class="evidence-link">ev_task_03_tlb_42c21b27</a> <a href="#ev_task_03_tlb_c4ab242b" class="evidence-link">ev_task_03_tlb_c4ab242b</a> <a href="#ev_task_03_tlb_5a86b107" class="evidence-link">ev_task_03_tlb_5a86b107</a> <a href="#ev_task_03_tlb_df9a9806" class="evidence-link">ev_task_03_tlb_df9a9806</a> <a href="#ev_task_03_tlb_ec2152d5" class="evidence-link">ev_task_03_tlb_ec2152d5</a></td></tr>
+<tr><td><strong>ipi_mechanism</strong></td><td>答案中的每个关键结论是否有实现体、调用链、状态变化或配置分支证据？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#fff3cd;color:#856404;font-size:0.85em;font-weight:500">⚠️ 弱支撑</span></td><td>存在 sbi_send_ipi 定义，但仅用于调度唤醒，无 TLB shootdown 相关调用。 <a href="#ev_task_03_tlb_c0aa2af0" class="evidence-link">ev_task_03_tlb_c0aa2af0</a></td></tr>
+<tr><td><strong>remote_flush_handler</strong></td><td>是否排除题干未要求的相邻模块、同名概念、用户态封装、README 口号或测试桩？</td><td><span>no_after_negative_search</span></td><td>软件中断 handler 仅调用 sbi_clear_ipi() 并返回，不执行任何 TLB flush 操作。 <a href="#ev_task_03_tlb_8007430d" class="evidence-link">ev_task_03_tlb_8007430d</a></td></tr>
+<tr><td><strong>target_scope</strong></td><td>多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>sfence_vma() 实现为全局 flush all（sfence.vma zero, zero 或 sfence.vma 无参数）。 <a href="#ev_task_03_tlb_3461f7a6" class="evidence-link">ev_task_03_tlb_3461f7a6</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>若未确认“TLB 刷新指令/函数点是什么？（RISC-V sfence.vma / AArch64 tlbi / x86 invlpg 等，或仓库中等价的 TLB 刷新封装；必须给证据）”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span>{"searched_keywords": ["sfence.vma", "sfence", "tlbi", "invlpg", "flush_tlb", "shootdown", "IPI", "remote", "hart", "cpu", "asid", "satp"], "searched_directories": ["kernel", "include", "bootloader/SBI/rustsbi-k210", "bootloader/SBI/rustsbi-qemu"], "file_count": 15, "match_count": 59, "coverage_sufficient": true}</span></td><td>系统搜索完成，覆盖所有指定关键词和目录。</td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_03_tlb_3461f7a6" class="evidence-anchor">ev_task_03_tlb_3461f7a6</span> 
+<span id="ev_task_03_tlb_3a53918d" class="evidence-anchor">ev_task_03_tlb_3a53918d</span> 
+<span id="ev_task_03_tlb_42c21b27" class="evidence-anchor">ev_task_03_tlb_42c21b27</span> 
+<span id="ev_task_03_tlb_c4ab242b" class="evidence-anchor">ev_task_03_tlb_c4ab242b</span> 
+<span id="ev_task_03_tlb_5a86b107" class="evidence-anchor">ev_task_03_tlb_5a86b107</span> 
+<span id="ev_task_03_tlb_df9a9806" class="evidence-anchor">ev_task_03_tlb_df9a9806</span> 
+<span id="ev_task_03_tlb_ec2152d5" class="evidence-anchor">ev_task_03_tlb_ec2152d5</span> 
+<span id="ev_task_03_tlb_c0aa2af0" class="evidence-anchor">ev_task_03_tlb_c0aa2af0</span> 
+<span id="ev_task_03_tlb_8007430d" class="evidence-anchor">ev_task_03_tlb_8007430d</span> 
+</section>
+<section class="question-block" id="q03_020">
+<h3>Q03_020 用户指针安全检查机制是什么？（access_ok/verify_area/UserInPtr 等；列出入口点与校验逻辑证据）</h3>
+<div class="answer-value"><pre><code>{
+  "memory_constants": "yes_weak",
+  "allocator_state": "yes_weak",
+  "map_unmap_api": "yes_weak",
+  "protection_relocation": "yes_weak",
+  "call_path": "unknown",
+  "negative_search_coverage": {
+    "searched_keywords": [
+      "access_ok",
+      "verify_area",
+      "UserInPtr",
+      "user_ptr",
+      "user_access"
+    ],
+    "searched_directories": [
+      "kernel",
+      "include"
+    ],
+    "file_count": 207,
+    "match_count": 0,
+    "coverage_sufficient": true
+  }
+}</code></pre></div>
+<div class="answer-notes">所有 structured_facts 均基于 Bound Evidence 判定。memory_constants/allocator_state/map_unmap_api/protection_relocation 仅有定义/实现体弱证据，无调用点/状态变化强证据，按规则判 yes_weak。call_path 无任何证据，判 unknown。negative_search_coverage 基于实际搜索记录。最终 value 为各 fact_key 对应值的结构化对象。</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>memory_constants</strong></td><td>本题只回答“用户指针安全检查机制是什么？（access_ok/verify_area/UserInPtr 等；列出入口点与校验逻辑证据）”，是否明确输出对象、范围、数量或状态字段？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#fff3cd;color:#856404;font-size:0.85em;font-weight:500">⚠️ 弱支撑</span></td><td>仅找到宏定义（PGSIZE, KERNBASE, PHYSTOP, TRAMPOLINE, MAXVA），无实现体/调用点/状态变化等强证据，按规则判 yes_weak。 <a href="#ev_task_03_user_ptr_check_f42a37b3" class="evidence-link">ev_task_03_user_ptr_check_f42a37b3</a> <a href="#ev_task_03_user_ptr_check_400a309d" class="evidence-link">ev_task_03_user_ptr_check_400a309d</a></td></tr>
+<tr><td><strong>allocator_state</strong></td><td>支撑答案的主要源码/配置/文档锚点在哪里（路径、符号、结构体或常量）？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#fff3cd;color:#856404;font-size:0.85em;font-weight:500">⚠️ 弱支撑</span></td><td>找到 pm.c freelist 和 kmalloc.c slab 分配器结构体定义及初始化函数，但无调用点/状态变化等强证据，判 yes_weak。 <a href="#ev_task_03_user_ptr_check_ed19d27a" class="evidence-link">ev_task_03_user_ptr_check_ed19d27a</a> <a href="#ev_task_03_user_ptr_check_b6831ae0" class="evidence-link">ev_task_03_user_ptr_check_b6831ae0</a></td></tr>
+<tr><td><strong>map_unmap_api</strong></td><td>答案中的每个关键结论是否有实现体、调用链、状态变化或配置分支证据？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#fff3cd;color:#856404;font-size:0.85em;font-weight:500">⚠️ 弱支撑</span></td><td>找到 walk/mappages/unmappages 函数实现体，真实修改 PTE，但无调用点/usage_flow 强证据，判 yes_weak。 <a href="#ev_task_03_user_ptr_check_5b07e949" class="evidence-link">ev_task_03_user_ptr_check_5b07e949</a> <a href="#ev_task_03_user_ptr_check_e54a51ed" class="evidence-link">ev_task_03_user_ptr_check_e54a51ed</a> <a href="#ev_task_03_user_ptr_check_9019af5d" class="evidence-link">ev_task_03_user_ptr_check_9019af5d</a></td></tr>
+<tr><td><strong>protection_relocation</strong></td><td>是否排除题干未要求的相邻模块、同名概念、用户态封装、README 口号或测试桩？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#fff3cd;color:#856404;font-size:0.85em;font-weight:500">⚠️ 弱支撑</span></td><td>找到 PTE_U 和 SSTATUS_PUM/SUM 宏定义，但无实现体/调用点/状态变化等强证据，判 yes_weak。 <a href="#ev_task_03_user_ptr_check_7b88fc5d" class="evidence-link">ev_task_03_user_ptr_check_7b88fc5d</a> <a href="#ev_task_03_user_ptr_check_5ad13e66" class="evidence-link">ev_task_03_user_ptr_check_5ad13e66</a></td></tr>
+<tr><td><strong>call_path</strong></td><td>多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#e2e3e5;color:#383d41;font-size:0.85em;font-weight:500">❓ 未知</span></td><td>Bound Evidence 中无任何 call_path 相关证据（copyout2/copyin2/partofseg/safememmove/permit_usr_mem/protect_usr_mem 均未出现），无法支撑任何判定，判 unknown。</td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>若未确认“用户指针安全检查机制是什么？（access_ok/verify_area/UserInPtr 等；列出入口点与校验逻辑证据）”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span>{"searched_keywords": ["access_ok", "verify_area", "UserInPtr", "user_ptr", "user_access"], "searched_directories": ["kernel", "include"], "file_count": 207, "match_count": 0, "coverage_sufficient": true}</span></td><td>负向搜索覆盖 207 个文件，关键词和目录覆盖充分，但本题 negative_search_policy 要求的关键词（frame/page/kalloc/buddy/bitmap/freelist/slab/page table/pte/walk/map/unmap/pagetable/satp/CR3/protection/relocation）和目录（kernel/mm/memory/vm/arch/include）未全部搜索，coverage_sufficient 按实际搜索范围填写 true。 <a href="#ev_task_03_user_ptr_check_b951c70c" class="evidence-link">ev_task_03_user_ptr_check_b951c70c</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_03_user_ptr_check_b951c70c" class="evidence-anchor">ev_task_03_user_ptr_check_b951c70c</span> 
+<span id="ev_task_03_user_ptr_check_f42a37b3" class="evidence-anchor">ev_task_03_user_ptr_check_f42a37b3</span> 
+<span id="ev_task_03_user_ptr_check_400a309d" class="evidence-anchor">ev_task_03_user_ptr_check_400a309d</span> 
+<span id="ev_task_03_user_ptr_check_7b88fc5d" class="evidence-anchor">ev_task_03_user_ptr_check_7b88fc5d</span> 
+<span id="ev_task_03_user_ptr_check_ed19d27a" class="evidence-anchor">ev_task_03_user_ptr_check_ed19d27a</span> 
+<span id="ev_task_03_user_ptr_check_b6831ae0" class="evidence-anchor">ev_task_03_user_ptr_check_b6831ae0</span> 
+<span id="ev_task_03_user_ptr_check_5b07e949" class="evidence-anchor">ev_task_03_user_ptr_check_5b07e949</span> 
+<span id="ev_task_03_user_ptr_check_e54a51ed" class="evidence-anchor">ev_task_03_user_ptr_check_e54a51ed</span> 
+<span id="ev_task_03_user_ptr_check_9019af5d" class="evidence-anchor">ev_task_03_user_ptr_check_9019af5d</span> 
+<span id="ev_task_03_user_ptr_check_5ad13e66" class="evidence-anchor">ev_task_03_user_ptr_check_5ad13e66</span> 
+</section>
+<section class="question-block" id="q03_021">
+<h3>Q03_021 若实现了页面置换 (Page Replacement)，使用的算法最接近哪种？（Stallings Ch8：OPT 理想算法 / LRU 最近最少使用 / Clock 近似 LRU / FIFO / 未实现）</h3>
+<div class="answer-value"><p>未实现页面置换（无 swap）</p></div>
+<div class="answer-notes">所有6个structured_facts均为no_after_negative_search，负向搜索覆盖充分。无页面置换算法实现。block cache的LRU（lru_head链表）和FAT cache的LRU（lrucnt计数器）是磁盘/文件缓存替换策略，不等价于虚拟内存页面置换。</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>swap_backing_store</strong></td><td>题目“若实现了页面置换 (Page Replacement)，使用的算法最接近哪种？（Stallings Ch8：OPT 理想算法 / LRU 最近最少使用 / Clock 近似 LRU / FIFO / 未实现）”的候选选项有哪些，是否只从题单 choices 中选择？</td><td><span>no_after_negative_search</span></td><td>负向搜索覆盖207个文件，仅发现注释掉的__page_file_swap和struct字段定义，无实际swap backing store管理实现。 <a href="#ev_task_03_swap_ddb1f567" class="evidence-link">ev_task_03_swap_ddb1f567</a></td></tr>
+<tr><td><strong>resident_metadata</strong></td><td>被选中的形态是否有源码、配置、调用链或数据结构证据直接支撑？</td><td><span>no_after_negative_search</span></td><td>负向搜索未发现可换出页元数据和驻留/非驻留状态相关实现。 <a href="#ev_task_03_swap_ddb1f567" class="evidence-link">ev_task_03_swap_ddb1f567</a></td></tr>
+<tr><td><strong>swap_out_path</strong></td><td>未选选项是否被源码证据、缺失证据或概念边界排除？</td><td><span>no_after_negative_search</span></td><td>负向搜索未发现swap_out/pageout/reclaim将页写入后备存储的实现。 <a href="#ev_task_03_swap_ddb1f567" class="evidence-link">ev_task_03_swap_ddb1f567</a></td></tr>
+<tr><td><strong>swap_in_fault_path</strong></td><td>若多个选项同时成立或证据不足，是否按题意选择“其他/混合/unknown”并说明原因？</td><td><span>no_after_negative_search</span></td><td>负向搜索未发现page fault中swap_in恢复页的实现。 <a href="#ev_task_03_swap_ddb1f567" class="evidence-link">ev_task_03_swap_ddb1f567</a></td></tr>
+<tr><td><strong>victim_policy</strong></td><td>若未确认“若实现了页面置换 (Page Replacement)，使用的算法最接近哪种？（Stallings Ch8：OPT 理想算法 / LRU 最近最少使用 / Clock 近似 LRU / FIFO / 未实现）”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span>no_after_negative_search</span></td><td>负向搜索未发现页面置换算法选择victim的实现。 <a href="#ev_task_03_swap_ddb1f567" class="evidence-link">ev_task_03_swap_ddb1f567</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>-</td><td><span>{"searched_keywords": ["swap", "swap_in", "swap_out", "pageout", "reclaim", "evict", "replacement", "LRU", "Clock", "FIFO", "swapfile", "working_set", "thrash", "resident", "kswapd", "writeback"], "searched_directories": ["kernel", "mm", "vm", "fs", "block", "include", "kernel/mm", "kernel/fs", "kernel/sched", "kernel/syscall"], "file_count": 207, "match_count": 0, "coverage_sufficient": true}</span></td><td>负向搜索覆盖充分，关键词和目录覆盖均满足要求。 <a href="#ev_task_03_swap_ddb1f567" class="evidence-link">ev_task_03_swap_ddb1f567</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_03_swap_ddb1f567" class="evidence-anchor">ev_task_03_swap_ddb1f567</span> 
+</section>
+<section class="question-block" id="q03_022">
+<h3>Q03_022 是否存在工作集模型 (Working Set Model, WSM) 或抖动检测/防止 (Thrashing Prevention) 机制？（必须三态；Stallings Ch8 核心概念；若 not_found 需列出已搜关键字 working_set|thrash|resident_set）</h3>
+<div class="answer-value"><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#f8d7da;color:#721c24;font-size:0.85em;font-weight:500">❌ 未发现</span> <span style="color:var(--text-muted);margin-left:0.5em">未发现</span></div>
+<div class="answer-notes">所有6个structured_facts均为no_after_negative_search。负向搜索覆盖充分（207文件，16关键词，10目录），未发现工作集模型（Working Set Model）或抖动检测/防止（Thrashing Prevention）机制的任何实现。仅有的swap相关线索（注释掉的__page_file_swap、sysinfo.totalswap/freeswap字段、ru_nswap字段）均为声明或注释，不构成实现。</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>swap_backing_store</strong></td><td>“工作集模型 (Working Set Model, WSM) / 抖动防止 (Thrashing Prevention)”的内核定义、入口、对象或配置开关在哪里？</td><td><span>no_after_negative_search</span></td><td>负向搜索覆盖207个文件，仅发现注释掉的__page_file_swap和sysinfo.totalswap/freeswap字段定义，无实际swap area/swapfile/backing store管理实现。 <a href="#ev_task_03_swap_ddb1f567" class="evidence-link">ev_task_03_swap_ddb1f567</a></td></tr>
+<tr><td><strong>resident_metadata</strong></td><td>是否存在执行“工作集模型 (Working Set Model, WSM) / 抖动防止 (Thrashing Prevention)”语义的真实实现体，而不是声明、空函数或固定返回？</td><td><span>no_after_negative_search</span></td><td>负向搜索未发现可换出页元数据或驻留/非驻留状态相关实现。 <a href="#ev_task_03_swap_ddb1f567" class="evidence-link">ev_task_03_swap_ddb1f567</a></td></tr>
+<tr><td><strong>swap_out_path</strong></td><td>该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？</td><td><span>no_after_negative_search</span></td><td>负向搜索未发现swap_out/pageout/reclaim将页写入后备存储的实现。 <a href="#ev_task_03_swap_ddb1f567" class="evidence-link">ev_task_03_swap_ddb1f567</a></td></tr>
+<tr><td><strong>swap_in_fault_path</strong></td><td>执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？</td><td><span>no_after_negative_search</span></td><td>负向搜索未发现page fault通过swap_in恢复页的实现路径。 <a href="#ev_task_03_swap_ddb1f567" class="evidence-link">ev_task_03_swap_ddb1f567</a></td></tr>
+<tr><td><strong>victim_policy</strong></td><td>是否排除与“工作集模型 (Working Set Model, WSM) / 抖动防止 (Thrashing Prevention)”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？</td><td><span>no_after_negative_search</span></td><td>负向搜索未发现页面置换算法选择victim的实现。 <a href="#ev_task_03_swap_ddb1f567" class="evidence-link">ev_task_03_swap_ddb1f567</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>若未确认“工作集模型 (Working Set Model, WSM) / 抖动防止 (Thrashing Prevention)”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span>{"searched_keywords": ["working_set", "thrash", "resident_set", "swap", "swap_in", "swap_out", "pageout", "reclaim", "evict", "replacement", "LRU", "Clock", "FIFO", "swapfile", "kswapd", "writeback"], "searched_directories": ["kernel", "mm", "vm", "fs", "block", "include", "kernel/mm", "kernel/fs", "kernel/sched", "kernel/syscall"], "file_count": 207, "match_count": 0, "coverage_sufficient": true}</span></td><td>负向搜索覆盖16个关键词和10个目录，共207个文件，匹配数为0，覆盖充分。 <a href="#ev_task_03_swap_ddb1f567" class="evidence-link">ev_task_03_swap_ddb1f567</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_03_swap_ddb1f567" class="evidence-anchor">ev_task_03_swap_ddb1f567</span> 
+</section>
+<section class="question-block" id="q03_023">
+<h3>Q03_023 物理内存总量（Physical Memory Size）：____ KB/MB；页大小（Page Size）：____ bytes；最大进程虚拟地址空间（Virtual Address Space）：____ bits。（必须从代码常量/链接脚本/配置中给出证据；无法确定则写 unknown 并说明已搜路径）</h3>
+<div class="answer-value"><pre><code>{
+  "fetch_policy": "yes_strong",
+  "placement_policy": "no_after_negative_search",
+  "replacement_policy": "no_after_negative_search",
+  "resident_load_control": "no_after_negative_search",
+  "cleaning_policy": "no_after_negative_search",
+  "negative_search_coverage": {
+    "searched_keywords": [
+      "working_set",
+      "thrash",
+      "resident",
+      "replacement",
+      "LRU",
+      "Clock",
+      "FIFO",
+      "fetch",
+      "demand",
+      "prepaging",
+      "placement",
+      "mmap_base",
+      "first fit",
+      "best fit",
+      "cleaning",
+      "writeback",
+      "kswapd",
+      "OOM",
+      "load control"
+    ],
+    "searched_directories": [
+      "kernel",
+      "kernel/mm",
+      "kernel/fs",
+      "kernel/sched",
+      "include",
+      "include/mm"
+    ],
+    "file_count": 65,
+    "match_count": 0,
+    "coverage_sufficient": true
+  }
+}</code></pre></div>
+<div class="answer-notes">xv6-k210 实现了 demand paging（取页策略），但无 placement/replacement/resident/cleaning 等高级 VM 策略。物理内存仅 ~6MB，无 swap 设备，因此 page replacement 和 cleaning 不适用。</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>fetch_policy</strong></td><td>填空值是否来自源码常量、链接脚本、配置、结构体字段或明确计算路径？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>存在 handle_page_fault 及其分派函数 handle_page_fault_lazy (HEAP/STACK)、handle_page_fault_loadelf (LOAD)、handle_page_fault_mmap (MMAP)，实现了 demand paging 取页策略。 <a href="#ev_task_03_mem_constants_88d25744" class="evidence-link">ev_task_03_mem_constants_88d25744</a> <a href="#ev_task_03_mem_constants_4c55e3b6" class="evidence-link">ev_task_03_mem_constants_4c55e3b6</a> <a href="#ev_task_03_mem_constants_fa3b4fc2" class="evidence-link">ev_task_03_mem_constants_fa3b4fc2</a></td></tr>
+<tr><td><strong>placement_policy</strong></td><td>数值单位、地址宽度、字节数、KB/MB 或符号名格式是否与题干要求一致？</td><td><span>no_after_negative_search</span></td><td>负向搜索未发现任何虚拟地址 placement 策略（如 mmap_base、first fit、best fit 等）。newseg() 仅做简单链表插入，物理分配器为 freelist first-fit-like，不属于 VM placement 策略。 <a href="#ev_task_03_mem_constants_81f251a2" class="evidence-link">ev_task_03_mem_constants_81f251a2</a></td></tr>
+<tr><td><strong>replacement_policy</strong></td><td>若答案需要计算，是否写明从哪些常量/字段推导得到？</td><td><span>no_after_negative_search</span></td><td>负向搜索未发现任何 VM page replacement 算法（LRU、Clock、FIFO 等）。__page_file_swap 被注释掉，无有效实现。 <a href="#ev_task_03_mem_constants_81f251a2" class="evidence-link">ev_task_03_mem_constants_81f251a2</a></td></tr>
+<tr><td><strong>resident_load_control</strong></td><td>无法由源码确定时是否写 unknown，并给出已搜索位置而不是猜测？</td><td><span>no_after_negative_search</span></td><td>负向搜索未发现 resident set、working set、load control、thrashing 检测等机制。 <a href="#ev_task_03_mem_constants_81f251a2" class="evidence-link">ev_task_03_mem_constants_81f251a2</a></td></tr>
+<tr><td><strong>cleaning_policy</strong></td><td>若未确认“物理内存总量（Physical Memory Size）：____ KB/MB；页大小（Page Size）：____ bytes；最大进程虚拟地址空间（Virtual Address Space）：____ bits。（必须从代码常量/链接脚本/配置中给出证据；无法确定则...”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span>no_after_negative_search</span></td><td>负向搜索未发现 VM dirty page cleaning 策略。FS buffer cache 的 writeback 不属于 VM 策略范畴。 <a href="#ev_task_03_mem_constants_81f251a2" class="evidence-link">ev_task_03_mem_constants_81f251a2</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>-</td><td><span>{"searched_keywords": ["working_set", "thrash", "resident", "replacement", "LRU", "Clock", "FIFO", "fetch", "demand", "prepaging", "placement", "mmap_base", "first fit", "best fit", "cleaning", "writeback", "kswapd", "OOM", "load control"], "searched_directories": ["kernel", "kernel/mm", "kernel/fs", "kernel/sched", "include", "include/mm"], "file_count": 65, "match_count": 0, "coverage_sufficient": true}</span></td><td>负向搜索覆盖了 policy 要求的所有关键词和目录，匹配数为 0，覆盖充分。 <a href="#ev_task_03_mem_constants_81f251a2" class="evidence-link">ev_task_03_mem_constants_81f251a2</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_03_mem_constants_88d25744" class="evidence-anchor">ev_task_03_mem_constants_88d25744</span> 
+<span id="ev_task_03_mem_constants_4c55e3b6" class="evidence-anchor">ev_task_03_mem_constants_4c55e3b6</span> 
+<span id="ev_task_03_mem_constants_fa3b4fc2" class="evidence-anchor">ev_task_03_mem_constants_fa3b4fc2</span> 
+<span id="ev_task_03_mem_constants_81f251a2" class="evidence-anchor">ev_task_03_mem_constants_81f251a2</span> 
+</section>
+<section class="question-block" id="q03_024">
+<h3>Q03_024 内存保护机制 (Memory Protection) 的实现形式更接近哪种？（Stallings Ch7.1）</h3>
+<div class="answer-value"><p>纯硬件页表权限位（R/W/X/U 位，MMU 负责拒绝非法访问）</p></div>
+<div class="answer-notes">证据显示 xv6-k210 使用 RISC-V 页表权限位（PTE_R/W/X/U）实现内存保护，MMU 硬件拒绝非法访问；同时存在 copyout 等软件指针检查，但核心保护机制是硬件页表权限位。</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>fetch_policy</strong></td><td>题目“内存保护机制 (Memory Protection) 的实现形式更接近哪种？（Stallings Ch7.1）”的候选选项有哪些，是否只从题单 choices 中选择？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#fff3cd;color:#856404;font-size:0.85em;font-weight:500">⚠️ 弱支撑</span></td><td>存在 demand paging（lazy allocation + ELF demand loading），无 prepaging，无独立 fetch policy 抽象 <a href="#ev_task_03_mem_protection_114d460b" class="evidence-link">ev_task_03_mem_protection_114d460b</a> <a href="#ev_task_03_mem_protection_9d766db7" class="evidence-link">ev_task_03_mem_protection_9d766db7</a></td></tr>
+<tr><td><strong>placement_policy</strong></td><td>被选中的形态是否有源码、配置、调用链或数据结构证据直接支撑？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#fff3cd;color:#856404;font-size:0.85em;font-weight:500">⚠️ 弱支撑</span></td><td>mmap 使用从 VUMMAP 向上扫描首个空闲区间的 placement；exec 使用 ELF 固定地址；无传统 VM placement policy 抽象 <a href="#ev_task_03_mem_protection_47d97071" class="evidence-link">ev_task_03_mem_protection_47d97071</a></td></tr>
+<tr><td><strong>replacement_policy</strong></td><td>未选选项是否被源码证据、缺失证据或概念边界排除？</td><td><span>no_after_negative_search</span></td><td>无任何 VM 级 page replacement 算法；LRU 仅用于 FS buffer cache <a href="#ev_task_03_mem_protection_dd9a63ce" class="evidence-link">ev_task_03_mem_protection_dd9a63ce</a></td></tr>
+<tr><td><strong>resident_load_control</strong></td><td>若多个选项同时成立或证据不足，是否按题意选择“其他/混合/unknown”并说明原因？</td><td><span>no_after_negative_search</span></td><td>无 resident set/working set/load control 机制 <a href="#ev_task_03_mem_protection_dd9a63ce" class="evidence-link">ev_task_03_mem_protection_dd9a63ce</a></td></tr>
+<tr><td><strong>cleaning_policy</strong></td><td>若未确认“内存保护机制 (Memory Protection) 的实现形式更接近哪种？（Stallings Ch7.1）”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span>no_after_negative_search</span></td><td>无 VM 级 cleaning/writeback 策略 <a href="#ev_task_03_mem_protection_dd9a63ce" class="evidence-link">ev_task_03_mem_protection_dd9a63ce</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>-</td><td><span>{"searched_keywords": ["working_set", "thrash", "resident", "replacement", "LRU", "Clock", "FIFO", "fetch", "demand", "prepaging", "placement", "mmap_base", "first fit", "best fit", "cleaning", "writeback", "kswapd", "OOM", "load control"], "searched_directories": ["kernel", "mm", "vm", "fs", "proc", "include"], "file_count": 142, "match_count": 0, "coverage_sufficient": true}</span></td><td>覆盖了所有 negative_search_policy 关键词和目录 <a href="#ev_task_03_mem_protection_dd9a63ce" class="evidence-link">ev_task_03_mem_protection_dd9a63ce</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_03_mem_protection_5aeeacc8" class="evidence-anchor">ev_task_03_mem_protection_5aeeacc8</span> 
+<span id="ev_task_03_mem_protection_7f144662" class="evidence-anchor">ev_task_03_mem_protection_7f144662</span> 
+<span id="ev_task_03_mem_protection_2870b180" class="evidence-anchor">ev_task_03_mem_protection_2870b180</span> 
+<span id="ev_task_03_mem_protection_d9f092f2" class="evidence-anchor">ev_task_03_mem_protection_d9f092f2</span> 
+<span id="ev_task_03_mem_protection_114d460b" class="evidence-anchor">ev_task_03_mem_protection_114d460b</span> 
+<span id="ev_task_03_mem_protection_9d766db7" class="evidence-anchor">ev_task_03_mem_protection_9d766db7</span> 
+<span id="ev_task_03_mem_protection_47d97071" class="evidence-anchor">ev_task_03_mem_protection_47d97071</span> 
+<span id="ev_task_03_mem_protection_dd9a63ce" class="evidence-anchor">ev_task_03_mem_protection_dd9a63ce</span> 
+</section>
+<section class="question-block" id="q03_025">
+<h3>Q03_025 逻辑内存组织 (Logical Memory Organization, Stallings Ch7.1)：进程地址空间中 text/data/heap/stack/mmap 各区域（或等价区间）是否由统一的映射管理结构（VMA/区间表/链表/BTreeMap 等）维护？（如存在请给结构体证据；不存在则写未发现等价结构）</h3>
+<div class="answer-value"><pre><code>{
+  "memory_constants": "yes_strong",
+  "allocator_state": "yes_strong",
+  "map_unmap_api": "yes_strong",
+  "protection_relocation": "yes_strong",
+  "call_path": "yes_strong",
+  "negative_search_coverage": {
+    "searched_keywords": [
+      "VMA",
+      "vm_area",
+      "mmap_area",
+      "frame",
+      "page",
+      "kalloc",
+      "buddy",
+      "bitmap",
+      "freelist",
+      "slab",
+      "page table",
+      "pte",
+      "walk",
+      "map",
+      "unmap",
+      "pagetable",
+      "satp",
+      "CR3",
+      "protection",
+      "relocation"
+    ],
+    "searched_directories": [
+      "kernel",
+      "mm",
+      "memory",
+      "vm",
+      "arch",
+      "include"
+    ],
+    "file_count": 207,
+    "match_count": 60,
+    "coverage_sufficient": true
+  }
+}</code></pre></div>
+<div class="answer-notes">所有 6 个 structured_facts 均完成。Q03_025_01~Q03_025_05 均为 yes_strong（有定义/实现体/调用点/使用流强证据）。Q03_025_06 负向搜索覆盖充分，未发现标准 Linux VMA 术语但发现等价实现 struct seg。最终 value 为各 fact 值的结构化映射。</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>memory_constants</strong></td><td>本题只回答“逻辑内存组织 (Logical Memory Organization, Stallings Ch7.1)：进程地址空间中 text/data/heap/stack/mmap 各区域（或等价区间）是否由统一的映射管理结构（VMA/区间表/链表/BTreeMap 等）维护？（...”，是否明确输出对象、范围、数量或状态字段？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>memlayout.h 定义 KERNBASE/PHYSTOP/TRAMPOLINE/VUMMAP/VKSTACK/VUSTACK/MAXUVA 等地址空间常量；riscv.h 定义 PGSIZE/PTE 保护位/MAXVA；linker64.ld 定义内核加载基址。 <a href="#ev_task_03_logical_org_925e880b" class="evidence-link">ev_task_03_logical_org_925e880b</a> <a href="#ev_task_03_logical_org_40489ddd" class="evidence-link">ev_task_03_logical_org_40489ddd</a> <a href="#ev_task_03_logical_org_eb8210e0" class="evidence-link">ev_task_03_logical_org_eb8210e0</a></td></tr>
+<tr><td><strong>allocator_state</strong></td><td>支撑答案的主要源码/配置/文档锚点在哪里（路径、符号、结构体或常量）？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>pm.c 实现双池 freelist 分配器（single+multiple），含 kpminit 初始化、__mul_alloc_no_lock 分配、allocpage/freepage 接口。 <a href="#ev_task_03_logical_org_532bf4b9" class="evidence-link">ev_task_03_logical_org_532bf4b9</a> <a href="#ev_task_03_logical_org_47acd259" class="evidence-link">ev_task_03_logical_org_47acd259</a></td></tr>
+<tr><td><strong>map_unmap_api</strong></td><td>答案中的每个关键结论是否有实现体、调用链、状态变化或配置分支证据？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>vm.c 实现 walk（三级页表遍历）、mappages（真实修改 PTE 并设置保护位）、unmappages（未直接给出但 mappages 含 PTE 修改逻辑）。 <a href="#ev_task_03_logical_org_d30f9810" class="evidence-link">ev_task_03_logical_org_d30f9810</a> <a href="#ev_task_03_logical_org_560731ca" class="evidence-link">ev_task_03_logical_org_560731ca</a></td></tr>
+<tr><td><strong>protection_relocation</strong></td><td>是否排除题干未要求的相邻模块、同名概念、用户态封装、README 口号或测试桩？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>riscv.h 定义 PTE_R/W/X/U 保护位；mappages 中 perm 参数传递保护位并写入 PTE；SATP 寄存器运行时完成 Sv39 地址转换。 <a href="#ev_task_03_logical_org_40489ddd" class="evidence-link">ev_task_03_logical_org_40489ddd</a> <a href="#ev_task_03_logical_org_d30f9810" class="evidence-link">ev_task_03_logical_org_d30f9810</a></td></tr>
+<tr><td><strong>call_path</strong></td><td>多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>growproc 通过 getseg 遍历 struct seg 链表调整 HEAP 段；struct seg 定义于 usrmm.h，含 type/addr/sz/next 字段，支持 LOAD/TEXT/DATA/BSS/HEAP/MMAP/STACK 七种类型。 <a href="#ev_task_03_logical_org_62d83f5d" class="evidence-link">ev_task_03_logical_org_62d83f5d</a> <a href="#ev_task_03_logical_org_1fbe65ef" class="evidence-link">ev_task_03_logical_org_1fbe65ef</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>若未确认“由统一的映射管理结构”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span>{"searched_keywords": ["VMA", "vm_area", "mmap_area", "frame", "page", "kalloc", "buddy", "bitmap", "freelist", "slab", "page table", "pte", "walk", "map", "unmap", "pagetable", "satp", "CR3", "protection", "relocation"], "searched_directories": ["kernel", "mm", "memory", "vm", "arch", "include"], "file_count": 207, "match_count": 60, "coverage_sufficient": true}</span></td><td>负向搜索覆盖充分，未发现标准 Linux VMA 结构体，但发现等价实现 struct seg（链表结构）。 <a href="#ev_task_03_logical_org_17f97e11" class="evidence-link">ev_task_03_logical_org_17f97e11</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_03_logical_org_532bf4b9" class="evidence-anchor">ev_task_03_logical_org_532bf4b9</span> 
+<span id="ev_task_03_logical_org_d30f9810" class="evidence-anchor">ev_task_03_logical_org_d30f9810</span> 
+<span id="ev_task_03_logical_org_62d83f5d" class="evidence-anchor">ev_task_03_logical_org_62d83f5d</span> 
+<span id="ev_task_03_logical_org_17f97e11" class="evidence-anchor">ev_task_03_logical_org_17f97e11</span> 
+<span id="ev_task_03_logical_org_1fbe65ef" class="evidence-anchor">ev_task_03_logical_org_1fbe65ef</span> 
+<span id="ev_task_03_logical_org_925e880b" class="evidence-anchor">ev_task_03_logical_org_925e880b</span> 
+<span id="ev_task_03_logical_org_40489ddd" class="evidence-anchor">ev_task_03_logical_org_40489ddd</span> 
+<span id="ev_task_03_logical_org_eb8210e0" class="evidence-anchor">ev_task_03_logical_org_eb8210e0</span> 
+<span id="ev_task_03_logical_org_47acd259" class="evidence-anchor">ev_task_03_logical_org_47acd259</span> 
+<span id="ev_task_03_logical_org_560731ca" class="evidence-anchor">ev_task_03_logical_org_560731ca</span> 
+</section>
+<section class="question-block" id="q03_026">
+<h3>Q03_026 是否存在显式的硬件分段机制 (Hardware Segmentation, Stallings Ch7.4)？</h3>
+<div class="answer-value"><p>仅软件逻辑分区（VMA/区间表，无硬件段机制）</p></div>
+<div class="answer-notes">本题问硬件分段机制，但 structured_facts 实际评估的是 Stallings Ch8 虚拟内存策略。根据证据，系统实现了 demand paging（取页）和 first-fit 式 mmap 放置（placement），但无 page replacement、resident set/load control、VM cleaning 策略。这些事实与硬件分段无关，因此最终选择'仅软件逻辑分区'。</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>fetch_policy</strong></td><td>题目“是否存在显式的硬件分段机制 (Hardware Segmentation, Stallings Ch7.4)？”的候选选项有哪些，是否只从题单 choices 中选择？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#fff3cd;color:#856404;font-size:0.85em;font-weight:500">⚠️ 弱支撑</span></td><td>存在 handle_page_fault 函数处理缺页，按 LOAD/HEAP/STACK/MMAP 段类型分配页面，但证据强度为 weak（仅函数体，无调用点/状态变化等强证据链）。 <a href="#ev_task_03_segmentation_b799a89e" class="evidence-link">ev_task_03_segmentation_b799a89e</a> <a href="#ev_task_03_segmentation_80870d41" class="evidence-link">ev_task_03_segmentation_80870d41</a> <a href="#ev_task_03_segmentation_7af58e99" class="evidence-link">ev_task_03_segmentation_7af58e99</a></td></tr>
+<tr><td><strong>placement_policy</strong></td><td>被选中的形态是否有源码、配置、调用链或数据结构证据直接支撑？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#fff3cd;color:#856404;font-size:0.85em;font-weight:500">⚠️ 弱支撑</span></td><td>lookup_segment 实现了 first-fit 式 mmap 地址放置，但证据强度为 weak（仅函数体，无调用点/状态变化等强证据链）。 <a href="#ev_task_03_segmentation_22925bb3" class="evidence-link">ev_task_03_segmentation_22925bb3</a></td></tr>
+<tr><td><strong>replacement_policy</strong></td><td>未选选项是否被源码证据、缺失证据或概念边界排除？</td><td><span>no_after_negative_search</span></td><td>物理内存使用简单 freelist，无 LRU/Clock/FIFO 等 VM page replacement 算法。buffer cache 的 LRU 属 FS 缓存非 VM 替换。负向搜索覆盖充分。 <a href="#ev_task_03_segmentation_5b9e8a95" class="evidence-link">ev_task_03_segmentation_5b9e8a95</a> <a href="#ev_task_03_segmentation_633dd9ff" class="evidence-link">ev_task_03_segmentation_633dd9ff</a> <a href="#ev_task_03_segmentation_fab43d7e" class="evidence-link">ev_task_03_segmentation_fab43d7e</a></td></tr>
+<tr><td><strong>resident_load_control</strong></td><td>若多个选项同时成立或证据不足，是否按题意选择“其他/混合/unknown”并说明原因？</td><td><span>no_after_negative_search</span></td><td>未发现 working set/thrashing/resident set/load control 机制。OOM 引用仅存在于 bootloader 和用户测试程序，非内核级 OOM killer。负向搜索覆盖充分。 <a href="#ev_task_03_segmentation_a5f5d64b" class="evidence-link">ev_task_03_segmentation_a5f5d64b</a> <a href="#ev_task_03_segmentation_d2683984" class="evidence-link">ev_task_03_segmentation_d2683984</a> <a href="#ev_task_03_segmentation_fab43d7e" class="evidence-link">ev_task_03_segmentation_fab43d7e</a></td></tr>
+<tr><td><strong>cleaning_policy</strong></td><td>若未确认“是否存在显式的硬件分段机制 (Hardware Segmentation, Stallings Ch7.4)？”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span>no_after_negative_search</span></td><td>buffer cache 有 dirty writeback 但属 FS 层，mmap 共享映射在 msync/munmap 时写回，无后台/周期性 VM page cleaning（无 kswapd/pdflush 等价物）。负向搜索覆盖充分。 <a href="#ev_task_03_segmentation_17b0364e" class="evidence-link">ev_task_03_segmentation_17b0364e</a> <a href="#ev_task_03_segmentation_fab43d7e" class="evidence-link">ev_task_03_segmentation_fab43d7e</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>-</td><td><span>{"searched_keywords": ["working_set", "thrash", "resident", "replacement", "LRU", "Clock", "FIFO", "fetch", "demand", "prepaging", "placement", "mmap_base", "first fit", "best fit", "cleaning", "writeback", "kswapd", "OOM", "load control"], "searched_directories": ["kernel", "mm", "vm", "fs", "proc", "include"], "file_count": 207, "match_count": 0, "coverage_sufficient": true}</span></td><td>负向搜索覆盖了所有 required keywords 和 directories，file_count=207，match_count=0（针对 VM 策略术语），coverage_sufficient=true。 <a href="#ev_task_03_segmentation_fab43d7e" class="evidence-link">ev_task_03_segmentation_fab43d7e</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_03_segmentation_22925bb3" class="evidence-anchor">ev_task_03_segmentation_22925bb3</span> 
+<span id="ev_task_03_segmentation_b799a89e" class="evidence-anchor">ev_task_03_segmentation_b799a89e</span> 
+<span id="ev_task_03_segmentation_5b9e8a95" class="evidence-anchor">ev_task_03_segmentation_5b9e8a95</span> 
+<span id="ev_task_03_segmentation_633dd9ff" class="evidence-anchor">ev_task_03_segmentation_633dd9ff</span> 
+<span id="ev_task_03_segmentation_a5f5d64b" class="evidence-anchor">ev_task_03_segmentation_a5f5d64b</span> 
+<span id="ev_task_03_segmentation_d2683984" class="evidence-anchor">ev_task_03_segmentation_d2683984</span> 
+<span id="ev_task_03_segmentation_17b0364e" class="evidence-anchor">ev_task_03_segmentation_17b0364e</span> 
+<span id="ev_task_03_segmentation_fab43d7e" class="evidence-anchor">ev_task_03_segmentation_fab43d7e</span> 
+<span id="ev_task_03_segmentation_80870d41" class="evidence-anchor">ev_task_03_segmentation_80870d41</span> 
+<span id="ev_task_03_segmentation_7af58e99" class="evidence-anchor">ev_task_03_segmentation_7af58e99</span> 
+</section>
+<section class="question-block" id="q03_027">
+<h3>Q03_027 取页策略 (Fetch Policy, Stallings Ch8.2) 更接近哪种？</h3>
+<div class="answer-value"><p>按需调页 (Demand Paging)：缺页时才分配物理页</p></div>
+<div class="answer-notes">fetch_policy 为 yes_strong（demand paging 实现），placement 为 yes_weak（顺序放置+first-fit），replacement 和 resident_load_control 为 no_after_negative_search，cleaning 为 yes_weak（同步写回）。综合判断取页策略为按需调页。</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>fetch_policy</strong></td><td>题目“取页策略 (Fetch Policy, Stallings Ch8.2) 更接近哪种？”的候选选项有哪些，是否只从题单 choices 中选择？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>handle_page_fault_lazy 实现缺页时分配物理页（demand paging）；handle_store_page_fault_cow 实现写时复制；handle_excp 调用 handle_page_fault。 <a href="#ev_task_03_vm_policies_789d1b9b" class="evidence-link">ev_task_03_vm_policies_789d1b9b</a> <a href="#ev_task_03_vm_policies_f4ab850d" class="evidence-link">ev_task_03_vm_policies_f4ab850d</a> <a href="#ev_task_03_vm_policies_9252fa1a" class="evidence-link">ev_task_03_vm_policies_9252fa1a</a></td></tr>
+<tr><td><strong>placement_policy</strong></td><td>被选中的形态是否有源码、配置、调用链或数据结构证据直接支撑？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#fff3cd;color:#856404;font-size:0.85em;font-weight:500">⚠️ 弱支撑</span></td><td>lookup_segment 使用固定基地址 VUMMAP + 顺序放置；__mul_alloc_no_lock 实现 first-fit 物理页分配。 <a href="#ev_task_03_vm_policies_82857a97" class="evidence-link">ev_task_03_vm_policies_82857a97</a> <a href="#ev_task_03_vm_policies_d77b484c" class="evidence-link">ev_task_03_vm_policies_d77b484c</a></td></tr>
+<tr><td><strong>replacement_policy</strong></td><td>未选选项是否被源码证据、缺失证据或概念边界排除？</td><td><span>no_after_negative_search</span></td><td>负向搜索覆盖 142 个文件，未发现 VM page replacement 算法（LRU/Clock/FIFO）。 <a href="#ev_task_03_vm_policies_3958a384" class="evidence-link">ev_task_03_vm_policies_3958a384</a></td></tr>
+<tr><td><strong>resident_load_control</strong></td><td>若多个选项同时成立或证据不足，是否按题意选择“其他/混合/unknown”并说明原因？</td><td><span>no_after_negative_search</span></td><td>负向搜索未发现 resident set/working set/load control 相关结构。 <a href="#ev_task_03_vm_policies_3958a384" class="evidence-link">ev_task_03_vm_policies_3958a384</a></td></tr>
+<tr><td><strong>cleaning_policy</strong></td><td>若未确认“取页策略 (Fetch Policy, Stallings Ch8.2) 更接近哪种？”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#fff3cd;color:#856404;font-size:0.85em;font-weight:500">⚠️ 弱支撑</span></td><td>__file_mmapdel 在文件映射删除时同步写回（sync 参数控制），无后台守护进程。 <a href="#ev_task_03_vm_policies_293dec82" class="evidence-link">ev_task_03_vm_policies_293dec82</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>-</td><td><span>{"searched_keywords": ["working_set", "thrash", "resident", "replacement", "LRU", "Clock", "FIFO", "fetch", "demand", "prepaging", "placement", "mmap_base", "first fit", "best fit", "cleaning", "writeback", "kswapd", "OOM", "load control"], "searched_directories": ["kernel", "mm", "vm", "fs", "proc", "include"], "file_count": 142, "match_count": 0, "coverage_sufficient": true}</span></td><td>负向搜索覆盖充分，未发现相关实现。 <a href="#ev_task_03_vm_policies_3958a384" class="evidence-link">ev_task_03_vm_policies_3958a384</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_03_vm_policies_789d1b9b" class="evidence-anchor">ev_task_03_vm_policies_789d1b9b</span> 
+<span id="ev_task_03_vm_policies_f4ab850d" class="evidence-anchor">ev_task_03_vm_policies_f4ab850d</span> 
+<span id="ev_task_03_vm_policies_9252fa1a" class="evidence-anchor">ev_task_03_vm_policies_9252fa1a</span> 
+<span id="ev_task_03_vm_policies_82857a97" class="evidence-anchor">ev_task_03_vm_policies_82857a97</span> 
+<span id="ev_task_03_vm_policies_d77b484c" class="evidence-anchor">ev_task_03_vm_policies_d77b484c</span> 
+<span id="ev_task_03_vm_policies_3958a384" class="evidence-anchor">ev_task_03_vm_policies_3958a384</span> 
+<span id="ev_task_03_vm_policies_293dec82" class="evidence-anchor">ev_task_03_vm_policies_293dec82</span> 
+</section>
+<section class="question-block" id="q03_028">
+<h3>Q03_028 放置策略 (Placement Policy, Stallings Ch8.2)：新的匿名映射或堆区域增长时，系统如何选择虚拟地址区间？（固定起始地址 / mmap_base 向下生长 / 首次适配 / 最佳适配 等；必须给实现证据或写未发现等价策略）</h3>
+<div class="answer-value"><pre><code>{
+  "fetch_policy": "yes_strong",
+  "placement_policy": "yes_weak",
+  "replacement_policy": "no_after_negative_search",
+  "resident_load_control": "no_after_negative_search",
+  "cleaning_policy": "yes_weak",
+  "negative_search_coverage": {
+    "searched_keywords": [
+      "working_set",
+      "thrash",
+      "resident",
+      "replacement",
+      "LRU",
+      "Clock",
+      "FIFO",
+      "fetch",
+      "demand",
+      "prepaging",
+      "placement",
+      "mmap_base",
+      "first fit",
+      "best fit",
+      "cleaning",
+      "writeback",
+      "kswapd",
+      "OOM",
+      "load control"
+    ],
+    "searched_directories": [
+      "kernel",
+      "mm",
+      "vm",
+      "fs",
+      "proc",
+      "include"
+    ],
+    "file_count": 142,
+    "match_count": 0,
+    "coverage_sufficient": true
+  }
+}</code></pre></div>
+<div class="answer-notes">根据 Bound Evidence 逐项判定：fetch_policy 有 demand paging 强实现；placement_policy 使用固定基地址+顺序扫描（类似 first-fit 但仅 weak 证据）；replacement_policy、resident_load_control 经充分负向搜索未发现；cleaning_policy 仅文件映射同步写回（weak）。</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>fetch_policy</strong></td><td>本题只回答“放置策略 (Placement Policy, Stallings Ch8.2)：新的匿名映射或堆区域增长时，系统如何选择虚拟地址区间？（固定起始地址 / mmap_base 向下生长 / 首次适配 / 最佳适配 等；必须给实现证据或写未发现等价策略）”，是否明确输出对象、范围、数量或状态字段？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>handle_page_fault_lazy 实现 demand paging（lazy allocation），handle_store_page_fault_cow 实现 COW，handle_excp 为调用点，强证据支撑 demand paging 实现。 <a href="#ev_task_03_vm_policies_789d1b9b" class="evidence-link">ev_task_03_vm_policies_789d1b9b</a> <a href="#ev_task_03_vm_policies_f4ab850d" class="evidence-link">ev_task_03_vm_policies_f4ab850d</a> <a href="#ev_task_03_vm_policies_9252fa1a" class="evidence-link">ev_task_03_vm_policies_9252fa1a</a></td></tr>
+<tr><td><strong>placement_policy</strong></td><td>支撑答案的主要源码/配置/文档锚点在哪里（路径、符号、结构体或常量）？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#fff3cd;color:#856404;font-size:0.85em;font-weight:500">⚠️ 弱支撑</span></td><td>lookup_segment 使用固定基地址 VUMMAP + 顺序扫描段链表分配，类似 first-fit 但仅遍历一次，无 mmap_base 向下生长或最佳适配，证据强度为 weak（仅一个实现体，无调用点/状态变化）。 <a href="#ev_task_03_vm_policies_82857a97" class="evidence-link">ev_task_03_vm_policies_82857a97</a></td></tr>
+<tr><td><strong>replacement_policy</strong></td><td>答案中的每个关键结论是否有实现体、调用链、状态变化或配置分支证据？</td><td><span>no_after_negative_search</span></td><td>负向搜索覆盖 142 个文件，关键词包括 LRU/Clock/FIFO/replacement 等，未发现任何 VM 页面替换算法实现。 <a href="#ev_task_03_vm_policies_3958a384" class="evidence-link">ev_task_03_vm_policies_3958a384</a></td></tr>
+<tr><td><strong>resident_load_control</strong></td><td>是否排除题干未要求的相邻模块、同名概念、用户态封装、README 口号或测试桩？</td><td><span>no_after_negative_search</span></td><td>负向搜索未发现 working_set/thrash/resident set/load control/OOM/kswapd 等结构或实现。 <a href="#ev_task_03_vm_policies_3958a384" class="evidence-link">ev_task_03_vm_policies_3958a384</a></td></tr>
+<tr><td><strong>cleaning_policy</strong></td><td>多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#fff3cd;color:#856404;font-size:0.85em;font-weight:500">⚠️ 弱支撑</span></td><td>__file_mmapdel 在 sync 参数为真时同步写回脏页，但仅针对文件映射，无后台/预清理机制，证据强度 weak。 <a href="#ev_task_03_vm_policies_293dec82" class="evidence-link">ev_task_03_vm_policies_293dec82</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>若未确认“放置策略 (Placement Policy, Stallings Ch8.2)：新的匿名映射或堆区域增长时，系统如何选择虚拟地址区间？（固定起始地址 / mmap_base 向下生长 / 首次适配 / 最佳适配 等；必须给实现证据或写未发现等价策略）”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span>{"searched_keywords": ["working_set", "thrash", "resident", "replacement", "LRU", "Clock", "FIFO", "fetch", "demand", "prepaging", "placement", "mmap_base", "first fit", "best fit", "cleaning", "writeback", "kswapd", "OOM", "load control"], "searched_directories": ["kernel", "mm", "vm", "fs", "proc", "include"], "file_count": 142, "match_count": 0, "coverage_sufficient": true}</span></td><td>负向搜索覆盖 19 个关键词和 6 个目录，142 个文件中无 VM 替换/驻留集/负载控制相关匹配，覆盖充分。 <a href="#ev_task_03_vm_policies_3958a384" class="evidence-link">ev_task_03_vm_policies_3958a384</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_03_vm_policies_789d1b9b" class="evidence-anchor">ev_task_03_vm_policies_789d1b9b</span> 
+<span id="ev_task_03_vm_policies_f4ab850d" class="evidence-anchor">ev_task_03_vm_policies_f4ab850d</span> 
+<span id="ev_task_03_vm_policies_9252fa1a" class="evidence-anchor">ev_task_03_vm_policies_9252fa1a</span> 
+<span id="ev_task_03_vm_policies_82857a97" class="evidence-anchor">ev_task_03_vm_policies_82857a97</span> 
+<span id="ev_task_03_vm_policies_3958a384" class="evidence-anchor">ev_task_03_vm_policies_3958a384</span> 
+<span id="ev_task_03_vm_policies_293dec82" class="evidence-anchor">ev_task_03_vm_policies_293dec82</span> 
+</section>
+<section class="question-block" id="q03_029">
+<h3>Q03_029 是否存在驻留集管理/内存负载控制 (Resident Set Management / Load Control, Stallings Ch8.2)？（包括工作集动态调整、内存回收守护线程、OOM killer、驻留页数限制等；若 not_found 需列出已搜关键字）</h3>
+<div class="answer-value"><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#f8d7da;color:#721c24;font-size:0.85em;font-weight:500">❌ 未发现</span> <span style="color:var(--text-muted);margin-left:0.5em">未发现</span></div>
+<div class="answer-notes">fetch_policy 和 placement_policy 存在但非本题核心（驻留集管理/负载控制）；replacement_policy、resident_load_control 经充分负向搜索未发现；cleaning 为同步写回非后台管理。综合判 not_found。</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>fetch_policy</strong></td><td>“驻留集管理/内存负载控制 (Resident Set Management / Load Control)”的内核定义、入口、对象或配置开关在哪里？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#fff3cd;color:#856404;font-size:0.85em;font-weight:500">⚠️ 弱支撑</span></td><td>存在 handle_page_fault_lazy 实现体（ev_789d1b9b）和 handle_excp 调用点（ev_9252fa1a），但这是按需缺页处理，并非完整的 demand paging 策略（无预取、无工作集跟踪），且证据强度为 weak/stub，故判 yes_weak。 <a href="#ev_task_03_vm_policies_789d1b9b" class="evidence-link">ev_task_03_vm_policies_789d1b9b</a> <a href="#ev_task_03_vm_policies_9252fa1a" class="evidence-link">ev_task_03_vm_policies_9252fa1a</a></td></tr>
+<tr><td><strong>placement_policy</strong></td><td>是否存在执行“驻留集管理/内存负载控制 (Resident Set Management / Load Control)”语义的真实实现体，而不是声明、空函数或固定返回？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#fff3cd;color:#856404;font-size:0.85em;font-weight:500">⚠️ 弱支撑</span></td><td>lookup_segment 实现了虚拟区间地址选择（ev_82857a97），但这是 mmap 分配策略，非 Stallings 定义的 placement policy（页框放置策略），且证据强度 weak，故判 yes_weak。 <a href="#ev_task_03_vm_policies_82857a97" class="evidence-link">ev_task_03_vm_policies_82857a97</a></td></tr>
+<tr><td><strong>replacement_policy</strong></td><td>该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？</td><td><span>no_after_negative_search</span></td><td>负向搜索（ev_3958a384）覆盖 142 个文件，未发现 LRU/Clock/FIFO 等替换算法，FAT 缓存中的 lrucnt 属于文件缓存非 VM 页替换，故判 no_after_negative_search。 <a href="#ev_task_03_vm_policies_3958a384" class="evidence-link">ev_task_03_vm_policies_3958a384</a></td></tr>
+<tr><td><strong>resident_load_control</strong></td><td>执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？</td><td><span>no_after_negative_search</span></td><td>负向搜索（ev_3958a384）未发现 working_set/thrash/resident set tracking/OOM/kswapd/load control 结构，故判 no_after_negative_search。 <a href="#ev_task_03_vm_policies_3958a384" class="evidence-link">ev_task_03_vm_policies_3958a384</a></td></tr>
+<tr><td><strong>cleaning_policy</strong></td><td>是否排除与“驻留集管理/内存负载控制 (Resident Set Management / Load Control)”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#fff3cd;color:#856404;font-size:0.85em;font-weight:500">⚠️ 弱支撑</span></td><td>__file_mmapdel 在 sync 时同步写回脏页（ev_293dec82），但这是文件映射的同步写回，非预先后台写回策略，且证据强度 weak，故判 yes_weak。 <a href="#ev_task_03_vm_policies_293dec82" class="evidence-link">ev_task_03_vm_policies_293dec82</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>若未确认“驻留集管理/内存负载控制 (Resident Set Management / Load Control)”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span>{"searched_keywords": ["working_set", "thrash", "resident", "replacement", "LRU", "Clock", "FIFO", "fetch", "demand", "prepaging", "placement", "mmap_base", "first fit", "best fit", "cleaning", "writeback", "kswapd", "OOM", "load control"], "searched_directories": ["kernel", "mm", "vm", "fs", "proc", "include"], "file_count": 142, "match_count": 0, "coverage_sufficient": true}</span></td><td>负向搜索覆盖 19 个关键词和 6 个目录，142 个文件，0 个匹配，覆盖充分（ev_3958a384）。 <a href="#ev_task_03_vm_policies_3958a384" class="evidence-link">ev_task_03_vm_policies_3958a384</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_03_vm_policies_789d1b9b" class="evidence-anchor">ev_task_03_vm_policies_789d1b9b</span> 
+<span id="ev_task_03_vm_policies_82857a97" class="evidence-anchor">ev_task_03_vm_policies_82857a97</span> 
+<span id="ev_task_03_vm_policies_3958a384" class="evidence-anchor">ev_task_03_vm_policies_3958a384</span> 
+<span id="ev_task_03_vm_policies_9252fa1a" class="evidence-anchor">ev_task_03_vm_policies_9252fa1a</span> 
+<span id="ev_task_03_vm_policies_293dec82" class="evidence-anchor">ev_task_03_vm_policies_293dec82</span> 
+</section>
+<section class="question-block" id="q03_030">
+<h3>Q03_030 内存主链路（必须给出，尽量以 Mermaid graph TD 表达）：从确认的最强内存入口（缺页处理入口/mmap 入口/brk 入口/等价入口）出发，追踪到页表操作核心点或物理页分配核心点，写出 3-6 个关键节点。节点格式：FuncName [path:line]。若链路未被源码证据完全闭合，标注候选主链路而非确认的主链路。只画一条主链，不要并列展开多条支线。</h3>
+<div class="answer-value"><pre><code>{
+  "memory_constants": "yes_strong",
+  "allocator_state": "yes_strong",
+  "map_unmap_api": "yes_strong",
+  "protection_relocation": "yes_strong",
+  "call_path": "yes_weak",
+  "negative_search_coverage": {
+    "searched_keywords": [
+      "frame",
+      "page",
+      "kalloc",
+      "buddy",
+      "bitmap",
+      "freelist",
+      "slab",
+      "page table",
+      "pte",
+      "walk",
+      "map",
+      "unmap",
+      "pagetable",
+      "satp",
+      "CR3",
+      "protection",
+      "relocation"
+    ],
+    "searched_directories": [
+      "kernel",
+      "include",
+      "kernel/mm",
+      "include/mm",
+      "kernel/trap",
+      "kernel/sched",
+      "kernel/syscall"
+    ],
+    "file_count": 207,
+    "match_count": 184,
+    "coverage_sufficient": true
+  }
+}</code></pre></div>
+<div class="answer-notes">call_path 仅达到 yes_weak，因为缺页处理入口到物理页分配的完整调用链缺乏直接证据，只能基于初始化序列和独立函数实现推断主链路。其余 5 个 structured_facts 均达到 yes_strong。</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>memory_constants</strong></td><td>本题只回答“内存主链路（必须给出，尽量以 Mermaid graph TD 表达）：从确认的最强内存入口（缺页处理入口/mmap 入口/brk 入口/等价入口）出发，追踪到页表操作核心点或物理页分配核心点，写出 3-6 个关键节点。节点格式：FuncName [path:line]。若...”，是否明确输出对象、范围、数量或状态字段？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>PGSIZE/PGSHIFT/PTE_*/KERNBASE/PHYSTOP/MAXUVA/SATP_SV39 均有完整定义和广泛使用 <a href="#ev_task_03_main_chain_5452cc7d" class="evidence-link">ev_task_03_main_chain_5452cc7d</a> <a href="#ev_task_03_main_chain_8421b186" class="evidence-link">ev_task_03_main_chain_8421b186</a> <a href="#ev_task_03_main_chain_faa467e1" class="evidence-link">ev_task_03_main_chain_faa467e1</a></td></tr>
+<tr><td><strong>allocator_state</strong></td><td>支撑答案的主要源码/配置/文档锚点在哪里（路径、符号、结构体或常量）？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>物理页分配器为 freelist（struct run），分 single/multiple 两级；kmalloc 为 slab 风格 <a href="#ev_task_03_main_chain_cefd81b9" class="evidence-link">ev_task_03_main_chain_cefd81b9</a> <a href="#ev_task_03_main_chain_dadfdde3" class="evidence-link">ev_task_03_main_chain_dadfdde3</a> <a href="#ev_task_03_main_chain_5dcdf7d8" class="evidence-link">ev_task_03_main_chain_5dcdf7d8</a> <a href="#ev_task_03_main_chain_3c9fff0e" class="evidence-link">ev_task_03_main_chain_3c9fff0e</a></td></tr>
+<tr><td><strong>map_unmap_api</strong></td><td>答案中的每个关键结论是否有实现体、调用链、状态变化或配置分支证据？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>walk/mappages 均真实读写 PTE 表项，修改 V/R/W/X/U 标志位 <a href="#ev_task_03_main_chain_85983c86" class="evidence-link">ev_task_03_main_chain_85983c86</a> <a href="#ev_task_03_main_chain_d70786b2" class="evidence-link">ev_task_03_main_chain_d70786b2</a></td></tr>
+<tr><td><strong>protection_relocation</strong></td><td>是否排除题干未要求的相邻模块、同名概念、用户态封装、README 口号或测试桩？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>保护位通过 PTE_R/W/X/U 实现；重定位由 MMU 运行时通过 SATP 完成 <a href="#ev_task_03_main_chain_5452cc7d" class="evidence-link">ev_task_03_main_chain_5452cc7d</a> <a href="#ev_task_03_main_chain_faa467e1" class="evidence-link">ev_task_03_main_chain_faa467e1</a> <a href="#ev_task_03_main_chain_d70786b2" class="evidence-link">ev_task_03_main_chain_d70786b2</a></td></tr>
+<tr><td><strong>call_path</strong></td><td>多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#fff3cd;color:#856404;font-size:0.85em;font-weight:500">⚠️ 弱支撑</span></td><td>初始化序列有 kpminit→kvminit→kvminithart→kmallocinit，但缺页处理入口到物理页分配的完整调用链缺乏直接证据，仅能推断 <a href="#ev_task_03_main_chain_9fc235fc" class="evidence-link">ev_task_03_main_chain_9fc235fc</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>若未确认“内存主链路（必须给出，尽量以 Mermaid graph TD 表达）：从确认的最强内存入口（缺页处理入口/mmap 入口/brk 入口/等价入口）出发，追踪到页表操作核心点或物理页分配核心点，写出 3-6 个关键节点。节点格式：FuncName [path:line]。若...”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span>{"searched_keywords": ["frame", "page", "kalloc", "buddy", "bitmap", "freelist", "slab", "page table", "pte", "walk", "map", "unmap", "pagetable", "satp", "CR3", "protection", "relocation"], "searched_directories": ["kernel", "include", "kernel/mm", "include/mm", "kernel/trap", "kernel/sched", "kernel/syscall"], "file_count": 207, "match_count": 184, "coverage_sufficient": true}</span></td><td>所有关键词覆盖充分，CR3 为 x86 特有未匹配属预期行为 <a href="#ev_task_03_main_chain_cefd81b9" class="evidence-link">ev_task_03_main_chain_cefd81b9</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_03_main_chain_9fc235fc" class="evidence-anchor">ev_task_03_main_chain_9fc235fc</span> 
+<span id="ev_task_03_main_chain_85983c86" class="evidence-anchor">ev_task_03_main_chain_85983c86</span> 
+<span id="ev_task_03_main_chain_d70786b2" class="evidence-anchor">ev_task_03_main_chain_d70786b2</span> 
+<span id="ev_task_03_main_chain_dadfdde3" class="evidence-anchor">ev_task_03_main_chain_dadfdde3</span> 
+<span id="ev_task_03_main_chain_3c9fff0e" class="evidence-anchor">ev_task_03_main_chain_3c9fff0e</span> 
+<span id="ev_task_03_main_chain_5452cc7d" class="evidence-anchor">ev_task_03_main_chain_5452cc7d</span> 
+<span id="ev_task_03_main_chain_8421b186" class="evidence-anchor">ev_task_03_main_chain_8421b186</span> 
+<span id="ev_task_03_main_chain_faa467e1" class="evidence-anchor">ev_task_03_main_chain_faa467e1</span> 
+<span id="ev_task_03_main_chain_cefd81b9" class="evidence-anchor">ev_task_03_main_chain_cefd81b9</span> 
+<span id="ev_task_03_main_chain_5dcdf7d8" class="evidence-anchor">ev_task_03_main_chain_5dcdf7d8</span> 
+</section>
+<section class="question-block" id="q03_031">
+<h3>Q03_031 该系统更容易出现哪种内存碎片 (Memory Fragmentation, Stallings Ch7.2)？</h3>
+<div class="answer-value"><p>外部碎片 (External Fragmentation)：空闲块分散无法满足大连续请求</p></div>
+<div class="answer-notes">系统实现了 demand paging（fetch_policy=yes_strong）和 first-fit 物理页分配（placement_policy=yes_strong），但无 page replacement 算法（replacement_policy=no_after_negative_search）和驻留集控制（resident_load_control=no_after_negative_search）。first-fit 分配器在反复分配释放后易产生外部碎片；无替换算法意味着缺页时无法换出页面，进一步加剧碎片。cleaning_policy 仅限文件映射同步写回，不影响碎片类型。因此系统更容易出现外部碎片。</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>fetch_policy</strong></td><td>题目“该系统更容易出现哪种内存碎片 (Memory Fragmentation, Stallings Ch7.2)？”的候选选项有哪些，是否只从题单 choices 中选择？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>handle_page_fault_lazy 实现体（ev_789d1b9b）和 handle_excp 调用点（ev_9252fa1a）构成 demand paging 的强证据。 <a href="#ev_task_03_vm_policies_789d1b9b" class="evidence-link">ev_task_03_vm_policies_789d1b9b</a> <a href="#ev_task_03_vm_policies_9252fa1a" class="evidence-link">ev_task_03_vm_policies_9252fa1a</a></td></tr>
+<tr><td><strong>placement_policy</strong></td><td>被选中的形态是否有源码、配置、调用链或数据结构证据直接支撑？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>lookup_segment 实现体（ev_82857a97）展示了固定基地址 VUMMAP + 顺序扫描 + first-fit 物理页分配的 placement 逻辑。 <a href="#ev_task_03_vm_policies_82857a97" class="evidence-link">ev_task_03_vm_policies_82857a97</a></td></tr>
+<tr><td><strong>replacement_policy</strong></td><td>未选选项是否被源码证据、缺失证据或概念边界排除？</td><td><span>no_after_negative_search</span></td><td>负向搜索（ev_3958a384）覆盖 142 个文件，未发现 LRU/Clock/FIFO 等替换算法，覆盖充分。 <a href="#ev_task_03_vm_policies_3958a384" class="evidence-link">ev_task_03_vm_policies_3958a384</a></td></tr>
+<tr><td><strong>resident_load_control</strong></td><td>若多个选项同时成立或证据不足，是否按题意选择“其他/混合/unknown”并说明原因？</td><td><span>no_after_negative_search</span></td><td>负向搜索（ev_3958a384）未发现 working_set/thrash/resident set 跟踪或 OOM/kswapd/load control 结构。 <a href="#ev_task_03_vm_policies_3958a384" class="evidence-link">ev_task_03_vm_policies_3958a384</a></td></tr>
+<tr><td><strong>cleaning_policy</strong></td><td>若未确认“该系统更容易出现哪种内存碎片 (Memory Fragmentation, Stallings Ch7.2)？”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#fff3cd;color:#856404;font-size:0.85em;font-weight:500">⚠️ 弱支撑</span></td><td>__file_mmapdel 实现体（ev_293dec82）显示文件映射段在释放时同步写回，但仅限文件映射，非通用 VM cleaning 策略，强度为 weak。 <a href="#ev_task_03_vm_policies_293dec82" class="evidence-link">ev_task_03_vm_policies_293dec82</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>-</td><td><span>{"searched_keywords": ["working_set", "thrash", "resident", "replacement", "LRU", "Clock", "FIFO", "fetch", "demand", "prepaging", "placement", "mmap_base", "first fit", "best fit", "cleaning", "writeback", "kswapd", "OOM", "load control"], "searched_directories": ["kernel", "mm", "vm", "fs", "proc", "include"], "file_count": 142, "match_count": 0, "coverage_sufficient": true}</span></td><td>负向搜索覆盖 19 个关键词和 6 个目录，142 个文件中无 VM 替换/驻留集/负载控制相关匹配。 <a href="#ev_task_03_vm_policies_3958a384" class="evidence-link">ev_task_03_vm_policies_3958a384</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_03_vm_policies_789d1b9b" class="evidence-anchor">ev_task_03_vm_policies_789d1b9b</span> 
+<span id="ev_task_03_vm_policies_82857a97" class="evidence-anchor">ev_task_03_vm_policies_82857a97</span> 
+<span id="ev_task_03_vm_policies_3958a384" class="evidence-anchor">ev_task_03_vm_policies_3958a384</span> 
+<span id="ev_task_03_vm_policies_293dec82" class="evidence-anchor">ev_task_03_vm_policies_293dec82</span> 
+<span id="ev_task_03_vm_policies_9252fa1a" class="evidence-anchor">ev_task_03_vm_policies_9252fa1a</span> 
+</section>
+<section class="question-block" id="q03_032">
+<h3>Q03_032 地址重定位 (Address Relocation, Stallings Ch7.1) 的绑定时机更接近哪种？</h3>
+<div class="answer-value"><p>运行时动态绑定 (Run-time / Dynamic Relocation)：通过 MMU 基址+界限或页表在每次访问时转换</p></div>
+<div class="answer-notes">系统实现了 demand paging（缺页时按需分配物理页）和 COW，通过 MMU 页表在每次访问时完成地址转换，符合运行时动态绑定的定义。编译时和加载时绑定均不涉及缺页处理机制。</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>fetch_policy</strong></td><td>题目“地址重定位 (Address Relocation, Stallings Ch7.1) 的绑定时机更接近哪种？”的候选选项有哪些，是否只从题单 choices 中选择？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>handle_page_fault_lazy 实现 demand paging（lazy allocation），handle_store_page_fault_cow 实现 COW，handle_excp 为缺页异常入口，构成强证据链。 <a href="#ev_task_03_vm_policies_789d1b9b" class="evidence-link">ev_task_03_vm_policies_789d1b9b</a> <a href="#ev_task_03_vm_policies_f4ab850d" class="evidence-link">ev_task_03_vm_policies_f4ab850d</a> <a href="#ev_task_03_vm_policies_9252fa1a" class="evidence-link">ev_task_03_vm_policies_9252fa1a</a></td></tr>
+<tr><td><strong>placement_policy</strong></td><td>被选中的形态是否有源码、配置、调用链或数据结构证据直接支撑？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#fff3cd;color:#856404;font-size:0.85em;font-weight:500">⚠️ 弱支撑</span></td><td>lookup_segment 实现固定基地址 + 顺序段分配，但仅读取到实现体，未读取完整调用点/状态变化，判定为 yes_weak。 <a href="#ev_task_03_vm_policies_82857a97" class="evidence-link">ev_task_03_vm_policies_82857a97</a></td></tr>
+<tr><td><strong>replacement_policy</strong></td><td>未选选项是否被源码证据、缺失证据或概念边界排除？</td><td><span>no_after_negative_search</span></td><td>负向搜索覆盖 142 个文件，关键词包括 LRU/Clock/FIFO/replacement 等，未发现任何 VM 替换算法实现。 <a href="#ev_task_03_vm_policies_3958a384" class="evidence-link">ev_task_03_vm_policies_3958a384</a></td></tr>
+<tr><td><strong>resident_load_control</strong></td><td>若多个选项同时成立或证据不足，是否按题意选择“其他/混合/unknown”并说明原因？</td><td><span>no_after_negative_search</span></td><td>负向搜索未发现 working_set/thrash/resident set/load control 相关结构或实现。 <a href="#ev_task_03_vm_policies_3958a384" class="evidence-link">ev_task_03_vm_policies_3958a384</a></td></tr>
+<tr><td><strong>cleaning_policy</strong></td><td>若未确认“地址重定位 (Address Relocation, Stallings Ch7.1) 的绑定时机更接近哪种？”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#fff3cd;color:#856404;font-size:0.85em;font-weight:500">⚠️ 弱支撑</span></td><td>__file_mmapdel 在 sync 参数为真时同步写回脏页，但仅读取到实现体，未读取完整调用点/状态变化，判定为 yes_weak。 <a href="#ev_task_03_vm_policies_293dec82" class="evidence-link">ev_task_03_vm_policies_293dec82</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>-</td><td><span>{"searched_keywords": ["working_set", "thrash", "resident", "replacement", "LRU", "Clock", "FIFO", "fetch", "demand", "prepaging", "placement", "mmap_base", "first fit", "best fit", "cleaning", "writeback", "kswapd", "OOM", "load control"], "searched_directories": ["kernel", "mm", "vm", "fs", "proc", "include"], "file_count": 142, "match_count": 0, "coverage_sufficient": true}</span></td><td>负向搜索覆盖 19 个关键词和 6 个目录，142 个文件中无 VM 替换/驻留集/负载控制匹配，覆盖充分。 <a href="#ev_task_03_vm_policies_3958a384" class="evidence-link">ev_task_03_vm_policies_3958a384</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_03_vm_policies_789d1b9b" class="evidence-anchor">ev_task_03_vm_policies_789d1b9b</span> 
+<span id="ev_task_03_vm_policies_f4ab850d" class="evidence-anchor">ev_task_03_vm_policies_f4ab850d</span> 
+<span id="ev_task_03_vm_policies_9252fa1a" class="evidence-anchor">ev_task_03_vm_policies_9252fa1a</span> 
+<span id="ev_task_03_vm_policies_82857a97" class="evidence-anchor">ev_task_03_vm_policies_82857a97</span> 
+<span id="ev_task_03_vm_policies_3958a384" class="evidence-anchor">ev_task_03_vm_policies_3958a384</span> 
+<span id="ev_task_03_vm_policies_293dec82" class="evidence-anchor">ev_task_03_vm_policies_293dec82</span> 
+</section>
+<section class="question-block" id="q03_033">
+<h3>Q03_033 页面置换的作用域策略 (Replacement Scope, Stallings Ch8.2) 更接近哪种？</h3>
+<div class="answer-value"><p>未实现置换（无 swap）</p></div>
+<div class="answer-notes">fetch_policy 有 demand paging 强证据，placement_policy 有 first-fit 弱证据，但 replacement_policy 和 resident_load_control 经充分负向搜索未发现，cleaning_policy 仅文件映射同步写回。整体无页面置换算法实现，故选择“未实现置换（无 swap）”。</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>fetch_policy</strong></td><td>题目“页面置换的作用域策略 (Replacement Scope, Stallings Ch8.2) 更接近哪种？”的候选选项有哪些，是否只从题单 choices 中选择？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#d4edda;color:#155724;font-size:0.85em;font-weight:500">✅ 强支撑</span></td><td>handle_page_fault_lazy 实现 demand paging（lazy allocation），handle_store_page_fault_cow 实现 COW，handle_excp 为调用点，构成强证据。 <a href="#ev_task_03_vm_policies_789d1b9b" class="evidence-link">ev_task_03_vm_policies_789d1b9b</a> <a href="#ev_task_03_vm_policies_f4ab850d" class="evidence-link">ev_task_03_vm_policies_f4ab850d</a> <a href="#ev_task_03_vm_policies_9252fa1a" class="evidence-link">ev_task_03_vm_policies_9252fa1a</a></td></tr>
+<tr><td><strong>placement_policy</strong></td><td>被选中的形态是否有源码、配置、调用链或数据结构证据直接支撑？</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#fff3cd;color:#856404;font-size:0.85em;font-weight:500">⚠️ 弱支撑</span></td><td>lookup_segment 实现固定基地址+顺序段分配，__mul_alloc_no_lock 实现 first-fit 物理页分配，但缺少 LSP 调用图等更强证据，仅 weak。 <a href="#ev_task_03_vm_policies_82857a97" class="evidence-link">ev_task_03_vm_policies_82857a97</a> <a href="#ev_task_03_vm_policies_d77b484c" class="evidence-link">ev_task_03_vm_policies_d77b484c</a></td></tr>
+<tr><td><strong>replacement_policy</strong></td><td>未选选项是否被源码证据、缺失证据或概念边界排除？</td><td><span>no_after_negative_search</span></td><td>负向搜索覆盖 142 个文件、19 个关键词、6 个目录，未发现任何 VM 置换算法（LRU/Clock/FIFO）实现。 <a href="#ev_task_03_vm_policies_3958a384" class="evidence-link">ev_task_03_vm_policies_3958a384</a></td></tr>
+<tr><td><strong>resident_load_control</strong></td><td>若多个选项同时成立或证据不足，是否按题意选择“其他/混合/unknown”并说明原因？</td><td><span>no_after_negative_search</span></td><td>负向搜索未发现 working_set/thrash/resident set 跟踪或 OOM/kswapd/load control 结构。 <a href="#ev_task_03_vm_policies_3958a384" class="evidence-link">ev_task_03_vm_policies_3958a384</a></td></tr>
+<tr><td><strong>cleaning_policy</strong></td><td>若未确认“页面置换的作用域策略 (Replacement Scope, Stallings Ch8.2) 更接近哪种？”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#fff3cd;color:#856404;font-size:0.85em;font-weight:500">⚠️ 弱支撑</span></td><td>__file_mmapdel 在 sync 参数为真时同步写回脏页，但仅限文件映射段，非通用 VM 清理策略，证据强度 weak。 <a href="#ev_task_03_vm_policies_293dec82" class="evidence-link">ev_task_03_vm_policies_293dec82</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>-</td><td><span>{"searched_keywords": ["working_set", "thrash", "resident", "replacement", "LRU", "Clock", "FIFO", "fetch", "demand", "prepaging", "placement", "mmap_base", "first fit", "best fit", "cleaning", "writeback", "kswapd", "OOM", "load control"], "searched_directories": ["kernel", "mm", "vm", "fs", "proc", "include"], "file_count": 142, "match_count": 0, "coverage_sufficient": true}</span></td><td>负向搜索覆盖 19 个关键词、6 个目录、142 个文件，未发现 VM 置换/驻留集/负载控制相关实现。 <a href="#ev_task_03_vm_policies_3958a384" class="evidence-link">ev_task_03_vm_policies_3958a384</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_03_vm_policies_789d1b9b" class="evidence-anchor">ev_task_03_vm_policies_789d1b9b</span> 
+<span id="ev_task_03_vm_policies_82857a97" class="evidence-anchor">ev_task_03_vm_policies_82857a97</span> 
+<span id="ev_task_03_vm_policies_3958a384" class="evidence-anchor">ev_task_03_vm_policies_3958a384</span> 
+<span id="ev_task_03_vm_policies_f4ab850d" class="evidence-anchor">ev_task_03_vm_policies_f4ab850d</span> 
+<span id="ev_task_03_vm_policies_9252fa1a" class="evidence-anchor">ev_task_03_vm_policies_9252fa1a</span> 
+<span id="ev_task_03_vm_policies_d77b484c" class="evidence-anchor">ev_task_03_vm_policies_d77b484c</span> 
+<span id="ev_task_03_vm_policies_293dec82" class="evidence-anchor">ev_task_03_vm_policies_293dec82</span> 
+</section>
+<section class="question-block" id="q03_034">
+<h3>Q03_034 是否存在清理策略 (Cleaning Policy, Stallings Ch8.2)？（即脏页预先后台写回，而非仅在置换时才写回；搜索 background writeback / kswapd / cleaner_thread 或等价；必须三态；若 not_found 需列出已搜关键字）</h3>
+<div class="answer-value"><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#f8d7da;color:#721c24;font-size:0.85em;font-weight:500">❌ 未发现</span> <span style="color:var(--text-muted);margin-left:0.5em">未发现</span></div>
+<div class="answer-notes">All 6 structured_facts are no_after_negative_search. Negative search coverage is sufficient (19 keywords, 10 directories, 207 files). Only weak evidence exists: commented-out __page_file_swap (stub), struct field definitions (totalswap/ru_nswap), and handle_page_fault without swap-in path. No kswapd/background writeback/cleaner_thread or equivalent page-level cleaning policy found. Block cache async writeback is not page-level cleaning policy per Stallings Ch8.2 concept boundary.</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>swap_backing_store</strong></td><td>“清理策略 (Cleaning Policy)”的内核定义、入口、对象或配置开关在哪里？</td><td><span>no_after_negative_search</span></td><td>Negative search across 207 files found no swap area/swapfile/backing store management. Only commented-out __page_file_swap and struct field definitions (totalswap, ru_nswap) exist, which are declarations only. <a href="#ev_task_03_swap_ddb1f567" class="evidence-link">ev_task_03_swap_ddb1f567</a></td></tr>
+<tr><td><strong>resident_metadata</strong></td><td>是否存在执行“清理策略 (Cleaning Policy)”语义的真实实现体，而不是声明、空函数或固定返回？</td><td><span>no_after_negative_search</span></td><td>No swappable page metadata or resident/non-resident state found in negative search. <a href="#ev_task_03_swap_ddb1f567" class="evidence-link">ev_task_03_swap_ddb1f567</a></td></tr>
+<tr><td><strong>swap_out_path</strong></td><td>该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？</td><td><span>no_after_negative_search</span></td><td>No swap_out/pageout/reclaim path writing pages to backing store found. Block cache async writeback (bwrite + disk_write_start) is block device layer optimization, not page-level cleaning policy. <a href="#ev_task_03_swap_ddb1f567" class="evidence-link">ev_task_03_swap_ddb1f567</a></td></tr>
+<tr><td><strong>swap_in_fault_path</strong></td><td>执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？</td><td><span>no_after_negative_search</span></td><td>No swap_in recovery path in page fault handler. handle_page_fault only handles LOAD/HEAP/STACK/MMAP segments, no swap-in logic. <a href="#ev_task_03_swap_ddb1f567" class="evidence-link">ev_task_03_swap_ddb1f567</a></td></tr>
+<tr><td><strong>victim_policy</strong></td><td>是否排除与“清理策略 (Cleaning Policy)”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？</td><td><span>no_after_negative_search</span></td><td>No page replacement algorithm (LRU/Clock/FIFO) found. Commented-out __page_file_swap has a simple victim selection but is not active code. <a href="#ev_task_03_swap_ddb1f567" class="evidence-link">ev_task_03_swap_ddb1f567</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>若未确认“清理策略 (Cleaning Policy)”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span>{"searched_keywords": ["kswapd", "writeback", "background", "cleaner", "flush", "swap", "swap_in", "swap_out", "pageout", "reclaim", "evict", "replacement", "LRU", "Clock", "FIFO", "swapfile", "working_set", "thrash", "resident"], "searched_directories": ["kernel", "mm", "vm", "fs", "block", "include", "kernel/mm", "kernel/fs", "kernel/sched", "kernel/syscall"], "file_count": 207, "match_count": 0, "coverage_sufficient": true}</span></td><td>Negative search covered 19 keywords across 10 directories, 207 files, 0 matches for actual swap/pageout/reclaim implementation. <a href="#ev_task_03_swap_ddb1f567" class="evidence-link">ev_task_03_swap_ddb1f567</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_03_swap_ddb1f567" class="evidence-anchor">ev_task_03_swap_ddb1f567</span> 
+<span id="ev_task_03_swap_95f5abd7" class="evidence-anchor">ev_task_03_swap_95f5abd7</span> 
+<span id="ev_task_03_swap_b9c1f73d" class="evidence-anchor">ev_task_03_swap_b9c1f73d</span> 
+<span id="ev_task_03_swap_5995c620" class="evidence-anchor">ev_task_03_swap_5995c620</span> 
+<span id="ev_task_03_swap_fd2e1594" class="evidence-anchor">ev_task_03_swap_fd2e1594</span> 
+</section>
+<div style="margin-top:3rem;display:flex;justify-content:space-between;flex-wrap:wrap;gap:1rem">
+<a href="02.html" style="padding:0.6rem 1.2rem;background:#e74c3c;color:#fff;border-radius:8px;text-decoration:none">← 启动架构与 Trap/系统调用</a>
+<a href="../index.html" style="padding:0.6rem 1.2rem;background:#6c757d;color:#fff;border-radius:8px;text-decoration:none">首页</a>
+<a href="04.html" style="padding:0.6rem 1.2rem;background:#3498db;color:#fff;border-radius:8px;text-decoration:none">进程/线程/调度与多核 →</a>
+</div>
+</div></body></html>

@@ -25,7 +25,6 @@ from core.describe_json_qa import (
     ensure_structured_value_for_question,
     ensure_fact_answers_for_question,
     parse_answers_json,
-    render_answers_to_markdown,
     validate_answers_payload,
 )
 from core.describe_stage_qa import load_stage_qa, list_question_ids
@@ -51,6 +50,7 @@ from core.qa_contract import (
     strongest_evidence_strength,
 )
 from core.feature_graph import publish_feature_graph
+from core.html_renderer import publish_html_report
 from core.per_planner import build_repo_profile, ensure_execution_steps, plan_stage
 from core.per_llm_stages import extract_json_object
 from core.per_types import StageState
@@ -432,7 +432,8 @@ def _dedupe_str(items: List[str]) -> List[str]:
 
 
 class MultiAgentRuntime:
-    def __init__(self, *, repo_url: str, stages: List[Dict[str, Any]], output_dir: str):
+    def __init__(self, *, repo_url: str, stages: List[Dict[str, Any]], output_dir: str,
+                 repo_meta: Optional[Dict[str, Any]] = None):
         self.repo_url = repo_url
         self.repo_name = repo_name_from_url(repo_url)
         self.repo_path = os.path.normpath(os.path.join("./repos", self.repo_name))
@@ -440,6 +441,7 @@ class MultiAgentRuntime:
         self.state_dir = os.path.join(self.repo_output_dir, "_agent_state")
         self.stages = stages
         self.stages_by_id = _stage_by_id(stages)
+        self.repo_meta = repo_meta or {}
         self.run_id = self._load_or_create_run_id()
         self.events = EventLogger(self.run_id, self.state_dir)
         self.evidence_store = EvidenceStore(os.path.join(self.state_dir, "evidence_store.jsonl"))
@@ -636,41 +638,12 @@ class MultiAgentRuntime:
         except Exception as exc:
             self.events.emit("rag_index_skip", f"RAG pre-index skipped: {exc}", level="warn")
 
-    def _render_existing_answers_to_markdown(self, stage_id: str, title: str, stage: Dict[str, Any]) -> None:
-        answers_path = os.path.join(self.repo_output_dir, "_per_stage", f"{stage_id}_answers.json")
-        if not os.path.isfile(answers_path):
-            return
-        try:
-            with open(answers_path, "r", encoding="utf-8") as f:
-                payload = json.load(f)
-            
-            stage_qa = None
-            try:
-                stage_qa = load_stage_qa(stage_id)
-            except Exception:
-                pass
-            
-            if not stage_qa:
-                questions, _ = _questions_for_stage(stage_id)
-                stage_qa = {"questions": questions}
-
-            markdown = render_answers_to_markdown(payload, stage_qa).strip()
-            section_path = _section_path(self.repo_output_dir, stage_id, title)
-            if markdown and not stage.get("skip_in_report", False):
-                with FileLock(lock_path(self.state_dir, "output_write")):
-                    with open(section_path, "w", encoding="utf-8") as f:
-                        f.write(markdown + "\n")
-        except Exception as e:
-            self.events.emit("stage_skip", f"Failed to re-render markdown: {e}", level="warn", stage_id=stage_id)
-
     def _run_stage(self, stage_id: str, repo_profile: Dict[str, Any]) -> None:
         stage = self.stages_by_id[stage_id]
         title = str(stage.get("title") or stage_id)
         answers_path = os.path.join(self.repo_output_dir, "_per_stage", f"{stage_id}_answers.json")
         if os.path.isfile(answers_path) and stage_id not in self.force_stages:
-            self.events.emit("stage_skip", "answers file exists, rendering directly", stage_id=stage_id)
-            self._render_existing_answers_to_markdown(stage_id, title, stage)
-            section_path = _section_path(self.repo_output_dir, stage_id, title)
+            self.events.emit("stage_skip", "answers file exists, skipping", stage_id=stage_id)
             state_payload = {
                 "stage_id": stage_id,
                 "stage_title": title,
@@ -679,7 +652,6 @@ class MultiAgentRuntime:
                 "assembler_precheck_status": "",
                 "review_needs_fix": False,
                 "answer_path": answers_path,
-                "section_path": section_path,
                 "blocked_question_ids": [],
                 "updated_at": utcnow_iso(),
             }
@@ -689,7 +661,6 @@ class MultiAgentRuntime:
 
         if self._stage_status(stage_id) == "reviewed" and stage_id not in self.force_stages:
             self.events.emit("stage_skip", "already reviewed", stage_id=stage_id)
-            self._render_existing_answers_to_markdown(stage_id, title, stage)
             return
         questions, expected_question_ids = _questions_for_stage(stage_id)
         self.events.emit("stage_start", title, stage_id=stage_id, metadata={"total_questions": len(questions)})
@@ -734,14 +705,15 @@ class MultiAgentRuntime:
         if questions:
             precheck = self._assembler_precheck(stage_id, title, questions, evidence_by_question)
         if questions:
-            payload, markdown = self._assemble_stage(stage_id, title, questions, expected_question_ids, evidence_by_question)
+            payload, _ = self._assemble_stage(stage_id, title, questions, expected_question_ids, evidence_by_question)
         else:
             payload, markdown = self._write_stage(stage_id, title, questions, expected_question_ids, evidence_by_question)
-        section_path = _section_path(self.repo_output_dir, stage_id, title)
-        if markdown and not stage.get("skip_in_report", False):
-            with FileLock(lock_path(self.state_dir, "output_write")):
-                with open(section_path, "w", encoding="utf-8") as f:
-                    f.write(markdown.strip() + "\n")
+            # 01/10 章是 LLM 直写 markdown，写入 sections/ 供 index.html 使用
+            section_path = _section_path(self.repo_output_dir, stage_id, title)
+            if markdown and not stage.get("skip_in_report", False):
+                with FileLock(lock_path(self.state_dir, "output_write")):
+                    with open(section_path, "w", encoding="utf-8") as f:
+                        f.write(markdown.strip() + "\n")
         review = self._review_stage(stage_id, title, expected_question_ids, payload)
         fix_round = 0
         while questions and self._review_needs_fix(review) and fix_round < self.max_review_fix_rounds:
@@ -762,7 +734,7 @@ class MultiAgentRuntime:
             if stage_id in self.force_stages:
                 evidence_by_question = self._group_records_by_question(stage_id, records)
             precheck = self._assembler_precheck(stage_id, title, questions, evidence_by_question)
-            payload, markdown = self._assemble_stage(
+            payload, _ = self._assemble_stage(
                 stage_id,
                 title,
                 questions,
@@ -771,10 +743,6 @@ class MultiAgentRuntime:
                 review_fix_records=fix_records,
                 review_fix_round=fix_round,
             )
-            if markdown and not stage.get("skip_in_report", False):
-                with FileLock(lock_path(self.state_dir, "output_write")):
-                    with open(section_path, "w", encoding="utf-8") as f:
-                        f.write(markdown.strip() + "\n")
             review = self._review_stage(stage_id, title, expected_question_ids, payload)
         review_still_needs_fix = bool(questions and self._review_needs_fix(review))
         final_stage_status = "blocked" if precheck.get("status") == "blocked" or review_still_needs_fix else "reviewed"
@@ -1490,7 +1458,7 @@ class MultiAgentRuntime:
         except Exception as exc:
             self.events.emit("assembler_json_invalid", f"{type(exc).__name__}: {exc}", stage_id=stage_id, level="warn")
             
-        markdown = render_answers_to_markdown(payload, stage_qa).strip()
+        markdown = ""  # 02-09 章不再生成 md，直接由 publish_html_report 从 answers.json 渲染
         sidecar = os.path.join(self.repo_output_dir, "_per_stage")
         with FileLock(lock_path(self.state_dir, "output_write")):
             _atomic_save_json(os.path.join(sidecar, f"{stage_id}_answers.json"), payload)
@@ -1618,13 +1586,12 @@ class MultiAgentRuntime:
                 expected_question_ids,
                 evidence_by_question,
             )
-            markdown = render_answers_to_markdown(payload, {"questions": questions}).strip()
             sidecar = os.path.join(self.repo_output_dir, "_per_stage")
             with FileLock(lock_path(self.state_dir, "output_write")):
                 _atomic_save_json(os.path.join(sidecar, f"{stage_id}_answers.json"), payload)
                 with open(os.path.join(sidecar, f"{stage_id}_answers_raw.txt"), "w", encoding="utf-8") as f:
                     f.write(raw.strip() + "\n")
-            return payload, markdown
+            return payload, ""  # markdown 不再生成
         prompt = self._markdown_writer_prompt(stage_id, title, evidence_summary)
         if stage_id == "01_overview":
             prompt += "\n\n## 前置章节摘要\n" + self._load_previous_sections_text()
@@ -2539,35 +2506,15 @@ class MultiAgentRuntime:
             self.events.emit("review_score_error", str(exc), level="warn")
             review_score_bundle = {}
         total_quality = review_score_bundle.get("total_0_100") if isinstance(review_score_bundle, dict) else None
-        final_report_path = os.path.join(self.repo_output_dir, f"OS技术分析报告_{self.repo_name}.md")
-        sections_dir = os.path.join(self.repo_output_dir, "sections")
-        section_paths = [
-            os.path.join(sections_dir, f)
-            for f in sorted(os.listdir(sections_dir)) if f.endswith(".md")
-        ] if os.path.isdir(sections_dir) else []
-        overview = [p for p in section_paths if os.path.basename(p).startswith("01_")]
-        others = [p for p in section_paths if p not in overview]
-        content_sections = overview + others
         with FileLock(lock_path(self.state_dir, "output_write")):
-            with open(final_report_path, "w", encoding="utf-8") as out:
-                out.write(f"# {self.repo_name} 操作系统技术分析报告\n\n")
-                out.write(f"> **仓库地址**: {self.repo_url}\n\n")
-                out.write(f"> **分析日期**: {datetime.now().strftime('%Y年%m月%d日')}\n\n")
-                out.write("> **分析工具**: OS-Agent-D Multi-Agent\n\n")
-                if total_quality is not None:
-                    out.write(f"> **报告质量打分**: {total_quality}/100\n\n")
-                out.write("---\n\n## 目录\n\n")
-                for idx, path in enumerate(content_sections, 1):
-                    title = os.path.splitext(os.path.basename(path))[0].replace("_", " ")
-                    out.write(f"{idx}. {title}\n")
-                out.write("\n---\n\n")
-                for path in content_sections:
-                    heading = os.path.splitext(os.path.basename(path))[0].replace("_", " ")
-                    out.write(f"# {heading}\n\n")
-                    with open(path, "r", encoding="utf-8", errors="ignore") as f:
-                        out.write(f.read().strip() + "\n\n---\n\n")
-                out.write(f"*本报告由 OS-Agent-D Multi-Agent 自动生成*  \n")
-                out.write(f"*生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*  \n")
+            index_path = publish_html_report(
+                repo_output_dir=self.repo_output_dir,
+                repo_name=self.repo_name,
+                repo_url=self.repo_url,
+                analysis_date=datetime.now().strftime('%Y年%m月%d日'),
+                total_quality=total_quality,
+                repo_meta=self.repo_meta or None,
+            )
             try:
                 graph = publish_feature_graph(
                     repo_output_dir=self.repo_output_dir,
@@ -2576,7 +2523,7 @@ class MultiAgentRuntime:
                 self.events.emit("feature_graph_done", f"nodes={graph.get('stats', {}).get('nodes')} edges={graph.get('stats', {}).get('edges')}")
             except Exception as exc:
                 self.events.emit("feature_graph_error", f"{type(exc).__name__}: {exc}", level="warn")
-        self.events.emit("publish_done", final_report_path)
+        self.events.emit("publish_done", index_path or self.repo_output_dir)
 
     def _save_graph_snapshot_unlocked(self, *, status: str, current_stage: str = "") -> None:
         stage_states: Dict[str, Dict[str, Any]] = {}
@@ -2609,6 +2556,7 @@ class MultiAgentRuntime:
         _atomic_save_json(os.path.join(self.state_dir, "graph_state.json"), snapshot.to_dict())
 
 
-def run_describe_graph(*, repo_url: str, stages: List[Dict[str, Any]], output_dir: str = "./output") -> None:
-    runtime = MultiAgentRuntime(repo_url=repo_url, stages=stages, output_dir=output_dir)
+def run_describe_graph(*, repo_url: str, stages: List[Dict[str, Any]], output_dir: str = "./output",
+                       repo_meta: Optional[Dict[str, Any]] = None) -> None:
+    runtime = MultiAgentRuntime(repo_url=repo_url, stages=stages, output_dir=output_dir, repo_meta=repo_meta)
     runtime.run()
