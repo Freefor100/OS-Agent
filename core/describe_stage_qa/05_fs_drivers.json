@@ -201,20 +201,6 @@
         "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
         "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。"
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch12 File Management",
-          "concepts": [
-            "file system",
-            "file organization",
-            "directories",
-            "file allocation",
-            "free space management",
-            "file sharing",
-            "VFS"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：VFS 抽象层 (Virtual File System, VFS)接口是什么形态？（Rust trait / C op 表；必须给接口定义证据）  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "task_hints": {
         "diagnostic_checks": [
@@ -354,21 +340,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "文件系统题要区分 VFS 抽象、具体后端、路径解析、目录结构、文件对象、fd table、特殊文件和实际 syscall 路径。只有用户态 API 或结构名不等于完整 FS 实现。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch12 File Management",
-            "concepts": [
-              "file system",
-              "file organization",
-              "directories",
-              "file allocation",
-              "free space management",
-              "file sharing",
-              "VFS"
-            ]
-          }
-        ]
+        "concept_boundary": "文件系统题要区分 VFS 抽象、具体后端、路径解析、目录结构、文件对象、fd table、特殊文件和实际 syscall 路径。只有用户态 API 或结构名不等于完整 FS 实现。"
       },
       "llm_answer_steps": [
         "只回答 Q05_001 的题干，不使用相邻题结论替代。",
@@ -562,20 +534,6 @@
         "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
         "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。"
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch12 File Management",
-          "concepts": [
-            "file system",
-            "file organization",
-            "directories",
-            "file allocation",
-            "free space management",
-            "file sharing",
-            "VFS"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：具体文件系统后端 (Concrete File System Backend) 更接近哪种？  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "task_hints": {
         "diagnostic_checks": [
@@ -686,21 +644,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "文件系统题要区分 VFS 抽象、具体后端、路径解析、目录结构、文件对象、fd table、特殊文件和实际 syscall 路径。只有用户态 API 或结构名不等于完整 FS 实现。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch12 File Management",
-            "concepts": [
-              "file system",
-              "file organization",
-              "directories",
-              "file allocation",
-              "free space management",
-              "file sharing",
-              "VFS"
-            ]
-          }
-        ]
+        "concept_boundary": "文件系统题要区分 VFS 抽象、具体后端、路径解析、目录结构、文件对象、fd table、特殊文件和实际 syscall 路径。只有用户态 API 或结构名不等于完整 FS 实现。"
       },
       "llm_answer_steps": [
         "只回答 Q05_002 的题干，不使用相邻题结论替代。",
@@ -917,20 +861,6 @@
         "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
         "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。"
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch12 File Management",
-          "concepts": [
-            "file system",
-            "file organization",
-            "directories",
-            "file allocation",
-            "free space management",
-            "file sharing",
-            "VFS"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：若支持 FAT32/Ext4：它是自研还是第三方库/crate？（必须引用 Cargo.toml/Cargo.lock 或 Makefile 引入证据）  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "task_hints": {
         "diagnostic_checks": [
@@ -1070,21 +1000,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "文件系统题要区分 VFS 抽象、具体后端、路径解析、目录结构、文件对象、fd table、特殊文件和实际 syscall 路径。只有用户态 API 或结构名不等于完整 FS 实现。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch12 File Management",
-            "concepts": [
-              "file system",
-              "file organization",
-              "directories",
-              "file allocation",
-              "free space management",
-              "file sharing",
-              "VFS"
-            ]
-          }
-        ]
+        "concept_boundary": "文件系统题要区分 VFS 抽象、具体后端、路径解析、目录结构、文件对象、fd table、特殊文件和实际 syscall 路径。只有用户态 API 或结构名不等于完整 FS 实现。"
       },
       "llm_answer_steps": [
         "只回答 Q05_003 的题干，不使用相邻题结论替代。",
@@ -1153,7 +1069,8 @@
         "支撑答案的主要源码/配置/文档锚点在哪里（路径、符号、结构体或常量）？",
         "答案中的每个关键结论是否有实现体、调用链、状态变化或配置分支证据？",
         "是否排除题干未要求的相邻模块、同名概念、用户态封装、README 口号或测试桩？",
-        "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？"
+        "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？",
+        "??????????????? sys_open ? VFS ???? FS open??????????????????"
       ],
       "structured_facts": [
         {
@@ -1301,20 +1218,6 @@
         "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
         "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。"
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch12 File Management",
-          "concepts": [
-            "file system",
-            "file organization",
-            "directories",
-            "file allocation",
-            "free space management",
-            "file sharing",
-            "VFS"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：文件打开路径：文件打开入口（sys_open 或等价）→ VFS 层 → 具体 FS open。列出 3-6 个关键节点并给证据。  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "task_hints": {
         "diagnostic_checks": [
@@ -1322,7 +1225,8 @@
           "支撑答案的主要源码/配置/文档锚点在哪里（路径、符号、结构体或常量）？",
           "答案中的每个关键结论是否有实现体、调用链、状态变化或配置分支证据？",
           "是否排除题干未要求的相邻模块、同名概念、用户态封装、README 口号或测试桩？",
-          "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？"
+          "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？",
+          "??????????????? sys_open ? VFS ???? FS open??????????????????"
         ],
         "structured_facts": [
           {
@@ -1454,21 +1358,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "文件系统题要区分 VFS 抽象、具体后端、路径解析、目录结构、文件对象、fd table、特殊文件和实际 syscall 路径。只有用户态 API 或结构名不等于完整 FS 实现。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch12 File Management",
-            "concepts": [
-              "file system",
-              "file organization",
-              "directories",
-              "file allocation",
-              "free space management",
-              "file sharing",
-              "VFS"
-            ]
-          }
-        ]
+        "concept_boundary": "文件系统题要区分 VFS 抽象、具体后端、路径解析、目录结构、文件对象、fd table、特殊文件和实际 syscall 路径。只有用户态 API 或结构名不等于完整 FS 实现。"
       },
       "llm_answer_steps": [
         "只回答 Q05_004 的题干，不使用相邻题结论替代。",
@@ -1685,20 +1575,6 @@
         "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
         "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。"
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch12 File Management",
-          "concepts": [
-            "file system",
-            "file organization",
-            "directories",
-            "file allocation",
-            "free space management",
-            "file sharing",
-            "VFS"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：文件描述符表 (File Descriptor Table, FD Table) 的实现形态是什么？（固定数组/Vec/BTreeMap 等；必须给结构体定义证据）  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "task_hints": {
         "diagnostic_checks": [
@@ -1838,21 +1714,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "文件系统题要区分 VFS 抽象、具体后端、路径解析、目录结构、文件对象、fd table、特殊文件和实际 syscall 路径。只有用户态 API 或结构名不等于完整 FS 实现。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch12 File Management",
-            "concepts": [
-              "file system",
-              "file organization",
-              "directories",
-              "file allocation",
-              "free space management",
-              "file sharing",
-              "VFS"
-            ]
-          }
-        ]
+        "concept_boundary": "文件系统题要区分 VFS 抽象、具体后端、路径解析、目录结构、文件对象、fd table、特殊文件和实际 syscall 路径。只有用户态 API 或结构名不等于完整 FS 实现。"
       },
       "llm_answer_steps": [
         "只回答 Q05_005 的题干，不使用相邻题结论替代。",
@@ -2102,19 +1964,6 @@
           "unknown"
         ]
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch12 File Management",
-          "concepts": [
-            "free space management",
-            "bit vectors",
-            "linked free space",
-            "grouping",
-            "counting",
-            "file allocation tables"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否实现块缓存/缓冲缓存 (Block Cache / Buffer Cache, bcache；以 device/blockno 或文件系统块号为 key)？ Block/Buffer Cache 固定指 device/blockno 或文件系统块号粒度的块缓存；文件 Page Cache、普通 I/O buffer、DMA descriptor 或页帧 freelist 不等价。 本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "task_hints": {
         "diagnostic_checks": [
@@ -2254,21 +2103,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "Block/Buffer Cache 缓存块设备块或文件系统块，通常以 device+blockno、sector 或 FS block id 为 key，并接入 block read/write 或 FS read/write。它不同于 Page Cache（inode+page offset）、I/O 临时 buffer、virtqueue ring 或 DMA descriptor。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-            "concepts": [
-              "I/O control techniques",
-              "interrupt-driven I/O",
-              "DMA",
-              "I/O buffering",
-              "disk scheduling",
-              "device drivers"
-            ]
-          }
-        ],
-        "text_authoring": "authored_in_describe_stage_qa_json"
+        "concept_boundary": "Block/Buffer Cache 缓存块设备块或文件系统块，通常以 device+blockno、sector 或 FS block id 为 key，并接入 block read/write 或 FS read/write。它不同于 Page Cache（inode+page offset）、I/O 临时 buffer、virtqueue ring 或 DMA descriptor。"
       },
       "llm_answer_steps": [
         "只回答 Q05_006 的题干，不使用相邻题结论替代。",
@@ -2480,20 +2315,6 @@
         "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
         "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。"
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch12 File Management",
-          "concepts": [
-            "file system",
-            "file organization",
-            "directories",
-            "file allocation",
-            "free space management",
-            "file sharing",
-            "VFS"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：若存在块缓存/缓冲缓存：替换/驱逐策略 (Replacement Policy)是什么（LRU/Clock/FIFO/引用计数保护/无驱逐）？必须指出判断依据（字段/算法分支）证据。 Block/Buffer Cache 固定指 device/blockno 或文件系统块号粒度的块缓存；文件 Page Cache、普通 I/O buffer、DMA descriptor 或页帧 freelist 不等价。 本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "task_hints": {
         "diagnostic_checks": [
@@ -2633,22 +2454,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "本题只讨论 Q05_006 的 Block/Buffer Cache 替换/驱逐策略 (Replacement Policy)，不讨论 Page Cache、I/O buffer、virtqueue ring 或普通内存分配器。若没有块缓存，应回答未发现块缓存替换/驱逐策略 (Replacement Policy)；不要把页面置换算法或调度队列算法搬来。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch12 File Management",
-            "concepts": [
-              "file system",
-              "file organization",
-              "directories",
-              "file allocation",
-              "free space management",
-              "file sharing",
-              "VFS"
-            ]
-          }
-        ],
-        "text_authoring": "authored_in_describe_stage_qa_json"
+        "concept_boundary": "本题只讨论 Q05_006 的 Block/Buffer Cache 替换/驱逐策略 (Replacement Policy)，不讨论 Page Cache、I/O buffer、virtqueue ring 或普通内存分配器。若没有块缓存，应回答未发现块缓存替换/驱逐策略 (Replacement Policy)；不要把页面置换算法或调度队列算法搬来。"
       },
       "llm_answer_steps": [
         "只回答 Q05_007 的题干，不使用相邻题结论替代。",
@@ -2893,35 +2699,6 @@
           "unknown"
         ]
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch8 Virtual Memory",
-          "concepts": [
-            "virtual memory",
-            "page fault",
-            "fetch policy",
-            "placement policy",
-            "replacement policy",
-            "resident set",
-            "cleaning policy",
-            "load control",
-            "thrashing",
-            "working set"
-          ]
-        },
-        {
-          "source": "Stallings Ch12 File Management",
-          "concepts": [
-            "file system",
-            "file organization",
-            "directories",
-            "file allocation",
-            "free space management",
-            "file sharing",
-            "VFS"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否实现文件页缓存 Page Cache（inode/文件对象 + page offset）或 mmap/文件映射共享缓存页？ Page Cache 固定指文件页缓存：key 为 inode/文件对象/address_space + page offset，并与 read/write/mmap/page fault/writeback 共享；block/buffer cache、I/O buffer、virtqueue descriptor、页帧分配器和 TLB 都不等价。 本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "task_hints": {
         "diagnostic_checks": [
@@ -3061,37 +2838,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "Page Cache 指文件页缓存：按文件对象/inode/address_space + page offset 管理文件页，并与 read/write、mmap、page fault、dirty/writeback 路径共享。block/buffer cache 以 device+blockno 为 key，只能说明块缓存；普通 I/O buffer 或 mmap VMA 记录不等价。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch8 Virtual Memory",
-            "concepts": [
-              "virtual memory",
-              "page fault",
-              "fetch policy",
-              "placement policy",
-              "replacement policy",
-              "resident set",
-              "cleaning policy",
-              "load control",
-              "thrashing",
-              "working set"
-            ]
-          },
-          {
-            "source": "Stallings Ch12 File Management",
-            "concepts": [
-              "file system",
-              "file organization",
-              "directories",
-              "file allocation",
-              "free space management",
-              "file sharing",
-              "VFS"
-            ]
-          }
-        ],
-        "text_authoring": "authored_in_describe_stage_qa_json"
+        "concept_boundary": "Page Cache 指文件页缓存：按文件对象/inode/address_space + page offset 管理文件页，并与 read/write、mmap、page fault、dirty/writeback 路径共享。block/buffer cache 以 device+blockno 为 key，只能说明块缓存；普通 I/O buffer 或 mmap VMA 记录不等价。"
       },
       "llm_answer_steps": [
         "只回答 Q05_008 的题干，不使用相邻题结论替代。",
@@ -3333,23 +3080,6 @@
           "unknown"
         ]
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch8 Virtual Memory",
-          "concepts": [
-            "virtual memory",
-            "page fault",
-            "fetch policy",
-            "placement policy",
-            "replacement policy",
-            "resident set",
-            "cleaning policy",
-            "load control",
-            "thrashing",
-            "working set"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否实现 mmap 的文件映射或匿名映射？  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "task_hints": {
         "diagnostic_checks": [
@@ -3489,24 +3219,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "mmap implemented 需要 syscall 入口、参数/flag 解析、VMA/地址空间登记、fault/readback 路径和 munmap/cleanup 的核心闭环；固定返回或只登记名字是 stub。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch8 Virtual Memory",
-            "concepts": [
-              "virtual memory",
-              "page fault",
-              "fetch policy",
-              "placement policy",
-              "replacement policy",
-              "resident set",
-              "cleaning policy",
-              "load control",
-              "thrashing",
-              "working set"
-            ]
-          }
-        ]
+        "concept_boundary": "mmap implemented 需要 syscall 入口、参数/flag 解析、VMA/地址空间登记、fault/readback 路径和 munmap/cleanup 的核心闭环；固定返回或只登记名字是 stub。"
       },
       "llm_answer_steps": [
         "只回答 Q05_009 的题干，不使用相邻题结论替代。",
@@ -3596,7 +3309,8 @@
         "是否存在执行“poll/select/epoll”语义的真实实现体，而不是声明、空函数或固定返回？",
         "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
         "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
-        "是否排除与“poll/select/epoll”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？"
+        "是否排除与“poll/select/epoll”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+        "???????poll/select/epoll ????? fd/socket/pipe readiness?return ready ?????? stub?"
       ],
       "structured_facts": [
         {
@@ -3756,20 +3470,6 @@
           "unknown"
         ]
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch12 File Management",
-          "concepts": [
-            "file system",
-            "file organization",
-            "directories",
-            "file allocation",
-            "free space management",
-            "file sharing",
-            "VFS"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否实现 poll/select/epoll（或等价 fd 事件等待机制），并真实检查文件/socket/pipe readiness？ poll/select/epoll 只看 fd readiness 与等待/唤醒语义；普通轮询循环、sleep、timer 或驱动 polling 不等价。 同步/IPC 题必须区分字节流、离散消息、共享内存、地址等待、条件等待和信号通知；只实现其中一种不能证明另一种。 本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "task_hints": {
         "diagnostic_checks": [
@@ -3777,7 +3477,8 @@
           "是否存在执行“poll/select/epoll”语义的真实实现体，而不是声明、空函数或固定返回？",
           "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
           "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
-          "是否排除与“poll/select/epoll”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？"
+          "是否排除与“poll/select/epoll”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+          "???????poll/select/epoll ????? fd/socket/pipe readiness?return ready ?????? stub?"
         ],
         "structured_facts": [
           {
@@ -3909,22 +3610,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "poll/select/epoll implemented 需要 syscall/API、fd 集合解析、ready mask 计算、等待队列/唤醒或 timeout 处理，并接入具体 file/socket/pipe readiness。固定返回 ready、只注册 syscall 号、只支持用户态 wrapper 或仅有常量定义都是 stub/弱线索。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch12 File Management",
-            "concepts": [
-              "file system",
-              "file organization",
-              "directories",
-              "file allocation",
-              "free space management",
-              "file sharing",
-              "VFS"
-            ]
-          }
-        ],
-        "text_authoring": "authored_in_describe_stage_qa_json"
+        "concept_boundary": "poll/select/epoll implemented 需要 syscall/API、fd 集合解析、ready mask 计算、等待队列/唤醒或 timeout 处理，并接入具体 file/socket/pipe readiness。固定返回 ready、只注册 syscall 号、只支持用户态 wrapper 或仅有常量定义都是 stub/弱线索。"
       },
       "llm_answer_steps": [
         "只回答 Q05_010 的题干，不使用相邻题结论替代。",
@@ -4174,20 +3860,6 @@
           "unknown"
         ]
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch12 File Management",
-          "concepts": [
-            "file system",
-            "file organization",
-            "directories",
-            "file allocation",
-            "free space management",
-            "file sharing",
-            "VFS"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：路径解析 (namei/path_walk/lookup) 是否实现并支持绝对/相对路径与 . ..？  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "task_hints": {
         "diagnostic_checks": [
@@ -4327,21 +3999,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "文件系统题要区分 VFS 抽象、具体后端、路径解析、目录结构、文件对象、fd table、特殊文件和实际 syscall 路径。只有用户态 API 或结构名不等于完整 FS 实现。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch12 File Management",
-            "concepts": [
-              "file system",
-              "file organization",
-              "directories",
-              "file allocation",
-              "free space management",
-              "file sharing",
-              "VFS"
-            ]
-          }
-        ]
+        "concept_boundary": "文件系统题要区分 VFS 抽象、具体后端、路径解析、目录结构、文件对象、fd table、特殊文件和实际 syscall 路径。只有用户态 API 或结构名不等于完整 FS 实现。"
       },
       "llm_answer_steps": [
         "只回答 Q05_011 的题干，不使用相邻题结论替代。",
@@ -4591,20 +4249,6 @@
           "unknown"
         ]
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch12 File Management",
-          "concepts": [
-            "file system",
-            "file organization",
-            "directories",
-            "file allocation",
-            "free space management",
-            "file sharing",
-            "VFS"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否支持符号链接 (symlink) 的解析/跟随？  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "task_hints": {
         "diagnostic_checks": [
@@ -4744,21 +4388,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "文件系统题要区分 VFS 抽象、具体后端、路径解析、目录结构、文件对象、fd table、特殊文件和实际 syscall 路径。只有用户态 API 或结构名不等于完整 FS 实现。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch12 File Management",
-            "concepts": [
-              "file system",
-              "file organization",
-              "directories",
-              "file allocation",
-              "free space management",
-              "file sharing",
-              "VFS"
-            ]
-          }
-        ]
+        "concept_boundary": "文件系统题要区分 VFS 抽象、具体后端、路径解析、目录结构、文件对象、fd table、特殊文件和实际 syscall 路径。只有用户态 API 或结构名不等于完整 FS 实现。"
       },
       "llm_answer_steps": [
         "只回答 Q05_012 的题干，不使用相邻题结论替代。",
@@ -4848,7 +4478,8 @@
         "是否存在执行“管道 (pipe/pipe2) 并在 VFS 层作为文件对象”语义的真实实现体，而不是声明、空函数或固定返回？",
         "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
         "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
-        "是否排除与“管道 (pipe/pipe2) 并在 VFS 层作为文件对象”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？"
+        "是否排除与“管道 (pipe/pipe2) 并在 VFS 层作为文件对象”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+        "???????pipe ?? VFS ?????? 06 IPC ? pipe ??????????"
       ],
       "structured_facts": [
         {
@@ -5008,20 +4639,6 @@
           "unknown"
         ]
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch12 File Management",
-          "concepts": [
-            "file system",
-            "file organization",
-            "directories",
-            "file allocation",
-            "free space management",
-            "file sharing",
-            "VFS"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否实现管道 (pipe/pipe2) 并在 VFS 层作为文件对象？ 同步/IPC 题必须区分字节流、离散消息、共享内存、地址等待、条件等待和信号通知；只实现其中一种不能证明另一种。 本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "task_hints": {
         "diagnostic_checks": [
@@ -5029,7 +4646,8 @@
           "是否存在执行“管道 (pipe/pipe2) 并在 VFS 层作为文件对象”语义的真实实现体，而不是声明、空函数或固定返回？",
           "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
           "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
-          "是否排除与“管道 (pipe/pipe2) 并在 VFS 层作为文件对象”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？"
+          "是否排除与“管道 (pipe/pipe2) 并在 VFS 层作为文件对象”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+          "???????pipe ?? VFS ?????? 06 IPC ? pipe ??????????"
         ],
         "structured_facts": [
           {
@@ -5161,21 +4779,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "文件系统题要区分 VFS 抽象、具体后端、路径解析、目录结构、文件对象、fd table、特殊文件和实际 syscall 路径。只有用户态 API 或结构名不等于完整 FS 实现。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch12 File Management",
-            "concepts": [
-              "file system",
-              "file organization",
-              "directories",
-              "file allocation",
-              "free space management",
-              "file sharing",
-              "VFS"
-            ]
-          }
-        ]
+        "concept_boundary": "文件系统题要区分 VFS 抽象、具体后端、路径解析、目录结构、文件对象、fd table、特殊文件和实际 syscall 路径。只有用户态 API 或结构名不等于完整 FS 实现。"
       },
       "llm_answer_steps": [
         "只回答 Q05_013 的题干，不使用相邻题结论替代。",
@@ -5425,20 +5029,6 @@
           "unknown"
         ]
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch12 File Management",
-          "concepts": [
-            "file system",
-            "file organization",
-            "directories",
-            "file allocation",
-            "free space management",
-            "file sharing",
-            "VFS"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否实现网络 socket（作为 VFS 文件对象）？  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "task_hints": {
         "diagnostic_checks": [
@@ -5578,21 +5168,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "文件系统题要区分 VFS 抽象、具体后端、路径解析、目录结构、文件对象、fd table、特殊文件和实际 syscall 路径。只有用户态 API 或结构名不等于完整 FS 实现。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch12 File Management",
-            "concepts": [
-              "file system",
-              "file organization",
-              "directories",
-              "file allocation",
-              "free space management",
-              "file sharing",
-              "VFS"
-            ]
-          }
-        ]
+        "concept_boundary": "文件系统题要区分 VFS 抽象、具体后端、路径解析、目录结构、文件对象、fd table、特殊文件和实际 syscall 路径。只有用户态 API 或结构名不等于完整 FS 实现。"
       },
       "llm_answer_steps": [
         "只回答 Q05_014 的题干，不使用相邻题结论替代。",
@@ -5842,20 +5418,6 @@
           "unknown"
         ]
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch12 File Management",
-          "concepts": [
-            "file system",
-            "file organization",
-            "directories",
-            "file allocation",
-            "free space management",
-            "file sharing",
-            "VFS"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否实现伪文件系统（devfs/procfs/sysfs）？  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "task_hints": {
         "diagnostic_checks": [
@@ -5995,21 +5557,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "文件系统题要区分 VFS 抽象、具体后端、路径解析、目录结构、文件对象、fd table、特殊文件和实际 syscall 路径。只有用户态 API 或结构名不等于完整 FS 实现。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch12 File Management",
-            "concepts": [
-              "file system",
-              "file organization",
-              "directories",
-              "file allocation",
-              "free space management",
-              "file sharing",
-              "VFS"
-            ]
-          }
-        ]
+        "concept_boundary": "文件系统题要区分 VFS 抽象、具体后端、路径解析、目录结构、文件对象、fd table、特殊文件和实际 syscall 路径。只有用户态 API 或结构名不等于完整 FS 实现。"
       },
       "llm_answer_steps": [
         "只回答 Q05_015 的题干，不使用相邻题结论替代。",
@@ -6196,20 +5744,6 @@
         "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
         "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。"
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch12 File Management",
-          "concepts": [
-            "file system",
-            "file organization",
-            "directories",
-            "file allocation",
-            "free space management",
-            "file sharing",
-            "VFS"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：文件描述符表的归属是哪种？  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "task_hints": {
         "diagnostic_checks": [
@@ -6320,21 +5854,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "文件系统题要区分 VFS 抽象、具体后端、路径解析、目录结构、文件对象、fd table、特殊文件和实际 syscall 路径。只有用户态 API 或结构名不等于完整 FS 实现。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch12 File Management",
-            "concepts": [
-              "file system",
-              "file organization",
-              "directories",
-              "file allocation",
-              "free space management",
-              "file sharing",
-              "VFS"
-            ]
-          }
-        ]
+        "concept_boundary": "文件系统题要区分 VFS 抽象、具体后端、路径解析、目录结构、文件对象、fd table、特殊文件和实际 syscall 路径。只有用户态 API 或结构名不等于完整 FS 实现。"
       },
       "llm_answer_steps": [
         "只回答 Q05_016 的题干，不使用相邻题结论替代。",
@@ -6524,20 +6044,6 @@
         "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
         "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。"
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch12 File Management",
-          "concepts": [
-            "file system",
-            "file organization",
-            "directories",
-            "file allocation",
-            "free space management",
-            "file sharing",
-            "VFS"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：文件数据块分配方式 (File Allocation Method, Stallings Ch12) 更接近哪种？  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "task_hints": {
         "diagnostic_checks": [
@@ -6648,21 +6154,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "Stallings Ch12 文件管理题按文件组织、访问方式、目录结构、数据块分配和空闲空间管理分类。必须从具体 FS 后端结构和算法判断，不能只按后端名字猜。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch12 File Management",
-            "concepts": [
-              "file system",
-              "file organization",
-              "directories",
-              "file allocation",
-              "free space management",
-              "file sharing",
-              "VFS"
-            ]
-          }
-        ]
+        "concept_boundary": "Stallings Ch12 文件管理题按文件组织、访问方式、目录结构、数据块分配和空闲空间管理分类。必须从具体 FS 后端结构和算法判断，不能只按后端名字猜。"
       },
       "llm_answer_steps": [
         "只回答 Q05_017 的题干，不使用相邻题结论替代。",
@@ -6861,19 +6353,6 @@
         "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
         "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。"
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-          "concepts": [
-            "I/O control techniques",
-            "interrupt-driven I/O",
-            "DMA",
-            "I/O buffering",
-            "disk scheduling",
-            "device drivers"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：磁盘/存储空闲空间管理 (Free Space Management, Stallings Ch12) 更接近哪种？  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "task_hints": {
         "diagnostic_checks": [
@@ -6984,20 +6463,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "本题只判断 Stallings Ch12 意义上的磁盘/持久化文件系统空闲空间管理：bitmap、空闲链表、成组链接、计数法或 FAT 表空闲链。必须从具体 FS 后端的分配/释放结构和超级块/位图/FAT/cluster 证据判断；块设备请求队列、I/O buffer、DMA ring、CPU scheduler 或内存分配器都不等价。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch12 File Management",
-            "concepts": [
-              "free space management",
-              "bit vectors",
-              "linked free space",
-              "grouping",
-              "counting",
-              "file allocation tables"
-            ]
-          }
-        ]
+        "concept_boundary": "本题只判断 Stallings Ch12 意义上的磁盘/持久化文件系统空闲空间管理：bitmap、空闲链表、成组链接、计数法或 FAT 表空闲链。必须从具体 FS 后端的分配/释放结构和超级块/位图/FAT/cluster 证据判断；块设备请求队列、I/O buffer、DMA ring、CPU scheduler 或内存分配器都不等价。"
       },
       "llm_answer_steps": [
         "只回答 Q05_018 的题干，不使用相邻题结论替代。",
@@ -7187,20 +6653,6 @@
         "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
         "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。"
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch12 File Management",
-          "concepts": [
-            "file system",
-            "file organization",
-            "directories",
-            "file allocation",
-            "free space management",
-            "file sharing",
-            "VFS"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：目录结构 (Directory Structure, Stallings Ch12) 更接近哪种？  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "task_hints": {
         "diagnostic_checks": [
@@ -7311,21 +6763,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "Stallings Ch12 文件管理题按文件组织、访问方式、目录结构、数据块分配和空闲空间管理分类。必须从具体 FS 后端结构和算法判断，不能只按后端名字猜。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch12 File Management",
-            "concepts": [
-              "file system",
-              "file organization",
-              "directories",
-              "file allocation",
-              "free space management",
-              "file sharing",
-              "VFS"
-            ]
-          }
-        ]
+        "concept_boundary": "Stallings Ch12 文件管理题按文件组织、访问方式、目录结构、数据块分配和空闲空间管理分类。必须从具体 FS 后端结构和算法判断，不能只按后端名字猜。"
       },
       "llm_answer_steps": [
         "只回答 Q05_019 的题干，不使用相邻题结论替代。",
@@ -7513,20 +6951,6 @@
         "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
         "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。"
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch12 File Management",
-          "concepts": [
-            "file system",
-            "file organization",
-            "directories",
-            "file allocation",
-            "free space management",
-            "file sharing",
-            "VFS"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：文件内部记录组织 (File Record Organization, Stallings Ch12) 更接近哪种？  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "task_hints": {
         "diagnostic_checks": [
@@ -7637,21 +7061,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "Stallings Ch12 文件管理题按文件组织、访问方式、目录结构、数据块分配和空闲空间管理分类。必须从具体 FS 后端结构和算法判断，不能只按后端名字猜。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch12 File Management",
-            "concepts": [
-              "file system",
-              "file organization",
-              "directories",
-              "file allocation",
-              "free space management",
-              "file sharing",
-              "VFS"
-            ]
-          }
-        ]
+        "concept_boundary": "Stallings Ch12 文件管理题按文件组织、访问方式、目录结构、数据块分配和空闲空间管理分类。必须从具体 FS 后端结构和算法判断，不能只按后端名字猜。"
       },
       "llm_answer_steps": [
         "只回答 Q05_020 的题干，不使用相邻题结论替代。",
@@ -7849,19 +7259,6 @@
         "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
         "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。"
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-          "concepts": [
-            "I/O control techniques",
-            "interrupt-driven I/O",
-            "DMA",
-            "I/O buffering",
-            "disk scheduling",
-            "device drivers"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：设备发现/枚举机制更接近哪种？  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "task_hints": {
         "diagnostic_checks": [
@@ -7972,20 +7369,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "I/O 题按 Stallings Ch11 区分设备发现、驱动框架、I/O 控制技术、缓冲、DMA、磁盘调度和中断控制。不要把 CPU scheduler 或普通内存 copy 当 I/O 策略。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-            "concepts": [
-              "I/O control techniques",
-              "interrupt-driven I/O",
-              "DMA",
-              "I/O buffering",
-              "disk scheduling",
-              "device drivers"
-            ]
-          }
-        ]
+        "concept_boundary": "I/O 题按 Stallings Ch11 区分设备发现、驱动框架、I/O 控制技术、缓冲、DMA、磁盘调度和中断控制。不要把 CPU scheduler 或普通内存 copy 当 I/O 策略。"
       },
       "llm_answer_steps": [
         "只回答 Q05_021 的题干，不使用相邻题结论替代。",
@@ -8084,7 +7468,8 @@
         "是否存在执行“解析了 `.dtb`/DeviceTree”语义的真实实现体，而不是声明、空函数或固定返回？",
         "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
         "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
-        "是否排除与“解析了 `.dtb`/DeviceTree”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？"
+        "是否排除与“解析了 `.dtb`/DeviceTree”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+        "???????DeviceTree ??????????? dtb???????????? dts ???"
       ],
       "structured_facts": [
         {
@@ -8244,19 +7629,6 @@
           "unknown"
         ]
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-          "concepts": [
-            "I/O control techniques",
-            "interrupt-driven I/O",
-            "DMA",
-            "I/O buffering",
-            "disk scheduling",
-            "device drivers"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否能在代码中证实解析了 `.dtb`/DeviceTree？  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "task_hints": {
         "diagnostic_checks": [
@@ -8264,7 +7636,8 @@
           "是否存在执行“解析了 `.dtb`/DeviceTree”语义的真实实现体，而不是声明、空函数或固定返回？",
           "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
           "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
-          "是否排除与“解析了 `.dtb`/DeviceTree”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？"
+          "是否排除与“解析了 `.dtb`/DeviceTree”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+          "???????DeviceTree ??????????? dtb???????????? dts ???"
         ],
         "structured_facts": [
           {
@@ -8396,20 +7769,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "I/O 题按 Stallings Ch11 区分设备发现、驱动框架、I/O 控制技术、缓冲、DMA、磁盘调度和中断控制。不要把 CPU scheduler 或普通内存 copy 当 I/O 策略。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-            "concepts": [
-              "I/O control techniques",
-              "interrupt-driven I/O",
-              "DMA",
-              "I/O buffering",
-              "disk scheduling",
-              "device drivers"
-            ]
-          }
-        ]
+        "concept_boundary": "I/O 题按 Stallings Ch11 区分设备发现、驱动框架、I/O 控制技术、缓冲、DMA、磁盘调度和中断控制。不要把 CPU scheduler 或普通内存 copy 当 I/O 策略。"
       },
       "llm_answer_steps": [
         "只回答 Q05_022 的题干，不使用相邻题结论替代。",
@@ -8625,19 +7985,6 @@
         "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
         "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。"
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-          "concepts": [
-            "I/O control techniques",
-            "interrupt-driven I/O",
-            "DMA",
-            "I/O buffering",
-            "disk scheduling",
-            "device drivers"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：驱动框架接口是什么？（Rust Driver trait / C driver ops / 注册表；必须引用接口定义证据）  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "task_hints": {
         "diagnostic_checks": [
@@ -8777,20 +8124,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "I/O 题按 Stallings Ch11 区分设备发现、驱动框架、I/O 控制技术、缓冲、DMA、磁盘调度和中断控制。不要把 CPU scheduler 或普通内存 copy 当 I/O 策略。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-            "concepts": [
-              "I/O control techniques",
-              "interrupt-driven I/O",
-              "DMA",
-              "I/O buffering",
-              "disk scheduling",
-              "device drivers"
-            ]
-          }
-        ]
+        "concept_boundary": "I/O 题按 Stallings Ch11 区分设备发现、驱动框架、I/O 控制技术、缓冲、DMA、磁盘调度和中断控制。不要把 CPU scheduler 或普通内存 copy 当 I/O 策略。"
       },
       "llm_answer_steps": [
         "只回答 Q05_023 的题干，不使用相邻题结论替代。",
@@ -8863,7 +8197,8 @@
         "支撑答案的主要源码/配置/文档锚点在哪里（路径、符号、结构体或常量）？",
         "答案中的每个关键结论是否有实现体、调用链、状态变化或配置分支证据？",
         "是否排除题干未要求的相邻模块、同名概念、用户态封装、README 口号或测试桩？",
-        "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？"
+        "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？",
+        "???????????/?????? init/probe/driver manager ?????"
       ],
       "structured_facts": [
         {
@@ -9011,19 +8346,6 @@
         "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
         "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。"
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-          "concepts": [
-            "I/O control techniques",
-            "interrupt-driven I/O",
-            "DMA",
-            "I/O buffering",
-            "disk scheduling",
-            "device drivers"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：驱动注册与初始化顺序是什么？（init_drivers/probe/driver_manager 等；列出 3-6 个关键节点并给证据）  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "task_hints": {
         "diagnostic_checks": [
@@ -9031,7 +8353,8 @@
           "支撑答案的主要源码/配置/文档锚点在哪里（路径、符号、结构体或常量）？",
           "答案中的每个关键结论是否有实现体、调用链、状态变化或配置分支证据？",
           "是否排除题干未要求的相邻模块、同名概念、用户态封装、README 口号或测试桩？",
-          "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？"
+          "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？",
+          "???????????/?????? init/probe/driver manager ?????"
         ],
         "structured_facts": [
           {
@@ -9163,20 +8486,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "I/O 题按 Stallings Ch11 区分设备发现、驱动框架、I/O 控制技术、缓冲、DMA、磁盘调度和中断控制。不要把 CPU scheduler 或普通内存 copy 当 I/O 策略。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-            "concepts": [
-              "I/O control techniques",
-              "interrupt-driven I/O",
-              "DMA",
-              "I/O buffering",
-              "disk scheduling",
-              "device drivers"
-            ]
-          }
-        ]
+        "concept_boundary": "I/O 题按 Stallings Ch11 区分设备发现、驱动框架、I/O 控制技术、缓冲、DMA、磁盘调度和中断控制。不要把 CPU scheduler 或普通内存 copy 当 I/O 策略。"
       },
       "llm_answer_steps": [
         "只回答 Q05_024 的题干，不使用相邻题结论替代。",
@@ -9435,19 +8745,6 @@
           "unknown"
         ]
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-          "concepts": [
-            "I/O control techniques",
-            "interrupt-driven I/O",
-            "DMA",
-            "I/O buffering",
-            "disk scheduling",
-            "device drivers"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否实现 UART/Console 驱动用于早期输出？  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "task_hints": {
         "diagnostic_checks": [
@@ -9587,20 +8884,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "I/O 题按 Stallings Ch11 区分设备发现、驱动框架、I/O 控制技术、缓冲、DMA、磁盘调度和中断控制。不要把 CPU scheduler 或普通内存 copy 当 I/O 策略。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-            "concepts": [
-              "I/O control techniques",
-              "interrupt-driven I/O",
-              "DMA",
-              "I/O buffering",
-              "disk scheduling",
-              "device drivers"
-            ]
-          }
-        ]
+        "concept_boundary": "I/O 题按 Stallings Ch11 区分设备发现、驱动框架、I/O 控制技术、缓冲、DMA、磁盘调度和中断控制。不要把 CPU scheduler 或普通内存 copy 当 I/O 策略。"
       },
       "llm_answer_steps": [
         "只回答 Q05_025 的题干，不使用相邻题结论替代。",
@@ -9854,19 +9138,6 @@
           "unknown"
         ]
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-          "concepts": [
-            "I/O control techniques",
-            "interrupt-driven I/O",
-            "DMA",
-            "I/O buffering",
-            "disk scheduling",
-            "device drivers"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否实现块设备驱动（virtio-blk/ramdisk/其他）？  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "task_hints": {
         "diagnostic_checks": [
@@ -10006,20 +9277,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "I/O 题按 Stallings Ch11 区分设备发现、驱动框架、I/O 控制技术、缓冲、DMA、磁盘调度和中断控制。不要把 CPU scheduler 或普通内存 copy 当 I/O 策略。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-            "concepts": [
-              "I/O control techniques",
-              "interrupt-driven I/O",
-              "DMA",
-              "I/O buffering",
-              "disk scheduling",
-              "device drivers"
-            ]
-          }
-        ]
+        "concept_boundary": "I/O 题按 Stallings Ch11 区分设备发现、驱动框架、I/O 控制技术、缓冲、DMA、磁盘调度和中断控制。不要把 CPU scheduler 或普通内存 copy 当 I/O 策略。"
       },
       "llm_answer_steps": [
         "只回答 Q05_026 的题干，不使用相邻题结论替代。",
@@ -10273,19 +9531,6 @@
           "unknown"
         ]
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-          "concepts": [
-            "I/O control techniques",
-            "interrupt-driven I/O",
-            "DMA",
-            "I/O buffering",
-            "disk scheduling",
-            "device drivers"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否实现网络设备驱动（virtio-net/e1000/rtl8139 等）？  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "task_hints": {
         "diagnostic_checks": [
@@ -10425,20 +9670,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "I/O 题按 Stallings Ch11 区分设备发现、驱动框架、I/O 控制技术、缓冲、DMA、磁盘调度和中断控制。不要把 CPU scheduler 或普通内存 copy 当 I/O 策略。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-            "concepts": [
-              "I/O control techniques",
-              "interrupt-driven I/O",
-              "DMA",
-              "I/O buffering",
-              "disk scheduling",
-              "device drivers"
-            ]
-          }
-        ]
+        "concept_boundary": "I/O 题按 Stallings Ch11 区分设备发现、驱动框架、I/O 控制技术、缓冲、DMA、磁盘调度和中断控制。不要把 CPU scheduler 或普通内存 copy 当 I/O 策略。"
       },
       "llm_answer_steps": [
         "只回答 Q05_027 的题干，不使用相邻题结论替代。",
@@ -10692,19 +9924,6 @@
           "unknown"
         ]
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-          "concepts": [
-            "I/O control techniques",
-            "interrupt-driven I/O",
-            "DMA",
-            "I/O buffering",
-            "disk scheduling",
-            "device drivers"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否实现中断控制器驱动（PLIC/CLINT/APIC 等）？  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "task_hints": {
         "diagnostic_checks": [
@@ -10844,20 +10063,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "I/O 题按 Stallings Ch11 区分设备发现、驱动框架、I/O 控制技术、缓冲、DMA、磁盘调度和中断控制。不要把 CPU scheduler 或普通内存 copy 当 I/O 策略。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-            "concepts": [
-              "I/O control techniques",
-              "interrupt-driven I/O",
-              "DMA",
-              "I/O buffering",
-              "disk scheduling",
-              "device drivers"
-            ]
-          }
-        ]
+        "concept_boundary": "I/O 题按 Stallings Ch11 区分设备发现、驱动框架、I/O 控制技术、缓冲、DMA、磁盘调度和中断控制。不要把 CPU scheduler 或普通内存 copy 当 I/O 策略。"
       },
       "llm_answer_steps": [
         "只回答 Q05_028 的题干，不使用相邻题结论替代。",
@@ -11073,19 +10279,6 @@
         "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
         "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。"
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-          "concepts": [
-            "I/O control techniques",
-            "interrupt-driven I/O",
-            "DMA",
-            "I/O buffering",
-            "disk scheduling",
-            "device drivers"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：MMIO 地址来源是什么？（DTB 提供 / 常量硬编码 / 物理→虚拟转换；必须给证据）  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "task_hints": {
         "diagnostic_checks": [
@@ -11225,20 +10418,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "I/O 题按 Stallings Ch11 区分设备发现、驱动框架、I/O 控制技术、缓冲、DMA、磁盘调度和中断控制。不要把 CPU scheduler 或普通内存 copy 当 I/O 策略。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-            "concepts": [
-              "I/O control techniques",
-              "interrupt-driven I/O",
-              "DMA",
-              "I/O buffering",
-              "disk scheduling",
-              "device drivers"
-            ]
-          }
-        ]
+        "concept_boundary": "I/O 题按 Stallings Ch11 区分设备发现、驱动框架、I/O 控制技术、缓冲、DMA、磁盘调度和中断控制。不要把 CPU scheduler 或普通内存 copy 当 I/O 策略。"
       },
       "llm_answer_steps": [
         "只回答 Q05_029 的题干，不使用相邻题结论替代。",
@@ -11311,7 +10491,8 @@
         "支撑答案的主要源码/配置/文档锚点在哪里（路径、符号、结构体或常量）？",
         "答案中的每个关键结论是否有实现体、调用链、状态变化或配置分支证据？",
         "是否排除题干未要求的相邻模块、同名概念、用户态封装、README 口号或测试桩？",
-        "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？"
+        "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？",
+        "??????????/??????? features/Kconfig/Makefile/??????????"
       ],
       "structured_facts": [
         {
@@ -11459,19 +10640,6 @@
         "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
         "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。"
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-          "concepts": [
-            "I/O control techniques",
-            "interrupt-driven I/O",
-            "DMA",
-            "I/O buffering",
-            "disk scheduling",
-            "device drivers"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：多平台适配是如何通过构建/条件编译选择驱动的？（features/Kconfig/Makefile 规则；必须给证据）  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "task_hints": {
         "diagnostic_checks": [
@@ -11479,7 +10647,8 @@
           "支撑答案的主要源码/配置/文档锚点在哪里（路径、符号、结构体或常量）？",
           "答案中的每个关键结论是否有实现体、调用链、状态变化或配置分支证据？",
           "是否排除题干未要求的相邻模块、同名概念、用户态封装、README 口号或测试桩？",
-          "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？"
+          "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？",
+          "??????????/??????? features/Kconfig/Makefile/??????????"
         ],
         "structured_facts": [
           {
@@ -11611,20 +10780,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "I/O 题按 Stallings Ch11 区分设备发现、驱动框架、I/O 控制技术、缓冲、DMA、磁盘调度和中断控制。不要把 CPU scheduler 或普通内存 copy 当 I/O 策略。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-            "concepts": [
-              "I/O control techniques",
-              "interrupt-driven I/O",
-              "DMA",
-              "I/O buffering",
-              "disk scheduling",
-              "device drivers"
-            ]
-          }
-        ]
+        "concept_boundary": "I/O 题按 Stallings Ch11 区分设备发现、驱动框架、I/O 控制技术、缓冲、DMA、磁盘调度和中断控制。不要把 CPU scheduler 或普通内存 copy 当 I/O 策略。"
       },
       "llm_answer_steps": [
         "只回答 Q05_030 的题干，不使用相邻题结论替代。",
@@ -11719,7 +10875,8 @@
         "是否存在执行“MMU 启用前后串口地址切换”语义的真实实现体，而不是声明、空函数或固定返回？",
         "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
         "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
-        "是否排除与“MMU 启用前后串口地址切换”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？"
+        "是否排除与“MMU 启用前后串口地址切换”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+        "???????UART ??????? MMU ?????? MMU ???????????"
       ],
       "structured_facts": [
         {
@@ -11879,20 +11036,6 @@
           "unknown"
         ]
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch12 File Management",
-          "concepts": [
-            "file system",
-            "file organization",
-            "directories",
-            "file allocation",
-            "free space management",
-            "file sharing",
-            "VFS"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否存在 MMU 启用前后串口地址切换（phys/virt 切换）逻辑？  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "task_hints": {
         "diagnostic_checks": [
@@ -11900,7 +11043,8 @@
           "是否存在执行“MMU 启用前后串口地址切换”语义的真实实现体，而不是声明、空函数或固定返回？",
           "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
           "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
-          "是否排除与“MMU 启用前后串口地址切换”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？"
+          "是否排除与“MMU 启用前后串口地址切换”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+          "???????UART ??????? MMU ?????? MMU ???????????"
         ],
         "structured_facts": [
           {
@@ -12032,21 +11176,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "文件系统题要区分 VFS 抽象、具体后端、路径解析、目录结构、文件对象、fd table、特殊文件和实际 syscall 路径。只有用户态 API 或结构名不等于完整 FS 实现。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch12 File Management",
-            "concepts": [
-              "file system",
-              "file organization",
-              "directories",
-              "file allocation",
-              "free space management",
-              "file sharing",
-              "VFS"
-            ]
-          }
-        ]
+        "concept_boundary": "文件系统题要区分 VFS 抽象、具体后端、路径解析、目录结构、文件对象、fd table、特殊文件和实际 syscall 路径。只有用户态 API 或结构名不等于完整 FS 实现。"
       },
       "llm_answer_steps": [
         "只回答 Q05_031 的题干，不使用相邻题结论替代。",
@@ -12226,19 +11356,6 @@
         "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
         "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。"
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-          "concepts": [
-            "I/O control techniques",
-            "interrupt-driven I/O",
-            "DMA",
-            "I/O buffering",
-            "disk scheduling",
-            "device drivers"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：I/O 缓冲模式 (I/O Buffering) 最接近哪种？（Stallings Ch11：单缓冲 Single Buffer / 双缓冲 Double Buffer / 循环缓冲 Circular Buffer / 缓冲池 Buffer Pool / 无缓冲 No Bu...  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "task_hints": {
         "diagnostic_checks": [
@@ -12349,20 +11466,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "Stallings Ch11 的 I/O buffering 指 I/O 路径中为平滑速率差、适配块/字符粒度和支持异步操作而设置的缓冲。要区分单缓冲、双缓冲、循环缓冲、缓冲池和无缓冲；不能把 CPU 队列或普通内存分配当 I/O 缓冲。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-            "concepts": [
-              "I/O control techniques",
-              "interrupt-driven I/O",
-              "DMA",
-              "I/O buffering",
-              "disk scheduling",
-              "device drivers"
-            ]
-          }
-        ]
+        "concept_boundary": "Stallings Ch11 的 I/O buffering 指 I/O 路径中为平滑速率差、适配块/字符粒度和支持异步操作而设置的缓冲。要区分单缓冲、双缓冲、循环缓冲、缓冲池和无缓冲；不能把 CPU 队列或普通内存分配当 I/O 缓冲。"
       },
       "llm_answer_steps": [
         "只回答 Q05_032 的题干，不使用相邻题结论替代。",
@@ -12552,19 +11656,6 @@
         "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
         "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。"
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-          "concepts": [
-            "I/O control techniques",
-            "interrupt-driven I/O",
-            "DMA",
-            "I/O buffering",
-            "disk scheduling",
-            "device drivers"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：块设备（磁盘/eMMC/NVMe）I/O 请求调度算法 (Scheduling Algorithm) (Disk Scheduling Algorithm) 更接近哪种？（Stallings Ch11；若无显式调度则选「FCFS 顺序提交」）  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "task_hints": {
         "diagnostic_checks": [
@@ -12675,20 +11766,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "Stallings Ch11 磁盘调度是块 I/O 请求排序算法，不是 CPU scheduler。无显式重排但按调用顺序提交时，只能选 FCFS/顺序提交；virtqueue/SD 请求环本身不等于 SSTF/SCAN。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-            "concepts": [
-              "I/O control techniques",
-              "interrupt-driven I/O",
-              "DMA",
-              "I/O buffering",
-              "disk scheduling",
-              "device drivers"
-            ]
-          }
-        ]
+        "concept_boundary": "Stallings Ch11 磁盘调度是块 I/O 请求排序算法，不是 CPU scheduler。无显式重排但按调用顺序提交时，只能选 FCFS/顺序提交；virtqueue/SD 请求环本身不等于 SSTF/SCAN。"
       },
       "llm_answer_steps": [
         "只回答 Q05_033 的题干，不使用相邻题结论替代。",
@@ -12873,19 +11951,6 @@
         "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
         "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。"
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-          "concepts": [
-            "I/O control techniques",
-            "interrupt-driven I/O",
-            "DMA",
-            "I/O buffering",
-            "disk scheduling",
-            "device drivers"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：I/O 控制技术 (I/O Control Techniques, Stallings Ch11) 更接近哪种？  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "task_hints": {
         "diagnostic_checks": [
@@ -12996,20 +12061,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "Stallings Ch11 I/O control techniques 要区分 programmed I/O、interrupt-driven I/O、DMA 和 channel/virtqueue 等价机制。判断依据是数据搬运方式、CPU 是否轮询、是否由中断完成、是否提交设备可访问 descriptor。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-            "concepts": [
-              "I/O control techniques",
-              "interrupt-driven I/O",
-              "DMA",
-              "I/O buffering",
-              "disk scheduling",
-              "device drivers"
-            ]
-          }
-        ]
+        "concept_boundary": "Stallings Ch11 I/O control techniques 要区分 programmed I/O、interrupt-driven I/O、DMA 和 channel/virtqueue 等价机制。判断依据是数据搬运方式、CPU 是否轮询、是否由中断完成、是否提交设备可访问 descriptor。"
       },
       "llm_answer_steps": [
         "只回答 Q05_034 的题干，不使用相邻题结论替代。",
@@ -13096,7 +12148,8 @@
         "是否存在执行“DMA (Direct Memory Access, Stallings Ch11) 传输路径”语义的真实实现体，而不是声明、空函数或固定返回？",
         "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
         "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
-        "是否排除与“DMA (Direct Memory Access, Stallings Ch11) 传输路径”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？"
+        "是否排除与“DMA (Direct Memory Access, Stallings Ch11) 传输路径”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+        "???????DMA/????????? DMA descriptor/virtqueue ???????README ?????????"
       ],
       "structured_facts": [
         {
@@ -13256,19 +12309,6 @@
           "unknown"
         ]
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-          "concepts": [
-            "I/O control techniques",
-            "interrupt-driven I/O",
-            "DMA",
-            "I/O buffering",
-            "disk scheduling",
-            "device drivers"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否实现 DMA (Direct Memory Access, Stallings Ch11) 传输路径？ DMA 需要设备可访问物理地址或 descriptor 提交；zero-copy 需要用户/协议栈/设备路径减少复制，普通 descriptor 或 memcpy 优化不能互相替代。 本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "task_hints": {
         "diagnostic_checks": [
@@ -13276,7 +12316,8 @@
           "是否存在执行“DMA (Direct Memory Access, Stallings Ch11) 传输路径”语义的真实实现体，而不是声明、空函数或固定返回？",
           "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
           "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
-          "是否排除与“DMA (Direct Memory Access, Stallings Ch11) 传输路径”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？"
+          "是否排除与“DMA (Direct Memory Access, Stallings Ch11) 传输路径”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+          "???????DMA/????????? DMA descriptor/virtqueue ???????README ?????????"
         ],
         "structured_facts": [
           {
@@ -13408,20 +12449,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "DMA 路径需要设备可访问 buffer/物理地址/descriptor 提交和完成处理。普通 memcpy、PIO 或块缓存不是 DMA。virtio descriptor ring 可作为 DMA 等价机制，但要有物理地址提交。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-            "concepts": [
-              "I/O control techniques",
-              "interrupt-driven I/O",
-              "DMA",
-              "I/O buffering",
-              "disk scheduling",
-              "device drivers"
-            ]
-          }
-        ]
+        "concept_boundary": "DMA 路径需要设备可访问 buffer/物理地址/descriptor 提交和完成处理。普通 memcpy、PIO 或块缓存不是 DMA。virtio descriptor ring 可作为 DMA 等价机制，但要有物理地址提交。"
       },
       "llm_answer_steps": [
         "只回答 Q05_035 的题干，不使用相邻题结论替代。",
@@ -13487,7 +12515,8 @@
         "支撑答案的主要源码/配置/文档锚点在哪里（路径、符号、结构体或常量）？",
         "答案中的每个关键结论是否有实现体、调用链、状态变化或配置分支证据？",
         "是否排除题干未要求的相邻模块、同名概念、用户态封装、README 口号或测试桩？",
-        "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？"
+        "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？",
+        "???????I/O ????? read/write ? syscall/VFS ???????????"
       ],
       "structured_facts": [
         {
@@ -13635,18 +12664,6 @@
         "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
         "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。"
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-          "concepts": [
-            "logical structure of I/O function",
-            "device-independent I/O",
-            "device drivers",
-            "interrupt handlers",
-            "I/O buffering"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：I/O 软件分层 (Logical Structure of the I/O Function, Stallings Ch11) 是什么？请追踪一个 read/write 请求从 syscall/VFS 到驱动提交的 3-6 个层级。  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "task_hints": {
         "diagnostic_checks": [
@@ -13654,7 +12671,8 @@
           "支撑答案的主要源码/配置/文档锚点在哪里（路径、符号、结构体或常量）？",
           "答案中的每个关键结论是否有实现体、调用链、状态变化或配置分支证据？",
           "是否排除题干未要求的相邻模块、同名概念、用户态封装、README 口号或测试桩？",
-          "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？"
+          "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？",
+          "???????I/O ????? read/write ? syscall/VFS ???????????"
         ],
         "structured_facts": [
           {
@@ -13982,18 +13000,6 @@
           "未发现 I/O 请求语义"
         ]
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-          "concepts": [
-            "synchronous I/O",
-            "asynchronous I/O",
-            "interrupt-driven I/O",
-            "I/O buffering",
-            "completion notification"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：异步与同步 I/O (Asynchronous vs Synchronous I/O, Stallings Ch11) 的实现更接近哪种？  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "task_hints": {
         "diagnostic_checks": [
@@ -14351,27 +13357,6 @@
           "unknown"
         ]
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch12 File Management",
-          "concepts": [
-            "file sharing",
-            "access rights",
-            "simultaneous access",
-            "file locks",
-            "directories",
-            "inodes"
-          ]
-        },
-        {
-          "source": "Stallings Ch15 Operating System Security",
-          "concepts": [
-            "access control",
-            "privileges",
-            "subjects and objects"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否实现文件共享访问权与并发访问控制 (File Sharing Access Rights / Simultaneous Access, Stallings Ch12)？  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "task_hints": {
         "diagnostic_checks": [
@@ -14520,7 +13505,6 @@
       ]
     }
   ],
-  "stage_constraints_md": "### 原 06 文件系统\n\n**本阶段须额外覆盖**：\n- 自研 vs 直接依赖 crate 的**边界文件**；`feature` 切换导致的 FS 组合差异；同一功能多目录重复实现时**以谁为准**（证据）。\n\n必须回答：\n- VFS 抽象层 (Virtual File System, VFS)：若为 Rust 则写 File/Inode/Dentry **Traits**；若为 **纯 C**，则写 **VFS op 表/函数指针结构**（如 `struct file_operations`/`inode_operations` 等）及挂载点，**勿强行套用 Trait 叙事**。\n- **VFS 与真实后端（防“内存 mock”）**：`grep_in_repo` 搜索 `inode|File trait|disk_inode|fat32|ext4|lwext` 等；**强制**回答：底层是**真实磁盘 FS**（FAT32/Ext4 等）、**仅 RamFS/TmpFS 内存文件系统**、还是**无后端桩**；结论须能指向具体 `路径:行号` 或 `Cargo.toml` 依赖证据。\n- **具体文件系统（必须代码验证）**：\n  - FAT32/Ext4：是否自己实现了？还是用的 crate？（**Rust**：`Cargo.toml`/`Cargo.lock`；**C/Makefile 项目**：同步检查 `Makefile`/`*.mk` 是否引入外部子目录或第三方 FS 源码路径）。**注意：对于组件化的 OS（如 ArceOS），具体的文件系统实现可能独立于 VFS 存在于诸如 `arceos/modules/axfs-ng/src/fs/fat/` 或 `ext4/` 目录中，务必使用搜索功能仔细查找，绝对不要仅仅因为特定目录下没有就断言未实现！**\n  - **具体 FS 的抽象层结构**：搜索 `FatFilesystemInner|Ext4Filesystem|FatFileNode|FatDirNode` 等，分析各层如何实现 VFS trait。这是文件系统架构的核心。\n  - RamFS/TmpFS：是否有内存文件系统？\n- **伪文件系统**：使用 grep_in_repo 搜索 `devfs|procfs|sysfs` 检查是否实现了伪文件系统。若有，分析其实现方式。\n- 文件描述符表：Global 还是 Per-Process？`fd_table` 结构在哪？**须进一步判定实现形态**：例如固定长度数组 `[Option<Arc<dyn File>>; N]`、`Vec<Option<...>>`、`BTreeMap<u32, ...>` 等；引用结构体定义 `路径:行号`，勿泛泛说“有 fd 表”。\n- **页缓存 / 块缓存（Buffer Cache）**：搜索 `block_cache|get_block_cache|bread|bwrite|BufBlock|PageCache`；若存在：**驱逐策略**（LRU、Clock、简单 FIFO、无驱逐）须在代码层指出判断依据 `路径:行号`；若不存在写「未发现块/页缓存」并列出已搜符号。\n- **路径解析（Path Resolution）**：搜索 `namei|path_walk|lookup|resolve_path`（或等价）；检查是否支持**绝对路径**（`/` 开头）与**相对路径**；是否正确处理 `.` / `..`；若声称支持**符号链接（symlink）**，须在 `readlink`/`open` 路径上给出跟随逻辑或写「未发现 symlink 处理」。\n- **功能细节**（必须分类为 `✅ 已实现`、`🔸 桩函数`、`❌ 未实现`）：\n  - 是否支持 `pipe` 套接字？\n  - 是否支持网络 `socket`？\n  - 是否支持 `mmap`？**注意**：必须检查 `sys_mmap` 实现。如果是 **零拷贝**，必须看到 `VmArea` 结构体中有 `shared` 字段或 `MAP_SHARED` 处理逻辑。如果是 `sys_mmap` 仅返回 Ok(0) 没有处理标志位，标注为'桩函数'。\n  - **高级特性**：`poll`/`select`/`epoll` 是否实现？搜索 `sys_poll` / `sys_select` / `sys_epoll`，检查是一律返回 Ready 还是真的检查了文件状态？\n  - **如果上述功能未找到代码，明确写“未实现（❌ 未实现）”**。\n\n- **文件打开流程**：追踪从 `sys_open` 到最终获得文件描述符的完整调用链，说明超级块、Inode、Dentry、File 四大核心数据结构如何协同。\n\n要求：\n- **语义发现（🥇 首选）**：使用 `rag_search_code` 搜索 \"VFS trait\", \"FAT32 implementation\", \"file descriptor table\", \"mount logic\", \"block cache\", \"namei\", \"path resolution\" 锁定文件系统核心实现。\n- 使用 `lsp_get_definition` 定位 `File` trait、`Inode` trait、`SuperBlock` 等 VFS 核心抽象的精确定义。\n- 使用 `lsp_get_references` 追踪 `sys_open` → `vfs_open` → 具体 FS `open` 的完整调用链。\n- **【必须】使用 `lsp_get_call_graph` 追踪文件打开完整路径**：\n  - `lsp_get_call_graph(repo_path, file_of_sys_open, \"sys_open\", direction=\"outgoing\", max_depth=4)` — 从 syscall 到 VFS 再到具体 FS 的完整下行链\n  - `lsp_get_call_graph(repo_path, file_of_vfs_open, \"vfs_open\", direction=\"both\", max_depth=3)` — VFS 中枢节点双向（谁调它，它调谁）\n  - 如返回 `[⚠️ DEGRADED MODE]`，标注\"DEGRADED — 静态 Grep 分析\"并继续使用，重点关注 outgoing 中 FS trait impl 的调用。\n- 使用 `lsp_get_document_outline` 快速摸清 VFS 和具体 FS 实现文件的内部结构。\n- 使用 grep_in_repo 搜索 \"FdTable|FileDescriptor|fd_table\" 确认文件描述符表实际命名。\n- **路径精确性（关键）**：注意区分相似目录（如 `core/file/` vs `core/fs/`，`src/fs/imp/` vs `api/src/core/fs/imp/`）。引用每个文件前必须用 `lsp_get_definition` 确认函数的真实定义位置。如果同一模块在多个目录中有实现（如 TmpFS 在 `src/` 和 `api/src/` 中都有），必须全部列出。\n- **多目录重复实现**：若检出多处 VFS/FS 实现，须用构建规则或条件编译行号说明**哪一路径参与当前 profile 链接**，避免仅列目录而无取舍依据。\n\n**【评测与交付适配 — 本阶段启发式】**（须 grep/README 与源码交叉验证；无则写未发现）：\n- **整盘挂载/无分区表 EXT4**、根目录**扫测试脚本**（如 `*testcode*`、固定横幅字符串）往往落在 **VFS/mount/init 用户态**交界：有命中则单列「Harness 与文件系统交界」并列出文件；无命中不写赛题名。\n- **双盘或多 virtio-blk** 挂载点：仅在代码或 README 中出现第二块盘、`disk.img` 等证据时描述。\n\n### 原 07 设备驱动\n\n**本阶段须额外覆盖**：\n- 每个外设子系统：**本仓支持的硬件列表 + 对应驱动文件**；未支持则写「未接入」而非默认假设 QEMU。\n\n必须回答：\n- 设备发现：Device Tree (DTS) 解析或 PCI/Bus 扫描？**必须验证**是否真的解析了 `.dtb` 文件，还是硬编码了地址？\n- 驱动框架：Driver Trait，如何注册/初始化驱动？\n- **组件化与配置**：搜索构建配置文件（Cargo.toml 的 features、Kconfig、条件编译宏），分析如何通过编译选项选择不同的驱动/模块实现。\n- **平台适配**：搜索 `platform/` 或 `boards/` 目录，列出所有支持的目标平台/开发板及其特有驱动，分析项目如何适配不同硬件。\n- 常见设备：\n    - UART/Serial（控制台输出）\n    - Block Device（磁盘读写，VirtIO-Blk）\n    - Net Device（网卡，VirtIO-Net）及网络协议栈（TCP/IP, smoltcp 等实现）\n    - GPU/Input（如有）\n- 中断控制器：PLIC/CLINT/APIC 驱动。\n- **MMU 前后串口地址切换**：分析 UART 驱动在 MMU 启用前（使用物理地址）和 MMU 启用后（使用虚拟地址）的地址切换机制。搜索串口基址常量的不同定义。\n\n要求：\n- **语义发现（🥇 首选）**：使用 `rag_search_code` 搜索 \"device driver trait\", \"virtio-blk driver\", \"UART initialization\", \"PCI bus scanning\" 快速锁定驱动程序。\n- 使用 `lsp_get_definition` 定位 Driver trait 定义和各设备驱动的 trait impl。\n- 使用 `lsp_get_references` 追踪 `init_drivers` / `probe` 的调用链，理解驱动注册与初始化顺序。\n- 使用 `lsp_get_document_outline` 浏览驱动文件结构，快速发现所有设备相关的 struct 和 impl。\n- 辅以 grep_in_repo 搜索 `axdriver` 或 `driver::` 和构建配置中的 feature flags。\n\n**【评测与交付适配 — 本阶段启发式】**（须源码证据；无则略）：\n- 若 README/Makefile 出现**多 virtio-blk/virtio-net 实例**，须与驱动代码对应 `路径:行号` 给出「能否同时挂载」结论。\n- 仅在有 `grep` 命中驱动相关符号或 README 明确描述时写评测相关内容；禁止臆测赛题。",
   "features": [
     {
       "feature_id": "feat_05_fs_drivers_q05_001",
@@ -14528,20 +13512,6 @@
       "domain": "filesystem_drivers",
       "feature_name": "Q05_001 VFS 抽象层 (Virtual File System, VFS)接口是什么形态？（Rust trait / C op 表；必须给接口定义证据）",
       "description": "VFS 抽象层 (Virtual File System, VFS)接口是什么形态？（Rust trait / C op 表；必须给接口定义证据）",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch12 File Management",
-          "concepts": [
-            "file system",
-            "file organization",
-            "directories",
-            "file allocation",
-            "free space management",
-            "file sharing",
-            "VFS"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：VFS 抽象层 (Virtual File System, VFS)接口是什么形态？（Rust trait / C op 表；必须给接口定义证据）  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "dependencies": [
         "03_mem_mgmt",
@@ -14912,21 +13882,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "文件系统题要区分 VFS 抽象、具体后端、路径解析、目录结构、文件对象、fd table、特殊文件和实际 syscall 路径。只有用户态 API 或结构名不等于完整 FS 实现。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch12 File Management",
-            "concepts": [
-              "file system",
-              "file organization",
-              "directories",
-              "file allocation",
-              "free space management",
-              "file sharing",
-              "VFS"
-            ]
-          }
-        ]
+        "concept_boundary": "文件系统题要区分 VFS 抽象、具体后端、路径解析、目录结构、文件对象、fd table、特殊文件和实际 syscall 路径。只有用户态 API 或结构名不等于完整 FS 实现。"
       }
     },
     {
@@ -14935,20 +13891,6 @@
       "domain": "filesystem_drivers",
       "feature_name": "Q05_002 具体文件系统后端 (Concrete File System Backend) 更接近哪种？",
       "description": "具体文件系统后端 (Concrete File System Backend) 更接近哪种？",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch12 File Management",
-          "concepts": [
-            "file system",
-            "file organization",
-            "directories",
-            "file allocation",
-            "free space management",
-            "file sharing",
-            "VFS"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：具体文件系统后端 (Concrete File System Backend) 更接近哪种？  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "dependencies": [
         "03_mem_mgmt",
@@ -15264,21 +14206,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "文件系统题要区分 VFS 抽象、具体后端、路径解析、目录结构、文件对象、fd table、特殊文件和实际 syscall 路径。只有用户态 API 或结构名不等于完整 FS 实现。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch12 File Management",
-            "concepts": [
-              "file system",
-              "file organization",
-              "directories",
-              "file allocation",
-              "free space management",
-              "file sharing",
-              "VFS"
-            ]
-          }
-        ]
+        "concept_boundary": "文件系统题要区分 VFS 抽象、具体后端、路径解析、目录结构、文件对象、fd table、特殊文件和实际 syscall 路径。只有用户态 API 或结构名不等于完整 FS 实现。"
       }
     },
     {
@@ -15287,20 +14215,6 @@
       "domain": "filesystem_drivers",
       "feature_name": "Q05_003 若支持 FAT32/Ext4：它是自研还是第三方库/crate？（必须引用 Cargo.toml/Cargo.lock 或 Makefile 引入证据）",
       "description": "若支持 FAT32/Ext4：它是自研还是第三方库/crate？（必须引用 Cargo.toml/Cargo.lock 或 Makefile 引入证据）",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch12 File Management",
-          "concepts": [
-            "file system",
-            "file organization",
-            "directories",
-            "file allocation",
-            "free space management",
-            "file sharing",
-            "VFS"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：若支持 FAT32/Ext4：它是自研还是第三方库/crate？（必须引用 Cargo.toml/Cargo.lock 或 Makefile 引入证据）  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "dependencies": [
         "03_mem_mgmt",
@@ -15677,21 +14591,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "文件系统题要区分 VFS 抽象、具体后端、路径解析、目录结构、文件对象、fd table、特殊文件和实际 syscall 路径。只有用户态 API 或结构名不等于完整 FS 实现。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch12 File Management",
-            "concepts": [
-              "file system",
-              "file organization",
-              "directories",
-              "file allocation",
-              "free space management",
-              "file sharing",
-              "VFS"
-            ]
-          }
-        ]
+        "concept_boundary": "文件系统题要区分 VFS 抽象、具体后端、路径解析、目录结构、文件对象、fd table、特殊文件和实际 syscall 路径。只有用户态 API 或结构名不等于完整 FS 实现。"
       }
     },
     {
@@ -15700,20 +14600,6 @@
       "domain": "filesystem_drivers",
       "feature_name": "Q05_004 文件打开路径：文件打开入口（sys_open 或等价）→ VFS 层 → 具体 FS open。列出 3-6 个关键节点并给证据。",
       "description": "文件打开路径：文件打开入口（sys_open 或等价）→ VFS 层 → 具体 FS open。列出 3-6 个关键节点并给证据。",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch12 File Management",
-          "concepts": [
-            "file system",
-            "file organization",
-            "directories",
-            "file allocation",
-            "free space management",
-            "file sharing",
-            "VFS"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：文件打开路径：文件打开入口（sys_open 或等价）→ VFS 层 → 具体 FS open。列出 3-6 个关键节点并给证据。  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "dependencies": [
         "03_mem_mgmt",
@@ -16085,21 +14971,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "文件系统题要区分 VFS 抽象、具体后端、路径解析、目录结构、文件对象、fd table、特殊文件和实际 syscall 路径。只有用户态 API 或结构名不等于完整 FS 实现。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch12 File Management",
-            "concepts": [
-              "file system",
-              "file organization",
-              "directories",
-              "file allocation",
-              "free space management",
-              "file sharing",
-              "VFS"
-            ]
-          }
-        ]
+        "concept_boundary": "文件系统题要区分 VFS 抽象、具体后端、路径解析、目录结构、文件对象、fd table、特殊文件和实际 syscall 路径。只有用户态 API 或结构名不等于完整 FS 实现。"
       }
     },
     {
@@ -16108,20 +14980,6 @@
       "domain": "filesystem_drivers",
       "feature_name": "Q05_005 文件描述符表 (File Descriptor Table, FD Table) 的实现形态是什么？（固定数组/Vec/BTreeMap 等；必须给结构体定义证据）",
       "description": "文件描述符表 (File Descriptor Table, FD Table) 的实现形态是什么？（固定数组/Vec/BTreeMap 等；必须给结构体定义证据）",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch12 File Management",
-          "concepts": [
-            "file system",
-            "file organization",
-            "directories",
-            "file allocation",
-            "free space management",
-            "file sharing",
-            "VFS"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：文件描述符表 (File Descriptor Table, FD Table) 的实现形态是什么？（固定数组/Vec/BTreeMap 等；必须给结构体定义证据）  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "dependencies": [
         "03_mem_mgmt",
@@ -16496,21 +15354,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "文件系统题要区分 VFS 抽象、具体后端、路径解析、目录结构、文件对象、fd table、特殊文件和实际 syscall 路径。只有用户态 API 或结构名不等于完整 FS 实现。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch12 File Management",
-            "concepts": [
-              "file system",
-              "file organization",
-              "directories",
-              "file allocation",
-              "free space management",
-              "file sharing",
-              "VFS"
-            ]
-          }
-        ]
+        "concept_boundary": "文件系统题要区分 VFS 抽象、具体后端、路径解析、目录结构、文件对象、fd table、特殊文件和实际 syscall 路径。只有用户态 API 或结构名不等于完整 FS 实现。"
       }
     },
     {
@@ -16519,19 +15363,6 @@
       "domain": "filesystem_drivers",
       "feature_name": "Q05_006 是否实现块缓存/缓冲缓存 (Block Cache / Buffer Cache, bcache；以 device/blockno 或文件系统块号为 key)？（必须三态）",
       "description": "是否实现块缓存/缓冲缓存 (Block Cache / Buffer Cache, bcache；以 device/blockno 或文件系统块号为 key)？（必须三态）",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-          "concepts": [
-            "I/O control techniques",
-            "interrupt-driven I/O",
-            "DMA",
-            "I/O buffering",
-            "disk scheduling",
-            "device drivers"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否实现块缓存/缓冲缓存 (Block Cache / Buffer Cache, bcache；以 device/blockno 或文件系统块号为 key)？ Block/Buffer Cache 固定指 device/blockno 或文件系统块号粒度的块缓存；文件 Page Cache、普通 I/O buffer、DMA descriptor 或页帧 freelist 不等价。 本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "dependencies": [
         "03_mem_mgmt",
@@ -16932,21 +15763,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "Block/Buffer Cache 缓存块设备块或文件系统块，通常以 device+blockno、sector 或 FS block id 为 key，并接入 block read/write 或 FS read/write。它不同于 Page Cache（inode+page offset）、I/O 临时 buffer、virtqueue ring 或 DMA descriptor。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-            "concepts": [
-              "I/O control techniques",
-              "interrupt-driven I/O",
-              "DMA",
-              "I/O buffering",
-              "disk scheduling",
-              "device drivers"
-            ]
-          }
-        ],
-        "text_authoring": "authored_in_describe_stage_qa_json"
+        "concept_boundary": "Block/Buffer Cache 缓存块设备块或文件系统块，通常以 device+blockno、sector 或 FS block id 为 key，并接入 block read/write 或 FS read/write。它不同于 Page Cache（inode+page offset）、I/O 临时 buffer、virtqueue ring 或 DMA descriptor。"
       }
     },
     {
@@ -16955,20 +15772,6 @@
       "domain": "filesystem_drivers",
       "feature_name": "Q05_007 若存在块缓存/缓冲缓存：驱逐策略是什么（LRU/Clock/FIFO/引用计数保护/无驱逐）？必须指出判断依据（字段/算法分支）证据。",
       "description": "若存在块缓存/缓冲缓存：驱逐策略是什么（LRU/Clock/FIFO/引用计数保护/无驱逐）？必须指出判断依据（字段/算法分支）证据。",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch12 File Management",
-          "concepts": [
-            "file system",
-            "file organization",
-            "directories",
-            "file allocation",
-            "free space management",
-            "file sharing",
-            "VFS"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：若存在块缓存/缓冲缓存：驱逐策略是什么（LRU/Clock/FIFO/引用计数保护/无驱逐）？必须指出判断依据（字段/算法分支）证据。 Block/Buffer Cache 固定指 device/blockno 或文件系统块号粒度的块缓存；文件 Page Cache、普通 I/O buffer、DMA descriptor 或页帧 freelist 不等价。 本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "dependencies": [
         "03_mem_mgmt",
@@ -17341,22 +16144,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "本题只讨论 Q05_006 的 Block/Buffer Cache 驱逐策略，不讨论 Page Cache、I/O buffer、virtqueue ring 或普通内存分配器。若没有块缓存，应回答未发现块缓存驱逐策略；不要把页面置换算法或调度队列算法搬来。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch12 File Management",
-            "concepts": [
-              "file system",
-              "file organization",
-              "directories",
-              "file allocation",
-              "free space management",
-              "file sharing",
-              "VFS"
-            ]
-          }
-        ],
-        "text_authoring": "authored_in_describe_stage_qa_json"
+        "concept_boundary": "本题只讨论 Q05_006 的 Block/Buffer Cache 驱逐策略，不讨论 Page Cache、I/O buffer、virtqueue ring 或普通内存分配器。若没有块缓存，应回答未发现块缓存驱逐策略；不要把页面置换算法或调度队列算法搬来。"
       }
     },
     {
@@ -17365,35 +16153,6 @@
       "domain": "filesystem_drivers",
       "feature_name": "Q05_008 是否实现文件页缓存 Page Cache（inode/文件对象 + page offset）或 mmap/文件映射共享缓存页？（必须三态）",
       "description": "是否实现文件页缓存 Page Cache（inode/文件对象 + page offset）或 mmap/文件映射共享缓存页？（必须三态）",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch8 Virtual Memory",
-          "concepts": [
-            "virtual memory",
-            "page fault",
-            "fetch policy",
-            "placement policy",
-            "replacement policy",
-            "resident set",
-            "cleaning policy",
-            "load control",
-            "thrashing",
-            "working set"
-          ]
-        },
-        {
-          "source": "Stallings Ch12 File Management",
-          "concepts": [
-            "file system",
-            "file organization",
-            "directories",
-            "file allocation",
-            "free space management",
-            "file sharing",
-            "VFS"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否实现文件页缓存 Page Cache（inode/文件对象 + page offset）或 mmap/文件映射共享缓存页？ Page Cache 固定指文件页缓存：key 为 inode/文件对象/address_space + page offset，并与 read/write/mmap/page fault/writeback 共享；block/buffer cache、I/O buffer、virtqueue descriptor、页帧分配器和 TLB 都不等价。 本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "dependencies": [
         "03_mem_mgmt",
@@ -17789,37 +16548,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "Page Cache 指文件页缓存：按文件对象/inode/address_space + page offset 管理文件页，并与 read/write、mmap、page fault、dirty/writeback 路径共享。block/buffer cache 以 device+blockno 为 key，只能说明块缓存；普通 I/O buffer 或 mmap VMA 记录不等价。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch8 Virtual Memory",
-            "concepts": [
-              "virtual memory",
-              "page fault",
-              "fetch policy",
-              "placement policy",
-              "replacement policy",
-              "resident set",
-              "cleaning policy",
-              "load control",
-              "thrashing",
-              "working set"
-            ]
-          },
-          {
-            "source": "Stallings Ch12 File Management",
-            "concepts": [
-              "file system",
-              "file organization",
-              "directories",
-              "file allocation",
-              "free space management",
-              "file sharing",
-              "VFS"
-            ]
-          }
-        ],
-        "text_authoring": "authored_in_describe_stage_qa_json"
+        "concept_boundary": "Page Cache 指文件页缓存：按文件对象/inode/address_space + page offset 管理文件页，并与 read/write、mmap、page fault、dirty/writeback 路径共享。block/buffer cache 以 device+blockno 为 key，只能说明块缓存；普通 I/O buffer 或 mmap VMA 记录不等价。"
       }
     },
     {
@@ -17828,23 +16557,6 @@
       "domain": "filesystem_drivers",
       "feature_name": "Q05_009 是否实现 mmap 的文件映射或匿名映射？（必须三态；若 stub 说明形态）",
       "description": "是否实现 mmap 的文件映射或匿名映射？（必须三态；若 stub 说明形态）",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch8 Virtual Memory",
-          "concepts": [
-            "virtual memory",
-            "page fault",
-            "fetch policy",
-            "placement policy",
-            "replacement policy",
-            "resident set",
-            "cleaning policy",
-            "load control",
-            "thrashing",
-            "working set"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否实现 mmap 的文件映射或匿名映射？  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "dependencies": [
         "03_mem_mgmt",
@@ -18241,24 +16953,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "mmap implemented 需要 syscall 入口、参数/flag 解析、VMA/地址空间登记、fault/readback 路径和 munmap/cleanup 的核心闭环；固定返回或只登记名字是 stub。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch8 Virtual Memory",
-            "concepts": [
-              "virtual memory",
-              "page fault",
-              "fetch policy",
-              "placement policy",
-              "replacement policy",
-              "resident set",
-              "cleaning policy",
-              "load control",
-              "thrashing",
-              "working set"
-            ]
-          }
-        ]
+        "concept_boundary": "mmap implemented 需要 syscall 入口、参数/flag 解析、VMA/地址空间登记、fault/readback 路径和 munmap/cleanup 的核心闭环；固定返回或只登记名字是 stub。"
       }
     },
     {
@@ -18267,20 +16962,6 @@
       "domain": "filesystem_drivers",
       "feature_name": "Q05_010 是否实现 poll/select/epoll（或等价 fd 事件等待机制），并真实检查文件/socket/pipe readiness？（必须三态）",
       "description": "是否实现 poll/select/epoll（或等价 fd 事件等待机制），并真实检查文件/socket/pipe readiness？（必须三态）",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch12 File Management",
-          "concepts": [
-            "file system",
-            "file organization",
-            "directories",
-            "file allocation",
-            "free space management",
-            "file sharing",
-            "VFS"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否实现 poll/select/epoll（或等价 fd 事件等待机制），并真实检查文件/socket/pipe readiness？ poll/select/epoll 只看 fd readiness 与等待/唤醒语义；普通轮询循环、sleep、timer 或驱动 polling 不等价。 同步/IPC 题必须区分字节流、离散消息、共享内存、地址等待、条件等待和信号通知；只实现其中一种不能证明另一种。 本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "dependencies": [
         "03_mem_mgmt",
@@ -18686,22 +17367,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "poll/select/epoll implemented 需要 syscall/API、fd 集合解析、ready mask 计算、等待队列/唤醒或 timeout 处理，并接入具体 file/socket/pipe readiness。固定返回 ready、只注册 syscall 号、只支持用户态 wrapper 或仅有常量定义都是 stub/弱线索。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch12 File Management",
-            "concepts": [
-              "file system",
-              "file organization",
-              "directories",
-              "file allocation",
-              "free space management",
-              "file sharing",
-              "VFS"
-            ]
-          }
-        ],
-        "text_authoring": "authored_in_describe_stage_qa_json"
+        "concept_boundary": "poll/select/epoll implemented 需要 syscall/API、fd 集合解析、ready mask 计算、等待队列/唤醒或 timeout 处理，并接入具体 file/socket/pipe readiness。固定返回 ready、只注册 syscall 号、只支持用户态 wrapper 或仅有常量定义都是 stub/弱线索。"
       }
     },
     {
@@ -18710,20 +17376,6 @@
       "domain": "filesystem_drivers",
       "feature_name": "Q05_011 路径解析 (namei/path_walk/lookup) 是否实现并支持绝对/相对路径与 . ..？（必须三态）",
       "description": "路径解析 (namei/path_walk/lookup) 是否实现并支持绝对/相对路径与 . ..？（必须三态）",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch12 File Management",
-          "concepts": [
-            "file system",
-            "file organization",
-            "directories",
-            "file allocation",
-            "free space management",
-            "file sharing",
-            "VFS"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：路径解析 (namei/path_walk/lookup) 是否实现并支持绝对/相对路径与 . ..？  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "dependencies": [
         "03_mem_mgmt",
@@ -19129,21 +17781,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "文件系统题要区分 VFS 抽象、具体后端、路径解析、目录结构、文件对象、fd table、特殊文件和实际 syscall 路径。只有用户态 API 或结构名不等于完整 FS 实现。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch12 File Management",
-            "concepts": [
-              "file system",
-              "file organization",
-              "directories",
-              "file allocation",
-              "free space management",
-              "file sharing",
-              "VFS"
-            ]
-          }
-        ]
+        "concept_boundary": "文件系统题要区分 VFS 抽象、具体后端、路径解析、目录结构、文件对象、fd table、特殊文件和实际 syscall 路径。只有用户态 API 或结构名不等于完整 FS 实现。"
       }
     },
     {
@@ -19152,20 +17790,6 @@
       "domain": "filesystem_drivers",
       "feature_name": "Q05_012 是否支持符号链接 (symlink) 的解析/跟随？（必须三态）",
       "description": "是否支持符号链接 (symlink) 的解析/跟随？（必须三态）",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch12 File Management",
-          "concepts": [
-            "file system",
-            "file organization",
-            "directories",
-            "file allocation",
-            "free space management",
-            "file sharing",
-            "VFS"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否支持符号链接 (symlink) 的解析/跟随？  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "dependencies": [
         "03_mem_mgmt",
@@ -19569,21 +18193,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "文件系统题要区分 VFS 抽象、具体后端、路径解析、目录结构、文件对象、fd table、特殊文件和实际 syscall 路径。只有用户态 API 或结构名不等于完整 FS 实现。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch12 File Management",
-            "concepts": [
-              "file system",
-              "file organization",
-              "directories",
-              "file allocation",
-              "free space management",
-              "file sharing",
-              "VFS"
-            ]
-          }
-        ]
+        "concept_boundary": "文件系统题要区分 VFS 抽象、具体后端、路径解析、目录结构、文件对象、fd table、特殊文件和实际 syscall 路径。只有用户态 API 或结构名不等于完整 FS 实现。"
       }
     },
     {
@@ -19592,20 +18202,6 @@
       "domain": "filesystem_drivers",
       "feature_name": "Q05_013 是否实现管道 (pipe/pipe2) 并在 VFS 层作为文件对象？（必须三态；与 06 同步/IPC 的 pipe 实现互指）",
       "description": "是否实现管道 (pipe/pipe2) 并在 VFS 层作为文件对象？（必须三态；与 06 同步/IPC 的 pipe 实现互指）",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch12 File Management",
-          "concepts": [
-            "file system",
-            "file organization",
-            "directories",
-            "file allocation",
-            "free space management",
-            "file sharing",
-            "VFS"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否实现管道 (pipe/pipe2) 并在 VFS 层作为文件对象？ 同步/IPC 题必须区分字节流、离散消息、共享内存、地址等待、条件等待和信号通知；只实现其中一种不能证明另一种。 本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "dependencies": [
         "03_mem_mgmt",
@@ -20010,21 +18606,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "文件系统题要区分 VFS 抽象、具体后端、路径解析、目录结构、文件对象、fd table、特殊文件和实际 syscall 路径。只有用户态 API 或结构名不等于完整 FS 实现。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch12 File Management",
-            "concepts": [
-              "file system",
-              "file organization",
-              "directories",
-              "file allocation",
-              "free space management",
-              "file sharing",
-              "VFS"
-            ]
-          }
-        ]
+        "concept_boundary": "文件系统题要区分 VFS 抽象、具体后端、路径解析、目录结构、文件对象、fd table、特殊文件和实际 syscall 路径。只有用户态 API 或结构名不等于完整 FS 实现。"
       }
     },
     {
@@ -20033,20 +18615,6 @@
       "domain": "filesystem_drivers",
       "feature_name": "Q05_014 是否实现网络 socket（作为 VFS 文件对象）？（必须三态）",
       "description": "是否实现网络 socket（作为 VFS 文件对象）？（必须三态）",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch12 File Management",
-          "concepts": [
-            "file system",
-            "file organization",
-            "directories",
-            "file allocation",
-            "free space management",
-            "file sharing",
-            "VFS"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否实现网络 socket（作为 VFS 文件对象）？  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "dependencies": [
         "03_mem_mgmt",
@@ -20451,21 +19019,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "文件系统题要区分 VFS 抽象、具体后端、路径解析、目录结构、文件对象、fd table、特殊文件和实际 syscall 路径。只有用户态 API 或结构名不等于完整 FS 实现。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch12 File Management",
-            "concepts": [
-              "file system",
-              "file organization",
-              "directories",
-              "file allocation",
-              "free space management",
-              "file sharing",
-              "VFS"
-            ]
-          }
-        ]
+        "concept_boundary": "文件系统题要区分 VFS 抽象、具体后端、路径解析、目录结构、文件对象、fd table、特殊文件和实际 syscall 路径。只有用户态 API 或结构名不等于完整 FS 实现。"
       }
     },
     {
@@ -20474,20 +19028,6 @@
       "domain": "filesystem_drivers",
       "feature_name": "Q05_015 是否实现伪文件系统（devfs/procfs/sysfs）？（必须三态；若 implemented 需说明实现形态）",
       "description": "是否实现伪文件系统（devfs/procfs/sysfs）？（必须三态；若 implemented 需说明实现形态）",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch12 File Management",
-          "concepts": [
-            "file system",
-            "file organization",
-            "directories",
-            "file allocation",
-            "free space management",
-            "file sharing",
-            "VFS"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否实现伪文件系统（devfs/procfs/sysfs）？  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "dependencies": [
         "03_mem_mgmt",
@@ -20895,21 +19435,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "文件系统题要区分 VFS 抽象、具体后端、路径解析、目录结构、文件对象、fd table、特殊文件和实际 syscall 路径。只有用户态 API 或结构名不等于完整 FS 实现。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch12 File Management",
-            "concepts": [
-              "file system",
-              "file organization",
-              "directories",
-              "file allocation",
-              "free space management",
-              "file sharing",
-              "VFS"
-            ]
-          }
-        ]
+        "concept_boundary": "文件系统题要区分 VFS 抽象、具体后端、路径解析、目录结构、文件对象、fd table、特殊文件和实际 syscall 路径。只有用户态 API 或结构名不等于完整 FS 实现。"
       }
     },
     {
@@ -20918,20 +19444,6 @@
       "domain": "filesystem_drivers",
       "feature_name": "Q05_016 文件描述符表的归属是哪种？",
       "description": "文件描述符表的归属是哪种？",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch12 File Management",
-          "concepts": [
-            "file system",
-            "file organization",
-            "directories",
-            "file allocation",
-            "free space management",
-            "file sharing",
-            "VFS"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：文件描述符表的归属是哪种？  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "dependencies": [
         "03_mem_mgmt",
@@ -21242,21 +19754,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "文件系统题要区分 VFS 抽象、具体后端、路径解析、目录结构、文件对象、fd table、特殊文件和实际 syscall 路径。只有用户态 API 或结构名不等于完整 FS 实现。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch12 File Management",
-            "concepts": [
-              "file system",
-              "file organization",
-              "directories",
-              "file allocation",
-              "free space management",
-              "file sharing",
-              "VFS"
-            ]
-          }
-        ]
+        "concept_boundary": "文件系统题要区分 VFS 抽象、具体后端、路径解析、目录结构、文件对象、fd table、特殊文件和实际 syscall 路径。只有用户态 API 或结构名不等于完整 FS 实现。"
       }
     },
     {
@@ -21265,20 +19763,6 @@
       "domain": "filesystem_drivers",
       "feature_name": "Q05_017 文件数据块分配方式 (File Allocation Method, Stallings Ch12) 更接近哪种？",
       "description": "文件数据块分配方式 (File Allocation Method, Stallings Ch12) 更接近哪种？",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch12 File Management",
-          "concepts": [
-            "file system",
-            "file organization",
-            "directories",
-            "file allocation",
-            "free space management",
-            "file sharing",
-            "VFS"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：文件数据块分配方式 (File Allocation Method, Stallings Ch12) 更接近哪种？  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "dependencies": [
         "03_mem_mgmt",
@@ -21589,21 +20073,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "Stallings Ch12 文件管理题按文件组织、访问方式、目录结构、数据块分配和空闲空间管理分类。必须从具体 FS 后端结构和算法判断，不能只按后端名字猜。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch12 File Management",
-            "concepts": [
-              "file system",
-              "file organization",
-              "directories",
-              "file allocation",
-              "free space management",
-              "file sharing",
-              "VFS"
-            ]
-          }
-        ]
+        "concept_boundary": "Stallings Ch12 文件管理题按文件组织、访问方式、目录结构、数据块分配和空闲空间管理分类。必须从具体 FS 后端结构和算法判断，不能只按后端名字猜。"
       }
     },
     {
@@ -21612,19 +20082,6 @@
       "domain": "filesystem_drivers",
       "feature_name": "Q05_018 磁盘/存储空闲空间管理 (Free Space Management, Stallings Ch12) 更接近哪种？",
       "description": "磁盘/存储空闲空间管理 (Free Space Management, Stallings Ch12) 更接近哪种？",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch12 File Management",
-          "concepts": [
-            "free space management",
-            "bit vectors",
-            "linked free space",
-            "grouping",
-            "counting",
-            "file allocation tables"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：磁盘/存储空闲空间管理 (Free Space Management, Stallings Ch12) 更接近哪种？  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "dependencies": [
         "03_mem_mgmt",
@@ -21944,20 +20401,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "本题只判断 Stallings Ch12 意义上的磁盘/持久化文件系统空闲空间管理：bitmap、空闲链表、成组链接、计数法或 FAT 表空闲链。必须从具体 FS 后端的分配/释放结构和超级块/位图/FAT/cluster 证据判断；块设备请求队列、I/O buffer、DMA ring、CPU scheduler 或内存分配器都不等价。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch12 File Management",
-            "concepts": [
-              "free space management",
-              "bit vectors",
-              "linked free space",
-              "grouping",
-              "counting",
-              "file allocation tables"
-            ]
-          }
-        ]
+        "concept_boundary": "本题只判断 Stallings Ch12 意义上的磁盘/持久化文件系统空闲空间管理：bitmap、空闲链表、成组链接、计数法或 FAT 表空闲链。必须从具体 FS 后端的分配/释放结构和超级块/位图/FAT/cluster 证据判断；块设备请求队列、I/O buffer、DMA ring、CPU scheduler 或内存分配器都不等价。"
       }
     },
     {
@@ -21966,20 +20410,6 @@
       "domain": "filesystem_drivers",
       "feature_name": "Q05_019 目录结构 (Directory Structure, Stallings Ch12) 更接近哪种？",
       "description": "目录结构 (Directory Structure, Stallings Ch12) 更接近哪种？",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch12 File Management",
-          "concepts": [
-            "file system",
-            "file organization",
-            "directories",
-            "file allocation",
-            "free space management",
-            "file sharing",
-            "VFS"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：目录结构 (Directory Structure, Stallings Ch12) 更接近哪种？  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "dependencies": [
         "03_mem_mgmt",
@@ -22289,21 +20719,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "Stallings Ch12 文件管理题按文件组织、访问方式、目录结构、数据块分配和空闲空间管理分类。必须从具体 FS 后端结构和算法判断，不能只按后端名字猜。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch12 File Management",
-            "concepts": [
-              "file system",
-              "file organization",
-              "directories",
-              "file allocation",
-              "free space management",
-              "file sharing",
-              "VFS"
-            ]
-          }
-        ]
+        "concept_boundary": "Stallings Ch12 文件管理题按文件组织、访问方式、目录结构、数据块分配和空闲空间管理分类。必须从具体 FS 后端结构和算法判断，不能只按后端名字猜。"
       }
     },
     {
@@ -22312,20 +20728,6 @@
       "domain": "filesystem_drivers",
       "feature_name": "Q05_020 文件内部记录组织 (File Record Organization, Stallings Ch12) 更接近哪种？",
       "description": "文件内部记录组织 (File Record Organization, Stallings Ch12) 更接近哪种？",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch12 File Management",
-          "concepts": [
-            "file system",
-            "file organization",
-            "directories",
-            "file allocation",
-            "free space management",
-            "file sharing",
-            "VFS"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：文件内部记录组织 (File Record Organization, Stallings Ch12) 更接近哪种？  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "dependencies": [
         "03_mem_mgmt",
@@ -22636,21 +21038,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "Stallings Ch12 文件管理题按文件组织、访问方式、目录结构、数据块分配和空闲空间管理分类。必须从具体 FS 后端结构和算法判断，不能只按后端名字猜。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch12 File Management",
-            "concepts": [
-              "file system",
-              "file organization",
-              "directories",
-              "file allocation",
-              "free space management",
-              "file sharing",
-              "VFS"
-            ]
-          }
-        ]
+        "concept_boundary": "Stallings Ch12 文件管理题按文件组织、访问方式、目录结构、数据块分配和空闲空间管理分类。必须从具体 FS 后端结构和算法判断，不能只按后端名字猜。"
       }
     },
     {
@@ -22659,19 +21047,6 @@
       "domain": "filesystem_drivers",
       "feature_name": "Q05_021 设备发现/枚举机制更接近哪种？",
       "description": "设备发现/枚举机制更接近哪种？",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-          "concepts": [
-            "I/O control techniques",
-            "interrupt-driven I/O",
-            "DMA",
-            "I/O buffering",
-            "disk scheduling",
-            "device drivers"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：设备发现/枚举机制更接近哪种？  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "dependencies": [
         "03_mem_mgmt",
@@ -22987,20 +21362,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "I/O 题按 Stallings Ch11 区分设备发现、驱动框架、I/O 控制技术、缓冲、DMA、磁盘调度和中断控制。不要把 CPU scheduler 或普通内存 copy 当 I/O 策略。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-            "concepts": [
-              "I/O control techniques",
-              "interrupt-driven I/O",
-              "DMA",
-              "I/O buffering",
-              "disk scheduling",
-              "device drivers"
-            ]
-          }
-        ]
+        "concept_boundary": "I/O 题按 Stallings Ch11 区分设备发现、驱动框架、I/O 控制技术、缓冲、DMA、磁盘调度和中断控制。不要把 CPU scheduler 或普通内存 copy 当 I/O 策略。"
       }
     },
     {
@@ -23009,19 +21371,6 @@
       "domain": "filesystem_drivers",
       "feature_name": "Q05_022 是否能在代码中证实解析了 `.dtb`/DeviceTree？（必须三态；若 implemented 必须指出解析入口）",
       "description": "是否能在代码中证实解析了 `.dtb`/DeviceTree？（必须三态；若 implemented 必须指出解析入口）",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-          "concepts": [
-            "I/O control techniques",
-            "interrupt-driven I/O",
-            "DMA",
-            "I/O buffering",
-            "disk scheduling",
-            "device drivers"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否能在代码中证实解析了 `.dtb`/DeviceTree？  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "dependencies": [
         "03_mem_mgmt",
@@ -23432,20 +21781,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "I/O 题按 Stallings Ch11 区分设备发现、驱动框架、I/O 控制技术、缓冲、DMA、磁盘调度和中断控制。不要把 CPU scheduler 或普通内存 copy 当 I/O 策略。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-            "concepts": [
-              "I/O control techniques",
-              "interrupt-driven I/O",
-              "DMA",
-              "I/O buffering",
-              "disk scheduling",
-              "device drivers"
-            ]
-          }
-        ]
+        "concept_boundary": "I/O 题按 Stallings Ch11 区分设备发现、驱动框架、I/O 控制技术、缓冲、DMA、磁盘调度和中断控制。不要把 CPU scheduler 或普通内存 copy 当 I/O 策略。"
       }
     },
     {
@@ -23454,19 +21790,6 @@
       "domain": "filesystem_drivers",
       "feature_name": "Q05_023 驱动框架接口是什么？（Rust Driver trait / C driver ops / 注册表；必须引用接口定义证据）",
       "description": "驱动框架接口是什么？（Rust Driver trait / C driver ops / 注册表；必须引用接口定义证据）",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-          "concepts": [
-            "I/O control techniques",
-            "interrupt-driven I/O",
-            "DMA",
-            "I/O buffering",
-            "disk scheduling",
-            "device drivers"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：驱动框架接口是什么？（Rust Driver trait / C driver ops / 注册表；必须引用接口定义证据）  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "dependencies": [
         "03_mem_mgmt",
@@ -23844,20 +22167,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "I/O 题按 Stallings Ch11 区分设备发现、驱动框架、I/O 控制技术、缓冲、DMA、磁盘调度和中断控制。不要把 CPU scheduler 或普通内存 copy 当 I/O 策略。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-            "concepts": [
-              "I/O control techniques",
-              "interrupt-driven I/O",
-              "DMA",
-              "I/O buffering",
-              "disk scheduling",
-              "device drivers"
-            ]
-          }
-        ]
+        "concept_boundary": "I/O 题按 Stallings Ch11 区分设备发现、驱动框架、I/O 控制技术、缓冲、DMA、磁盘调度和中断控制。不要把 CPU scheduler 或普通内存 copy 当 I/O 策略。"
       }
     },
     {
@@ -23866,19 +22176,6 @@
       "domain": "filesystem_drivers",
       "feature_name": "Q05_024 驱动注册与初始化顺序是什么？（init_drivers/probe/driver_manager 等；列出 3-6 个关键节点并给证据）",
       "description": "驱动注册与初始化顺序是什么？（init_drivers/probe/driver_manager 等；列出 3-6 个关键节点并给证据）",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-          "concepts": [
-            "I/O control techniques",
-            "interrupt-driven I/O",
-            "DMA",
-            "I/O buffering",
-            "disk scheduling",
-            "device drivers"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：驱动注册与初始化顺序是什么？（init_drivers/probe/driver_manager 等；列出 3-6 个关键节点并给证据）  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "dependencies": [
         "03_mem_mgmt",
@@ -24255,20 +22552,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "I/O 题按 Stallings Ch11 区分设备发现、驱动框架、I/O 控制技术、缓冲、DMA、磁盘调度和中断控制。不要把 CPU scheduler 或普通内存 copy 当 I/O 策略。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-            "concepts": [
-              "I/O control techniques",
-              "interrupt-driven I/O",
-              "DMA",
-              "I/O buffering",
-              "disk scheduling",
-              "device drivers"
-            ]
-          }
-        ]
+        "concept_boundary": "I/O 题按 Stallings Ch11 区分设备发现、驱动框架、I/O 控制技术、缓冲、DMA、磁盘调度和中断控制。不要把 CPU scheduler 或普通内存 copy 当 I/O 策略。"
       }
     },
     {
@@ -24277,19 +22561,6 @@
       "domain": "filesystem_drivers",
       "feature_name": "Q05_025 是否实现 UART/Console 驱动用于早期输出？（必须三态）",
       "description": "是否实现 UART/Console 驱动用于早期输出？（必须三态）",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-          "concepts": [
-            "I/O control techniques",
-            "interrupt-driven I/O",
-            "DMA",
-            "I/O buffering",
-            "disk scheduling",
-            "device drivers"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否实现 UART/Console 驱动用于早期输出？  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "dependencies": [
         "03_mem_mgmt",
@@ -24698,20 +22969,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "I/O 题按 Stallings Ch11 区分设备发现、驱动框架、I/O 控制技术、缓冲、DMA、磁盘调度和中断控制。不要把 CPU scheduler 或普通内存 copy 当 I/O 策略。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-            "concepts": [
-              "I/O control techniques",
-              "interrupt-driven I/O",
-              "DMA",
-              "I/O buffering",
-              "disk scheduling",
-              "device drivers"
-            ]
-          }
-        ]
+        "concept_boundary": "I/O 题按 Stallings Ch11 区分设备发现、驱动框架、I/O 控制技术、缓冲、DMA、磁盘调度和中断控制。不要把 CPU scheduler 或普通内存 copy 当 I/O 策略。"
       }
     },
     {
@@ -24720,19 +22978,6 @@
       "domain": "filesystem_drivers",
       "feature_name": "Q05_026 是否实现块设备驱动（virtio-blk/ramdisk/其他）？（必须三态）",
       "description": "是否实现块设备驱动（virtio-blk/ramdisk/其他）？（必须三态）",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-          "concepts": [
-            "I/O control techniques",
-            "interrupt-driven I/O",
-            "DMA",
-            "I/O buffering",
-            "disk scheduling",
-            "device drivers"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否实现块设备驱动（virtio-blk/ramdisk/其他）？  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "dependencies": [
         "03_mem_mgmt",
@@ -25142,20 +23387,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "I/O 题按 Stallings Ch11 区分设备发现、驱动框架、I/O 控制技术、缓冲、DMA、磁盘调度和中断控制。不要把 CPU scheduler 或普通内存 copy 当 I/O 策略。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-            "concepts": [
-              "I/O control techniques",
-              "interrupt-driven I/O",
-              "DMA",
-              "I/O buffering",
-              "disk scheduling",
-              "device drivers"
-            ]
-          }
-        ]
+        "concept_boundary": "I/O 题按 Stallings Ch11 区分设备发现、驱动框架、I/O 控制技术、缓冲、DMA、磁盘调度和中断控制。不要把 CPU scheduler 或普通内存 copy 当 I/O 策略。"
       }
     },
     {
@@ -25164,19 +23396,6 @@
       "domain": "filesystem_drivers",
       "feature_name": "Q05_027 是否实现网络设备驱动（virtio-net/e1000/rtl8139 等）？（必须三态）",
       "description": "是否实现网络设备驱动（virtio-net/e1000/rtl8139 等）？（必须三态）",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-          "concepts": [
-            "I/O control techniques",
-            "interrupt-driven I/O",
-            "DMA",
-            "I/O buffering",
-            "disk scheduling",
-            "device drivers"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否实现网络设备驱动（virtio-net/e1000/rtl8139 等）？  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "dependencies": [
         "03_mem_mgmt",
@@ -25588,20 +23807,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "I/O 题按 Stallings Ch11 区分设备发现、驱动框架、I/O 控制技术、缓冲、DMA、磁盘调度和中断控制。不要把 CPU scheduler 或普通内存 copy 当 I/O 策略。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-            "concepts": [
-              "I/O control techniques",
-              "interrupt-driven I/O",
-              "DMA",
-              "I/O buffering",
-              "disk scheduling",
-              "device drivers"
-            ]
-          }
-        ]
+        "concept_boundary": "I/O 题按 Stallings Ch11 区分设备发现、驱动框架、I/O 控制技术、缓冲、DMA、磁盘调度和中断控制。不要把 CPU scheduler 或普通内存 copy 当 I/O 策略。"
       }
     },
     {
@@ -25610,19 +23816,6 @@
       "domain": "filesystem_drivers",
       "feature_name": "Q05_028 是否实现中断控制器驱动（PLIC/CLINT/APIC 等）？（必须三态；需指出中断源到 handler 的分发证据）",
       "description": "是否实现中断控制器驱动（PLIC/CLINT/APIC 等）？（必须三态；需指出中断源到 handler 的分发证据）",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-          "concepts": [
-            "I/O control techniques",
-            "interrupt-driven I/O",
-            "DMA",
-            "I/O buffering",
-            "disk scheduling",
-            "device drivers"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否实现中断控制器驱动（PLIC/CLINT/APIC 等）？  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "dependencies": [
         "03_mem_mgmt",
@@ -26034,20 +24227,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "I/O 题按 Stallings Ch11 区分设备发现、驱动框架、I/O 控制技术、缓冲、DMA、磁盘调度和中断控制。不要把 CPU scheduler 或普通内存 copy 当 I/O 策略。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-            "concepts": [
-              "I/O control techniques",
-              "interrupt-driven I/O",
-              "DMA",
-              "I/O buffering",
-              "disk scheduling",
-              "device drivers"
-            ]
-          }
-        ]
+        "concept_boundary": "I/O 题按 Stallings Ch11 区分设备发现、驱动框架、I/O 控制技术、缓冲、DMA、磁盘调度和中断控制。不要把 CPU scheduler 或普通内存 copy 当 I/O 策略。"
       }
     },
     {
@@ -26056,19 +24236,6 @@
       "domain": "filesystem_drivers",
       "feature_name": "Q05_029 MMIO 地址来源是什么？（DTB 提供 / 常量硬编码 / 物理→虚拟转换；必须给证据）",
       "description": "MMIO 地址来源是什么？（DTB 提供 / 常量硬编码 / 物理→虚拟转换；必须给证据）",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-          "concepts": [
-            "I/O control techniques",
-            "interrupt-driven I/O",
-            "DMA",
-            "I/O buffering",
-            "disk scheduling",
-            "device drivers"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：MMIO 地址来源是什么？（DTB 提供 / 常量硬编码 / 物理→虚拟转换；必须给证据）  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "dependencies": [
         "03_mem_mgmt",
@@ -26444,20 +24611,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "I/O 题按 Stallings Ch11 区分设备发现、驱动框架、I/O 控制技术、缓冲、DMA、磁盘调度和中断控制。不要把 CPU scheduler 或普通内存 copy 当 I/O 策略。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-            "concepts": [
-              "I/O control techniques",
-              "interrupt-driven I/O",
-              "DMA",
-              "I/O buffering",
-              "disk scheduling",
-              "device drivers"
-            ]
-          }
-        ]
+        "concept_boundary": "I/O 题按 Stallings Ch11 区分设备发现、驱动框架、I/O 控制技术、缓冲、DMA、磁盘调度和中断控制。不要把 CPU scheduler 或普通内存 copy 当 I/O 策略。"
       }
     },
     {
@@ -26466,19 +24620,6 @@
       "domain": "filesystem_drivers",
       "feature_name": "Q05_030 多平台适配是如何通过构建/条件编译选择驱动的？（features/Kconfig/Makefile 规则；必须给证据）",
       "description": "多平台适配是如何通过构建/条件编译选择驱动的？（features/Kconfig/Makefile 规则；必须给证据）",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-          "concepts": [
-            "I/O control techniques",
-            "interrupt-driven I/O",
-            "DMA",
-            "I/O buffering",
-            "disk scheduling",
-            "device drivers"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：多平台适配是如何通过构建/条件编译选择驱动的？（features/Kconfig/Makefile 规则；必须给证据）  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "dependencies": [
         "03_mem_mgmt",
@@ -26855,20 +24996,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "I/O 题按 Stallings Ch11 区分设备发现、驱动框架、I/O 控制技术、缓冲、DMA、磁盘调度和中断控制。不要把 CPU scheduler 或普通内存 copy 当 I/O 策略。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-            "concepts": [
-              "I/O control techniques",
-              "interrupt-driven I/O",
-              "DMA",
-              "I/O buffering",
-              "disk scheduling",
-              "device drivers"
-            ]
-          }
-        ]
+        "concept_boundary": "I/O 题按 Stallings Ch11 区分设备发现、驱动框架、I/O 控制技术、缓冲、DMA、磁盘调度和中断控制。不要把 CPU scheduler 或普通内存 copy 当 I/O 策略。"
       }
     },
     {
@@ -26877,18 +25005,6 @@
       "domain": "filesystem_drivers",
       "feature_name": "Q05_031 是否存在 MMU 启用前后串口地址切换（phys/virt 切换）逻辑？（必须三态）",
       "description": "是否存在 MMU 启用前后串口地址切换（phys/virt 切换）逻辑？（必须三态）",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-          "concepts": [
-            "device drivers",
-            "MMIO",
-            "I/O control techniques",
-            "device initialization",
-            "logical structure of I/O function"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否存在 MMU 启用前后串口地址切换（phys/virt 切换）逻辑？  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "dependencies": [
         "03_mem_mgmt",
@@ -27295,19 +25411,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "本题只看早期 UART/Console MMIO 地址是否在 MMU 启用前后发生明确的物理地址到虚拟地址切换，并且该切换接入启动或控制台输出路径。普通 phys_to_virt 工具函数、通用内核映射、VFS 文件对象或用户态串口 API 不能单独证明串口地址切换。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-            "concepts": [
-              "device drivers",
-              "MMIO",
-              "I/O control techniques",
-              "device initialization",
-              "logical structure of I/O function"
-            ]
-          }
-        ]
+        "concept_boundary": "本题只看早期 UART/Console MMIO 地址是否在 MMU 启用前后发生明确的物理地址到虚拟地址切换，并且该切换接入启动或控制台输出路径。普通 phys_to_virt 工具函数、通用内核映射、VFS 文件对象或用户态串口 API 不能单独证明串口地址切换。"
       }
     },
     {
@@ -27316,19 +25420,6 @@
       "domain": "filesystem_drivers",
       "feature_name": "Q05_032 I/O 缓冲模式 (I/O Buffering) 最接近哪种？（Stallings Ch11：单缓冲 Single Buffer / 双缓冲 Double Buffer / 循环缓冲 Circular Buffer / 缓冲池 Buffer Pool / 无缓冲 No Buffer）",
       "description": "I/O 缓冲模式 (I/O Buffering) 最接近哪种？（Stallings Ch11：单缓冲 Single Buffer / 双缓冲 Double Buffer / 循环缓冲 Circular Buffer / 缓冲池 Buffer Pool / 无缓冲 No Buffer）",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-          "concepts": [
-            "I/O control techniques",
-            "interrupt-driven I/O",
-            "DMA",
-            "I/O buffering",
-            "disk scheduling",
-            "device drivers"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：I/O 缓冲模式 (I/O Buffering) 最接近哪种？（Stallings Ch11：单缓冲 Single Buffer / 双缓冲 Double Buffer / 循环缓冲 Circular Buffer / 缓冲池 Buffer Pool / 无缓冲 No Bu...  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "dependencies": [
         "03_mem_mgmt",
@@ -27637,20 +25728,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "Stallings Ch11 的 I/O buffering 指 I/O 路径中为平滑速率差、适配块/字符粒度和支持异步操作而设置的缓冲。要区分单缓冲、双缓冲、循环缓冲、缓冲池和无缓冲；不能把 CPU 队列或普通内存分配当 I/O 缓冲。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-            "concepts": [
-              "I/O control techniques",
-              "interrupt-driven I/O",
-              "DMA",
-              "I/O buffering",
-              "disk scheduling",
-              "device drivers"
-            ]
-          }
-        ]
+        "concept_boundary": "Stallings Ch11 的 I/O buffering 指 I/O 路径中为平滑速率差、适配块/字符粒度和支持异步操作而设置的缓冲。要区分单缓冲、双缓冲、循环缓冲、缓冲池和无缓冲；不能把 CPU 队列或普通内存分配当 I/O 缓冲。"
       }
     },
     {
@@ -27659,19 +25737,6 @@
       "domain": "filesystem_drivers",
       "feature_name": "Q05_033 块设备（磁盘/eMMC/NVMe）I/O 请求调度算法 (Scheduling Algorithm) (Disk Scheduling Algorithm) 更接近哪种？（Stallings Ch11；若无显式调度则选「FCFS 顺序提交」）",
       "description": "块设备（磁盘/eMMC/NVMe）I/O 请求调度算法 (Scheduling Algorithm) (Disk Scheduling Algorithm) 更接近哪种？（Stallings Ch11；若无显式调度则选「FCFS 顺序提交」）",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-          "concepts": [
-            "I/O control techniques",
-            "interrupt-driven I/O",
-            "DMA",
-            "I/O buffering",
-            "disk scheduling",
-            "device drivers"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：块设备（磁盘/eMMC/NVMe）I/O 请求调度算法 (Scheduling Algorithm) (Disk Scheduling Algorithm) 更接近哪种？（Stallings Ch11；若无显式调度则选「FCFS 顺序提交」）  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "dependencies": [
         "03_mem_mgmt",
@@ -27987,20 +26052,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "Stallings Ch11 磁盘调度是块 I/O 请求排序算法，不是 CPU scheduler。无显式重排但按调用顺序提交时，只能选 FCFS/顺序提交；virtqueue/SD 请求环本身不等于 SSTF/SCAN。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-            "concepts": [
-              "I/O control techniques",
-              "interrupt-driven I/O",
-              "DMA",
-              "I/O buffering",
-              "disk scheduling",
-              "device drivers"
-            ]
-          }
-        ]
+        "concept_boundary": "Stallings Ch11 磁盘调度是块 I/O 请求排序算法，不是 CPU scheduler。无显式重排但按调用顺序提交时，只能选 FCFS/顺序提交；virtqueue/SD 请求环本身不等于 SSTF/SCAN。"
       }
     },
     {
@@ -28009,19 +26061,6 @@
       "domain": "filesystem_drivers",
       "feature_name": "Q05_034 I/O 控制技术 (I/O Control Techniques, Stallings Ch11) 更接近哪种？",
       "description": "I/O 控制技术 (I/O Control Techniques, Stallings Ch11) 更接近哪种？",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-          "concepts": [
-            "I/O control techniques",
-            "interrupt-driven I/O",
-            "DMA",
-            "I/O buffering",
-            "disk scheduling",
-            "device drivers"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：I/O 控制技术 (I/O Control Techniques, Stallings Ch11) 更接近哪种？  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "dependencies": [
         "03_mem_mgmt",
@@ -28327,20 +26366,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "Stallings Ch11 I/O control techniques 要区分 programmed I/O、interrupt-driven I/O、DMA 和 channel/virtqueue 等价机制。判断依据是数据搬运方式、CPU 是否轮询、是否由中断完成、是否提交设备可访问 descriptor。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-            "concepts": [
-              "I/O control techniques",
-              "interrupt-driven I/O",
-              "DMA",
-              "I/O buffering",
-              "disk scheduling",
-              "device drivers"
-            ]
-          }
-        ]
+        "concept_boundary": "Stallings Ch11 I/O control techniques 要区分 programmed I/O、interrupt-driven I/O、DMA 和 channel/virtqueue 等价机制。判断依据是数据搬运方式、CPU 是否轮询、是否由中断完成、是否提交设备可访问 descriptor。"
       }
     },
     {
@@ -28349,19 +26375,6 @@
       "domain": "filesystem_drivers",
       "feature_name": "Q05_035 是否实现 DMA (Direct Memory Access, Stallings Ch11) 传输路径？（必须三态；搜索 dma_alloc / dma_map / dma_buf / virtio 描述符环等；virtio 的描述符环也算 DMA 等价机制）",
       "description": "是否实现 DMA (Direct Memory Access, Stallings Ch11) 传输路径？（必须三态；搜索 dma_alloc / dma_map / dma_buf / virtio 描述符环等；virtio 的描述符环也算 DMA 等价机制）",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-          "concepts": [
-            "I/O control techniques",
-            "interrupt-driven I/O",
-            "DMA",
-            "I/O buffering",
-            "disk scheduling",
-            "device drivers"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否实现 DMA (Direct Memory Access, Stallings Ch11) 传输路径？ DMA 需要设备可访问物理地址或 descriptor 提交；zero-copy 需要用户/协议栈/设备路径减少复制，普通 descriptor 或 memcpy 优化不能互相替代。 本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "dependencies": [
         "03_mem_mgmt",
@@ -28765,20 +26778,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "DMA 路径需要设备可访问 buffer/物理地址/descriptor 提交和完成处理。普通 memcpy、PIO 或块缓存不是 DMA。virtio descriptor ring 可作为 DMA 等价机制，但要有物理地址提交。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-            "concepts": [
-              "I/O control techniques",
-              "interrupt-driven I/O",
-              "DMA",
-              "I/O buffering",
-              "disk scheduling",
-              "device drivers"
-            ]
-          }
-        ]
+        "concept_boundary": "DMA 路径需要设备可访问 buffer/物理地址/descriptor 提交和完成处理。普通 memcpy、PIO 或块缓存不是 DMA。virtio descriptor ring 可作为 DMA 等价机制，但要有物理地址提交。"
       }
     },
     {
@@ -28787,18 +26787,6 @@
       "domain": "fs_drivers_io",
       "feature_name": "Q05_036 I/O 软件分层 (Logical Structure of the I/O Function, Stallings Ch11) 是什么？请追踪一个 read/write 请求从 syscall/VFS 到驱动提交的 3-6 个层级。",
       "description": "I/O 软件分层 (Logical Structure of the I/O Function, Stallings Ch11) 是什么？请追踪一个 read/write 请求从 syscall/VFS 到驱动提交的 3-6 个层级。",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-          "concepts": [
-            "logical structure of I/O function",
-            "device-independent I/O",
-            "device drivers",
-            "interrupt handlers",
-            "I/O buffering"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：I/O 软件分层 (Logical Structure of the I/O Function, Stallings Ch11) 是什么？请追踪一个 read/write 请求从 syscall/VFS 到驱动提交的 3-6 个层级。  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "dependencies": [
         "02_boot_trap",
@@ -29154,18 +27142,6 @@
       "domain": "fs_drivers_io",
       "feature_name": "Q05_037 异步与同步 I/O (Asynchronous vs Synchronous I/O, Stallings Ch11) 的实现更接近哪种？",
       "description": "异步与同步 I/O (Asynchronous vs Synchronous I/O, Stallings Ch11) 的实现更接近哪种？",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch11 I/O Management and Disk Scheduling",
-          "concepts": [
-            "synchronous I/O",
-            "asynchronous I/O",
-            "interrupt-driven I/O",
-            "I/O buffering",
-            "completion notification"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：异步与同步 I/O (Asynchronous vs Synchronous I/O, Stallings Ch11) 的实现更接近哪种？  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "dependencies": [
         "06_sync_ipc"
@@ -29467,27 +27443,6 @@
       "domain": "fs_drivers_io",
       "feature_name": "Q05_038 是否实现文件共享访问权与并发访问控制 (File Sharing Access Rights / Simultaneous Access, Stallings Ch12)？（必须三态）",
       "description": "是否实现文件共享访问权与并发访问控制 (File Sharing Access Rights / Simultaneous Access, Stallings Ch12)？（必须三态）",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch12 File Management",
-          "concepts": [
-            "file sharing",
-            "access rights",
-            "simultaneous access",
-            "file locks",
-            "directories",
-            "inodes"
-          ]
-        },
-        {
-          "source": "Stallings Ch15 Operating System Security",
-          "concepts": [
-            "access control",
-            "privileges",
-            "subjects and objects"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否实现文件共享访问权与并发访问控制 (File Sharing Access Rights / Simultaneous Access, Stallings Ch12)？  本题属于文件系统、VFS、文件描述符、设备发现与驱动/I/O 层，只看文件对象、路径、后端 FS、缓存、设备寄存器、队列、DMA 与中断控制器；进程调度、网络协议语义或内存 VM 机制只能作为交叉证据。",
       "dependencies": [
         "07_security",
@@ -29871,44 +27826,5 @@
         ]
       }
     }
-  ],
-  "llm_field_guide": {
-    "purpose": "这些字段是给弱模型看的作答说明：不要把题目当作文题，必须先填结构化事实，再推出最终答案。",
-    "field_meanings": {
-      "question_id": "稳定题号。回答、证据、fact_result 都必须绑定这个 ID。",
-      "stem": "人类可读题面，只说明要问什么；不能只根据 stem 直接下结论。",
-      "question_type": "题型。tri_state_impl 只能回答 implemented / stub / not_found / unknown。",
-      "choices": "选择题的合法选项。single_choice 必须原样选择其中一个；multi_choice 必须返回数组。",
-      "feature_ids": "本题对应的 OS 机制特征 ID，用于图谱和证据追踪。",
-      "textbook_basis": "本题参考的 Stallings 教材概念范围，用来帮助理解概念边界，不是源码证据。",
-      "concept_boundary": "本题最容易混淆的概念边界。判断前必须先读，防止把相似机制误判为实现。",
-      "diagnostic_checks": "局部判断步骤。弱模型应逐条查，不要直接回答总问题。",
-      "structured_facts": "必须逐项完成的事实表。每个 fact 都要给 status_or_value 和 evidence_id；这是最终 value 的依据。",
-      "answer_contract": "最终答案约束。规定 value 类型、合法值、必须完成哪些 fact，以及证据引用规则。",
-      "evidence_policy": "证据要求。RAG/grep 只是线索；implemented 需要 read/LSP/function body/call site 等强证据。",
-      "tri_state_rule": "三态/四态判定规则。implemented、stub、not_found、unknown 的边界写在这里。",
-      "anti_examples": "反例。命中这些情况时不能判 implemented，避免看到名字就误判。",
-      "negative_search_policy": "判 not_found 前必须覆盖的关键词和目录要求。覆盖不足只能 unknown。",
-      "features": "题单顶层的 feature 汇总，供图谱和跨题审阅使用。"
-    },
-    "status_values": {
-      "yes_strong": "有强源码证据：定义/实现体/调用点/状态变化/数据结构读写/调用链。可参与支撑 implemented。",
-      "yes_weak": "只有 RAG、grep、outline、README 或名字命中。只能当线索，不能单独支撑 implemented。",
-      "stub_or_declaration_only": "只有声明、trait/struct 壳、空实现、固定返回、ENOSYS、unsupported、todo/unimplemented。通常支撑 stub。",
-      "no_after_negative_search": "按 negative_search_policy 搜过关键词和目录后仍未发现。可参与支撑 not_found。",
-      "unknown": "证据不足、覆盖不足、冲突或 fact 未完成。最终应降级 unknown/待核实。"
-    },
-    "required_reasoning_order": [
-      "先读 stem，确认问题对象。",
-      "再读 textbook_basis 和 concept_boundary，确认 OS 概念边界。",
-      "逐项完成 structured_facts；每个 fact 只能引用 evidence_id，不要手写新路径/行号当证据。",
-      "把 RAG/grep 命中标成 yes_weak 或 hint，不要直接推出 implemented。",
-      "若要判 not_found，必须完成 negative_search_coverage fact。",
-      "最后按 answer_contract 和 tri_state_rule 推出 value。"
-    ],
-    "output_expectation": {
-      "draft_answer": "应包含 question_id、value、structured_fact_results、used_evidence_ids、confidence、notes。",
-      "final_answer": "最终 value 必须能由 structured_fact_results 和 evidence_id 追溯出来。"
-    }
-  }
+  ]
 }

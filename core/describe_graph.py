@@ -49,6 +49,7 @@ from core.qa_contract import (
     required_evidence_types_for_question,
     strongest_evidence_strength,
 )
+from core.qa_prompt_guidance import answer_shape_guidance, evidence_discipline_guidance, field_guidance
 from core.feature_graph import publish_feature_graph
 from core.html_renderer import publish_html_report
 from core.per_planner import build_repo_profile, ensure_execution_steps, plan_stage
@@ -1225,7 +1226,6 @@ class MultiAgentRuntime:
                 "diagnostic_checks": q.get("diagnostic_checks"),
                 "structured_facts": q.get("structured_facts"),
                 "answer_contract": q.get("answer_contract"),
-                "textbook_basis": q.get("textbook_basis"),
                 "concept_boundary": q.get("concept_boundary"),
                 "llm_answer_steps": q.get("llm_answer_steps"),
                 "evidence_policy": q.get("evidence_policy"),
@@ -1246,12 +1246,10 @@ class MultiAgentRuntime:
             "- expected_evidence_types 使用 definition / implementation_body / call_site / usage_flow / build_config / git_history / search。\n\n"
             "QA Contract 约束：\n"
             "- tri_state_impl 题需要按 feature 的 required_evidence_types 和 negative_search_policy 规划任务。\n"
-            "- 字段含义：structured_facts 是必须完成的事实表；answer_contract 是最终 value 的约束；concept_boundary 是概念边界；llm_answer_steps 是弱模型作答顺序。\n"
+            f"{field_guidance(['structured_facts', 'answer_contract', 'concept_boundary', 'diagnostic_checks', 'tri_state_rule', 'anti_examples', 'evidence_policy', 'llm_answer_steps', 'choices'])}"
             "- 每个 task 必须能填充相关题目的 structured_facts；task_goal/query 需要写明要完成哪些 fact_id/fact_key。\n"
-            "- concept_boundary 是概念边界，规划时必须防止把近似概念混同（例如 Page Cache vs Buffer Cache）。\n"
             "- 对包含 diagnostic_checks 的复杂题，必须把局部判断步骤反映到 task_goal/query 中，不能只问“是否实现”。\n"
-            "- RAG/grep 命中只能作为 hint；若要证明 implemented，必须规划 read/LSP/function body/call-site 强证据。\n"
-            "- 若要证明 not_found，必须规划覆盖题单 evidence_policy/structured_facts 中 keywords 和 seed_paths 的负向搜索。\n\n"
+            f"{evidence_discipline_guidance()}\n"
             f"stage_id={stage_id}\nstage_title={title}\n\n"
             "## Heuristic PlanSpec\n"
             f"{json.dumps(plan.to_dict() if hasattr(plan, 'to_dict') else {}, ensure_ascii=False, indent=2)}\n\n"
@@ -1549,13 +1547,9 @@ class MultiAgentRuntime:
             "你是 OS-Agent D 的 Stage Assembler Agent。现在只组装一个小题的最终 JSON answer。\n"
             "你不是源码分析执行者，不能发明新事实；只能根据 Task draft 和 Bound Evidence 统一格式、去重、修正过度表述。\n"
             "只输出一个 JSON object，字段必须是 question_id, question_type, stem, fact_answers, value, used_evidence_ids, notes。\n"
-            "字段含义：structured_facts 是题单给出的必答事实表；fact_answers 是你逐 fact 的交账；answer_contract 是汇总 value 的约束；concept_boundary 是概念边界。\n"
-            "必须为 Question.structured_facts 中每个 fact_id 输出一个 fact_answers item，字段为 fact_id, fact_key, value, used_evidence_ids, notes。\n"
-            "若该 fact 定义了 allowed_values，fact_answers[*].value 必须使用其中一个枚举值；若未定义 allowed_values，则按该 fact 的 answer_type/fields 输出结构化值或 unknown。\n"
-            "如果 Question.answer_contract.value_shape 明确给出字段，value 必须按该 value_shape 输出固定字段 JSON object；否则 short_answer/fill_in 的 value 应直接回答题干，不能只重复 fact 状态对象。\n"
-            "tri_state_impl 的 value 只能是 implemented / stub / not_found / unknown。\n"
+            f"{field_guidance(['structured_facts', 'answer_contract', 'concept_boundary', 'tri_state_rule', 'anti_examples', 'choices'])}"
+            f"{answer_shape_guidance()}"
             "tri_state_impl 判定必须遵守 Question 中的 tri_state_rule 和 anti_examples：没有 strong implementation evidence 时不能写 implemented；负向搜索覆盖不足时不能写 not_found。\n"
-            "used_evidence_ids 与 fact_answers[*].used_evidence_ids 只能填当前 Bound Evidence 中的 evidence_id；不要输出 path、line、excerpt，系统会按 ID 回填证据快照。\n"
             "你能看到并引用的证据列表只有下方 ## Bound Evidence；Task Drafts 里的旧 evidence/path/excerpt 不能作为最终证据，必须回到 Bound Evidence 找 ID。\n"
             "single_choice 的 value 必须等于 choices 中某一项完整原文；multi_choice 的 value 必须是数组。\n"
             "如果 draft 与 evidence 不一致，以 evidence 为准；证据不足写 unknown/待核实。\n\n"
@@ -1631,11 +1625,10 @@ class MultiAgentRuntime:
             "你是 OS-Agent D 的 Stage Writer Agent。只根据给定 evidence 作答，不要声称 evidence 未支持的实现事实。\n"
             "最终只输出一个合法 JSON 对象，字段为 schema_version, stage_id, stage_title, terminology_profile, answers。\n"
             "answers 必须按题单顺序逐题回答，每题包含 question_id, question_type, stem, fact_answers, value, used_evidence_ids, notes。\n"
+            f"{field_guidance(['structured_facts', 'answer_contract', 'concept_boundary', 'tri_state_rule', 'anti_examples', 'choices'])}"
+            f"{answer_shape_guidance()}"
             "若题目含 structured_facts/answer_contract，必须逐项输出 fact_answers；自然语言只能作为 notes，不得替代事实字段。\n"
             "每个 fact_answers item 必须包含 fact_id, fact_key, value, used_evidence_ids, notes；value 只能由 fact_answers 推出。\n"
-            "只有 Question.answer_contract.value_shape 明确给出字段时，short_answer/fill_in 的 value 才必须是固定字段 JSON object；否则 value 应直接回答题干，不能只输出 fact 状态对象。\n"
-            "tri_state_impl 的 value 只能是 implemented / stub / not_found / unknown。\n"
-            "used_evidence_ids 与 fact_answers[*].used_evidence_ids 只能引用 Evidence By Question 中对应题目的 evidence_id；不要输出 path、line、excerpt，系统会按 ID 回填证据快照。\n"
             "你能看到并引用的证据列表只有下方 ## Evidence By Question；每个 answer 只能引用本 question_id 分组下的 evidence_id。\n"
             "RAG/grep 只能作为 hint，不能单独支撑 implemented。\n\n"
             f"stage_id={stage_id}\nstage_title={title}\n\n"
@@ -1721,13 +1714,9 @@ class MultiAgentRuntime:
             "你是 OS-Agent D 的 Stage Writer Agent。现在只回答一个小题。\n"
             "只能输出一个 JSON object，字段必须是 question_id, question_type, stem, fact_answers, value, used_evidence_ids, notes。\n"
             "不要输出 Markdown，不要围栏，不要解释。\n"
-            "字段含义：structured_facts 是题单给出的必答事实表；fact_answers 是你逐 fact 的交账；answer_contract 是汇总 value 的约束；concept_boundary 是概念边界。\n"
-            "必须为 Question.structured_facts 中每个 fact_id 输出一个 fact_answers item，字段为 fact_id, fact_key, value, used_evidence_ids, notes。\n"
-            "若该 fact 定义了 allowed_values，fact_answers[*].value 必须使用其中一个枚举值；若未定义 allowed_values，则按该 fact 的 answer_type/fields 输出结构化值或 unknown。\n"
-            "如果 Question.answer_contract.value_shape 明确给出字段，value 必须按该 value_shape 输出固定字段 JSON object；否则 short_answer/fill_in 的 value 应直接回答题干，不能只重复 fact 状态对象。\n"
-            "tri_state_impl 的 value 只能是 implemented / stub / not_found / unknown。\n"
+            f"{field_guidance(['structured_facts', 'answer_contract', 'concept_boundary', 'tri_state_rule', 'anti_examples', 'choices'])}"
+            f"{answer_shape_guidance()}"
             "tri_state_impl 不能由 RAG/grep hint 直接判 implemented；证据不足写 unknown。\n"
-            "used_evidence_ids 与 fact_answers[*].used_evidence_ids 只能填当前 Bound Evidence 中的 evidence_id；不要输出 path、line、excerpt，系统会按 ID 回填证据快照。\n"
             "你能看到并引用的证据列表只有下方 ## Bound Evidence；没有出现在该列表中的证据不可引用。\n"
             "single_choice 的 value 必须等于 choices 中某一项完整原文；multi_choice 的 value 必须是数组。\n"
             "证据不足时写 unknown/待核实，不能编造路径。\n\n"
@@ -1827,10 +1816,8 @@ class MultiAgentRuntime:
             "关键硬要求：\n"
             "- 必须包含 fact_answers。\n"
             "- fact_answers 必须覆盖 Question.structured_facts 中每个 fact_id，不能多也不能漏。\n"
-            "- 每个 fact_answers item 必须包含 fact_id, fact_key, value, used_evidence_ids, notes。\n"
-            "- 若该 fact 定义了 allowed_values，fact_answers[*].value 必须使用其中一个枚举值；若未定义 allowed_values，则按该 fact 的 answer_type/fields 输出结构化值或 unknown。\n"
-            "- 只有 Question.answer_contract.value_shape 明确给出字段时，short_answer/fill_in 的 value 才必须是固定字段 JSON object；否则 value 应直接回答题干。\n"
-            "- used_evidence_ids 只能引用 Bound Evidence 中的 evidence_id；没有证据就填 []，不要编 path/line/excerpt。\n"
+            f"{answer_shape_guidance()}"
+            "- 没有证据就填 []，不要编 path/line/excerpt。\n"
             "- value 只是 fact_answers 推出的汇总结论。\n\n"
             "## 上一次原始输出\n"
             f"{(raw or '')[:6000]}\n"

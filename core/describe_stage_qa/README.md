@@ -22,7 +22,6 @@
   - `diagnostic_checks`
   - `structured_facts`
   - `answer_contract`
-  - `textbook_basis`
   - `concept_boundary`
   - `tri_state_rule`
   - `anti_examples`
@@ -30,6 +29,8 @@
   - `task_hints.structured_facts`
   - 顶层 `features`
 - RAG / grep 命中是 hint；`implemented` 需要强证据，`not_found` 需要结构化负向搜索覆盖 feature policy。
+- 题单字段解释与作答指导统一维护在 `core/qa_prompt_guidance.py`；题库 JSON 不再保存顶层 `llm_field_guide`。
+- 阶段级约束应拆进具体题目的 `concept_boundary`、`diagnostic_checks`、`structured_facts` 或 `evidence_policy`，不要使用顶层 `stage_constraints_md`。
 
 注意：题库本身不含“答案”，答案由 LLM 输出并在 `_per_stage/<stage_id>_answers.json` 保存。
 

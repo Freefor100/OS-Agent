@@ -80,7 +80,6 @@ def feature_context_for_question(question: Dict[str, Any]) -> Dict[str, Any]:
         "diagnostic_checks": question.get("diagnostic_checks") if isinstance(question.get("diagnostic_checks"), list) else [],
         "structured_facts": question.get("structured_facts") if isinstance(question.get("structured_facts"), list) else [],
         "answer_contract": question.get("answer_contract") if isinstance(question.get("answer_contract"), dict) else {},
-        "textbook_basis": question.get("textbook_basis") if isinstance(question.get("textbook_basis"), list) else [],
         "concept_boundary": str(question.get("concept_boundary") or ""),
     }
 

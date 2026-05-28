@@ -188,20 +188,6 @@
         "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
         "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。"
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch15 Operating System Security",
-          "concepts": [
-            "access control",
-            "protection domains",
-            "file permissions",
-            "credentials",
-            "security policy",
-            "integrity",
-            "audit"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：特权级隔离形态更接近哪种？  本题属于安全与保护层，只看特权隔离、凭证/权限、强制检查链、用户指针验证、沙箱、审计、完整性与溢出防护；普通 debug log、字段声明或文档口号不能证明安全机制 implemented。",
       "task_hints": {
         "diagnostic_checks": [
@@ -312,21 +298,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "安全题按 Stallings Ch15 区分特权级保护、访问控制、主体凭证、对象权限、强制检查链、完整性/审计/沙箱。只有字段、常量、文档或固定 root 返回不算 implemented。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch15 Operating System Security",
-            "concepts": [
-              "access control",
-              "protection domains",
-              "file permissions",
-              "credentials",
-              "security policy",
-              "integrity",
-              "audit"
-            ]
-          }
-        ]
+        "concept_boundary": "安全题按 Stallings Ch15 区分特权级保护、访问控制、主体凭证、对象权限、强制检查链、完整性/审计/沙箱。只有字段、常量、文档或固定 root 返回不算 implemented。"
       },
       "llm_answer_steps": [
         "只回答 Q07_001 的题干，不使用相邻题结论替代。",
@@ -588,20 +560,6 @@
           "unknown"
         ]
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch15 Operating System Security",
-          "concepts": [
-            "access control",
-            "protection domains",
-            "file permissions",
-            "credentials",
-            "security policy",
-            "integrity",
-            "audit"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否存在凭证/权限数据结构（UID/GID/Credential/Capability/ACL 等）。本题只判断数据结构存在性，不要求已在 syscall 路径强制执行；但 implemented 必须是内核主体或对象可关联的真实 credential/UID/GID/capability/ACL/mode 数据结构，并有创建、复制、继承、挂载到进程/文件对象或被读取的证据。孤立字段、固定 root 返回、依赖库类型、README 声称或未接入对象生命周期的 struct 壳只能判 stub/unknown，不能证明完整权限模型。",
       "task_hints": {
         "diagnostic_checks": [
@@ -741,21 +699,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "本题只问 credential/permission 数据结构存在性；真实对象生命周期或绑定关系可支撑 implemented，孤立字段、常量、文档或固定 root 返回只能支撑 stub/unknown。权限强制执行另见 Q07_003/Q07_012。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch15 Operating System Security",
-            "concepts": [
-              "access control",
-              "protection domains",
-              "file permissions",
-              "credentials",
-              "security policy",
-              "integrity",
-              "audit"
-            ]
-          }
-        ]
+        "concept_boundary": "本题只问 credential/permission 数据结构存在性；真实对象生命周期或绑定关系可支撑 implemented，孤立字段、常量、文档或固定 root 返回只能支撑 stub/unknown。权限强制执行另见 Q07_003/Q07_012。"
       },
       "llm_answer_steps": [
         "只回答 Q07_002 的题干，不使用相邻题结论替代。",
@@ -852,7 +796,8 @@
         "是否存在执行“能证实在 syscall 路径上真实执行了权限检查”语义的真实实现体，而不是声明、空函数或固定返回？",
         "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
         "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
-        "是否排除与“能证实在 syscall 路径上真实执行了权限检查”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？"
+        "是否排除与“能证实在 syscall 路径上真实执行了权限检查”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+        "??????????????? syscall ?????/????????? UID/GID ???? implemented?"
       ],
       "structured_facts": [
         {
@@ -1012,20 +957,6 @@
           "unknown"
         ]
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch15 Operating System Security",
-          "concepts": [
-            "access control",
-            "protection domains",
-            "file permissions",
-            "credentials",
-            "security policy",
-            "integrity",
-            "audit"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否能证实在 syscall 路径上真实执行了权限检查（open/exec/write 等）？ 安全题必须有强制检查或失败路径；字段、依赖库、哈希函数、普通日志或文档声称不能单独证明安全机制。 本题属于安全与保护层，只看特权隔离、凭证/权限、强制检查链、用户指针验证、沙箱、审计、完整性与溢出防护；普通 debug log、字段声明或文档口号不能证明安全机制 implemented。",
       "task_hints": {
         "diagnostic_checks": [
@@ -1033,7 +964,8 @@
           "是否存在执行“能证实在 syscall 路径上真实执行了权限检查”语义的真实实现体，而不是声明、空函数或固定返回？",
           "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
           "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
-          "是否排除与“能证实在 syscall 路径上真实执行了权限检查”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？"
+          "是否排除与“能证实在 syscall 路径上真实执行了权限检查”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+          "??????????????? syscall ?????/????????? UID/GID ???? implemented?"
         ],
         "structured_facts": [
           {
@@ -1165,21 +1097,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "安全题按 Stallings Ch15 区分特权级保护、访问控制、主体凭证、对象权限、强制检查链、完整性/审计/沙箱。只有字段、常量、文档或固定 root 返回不算 implemented。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch15 Operating System Security",
-            "concepts": [
-              "access control",
-              "protection domains",
-              "file permissions",
-              "credentials",
-              "security policy",
-              "integrity",
-              "audit"
-            ]
-          }
-        ]
+        "concept_boundary": "安全题按 Stallings Ch15 区分特权级保护、访问控制、主体凭证、对象权限、强制检查链、完整性/审计/沙箱。只有字段、常量、文档或固定 root 返回不算 implemented。"
       },
       "llm_answer_steps": [
         "只回答 Q07_003 的题干，不使用相邻题结论替代。",
@@ -1398,20 +1316,6 @@
         "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
         "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。 若前置条件「存在权限检查 (Access Control Check)」不成立，所有 facts 填 no_after_negative_search，并在 notes 注明「条件不满足」。"
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch15 Operating System Security",
-          "concepts": [
-            "access control",
-            "protection domains",
-            "file permissions",
-            "credentials",
-            "security policy",
-            "integrity",
-            "audit"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：若存在权限检查 (Access Control Check, Stallings Ch15)：入口点与核心检查函数链路是什么？（列 2-5 个节点并给证据） 安全题必须有强制检查或失败路径；字段、依赖库、哈希函数、普通日志或文档声称不能单独证明安全机制。 本题属于安全与保护层，只看特权隔离、凭证/权限、强制检查链、用户指针验证、沙箱、审计、完整性与溢出防护；普通 debug log、字段声明或文档口号不能证明安全机制 implemented。",
       "task_hints": {
         "diagnostic_checks": [
@@ -1551,21 +1455,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "安全题按 Stallings Ch15 区分特权级保护、访问控制、主体凭证、对象权限、强制检查链、完整性/审计/沙箱。只有字段、常量、文档或固定 root 返回不算 implemented。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch15 Operating System Security",
-            "concepts": [
-              "access control",
-              "protection domains",
-              "file permissions",
-              "credentials",
-              "security policy",
-              "integrity",
-              "audit"
-            ]
-          }
-        ]
+        "concept_boundary": "安全题按 Stallings Ch15 区分特权级保护、访问控制、主体凭证、对象权限、强制检查链、完整性/审计/沙箱。只有字段、常量、文档或固定 root 返回不算 implemented。"
       },
       "llm_answer_steps": [
         "只回答 Q07_004 的题干，不使用相邻题结论替代。",
@@ -1827,20 +1717,6 @@
           "unknown"
         ]
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch15 Operating System Security",
-          "concepts": [
-            "access control",
-            "protection domains",
-            "file permissions",
-            "credentials",
-            "security policy",
-            "integrity",
-            "audit"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否实现用户指针验证（access_ok/verify_area/UserInPtr/copyin/copyout 等）？本题聚焦用户指针验证的权限检查语义（访问失败时是否正确返回错误码/异常）；与 Q02_022（syscall path 上的地址验证）和 Q03_020（VM 层范围检查）的关注点不同，三题证据不可互相替代。  本题属于安全与保护层，只看特权隔离、凭证/权限、强制检查链、用户指针验证、沙箱、审计、完整性与溢出防护；普通 debug log、字段声明或文档口号不能证明安全机制 implemented。",
       "task_hints": {
         "diagnostic_checks": [
@@ -1980,21 +1856,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "安全题按 Stallings Ch15 区分特权级保护、访问控制、主体凭证、对象权限、强制检查链、完整性/审计/沙箱。只有字段、常量、文档或固定 root 返回不算 implemented。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch15 Operating System Security",
-            "concepts": [
-              "access control",
-              "protection domains",
-              "file permissions",
-              "credentials",
-              "security policy",
-              "integrity",
-              "audit"
-            ]
-          }
-        ]
+        "concept_boundary": "安全题按 Stallings Ch15 区分特权级保护、访问控制、主体凭证、对象权限、强制检查链、完整性/审计/沙箱。只有字段、常量、文档或固定 root 返回不算 implemented。"
       },
       "llm_answer_steps": [
         "只回答 Q07_005 的题干，不使用相邻题结论替代。",
@@ -2091,7 +1953,8 @@
         "是否存在执行“seccomp/prctl/sandbox 等系统调用过滤/沙箱”语义的真实实现体，而不是声明、空函数或固定返回？",
         "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
         "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
-        "是否排除与“seccomp/prctl/sandbox 等系统调用过滤/沙箱”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？"
+        "是否排除与“seccomp/prctl/sandbox 等系统调用过滤/沙箱”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+        "???????seccomp/prctl ??? ENOSYS?return 0 ?????????????"
       ],
       "structured_facts": [
         {
@@ -2251,20 +2114,6 @@
           "unknown"
         ]
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch15 Operating System Security",
-          "concepts": [
-            "access control",
-            "protection domains",
-            "file permissions",
-            "credentials",
-            "security policy",
-            "integrity",
-            "audit"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否实现 seccomp/prctl/sandbox 等系统调用过滤/沙箱？ 安全题必须有强制检查或失败路径；字段、依赖库、哈希函数、普通日志或文档声称不能单独证明安全机制。 本题属于安全与保护层，只看特权隔离、凭证/权限、强制检查链、用户指针验证、沙箱、审计、完整性与溢出防护；普通 debug log、字段声明或文档口号不能证明安全机制 implemented。",
       "task_hints": {
         "diagnostic_checks": [
@@ -2272,7 +2121,8 @@
           "是否存在执行“seccomp/prctl/sandbox 等系统调用过滤/沙箱”语义的真实实现体，而不是声明、空函数或固定返回？",
           "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
           "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
-          "是否排除与“seccomp/prctl/sandbox 等系统调用过滤/沙箱”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？"
+          "是否排除与“seccomp/prctl/sandbox 等系统调用过滤/沙箱”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+          "???????seccomp/prctl ??? ENOSYS?return 0 ?????????????"
         ],
         "structured_facts": [
           {
@@ -2404,21 +2254,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "安全题按 Stallings Ch15 区分特权级保护、访问控制、主体凭证、对象权限、强制检查链、完整性/审计/沙箱。只有字段、常量、文档或固定 root 返回不算 implemented。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch15 Operating System Security",
-            "concepts": [
-              "access control",
-              "protection domains",
-              "file permissions",
-              "credentials",
-              "security policy",
-              "integrity",
-              "audit"
-            ]
-          }
-        ]
+        "concept_boundary": "安全题按 Stallings Ch15 区分特权级保护、访问控制、主体凭证、对象权限、强制检查链、完整性/审计/沙箱。只有字段、常量、文档或固定 root 返回不算 implemented。"
       },
       "llm_answer_steps": [
         "只回答 Q07_006 的题干，不使用相邻题结论替代。",
@@ -2675,20 +2511,6 @@
           "unknown"
         ]
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch15 Operating System Security",
-          "concepts": [
-            "access control",
-            "protection domains",
-            "file permissions",
-            "credentials",
-            "security policy",
-            "integrity",
-            "audit"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否存在栈保护/溢出防护（stack canary/guard page）或等价机制。implemented 必须指出 canary 初始化与校验失败路径、栈 guard page 映射与触发页故障路径，或编译/运行时等价机制；仅有栈大小常量、panic 文本、依赖库或普通边界检查不能证明本题 implemented。更广义 NX/W^X/ASLR/边界检查归 Q07_015 统一判断。",
       "task_hints": {
         "diagnostic_checks": [
@@ -2828,21 +2650,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "安全题按 Stallings Ch15 区分特权级保护、访问控制、主体凭证、对象权限、强制检查链、完整性/审计/沙箱。只有字段、常量、文档或固定 root 返回不算 implemented。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch15 Operating System Security",
-            "concepts": [
-              "access control",
-              "protection domains",
-              "file permissions",
-              "credentials",
-              "security policy",
-              "integrity",
-              "audit"
-            ]
-          }
-        ]
+        "concept_boundary": "安全题按 Stallings Ch15 区分特权级保护、访问控制、主体凭证、对象权限、强制检查链、完整性/审计/沙箱。只有字段、常量、文档或固定 root 返回不算 implemented。"
       },
       "llm_answer_steps": [
         "只回答 Q07_007 的题干，不使用相邻题结论替代。",
@@ -3066,20 +2874,6 @@
         "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
         "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。"
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch15 Operating System Security",
-          "concepts": [
-            "access control",
-            "protection domains",
-            "file permissions",
-            "credentials",
-            "security policy",
-            "integrity",
-            "audit"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：审计、Secure Boot、签名校验覆盖情况如何？请分别给 audit logging、secure boot、signature verification 的状态（implemented/stub/not_found/unknown）和证据。 安全题必须有强制检查或失败路径；字段、依赖库、哈希函数、普通日志或文档声称不能单独证明安全机制。 本题属于安全与保护层，只看特权隔离、凭证/权限、强制检查链、用户指针验证、沙箱、审计、完整性与溢出防护；普通 debug log、字段声明或文档口号不能证明安全机制 implemented。",
       "task_hints": {
         "diagnostic_checks": [
@@ -3219,22 +3013,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "审计日志、secure boot 和签名校验是三类不同安全机制。普通 debug log 不等于安全审计；README 声称安全启动不等于启动链校验；哈希函数/签名库依赖不等于内核在加载或启动路径强制验证签名。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch15 Operating System Security",
-            "concepts": [
-              "access control",
-              "protection domains",
-              "file permissions",
-              "credentials",
-              "security policy",
-              "integrity",
-              "audit"
-            ]
-          }
-        ],
-        "text_authoring": "authored_in_describe_stage_qa_json"
+        "concept_boundary": "审计日志、secure boot 和签名校验是三类不同安全机制。普通 debug log 不等于安全审计；README 声称安全启动不等于启动链校验；哈希函数/签名库依赖不等于内核在加载或启动路径强制验证签名。"
       },
       "llm_answer_steps": [
         "只回答 Q07_008 的题干，不使用相邻题结论替代。",
@@ -3305,7 +3084,8 @@
         "支撑答案的主要源码/配置/文档锚点在哪里（路径、符号、结构体或常量）？",
         "答案中的每个关键结论是否有实现体、调用链、状态变化或配置分支证据？",
         "是否排除题干未要求的相邻模块、同名概念、用户态封装、README 口号或测试桩？",
-        "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？"
+        "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？",
+        "??????????????????????????????????????"
       ],
       "structured_facts": [
         {
@@ -3482,20 +3262,6 @@
           }
         }
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch15 Operating System Security",
-          "concepts": [
-            "access control",
-            "protection domains",
-            "file permissions",
-            "credentials",
-            "security policy",
-            "integrity",
-            "audit"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：本项目支持哪些架构（riscv64/aarch64/x86_64/loongarch64 等）？每种架构的安全相关初始化（特权级配置、PMP/MPU/SMEP 等）是否有代码证据？（必须逐架构作答，无证据写「未发现」） 安全题必须有强制检查或失败路径；字段、依赖库、哈希函数、普通日志或文档声称不能单独证明安全机制。 本题属于安全与保护层，只看特权隔离、凭证/权限、强制检查链、用户指针验证、沙箱、审计、完整性与溢出防护；普通 debug log、字段声明或文档口号不能证明安全机制 implemented。",
       "task_hints": {
         "diagnostic_checks": [
@@ -3503,7 +3269,8 @@
           "支撑答案的主要源码/配置/文档锚点在哪里（路径、符号、结构体或常量）？",
           "答案中的每个关键结论是否有实现体、调用链、状态变化或配置分支证据？",
           "是否排除题干未要求的相邻模块、同名概念、用户态封装、README 口号或测试桩？",
-          "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？"
+          "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？",
+          "??????????????????????????????????????"
         ],
         "structured_facts": [
           {
@@ -3635,21 +3402,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "安全题按 Stallings Ch15 区分特权级保护、访问控制、主体凭证、对象权限、强制检查链、完整性/审计/沙箱。只有字段、常量、文档或固定 root 返回不算 implemented。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch15 Operating System Security",
-            "concepts": [
-              "access control",
-              "protection domains",
-              "file permissions",
-              "credentials",
-              "security policy",
-              "integrity",
-              "audit"
-            ]
-          }
-        ]
+        "concept_boundary": "安全题按 Stallings Ch15 区分特权级保护、访问控制、主体凭证、对象权限、强制检查链、完整性/审计/沙箱。只有字段、常量、文档或固定 root 返回不算 implemented。"
       },
       "llm_answer_steps": [
         "只回答 Q07_009 的题干，不使用相邻题结论替代。",
@@ -3751,7 +3504,8 @@
         "是否存在执行“RAII/所有权/生命周期相关的内核安全机制”语义的真实实现体，而不是声明、空函数或固定返回？",
         "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
         "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
-        "是否排除与“RAII/所有权/生命周期相关的内核安全机制”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？"
+        "是否排除与“RAII/所有权/生命周期相关的内核安全机制”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+        "???????Rust ??????? RAII?????????????????????????"
       ],
       "structured_facts": [
         {
@@ -3911,20 +3665,6 @@
           "unknown"
         ]
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch15 Operating System Security",
-          "concepts": [
-            "access control",
-            "protection domains",
-            "file permissions",
-            "credentials",
-            "security policy",
-            "integrity",
-            "audit"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：若项目使用 Rust，是否存在 RAII/所有权/生命周期相关的内核安全机制（如不可 unsafe 直接访问用户内存、锁的 RAII 自动释放等）？若目标 OS 为 C 语言项目，本题 Rust 所有权机制的条件不成立，填 not_found 并注明「C 项目不适用 Rust 所有权机制」。  本题属于安全与保护层，只看特权隔离、凭证/权限、强制检查链、用户指针验证、沙箱、审计、完整性与溢出防护；普通 debug log、字段声明或文档口号不能证明安全机制 implemented。",
       "task_hints": {
         "diagnostic_checks": [
@@ -3932,7 +3672,8 @@
           "是否存在执行“RAII/所有权/生命周期相关的内核安全机制”语义的真实实现体，而不是声明、空函数或固定返回？",
           "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
           "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
-          "是否排除与“RAII/所有权/生命周期相关的内核安全机制”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？"
+          "是否排除与“RAII/所有权/生命周期相关的内核安全机制”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+          "???????Rust ??????? RAII?????????????????????????"
         ],
         "structured_facts": [
           {
@@ -4064,21 +3805,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "安全题按 Stallings Ch15 区分特权级保护、访问控制、主体凭证、对象权限、强制检查链、完整性/审计/沙箱。只有字段、常量、文档或固定 root 返回不算 implemented。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch15 Operating System Security",
-            "concepts": [
-              "access control",
-              "protection domains",
-              "file permissions",
-              "credentials",
-              "security policy",
-              "integrity",
-              "audit"
-            ]
-          }
-        ]
+        "concept_boundary": "安全题按 Stallings Ch15 区分特权级保护、访问控制、主体凭证、对象权限、强制检查链、完整性/审计/沙箱。只有字段、常量、文档或固定 root 返回不算 implemented。"
       },
       "llm_answer_steps": [
         "只回答 Q07_010 的题干，不使用相邻题结论替代。",
@@ -4154,7 +3881,8 @@
         "支撑答案的主要源码/配置/文档锚点在哪里（路径、符号、结构体或常量）？",
         "答案中的每个关键结论是否有实现体、调用链、状态变化或配置分支证据？",
         "是否排除题干未要求的相邻模块、同名概念、用户态封装、README 口号或测试桩？",
-        "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？"
+        "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？",
+        "?????????/??????? KPTI/SMEP/SMAP/PMP/MPU/TTBR ??????/???????"
       ],
       "structured_facts": [
         {
@@ -4302,20 +4030,6 @@
         "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
         "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。"
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch15 Operating System Security",
-          "concepts": [
-            "access control",
-            "protection domains",
-            "file permissions",
-            "credentials",
-            "security policy",
-            "integrity",
-            "audit"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：内核/用户地址空间隔离与架构安全保护覆盖情况如何？请按当前支持架构分别说明 KPTI/双页表、SMEP/SMAP、PMP/MPU、TTBR0/TTBR1 或等价机制的状态与证据。 安全题必须有强制检查或失败路径；字段、依赖库、哈希函数、普通日志或文档声称不能单独证明安全机制。 本题属于安全与保护层，只看特权隔离、凭证/权限、强制检查链、用户指针验证、沙箱、审计、完整性与溢出防护；普通 debug log、字段声明或文档口号不能证明安全机制 implemented。",
       "task_hints": {
         "diagnostic_checks": [
@@ -4323,7 +4037,8 @@
           "支撑答案的主要源码/配置/文档锚点在哪里（路径、符号、结构体或常量）？",
           "答案中的每个关键结论是否有实现体、调用链、状态变化或配置分支证据？",
           "是否排除题干未要求的相邻模块、同名概念、用户态封装、README 口号或测试桩？",
-          "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？"
+          "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？",
+          "?????????/??????? KPTI/SMEP/SMAP/PMP/MPU/TTBR ??????/???????"
         ],
         "structured_facts": [
           {
@@ -4455,22 +4170,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "KPTI、SMEP/SMAP、RISC-V PMP、AArch64 TTBR0/TTBR1 是不同架构机制。普通用户/内核特权级分离或 PTE_U 不自动等于 KPTI；非当前架构机制应标注不适用而不是误判 not_found。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch15 Operating System Security",
-            "concepts": [
-              "access control",
-              "protection domains",
-              "file permissions",
-              "credentials",
-              "security policy",
-              "integrity",
-              "audit"
-            ]
-          }
-        ],
-        "text_authoring": "authored_in_describe_stage_qa_json"
+        "concept_boundary": "KPTI、SMEP/SMAP、RISC-V PMP、AArch64 TTBR0/TTBR1 是不同架构机制。普通用户/内核特权级分离或 PTE_U 不自动等于 KPTI；非当前架构机制应标注不适用而不是误判 not_found。"
       },
       "llm_answer_steps": [
         "只回答 Q07_011 的题干，不使用相邻题结论替代。",
@@ -4541,7 +4241,8 @@
         "支撑答案的主要源码/配置/文档锚点在哪里（路径、符号、结构体或常量）？",
         "答案中的每个关键结论是否有实现体、调用链、状态变化或配置分支证据？",
         "是否排除题干未要求的相邻模块、同名概念、用户态封装、README 口号或测试桩？",
-        "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？"
+        "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？",
+        "???????UID/GID ????? open/write/exec ? syscall ??????????????"
       ],
       "structured_facts": [
         {
@@ -4689,20 +4390,6 @@
         "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
         "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。"
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch15 Operating System Security",
-          "concepts": [
-            "access control",
-            "protection domains",
-            "file permissions",
-            "credentials",
-            "security policy",
-            "integrity",
-            "audit"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：UID/GID 字段是否在 syscall 路径上真实执行权限检查？（搜索 check_perm/inode_permission；若只有字段无检查链须标注「仅有定义但未强制执行 🔸」；给检查链证据或写「字段存在但无检查链」）本题需提供 Q07_002（权限/保护域数据结构）和 Q07_003（syscall 路径检查）中未单独体现的联动证据（如访问控制 (Access Control) 判断链的完整调用路径），而非重复单项证据。 安全题必须有强制检查或失败路径；字段、依赖库、哈希函数、普通日志或文档声称不能单独证明安全机制。 本题属于安全与保护层，只看特权隔离、凭证/权限、强制检查链、用户指针验证、沙箱、审计、完整性与溢出防护；普通 debug log、字段声明或文档口号不能证明安全机制 implemented。",
       "task_hints": {
         "diagnostic_checks": [
@@ -4710,7 +4397,8 @@
           "支撑答案的主要源码/配置/文档锚点在哪里（路径、符号、结构体或常量）？",
           "答案中的每个关键结论是否有实现体、调用链、状态变化或配置分支证据？",
           "是否排除题干未要求的相邻模块、同名概念、用户态封装、README 口号或测试桩？",
-          "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？"
+          "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？",
+          "???????UID/GID ????? open/write/exec ? syscall ??????????????"
         ],
         "structured_facts": [
           {
@@ -4842,21 +4530,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "安全题按 Stallings Ch15 区分特权级保护、访问控制、主体凭证、对象权限、强制检查链、完整性/审计/沙箱。只有字段、常量、文档或固定 root 返回不算 implemented。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch15 Operating System Security",
-            "concepts": [
-              "access control",
-              "protection domains",
-              "file permissions",
-              "credentials",
-              "security policy",
-              "integrity",
-              "audit"
-            ]
-          }
-        ]
+        "concept_boundary": "安全题按 Stallings Ch15 区分特权级保护、访问控制、主体凭证、对象权限、强制检查链、完整性/审计/沙箱。只有字段、常量、文档或固定 root 返回不算 implemented。"
       },
       "llm_answer_steps": [
         "只回答 Q07_012 的题干，不使用相邻题结论替代。",
@@ -5044,20 +4718,6 @@
         "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
         "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。"
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch15 Operating System Security",
-          "concepts": [
-            "access control",
-            "protection domains",
-            "file permissions",
-            "credentials",
-            "security policy",
-            "integrity",
-            "audit"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：访问控制模型 (Access Control Model, Stallings Ch15) 更接近哪种？  本题属于安全与保护层，只看特权隔离、凭证/权限、强制检查链、用户指针验证、沙箱、审计、完整性与溢出防护；普通 debug log、字段声明或文档口号不能证明安全机制 implemented。",
       "task_hints": {
         "diagnostic_checks": [
@@ -5168,21 +4828,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "Stallings Ch15 访问控制模型要区分 DAC、MAC、RBAC、ACL、capability 和无强制访问控制。只有 UID/GID 字段、mode 常量或 getuid 固定返回 0 不能判完整访问控制模型。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch15 Operating System Security",
-            "concepts": [
-              "access control",
-              "protection domains",
-              "file permissions",
-              "credentials",
-              "security policy",
-              "integrity",
-              "audit"
-            ]
-          }
-        ]
+        "concept_boundary": "Stallings Ch15 访问控制模型要区分 DAC、MAC、RBAC、ACL、capability 和无强制访问控制。只有 UID/GID 字段、mode 常量或 getuid 固定返回 0 不能判完整访问控制模型。"
       },
       "llm_answer_steps": [
         "只回答 Q07_013 的题干，不使用相邻题结论替代。",
@@ -5284,7 +4930,8 @@
         "是否存在执行“至少一条被内核强制执行的完整性策略”语义的真实实现体，而不是声明、空函数或固定返回？",
         "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
         "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
-        "是否排除与“至少一条被内核强制执行的完整性策略”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？"
+        "是否排除与“至少一条被内核强制执行的完整性策略”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+        "????????????????????????????/??/README ?????????"
       ],
       "structured_facts": [
         {
@@ -5444,20 +5091,6 @@
           "unknown"
         ]
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch15 Operating System Security",
-          "concepts": [
-            "access control",
-            "protection domains",
-            "file permissions",
-            "credentials",
-            "security policy",
-            "integrity",
-            "audit"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否存在至少一条被内核强制执行的完整性策略（Biba/只读内核段/代码签名验证/W^X 等之一）。implemented 必须给出具体策略、实施入口和拒绝/故障路径，例如写只读代码段触发权限 fault、加载未签名镜像被拒绝、W^X 映射被检查失败；哈希/签名库、ELF 段标志、字段或 README 声称不能单独证明完整性策略。",
       "task_hints": {
         "diagnostic_checks": [
@@ -5465,7 +5098,8 @@
           "是否存在执行“至少一条被内核强制执行的完整性策略”语义的真实实现体，而不是声明、空函数或固定返回？",
           "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
           "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
-          "是否排除与“至少一条被内核强制执行的完整性策略”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？"
+          "是否排除与“至少一条被内核强制执行的完整性策略”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+          "????????????????????????????/??/README ?????????"
         ],
         "structured_facts": [
           {
@@ -5597,21 +5231,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "安全题按 Stallings Ch15 区分特权级保护、访问控制、主体凭证、对象权限、强制检查链、完整性/审计/沙箱。只有字段、常量、文档或固定 root 返回不算 implemented。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch15 Operating System Security",
-            "concepts": [
-              "access control",
-              "protection domains",
-              "file permissions",
-              "credentials",
-              "security policy",
-              "integrity",
-              "audit"
-            ]
-          }
-        ]
+        "concept_boundary": "安全题按 Stallings Ch15 区分特权级保护、访问控制、主体凭证、对象权限、强制检查链、完整性/审计/沙箱。只有字段、常量、文档或固定 root 返回不算 implemented。"
       },
       "llm_answer_steps": [
         "只回答 Q07_014 的题干，不使用相邻题结论替代。",
@@ -5699,7 +5319,8 @@
         "是否存在执行“至少一种可证实的缓冲区溢出防护”语义的真实实现体，而不是声明、空函数或固定返回？",
         "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
         "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
-        "是否排除与“至少一种可证实的缓冲区溢出防护”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？"
+        "是否排除与“至少一种可证实的缓冲区溢出防护”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+        "??????????????????????????/?????"
       ],
       "structured_facts": [
         {
@@ -5859,19 +5480,6 @@
           "unknown"
         ]
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch15 Operating System Security",
-          "concepts": [
-            "buffer overflow attacks",
-            "compile-time defenses",
-            "runtime defenses",
-            "stack canary",
-            "nonexecutable memory",
-            "address space randomization"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否启用至少一种可证实的缓冲区溢出防护（stack canary、guard page、NX/W^X、ASLR、边界检查等）？ 安全题必须有强制检查或失败路径；字段、依赖库、哈希函数、普通日志或文档声称不能单独证明安全机制。 本题属于安全与保护层，只看特权隔离、凭证/权限、强制检查链、用户指针验证、沙箱、审计、完整性与溢出防护；普通 debug log、字段声明或文档口号不能证明安全机制 implemented。",
       "task_hints": {
         "diagnostic_checks": [
@@ -5879,7 +5487,8 @@
           "是否存在执行“至少一种可证实的缓冲区溢出防护”语义的真实实现体，而不是声明、空函数或固定返回？",
           "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
           "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
-          "是否排除与“至少一种可证实的缓冲区溢出防护”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？"
+          "是否排除与“至少一种可证实的缓冲区溢出防护”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+          "??????????????????????????/?????"
         ],
         "structured_facts": [
           {
@@ -6226,19 +5835,6 @@
         "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
         "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。"
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch15 Operating System Security",
-          "concepts": [
-            "operating systems hardening",
-            "remove unnecessary services",
-            "configure users groups and authentication",
-            "logging",
-            "backup and archive",
-            "security maintenance"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：系统硬化与安全维护 (OS Hardening / Security Maintenance, Stallings Ch15) 在代码或构建中有哪些可证实措施？按“服务裁剪、权限最小化、审计日志、备份/恢复、补丁/版本策略”逐项回答。每个子项必须分别标注 implemented/stub/not_found/unknown；服务裁剪需有配置或构建裁剪证据，权限最小化需有强制检查或默认拒绝证据，审计日志需是安全事件审计而非普通 debug log，备份/恢复和补丁/版本策略需有脚本、配置或流程文件证据。README 口号、依赖库或普通日志不能单独证明 hardening implemented。",
       "task_hints": {
         "diagnostic_checks": [
@@ -6387,7 +5983,6 @@
       ]
     }
   ],
-  "stage_constraints_md": "**严格反幻觉要求**：\n1. **证据为王**：描述任何特性（如 Seccomp, Audit, ACL）必须附带 `[Source: path/to/file:L1-L10]` 引用。\n2. **否定确认**：如果搜索不到相关关键词，你必须明确地写「未发现实现」。\n3. **禁止臆测**：禁止将 Linux 通用机制套用到当前 OS。\n\n**本阶段须额外覆盖**：\n- 每个声称的安全特性：**检查链**从入口到策略函数是否贯通；与页表隔离（若有关）的**耦合文件**。\n- 若整体机制单薄：一节内写清能力边界（如仅有凭证字段、无 syscall 检查链）即可。\n\n**必须回答（代码验证）**：\n- **多架构覆盖要求**：本章分析必须覆盖项目支持的所有架构（riscv64, aarch64, x86_64, loongarch64 等），不得仅以某一个架构为视角描述。\n- **Rust 安全性机制**：如果项目使用 Rust 编写，必须指出 RAII、所有权分析、基于生命周期的锁等机制带来的安全性（这是结构性安全，有别于运行时检查）。\n- **用户态/内核态隔离**：页表隔离（KPTI）、SMEP/SMAP（或 RISC-V/AArch64 等价机制）是否开启？搜索对应寄存器配置。\n- **权限模型深度验证（关键）**：\n    - **用户/组（UID/GID）**：不仅要看 `Task` 结构体是否有 `uid` 字段，**必须验证**这些字段是否在 `open/write/exec` 等系统调用中被用于权限检查（grep `check_perm`, `inode_permission`）。如果仅有字段但无检查逻辑，必须注明「仅有定义但未强制执行（🔸 桩函数）」。\n    - **Capability/ACL**：搜索 `capability`, `acl`，判定是否真实存在还是仅注释/文档。\n- **安全沙箱 (Seccomp/Prctl)**：\n    - 搜索 `prctl` 或 `seccomp`。是返回 `ENOSYS`（未实现），还是返回 `0`（假装成功），还是真的解析了 BPF 规则？\n    - 如果 `sys_prctl` 只是 return 0 without doing anything，标记为 **`🔸 桩函数`**。\n- **审计与安全启动**：搜索 `audit`（审计日志）、`secure_boot`、`signature`（签名验证）。\n- **内存安全**：用户指针验证（`UserInPtr`, `verify_area`, `access_ok`）；缓冲区溢出保护（`stack_guard`, `canary`）。\n\n**要求**：\n- **语义发现（🥇 首选）**：使用 `rag_search_code` 搜索 \"capability check\", \"seccomp filter\", \"user pointer verification\", \"stack canary\" 锁定安全机制实现。\n- 使用 `lsp_get_definition` 定位 `Credential`/`UID`/`GID` 等安全相关结构体的定义。\n- **【必须】使用 `lsp_get_call_graph` 追踪权限检查链**：\n  - `lsp_get_call_graph(repo_path, file_of_check_perm, \"check_perm\", direction=\"incoming\", max_depth=3)` — 哪些 syscall 调用了权限检查？\n  - 如返回 `[⚠️ DEGRADED MODE]`，标注后继续使用 Grep 结果，并用 `lsp_get_references` 补充单层引用。\n- 辅以 grep_in_repo 搜索 security/、auth/、capability 相关模块和 \"seccomp|sandbox|prctl\"。\n- 查找 syscall 入口处的权限检查逻辑，分析用户/组/权限位的实现。\n\n**【评测与交付适配 — 本阶段启发式】**（须源码证据；无则略）：\n- 自动化评测可能依赖 **真实 uid/gid 检查** 或 **沙箱拒绝**；若 README 声称权限模型与代码均为桩，须显式写「评测相关 syscall 可能全通过或全失败」并附检查链路径。\n- 不扩大 web_search；仅本仓与执行契约允许的文档。",
   "features": [
     {
       "feature_id": "feat_07_security_q07_001",
@@ -6395,20 +5990,6 @@
       "domain": "security_permissions",
       "feature_name": "Q07_001 特权级隔离形态更接近哪种？",
       "description": "特权级隔离形态更接近哪种？",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch15 Operating System Security",
-          "concepts": [
-            "access control",
-            "protection domains",
-            "file permissions",
-            "credentials",
-            "security policy",
-            "integrity",
-            "audit"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：特权级隔离形态更接近哪种？  本题属于安全与保护层，只看特权隔离、凭证/权限、强制检查链、用户指针验证、沙箱、审计、完整性与溢出防护；普通 debug log、字段声明或文档口号不能证明安全机制 implemented。",
       "dependencies": [
         "03_mem_mgmt",
@@ -6725,21 +6306,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "安全题按 Stallings Ch15 区分特权级保护、访问控制、主体凭证、对象权限、强制检查链、完整性/审计/沙箱。只有字段、常量、文档或固定 root 返回不算 implemented。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch15 Operating System Security",
-            "concepts": [
-              "access control",
-              "protection domains",
-              "file permissions",
-              "credentials",
-              "security policy",
-              "integrity",
-              "audit"
-            ]
-          }
-        ]
+        "concept_boundary": "安全题按 Stallings Ch15 区分特权级保护、访问控制、主体凭证、对象权限、强制检查链、完整性/审计/沙箱。只有字段、常量、文档或固定 root 返回不算 implemented。"
       }
     },
     {
@@ -6748,20 +6315,6 @@
       "domain": "security_permissions",
       "feature_name": "Q07_002 是否存在凭证/权限/保护域数据结构 (Access Control / Protection Domains Structure, Stallings Ch15)（UID/GID/Credential/Capability/ACL 等）？（必须三态）",
       "description": "是否存在凭证/权限/保护域数据结构 (Access Control / Protection Domains Structure, Stallings Ch15)（UID/GID/Credential/Capability/ACL 等）？（必须三态）",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch15 Operating System Security",
-          "concepts": [
-            "access control",
-            "protection domains",
-            "file permissions",
-            "credentials",
-            "security policy",
-            "integrity",
-            "audit"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否存在凭证/权限数据结构（UID/GID/Credential/Capability/ACL 等）。本题只判断数据结构存在性，不要求已在 syscall 路径强制执行；但 implemented 必须是内核主体或对象可关联的真实 credential/UID/GID/capability/ACL/mode 数据结构，并有创建、复制、继承、挂载到进程/文件对象或被读取的证据。孤立字段、固定 root 返回、依赖库类型、README 声称或未接入对象生命周期的 struct 壳只能判 stub/unknown，不能证明完整权限模型。",
       "dependencies": [
         "03_mem_mgmt",
@@ -7173,21 +6726,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "本题只问 credential/permission 数据结构存在性；真实对象生命周期或绑定关系可支撑 implemented，孤立字段、常量、文档或固定 root 返回只能支撑 stub/unknown。权限强制执行另见 Q07_003/Q07_012。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch15 Operating System Security",
-            "concepts": [
-              "access control",
-              "protection domains",
-              "file permissions",
-              "credentials",
-              "security policy",
-              "integrity",
-              "audit"
-            ]
-          }
-        ]
+        "concept_boundary": "本题只问 credential/permission 数据结构存在性；真实对象生命周期或绑定关系可支撑 implemented，孤立字段、常量、文档或固定 root 返回只能支撑 stub/unknown。权限强制执行另见 Q07_003/Q07_012。"
       }
     },
     {
@@ -7196,20 +6735,6 @@
       "domain": "security_permissions",
       "feature_name": "Q07_003 是否能证实在 syscall 路径上真实执行了权限检查（open/exec/write 等）？（必须三态；仅有字段不算 implemented）",
       "description": "是否能证实在 syscall 路径上真实执行了权限检查（open/exec/write 等）？（必须三态；仅有字段不算 implemented）",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch15 Operating System Security",
-          "concepts": [
-            "access control",
-            "protection domains",
-            "file permissions",
-            "credentials",
-            "security policy",
-            "integrity",
-            "audit"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否能证实在 syscall 路径上真实执行了权限检查（open/exec/write 等）？ 安全题必须有强制检查或失败路径；字段、依赖库、哈希函数、普通日志或文档声称不能单独证明安全机制。 本题属于安全与保护层，只看特权隔离、凭证/权限、强制检查链、用户指针验证、沙箱、审计、完整性与溢出防护；普通 debug log、字段声明或文档口号不能证明安全机制 implemented。",
       "dependencies": [
         "03_mem_mgmt",
@@ -7624,21 +7149,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "安全题按 Stallings Ch15 区分特权级保护、访问控制、主体凭证、对象权限、强制检查链、完整性/审计/沙箱。只有字段、常量、文档或固定 root 返回不算 implemented。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch15 Operating System Security",
-            "concepts": [
-              "access control",
-              "protection domains",
-              "file permissions",
-              "credentials",
-              "security policy",
-              "integrity",
-              "audit"
-            ]
-          }
-        ]
+        "concept_boundary": "安全题按 Stallings Ch15 区分特权级保护、访问控制、主体凭证、对象权限、强制检查链、完整性/审计/沙箱。只有字段、常量、文档或固定 root 返回不算 implemented。"
       }
     },
     {
@@ -7647,20 +7158,6 @@
       "domain": "security_permissions",
       "feature_name": "Q07_004 若存在权限检查 (Access Control Check, Stallings Ch15)：入口点与核心检查函数链路是什么？（列 2-5 个节点并给证据）",
       "description": "若存在权限检查 (Access Control Check, Stallings Ch15)：入口点与核心检查函数链路是什么？（列 2-5 个节点并给证据）",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch15 Operating System Security",
-          "concepts": [
-            "access control",
-            "protection domains",
-            "file permissions",
-            "credentials",
-            "security policy",
-            "integrity",
-            "audit"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：若存在权限检查 (Access Control Check, Stallings Ch15)：入口点与核心检查函数链路是什么？（列 2-5 个节点并给证据） 安全题必须有强制检查或失败路径；字段、依赖库、哈希函数、普通日志或文档声称不能单独证明安全机制。 本题属于安全与保护层，只看特权隔离、凭证/权限、强制检查链、用户指针验证、沙箱、审计、完整性与溢出防护；普通 debug log、字段声明或文档口号不能证明安全机制 implemented。",
       "dependencies": [
         "03_mem_mgmt",
@@ -8038,21 +7535,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "安全题按 Stallings Ch15 区分特权级保护、访问控制、主体凭证、对象权限、强制检查链、完整性/审计/沙箱。只有字段、常量、文档或固定 root 返回不算 implemented。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch15 Operating System Security",
-            "concepts": [
-              "access control",
-              "protection domains",
-              "file permissions",
-              "credentials",
-              "security policy",
-              "integrity",
-              "audit"
-            ]
-          }
-        ]
+        "concept_boundary": "安全题按 Stallings Ch15 区分特权级保护、访问控制、主体凭证、对象权限、强制检查链、完整性/审计/沙箱。只有字段、常量、文档或固定 root 返回不算 implemented。"
       }
     },
     {
@@ -8061,20 +7544,6 @@
       "domain": "security_permissions",
       "feature_name": "Q07_005 是否实现用户指针验证（access_ok/verify_area/UserInPtr/copyin/copyout 等）？（必须三态）",
       "description": "是否实现用户指针验证（access_ok/verify_area/UserInPtr/copyin/copyout 等）？（必须三态）",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch15 Operating System Security",
-          "concepts": [
-            "access control",
-            "protection domains",
-            "file permissions",
-            "credentials",
-            "security policy",
-            "integrity",
-            "audit"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否实现用户指针验证（access_ok/verify_area/UserInPtr/copyin/copyout 等）？  本题属于安全与保护层，只看特权隔离、凭证/权限、强制检查链、用户指针验证、沙箱、审计、完整性与溢出防护；普通 debug log、字段声明或文档口号不能证明安全机制 implemented。",
       "dependencies": [
         "03_mem_mgmt",
@@ -8487,21 +7956,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "安全题按 Stallings Ch15 区分特权级保护、访问控制、主体凭证、对象权限、强制检查链、完整性/审计/沙箱。只有字段、常量、文档或固定 root 返回不算 implemented。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch15 Operating System Security",
-            "concepts": [
-              "access control",
-              "protection domains",
-              "file permissions",
-              "credentials",
-              "security policy",
-              "integrity",
-              "audit"
-            ]
-          }
-        ]
+        "concept_boundary": "安全题按 Stallings Ch15 区分特权级保护、访问控制、主体凭证、对象权限、强制检查链、完整性/审计/沙箱。只有字段、常量、文档或固定 root 返回不算 implemented。"
       }
     },
     {
@@ -8510,20 +7965,6 @@
       "domain": "security_permissions",
       "feature_name": "Q07_006 是否实现 seccomp/prctl/sandbox 等系统调用过滤/沙箱？（必须三态；stub 需说明形态：ENOSYS/return 0）",
       "description": "是否实现 seccomp/prctl/sandbox 等系统调用过滤/沙箱？（必须三态；stub 需说明形态：ENOSYS/return 0）",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch15 Operating System Security",
-          "concepts": [
-            "access control",
-            "protection domains",
-            "file permissions",
-            "credentials",
-            "security policy",
-            "integrity",
-            "audit"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否实现 seccomp/prctl/sandbox 等系统调用过滤/沙箱？ 安全题必须有强制检查或失败路径；字段、依赖库、哈希函数、普通日志或文档声称不能单独证明安全机制。 本题属于安全与保护层，只看特权隔离、凭证/权限、强制检查链、用户指针验证、沙箱、审计、完整性与溢出防护；普通 debug log、字段声明或文档口号不能证明安全机制 implemented。",
       "dependencies": [
         "03_mem_mgmt",
@@ -8939,21 +8380,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "安全题按 Stallings Ch15 区分特权级保护、访问控制、主体凭证、对象权限、强制检查链、完整性/审计/沙箱。只有字段、常量、文档或固定 root 返回不算 implemented。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch15 Operating System Security",
-            "concepts": [
-              "access control",
-              "protection domains",
-              "file permissions",
-              "credentials",
-              "security policy",
-              "integrity",
-              "audit"
-            ]
-          }
-        ]
+        "concept_boundary": "安全题按 Stallings Ch15 区分特权级保护、访问控制、主体凭证、对象权限、强制检查链、完整性/审计/沙箱。只有字段、常量、文档或固定 root 返回不算 implemented。"
       }
     },
     {
@@ -8962,20 +8389,6 @@
       "domain": "security_permissions",
       "feature_name": "Q07_007 是否存在栈保护/溢出防护（stack canary/guard page）或等价机制？（必须三态）",
       "description": "是否存在栈保护/溢出防护（stack canary/guard page）或等价机制？（必须三态）",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch15 Operating System Security",
-          "concepts": [
-            "access control",
-            "protection domains",
-            "file permissions",
-            "credentials",
-            "security policy",
-            "integrity",
-            "audit"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否存在栈保护/溢出防护（stack canary/guard page）或等价机制。implemented 必须指出 canary 初始化与校验失败路径、栈 guard page 映射与触发页故障路径，或编译/运行时等价机制；仅有栈大小常量、panic 文本、依赖库或普通边界检查不能证明本题 implemented。更广义 NX/W^X/ASLR/边界检查归 Q07_015 统一判断。",
       "dependencies": [
         "03_mem_mgmt",
@@ -9388,21 +8801,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "安全题按 Stallings Ch15 区分特权级保护、访问控制、主体凭证、对象权限、强制检查链、完整性/审计/沙箱。只有字段、常量、文档或固定 root 返回不算 implemented。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch15 Operating System Security",
-            "concepts": [
-              "access control",
-              "protection domains",
-              "file permissions",
-              "credentials",
-              "security policy",
-              "integrity",
-              "audit"
-            ]
-          }
-        ]
+        "concept_boundary": "安全题按 Stallings Ch15 区分特权级保护、访问控制、主体凭证、对象权限、强制检查链、完整性/审计/沙箱。只有字段、常量、文档或固定 root 返回不算 implemented。"
       }
     },
     {
@@ -9411,20 +8810,6 @@
       "domain": "security_permissions",
       "feature_name": "Q07_008 审计、Secure Boot、签名校验覆盖情况如何？请分别给 audit logging、secure boot、signature verification 的状态（implemented/stub/not_found/unknown）和证据。",
       "description": "审计、Secure Boot、签名校验覆盖情况如何？请分别给 audit logging、secure boot、signature verification 的状态（implemented/stub/not_found/unknown）和证据。",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch15 Operating System Security",
-          "concepts": [
-            "access control",
-            "protection domains",
-            "file permissions",
-            "credentials",
-            "security policy",
-            "integrity",
-            "audit"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：审计、Secure Boot、签名校验覆盖情况如何？请分别给 audit logging、secure boot、signature verification 的状态（implemented/stub/not_found/unknown）和证据。 安全题必须有强制检查或失败路径；字段、依赖库、哈希函数、普通日志或文档声称不能单独证明安全机制。 本题属于安全与保护层，只看特权隔离、凭证/权限、强制检查链、用户指针验证、沙箱、审计、完整性与溢出防护；普通 debug log、字段声明或文档口号不能证明安全机制 implemented。",
       "dependencies": [
         "03_mem_mgmt",
@@ -9805,22 +9190,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "审计日志、secure boot 和签名校验是三类不同安全机制。普通 debug log 不等于安全审计；README 声称安全启动不等于启动链校验；哈希函数/签名库依赖不等于内核在加载或启动路径强制验证签名。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch15 Operating System Security",
-            "concepts": [
-              "access control",
-              "protection domains",
-              "file permissions",
-              "credentials",
-              "security policy",
-              "integrity",
-              "audit"
-            ]
-          }
-        ],
-        "text_authoring": "authored_in_describe_stage_qa_json"
+        "concept_boundary": "审计日志、secure boot 和签名校验是三类不同安全机制。普通 debug log 不等于安全审计；README 声称安全启动不等于启动链校验；哈希函数/签名库依赖不等于内核在加载或启动路径强制验证签名。"
       }
     },
     {
@@ -9829,20 +9199,6 @@
       "domain": "security_permissions",
       "feature_name": "Q07_009 本项目支持哪些架构（riscv64/aarch64/x86_64/loongarch64 等）？每种架构的安全相关初始化（特权级配置、PMP/MPU/SMEP 等）是否有代码证据？（必须逐架构作答，无证据写「未发现」）",
       "description": "本项目支持哪些架构（riscv64/aarch64/x86_64/loongarch64 等）？每种架构的安全相关初始化（特权级配置、PMP/MPU/SMEP 等）是否有代码证据？（必须逐架构作答，无证据写「未发现」）",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch15 Operating System Security",
-          "concepts": [
-            "access control",
-            "protection domains",
-            "file permissions",
-            "credentials",
-            "security policy",
-            "integrity",
-            "audit"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：本项目支持哪些架构（riscv64/aarch64/x86_64/loongarch64 等）？每种架构的安全相关初始化（特权级配置、PMP/MPU/SMEP 等）是否有代码证据？（必须逐架构作答，无证据写「未发现」） 安全题必须有强制检查或失败路径；字段、依赖库、哈希函数、普通日志或文档声称不能单独证明安全机制。 本题属于安全与保护层，只看特权隔离、凭证/权限、强制检查链、用户指针验证、沙箱、审计、完整性与溢出防护；普通 debug log、字段声明或文档口号不能证明安全机制 implemented。",
       "dependencies": [
         "03_mem_mgmt",
@@ -10254,21 +9610,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "安全题按 Stallings Ch15 区分特权级保护、访问控制、主体凭证、对象权限、强制检查链、完整性/审计/沙箱。只有字段、常量、文档或固定 root 返回不算 implemented。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch15 Operating System Security",
-            "concepts": [
-              "access control",
-              "protection domains",
-              "file permissions",
-              "credentials",
-              "security policy",
-              "integrity",
-              "audit"
-            ]
-          }
-        ]
+        "concept_boundary": "安全题按 Stallings Ch15 区分特权级保护、访问控制、主体凭证、对象权限、强制检查链、完整性/审计/沙箱。只有字段、常量、文档或固定 root 返回不算 implemented。"
       }
     },
     {
@@ -10277,20 +9619,6 @@
       "domain": "security_permissions",
       "feature_name": "Q07_010 若项目使用 Rust，是否存在 RAII/所有权/生命周期相关的内核安全机制（如不可 unsafe 直接访问用户内存、锁的 RAII 自动释放等）？（必须三态；给具体模式证据）",
       "description": "若项目使用 Rust，是否存在 RAII/所有权/生命周期相关的内核安全机制（如不可 unsafe 直接访问用户内存、锁的 RAII 自动释放等）？（必须三态；给具体模式证据）",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch15 Operating System Security",
-          "concepts": [
-            "access control",
-            "protection domains",
-            "file permissions",
-            "credentials",
-            "security policy",
-            "integrity",
-            "audit"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：若项目使用 Rust，是否存在 RAII/所有权/生命周期相关的内核安全机制（如不可 unsafe 直接访问用户内存、锁的 RAII 自动释放等）？  本题属于安全与保护层，只看特权隔离、凭证/权限、强制检查链、用户指针验证、沙箱、审计、完整性与溢出防护；普通 debug log、字段声明或文档口号不能证明安全机制 implemented。",
       "dependencies": [
         "03_mem_mgmt",
@@ -10703,21 +10031,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "安全题按 Stallings Ch15 区分特权级保护、访问控制、主体凭证、对象权限、强制检查链、完整性/审计/沙箱。只有字段、常量、文档或固定 root 返回不算 implemented。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch15 Operating System Security",
-            "concepts": [
-              "access control",
-              "protection domains",
-              "file permissions",
-              "credentials",
-              "security policy",
-              "integrity",
-              "audit"
-            ]
-          }
-        ]
+        "concept_boundary": "安全题按 Stallings Ch15 区分特权级保护、访问控制、主体凭证、对象权限、强制检查链、完整性/审计/沙箱。只有字段、常量、文档或固定 root 返回不算 implemented。"
       }
     },
     {
@@ -10726,20 +10040,6 @@
       "domain": "security_permissions",
       "feature_name": "Q07_011 内核/用户地址空间隔离与架构安全保护覆盖情况如何？请按当前支持架构分别说明 KPTI/双页表、SMEP/SMAP、PMP/MPU、TTBR0/TTBR1 或等价机制的状态与证据。",
       "description": "内核/用户地址空间隔离与架构安全保护覆盖情况如何？请按当前支持架构分别说明 KPTI/双页表、SMEP/SMAP、PMP/MPU、TTBR0/TTBR1 或等价机制的状态与证据。",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch15 Operating System Security",
-          "concepts": [
-            "access control",
-            "protection domains",
-            "file permissions",
-            "credentials",
-            "security policy",
-            "integrity",
-            "audit"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：内核/用户地址空间隔离与架构安全保护覆盖情况如何？请按当前支持架构分别说明 KPTI/双页表、SMEP/SMAP、PMP/MPU、TTBR0/TTBR1 或等价机制的状态与证据。 安全题必须有强制检查或失败路径；字段、依赖库、哈希函数、普通日志或文档声称不能单独证明安全机制。 本题属于安全与保护层，只看特权隔离、凭证/权限、强制检查链、用户指针验证、沙箱、审计、完整性与溢出防护；普通 debug log、字段声明或文档口号不能证明安全机制 implemented。",
       "dependencies": [
         "03_mem_mgmt",
@@ -11131,22 +10431,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "KPTI、SMEP/SMAP、RISC-V PMP、AArch64 TTBR0/TTBR1 是不同架构机制。普通用户/内核特权级分离或 PTE_U 不自动等于 KPTI；非当前架构机制应标注不适用而不是误判 not_found。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch15 Operating System Security",
-            "concepts": [
-              "access control",
-              "protection domains",
-              "file permissions",
-              "credentials",
-              "security policy",
-              "integrity",
-              "audit"
-            ]
-          }
-        ],
-        "text_authoring": "authored_in_describe_stage_qa_json"
+        "concept_boundary": "KPTI、SMEP/SMAP、RISC-V PMP、AArch64 TTBR0/TTBR1 是不同架构机制。普通用户/内核特权级分离或 PTE_U 不自动等于 KPTI；非当前架构机制应标注不适用而不是误判 not_found。"
       }
     },
     {
@@ -11155,20 +10440,6 @@
       "domain": "security_permissions",
       "feature_name": "Q07_012 UID/GID 字段是否在 syscall 路径上真实执行权限检查？（搜索 check_perm/inode_permission；若只有字段无检查链须标注「仅有定义但未强制执行 🔸」；给检查链证据或写「字段存在但无检查链」）",
       "description": "UID/GID 字段是否在 syscall 路径上真实执行权限检查？（搜索 check_perm/inode_permission；若只有字段无检查链须标注「仅有定义但未强制执行 🔸」；给检查链证据或写「字段存在但无检查链」）",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch15 Operating System Security",
-          "concepts": [
-            "access control",
-            "protection domains",
-            "file permissions",
-            "credentials",
-            "security policy",
-            "integrity",
-            "audit"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：UID/GID 字段是否在 syscall 路径上真实执行权限检查？（搜索 check_perm/inode_permission；若只有字段无检查链须标注「仅有定义但未强制执行 🔸」；给检查链证据或写「字段存在但无检查链」） 安全题必须有强制检查或失败路径；字段、依赖库、哈希函数、普通日志或文档声称不能单独证明安全机制。 本题属于安全与保护层，只看特权隔离、凭证/权限、强制检查链、用户指针验证、沙箱、审计、完整性与溢出防护；普通 debug log、字段声明或文档口号不能证明安全机制 implemented。",
       "dependencies": [
         "03_mem_mgmt",
@@ -11548,21 +10819,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "安全题按 Stallings Ch15 区分特权级保护、访问控制、主体凭证、对象权限、强制检查链、完整性/审计/沙箱。只有字段、常量、文档或固定 root 返回不算 implemented。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch15 Operating System Security",
-            "concepts": [
-              "access control",
-              "protection domains",
-              "file permissions",
-              "credentials",
-              "security policy",
-              "integrity",
-              "audit"
-            ]
-          }
-        ]
+        "concept_boundary": "安全题按 Stallings Ch15 区分特权级保护、访问控制、主体凭证、对象权限、强制检查链、完整性/审计/沙箱。只有字段、常量、文档或固定 root 返回不算 implemented。"
       }
     },
     {
@@ -11571,20 +10828,6 @@
       "domain": "security_permissions",
       "feature_name": "Q07_013 访问控制模型 (Access Control Model, Stallings Ch15) 更接近哪种？",
       "description": "访问控制模型 (Access Control Model, Stallings Ch15) 更接近哪种？",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch15 Operating System Security",
-          "concepts": [
-            "access control",
-            "protection domains",
-            "file permissions",
-            "credentials",
-            "security policy",
-            "integrity",
-            "audit"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：访问控制模型 (Access Control Model, Stallings Ch15) 更接近哪种？  本题属于安全与保护层，只看特权隔离、凭证/权限、强制检查链、用户指针验证、沙箱、审计、完整性与溢出防护；普通 debug log、字段声明或文档口号不能证明安全机制 implemented。",
       "dependencies": [
         "03_mem_mgmt",
@@ -11892,21 +11135,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "Stallings Ch15 访问控制模型要区分 DAC、MAC、RBAC、ACL、capability 和无强制访问控制。只有 UID/GID 字段、mode 常量或 getuid 固定返回 0 不能判完整访问控制模型。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch15 Operating System Security",
-            "concepts": [
-              "access control",
-              "protection domains",
-              "file permissions",
-              "credentials",
-              "security policy",
-              "integrity",
-              "audit"
-            ]
-          }
-        ]
+        "concept_boundary": "Stallings Ch15 访问控制模型要区分 DAC、MAC、RBAC、ACL、capability 和无强制访问控制。只有 UID/GID 字段、mode 常量或 getuid 固定返回 0 不能判完整访问控制模型。"
       }
     },
     {
@@ -11915,20 +11144,6 @@
       "domain": "security_permissions",
       "feature_name": "Q07_014 是否存在至少一条被内核强制执行的完整性策略（Biba/只读内核段/代码签名验证/W^X 等之一）？（必须三态；implemented 必须指出具体策略和拒绝/故障路径）",
       "description": "是否存在至少一条被内核强制执行的完整性策略（Biba/只读内核段/代码签名验证/W^X 等之一）？（必须三态；implemented 必须指出具体策略和拒绝/故障路径）",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch15 Operating System Security",
-          "concepts": [
-            "access control",
-            "protection domains",
-            "file permissions",
-            "credentials",
-            "security policy",
-            "integrity",
-            "audit"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否存在至少一条被内核强制执行的完整性策略（Biba/只读内核段/代码签名验证/W^X 等之一）。implemented 必须给出具体策略、实施入口和拒绝/故障路径，例如写只读代码段触发权限 fault、加载未签名镜像被拒绝、W^X 映射被检查失败；哈希/签名库、ELF 段标志、字段或 README 声称不能单独证明完整性策略。",
       "dependencies": [
         "03_mem_mgmt",
@@ -12342,21 +11557,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "安全题按 Stallings Ch15 区分特权级保护、访问控制、主体凭证、对象权限、强制检查链、完整性/审计/沙箱。只有字段、常量、文档或固定 root 返回不算 implemented。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch15 Operating System Security",
-            "concepts": [
-              "access control",
-              "protection domains",
-              "file permissions",
-              "credentials",
-              "security policy",
-              "integrity",
-              "audit"
-            ]
-          }
-        ]
+        "concept_boundary": "安全题按 Stallings Ch15 区分特权级保护、访问控制、主体凭证、对象权限、强制检查链、完整性/审计/沙箱。只有字段、常量、文档或固定 root 返回不算 implemented。"
       }
     },
     {
@@ -12365,19 +11566,6 @@
       "domain": "security",
       "feature_name": "Q07_015 是否启用至少一种可证实的缓冲区溢出防护（stack canary、guard page、NX/W^X、ASLR、边界检查等）？（必须三态；implemented 需指出具体防护类型和触发/检查路径）",
       "description": "是否启用至少一种可证实的缓冲区溢出防护（stack canary、guard page、NX/W^X、ASLR、边界检查等）？（必须三态；implemented 需指出具体防护类型和触发/检查路径）",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch15 Operating System Security",
-          "concepts": [
-            "buffer overflow attacks",
-            "compile-time defenses",
-            "runtime defenses",
-            "stack canary",
-            "nonexecutable memory",
-            "address space randomization"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否启用至少一种可证实的缓冲区溢出防护（stack canary、guard page、NX/W^X、ASLR、边界检查等）？ 安全题必须有强制检查或失败路径；字段、依赖库、哈希函数、普通日志或文档声称不能单独证明安全机制。 本题属于安全与保护层，只看特权隔离、凭证/权限、强制检查链、用户指针验证、沙箱、审计、完整性与溢出防护；普通 debug log、字段声明或文档口号不能证明安全机制 implemented。",
       "dependencies": [
         "03_mem_mgmt"
@@ -12766,19 +11954,6 @@
       "domain": "security",
       "feature_name": "Q07_016 系统硬化与安全维护 (OS Hardening / Security Maintenance, Stallings Ch15) 在代码或构建中有哪些可证实措施？按“服务裁剪、权限最小化、审计日志、备份/恢复、补丁/版本策略”逐项回答。",
       "description": "系统硬化与安全维护 (OS Hardening / Security Maintenance, Stallings Ch15) 在代码或构建中有哪些可证实措施？按“服务裁剪、权限最小化、审计日志、备份/恢复、补丁/版本策略”逐项回答。",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch15 Operating System Security",
-          "concepts": [
-            "operating systems hardening",
-            "remove unnecessary services",
-            "configure users groups and authentication",
-            "logging",
-            "backup and archive",
-            "security maintenance"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：系统硬化与安全维护 (OS Hardening / Security Maintenance, Stallings Ch15) 在代码或构建中有哪些可证实措施？按“服务裁剪、权限最小化、审计日志、备份/恢复、补丁/版本策略”逐项回答。每个子项必须分别标注 implemented/stub/not_found/unknown；服务裁剪需有配置或构建裁剪证据，权限最小化需有强制检查或默认拒绝证据，审计日志需是安全事件审计而非普通 debug log，备份/恢复和补丁/版本策略需有脚本、配置或流程文件证据。README 口号、依赖库或普通日志不能单独证明 hardening implemented。",
       "dependencies": [
         "09_debug_error"
@@ -13129,44 +12304,5 @@
         ]
       }
     }
-  ],
-  "llm_field_guide": {
-    "purpose": "这些字段是给弱模型看的作答说明：不要把题目当作文题，必须先填结构化事实，再推出最终答案。",
-    "field_meanings": {
-      "question_id": "稳定题号。回答、证据、fact_result 都必须绑定这个 ID。",
-      "stem": "人类可读题面，只说明要问什么；不能只根据 stem 直接下结论。",
-      "question_type": "题型。tri_state_impl 只能回答 implemented / stub / not_found / unknown。",
-      "choices": "选择题的合法选项。single_choice 必须原样选择其中一个；multi_choice 必须返回数组。",
-      "feature_ids": "本题对应的 OS 机制特征 ID，用于图谱和证据追踪。",
-      "textbook_basis": "本题参考的 Stallings 教材概念范围，用来帮助理解概念边界，不是源码证据。",
-      "concept_boundary": "本题最容易混淆的概念边界。判断前必须先读，防止把相似机制误判为实现。",
-      "diagnostic_checks": "局部判断步骤。弱模型应逐条查，不要直接回答总问题。",
-      "structured_facts": "必须逐项完成的事实表。每个 fact 都要给 status_or_value 和 evidence_id；这是最终 value 的依据。",
-      "answer_contract": "最终答案约束。规定 value 类型、合法值、必须完成哪些 fact，以及证据引用规则。",
-      "evidence_policy": "证据要求。RAG/grep 只是线索；implemented 需要 read/LSP/function body/call site 等强证据。",
-      "tri_state_rule": "三态/四态判定规则。implemented、stub、not_found、unknown 的边界写在这里。",
-      "anti_examples": "反例。命中这些情况时不能判 implemented，避免看到名字就误判。",
-      "negative_search_policy": "判 not_found 前必须覆盖的关键词和目录要求。覆盖不足只能 unknown。",
-      "features": "题单顶层的 feature 汇总，供图谱和跨题审阅使用。"
-    },
-    "status_values": {
-      "yes_strong": "有强源码证据：定义/实现体/调用点/状态变化/数据结构读写/调用链。可参与支撑 implemented。",
-      "yes_weak": "只有 RAG、grep、outline、README 或名字命中。只能当线索，不能单独支撑 implemented。",
-      "stub_or_declaration_only": "只有声明、trait/struct 壳、空实现、固定返回、ENOSYS、unsupported、todo/unimplemented。通常支撑 stub。",
-      "no_after_negative_search": "按 negative_search_policy 搜过关键词和目录后仍未发现。可参与支撑 not_found。",
-      "unknown": "证据不足、覆盖不足、冲突或 fact 未完成。最终应降级 unknown/待核实。"
-    },
-    "required_reasoning_order": [
-      "先读 stem，确认问题对象。",
-      "再读 textbook_basis 和 concept_boundary，确认 OS 概念边界。",
-      "逐项完成 structured_facts；每个 fact 只能引用 evidence_id，不要手写新路径/行号当证据。",
-      "把 RAG/grep 命中标成 yes_weak 或 hint，不要直接推出 implemented。",
-      "若要判 not_found，必须完成 negative_search_coverage fact。",
-      "最后按 answer_contract 和 tri_state_rule 推出 value。"
-    ],
-    "output_expectation": {
-      "draft_answer": "应包含 question_id、value、structured_fact_results、used_evidence_ids、confidence、notes。",
-      "final_answer": "最终 value 必须能由 structured_fact_results 和 evidence_id 追溯出来。"
-    }
-  }
+  ]
 }

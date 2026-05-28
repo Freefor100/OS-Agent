@@ -9,6 +9,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from core.agent_events import emit_task_debug_event, emit_task_tool_event
 from core.agent_graph_state import DraftAnswerRecord, EvidenceRecord, TaskResult, TaskSpec
 from core.evidence_verifier import verify_evidence
+from core.qa_prompt_guidance import field_guidance
 
 
 def _task_question_ids(task: TaskSpec) -> List[str]:
@@ -146,7 +147,7 @@ def _react_task_prompt(task: TaskSpec, *, repo_path: str, tool_names: List[str])
         f"concept_boundary: {task.metadata.get('concept_boundary') or task.metadata.get('concept_boundary_by_question')}\n"
         f"llm_answer_steps: {task.metadata.get('llm_answer_steps')}\n"
         f"available_tools: {tool_names}\n\n"
-        "字段含义：structured_facts 是必须逐项完成的事实表；answer_contract 规定最终 value 的合法形式；concept_boundary 是防止概念混淆的边界；llm_answer_steps 是本题作答顺序。\n"
+        f"{field_guidance(['structured_facts', 'answer_contract', 'concept_boundary', 'diagnostic_checks', 'evidence_policy', 'llm_answer_steps'])}"
         "执行方式：先按 structured_facts 逐项查证可复现事实，再用 diagnostic_checks 补足局部判断，最后给最小 claim；不要跳过事实表直接回答 implemented/not_found。\n"
         "你在本 task 中能看到的证据，是你调用工具后整理出的 evidence_candidates 列表；structured_fact_results 只能用 evidence_candidate_indexes 指向这个候选列表。\n"
         "注意：evidence_candidates 还没有系统 evidence_id，不能被当成最终证据引用；used_evidence_ids 通常留空，等待系统验证候选并生成 Bound Evidence。\n"

@@ -240,19 +240,6 @@
           "unknown"
         ]
       },
-      "textbook_basis": [
-        {
-          "source": "OS diagnostics and maintainability practice",
-          "concepts": [
-            "logging",
-            "panic handling",
-            "error propagation",
-            "kernel monitor",
-            "debug stub",
-            "tracepoint"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否存在日志系统（log/printk/println 宏）与日志级别控制？ 调试题必须区分日志、panic、backtrace、kernel debug monitor、GDB remote stub 和 tracepoint；用户 shell 或普通打印不能替代内核调试设施。 本题属于调试与错误处理层，只看日志、panic、诊断输出、backtrace、kernel debug monitor、GDB stub、错误码和 tracepoint；普通 printf 或用户 shell 不能替代调试子系统。",
       "task_hints": {
         "diagnostic_checks": [
@@ -392,20 +379,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "调试/错误处理题要区分普通日志、日志级别、panic 终止路径、栈回溯、内核监视器、GDB remote stub、tracepoint 和 errno/Error 传播。printf 不等于 GDB stub 或 tracing。",
-        "textbook_basis": [
-          {
-            "source": "OS diagnostics and maintainability practice",
-            "concepts": [
-              "logging",
-              "panic handling",
-              "error propagation",
-              "kernel monitor",
-              "debug stub",
-              "tracepoint"
-            ]
-          }
-        ]
+        "concept_boundary": "调试/错误处理题要区分普通日志、日志级别、panic 终止路径、栈回溯、内核监视器、GDB remote stub、tracepoint 和 errno/Error 传播。printf 不等于 GDB stub 或 tracing。"
       },
       "llm_answer_steps": [
         "只回答 Q09_001 的题干，不使用相邻题结论替代。",
@@ -492,7 +466,8 @@
         "是否存在执行“panic/崩溃处理路径”语义的真实实现体，而不是声明、空函数或固定返回？",
         "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
         "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
-        "是否排除与“panic/崩溃处理路径”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？"
+        "是否排除与“panic/崩溃处理路径”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+        "???????panic ?????? panic_handler ???????????/abort?"
       ],
       "structured_facts": [
         {
@@ -652,19 +627,6 @@
           "unknown"
         ]
       },
-      "textbook_basis": [
-        {
-          "source": "OS diagnostics and maintainability practice",
-          "concepts": [
-            "logging",
-            "panic handling",
-            "error propagation",
-            "kernel monitor",
-            "debug stub",
-            "tracepoint"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否存在 panic/崩溃处理路径（panic_handler/oom/abort 等）？ 调试题必须区分日志、panic、backtrace、kernel debug monitor、GDB remote stub 和 tracepoint；用户 shell 或普通打印不能替代内核调试设施。 本题属于调试与错误处理层，只看日志、panic、诊断输出、backtrace、kernel debug monitor、GDB stub、错误码和 tracepoint；普通 printf 或用户 shell 不能替代调试子系统。",
       "task_hints": {
         "diagnostic_checks": [
@@ -672,7 +634,8 @@
           "是否存在执行“panic/崩溃处理路径”语义的真实实现体，而不是声明、空函数或固定返回？",
           "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
           "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
-          "是否排除与“panic/崩溃处理路径”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？"
+          "是否排除与“panic/崩溃处理路径”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+          "???????panic ?????? panic_handler ???????????/abort?"
         ],
         "structured_facts": [
           {
@@ -804,20 +767,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "调试/错误处理题要区分普通日志、日志级别、panic 终止路径、栈回溯、内核监视器、GDB remote stub、tracepoint 和 errno/Error 传播。printf 不等于 GDB stub 或 tracing。",
-        "textbook_basis": [
-          {
-            "source": "OS diagnostics and maintainability practice",
-            "concepts": [
-              "logging",
-              "panic handling",
-              "error propagation",
-              "kernel monitor",
-              "debug stub",
-              "tracepoint"
-            ]
-          }
-        ]
+        "concept_boundary": "调试/错误处理题要区分普通日志、日志级别、panic 终止路径、栈回溯、内核监视器、GDB remote stub、tracepoint 和 errno/Error 传播。printf 不等于 GDB stub 或 tracing。"
       },
       "llm_answer_steps": [
         "只回答 Q09_002 的题干，不使用相邻题结论替代。",
@@ -878,7 +828,8 @@
         "支撑答案的主要源码/配置/文档锚点在哪里（路径、符号、结构体或常量）？",
         "答案中的每个关键结论是否有实现体、调用链、状态变化或配置分支证据？",
         "是否排除题干未要求的相邻模块、同名概念、用户态封装、README 口号或测试桩？",
-        "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？"
+        "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？",
+        "???????panic ?????????? dump?????????????????"
       ],
       "structured_facts": [
         {
@@ -1026,19 +977,6 @@
         "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
         "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。"
       },
-      "textbook_basis": [
-        {
-          "source": "OS diagnostics and maintainability practice",
-          "concepts": [
-            "logging",
-            "panic handling",
-            "error propagation",
-            "kernel monitor",
-            "debug stub",
-            "tracepoint"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：panic 路径会输出哪些诊断？（寄存器 dump/栈回溯/停机；必须引用实现证据） 调试题必须区分日志、panic、backtrace、kernel debug monitor、GDB remote stub 和 tracepoint；用户 shell 或普通打印不能替代内核调试设施。 本题属于调试与错误处理层，只看日志、panic、诊断输出、backtrace、kernel debug monitor、GDB stub、错误码和 tracepoint；普通 printf 或用户 shell 不能替代调试子系统。",
       "task_hints": {
         "diagnostic_checks": [
@@ -1046,7 +984,8 @@
           "支撑答案的主要源码/配置/文档锚点在哪里（路径、符号、结构体或常量）？",
           "答案中的每个关键结论是否有实现体、调用链、状态变化或配置分支证据？",
           "是否排除题干未要求的相邻模块、同名概念、用户态封装、README 口号或测试桩？",
-          "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？"
+          "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？",
+          "???????panic ?????????? dump?????????????????"
         ],
         "structured_facts": [
           {
@@ -1178,20 +1117,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "调试/错误处理题要区分普通日志、日志级别、panic 终止路径、栈回溯、内核监视器、GDB remote stub、tracepoint 和 errno/Error 传播。printf 不等于 GDB stub 或 tracing。",
-        "textbook_basis": [
-          {
-            "source": "OS diagnostics and maintainability practice",
-            "concepts": [
-              "logging",
-              "panic handling",
-              "error propagation",
-              "kernel monitor",
-              "debug stub",
-              "tracepoint"
-            ]
-          }
-        ]
+        "concept_boundary": "调试/错误处理题要区分普通日志、日志级别、panic 终止路径、栈回溯、内核监视器、GDB remote stub、tracepoint 和 errno/Error 传播。printf 不等于 GDB stub 或 tracing。"
       },
       "llm_answer_steps": [
         "只回答 Q09_003 的题干，不使用相邻题结论替代。",
@@ -1283,7 +1209,8 @@
         "是否存在执行“栈回溯 (backtrace/unwind/stack_trace)”语义的真实实现体，而不是声明、空函数或固定返回？",
         "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
         "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
-        "是否排除与“栈回溯 (backtrace/unwind/stack_trace)”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？"
+        "是否排除与“栈回溯 (backtrace/unwind/stack_trace)”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+        "???????backtrace ???? backtrace/unwind/stack_trace/StackTrace???? ra ?????????????"
       ],
       "structured_facts": [
         {
@@ -1443,19 +1370,6 @@
           "unknown"
         ]
       },
-      "textbook_basis": [
-        {
-          "source": "OS diagnostics and maintainability practice",
-          "concepts": [
-            "logging",
-            "panic handling",
-            "error propagation",
-            "kernel monitor",
-            "debug stub",
-            "tracepoint"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否实现栈回溯 (backtrace/unwind/stack_trace)？ 调试题必须区分日志、panic、backtrace、kernel debug monitor、GDB remote stub 和 tracepoint；用户 shell 或普通打印不能替代内核调试设施。 本题属于调试与错误处理层，只看日志、panic、诊断输出、backtrace、kernel debug monitor、GDB stub、错误码和 tracepoint；普通 printf 或用户 shell 不能替代调试子系统。",
       "task_hints": {
         "diagnostic_checks": [
@@ -1463,7 +1377,8 @@
           "是否存在执行“栈回溯 (backtrace/unwind/stack_trace)”语义的真实实现体，而不是声明、空函数或固定返回？",
           "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
           "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
-          "是否排除与“栈回溯 (backtrace/unwind/stack_trace)”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？"
+          "是否排除与“栈回溯 (backtrace/unwind/stack_trace)”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+          "???????backtrace ???? backtrace/unwind/stack_trace/StackTrace???? ra ?????????????"
         ],
         "structured_facts": [
           {
@@ -1595,20 +1510,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "调试/错误处理题要区分普通日志、日志级别、panic 终止路径、栈回溯、内核监视器、GDB remote stub、tracepoint 和 errno/Error 传播。printf 不等于 GDB stub 或 tracing。",
-        "textbook_basis": [
-          {
-            "source": "OS diagnostics and maintainability practice",
-            "concepts": [
-              "logging",
-              "panic handling",
-              "error propagation",
-              "kernel monitor",
-              "debug stub",
-              "tracepoint"
-            ]
-          }
-        ]
+        "concept_boundary": "调试/错误处理题要区分普通日志、日志级别、panic 终止路径、栈回溯、内核监视器、GDB remote stub、tracepoint 和 errno/Error 传播。printf 不等于 GDB stub 或 tracing。"
       },
       "llm_answer_steps": [
         "只回答 Q09_004 的题干，不使用相邻题结论替代。",
@@ -1695,7 +1597,8 @@
         "是否存在执行“内核驻留调试监视器 (Kernel Debug Monitor)”语义的真实实现体，而不是声明、空函数或固定返回？",
         "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
         "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
-        "是否排除与“内核驻留调试监视器 (Kernel Debug Monitor)”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？"
+        "是否排除与“内核驻留调试监视器 (Kernel Debug Monitor)”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+        "???????Kernel Debug Monitor ?????????/????????? shell ???????"
       ],
       "structured_facts": [
         {
@@ -1855,17 +1758,6 @@
           "unknown"
         ]
       },
-      "textbook_basis": [
-        {
-          "source": "OS diagnostics/debugging practice; distinction from Stallings Ch5 Monitor synchronization primitive",
-          "concepts": [
-            "kernel debug monitor",
-            "debug console",
-            "command dispatch",
-            "not monitor synchronization"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否存在内核驻留调试监视器 (Kernel Debug Monitor)（内核态命令解释器/调试控制台）。调试题必须区分日志、panic、backtrace、kernel debug monitor、GDB remote stub 和 tracepoint；用户 shell 或普通打印不能替代内核调试设施。 本题属于调试与错误处理层，只看日志、panic、诊断输出、backtrace、kernel debug monitor、GDB stub、错误码和 tracepoint；普通 printf 或用户 shell 不能替代调试子系统。",
       "task_hints": {
         "diagnostic_checks": [
@@ -1873,7 +1765,8 @@
           "是否存在执行“内核驻留调试监视器 (Kernel Debug Monitor)”语义的真实实现体，而不是声明、空函数或固定返回？",
           "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
           "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
-          "是否排除与“内核驻留调试监视器 (Kernel Debug Monitor)”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？"
+          "是否排除与“内核驻留调试监视器 (Kernel Debug Monitor)”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+          "???????Kernel Debug Monitor ?????????/????????? shell ???????"
         ],
         "structured_facts": [
           {
@@ -2005,20 +1898,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "调试/错误处理题要区分普通日志、日志级别、panic 终止路径、栈回溯、内核监视器、GDB remote stub、tracepoint 和 errno/Error 传播。printf 不等于 GDB stub 或 tracing。",
-        "textbook_basis": [
-          {
-            "source": "OS diagnostics and maintainability practice",
-            "concepts": [
-              "logging",
-              "panic handling",
-              "error propagation",
-              "kernel monitor",
-              "debug stub",
-              "tracepoint"
-            ]
-          }
-        ]
+        "concept_boundary": "调试/错误处理题要区分普通日志、日志级别、panic 终止路径、栈回溯、内核监视器、GDB remote stub、tracepoint 和 errno/Error 传播。printf 不等于 GDB stub 或 tracing。"
       },
       "llm_answer_steps": [
         "只回答 Q09_005 的题干，不使用相邻题结论替代。",
@@ -2101,7 +1981,8 @@
         "是否存在执行“GDB stub”语义的真实实现体，而不是声明、空函数或固定返回？",
         "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
         "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
-        "是否排除与“GDB stub”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？"
+        "是否排除与“GDB stub”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+        "???????GDB stub ?? Remote Serial Protocol ??????????/OpenOCD/Makefile gdb ?????"
       ],
       "structured_facts": [
         {
@@ -2261,19 +2142,6 @@
           "unknown"
         ]
       },
-      "textbook_basis": [
-        {
-          "source": "OS diagnostics and maintainability practice",
-          "concepts": [
-            "logging",
-            "panic handling",
-            "error propagation",
-            "kernel monitor",
-            "debug stub",
-            "tracepoint"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否实现 GDB stub（需数据包解析循环，如 handle_gdb_packet）？ 调试题必须区分日志、panic、backtrace、kernel debug monitor、GDB remote stub 和 tracepoint；用户 shell 或普通打印不能替代内核调试设施。 本题属于调试与错误处理层，只看日志、panic、诊断输出、backtrace、kernel debug monitor、GDB stub、错误码和 tracepoint；普通 printf 或用户 shell 不能替代调试子系统。",
       "task_hints": {
         "diagnostic_checks": [
@@ -2281,7 +2149,8 @@
           "是否存在执行“GDB stub”语义的真实实现体，而不是声明、空函数或固定返回？",
           "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
           "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
-          "是否排除与“GDB stub”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？"
+          "是否排除与“GDB stub”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+          "???????GDB stub ?? Remote Serial Protocol ??????????/OpenOCD/Makefile gdb ?????"
         ],
         "structured_facts": [
           {
@@ -2413,20 +2282,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "GDB stub 需要内核侧 Remote Serial Protocol 数据包解析循环和寄存器/内存/继续/单步等命令处理；仅有 GDB 调试脚本、OpenOCD 配置或 Makefile gdb 目标不算内核 GDB stub。",
-        "textbook_basis": [
-          {
-            "source": "OS diagnostics and maintainability practice",
-            "concepts": [
-              "logging",
-              "panic handling",
-              "error propagation",
-              "kernel monitor",
-              "debug stub",
-              "tracepoint"
-            ]
-          }
-        ]
+        "concept_boundary": "GDB stub 需要内核侧 Remote Serial Protocol 数据包解析循环和寄存器/内存/继续/单步等命令处理；仅有 GDB 调试脚本、OpenOCD 配置或 Makefile gdb 目标不算内核 GDB stub。"
       },
       "llm_answer_steps": [
         "只回答 Q09_006 的题干，不使用相邻题结论替代。",
@@ -2635,19 +2491,6 @@
         "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
         "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。"
       },
-      "textbook_basis": [
-        {
-          "source": "OS diagnostics and maintainability practice",
-          "concepts": [
-            "logging",
-            "panic handling",
-            "error propagation",
-            "kernel monitor",
-            "debug stub",
-            "tracepoint"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：错误码/错误类型体系是什么？（errno/Result/Error enum；给类型定义与传播点证据）  本题属于调试与错误处理层，只看日志、panic、诊断输出、backtrace、kernel debug monitor、GDB stub、错误码和 tracepoint；普通 printf 或用户 shell 不能替代调试子系统。",
       "task_hints": {
         "diagnostic_checks": [
@@ -2787,20 +2630,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "调试/错误处理题要区分普通日志、日志级别、panic 终止路径、栈回溯、内核监视器、GDB remote stub、tracepoint 和 errno/Error 传播。printf 不等于 GDB stub 或 tracing。",
-        "textbook_basis": [
-          {
-            "source": "OS diagnostics and maintainability practice",
-            "concepts": [
-              "logging",
-              "panic handling",
-              "error propagation",
-              "kernel monitor",
-              "debug stub",
-              "tracepoint"
-            ]
-          }
-        ]
+        "concept_boundary": "调试/错误处理题要区分普通日志、日志级别、panic 终止路径、栈回溯、内核监视器、GDB remote stub、tracepoint 和 errno/Error 传播。printf 不等于 GDB stub 或 tracing。"
       },
       "llm_answer_steps": [
         "只回答 Q09_007 的题干，不使用相邻题结论替代。",
@@ -2887,7 +2717,8 @@
         "是否存在执行“trace/perf/ftrace 等跟踪机制或 tracepoints”语义的真实实现体，而不是声明、空函数或固定返回？",
         "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
         "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
-        "是否排除与“trace/perf/ftrace 等跟踪机制或 tracepoints”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？"
+        "是否排除与“trace/perf/ftrace 等跟踪机制或 tracepoints”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+        "???????trace/perf/ftrace ????????????????????/printf ??? tracepoint?"
       ],
       "structured_facts": [
         {
@@ -3047,19 +2878,6 @@
           "unknown"
         ]
       },
-      "textbook_basis": [
-        {
-          "source": "OS diagnostics and maintainability practice",
-          "concepts": [
-            "logging",
-            "panic handling",
-            "error propagation",
-            "kernel monitor",
-            "debug stub",
-            "tracepoint"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否存在 trace/perf/ftrace 等跟踪机制或 tracepoints？ 调试题必须区分日志、panic、backtrace、kernel debug monitor、GDB remote stub 和 tracepoint；用户 shell 或普通打印不能替代内核调试设施。 本题属于调试与错误处理层，只看日志、panic、诊断输出、backtrace、kernel debug monitor、GDB stub、错误码和 tracepoint；普通 printf 或用户 shell 不能替代调试子系统。",
       "task_hints": {
         "diagnostic_checks": [
@@ -3067,7 +2885,8 @@
           "是否存在执行“trace/perf/ftrace 等跟踪机制或 tracepoints”语义的真实实现体，而不是声明、空函数或固定返回？",
           "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
           "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
-          "是否排除与“trace/perf/ftrace 等跟踪机制或 tracepoints”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？"
+          "是否排除与“trace/perf/ftrace 等跟踪机制或 tracepoints”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+          "???????trace/perf/ftrace ????????????????????/printf ??? tracepoint?"
         ],
         "structured_facts": [
           {
@@ -3199,20 +3018,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "trace/perf/ftrace 是结构化事件记录或探针机制；普通日志、printf、panic 输出不等于 tracepoint。",
-        "textbook_basis": [
-          {
-            "source": "OS diagnostics and maintainability practice",
-            "concepts": [
-              "logging",
-              "panic handling",
-              "error propagation",
-              "kernel monitor",
-              "debug stub",
-              "tracepoint"
-            ]
-          }
-        ]
+        "concept_boundary": "trace/perf/ftrace 是结构化事件记录或探针机制；普通日志、printf、panic 输出不等于 tracepoint。"
       },
       "llm_answer_steps": [
         "只回答 Q09_008 的题干，不使用相邻题结论替代。",
@@ -3222,7 +3028,6 @@
       ]
     }
   ],
-  "stage_constraints_md": "**本阶段须额外覆盖**：\n- **Kernel debug monitor（非 Stallings Ch5 同步 Monitor）**：仅统计 **`kernel/`**（或经引导后**仅内核可达**的调试循环）内的交互监视器；须与用户态 shell 区分。若存在：**命令名 + 内核处理入口**列表；若无：明确「未发现」。**禁止**把 `xv6-user/`、`user/` 等用户态 shell 单独当作内核 monitor 的充分证据。\n\n必须回答：\n- 日志系统：print/log 宏如何实现？日志级别设计？\n- Panic 处理：panic! 触发后的流程（栈回溯、寄存器 dump、停机）。**须一句话结论**：是否包含寄存器 dump、是否调用回溯辅助函数，并附 `路径:行号`。\n- **栈回溯 (Backtrace)**：是否支持 `dwarf` 解析或基于 FramePointer 的回溯？**必须** `grep_in_repo` 搜索 `backtrace|unwind|stack_trace|StackTrace`，在正文**摘录关键命中行或明确写零命中**。**注意**：不要被 panic 时仅打印若干寄存器/`ra` 误导为完整回溯；`doc/*.md` 不得单独作为「已实现回溯」的证据，须 C/Rust 源码 `路径:行号`。\n- 异常处理：未处理异常的默认行为。\n- 调试接口：\n    - **Kernel debug monitor vs 用户态 shell**：是否提供 **内核监视器**（非用户态 `sh`）？若声称有，命令须在 **内核源码** 中有分发实现；支持哪些命令（如 `ps`/`help` 等须对应内核侧入口）。\n    - GDB stub 支持（如有）：**严格检查**。搜索 `handle_gdb_packet`。如果找不到数据包解析循环，就不是 GDB Stub。\n    - 调试控制台/Monitor\n    - 内核调试选项\n    - 是否支持 `perf` 或 `ftrace`？**Tracepoints** 是否插入到了关键路径？\n- 错误码设计：Result/Error 类型定义。\n- 断言与检查：debug_assert、运行时检查。\n\n要求：\n- 使用 `lsp_get_definition` 定位 `panic_handler`、`log` 宏的实现位置。\n- **【必须】使用 `lsp_get_call_graph` 追踪 panic 处理链**（`panic!` → `panic_handler` → 栈回溯 → 停机）：\n  - `lsp_get_call_graph(repo_path, file_of_panic_handler, \"panic_handler\", direction=\"incoming\", max_depth=3)` — 谁触发了 panic？\n  - 如返回 `[⚠️ DEGRADED MODE]`，标注后继续使用，用 `lsp_get_references` 补充单层引用。\n- 使用 `lsp_get_document_outline` 浏览调试模块，发现所有调试相关函数（backtrace、dump、monitor命令）。\n- 辅以 grep_in_repo 搜索 `gdbstub|monitor|perf|trace` 确认调试工具支持。\n\n**【评测与交付适配 — 本阶段启发式】**（须源码证据；无则略）：\n- 长测例下 **panic/回溯/日志与资源泄漏**的稳定性风险；若有 monitor 或 GDB 脚本与测例集成，列出路径。\n- 无命中时不写具体赛题名称。",
   "features": [
     {
       "feature_id": "feat_09_debug_error_q09_001",
@@ -3230,19 +3035,6 @@
       "domain": "debug_error_handling",
       "feature_name": "Q09_001 是否存在日志系统（log/printk/println 宏）与日志级别控制？（必须三态）",
       "description": "是否存在日志系统（log/printk/println 宏）与日志级别控制？（必须三态）",
-      "textbook_basis": [
-        {
-          "source": "OS diagnostics and maintainability practice",
-          "concepts": [
-            "logging",
-            "panic handling",
-            "error propagation",
-            "kernel monitor",
-            "debug stub",
-            "tracepoint"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否存在日志系统（log/printk/println 宏）与日志级别控制？ 调试题必须区分日志、panic、backtrace、kernel debug monitor、GDB remote stub 和 tracepoint；用户 shell 或普通打印不能替代内核调试设施。 本题属于调试与错误处理层，只看日志、panic、诊断输出、backtrace、kernel debug monitor、GDB stub、错误码和 tracepoint；普通 printf 或用户 shell 不能替代调试子系统。",
       "dependencies": [
         "02_boot_trap",
@@ -3642,20 +3434,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "调试/错误处理题要区分普通日志、日志级别、panic 终止路径、栈回溯、内核监视器、GDB remote stub、tracepoint 和 errno/Error 传播。printf 不等于 GDB stub 或 tracing。",
-        "textbook_basis": [
-          {
-            "source": "OS diagnostics and maintainability practice",
-            "concepts": [
-              "logging",
-              "panic handling",
-              "error propagation",
-              "kernel monitor",
-              "debug stub",
-              "tracepoint"
-            ]
-          }
-        ]
+        "concept_boundary": "调试/错误处理题要区分普通日志、日志级别、panic 终止路径、栈回溯、内核监视器、GDB remote stub、tracepoint 和 errno/Error 传播。printf 不等于 GDB stub 或 tracing。"
       }
     },
     {
@@ -3664,19 +3443,6 @@
       "domain": "debug_error_handling",
       "feature_name": "Q09_002 是否存在 panic/崩溃处理路径（panic_handler/oom/abort 等）？（必须三态）",
       "description": "是否存在 panic/崩溃处理路径（panic_handler/oom/abort 等）？（必须三态）",
-      "textbook_basis": [
-        {
-          "source": "OS diagnostics and maintainability practice",
-          "concepts": [
-            "logging",
-            "panic handling",
-            "error propagation",
-            "kernel monitor",
-            "debug stub",
-            "tracepoint"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否存在 panic/崩溃处理路径（panic_handler/oom/abort 等）？ 调试题必须区分日志、panic、backtrace、kernel debug monitor、GDB remote stub 和 tracepoint；用户 shell 或普通打印不能替代内核调试设施。 本题属于调试与错误处理层，只看日志、panic、诊断输出、backtrace、kernel debug monitor、GDB stub、错误码和 tracepoint；普通 printf 或用户 shell 不能替代调试子系统。",
       "dependencies": [
         "02_boot_trap",
@@ -4077,20 +3843,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "调试/错误处理题要区分普通日志、日志级别、panic 终止路径、栈回溯、内核监视器、GDB remote stub、tracepoint 和 errno/Error 传播。printf 不等于 GDB stub 或 tracing。",
-        "textbook_basis": [
-          {
-            "source": "OS diagnostics and maintainability practice",
-            "concepts": [
-              "logging",
-              "panic handling",
-              "error propagation",
-              "kernel monitor",
-              "debug stub",
-              "tracepoint"
-            ]
-          }
-        ]
+        "concept_boundary": "调试/错误处理题要区分普通日志、日志级别、panic 终止路径、栈回溯、内核监视器、GDB remote stub、tracepoint 和 errno/Error 传播。printf 不等于 GDB stub 或 tracing。"
       }
     },
     {
@@ -4099,19 +3852,6 @@
       "domain": "debug_error_handling",
       "feature_name": "Q09_003 panic 路径会输出哪些诊断？（寄存器 dump/栈回溯/停机；必须引用实现证据）",
       "description": "panic 路径会输出哪些诊断？（寄存器 dump/栈回溯/停机；必须引用实现证据）",
-      "textbook_basis": [
-        {
-          "source": "OS diagnostics and maintainability practice",
-          "concepts": [
-            "logging",
-            "panic handling",
-            "error propagation",
-            "kernel monitor",
-            "debug stub",
-            "tracepoint"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：panic 路径会输出哪些诊断？（寄存器 dump/栈回溯/停机；必须引用实现证据） 调试题必须区分日志、panic、backtrace、kernel debug monitor、GDB remote stub 和 tracepoint；用户 shell 或普通打印不能替代内核调试设施。 本题属于调试与错误处理层，只看日志、panic、诊断输出、backtrace、kernel debug monitor、GDB stub、错误码和 tracepoint；普通 printf 或用户 shell 不能替代调试子系统。",
       "dependencies": [
         "02_boot_trap",
@@ -4477,20 +4217,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "调试/错误处理题要区分普通日志、日志级别、panic 终止路径、栈回溯、内核监视器、GDB remote stub、tracepoint 和 errno/Error 传播。printf 不等于 GDB stub 或 tracing。",
-        "textbook_basis": [
-          {
-            "source": "OS diagnostics and maintainability practice",
-            "concepts": [
-              "logging",
-              "panic handling",
-              "error propagation",
-              "kernel monitor",
-              "debug stub",
-              "tracepoint"
-            ]
-          }
-        ]
+        "concept_boundary": "调试/错误处理题要区分普通日志、日志级别、panic 终止路径、栈回溯、内核监视器、GDB remote stub、tracepoint 和 errno/Error 传播。printf 不等于 GDB stub 或 tracing。"
       }
     },
     {
@@ -4499,19 +4226,6 @@
       "domain": "debug_error_handling",
       "feature_name": "Q09_004 是否实现栈回溯 (backtrace/unwind/stack_trace)？（必须三态；仅打印 ra 不算）",
       "description": "是否实现栈回溯 (backtrace/unwind/stack_trace)？（必须三态；仅打印 ra 不算）",
-      "textbook_basis": [
-        {
-          "source": "OS diagnostics and maintainability practice",
-          "concepts": [
-            "logging",
-            "panic handling",
-            "error propagation",
-            "kernel monitor",
-            "debug stub",
-            "tracepoint"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否实现栈回溯 (backtrace/unwind/stack_trace)？ 调试题必须区分日志、panic、backtrace、kernel debug monitor、GDB remote stub 和 tracepoint；用户 shell 或普通打印不能替代内核调试设施。 本题属于调试与错误处理层，只看日志、panic、诊断输出、backtrace、kernel debug monitor、GDB stub、错误码和 tracepoint；普通 printf 或用户 shell 不能替代调试子系统。",
       "dependencies": [
         "02_boot_trap",
@@ -4911,20 +4625,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "调试/错误处理题要区分普通日志、日志级别、panic 终止路径、栈回溯、内核监视器、GDB remote stub、tracepoint 和 errno/Error 传播。printf 不等于 GDB stub 或 tracing。",
-        "textbook_basis": [
-          {
-            "source": "OS diagnostics and maintainability practice",
-            "concepts": [
-              "logging",
-              "panic handling",
-              "error propagation",
-              "kernel monitor",
-              "debug stub",
-              "tracepoint"
-            ]
-          }
-        ]
+        "concept_boundary": "调试/错误处理题要区分普通日志、日志级别、panic 终止路径、栈回溯、内核监视器、GDB remote stub、tracepoint 和 errno/Error 传播。printf 不等于 GDB stub 或 tracing。"
       }
     },
     {
@@ -4933,17 +4634,6 @@
       "domain": "debug_error_handling",
       "feature_name": "Q09_005 是否存在内核驻留调试监视器 (Kernel Debug Monitor)？（本题指内核态命令解释器/调试控制台；不要与 Stallings Ch5 的 Monitor/Condition Variable 同步构造混淆；不包括仅在用户态运行的常规 shell。必须三态；若 implemented，须给出 3-10 个用户可键入的 monitor 命令名及对应内核内解析/分发入口证据。）",
       "description": "是否存在内核驻留调试监视器 (Kernel Debug Monitor)？（本题指内核态命令解释器/调试控制台；不要与 Stallings Ch5 的 Monitor/Condition Variable 同步构造混淆；不包括仅在用户态运行的常规 shell。必须三态；若 implemented，须给出 3-10 个用户可键入的 monitor 命令名及对应内核内解析/分发入口证据。）",
-      "textbook_basis": [
-        {
-          "source": "OS diagnostics/debugging practice; distinction from Stallings Ch5 Monitor synchronization primitive",
-          "concepts": [
-            "kernel debug monitor",
-            "debug console",
-            "command dispatch",
-            "not monitor synchronization"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否存在内核驻留调试监视器 (Kernel Debug Monitor)（内核态命令解释器/调试控制台）。调试题必须区分日志、panic、backtrace、kernel debug monitor、GDB remote stub 和 tracepoint；用户 shell 或普通打印不能替代内核调试设施。 本题属于调试与错误处理层，只看日志、panic、诊断输出、backtrace、kernel debug monitor、GDB stub、错误码和 tracepoint；普通 printf 或用户 shell 不能替代调试子系统。",
       "dependencies": [
         "02_boot_trap",
@@ -5351,20 +5041,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "调试/错误处理题要区分普通日志、日志级别、panic 终止路径、栈回溯、内核监视器、GDB remote stub、tracepoint 和 errno/Error 传播。printf 不等于 GDB stub 或 tracing。",
-        "textbook_basis": [
-          {
-            "source": "OS diagnostics and maintainability practice",
-            "concepts": [
-              "logging",
-              "panic handling",
-              "error propagation",
-              "kernel monitor",
-              "debug stub",
-              "tracepoint"
-            ]
-          }
-        ]
+        "concept_boundary": "调试/错误处理题要区分普通日志、日志级别、panic 终止路径、栈回溯、内核监视器、GDB remote stub、tracepoint 和 errno/Error 传播。printf 不等于 GDB stub 或 tracing。"
       }
     },
     {
@@ -5373,19 +5050,6 @@
       "domain": "debug_error_handling",
       "feature_name": "Q09_006 是否实现 GDB stub（需数据包解析循环，如 handle_gdb_packet）？（必须三态）",
       "description": "是否实现 GDB stub（需数据包解析循环，如 handle_gdb_packet）？（必须三态）",
-      "textbook_basis": [
-        {
-          "source": "OS diagnostics and maintainability practice",
-          "concepts": [
-            "logging",
-            "panic handling",
-            "error propagation",
-            "kernel monitor",
-            "debug stub",
-            "tracepoint"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否实现 GDB stub（需数据包解析循环，如 handle_gdb_packet）？ 调试题必须区分日志、panic、backtrace、kernel debug monitor、GDB remote stub 和 tracepoint；用户 shell 或普通打印不能替代内核调试设施。 本题属于调试与错误处理层，只看日志、panic、诊断输出、backtrace、kernel debug monitor、GDB stub、错误码和 tracepoint；普通 printf 或用户 shell 不能替代调试子系统。",
       "dependencies": [
         "02_boot_trap",
@@ -5782,20 +5446,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "GDB stub 需要内核侧 Remote Serial Protocol 数据包解析循环和寄存器/内存/继续/单步等命令处理；仅有 GDB 调试脚本、OpenOCD 配置或 Makefile gdb 目标不算内核 GDB stub。",
-        "textbook_basis": [
-          {
-            "source": "OS diagnostics and maintainability practice",
-            "concepts": [
-              "logging",
-              "panic handling",
-              "error propagation",
-              "kernel monitor",
-              "debug stub",
-              "tracepoint"
-            ]
-          }
-        ]
+        "concept_boundary": "GDB stub 需要内核侧 Remote Serial Protocol 数据包解析循环和寄存器/内存/继续/单步等命令处理；仅有 GDB 调试脚本、OpenOCD 配置或 Makefile gdb 目标不算内核 GDB stub。"
       }
     },
     {
@@ -5804,19 +5455,6 @@
       "domain": "debug_error_handling",
       "feature_name": "Q09_007 错误码/错误类型体系是什么？（errno/Result/Error enum；给类型定义与传播点证据）",
       "description": "错误码/错误类型体系是什么？（errno/Result/Error enum；给类型定义与传播点证据）",
-      "textbook_basis": [
-        {
-          "source": "OS diagnostics and maintainability practice",
-          "concepts": [
-            "logging",
-            "panic handling",
-            "error propagation",
-            "kernel monitor",
-            "debug stub",
-            "tracepoint"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：错误码/错误类型体系是什么？（errno/Result/Error enum；给类型定义与传播点证据）  本题属于调试与错误处理层，只看日志、panic、诊断输出、backtrace、kernel debug monitor、GDB stub、错误码和 tracepoint；普通 printf 或用户 shell 不能替代调试子系统。",
       "dependencies": [
         "02_boot_trap",
@@ -6184,20 +5822,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "调试/错误处理题要区分普通日志、日志级别、panic 终止路径、栈回溯、内核监视器、GDB remote stub、tracepoint 和 errno/Error 传播。printf 不等于 GDB stub 或 tracing。",
-        "textbook_basis": [
-          {
-            "source": "OS diagnostics and maintainability practice",
-            "concepts": [
-              "logging",
-              "panic handling",
-              "error propagation",
-              "kernel monitor",
-              "debug stub",
-              "tracepoint"
-            ]
-          }
-        ]
+        "concept_boundary": "调试/错误处理题要区分普通日志、日志级别、panic 终止路径、栈回溯、内核监视器、GDB remote stub、tracepoint 和 errno/Error 传播。printf 不等于 GDB stub 或 tracing。"
       }
     },
     {
@@ -6206,19 +5831,6 @@
       "domain": "debug_error_handling",
       "feature_name": "Q09_008 是否存在 trace/perf/ftrace 等跟踪机制或 tracepoints？（必须三态）",
       "description": "是否存在 trace/perf/ftrace 等跟踪机制或 tracepoints？（必须三态）",
-      "textbook_basis": [
-        {
-          "source": "OS diagnostics and maintainability practice",
-          "concepts": [
-            "logging",
-            "panic handling",
-            "error propagation",
-            "kernel monitor",
-            "debug stub",
-            "tracepoint"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否存在 trace/perf/ftrace 等跟踪机制或 tracepoints？ 调试题必须区分日志、panic、backtrace、kernel debug monitor、GDB remote stub 和 tracepoint；用户 shell 或普通打印不能替代内核调试设施。 本题属于调试与错误处理层，只看日志、panic、诊断输出、backtrace、kernel debug monitor、GDB stub、错误码和 tracepoint；普通 printf 或用户 shell 不能替代调试子系统。",
       "dependencies": [
         "02_boot_trap",
@@ -6614,60 +6226,8 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "trace/perf/ftrace 是结构化事件记录或探针机制；普通日志、printf、panic 输出不等于 tracepoint。",
-        "textbook_basis": [
-          {
-            "source": "OS diagnostics and maintainability practice",
-            "concepts": [
-              "logging",
-              "panic handling",
-              "error propagation",
-              "kernel monitor",
-              "debug stub",
-              "tracepoint"
-            ]
-          }
-        ]
+        "concept_boundary": "trace/perf/ftrace 是结构化事件记录或探针机制；普通日志、printf、panic 输出不等于 tracepoint。"
       }
     }
-  ],
-  "llm_field_guide": {
-    "purpose": "这些字段是给弱模型看的作答说明：不要把题目当作文题，必须先填结构化事实，再推出最终答案。",
-    "field_meanings": {
-      "question_id": "稳定题号。回答、证据、fact_result 都必须绑定这个 ID。",
-      "stem": "人类可读题面，只说明要问什么；不能只根据 stem 直接下结论。",
-      "question_type": "题型。tri_state_impl 只能回答 implemented / stub / not_found / unknown。",
-      "choices": "选择题的合法选项。single_choice 必须原样选择其中一个；multi_choice 必须返回数组。",
-      "feature_ids": "本题对应的 OS 机制特征 ID，用于图谱和证据追踪。",
-      "textbook_basis": "本题参考的 Stallings 教材概念范围，用来帮助理解概念边界，不是源码证据。",
-      "concept_boundary": "本题最容易混淆的概念边界。判断前必须先读，防止把相似机制误判为实现。",
-      "diagnostic_checks": "局部判断步骤。弱模型应逐条查，不要直接回答总问题。",
-      "structured_facts": "必须逐项完成的事实表。每个 fact 都要给 status_or_value 和 evidence_id；这是最终 value 的依据。",
-      "answer_contract": "最终答案约束。规定 value 类型、合法值、必须完成哪些 fact，以及证据引用规则。",
-      "evidence_policy": "证据要求。RAG/grep 只是线索；implemented 需要 read/LSP/function body/call site 等强证据。",
-      "tri_state_rule": "三态/四态判定规则。implemented、stub、not_found、unknown 的边界写在这里。",
-      "anti_examples": "反例。命中这些情况时不能判 implemented，避免看到名字就误判。",
-      "negative_search_policy": "判 not_found 前必须覆盖的关键词和目录要求。覆盖不足只能 unknown。",
-      "features": "题单顶层的 feature 汇总，供图谱和跨题审阅使用。"
-    },
-    "status_values": {
-      "yes_strong": "有强源码证据：定义/实现体/调用点/状态变化/数据结构读写/调用链。可参与支撑 implemented。",
-      "yes_weak": "只有 RAG、grep、outline、README 或名字命中。只能当线索，不能单独支撑 implemented。",
-      "stub_or_declaration_only": "只有声明、trait/struct 壳、空实现、固定返回、ENOSYS、unsupported、todo/unimplemented。通常支撑 stub。",
-      "no_after_negative_search": "按 negative_search_policy 搜过关键词和目录后仍未发现。可参与支撑 not_found。",
-      "unknown": "证据不足、覆盖不足、冲突或 fact 未完成。最终应降级 unknown/待核实。"
-    },
-    "required_reasoning_order": [
-      "先读 stem，确认问题对象。",
-      "再读 textbook_basis 和 concept_boundary，确认 OS 概念边界。",
-      "逐项完成 structured_facts；每个 fact 只能引用 evidence_id，不要手写新路径/行号当证据。",
-      "把 RAG/grep 命中标成 yes_weak 或 hint，不要直接推出 implemented。",
-      "若要判 not_found，必须完成 negative_search_coverage fact。",
-      "最后按 answer_contract 和 tri_state_rule 推出 value。"
-    ],
-    "output_expectation": {
-      "draft_answer": "应包含 question_id、value、structured_fact_results、used_evidence_ids、confidence、notes。",
-      "final_answer": "最终 value 必须能由 structured_fact_results 和 evidence_id 追溯出来。"
-    }
-  }
+  ]
 }

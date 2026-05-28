@@ -83,7 +83,8 @@
         "是否存在执行“网络子系统实现”语义的真实实现体，而不是声明、空函数或固定返回？",
         "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
         "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
-        "是否排除与“网络子系统实现”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？"
+        "是否排除与“网络子系统实现”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+        "???????????????/socket/?????????????????"
       ],
       "structured_facts": [
         {
@@ -243,18 +244,6 @@
           "unknown"
         ]
       },
-      "textbook_basis": [
-        {
-          "source": "OS network stack practice beyond Stallings core chapters",
-          "concepts": [
-            "socket interface",
-            "protocol stack",
-            "network device driver",
-            "packet buffer",
-            "zero-copy"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否存在网络子系统实现（协议栈或 socket 层）？  本题属于网络子系统层，只看协议栈、socket API、网卡驱动衔接、协议支持和网络数据路径；块设备 DMA、普通 VFS fd 或孤立驱动 descriptor 不能替代网络语义。",
       "task_hints": {
         "diagnostic_checks": [
@@ -262,7 +251,8 @@
           "是否存在执行“网络子系统实现”语义的真实实现体，而不是声明、空函数或固定返回？",
           "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
           "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
-          "是否排除与“网络子系统实现”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？"
+          "是否排除与“网络子系统实现”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+          "???????????????/socket/?????????????????"
         ],
         "structured_facts": [
           {
@@ -394,19 +384,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "网络子系统需要 socket/API、协议栈状态机、网络设备或 loopback 数据路径。只有 syscall 号、用户头文件、README 声称或网卡常量不能判 implemented。",
-        "textbook_basis": [
-          {
-            "source": "OS network stack practice beyond Stallings core chapters",
-            "concepts": [
-              "socket interface",
-              "protocol stack",
-              "network device driver",
-              "packet buffer",
-              "zero-copy"
-            ]
-          }
-        ]
+        "concept_boundary": "网络子系统需要 socket/API、协议栈状态机、网络设备或 loopback 数据路径。只有 syscall 号、用户头文件、README 声称或网卡常量不能判 implemented。"
       },
       "llm_answer_steps": [
         "只回答 Q08_001 的题干，不使用相邻题结论替代。",
@@ -475,7 +453,8 @@
         "题目“协议栈来源更接近哪种？”的候选选项有哪些，是否只从题单 choices 中选择？",
         "被选中的形态是否有源码、配置、调用链或数据结构证据直接支撑？",
         "未选选项是否被源码证据、缺失证据或概念边界排除？",
-        "若多个选项同时成立或证据不足，是否按题意选择“其他/混合/unknown”并说明原因？"
+        "若多个选项同时成立或证据不足，是否按题意选择“其他/混合/unknown”并说明原因？",
+        "?????????????????????????????smoltcp/lwIP ??????????"
       ],
       "structured_facts": [
         {
@@ -594,25 +573,14 @@
         "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
         "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。"
       },
-      "textbook_basis": [
-        {
-          "source": "OS network stack practice beyond Stallings core chapters",
-          "concepts": [
-            "socket interface",
-            "protocol stack",
-            "network device driver",
-            "packet buffer",
-            "zero-copy"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：协议栈来源更接近哪种？  本题属于网络子系统层，只看协议栈、socket API、网卡驱动衔接、协议支持和网络数据路径；块设备 DMA、普通 VFS fd 或孤立驱动 descriptor 不能替代网络语义。",
       "task_hints": {
         "diagnostic_checks": [
           "题目“协议栈来源更接近哪种？”的候选选项有哪些，是否只从题单 choices 中选择？",
           "被选中的形态是否有源码、配置、调用链或数据结构证据直接支撑？",
           "未选选项是否被源码证据、缺失证据或概念边界排除？",
-          "若多个选项同时成立或证据不足，是否按题意选择“其他/混合/unknown”并说明原因？"
+          "若多个选项同时成立或证据不足，是否按题意选择“其他/混合/unknown”并说明原因？",
+          "?????????????????????????????smoltcp/lwIP ??????????"
         ],
         "structured_facts": [
           {
@@ -716,19 +684,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "网络子系统需要 socket/API、协议栈状态机、网络设备或 loopback 数据路径。只有 syscall 号、用户头文件、README 声称或网卡常量不能判 implemented。",
-        "textbook_basis": [
-          {
-            "source": "OS network stack practice beyond Stallings core chapters",
-            "concepts": [
-              "socket interface",
-              "protocol stack",
-              "network device driver",
-              "packet buffer",
-              "zero-copy"
-            ]
-          }
-        ]
+        "concept_boundary": "网络子系统需要 socket/API、协议栈状态机、网络设备或 loopback 数据路径。只有 syscall 号、用户头文件、README 声称或网卡常量不能判 implemented。"
       },
       "llm_answer_steps": [
         "只回答 Q08_002 的题干，不使用相邻题结论替代。",
@@ -823,7 +779,8 @@
         "是否存在执行“socket 系统调用接口”语义的真实实现体，而不是声明、空函数或固定返回？",
         "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
         "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
-        "是否排除与“socket 系统调用接口”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？"
+        "是否排除与“socket 系统调用接口”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+        "???????socket ????? syscall ?????????????????????"
       ],
       "structured_facts": [
         {
@@ -983,18 +940,6 @@
           "unknown"
         ]
       },
-      "textbook_basis": [
-        {
-          "source": "OS network stack practice beyond Stallings core chapters",
-          "concepts": [
-            "socket interface",
-            "protocol stack",
-            "network device driver",
-            "packet buffer",
-            "zero-copy"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否实现 socket 系统调用接口（socket/bind/connect/sendto/recvfrom 等）？  本题属于网络子系统层，只看协议栈、socket API、网卡驱动衔接、协议支持和网络数据路径；块设备 DMA、普通 VFS fd 或孤立驱动 descriptor 不能替代网络语义。",
       "task_hints": {
         "diagnostic_checks": [
@@ -1002,7 +947,8 @@
           "是否存在执行“socket 系统调用接口”语义的真实实现体，而不是声明、空函数或固定返回？",
           "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
           "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
-          "是否排除与“socket 系统调用接口”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？"
+          "是否排除与“socket 系统调用接口”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+          "???????socket ????? syscall ?????????????????????"
         ],
         "structured_facts": [
           {
@@ -1134,19 +1080,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "网络子系统需要 socket/API、协议栈状态机、网络设备或 loopback 数据路径。只有 syscall 号、用户头文件、README 声称或网卡常量不能判 implemented。",
-        "textbook_basis": [
-          {
-            "source": "OS network stack practice beyond Stallings core chapters",
-            "concepts": [
-              "socket interface",
-              "protocol stack",
-              "network device driver",
-              "packet buffer",
-              "zero-copy"
-            ]
-          }
-        ]
+        "concept_boundary": "网络子系统需要 socket/API、协议栈状态机、网络设备或 loopback 数据路径。只有 syscall 号、用户头文件、README 声称或网卡常量不能判 implemented。"
       },
       "llm_answer_steps": [
         "只回答 Q08_003 的题干，不使用相邻题结论替代。",
@@ -1210,7 +1144,8 @@
         "支撑答案的主要源码/配置/文档锚点在哪里（路径、符号、结构体或常量）？",
         "答案中的每个关键结论是否有实现体、调用链、状态变化或配置分支证据？",
         "是否排除题干未要求的相邻模块、同名概念、用户态封装、README 口号或测试桩？",
-        "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？"
+        "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？",
+        "????????????? sys_sendto ??????????/?????????"
       ],
       "structured_facts": [
         {
@@ -1358,18 +1293,6 @@
         "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
         "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。"
       },
-      "textbook_basis": [
-        {
-          "source": "OS network stack practice beyond Stallings core chapters",
-          "concepts": [
-            "socket interface",
-            "protocol stack",
-            "network device driver",
-            "packet buffer",
-            "zero-copy"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：选择一个发送路径（优先 sys_sendto），追踪：syscall → 协议栈 → 网卡驱动。列 3-6 个关键节点并给证据。  本题属于网络子系统层，只看协议栈、socket API、网卡驱动衔接、协议支持和网络数据路径；块设备 DMA、普通 VFS fd 或孤立驱动 descriptor 不能替代网络语义。",
       "task_hints": {
         "diagnostic_checks": [
@@ -1377,7 +1300,8 @@
           "支撑答案的主要源码/配置/文档锚点在哪里（路径、符号、结构体或常量）？",
           "答案中的每个关键结论是否有实现体、调用链、状态变化或配置分支证据？",
           "是否排除题干未要求的相邻模块、同名概念、用户态封装、README 口号或测试桩？",
-          "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？"
+          "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？",
+          "????????????? sys_sendto ??????????/?????????"
         ],
         "structured_facts": [
           {
@@ -1509,19 +1433,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "网络子系统需要 socket/API、协议栈状态机、网络设备或 loopback 数据路径。只有 syscall 号、用户头文件、README 声称或网卡常量不能判 implemented。",
-        "textbook_basis": [
-          {
-            "source": "OS network stack practice beyond Stallings core chapters",
-            "concepts": [
-              "socket interface",
-              "protocol stack",
-              "network device driver",
-              "packet buffer",
-              "zero-copy"
-            ]
-          }
-        ]
+        "concept_boundary": "网络子系统需要 socket/API、协议栈状态机、网络设备或 loopback 数据路径。只有 syscall 号、用户头文件、README 声称或网卡常量不能判 implemented。"
       },
       "llm_answer_steps": [
         "只回答 Q08_004 的题干，不使用相邻题结论替代。",
@@ -1616,7 +1528,8 @@
         "是否存在执行“网卡驱动”语义的真实实现体，而不是声明、空函数或固定返回？",
         "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
         "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
-        "是否排除与“网卡驱动”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？"
+        "是否排除与“网卡驱动”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+        "??????????????????????/????????????"
       ],
       "structured_facts": [
         {
@@ -1776,18 +1689,6 @@
           "unknown"
         ]
       },
-      "textbook_basis": [
-        {
-          "source": "OS network stack practice beyond Stallings core chapters",
-          "concepts": [
-            "socket interface",
-            "protocol stack",
-            "network device driver",
-            "packet buffer",
-            "zero-copy"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否实现网卡驱动（virtio-net/e1000 等）与收包中断路径？  本题属于网络子系统层，只看协议栈、socket API、网卡驱动衔接、协议支持和网络数据路径；块设备 DMA、普通 VFS fd 或孤立驱动 descriptor 不能替代网络语义。",
       "task_hints": {
         "diagnostic_checks": [
@@ -1795,7 +1696,8 @@
           "是否存在执行“网卡驱动”语义的真实实现体，而不是声明、空函数或固定返回？",
           "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
           "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
-          "是否排除与“网卡驱动”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？"
+          "是否排除与“网卡驱动”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+          "??????????????????????/????????????"
         ],
         "structured_facts": [
           {
@@ -1927,19 +1829,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "网络子系统需要 socket/API、协议栈状态机、网络设备或 loopback 数据路径。只有 syscall 号、用户头文件、README 声称或网卡常量不能判 implemented。",
-        "textbook_basis": [
-          {
-            "source": "OS network stack practice beyond Stallings core chapters",
-            "concepts": [
-              "socket interface",
-              "protocol stack",
-              "network device driver",
-              "packet buffer",
-              "zero-copy"
-            ]
-          }
-        ]
+        "concept_boundary": "网络子系统需要 socket/API、协议栈状态机、网络设备或 loopback 数据路径。只有 syscall 号、用户头文件、README 声称或网卡常量不能判 implemented。"
       },
       "llm_answer_steps": [
         "只回答 Q08_005 的题干，不使用相邻题结论替代。",
@@ -2013,7 +1903,8 @@
         "逐项读取题单 choices，列出本题允许多选的全部候选项。",
         "每个被选中的选项是否都有独立源码/配置/调用点证据？",
         "未选选项是否经过关键词和目录搜索，而不是默认遗漏？",
-        "是否避免把相似选项、相邻模块或文档声称混作已选功能？"
+        "是否避免把相似选项、相邻模块或文档声称混作已选功能？",
+        "???????????????? DHCP/DNS/ARP/ICMP/TCP/UDP??????? not_found?"
       ],
       "structured_facts": [
         {
@@ -2132,25 +2023,14 @@
         "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
         "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。"
       },
-      "textbook_basis": [
-        {
-          "source": "OS network stack practice beyond Stallings core chapters",
-          "concepts": [
-            "socket interface",
-            "protocol stack",
-            "network device driver",
-            "packet buffer",
-            "zero-copy"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：协议支持情况（多选；未发现则留空并在 notes 写 not_found）：  本题属于网络子系统层，只看协议栈、socket API、网卡驱动衔接、协议支持和网络数据路径；块设备 DMA、普通 VFS fd 或孤立驱动 descriptor 不能替代网络语义。",
       "task_hints": {
         "diagnostic_checks": [
           "逐项读取题单 choices，列出本题允许多选的全部候选项。",
           "每个被选中的选项是否都有独立源码/配置/调用点证据？",
           "未选选项是否经过关键词和目录搜索，而不是默认遗漏？",
-          "是否避免把相似选项、相邻模块或文档声称混作已选功能？"
+          "是否避免把相似选项、相邻模块或文档声称混作已选功能？",
+          "???????????????? DHCP/DNS/ARP/ICMP/TCP/UDP??????? not_found?"
         ],
         "structured_facts": [
           {
@@ -2254,19 +2134,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "网络子系统需要 socket/API、协议栈状态机、网络设备或 loopback 数据路径。只有 syscall 号、用户头文件、README 声称或网卡常量不能判 implemented。",
-        "textbook_basis": [
-          {
-            "source": "OS network stack practice beyond Stallings core chapters",
-            "concepts": [
-              "socket interface",
-              "protocol stack",
-              "network device driver",
-              "packet buffer",
-              "zero-copy"
-            ]
-          }
-        ]
+        "concept_boundary": "网络子系统需要 socket/API、协议栈状态机、网络设备或 loopback 数据路径。只有 syscall 号、用户头文件、README 声称或网卡常量不能判 implemented。"
       },
       "llm_answer_steps": [
         "只回答 Q08_006 的题干，不使用相邻题结论替代。",
@@ -2342,7 +2210,8 @@
         "支撑答案的主要源码/配置/文档锚点在哪里（路径、符号、结构体或常量）？",
         "答案中的每个关键结论是否有实现体、调用链、状态变化或配置分支证据？",
         "是否排除题干未要求的相邻模块、同名概念、用户态封装、README 口号或测试桩？",
-        "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？"
+        "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？",
+        "???????zero-copy?????? DMA descriptor ??????? DMA descriptor ?????????????"
       ],
       "structured_facts": [
         {
@@ -2490,18 +2359,6 @@
         "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
         "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。"
       },
-      "textbook_basis": [
-        {
-          "source": "OS network stack practice beyond Stallings core chapters",
-          "concepts": [
-            "socket interface",
-            "protocol stack",
-            "network device driver",
-            "packet buffer",
-            "zero-copy"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：网络数据路径中是否存在用户可见 zero-copy、内核共享缓冲、或网卡 DMA descriptor？请分别给状态与证据；普通 DMA descriptor 不自动等于 zero-copy。 DMA 需要设备可访问物理地址或 descriptor 提交；zero-copy 需要用户/协议栈/设备路径减少复制，普通 descriptor 或 memcpy 优化不能互相替代。 本题属于网络子系统层，只看协议栈、socket API、网卡驱动衔接、协议支持和网络数据路径；块设备 DMA、普通 VFS fd 或孤立驱动 descriptor 不能替代网络语义。",
       "task_hints": {
         "diagnostic_checks": [
@@ -2509,7 +2366,8 @@
           "支撑答案的主要源码/配置/文档锚点在哪里（路径、符号、结构体或常量）？",
           "答案中的每个关键结论是否有实现体、调用链、状态变化或配置分支证据？",
           "是否排除题干未要求的相邻模块、同名概念、用户态封装、README 口号或测试桩？",
-          "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？"
+          "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？",
+          "???????zero-copy?????? DMA descriptor ??????? DMA descriptor ?????????????"
         ],
         "structured_facts": [
           {
@@ -2641,20 +2499,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "zero-copy 指用户缓冲、协议栈缓冲与设备传输之间减少或避免数据复制的端到端路径；共享 skb/packet buffer 是内核内部缓冲复用；网卡 DMA descriptor 只说明设备直接访问内存。三者相关但不能互相替代。",
-        "textbook_basis": [
-          {
-            "source": "OS network stack practice beyond Stallings core chapters",
-            "concepts": [
-              "socket interface",
-              "protocol stack",
-              "network device driver",
-              "packet buffer",
-              "zero-copy"
-            ]
-          }
-        ],
-        "text_authoring": "authored_in_describe_stage_qa_json"
+        "concept_boundary": "zero-copy 指用户缓冲、协议栈缓冲与设备传输之间减少或避免数据复制的端到端路径；共享 skb/packet buffer 是内核内部缓冲复用；网卡 DMA descriptor 只说明设备直接访问内存。三者相关但不能互相替代。"
       },
       "llm_answer_steps": [
         "只回答 Q08_007 的题干，不使用相邻题结论替代。",
@@ -2664,7 +2509,6 @@
       ]
     }
   ],
-  "stage_constraints_md": "**本阶段须额外覆盖**：\n- 若仅回环/仅 QEMU：写明**限制**；若多网卡：列**各自入口文件**与 feature 开关。\n- 若无网络实现：单列一节说明依据即可。\n\n必须回答：\n- 网络协议栈架构：自实现还是使用 `smoltcp`/`lwip` 等库？（**检查 Cargo.toml 依赖**）**如果完全没有网络支持，明确写“未实现网络功能（❌ 未实现）”**。\n- Socket 接口实现：是否有 `socket`/`bind`/`connect` 等 syscall？还是仅有 Loopback？\n- **功能限制声明（必须）**：分析项目是否已在真实物理网卡上测试过网络功能。如果仅在 QEMU 环境测试或仅支持本地回环通信，必须明确写出该限制。搜索 `loopback|LOOPBACK|127.0.0.1` 确认是否仅有回环设备。\n- **网卡驱动细节**：\n  - 搜索 `drivers/net/`, `virtio-drivers`, `ixgbe` 等。\n  - 列出支持的网卡类型（VirtIO, E1000, RTL8139, Intel 82599 等）。\n  - **PHY/MAC 层抽象**：是否存在独立的 PHY 驱动层？\n  - **错误处理**：描述一个网络操作失败（如 connect timeout）时的错误码传递流程。\n- **高级特性验证（必须 grep 代码）**：\n  - 零拷贝（Zero Copy）：搜索 `DMA` 或 `shared` buffer。只有在驱动层看到 DMA 描述符操作，或者协议栈层有 `mbuf` 传递引用，才算零拷贝。\n  - 多队列（Multi-queue）：是否有 RSS 支持？\n  - **协议支持**：DHCP, DNS, ARP, ICMP, TCP, UDP。\n  - **如果未找到代码，明确说明“不支持”**。\n- 数据包收发流程：追踪从 `virtio-net` 中断到 `tcp_recv` 的路径。\n- **禁止仅靠 README 断言**「支持某网卡/某平台/零拷贝」；须 `read_code_segment`/`grep_in_repo` 到驱动或协议栈源码。DMA/零拷贝声称须在驱动或 DMA 描述符路径上给出片段，否则标「未发现」。\n\n要求：\n- **语义发现（🥇 首选）**：使用 `rag_search_code` 搜索 \"smoltcp integration\", \"socket syscall\", \"VirtIO-Net driver\", \"network stack architecture\" 锁定网络源码。\n- 使用 `lsp_get_definition` 定位 `Socket` trait、`TcpSocket`/`UdpSocket` 结构体定义。\n- **【必须】使用 `lsp_get_call_graph` 追踪数据发送路径**（`sys_sendto` → 协议栈 → 网卡驱动）：\n  - `lsp_get_call_graph(repo_path, file_of_sys_sendto, \"sys_sendto\", direction=\"outgoing\", max_depth=4)`\n  - 如返回 `[⚠️ DEGRADED MODE]`，标注后继续使用 Grep 结果。\n- 使用 `lsp_get_references` 查找单层引用（如哪些地方调用了 `socket_write`、`tcp_send`）。\n- 使用 `lsp_get_document_outline` 浏览网络模块文件，发现所有 socket 操作和协议处理函数。\n- 辅以 grep_in_repo 搜索 net/、socket/、tcp/ 相关模块。\n- **严格区分**：使用了网络库（如 smoltcp）vs 自己实现了协议栈。\n\n**【评测与交付适配 — 本阶段启发式】**（须源码证据；无则略）：\n- 若测例涉及 iperf/netperf/网络吞吐，须与本仓网卡驱动和协议栈实现对照，写「能否实际跑通」结论并附路径。\n- 仅 QEMU/仅回环的限制（`loopback`/`127.0.0.1`）须明确声明；无多网卡或 `hostfwd` 时写「仅回环或 QEMU 虚拟网」。",
   "features": [
     {
       "feature_id": "feat_08_network_q08_001",
@@ -2672,18 +2516,6 @@
       "domain": "network_stack",
       "feature_name": "Q08_001 是否存在网络子系统实现（协议栈或 socket 层）？（必须三态）",
       "description": "是否存在网络子系统实现（协议栈或 socket 层）？（必须三态）",
-      "textbook_basis": [
-        {
-          "source": "OS network stack practice beyond Stallings core chapters",
-          "concepts": [
-            "socket interface",
-            "protocol stack",
-            "network device driver",
-            "packet buffer",
-            "zero-copy"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否存在网络子系统实现（协议栈或 socket 层）？  本题属于网络子系统层，只看协议栈、socket API、网卡驱动衔接、协议支持和网络数据路径；块设备 DMA、普通 VFS fd 或孤立驱动 descriptor 不能替代网络语义。",
       "dependencies": [
         "05_fs_drivers",
@@ -3088,19 +2920,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "网络子系统需要 socket/API、协议栈状态机、网络设备或 loopback 数据路径。只有 syscall 号、用户头文件、README 声称或网卡常量不能判 implemented。",
-        "textbook_basis": [
-          {
-            "source": "OS network stack practice beyond Stallings core chapters",
-            "concepts": [
-              "socket interface",
-              "protocol stack",
-              "network device driver",
-              "packet buffer",
-              "zero-copy"
-            ]
-          }
-        ]
+        "concept_boundary": "网络子系统需要 socket/API、协议栈状态机、网络设备或 loopback 数据路径。只有 syscall 号、用户头文件、README 声称或网卡常量不能判 implemented。"
       }
     },
     {
@@ -3109,18 +2929,6 @@
       "domain": "network_stack",
       "feature_name": "Q08_002 协议栈来源更接近哪种？",
       "description": "协议栈来源更接近哪种？",
-      "textbook_basis": [
-        {
-          "source": "OS network stack practice beyond Stallings core chapters",
-          "concepts": [
-            "socket interface",
-            "protocol stack",
-            "network device driver",
-            "packet buffer",
-            "zero-copy"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：协议栈来源更接近哪种？  本题属于网络子系统层，只看协议栈、socket API、网卡驱动衔接、协议支持和网络数据路径；块设备 DMA、普通 VFS fd 或孤立驱动 descriptor 不能替代网络语义。",
       "dependencies": [
         "05_fs_drivers",
@@ -3432,19 +3240,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "网络子系统需要 socket/API、协议栈状态机、网络设备或 loopback 数据路径。只有 syscall 号、用户头文件、README 声称或网卡常量不能判 implemented。",
-        "textbook_basis": [
-          {
-            "source": "OS network stack practice beyond Stallings core chapters",
-            "concepts": [
-              "socket interface",
-              "protocol stack",
-              "network device driver",
-              "packet buffer",
-              "zero-copy"
-            ]
-          }
-        ]
+        "concept_boundary": "网络子系统需要 socket/API、协议栈状态机、网络设备或 loopback 数据路径。只有 syscall 号、用户头文件、README 声称或网卡常量不能判 implemented。"
       }
     },
     {
@@ -3453,18 +3249,6 @@
       "domain": "network_stack",
       "feature_name": "Q08_003 是否实现 socket 系统调用接口（socket/bind/connect/sendto/recvfrom 等）？（必须三态）",
       "description": "是否实现 socket 系统调用接口（socket/bind/connect/sendto/recvfrom 等）？（必须三态）",
-      "textbook_basis": [
-        {
-          "source": "OS network stack practice beyond Stallings core chapters",
-          "concepts": [
-            "socket interface",
-            "protocol stack",
-            "network device driver",
-            "packet buffer",
-            "zero-copy"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否实现 socket 系统调用接口（socket/bind/connect/sendto/recvfrom 等）？  本题属于网络子系统层，只看协议栈、socket API、网卡驱动衔接、协议支持和网络数据路径；块设备 DMA、普通 VFS fd 或孤立驱动 descriptor 不能替代网络语义。",
       "dependencies": [
         "05_fs_drivers",
@@ -3871,19 +3655,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "网络子系统需要 socket/API、协议栈状态机、网络设备或 loopback 数据路径。只有 syscall 号、用户头文件、README 声称或网卡常量不能判 implemented。",
-        "textbook_basis": [
-          {
-            "source": "OS network stack practice beyond Stallings core chapters",
-            "concepts": [
-              "socket interface",
-              "protocol stack",
-              "network device driver",
-              "packet buffer",
-              "zero-copy"
-            ]
-          }
-        ]
+        "concept_boundary": "网络子系统需要 socket/API、协议栈状态机、网络设备或 loopback 数据路径。只有 syscall 号、用户头文件、README 声称或网卡常量不能判 implemented。"
       }
     },
     {
@@ -3892,18 +3664,6 @@
       "domain": "network_stack",
       "feature_name": "Q08_004 选择一个发送路径（优先 sys_sendto），追踪：syscall → 协议栈 → 网卡驱动。列 3-6 个关键节点并给证据。",
       "description": "选择一个发送路径（优先 sys_sendto），追踪：syscall → 协议栈 → 网卡驱动。列 3-6 个关键节点并给证据。",
-      "textbook_basis": [
-        {
-          "source": "OS network stack practice beyond Stallings core chapters",
-          "concepts": [
-            "socket interface",
-            "protocol stack",
-            "network device driver",
-            "packet buffer",
-            "zero-copy"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：选择一个发送路径（优先 sys_sendto），追踪：syscall → 协议栈 → 网卡驱动。列 3-6 个关键节点并给证据。  本题属于网络子系统层，只看协议栈、socket API、网卡驱动衔接、协议支持和网络数据路径；块设备 DMA、普通 VFS fd 或孤立驱动 descriptor 不能替代网络语义。",
       "dependencies": [
         "05_fs_drivers",
@@ -4276,19 +4036,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "网络子系统需要 socket/API、协议栈状态机、网络设备或 loopback 数据路径。只有 syscall 号、用户头文件、README 声称或网卡常量不能判 implemented。",
-        "textbook_basis": [
-          {
-            "source": "OS network stack practice beyond Stallings core chapters",
-            "concepts": [
-              "socket interface",
-              "protocol stack",
-              "network device driver",
-              "packet buffer",
-              "zero-copy"
-            ]
-          }
-        ]
+        "concept_boundary": "网络子系统需要 socket/API、协议栈状态机、网络设备或 loopback 数据路径。只有 syscall 号、用户头文件、README 声称或网卡常量不能判 implemented。"
       }
     },
     {
@@ -4297,18 +4045,6 @@
       "domain": "network_stack",
       "feature_name": "Q08_005 是否实现网卡驱动（virtio-net/e1000 等）与收包中断路径？（必须三态）",
       "description": "是否实现网卡驱动（virtio-net/e1000 等）与收包中断路径？（必须三态）",
-      "textbook_basis": [
-        {
-          "source": "OS network stack practice beyond Stallings core chapters",
-          "concepts": [
-            "socket interface",
-            "protocol stack",
-            "network device driver",
-            "packet buffer",
-            "zero-copy"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否实现网卡驱动（virtio-net/e1000 等）与收包中断路径？  本题属于网络子系统层，只看协议栈、socket API、网卡驱动衔接、协议支持和网络数据路径；块设备 DMA、普通 VFS fd 或孤立驱动 descriptor 不能替代网络语义。",
       "dependencies": [
         "05_fs_drivers",
@@ -4715,19 +4451,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "网络子系统需要 socket/API、协议栈状态机、网络设备或 loopback 数据路径。只有 syscall 号、用户头文件、README 声称或网卡常量不能判 implemented。",
-        "textbook_basis": [
-          {
-            "source": "OS network stack practice beyond Stallings core chapters",
-            "concepts": [
-              "socket interface",
-              "protocol stack",
-              "network device driver",
-              "packet buffer",
-              "zero-copy"
-            ]
-          }
-        ]
+        "concept_boundary": "网络子系统需要 socket/API、协议栈状态机、网络设备或 loopback 数据路径。只有 syscall 号、用户头文件、README 声称或网卡常量不能判 implemented。"
       }
     },
     {
@@ -4736,18 +4460,6 @@
       "domain": "network_stack",
       "feature_name": "Q08_006 协议支持情况（多选；未发现则留空并在 notes 写 not_found）：",
       "description": "协议支持情况（多选；未发现则留空并在 notes 写 not_found）：",
-      "textbook_basis": [
-        {
-          "source": "OS network stack practice beyond Stallings core chapters",
-          "concepts": [
-            "socket interface",
-            "protocol stack",
-            "network device driver",
-            "packet buffer",
-            "zero-copy"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：协议支持情况（多选；未发现则留空并在 notes 写 not_found）：  本题属于网络子系统层，只看协议栈、socket API、网卡驱动衔接、协议支持和网络数据路径；块设备 DMA、普通 VFS fd 或孤立驱动 descriptor 不能替代网络语义。",
       "dependencies": [
         "05_fs_drivers",
@@ -5061,19 +4773,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "网络子系统需要 socket/API、协议栈状态机、网络设备或 loopback 数据路径。只有 syscall 号、用户头文件、README 声称或网卡常量不能判 implemented。",
-        "textbook_basis": [
-          {
-            "source": "OS network stack practice beyond Stallings core chapters",
-            "concepts": [
-              "socket interface",
-              "protocol stack",
-              "network device driver",
-              "packet buffer",
-              "zero-copy"
-            ]
-          }
-        ]
+        "concept_boundary": "网络子系统需要 socket/API、协议栈状态机、网络设备或 loopback 数据路径。只有 syscall 号、用户头文件、README 声称或网卡常量不能判 implemented。"
       }
     },
     {
@@ -5082,18 +4782,6 @@
       "domain": "network_stack",
       "feature_name": "Q08_007 网络数据路径中是否存在用户可见 zero-copy、内核共享缓冲、或网卡 DMA descriptor？请分别给状态与证据；普通 DMA descriptor 不自动等于 zero-copy。",
       "description": "网络数据路径中是否存在用户可见 zero-copy、内核共享缓冲、或网卡 DMA descriptor？请分别给状态与证据；普通 DMA descriptor 不自动等于 zero-copy。",
-      "textbook_basis": [
-        {
-          "source": "OS network stack practice beyond Stallings core chapters",
-          "concepts": [
-            "socket interface",
-            "protocol stack",
-            "network device driver",
-            "packet buffer",
-            "zero-copy"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：网络数据路径中是否存在用户可见 zero-copy、内核共享缓冲、或网卡 DMA descriptor？请分别给状态与证据；普通 DMA descriptor 不自动等于 zero-copy。 DMA 需要设备可访问物理地址或 descriptor 提交；zero-copy 需要用户/协议栈/设备路径减少复制，普通 descriptor 或 memcpy 优化不能互相替代。 本题属于网络子系统层，只看协议栈、socket API、网卡驱动衔接、协议支持和网络数据路径；块设备 DMA、普通 VFS fd 或孤立驱动 descriptor 不能替代网络语义。",
       "dependencies": [
         "05_fs_drivers",
@@ -5469,60 +5157,8 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "zero-copy 指用户缓冲、协议栈缓冲与设备传输之间减少或避免数据复制的端到端路径；共享 skb/packet buffer 是内核内部缓冲复用；网卡 DMA descriptor 只说明设备直接访问内存。三者相关但不能互相替代。",
-        "textbook_basis": [
-          {
-            "source": "OS network stack practice beyond Stallings core chapters",
-            "concepts": [
-              "socket interface",
-              "protocol stack",
-              "network device driver",
-              "packet buffer",
-              "zero-copy"
-            ]
-          }
-        ],
-        "text_authoring": "authored_in_describe_stage_qa_json"
+        "concept_boundary": "zero-copy 指用户缓冲、协议栈缓冲与设备传输之间减少或避免数据复制的端到端路径；共享 skb/packet buffer 是内核内部缓冲复用；网卡 DMA descriptor 只说明设备直接访问内存。三者相关但不能互相替代。"
       }
     }
-  ],
-  "llm_field_guide": {
-    "purpose": "这些字段是给弱模型看的作答说明：不要把题目当作文题，必须先填结构化事实，再推出最终答案。",
-    "field_meanings": {
-      "question_id": "稳定题号。回答、证据、fact_result 都必须绑定这个 ID。",
-      "stem": "人类可读题面，只说明要问什么；不能只根据 stem 直接下结论。",
-      "question_type": "题型。tri_state_impl 只能回答 implemented / stub / not_found / unknown。",
-      "choices": "选择题的合法选项。single_choice 必须原样选择其中一个；multi_choice 必须返回数组。",
-      "feature_ids": "本题对应的 OS 机制特征 ID，用于图谱和证据追踪。",
-      "textbook_basis": "本题参考的 Stallings 教材概念范围，用来帮助理解概念边界，不是源码证据。",
-      "concept_boundary": "本题最容易混淆的概念边界。判断前必须先读，防止把相似机制误判为实现。",
-      "diagnostic_checks": "局部判断步骤。弱模型应逐条查，不要直接回答总问题。",
-      "structured_facts": "必须逐项完成的事实表。每个 fact 都要给 status_or_value 和 evidence_id；这是最终 value 的依据。",
-      "answer_contract": "最终答案约束。规定 value 类型、合法值、必须完成哪些 fact，以及证据引用规则。",
-      "evidence_policy": "证据要求。RAG/grep 只是线索；implemented 需要 read/LSP/function body/call site 等强证据。",
-      "tri_state_rule": "三态/四态判定规则。implemented、stub、not_found、unknown 的边界写在这里。",
-      "anti_examples": "反例。命中这些情况时不能判 implemented，避免看到名字就误判。",
-      "negative_search_policy": "判 not_found 前必须覆盖的关键词和目录要求。覆盖不足只能 unknown。",
-      "features": "题单顶层的 feature 汇总，供图谱和跨题审阅使用。"
-    },
-    "status_values": {
-      "yes_strong": "有强源码证据：定义/实现体/调用点/状态变化/数据结构读写/调用链。可参与支撑 implemented。",
-      "yes_weak": "只有 RAG、grep、outline、README 或名字命中。只能当线索，不能单独支撑 implemented。",
-      "stub_or_declaration_only": "只有声明、trait/struct 壳、空实现、固定返回、ENOSYS、unsupported、todo/unimplemented。通常支撑 stub。",
-      "no_after_negative_search": "按 negative_search_policy 搜过关键词和目录后仍未发现。可参与支撑 not_found。",
-      "unknown": "证据不足、覆盖不足、冲突或 fact 未完成。最终应降级 unknown/待核实。"
-    },
-    "required_reasoning_order": [
-      "先读 stem，确认问题对象。",
-      "再读 textbook_basis 和 concept_boundary，确认 OS 概念边界。",
-      "逐项完成 structured_facts；每个 fact 只能引用 evidence_id，不要手写新路径/行号当证据。",
-      "把 RAG/grep 命中标成 yes_weak 或 hint，不要直接推出 implemented。",
-      "若要判 not_found，必须完成 negative_search_coverage fact。",
-      "最后按 answer_contract 和 tri_state_rule 推出 value。"
-    ],
-    "output_expectation": {
-      "draft_answer": "应包含 question_id、value、structured_fact_results、used_evidence_ids、confidence、notes。",
-      "final_answer": "最终 value 必须能由 structured_fact_results 和 evidence_id 追溯出来。"
-    }
-  }
+  ]
 }

@@ -204,20 +204,6 @@
         "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
         "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。"
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-          "concepts": [
-            "mutual exclusion",
-            "semaphore",
-            "monitor",
-            "message passing",
-            "deadlock",
-            "condition synchronization",
-            "barrier"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：该内核提供了哪些同步原语？（SpinLock/Mutex/RwLock/Semaphore/Condvar/WaitQueue 等；列出类型定义证据） 同步/IPC 题必须区分字节流、离散消息、共享内存、地址等待、条件等待和信号通知；只实现其中一种不能证明另一种。 本题属于同步与 IPC 层，只看锁、等待队列、sleep/wakeup、pipe、futex、signal、条件变量、消息传递、死锁与屏障语义；VFS 接入、trap 返回或进程状态只作为互指证据。",
       "task_hints": {
         "diagnostic_checks": [
@@ -357,21 +343,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "管程/条件变量必须体现与互斥锁关联的条件等待：wait 释放锁并阻塞，notify/signal/broadcast 后按 Hoare 或 Mesa 语义恢复。不能把 kernel debug monitor、Unix signal、pipe 阻塞、futex 地址等待、裸 WaitQueue 或普通 mutex/rwlock 混为条件变量。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-            "concepts": [
-              "mutual exclusion",
-              "semaphore",
-              "monitor",
-              "message passing",
-              "deadlock",
-              "condition synchronization",
-              "barrier"
-            ]
-          }
-        ]
+        "concept_boundary": "管程/条件变量必须体现与互斥锁关联的条件等待：wait 释放锁并阻塞，notify/signal/broadcast 后按 Hoare 或 Mesa 语义恢复。不能把 kernel debug monitor、Unix signal、pipe 阻塞、futex 地址等待、裸 WaitQueue 或普通 mutex/rwlock 混为条件变量。"
       },
       "llm_answer_steps": [
         "只回答 Q06_001 的题干，不使用相邻题结论替代。",
@@ -563,20 +535,6 @@
         "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
         "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。"
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-          "concepts": [
-            "mutual exclusion",
-            "semaphore",
-            "monitor",
-            "message passing",
-            "deadlock",
-            "condition synchronization",
-            "barrier"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：Mutex 更接近哪种实现？  本题属于同步与 IPC 层，只看锁、等待队列、sleep/wakeup、pipe、futex、signal、条件变量、消息传递、死锁与屏障语义；VFS 接入、trap 返回或进程状态只作为互指证据。",
       "task_hints": {
         "diagnostic_checks": [
@@ -687,21 +645,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "同步题按 Stallings Ch5 区分互斥、条件同步、管程、消息传递、死锁条件/处理策略和具体 IPC。不能把 signal、pipe、futex、mutex、waitqueue 混为同一概念。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-            "concepts": [
-              "mutual exclusion",
-              "semaphore",
-              "monitor",
-              "message passing",
-              "deadlock",
-              "condition synchronization",
-              "barrier"
-            ]
-          }
-        ]
+        "concept_boundary": "同步题按 Stallings Ch5 区分互斥、条件同步、管程、消息传递、死锁条件/处理策略和具体 IPC。不能把 signal、pipe、futex、mutex、waitqueue 混为同一概念。"
       },
       "llm_answer_steps": [
         "只回答 Q06_002 的题干，不使用相邻题结论替代。",
@@ -955,20 +899,6 @@
           "unknown"
         ]
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-          "concepts": [
-            "mutual exclusion",
-            "semaphore",
-            "monitor",
-            "message passing",
-            "deadlock",
-            "condition synchronization",
-            "barrier"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否存在等待队列 (Wait Queue, WaitQueue) 与 sleep/wakeup（或等价阻塞/唤醒）实现？  本题属于同步与 IPC 层，只看锁、等待队列、sleep/wakeup、pipe、futex、signal、条件变量、消息传递、死锁与屏障语义；VFS 接入、trap 返回或进程状态只作为互指证据。",
       "task_hints": {
         "diagnostic_checks": [
@@ -1108,21 +1038,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "同步题按 Stallings Ch5 区分互斥、条件同步、管程、消息传递、死锁条件/处理策略和具体 IPC。不能把 signal、pipe、futex、mutex、waitqueue 混为同一概念。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-            "concepts": [
-              "mutual exclusion",
-              "semaphore",
-              "monitor",
-              "message passing",
-              "deadlock",
-              "condition synchronization",
-              "barrier"
-            ]
-          }
-        ]
+        "concept_boundary": "同步题按 Stallings Ch5 区分互斥、条件同步、管程、消息传递、死锁条件/处理策略和具体 IPC。不能把 signal、pipe、futex、mutex、waitqueue 混为同一概念。"
       },
       "llm_answer_steps": [
         "只回答 Q06_003 的题干，不使用相邻题结论替代。",
@@ -1184,7 +1100,8 @@
         "填空值是否来自源码常量、链接脚本、配置、结构体字段或明确计算路径？",
         "sleep/wakeup 路径 (Sleep/Wakeup Path) 上的入口函数名、持有锁名及 wakeup 函数名是否能从源码直接读出，并给出文件/行证据？",
         "若答案需要计算，是否写明从哪些常量/字段推导得到？",
-        "无法由源码确定时是否写 unknown，并给出已搜索位置而不是猜测？"
+        "无法由源码确定时是否写 unknown，并给出已搜索位置而不是猜测？",
+        "???????sleep/wakeup ?????????????????? wakeup????????"
       ],
       "structured_facts": [
         {
@@ -1309,27 +1226,14 @@
         "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
         "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。"
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-          "concepts": [
-            "mutual exclusion",
-            "semaphore",
-            "monitor",
-            "message passing",
-            "deadlock",
-            "condition synchronization",
-            "barrier"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：sleep / wakeup 不变量 (Sleep-Wakeup Invariant) 分析，按格式填写： - sleep 入口函数: ___（路径） - 入睡前持有的锁: ___（无则写 none） - 防丢 wakeup (Lost Wakeup Prevention)...  本题属于同步与 IPC 层，只看锁、等待队列、sleep/wakeup、pipe、futex、signal、条件变量、消息传递、死锁与屏障语义；VFS 接入、trap 返回或进程状态只作为互指证据。",
       "task_hints": {
         "diagnostic_checks": [
           "填空值是否来自源码常量、链接脚本、配置、结构体字段或明确计算路径？",
           "sleep/wakeup 路径 (Sleep/Wakeup Path) 上的入口函数名、持有锁名及 wakeup 函数名是否能从源码直接读出，并给出文件/行证据？",
           "若答案需要计算，是否写明从哪些常量/字段推导得到？",
-          "无法由源码确定时是否写 unknown，并给出已搜索位置而不是猜测？"
+          "无法由源码确定时是否写 unknown，并给出已搜索位置而不是猜测？",
+          "???????sleep/wakeup ?????????????????? wakeup????????"
         ],
         "structured_facts": [
           {
@@ -1439,21 +1343,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "同步题按 Stallings Ch5 区分互斥、条件同步、管程、消息传递、死锁条件/处理策略和具体 IPC。不能把 signal、pipe、futex、mutex、waitqueue 混为同一概念。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-            "concepts": [
-              "mutual exclusion",
-              "semaphore",
-              "monitor",
-              "message passing",
-              "deadlock",
-              "condition synchronization",
-              "barrier"
-            ]
-          }
-        ]
+        "concept_boundary": "同步题按 Stallings Ch5 区分互斥、条件同步、管程、消息传递、死锁条件/处理策略和具体 IPC。不能把 signal、pipe、futex、mutex、waitqueue 混为同一概念。"
       },
       "llm_answer_steps": [
         "只回答 Q06_004 的题干，不使用相邻题结论替代。",
@@ -1547,7 +1437,8 @@
         "是否存在执行“管道 (Pipe)”语义的真实实现体，而不是声明、空函数或固定返回？",
         "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
         "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
-        "是否排除与“管道 (Pipe)”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？"
+        "是否排除与“管道 (Pipe)”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+        "???????pipe ???????/???????????????? stub?"
       ],
       "structured_facts": [
         {
@@ -1707,20 +1598,6 @@
           "unknown"
         ]
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-          "concepts": [
-            "mutual exclusion",
-            "semaphore",
-            "monitor",
-            "message passing",
-            "deadlock",
-            "condition synchronization",
-            "barrier"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否实现管道 (Pipe)？ 同步/IPC 题必须区分字节流、离散消息、共享内存、地址等待、条件等待和信号通知；只实现其中一种不能证明另一种。 本题属于同步与 IPC 层，只看锁、等待队列、sleep/wakeup、pipe、futex、signal、条件变量、消息传递、死锁与屏障语义；VFS 接入、trap 返回或进程状态只作为互指证据。",
       "task_hints": {
         "diagnostic_checks": [
@@ -1728,7 +1605,8 @@
           "是否存在执行“管道 (Pipe)”语义的真实实现体，而不是声明、空函数或固定返回？",
           "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
           "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
-          "是否排除与“管道 (Pipe)”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？"
+          "是否排除与“管道 (Pipe)”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+          "???????pipe ???????/???????????????? stub?"
         ],
         "structured_facts": [
           {
@@ -1860,21 +1738,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "同步题按 Stallings Ch5 区分互斥、条件同步、管程、消息传递、死锁条件/处理策略和具体 IPC。不能把 signal、pipe、futex、mutex、waitqueue 混为同一概念。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-            "concepts": [
-              "mutual exclusion",
-              "semaphore",
-              "monitor",
-              "message passing",
-              "deadlock",
-              "condition synchronization",
-              "barrier"
-            ]
-          }
-        ]
+        "concept_boundary": "同步题按 Stallings Ch5 区分互斥、条件同步、管程、消息传递、死锁条件/处理策略和具体 IPC。不能把 signal、pipe、futex、mutex、waitqueue 混为同一概念。"
       },
       "llm_answer_steps": [
         "只回答 Q06_005 的题干，不使用相邻题结论替代。",
@@ -1942,7 +1806,8 @@
         "题目“pipe 缓冲形态更接近哪种？”的候选选项有哪些，是否只从题单 choices 中选择？",
         "被选中的形态是否有源码、配置、调用链或数据结构证据直接支撑？",
         "未选选项是否被源码证据、缺失证据或概念边界排除？",
-        "若多个选项同时成立或证据不足，是否按题意选择“其他/混合/unknown”并说明原因？"
+        "若多个选项同时成立或证据不足，是否按题意选择“其他/混合/unknown”并说明原因？",
+        "???????pipe ???????????????????"
       ],
       "structured_facts": [
         {
@@ -2061,27 +1926,14 @@
         "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
         "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。"
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-          "concepts": [
-            "mutual exclusion",
-            "semaphore",
-            "monitor",
-            "message passing",
-            "deadlock",
-            "condition synchronization",
-            "barrier"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：pipe 缓冲形态更接近哪种？ 同步/IPC 题必须区分字节流、离散消息、共享内存、地址等待、条件等待和信号通知；只实现其中一种不能证明另一种。 本题属于同步与 IPC 层，只看锁、等待队列、sleep/wakeup、pipe、futex、signal、条件变量、消息传递、死锁与屏障语义；VFS 接入、trap 返回或进程状态只作为互指证据。",
       "task_hints": {
         "diagnostic_checks": [
           "题目“pipe 缓冲形态更接近哪种？”的候选选项有哪些，是否只从题单 choices 中选择？",
           "被选中的形态是否有源码、配置、调用链或数据结构证据直接支撑？",
           "未选选项是否被源码证据、缺失证据或概念边界排除？",
-          "若多个选项同时成立或证据不足，是否按题意选择“其他/混合/unknown”并说明原因？"
+          "若多个选项同时成立或证据不足，是否按题意选择“其他/混合/unknown”并说明原因？",
+          "???????pipe ???????????????????"
         ],
         "structured_facts": [
           {
@@ -2185,21 +2037,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "同步题按 Stallings Ch5 区分互斥、条件同步、管程、消息传递、死锁条件/处理策略和具体 IPC。不能把 signal、pipe、futex、mutex、waitqueue 混为同一概念。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-            "concepts": [
-              "mutual exclusion",
-              "semaphore",
-              "monitor",
-              "message passing",
-              "deadlock",
-              "condition synchronization",
-              "barrier"
-            ]
-          }
-        ]
+        "concept_boundary": "同步题按 Stallings Ch5 区分互斥、条件同步、管程、消息传递、死锁条件/处理策略和具体 IPC。不能把 signal、pipe、futex、mutex、waitqueue 混为同一概念。"
       },
       "llm_answer_steps": [
         "只回答 Q06_006 的题干，不使用相邻题结论替代。",
@@ -2272,7 +2110,8 @@
         "题目“pipe 的阻塞语义更接近哪种？”的候选选项有哪些，是否只从题单 choices 中选择？",
         "被选中的形态是否有源码、配置、调用链或数据结构证据直接支撑？",
         "未选选项是否被源码证据、缺失证据或概念边界排除？",
-        "若多个选项同时成立或证据不足，是否按题意选择“其他/混合/unknown”并说明原因？"
+        "若多个选项同时成立或证据不足，是否按题意选择“其他/混合/unknown”并说明原因？",
+        "???????pipe ???????????????? EAGAIN?busy-loop/yield?"
       ],
       "structured_facts": [
         {
@@ -2391,27 +2230,14 @@
         "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
         "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。"
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-          "concepts": [
-            "mutual exclusion",
-            "semaphore",
-            "monitor",
-            "message passing",
-            "deadlock",
-            "condition synchronization",
-            "barrier"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：pipe 的阻塞语义更接近哪种？ 同步/IPC 题必须区分字节流、离散消息、共享内存、地址等待、条件等待和信号通知；只实现其中一种不能证明另一种。 本题属于同步与 IPC 层，只看锁、等待队列、sleep/wakeup、pipe、futex、signal、条件变量、消息传递、死锁与屏障语义；VFS 接入、trap 返回或进程状态只作为互指证据。",
       "task_hints": {
         "diagnostic_checks": [
           "题目“pipe 的阻塞语义更接近哪种？”的候选选项有哪些，是否只从题单 choices 中选择？",
           "被选中的形态是否有源码、配置、调用链或数据结构证据直接支撑？",
           "未选选项是否被源码证据、缺失证据或概念边界排除？",
-          "若多个选项同时成立或证据不足，是否按题意选择“其他/混合/unknown”并说明原因？"
+          "若多个选项同时成立或证据不足，是否按题意选择“其他/混合/unknown”并说明原因？",
+          "???????pipe ???????????????? EAGAIN?busy-loop/yield?"
         ],
         "structured_facts": [
           {
@@ -2515,21 +2341,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "同步题按 Stallings Ch5 区分互斥、条件同步、管程、消息传递、死锁条件/处理策略和具体 IPC。不能把 signal、pipe、futex、mutex、waitqueue 混为同一概念。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-            "concepts": [
-              "mutual exclusion",
-              "semaphore",
-              "monitor",
-              "message passing",
-              "deadlock",
-              "condition synchronization",
-              "barrier"
-            ]
-          }
-        ]
+        "concept_boundary": "同步题按 Stallings Ch5 区分互斥、条件同步、管程、消息传递、死锁条件/处理策略和具体 IPC。不能把 signal、pipe、futex、mutex、waitqueue 混为同一概念。"
       },
       "llm_answer_steps": [
         "只回答 Q06_007 的题干，不使用相邻题结论替代。",
@@ -2595,7 +2407,8 @@
         "支撑答案的主要源码/配置/文档锚点在哪里（路径、符号、结构体或常量）？",
         "答案中的每个关键结论是否有实现体、调用链、状态变化或配置分支证据？",
         "是否排除题干未要求的相邻模块、同名概念、用户态封装、README 口号或测试桩？",
-        "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？"
+        "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？",
+        "???????SysV Message Queue/Semaphore/Shared Memory ??????????/PV/????? return 0/ENOSYS ??"
       ],
       "structured_facts": [
         {
@@ -2743,20 +2556,6 @@
         "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
         "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。"
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-          "concepts": [
-            "mutual exclusion",
-            "semaphore",
-            "monitor",
-            "message passing",
-            "deadlock",
-            "condition synchronization",
-            "barrier"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：SysV IPC 覆盖情况如何？请分别回答 Message Queue、Semaphore、Shared Memory 三类系统调用/内核对象的状态（implemented/stub/not_found/unknown）并给证据。 同步/IPC 题必须区分字节流、离散消息、共享内存、地址等待、条件等待和信号通知；只实现其中一种不能证明另一种。 本题属于同步与 IPC 层，只看锁、等待队列、sleep/wakeup、pipe、futex、signal、条件变量、消息传递、死锁与屏障语义；VFS 接入、trap 返回或进程状态只作为互指证据。",
       "task_hints": {
         "diagnostic_checks": [
@@ -2764,7 +2563,8 @@
           "支撑答案的主要源码/配置/文档锚点在哪里（路径、符号、结构体或常量）？",
           "答案中的每个关键结论是否有实现体、调用链、状态变化或配置分支证据？",
           "是否排除题干未要求的相邻模块、同名概念、用户态封装、README 口号或测试桩？",
-          "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？"
+          "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？",
+          "???????SysV Message Queue/Semaphore/Shared Memory ??????????/PV/????? return 0/ENOSYS ??"
         ],
         "structured_facts": [
           {
@@ -2896,22 +2696,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "SysV IPC 是 msg/sem/shm 三类独立机制。只实现其中一类不能把整题概括为 implemented；signal、pipe、futex、普通共享内存指针或 mmap 不等价于 SysV IPC。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-            "concepts": [
-              "mutual exclusion",
-              "semaphore",
-              "monitor",
-              "message passing",
-              "deadlock",
-              "condition synchronization",
-              "barrier"
-            ]
-          }
-        ],
-        "text_authoring": "authored_in_describe_stage_qa_json"
+        "concept_boundary": "SysV IPC 是 msg/sem/shm 三类独立机制。只实现其中一类不能把整题概括为 implemented；signal、pipe、futex、普通共享内存指针或 mmap 不等价于 SysV IPC。"
       },
       "llm_answer_steps": [
         "只回答 Q06_008 的题干，不使用相邻题结论替代。",
@@ -2989,7 +2774,8 @@
         "是否存在执行“futex”语义的真实实现体，而不是声明、空函数或固定返回？",
         "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
         "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
-        "是否排除与“futex”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？"
+        "是否排除与“futex”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+        "???????futex ??/????? syscall ????? sleep/wake ???????"
       ],
       "structured_facts": [
         {
@@ -3149,20 +2935,6 @@
           "unknown"
         ]
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-          "concepts": [
-            "mutual exclusion",
-            "semaphore",
-            "monitor",
-            "message passing",
-            "deadlock",
-            "condition synchronization",
-            "barrier"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否实现 futex？ 同步/IPC 题必须区分字节流、离散消息、共享内存、地址等待、条件等待和信号通知；只实现其中一种不能证明另一种。 本题属于同步与 IPC 层，只看锁、等待队列、sleep/wakeup、pipe、futex、signal、条件变量、消息传递、死锁与屏障语义；VFS 接入、trap 返回或进程状态只作为互指证据。",
       "task_hints": {
         "diagnostic_checks": [
@@ -3170,7 +2942,8 @@
           "是否存在执行“futex”语义的真实实现体，而不是声明、空函数或固定返回？",
           "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
           "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
-          "是否排除与“futex”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？"
+          "是否排除与“futex”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+          "???????futex ??/????? syscall ????? sleep/wake ???????"
         ],
         "structured_facts": [
           {
@@ -3302,21 +3075,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "futex 是基于用户地址值比较的 wait/wake syscall；普通 sleep/wakeup、mutex 或 semaphore 不等价于 futex。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-            "concepts": [
-              "mutual exclusion",
-              "semaphore",
-              "monitor",
-              "message passing",
-              "deadlock",
-              "condition synchronization",
-              "barrier"
-            ]
-          }
-        ]
+        "concept_boundary": "futex 是基于用户地址值比较的 wait/wake syscall；普通 sleep/wakeup、mutex 或 semaphore 不等价于 futex。"
       },
       "llm_answer_steps": [
         "只回答 Q06_009 的题干，不使用相邻题结论替代。",
@@ -3565,20 +3324,6 @@
           "unknown"
         ]
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-          "concepts": [
-            "mutual exclusion",
-            "semaphore",
-            "monitor",
-            "message passing",
-            "deadlock",
-            "condition synchronization",
-            "barrier"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否实现信号机制（sigaction/kill/sigreturn/trampoline）？ signal 题必须区分 trap-return 投递点、进程 pending/handler API、IPC 通知和故障信号映射，不能跨题混用。 本题属于同步与 IPC 层，只看锁、等待队列、sleep/wakeup、pipe、futex、signal、条件变量、消息传递、死锁与屏障语义；VFS 接入、trap 返回或进程状态只作为互指证据。",
       "task_hints": {
         "diagnostic_checks": [
@@ -3718,21 +3463,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "同步题按 Stallings Ch5 区分互斥、条件同步、管程、消息传递、死锁条件/处理策略和具体 IPC。不能把 signal、pipe、futex、mutex、waitqueue 混为同一概念。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-            "concepts": [
-              "mutual exclusion",
-              "semaphore",
-              "monitor",
-              "message passing",
-              "deadlock",
-              "condition synchronization",
-              "barrier"
-            ]
-          }
-        ]
+        "concept_boundary": "同步题按 Stallings Ch5 区分互斥、条件同步、管程、消息传递、死锁条件/处理策略和具体 IPC。不能把 signal、pipe、futex、mutex、waitqueue 混为同一概念。"
       },
       "llm_answer_steps": [
         "只回答 Q06_010 的题干，不使用相邻题结论替代。",
@@ -3795,7 +3526,8 @@
         "支撑答案的主要源码/配置/文档锚点在哪里（路径、符号、结构体或常量）？",
         "答案中的每个关键结论是否有实现体、调用链、状态变化或配置分支证据？",
         "是否排除题干未要求的相邻模块、同名概念、用户态封装、README 口号或测试桩？",
-        "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？"
+        "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？",
+        "???????signal handler ??????/trap frame ??? sigreturn ?????"
       ],
       "structured_facts": [
         {
@@ -3943,20 +3675,6 @@
         "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
         "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。"
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-          "concepts": [
-            "mutual exclusion",
-            "semaphore",
-            "monitor",
-            "message passing",
-            "deadlock",
-            "condition synchronization",
-            "barrier"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：若实现 signal handler：用户态 handler 上下文如何构建？是否存在 sigreturn 恢复原 trap frame？（必须给证据） signal 题必须区分 trap-return 投递点、进程 pending/handler API、IPC 通知和故障信号映射，不能跨题混用。 本题属于同步与 IPC 层，只看锁、等待队列、sleep/wakeup、pipe、futex、signal、条件变量、消息传递、死锁与屏障语义；VFS 接入、trap 返回或进程状态只作为互指证据。",
       "task_hints": {
         "diagnostic_checks": [
@@ -3964,7 +3682,8 @@
           "支撑答案的主要源码/配置/文档锚点在哪里（路径、符号、结构体或常量）？",
           "答案中的每个关键结论是否有实现体、调用链、状态变化或配置分支证据？",
           "是否排除题干未要求的相邻模块、同名概念、用户态封装、README 口号或测试桩？",
-          "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？"
+          "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？",
+          "???????signal handler ??????/trap frame ??? sigreturn ?????"
         ],
         "structured_facts": [
           {
@@ -4096,21 +3815,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "同步题按 Stallings Ch5 区分互斥、条件同步、管程、消息传递、死锁条件/处理策略和具体 IPC。不能把 signal、pipe、futex、mutex、waitqueue 混为同一概念。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-            "concepts": [
-              "mutual exclusion",
-              "semaphore",
-              "monitor",
-              "message passing",
-              "deadlock",
-              "condition synchronization",
-              "barrier"
-            ]
-          }
-        ]
+        "concept_boundary": "同步题按 Stallings Ch5 区分互斥、条件同步、管程、消息传递、死锁条件/处理策略和具体 IPC。不能把 signal、pipe、futex、mutex、waitqueue 混为同一概念。"
       },
       "llm_answer_steps": [
         "只回答 Q06_011 的题干，不使用相邻题结论替代。",
@@ -4182,7 +3887,8 @@
         "题目“RwLock（读写锁 Reader-Writer Lock）的实现形态更接近哪种？”的候选选项有哪些，是否只从题单 choices 中选择？",
         "被选中的形态是否有源码、配置、调用链或数据结构证据直接支撑？",
         "未选选项是否被源码证据、缺失证据或概念边界排除？",
-        "若多个选项同时成立或证据不足，是否按题意选择“其他/混合/unknown”并说明原因？"
+        "若多个选项同时成立或证据不足，是否按题意选择“其他/混合/unknown”并说明原因？",
+        "???????RwLock ??????????????????????"
       ],
       "structured_facts": [
         {
@@ -4301,27 +4007,14 @@
         "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
         "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。"
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-          "concepts": [
-            "mutual exclusion",
-            "semaphore",
-            "monitor",
-            "message passing",
-            "deadlock",
-            "condition synchronization",
-            "barrier"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：RwLock（读写锁 Reader-Writer Lock）的实现形态更接近哪种？  本题属于同步与 IPC 层，只看锁、等待队列、sleep/wakeup、pipe、futex、signal、条件变量、消息传递、死锁与屏障语义；VFS 接入、trap 返回或进程状态只作为互指证据。",
       "task_hints": {
         "diagnostic_checks": [
           "题目“RwLock（读写锁 Reader-Writer Lock）的实现形态更接近哪种？”的候选选项有哪些，是否只从题单 choices 中选择？",
           "被选中的形态是否有源码、配置、调用链或数据结构证据直接支撑？",
           "未选选项是否被源码证据、缺失证据或概念边界排除？",
-          "若多个选项同时成立或证据不足，是否按题意选择“其他/混合/unknown”并说明原因？"
+          "若多个选项同时成立或证据不足，是否按题意选择“其他/混合/unknown”并说明原因？",
+          "???????RwLock ??????????????????????"
         ],
         "structured_facts": [
           {
@@ -4425,21 +4118,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "同步题按 Stallings Ch5 区分互斥、条件同步、管程、消息传递、死锁条件/处理策略和具体 IPC。不能把 signal、pipe、futex、mutex、waitqueue 混为同一概念。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-            "concepts": [
-              "mutual exclusion",
-              "semaphore",
-              "monitor",
-              "message passing",
-              "deadlock",
-              "condition synchronization",
-              "barrier"
-            ]
-          }
-        ]
+        "concept_boundary": "同步题按 Stallings Ch5 区分互斥、条件同步、管程、消息传递、死锁条件/处理策略和具体 IPC。不能把 signal、pipe、futex、mutex、waitqueue 混为同一概念。"
       },
       "llm_answer_steps": [
         "只回答 Q06_012 的题干，不使用相邻题结论替代。",
@@ -4512,7 +4191,8 @@
         "题目“底层原子操作来源更接近哪种？”的候选选项有哪些，是否只从题单 choices 中选择？",
         "被选中的形态是否有源码、配置、调用链或数据结构证据直接支撑？",
         "未选选项是否被源码证据、缺失证据或概念边界排除？",
-        "若多个选项同时成立或证据不足，是否按题意选择“其他/混合/unknown”并说明原因？"
+        "若多个选项同时成立或证据不足，是否按题意选择“其他/混合/unknown”并说明原因？",
+        "???????????????? Rust core::sync::atomic????????????"
       ],
       "structured_facts": [
         {
@@ -4631,27 +4311,14 @@
         "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
         "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。"
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-          "concepts": [
-            "mutual exclusion",
-            "semaphore",
-            "monitor",
-            "message passing",
-            "deadlock",
-            "condition synchronization",
-            "barrier"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：底层原子操作来源更接近哪种？  本题属于同步与 IPC 层，只看锁、等待队列、sleep/wakeup、pipe、futex、signal、条件变量、消息传递、死锁与屏障语义；VFS 接入、trap 返回或进程状态只作为互指证据。",
       "task_hints": {
         "diagnostic_checks": [
           "题目“底层原子操作来源更接近哪种？”的候选选项有哪些，是否只从题单 choices 中选择？",
           "被选中的形态是否有源码、配置、调用链或数据结构证据直接支撑？",
           "未选选项是否被源码证据、缺失证据或概念边界排除？",
-          "若多个选项同时成立或证据不足，是否按题意选择“其他/混合/unknown”并说明原因？"
+          "若多个选项同时成立或证据不足，是否按题意选择“其他/混合/unknown”并说明原因？",
+          "???????????????? Rust core::sync::atomic????????????"
         ],
         "structured_facts": [
           {
@@ -4755,21 +4422,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "同步题按 Stallings Ch5 区分互斥、条件同步、管程、消息传递、死锁条件/处理策略和具体 IPC。不能把 signal、pipe、futex、mutex、waitqueue 混为同一概念。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-            "concepts": [
-              "mutual exclusion",
-              "semaphore",
-              "monitor",
-              "message passing",
-              "deadlock",
-              "condition synchronization",
-              "barrier"
-            ]
-          }
-        ]
+        "concept_boundary": "同步题按 Stallings Ch5 区分互斥、条件同步、管程、消息传递、死锁条件/处理策略和具体 IPC。不能把 signal、pipe、futex、mutex、waitqueue 混为同一概念。"
       },
       "llm_answer_steps": [
         "只回答 Q06_013 的题干，不使用相邻题结论替代。",
@@ -4978,21 +4631,6 @@
         "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
         "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。"
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch6 Concurrency: Deadlock and Starvation",
-          "concepts": [
-            "deadlock",
-            "starvation",
-            "Coffman conditions",
-            "deadlock prevention",
-            "deadlock avoidance",
-            "deadlock detection",
-            "recovery",
-            "lock ordering"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：死锁四必要条件（Coffman Conditions）在该内核中是否均成立？ 请逐条作答（互斥 Mutual Exclusion / 持有并等待 Hold-and-Wait / 不可剥夺 No Preemption / 循环等待 Circular Wait），并结合 Spi... 同步/IPC 题必须区分字节流、离散消息、共享内存、地址等待、条件等待和信号通知；只实现其中一种不能证明另一种。 本题属于同步与 IPC 层，只看锁、等待队列、sleep/wakeup、pipe、futex、signal、条件变量、消息传递、死锁与屏障语义；VFS 接入、trap 返回或进程状态只作为互指证据。",
       "task_hints": {
         "diagnostic_checks": [
@@ -5132,21 +4770,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "死锁题按 Stallings/Coffman 四必要条件和处理策略判断。要区分死锁预防、避免、检测恢复和鸵鸟策略；普通锁存在只说明互斥条件，不能说明完整死锁处理。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-            "concepts": [
-              "mutual exclusion",
-              "semaphore",
-              "monitor",
-              "message passing",
-              "deadlock",
-              "condition synchronization",
-              "barrier"
-            ]
-          }
-        ]
+        "concept_boundary": "死锁题按 Stallings/Coffman 四必要条件和处理策略判断。要区分死锁预防、避免、检测恢复和鸵鸟策略；普通锁存在只说明互斥条件，不能说明完整死锁处理。"
       },
       "llm_answer_steps": [
         "只回答 Q06_014 的题干，不使用相邻题结论替代。",
@@ -5332,21 +4956,6 @@
         "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
         "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。"
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch6 Concurrency: Deadlock and Starvation",
-          "concepts": [
-            "deadlock",
-            "starvation",
-            "Coffman conditions",
-            "deadlock prevention",
-            "deadlock avoidance",
-            "deadlock detection",
-            "recovery",
-            "lock ordering"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：内核对死锁 (Deadlock) 的处理策略更接近哪种？  本题属于同步与 IPC 层，只看锁、等待队列、sleep/wakeup、pipe、futex、signal、条件变量、消息传递、死锁与屏障语义；VFS 接入、trap 返回或进程状态只作为互指证据。",
       "task_hints": {
         "diagnostic_checks": [
@@ -5457,21 +5066,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "死锁题按 Stallings/Coffman 四必要条件和处理策略判断。要区分死锁预防、避免、检测恢复和鸵鸟策略；普通锁存在只说明互斥条件，不能说明完整死锁处理。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-            "concepts": [
-              "mutual exclusion",
-              "semaphore",
-              "monitor",
-              "message passing",
-              "deadlock",
-              "condition synchronization",
-              "barrier"
-            ]
-          }
-        ]
+        "concept_boundary": "死锁题按 Stallings/Coffman 四必要条件和处理策略判断。要区分死锁预防、避免、检测恢复和鸵鸟策略；普通锁存在只说明互斥条件，不能说明完整死锁处理。"
       },
       "llm_answer_steps": [
         "只回答 Q06_015 的题干，不使用相邻题结论替代。",
@@ -5718,21 +5313,6 @@
           "unknown"
         ]
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch6 Concurrency: Deadlock and Starvation",
-          "concepts": [
-            "deadlock",
-            "starvation",
-            "Coffman conditions",
-            "deadlock prevention",
-            "deadlock avoidance",
-            "deadlock detection",
-            "recovery",
-            "lock ordering"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否存在全局锁顺序（Lock Ordering）规范或注释，以预防嵌套锁导致的循环等待死锁 (Circular Wait Deadlock)？  本题属于同步与 IPC 层，只看锁、等待队列、sleep/wakeup、pipe、futex、signal、条件变量、消息传递、死锁与屏障语义；VFS 接入、trap 返回或进程状态只作为互指证据。",
       "task_hints": {
         "diagnostic_checks": [
@@ -5872,21 +5452,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "死锁题按 Stallings/Coffman 四必要条件和处理策略判断。要区分死锁预防、避免、检测恢复和鸵鸟策略；普通锁存在只说明互斥条件，不能说明完整死锁处理。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-            "concepts": [
-              "mutual exclusion",
-              "semaphore",
-              "monitor",
-              "message passing",
-              "deadlock",
-              "condition synchronization",
-              "barrier"
-            ]
-          }
-        ]
+        "concept_boundary": "死锁题按 Stallings/Coffman 四必要条件和处理策略判断。要区分死锁预防、避免、检测恢复和鸵鸟策略；普通锁存在只说明互斥条件，不能说明完整死锁处理。"
       },
       "llm_answer_steps": [
         "只回答 Q06_016 的题干，不使用相邻题结论替代。",
@@ -6135,20 +5701,6 @@
           "unknown"
         ]
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-          "concepts": [
-            "mutual exclusion",
-            "semaphore",
-            "monitor",
-            "message passing",
-            "deadlock",
-            "condition synchronization",
-            "barrier"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否实现 Stallings Ch5 意义上的管程/条件变量，并在 implemented 时区分 Hoare 语义（通知后等待者立即恢复）与 Mesa 语义（等待者被唤醒后重新竞争锁）。条件变量/管程要求存在与互斥锁关联的条件等待：wait 时释放关联锁并阻塞，notify/signal/broadcast 后按语义恢复。必须区别 kernel debug monitor、Unix signal 通知、裸 WaitQueue sleep/wakeup、futex 地址等待、pipe 阻塞和普通 Mutex/RwLock；这些相似机制不能单独证明管程或条件变量 implemented。",
       "task_hints": {
         "diagnostic_checks": [
@@ -6288,21 +5840,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "同步题按 Stallings Ch5 区分互斥、条件同步、管程、消息传递、死锁条件/处理策略和具体 IPC。不能把 signal、pipe、futex、mutex、waitqueue 混为同一概念。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-            "concepts": [
-              "mutual exclusion",
-              "semaphore",
-              "monitor",
-              "message passing",
-              "deadlock",
-              "condition synchronization",
-              "barrier"
-            ]
-          }
-        ]
+        "concept_boundary": "同步题按 Stallings Ch5 区分互斥、条件同步、管程、消息传递、死锁条件/处理策略和具体 IPC。不能把 signal、pipe、futex、mutex、waitqueue 混为同一概念。"
       },
       "llm_answer_steps": [
         "只回答 Q06_017 的题干，不使用相邻题结论替代。",
@@ -6513,20 +6051,6 @@
         "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
         "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。"
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-          "concepts": [
-            "mutual exclusion",
-            "semaphore",
-            "monitor",
-            "message passing",
-            "deadlock",
-            "condition synchronization",
-            "barrier"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：经典同步问题验证 (Classic Synchronization Problems, Stallings Ch5)： 以下三个经典问题在该内核中是否有对应实现或测试？ - 生产者-消费者 (Producer-Consumer / Bounded Buffer)：___（i...  本题属于同步与 IPC 层，只看锁、等待队列、sleep/wakeup、pipe、futex、signal、条件变量、消息传递、死锁与屏障语义；VFS 接入、trap 返回或进程状态只作为互指证据。",
       "task_hints": {
         "diagnostic_checks": [
@@ -6666,21 +6190,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "同步题按 Stallings Ch5 区分互斥、条件同步、管程、消息传递、死锁条件/处理策略和具体 IPC。不能把 signal、pipe、futex、mutex、waitqueue 混为同一概念。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-            "concepts": [
-              "mutual exclusion",
-              "semaphore",
-              "monitor",
-              "message passing",
-              "deadlock",
-              "condition synchronization",
-              "barrier"
-            ]
-          }
-        ]
+        "concept_boundary": "同步题按 Stallings Ch5 区分互斥、条件同步、管程、消息传递、死锁条件/处理策略和具体 IPC。不能把 signal、pipe、futex、mutex、waitqueue 混为同一概念。"
       },
       "llm_answer_steps": [
         "只回答 Q06_018 的题干，不使用相邻题结论替代。",
@@ -6901,20 +6411,6 @@
         "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
         "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。"
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-          "concepts": [
-            "mutual exclusion",
-            "semaphore",
-            "monitor",
-            "message passing",
-            "deadlock",
-            "condition synchronization",
-            "barrier"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否实现 Stallings Ch5 意义上的消息传递 IPC，并分别给出 direct message passing、indirect mailbox、POSIX message queue、System V message queue 的状态与证据。Message Passing 关注通过内核消息对象、邮箱或队列传递离散消息及其阻塞/非阻塞语义；pipe 字节流、shared memory 共享页、futex 地址等待、signal 通知、condition variable 条件等待都不能替代消息传递。SysV msgq 与 POSIX mqueue 必须分开判断，不能把 syscall 号、stub 或相邻 IPC 合并成强结论。",
       "task_hints": {
         "diagnostic_checks": [
@@ -7054,22 +6550,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "Message Passing 关注通过内核消息对象/邮箱/队列传递离散消息及其阻塞/非阻塞语义。direct send/receive、indirect mailbox、POSIX mqueue、SysV msgq 必须分别给状态；共享内存、pipe 字节流、signal 通知、futex 地址等待、condition variable 条件等待都不是一般消息传递。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-            "concepts": [
-              "mutual exclusion",
-              "semaphore",
-              "monitor",
-              "message passing",
-              "deadlock",
-              "condition synchronization",
-              "barrier"
-            ]
-          }
-        ],
-        "text_authoring": "authored_in_describe_stage_qa_json"
+        "concept_boundary": "Message Passing 关注通过内核消息对象/邮箱/队列传递离散消息及其阻塞/非阻塞语义。direct send/receive、indirect mailbox、POSIX mqueue、SysV msgq 必须分别给状态；共享内存、pipe 字节流、signal 通知、futex 地址等待、condition variable 条件等待都不是一般消息传递。"
       },
       "llm_answer_steps": [
         "只回答 Q06_019 的题干，不使用相邻题结论替代。",
@@ -7318,20 +6799,6 @@
           "unknown"
         ]
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-          "concepts": [
-            "mutual exclusion",
-            "semaphore",
-            "monitor",
-            "message passing",
-            "deadlock",
-            "condition synchronization",
-            "barrier"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否实现屏障同步 (Barrier Synchronization, Stallings Ch5)？  本题属于同步与 IPC 层，只看锁、等待队列、sleep/wakeup、pipe、futex、signal、条件变量、消息传递、死锁与屏障语义；VFS 接入、trap 返回或进程状态只作为互指证据。",
       "task_hints": {
         "diagnostic_checks": [
@@ -7471,21 +6938,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "同步题按 Stallings Ch5 区分互斥、条件同步、管程、消息传递、死锁条件/处理策略和具体 IPC。不能把 signal、pipe、futex、mutex、waitqueue 混为同一概念。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-            "concepts": [
-              "mutual exclusion",
-              "semaphore",
-              "monitor",
-              "message passing",
-              "deadlock",
-              "condition synchronization",
-              "barrier"
-            ]
-          }
-        ]
+        "concept_boundary": "同步题按 Stallings Ch5 区分互斥、条件同步、管程、消息传递、死锁条件/处理策略和具体 IPC。不能把 signal、pipe、futex、mutex、waitqueue 混为同一概念。"
       },
       "llm_answer_steps": [
         "只回答 Q06_020 的题干，不使用相邻题结论替代。",
@@ -7571,7 +7024,8 @@
         "是否存在执行“计数信号量 (Counting Semaphore) 及 P/V(wait/signal) 语义”语义的真实实现体，而不是声明、空函数或固定返回？",
         "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
         "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
-        "是否排除与“计数信号量 (Counting Semaphore) 及 P/V(wait/signal) 语义”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？"
+        "是否排除与“计数信号量 (Counting Semaphore) 及 P/V(wait/signal) 语义”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+        "??????????????? P/V wait/signal ?????? Mutex/SpinLock ???"
       ],
       "structured_facts": [
         {
@@ -7731,18 +7185,6 @@
           "unknown"
         ]
       },
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-          "concepts": [
-            "semaphore",
-            "binary semaphore",
-            "counting semaphore",
-            "producer-consumer",
-            "wait/signal"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否实现计数信号量 (Counting Semaphore, Stallings Ch5) 及 P/V(wait/signal) 语义？ signal 题必须区分 trap-return 投递点、进程 pending/handler API、IPC 通知和故障信号映射，不能跨题混用。 同步/IPC 题必须区分字节流、离散消息、共享内存、地址等待、条件等待和信号通知；只实现其中一种不能证明另一种。 本题属于同步与 IPC 层，只看锁、等待队列、sleep/wakeup、pipe、futex、signal、条件变量、消息传递、死锁与屏障语义；VFS 接入、trap 返回或进程状态只作为互指证据。",
       "task_hints": {
         "diagnostic_checks": [
@@ -7750,7 +7192,8 @@
           "是否存在执行“计数信号量 (Counting Semaphore) 及 P/V(wait/signal) 语义”语义的真实实现体，而不是声明、空函数或固定返回？",
           "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
           "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
-          "是否排除与“计数信号量 (Counting Semaphore) 及 P/V(wait/signal) 语义”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？"
+          "是否排除与“计数信号量 (Counting Semaphore) 及 P/V(wait/signal) 语义”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+          "??????????????? P/V wait/signal ?????? Mutex/SpinLock ???"
         ],
         "structured_facts": [
           {
@@ -7891,7 +7334,6 @@
       ]
     }
   ],
-  "stage_constraints_md": "**本阶段须额外覆盖**：\n- `sys_msgget`/`sys_semget`/`sys_pipe` 等：**队列/环形缓冲**是否真实存在；与 futex 的复用或分叉（路径）。\n\n必须回答：\n- 锁机制：SpinLock / Mutex / Semaphore / RwLock 实现。\n    - **RwLock**：`grep_in_repo`/`read_code_segment` 判断是否**真有**读写锁实现或仅为自旋锁/互斥包装；结论须附 `路径:行号`。\n    - **原子操作**：是使用 Rust `core::sync::atomic` 还是自定义汇编？(grep `ldxr/stxr`, `lock xchg`)\n    - **等待队列 (Wait Queue, WaitQueue)**：线程获取锁失败时如何挂起？（find `WaitQueue`, `sleep`, `block`）\n    - **sleep / wakeup 不变量**：用文字写出「持有什么锁进入 sleep、是否防丢 wakeup、唤醒与锁顺序」等可核对陈述，并引用 `sleep`/`wakeup`（或等价）实现片段 `路径:行号`。\n- **IPC 机制（必须代码验证并分类为 `✅ 已实现`、`🔸 桩函数`、`❌ 未实现`，谨防桩代码）**：\n    - 管道 (Pipe)：搜索 `Pipe|sys_pipe|pipe2`。**实现验证**：底层是**字节环形缓冲区**、**页级传递**、还是**无缓冲占位**？读写阻塞时：是**挂起当前任务/线程**（`block`/`WaitQueue`）、还是**返回 EAGAIN 非阻塞语义**、还是 **busy-loop/yield**？须 `路径:行号`。\n    - 消息队列 (MessageQueue)：**必须检查实现**。grep `sys_msgget` 或 `msgget`。\n        - 如果函数体为空、`Ok(0)` 但没有队列逻辑，必须标记为 **`🔸 桩函数`**。\n        - 只有看到了完整的队列结构体操作（push/pop），才可标记为 **`✅ 已实现`**。\n    - 共享内存 (SharedMem)：结合内存管理章节分析（SharedMemoryManager 实现）。\n    - 信号量 (Semaphore)：PV 操作实现。同样需要检查 `sys_semget`, `semop` 区分是否为桩代码。\n    - **信号 (Signal) 作为 IPC**：搜索 `sys_kill|sig_send|signal_send`，分析信号分发机制是否也用于进程间通信。\n    - **信号处理时机**：搜索 `POST_TRAP|do_signal|handle_pending_signal`，分析信号在 Trap 返回用户态前的确切处理位置。\n    - **信号处理函数（Signal Handler）上下文**：搜索 `sys_sigaction|sigaction|sigreturn|signal_trampoline|trampoline`；判定用户态 handler 的**陷阱帧/用户栈**如何构建、是否存在 **`sigreturn` 恢复原上下文**；若仅有 `todo!`/`ENOSYS`，标 `🔸 桩函数`。\n- **Mutex / Semaphore 形态鉴定**：对 `Mutex`/`Semaphore` 的 `lock`/`wait` 实现**强制区分**：**自旋锁（Spinlock，Busy-Waiting）** vs **阻塞型（Blocking Mutex，入等待队列并挂起）**；若为混合（短 spin + block），写明条件与 `路径:行号`。\n- **关键流程的跨文件调用链**：对 Futex 等待/唤醒流程，使用 `lsp_get_call_graph` 递归展开完整调用树（优先于 `lsp_get_references` 的单层查找）。\n\n要求：\n- **语义发现（🥇 首选）**：使用 `rag_search_code` 搜索 \"SpinLock implementation\", \"Mutex wait queue\", \"Pipe ring buffer\", \"shared memory manager\", \"sys_pipe\", \"sigreturn\" 锁定同步与 IPC 源码。\n- 使用 `lsp_get_definition` 定位 `Mutex`、`SpinLock`、`WaitQueue` 的结构体定义和 `lock()`/`unlock()` 实现。\n- **【必须】使用 `lsp_get_call_graph` 展开关键 IPC 流程调用链**（`sys_futex` → `futex_wait` → `WaitQueue::sleep`）：\n  - `lsp_get_call_graph(repo_path, file_of_sys_futex, \"sys_futex\", direction=\"outgoing\", max_depth=4)`\n  - 如返回 `[⚠️ DEGRADED MODE]`，标注后继续使用 Grep 结果。\n- 使用 `lsp_get_references` 查找单节点引用（如哪些地方调用了 `futex_wake`）。\n- 使用 `lsp_get_document_outline` 浏览 IPC 模块文件，发现所有 Pipe/Sem/Shm 实现。\n- 辅以 grep_in_repo 搜索 sync/、ipc/ 模块。\n- **验证消息队列与信号量**：务必区分 Stub（桩）与 Real Implementation（真实实现）。\n\n**【评测与交付适配 — 本阶段启发式】**（须源码证据；无则略）：\n- **libc/LTP 类测例**常压 **pipe/futex/文件锁**；若 README 声称可跑相关套件，须用本章结论对照 05 章 syscall 桩态，标潜在缺口并附路径。\n- 无 README/grep 命中时不要写具体赛题名称。",
   "features": [
     {
       "feature_id": "feat_06_sync_ipc_q06_001",
@@ -7899,20 +7341,6 @@
       "domain": "sync_ipc",
       "feature_name": "Q06_001 该内核提供了哪些同步原语？（SpinLock/Mutex/RwLock/Semaphore/Condvar/WaitQueue 等；列出类型定义证据）",
       "description": "该内核提供了哪些同步原语？（SpinLock/Mutex/RwLock/Semaphore/Condvar/WaitQueue 等；列出类型定义证据）",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-          "concepts": [
-            "mutual exclusion",
-            "semaphore",
-            "monitor",
-            "message passing",
-            "deadlock",
-            "condition synchronization",
-            "barrier"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：该内核提供了哪些同步原语？（SpinLock/Mutex/RwLock/Semaphore/Condvar/WaitQueue 等；列出类型定义证据） 同步/IPC 题必须区分字节流、离散消息、共享内存、地址等待、条件等待和信号通知；只实现其中一种不能证明另一种。 本题属于同步与 IPC 层，只看锁、等待队列、sleep/wakeup、pipe、futex、signal、条件变量、消息传递、死锁与屏障语义；VFS 接入、trap 返回或进程状态只作为互指证据。",
       "dependencies": [
         "04_process_smp"
@@ -8282,21 +7710,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "同步题按 Stallings Ch5 区分互斥、条件同步、管程、消息传递、死锁条件/处理策略和具体 IPC。不能把 signal、pipe、futex、mutex、waitqueue 混为同一概念。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-            "concepts": [
-              "mutual exclusion",
-              "semaphore",
-              "monitor",
-              "message passing",
-              "deadlock",
-              "condition synchronization",
-              "barrier"
-            ]
-          }
-        ]
+        "concept_boundary": "同步题按 Stallings Ch5 区分互斥、条件同步、管程、消息传递、死锁条件/处理策略和具体 IPC。不能把 signal、pipe、futex、mutex、waitqueue 混为同一概念。"
       }
     },
     {
@@ -8305,20 +7719,6 @@
       "domain": "sync_ipc",
       "feature_name": "Q06_002 Mutex 更接近哪种实现？",
       "description": "Mutex 更接近哪种实现？",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-          "concepts": [
-            "mutual exclusion",
-            "semaphore",
-            "monitor",
-            "message passing",
-            "deadlock",
-            "condition synchronization",
-            "barrier"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：Mutex 更接近哪种实现？  本题属于同步与 IPC 层，只看锁、等待队列、sleep/wakeup、pipe、futex、signal、条件变量、消息传递、死锁与屏障语义；VFS 接入、trap 返回或进程状态只作为互指证据。",
       "dependencies": [
         "04_process_smp"
@@ -8626,21 +8026,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "同步题按 Stallings Ch5 区分互斥、条件同步、管程、消息传递、死锁条件/处理策略和具体 IPC。不能把 signal、pipe、futex、mutex、waitqueue 混为同一概念。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-            "concepts": [
-              "mutual exclusion",
-              "semaphore",
-              "monitor",
-              "message passing",
-              "deadlock",
-              "condition synchronization",
-              "barrier"
-            ]
-          }
-        ]
+        "concept_boundary": "同步题按 Stallings Ch5 区分互斥、条件同步、管程、消息传递、死锁条件/处理策略和具体 IPC。不能把 signal、pipe、futex、mutex、waitqueue 混为同一概念。"
       }
     },
     {
@@ -8649,20 +8035,6 @@
       "domain": "sync_ipc",
       "feature_name": "Q06_003 是否存在等待队列 (Wait Queue, WaitQueue) 与 sleep/wakeup（或等价阻塞/唤醒）实现？（必须三态）",
       "description": "是否存在等待队列 (Wait Queue, WaitQueue) 与 sleep/wakeup（或等价阻塞/唤醒）实现？（必须三态）",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-          "concepts": [
-            "mutual exclusion",
-            "semaphore",
-            "monitor",
-            "message passing",
-            "deadlock",
-            "condition synchronization",
-            "barrier"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否存在等待队列 (Wait Queue, WaitQueue) 与 sleep/wakeup（或等价阻塞/唤醒）实现？  本题属于同步与 IPC 层，只看锁、等待队列、sleep/wakeup、pipe、futex、signal、条件变量、消息传递、死锁与屏障语义；VFS 接入、trap 返回或进程状态只作为互指证据。",
       "dependencies": [
         "04_process_smp"
@@ -9067,21 +8439,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "同步题按 Stallings Ch5 区分互斥、条件同步、管程、消息传递、死锁条件/处理策略和具体 IPC。不能把 signal、pipe、futex、mutex、waitqueue 混为同一概念。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-            "concepts": [
-              "mutual exclusion",
-              "semaphore",
-              "monitor",
-              "message passing",
-              "deadlock",
-              "condition synchronization",
-              "barrier"
-            ]
-          }
-        ]
+        "concept_boundary": "同步题按 Stallings Ch5 区分互斥、条件同步、管程、消息传递、死锁条件/处理策略和具体 IPC。不能把 signal、pipe、futex、mutex、waitqueue 混为同一概念。"
       }
     },
     {
@@ -9090,20 +8448,6 @@
       "domain": "sync_ipc",
       "feature_name": "Q06_004 sleep / wakeup 不变量 (Sleep-Wakeup Invariant) 分析，按格式填写：\n- sleep 入口函数: ___（路径）\n- 入睡前持有的锁: ___（无则写 none）\n- 防丢 wakeup (Lost Wakeup Prevention) 机制: ___（如：持队列锁检查条件 / 无防护）\n- wakeup 函数: ___（路径）\n- 唤醒与锁释放顺序: ___（先唤醒后释放 / 先释放后唤醒 / 其他）",
       "description": "sleep / wakeup 不变量 (Sleep-Wakeup Invariant) 分析，按格式填写：\n- sleep 入口函数: ___（路径）\n- 入睡前持有的锁: ___（无则写 none）\n- 防丢 wakeup (Lost Wakeup Prevention) 机制: ___（如：持队列锁检查条件 / 无防护）\n- wakeup 函数: ___（路径）\n- 唤醒与锁释放顺序: ___（先唤醒后释放 / 先释放后唤醒 / 其他）",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-          "concepts": [
-            "mutual exclusion",
-            "semaphore",
-            "monitor",
-            "message passing",
-            "deadlock",
-            "condition synchronization",
-            "barrier"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：sleep / wakeup 不变量 (Sleep-Wakeup Invariant) 分析，按格式填写： - sleep 入口函数: ___（路径） - 入睡前持有的锁: ___（无则写 none） - 防丢 wakeup (Lost Wakeup Prevention)...  本题属于同步与 IPC 层，只看锁、等待队列、sleep/wakeup、pipe、futex、signal、条件变量、消息传递、死锁与屏障语义；VFS 接入、trap 返回或进程状态只作为互指证据。",
       "dependencies": [
         "04_process_smp"
@@ -9433,21 +8777,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "同步题按 Stallings Ch5 区分互斥、条件同步、管程、消息传递、死锁条件/处理策略和具体 IPC。不能把 signal、pipe、futex、mutex、waitqueue 混为同一概念。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-            "concepts": [
-              "mutual exclusion",
-              "semaphore",
-              "monitor",
-              "message passing",
-              "deadlock",
-              "condition synchronization",
-              "barrier"
-            ]
-          }
-        ]
+        "concept_boundary": "同步题按 Stallings Ch5 区分互斥、条件同步、管程、消息传递、死锁条件/处理策略和具体 IPC。不能把 signal、pipe、futex、mutex、waitqueue 混为同一概念。"
       }
     },
     {
@@ -9456,20 +8786,6 @@
       "domain": "sync_ipc",
       "feature_name": "Q06_005 是否实现管道 (Pipe)？（必须三态）",
       "description": "是否实现管道 (Pipe)？（必须三态）",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-          "concepts": [
-            "mutual exclusion",
-            "semaphore",
-            "monitor",
-            "message passing",
-            "deadlock",
-            "condition synchronization",
-            "barrier"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否实现管道 (Pipe)？ 同步/IPC 题必须区分字节流、离散消息、共享内存、地址等待、条件等待和信号通知；只实现其中一种不能证明另一种。 本题属于同步与 IPC 层，只看锁、等待队列、sleep/wakeup、pipe、futex、signal、条件变量、消息传递、死锁与屏障语义；VFS 接入、trap 返回或进程状态只作为互指证据。",
       "dependencies": [
         "04_process_smp"
@@ -9869,21 +9185,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "同步题按 Stallings Ch5 区分互斥、条件同步、管程、消息传递、死锁条件/处理策略和具体 IPC。不能把 signal、pipe、futex、mutex、waitqueue 混为同一概念。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-            "concepts": [
-              "mutual exclusion",
-              "semaphore",
-              "monitor",
-              "message passing",
-              "deadlock",
-              "condition synchronization",
-              "barrier"
-            ]
-          }
-        ]
+        "concept_boundary": "同步题按 Stallings Ch5 区分互斥、条件同步、管程、消息传递、死锁条件/处理策略和具体 IPC。不能把 signal、pipe、futex、mutex、waitqueue 混为同一概念。"
       }
     },
     {
@@ -9892,20 +9194,6 @@
       "domain": "sync_ipc",
       "feature_name": "Q06_006 pipe 缓冲形态更接近哪种？",
       "description": "pipe 缓冲形态更接近哪种？",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-          "concepts": [
-            "mutual exclusion",
-            "semaphore",
-            "monitor",
-            "message passing",
-            "deadlock",
-            "condition synchronization",
-            "barrier"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：pipe 缓冲形态更接近哪种？ 同步/IPC 题必须区分字节流、离散消息、共享内存、地址等待、条件等待和信号通知；只实现其中一种不能证明另一种。 本题属于同步与 IPC 层，只看锁、等待队列、sleep/wakeup、pipe、futex、signal、条件变量、消息传递、死锁与屏障语义；VFS 接入、trap 返回或进程状态只作为互指证据。",
       "dependencies": [
         "04_process_smp"
@@ -10213,21 +9501,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "同步题按 Stallings Ch5 区分互斥、条件同步、管程、消息传递、死锁条件/处理策略和具体 IPC。不能把 signal、pipe、futex、mutex、waitqueue 混为同一概念。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-            "concepts": [
-              "mutual exclusion",
-              "semaphore",
-              "monitor",
-              "message passing",
-              "deadlock",
-              "condition synchronization",
-              "barrier"
-            ]
-          }
-        ]
+        "concept_boundary": "同步题按 Stallings Ch5 区分互斥、条件同步、管程、消息传递、死锁条件/处理策略和具体 IPC。不能把 signal、pipe、futex、mutex、waitqueue 混为同一概念。"
       }
     },
     {
@@ -10236,20 +9510,6 @@
       "domain": "sync_ipc",
       "feature_name": "Q06_007 pipe 的阻塞语义更接近哪种？",
       "description": "pipe 的阻塞语义更接近哪种？",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-          "concepts": [
-            "mutual exclusion",
-            "semaphore",
-            "monitor",
-            "message passing",
-            "deadlock",
-            "condition synchronization",
-            "barrier"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：pipe 的阻塞语义更接近哪种？ 同步/IPC 题必须区分字节流、离散消息、共享内存、地址等待、条件等待和信号通知；只实现其中一种不能证明另一种。 本题属于同步与 IPC 层，只看锁、等待队列、sleep/wakeup、pipe、futex、signal、条件变量、消息传递、死锁与屏障语义；VFS 接入、trap 返回或进程状态只作为互指证据。",
       "dependencies": [
         "04_process_smp"
@@ -10557,21 +9817,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "同步题按 Stallings Ch5 区分互斥、条件同步、管程、消息传递、死锁条件/处理策略和具体 IPC。不能把 signal、pipe、futex、mutex、waitqueue 混为同一概念。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-            "concepts": [
-              "mutual exclusion",
-              "semaphore",
-              "monitor",
-              "message passing",
-              "deadlock",
-              "condition synchronization",
-              "barrier"
-            ]
-          }
-        ]
+        "concept_boundary": "同步题按 Stallings Ch5 区分互斥、条件同步、管程、消息传递、死锁条件/处理策略和具体 IPC。不能把 signal、pipe、futex、mutex、waitqueue 混为同一概念。"
       }
     },
     {
@@ -10580,20 +9826,6 @@
       "domain": "sync_ipc",
       "feature_name": "Q06_008 SysV IPC 覆盖情况如何？请分别回答 Message Queue、Semaphore、Shared Memory 三类系统调用/内核对象的状态（implemented/stub/not_found/unknown）并给证据。",
       "description": "SysV IPC 覆盖情况如何？请分别回答 Message Queue、Semaphore、Shared Memory 三类系统调用/内核对象的状态（implemented/stub/not_found/unknown）并给证据。",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-          "concepts": [
-            "mutual exclusion",
-            "semaphore",
-            "monitor",
-            "message passing",
-            "deadlock",
-            "condition synchronization",
-            "barrier"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：SysV IPC 覆盖情况如何？请分别回答 Message Queue、Semaphore、Shared Memory 三类系统调用/内核对象的状态（implemented/stub/not_found/unknown）并给证据。 同步/IPC 题必须区分字节流、离散消息、共享内存、地址等待、条件等待和信号通知；只实现其中一种不能证明另一种。 本题属于同步与 IPC 层，只看锁、等待队列、sleep/wakeup、pipe、futex、signal、条件变量、消息传递、死锁与屏障语义；VFS 接入、trap 返回或进程状态只作为互指证据。",
       "dependencies": [
         "04_process_smp"
@@ -10963,22 +10195,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "SysV IPC 是 msg/sem/shm 三类独立机制。只实现其中一类不能把整题概括为 implemented；signal、pipe、futex、普通共享内存指针或 mmap 不等价于 SysV IPC。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-            "concepts": [
-              "mutual exclusion",
-              "semaphore",
-              "monitor",
-              "message passing",
-              "deadlock",
-              "condition synchronization",
-              "barrier"
-            ]
-          }
-        ],
-        "text_authoring": "authored_in_describe_stage_qa_json"
+        "concept_boundary": "SysV IPC 是 msg/sem/shm 三类独立机制。只实现其中一类不能把整题概括为 implemented；signal、pipe、futex、普通共享内存指针或 mmap 不等价于 SysV IPC。"
       }
     },
     {
@@ -10987,20 +10204,6 @@
       "domain": "sync_ipc",
       "feature_name": "Q06_009 是否实现 futex？（必须三态）",
       "description": "是否实现 futex？（必须三态）",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-          "concepts": [
-            "mutual exclusion",
-            "semaphore",
-            "monitor",
-            "message passing",
-            "deadlock",
-            "condition synchronization",
-            "barrier"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否实现 futex？ 同步/IPC 题必须区分字节流、离散消息、共享内存、地址等待、条件等待和信号通知；只实现其中一种不能证明另一种。 本题属于同步与 IPC 层，只看锁、等待队列、sleep/wakeup、pipe、futex、signal、条件变量、消息传递、死锁与屏障语义；VFS 接入、trap 返回或进程状态只作为互指证据。",
       "dependencies": [
         "04_process_smp"
@@ -11389,21 +10592,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "futex 是基于用户地址值比较的 wait/wake syscall；普通 sleep/wakeup、mutex 或 semaphore 不等价于 futex。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-            "concepts": [
-              "mutual exclusion",
-              "semaphore",
-              "monitor",
-              "message passing",
-              "deadlock",
-              "condition synchronization",
-              "barrier"
-            ]
-          }
-        ]
+        "concept_boundary": "futex 是基于用户地址值比较的 wait/wake syscall；普通 sleep/wakeup、mutex 或 semaphore 不等价于 futex。"
       }
     },
     {
@@ -11412,20 +10601,6 @@
       "domain": "sync_ipc",
       "feature_name": "Q06_010 是否实现信号机制（sigaction/kill/sigreturn/trampoline）？（必须三态）",
       "description": "是否实现信号机制（sigaction/kill/sigreturn/trampoline）？（必须三态）",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-          "concepts": [
-            "mutual exclusion",
-            "semaphore",
-            "monitor",
-            "message passing",
-            "deadlock",
-            "condition synchronization",
-            "barrier"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否实现信号机制（sigaction/kill/sigreturn/trampoline）？ signal 题必须区分 trap-return 投递点、进程 pending/handler API、IPC 通知和故障信号映射，不能跨题混用。 本题属于同步与 IPC 层，只看锁、等待队列、sleep/wakeup、pipe、futex、signal、条件变量、消息传递、死锁与屏障语义；VFS 接入、trap 返回或进程状态只作为互指证据。",
       "dependencies": [
         "04_process_smp"
@@ -11830,21 +11005,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "同步题按 Stallings Ch5 区分互斥、条件同步、管程、消息传递、死锁条件/处理策略和具体 IPC。不能把 signal、pipe、futex、mutex、waitqueue 混为同一概念。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-            "concepts": [
-              "mutual exclusion",
-              "semaphore",
-              "monitor",
-              "message passing",
-              "deadlock",
-              "condition synchronization",
-              "barrier"
-            ]
-          }
-        ]
+        "concept_boundary": "同步题按 Stallings Ch5 区分互斥、条件同步、管程、消息传递、死锁条件/处理策略和具体 IPC。不能把 signal、pipe、futex、mutex、waitqueue 混为同一概念。"
       }
     },
     {
@@ -11853,20 +11014,6 @@
       "domain": "sync_ipc",
       "feature_name": "Q06_011 若实现 signal handler：用户态 handler 上下文如何构建？是否存在 sigreturn 恢复原 trap frame？（必须给证据）",
       "description": "若实现 signal handler：用户态 handler 上下文如何构建？是否存在 sigreturn 恢复原 trap frame？（必须给证据）",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-          "concepts": [
-            "mutual exclusion",
-            "semaphore",
-            "monitor",
-            "message passing",
-            "deadlock",
-            "condition synchronization",
-            "barrier"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：若实现 signal handler：用户态 handler 上下文如何构建？是否存在 sigreturn 恢复原 trap frame？（必须给证据） signal 题必须区分 trap-return 投递点、进程 pending/handler API、IPC 通知和故障信号映射，不能跨题混用。 本题属于同步与 IPC 层，只看锁、等待队列、sleep/wakeup、pipe、futex、signal、条件变量、消息传递、死锁与屏障语义；VFS 接入、trap 返回或进程状态只作为互指证据。",
       "dependencies": [
         "04_process_smp"
@@ -12237,21 +11384,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "同步题按 Stallings Ch5 区分互斥、条件同步、管程、消息传递、死锁条件/处理策略和具体 IPC。不能把 signal、pipe、futex、mutex、waitqueue 混为同一概念。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-            "concepts": [
-              "mutual exclusion",
-              "semaphore",
-              "monitor",
-              "message passing",
-              "deadlock",
-              "condition synchronization",
-              "barrier"
-            ]
-          }
-        ]
+        "concept_boundary": "同步题按 Stallings Ch5 区分互斥、条件同步、管程、消息传递、死锁条件/处理策略和具体 IPC。不能把 signal、pipe、futex、mutex、waitqueue 混为同一概念。"
       }
     },
     {
@@ -12260,20 +11393,6 @@
       "domain": "sync_ipc",
       "feature_name": "Q06_012 RwLock（读写锁 Reader-Writer Lock）的实现形态更接近哪种？",
       "description": "RwLock（读写锁 Reader-Writer Lock）的实现形态更接近哪种？",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-          "concepts": [
-            "mutual exclusion",
-            "semaphore",
-            "monitor",
-            "message passing",
-            "deadlock",
-            "condition synchronization",
-            "barrier"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：RwLock（读写锁 Reader-Writer Lock）的实现形态更接近哪种？  本题属于同步与 IPC 层，只看锁、等待队列、sleep/wakeup、pipe、futex、signal、条件变量、消息传递、死锁与屏障语义；VFS 接入、trap 返回或进程状态只作为互指证据。",
       "dependencies": [
         "04_process_smp"
@@ -12585,21 +11704,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "同步题按 Stallings Ch5 区分互斥、条件同步、管程、消息传递、死锁条件/处理策略和具体 IPC。不能把 signal、pipe、futex、mutex、waitqueue 混为同一概念。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-            "concepts": [
-              "mutual exclusion",
-              "semaphore",
-              "monitor",
-              "message passing",
-              "deadlock",
-              "condition synchronization",
-              "barrier"
-            ]
-          }
-        ]
+        "concept_boundary": "同步题按 Stallings Ch5 区分互斥、条件同步、管程、消息传递、死锁条件/处理策略和具体 IPC。不能把 signal、pipe、futex、mutex、waitqueue 混为同一概念。"
       }
     },
     {
@@ -12608,20 +11713,6 @@
       "domain": "sync_ipc",
       "feature_name": "Q06_013 底层原子操作来源更接近哪种？",
       "description": "底层原子操作来源更接近哪种？",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-          "concepts": [
-            "mutual exclusion",
-            "semaphore",
-            "monitor",
-            "message passing",
-            "deadlock",
-            "condition synchronization",
-            "barrier"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：底层原子操作来源更接近哪种？  本题属于同步与 IPC 层，只看锁、等待队列、sleep/wakeup、pipe、futex、signal、条件变量、消息传递、死锁与屏障语义；VFS 接入、trap 返回或进程状态只作为互指证据。",
       "dependencies": [
         "04_process_smp"
@@ -12929,21 +12020,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "同步题按 Stallings Ch5 区分互斥、条件同步、管程、消息传递、死锁条件/处理策略和具体 IPC。不能把 signal、pipe、futex、mutex、waitqueue 混为同一概念。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-            "concepts": [
-              "mutual exclusion",
-              "semaphore",
-              "monitor",
-              "message passing",
-              "deadlock",
-              "condition synchronization",
-              "barrier"
-            ]
-          }
-        ]
+        "concept_boundary": "同步题按 Stallings Ch5 区分互斥、条件同步、管程、消息传递、死锁条件/处理策略和具体 IPC。不能把 signal、pipe、futex、mutex、waitqueue 混为同一概念。"
       }
     },
     {
@@ -12952,21 +12029,6 @@
       "domain": "sync_ipc",
       "feature_name": "Q06_014 死锁四必要条件（Coffman Conditions）在该内核中是否均成立？\n请逐条作答（互斥 Mutual Exclusion / 持有并等待 Hold-and-Wait / 不可剥夺 No Preemption / 循环等待 Circular Wait），并结合 SpinLock/Mutex 的实现给出证据或写「不适用」。",
       "description": "死锁四必要条件（Coffman Conditions）在该内核中是否均成立？\n请逐条作答（互斥 Mutual Exclusion / 持有并等待 Hold-and-Wait / 不可剥夺 No Preemption / 循环等待 Circular Wait），并结合 SpinLock/Mutex 的实现给出证据或写「不适用」。",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch6 Concurrency: Deadlock and Starvation",
-          "concepts": [
-            "deadlock",
-            "starvation",
-            "Coffman conditions",
-            "deadlock prevention",
-            "deadlock avoidance",
-            "deadlock detection",
-            "recovery",
-            "lock ordering"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：死锁四必要条件（Coffman Conditions）在该内核中是否均成立？ 请逐条作答（互斥 Mutual Exclusion / 持有并等待 Hold-and-Wait / 不可剥夺 No Preemption / 循环等待 Circular Wait），并结合 Spi... 同步/IPC 题必须区分字节流、离散消息、共享内存、地址等待、条件等待和信号通知；只实现其中一种不能证明另一种。 本题属于同步与 IPC 层，只看锁、等待队列、sleep/wakeup、pipe、futex、signal、条件变量、消息传递、死锁与屏障语义；VFS 接入、trap 返回或进程状态只作为互指证据。",
       "dependencies": [
         "04_process_smp"
@@ -13335,21 +12397,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "死锁题按 Stallings/Coffman 四必要条件和处理策略判断。要区分死锁预防、避免、检测恢复和鸵鸟策略；普通锁存在只说明互斥条件，不能说明完整死锁处理。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-            "concepts": [
-              "mutual exclusion",
-              "semaphore",
-              "monitor",
-              "message passing",
-              "deadlock",
-              "condition synchronization",
-              "barrier"
-            ]
-          }
-        ]
+        "concept_boundary": "死锁题按 Stallings/Coffman 四必要条件和处理策略判断。要区分死锁预防、避免、检测恢复和鸵鸟策略；普通锁存在只说明互斥条件，不能说明完整死锁处理。"
       }
     },
     {
@@ -13358,21 +12406,6 @@
       "domain": "sync_ipc",
       "feature_name": "Q06_015 内核对死锁 (Deadlock) 的处理策略更接近哪种？",
       "description": "内核对死锁 (Deadlock) 的处理策略更接近哪种？",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch6 Concurrency: Deadlock and Starvation",
-          "concepts": [
-            "deadlock",
-            "starvation",
-            "Coffman conditions",
-            "deadlock prevention",
-            "deadlock avoidance",
-            "deadlock detection",
-            "recovery",
-            "lock ordering"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：内核对死锁 (Deadlock) 的处理策略更接近哪种？  本题属于同步与 IPC 层，只看锁、等待队列、sleep/wakeup、pipe、futex、signal、条件变量、消息传递、死锁与屏障语义；VFS 接入、trap 返回或进程状态只作为互指证据。",
       "dependencies": [
         "04_process_smp"
@@ -13675,21 +12708,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "死锁题按 Stallings/Coffman 四必要条件和处理策略判断。要区分死锁预防、避免、检测恢复和鸵鸟策略；普通锁存在只说明互斥条件，不能说明完整死锁处理。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-            "concepts": [
-              "mutual exclusion",
-              "semaphore",
-              "monitor",
-              "message passing",
-              "deadlock",
-              "condition synchronization",
-              "barrier"
-            ]
-          }
-        ]
+        "concept_boundary": "死锁题按 Stallings/Coffman 四必要条件和处理策略判断。要区分死锁预防、避免、检测恢复和鸵鸟策略；普通锁存在只说明互斥条件，不能说明完整死锁处理。"
       }
     },
     {
@@ -13698,21 +12717,6 @@
       "domain": "sync_ipc",
       "feature_name": "Q06_016 是否存在全局锁顺序（Lock Ordering）规范或注释，以预防嵌套锁导致的循环等待死锁 (Circular Wait Deadlock)？（必须三态；若 implemented 需给出锁排序规则或 ABBA 锁检测代码证据）",
       "description": "是否存在全局锁顺序（Lock Ordering）规范或注释，以预防嵌套锁导致的循环等待死锁 (Circular Wait Deadlock)？（必须三态；若 implemented 需给出锁排序规则或 ABBA 锁检测代码证据）",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch6 Concurrency: Deadlock and Starvation",
-          "concepts": [
-            "deadlock",
-            "starvation",
-            "Coffman conditions",
-            "deadlock prevention",
-            "deadlock avoidance",
-            "deadlock detection",
-            "recovery",
-            "lock ordering"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否存在全局锁顺序（Lock Ordering）规范或注释，以预防嵌套锁导致的循环等待死锁 (Circular Wait Deadlock)？  本题属于同步与 IPC 层，只看锁、等待队列、sleep/wakeup、pipe、futex、signal、条件变量、消息传递、死锁与屏障语义；VFS 接入、trap 返回或进程状态只作为互指证据。",
       "dependencies": [
         "04_process_smp"
@@ -14113,21 +13117,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "死锁题按 Stallings/Coffman 四必要条件和处理策略判断。要区分死锁预防、避免、检测恢复和鸵鸟策略；普通锁存在只说明互斥条件，不能说明完整死锁处理。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-            "concepts": [
-              "mutual exclusion",
-              "semaphore",
-              "monitor",
-              "message passing",
-              "deadlock",
-              "condition synchronization",
-              "barrier"
-            ]
-          }
-        ]
+        "concept_boundary": "死锁题按 Stallings/Coffman 四必要条件和处理策略判断。要区分死锁预防、避免、检测恢复和鸵鸟策略；普通锁存在只说明互斥条件，不能说明完整死锁处理。"
       }
     },
     {
@@ -14136,20 +13126,6 @@
       "domain": "sync_ipc",
       "feature_name": "Q06_017 是否实现管程/条件变量 (Monitor / Condition Variable, Stallings Ch5)？（必须三态；搜索 Condvar / condition_variable / monitor / wait/notify/signal 等；若 implemented 需区分 Hoare 语义（等待者立即恢复）vs Mesa 语义（等待者重新竞争锁））",
       "description": "是否实现管程/条件变量 (Monitor / Condition Variable, Stallings Ch5)？（必须三态；搜索 Condvar / condition_variable / monitor / wait/notify/signal 等；若 implemented 需区分 Hoare 语义（等待者立即恢复）vs Mesa 语义（等待者重新竞争锁））",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-          "concepts": [
-            "mutual exclusion",
-            "semaphore",
-            "monitor",
-            "message passing",
-            "deadlock",
-            "condition synchronization",
-            "barrier"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否实现管程/条件变量 (Monitor / Condition Variable, Stallings Ch5)？vs Mesa 语义（等待者重新竞争锁）） signal 题必须区分 trap-return 投递点、进程 pending/handler API、IPC 通知和故障信号映射，不能跨题混用。 同步/IPC 题必须区分字节流、离散消息、共享内存、地址等待、条件等待和信号通知；只实现其中一种不能证明另一种。 调试题必须区分日志、panic、backtrace、kernel debug monitor、GDB remote stub 和 tracepoint；用户 shell 或普通打印不能替代内核调试设施。 本题属于同步与 IPC 层，只看锁、等待队列、sleep/wakeup、pipe、futex、signal、条件变量、消息传递、死锁与屏障语义；VFS 接入、trap 返回或进程状态只作为互指证据。",
       "dependencies": [
         "04_process_smp"
@@ -14562,21 +13538,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "同步题按 Stallings Ch5 区分互斥、条件同步、管程、消息传递、死锁条件/处理策略和具体 IPC。不能把 signal、pipe、futex、mutex、waitqueue 混为同一概念。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-            "concepts": [
-              "mutual exclusion",
-              "semaphore",
-              "monitor",
-              "message passing",
-              "deadlock",
-              "condition synchronization",
-              "barrier"
-            ]
-          }
-        ]
+        "concept_boundary": "同步题按 Stallings Ch5 区分互斥、条件同步、管程、消息传递、死锁条件/处理策略和具体 IPC。不能把 signal、pipe、futex、mutex、waitqueue 混为同一概念。"
       }
     },
     {
@@ -14585,20 +13547,6 @@
       "domain": "sync_ipc",
       "feature_name": "Q06_018 经典同步问题验证 (Classic Synchronization Problems, Stallings Ch5)：\n以下三个经典问题在该内核中是否有对应实现或测试？\n- 生产者-消费者 (Producer-Consumer / Bounded Buffer)：___（implemented/not_found + 证据）\n- 读者-写者 (Readers-Writers)：___（实现了读者优先/写者优先/公平？ + 证据）\n- 哲学家就餐 (Dining Philosophers)：___（implemented/not_found）",
       "description": "经典同步问题验证 (Classic Synchronization Problems, Stallings Ch5)：\n以下三个经典问题在该内核中是否有对应实现或测试？\n- 生产者-消费者 (Producer-Consumer / Bounded Buffer)：___（implemented/not_found + 证据）\n- 读者-写者 (Readers-Writers)：___（实现了读者优先/写者优先/公平？ + 证据）\n- 哲学家就餐 (Dining Philosophers)：___（implemented/not_found）",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-          "concepts": [
-            "mutual exclusion",
-            "semaphore",
-            "monitor",
-            "message passing",
-            "deadlock",
-            "condition synchronization",
-            "barrier"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：经典同步问题验证 (Classic Synchronization Problems, Stallings Ch5)： 以下三个经典问题在该内核中是否有对应实现或测试？ - 生产者-消费者 (Producer-Consumer / Bounded Buffer)：___（i...  本题属于同步与 IPC 层，只看锁、等待队列、sleep/wakeup、pipe、futex、signal、条件变量、消息传递、死锁与屏障语义；VFS 接入、trap 返回或进程状态只作为互指证据。",
       "dependencies": [
         "04_process_smp"
@@ -14979,21 +13927,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "同步题按 Stallings Ch5 区分互斥、条件同步、管程、消息传递、死锁条件/处理策略和具体 IPC。不能把 signal、pipe、futex、mutex、waitqueue 混为同一概念。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-            "concepts": [
-              "mutual exclusion",
-              "semaphore",
-              "monitor",
-              "message passing",
-              "deadlock",
-              "condition synchronization",
-              "barrier"
-            ]
-          }
-        ]
+        "concept_boundary": "同步题按 Stallings Ch5 区分互斥、条件同步、管程、消息传递、死锁条件/处理策略和具体 IPC。不能把 signal、pipe、futex、mutex、waitqueue 混为同一概念。"
       }
     },
     {
@@ -15002,20 +13936,6 @@
       "domain": "sync_ipc",
       "feature_name": "Q06_019 是否实现 Stallings Ch5 意义上的消息传递 IPC？请区分 direct message passing、indirect mailbox、POSIX/System V message queue，并给各自状态与证据。",
       "description": "是否实现 Stallings Ch5 意义上的消息传递 IPC？请区分 direct message passing、indirect mailbox、POSIX/System V message queue，并给各自状态与证据。",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-          "concepts": [
-            "mutual exclusion",
-            "semaphore",
-            "monitor",
-            "message passing",
-            "deadlock",
-            "condition synchronization",
-            "barrier"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否实现 Stallings Ch5 意义上的消息传递 IPC？请区分 direct message passing、indirect mailbox、POSIX/System V message queue，并给各自状态与证据。 同步/IPC 题必须区分字节流、离散消息、共享内存、地址等待、条件等待和信号通知；只实现其中一种不能证明另一种。 本题属于同步与 IPC 层，只看锁、等待队列、sleep/wakeup、pipe、futex、signal、条件变量、消息传递、死锁与屏障语义；VFS 接入、trap 返回或进程状态只作为互指证据。",
       "dependencies": [
         "04_process_smp"
@@ -15386,22 +14306,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "Message Passing 关注通过内核消息对象/邮箱/队列传递离散消息及其阻塞/非阻塞语义。共享内存、pipe 字节流、signal 通知、futex 等待地址值都不是一般消息传递；SysV msgq 只是其中一种具体消息队列形态。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-            "concepts": [
-              "mutual exclusion",
-              "semaphore",
-              "monitor",
-              "message passing",
-              "deadlock",
-              "condition synchronization",
-              "barrier"
-            ]
-          }
-        ],
-        "text_authoring": "authored_in_describe_stage_qa_json"
+        "concept_boundary": "Message Passing 关注通过内核消息对象/邮箱/队列传递离散消息及其阻塞/非阻塞语义。共享内存、pipe 字节流、signal 通知、futex 等待地址值都不是一般消息传递；SysV msgq 只是其中一种具体消息队列形态。"
       }
     },
     {
@@ -15410,20 +14315,6 @@
       "domain": "sync_ipc",
       "feature_name": "Q06_020 是否实现屏障同步 (Barrier Synchronization, Stallings Ch5)？（必须三态；搜索 barrier / sync_barrier / pthread_barrier 或等价；用于多线程/多核同步到同一检查点）",
       "description": "是否实现屏障同步 (Barrier Synchronization, Stallings Ch5)？（必须三态；搜索 barrier / sync_barrier / pthread_barrier 或等价；用于多线程/多核同步到同一检查点）",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-          "concepts": [
-            "mutual exclusion",
-            "semaphore",
-            "monitor",
-            "message passing",
-            "deadlock",
-            "condition synchronization",
-            "barrier"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否实现屏障同步 (Barrier Synchronization, Stallings Ch5)？  本题属于同步与 IPC 层，只看锁、等待队列、sleep/wakeup、pipe、futex、signal、条件变量、消息传递、死锁与屏障语义；VFS 接入、trap 返回或进程状态只作为互指证据。",
       "dependencies": [
         "04_process_smp"
@@ -15829,21 +14720,7 @@
             "conclusion_role": "required_for_not_found"
           }
         ],
-        "concept_boundary": "同步题按 Stallings Ch5 区分互斥、条件同步、管程、消息传递、死锁条件/处理策略和具体 IPC。不能把 signal、pipe、futex、mutex、waitqueue 混为同一概念。",
-        "textbook_basis": [
-          {
-            "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-            "concepts": [
-              "mutual exclusion",
-              "semaphore",
-              "monitor",
-              "message passing",
-              "deadlock",
-              "condition synchronization",
-              "barrier"
-            ]
-          }
-        ]
+        "concept_boundary": "同步题按 Stallings Ch5 区分互斥、条件同步、管程、消息传递、死锁条件/处理策略和具体 IPC。不能把 signal、pipe、futex、mutex、waitqueue 混为同一概念。"
       }
     },
     {
@@ -15852,18 +14729,6 @@
       "domain": "sync_ipc",
       "feature_name": "Q06_021 是否实现计数信号量 (Counting Semaphore, Stallings Ch5) 及 P/V(wait/signal) 语义？（必须三态；与 Mutex/SpinLock 区分）",
       "description": "是否实现计数信号量 (Counting Semaphore, Stallings Ch5) 及 P/V(wait/signal) 语义？（必须三态；与 Mutex/SpinLock 区分）",
-      "textbook_basis": [
-        {
-          "source": "Stallings Ch5 Concurrency: Mutual Exclusion and Synchronization",
-          "concepts": [
-            "semaphore",
-            "binary semaphore",
-            "counting semaphore",
-            "producer-consumer",
-            "wait/signal"
-          ]
-        }
-      ],
       "concept_boundary": "本题精确定义为：是否实现计数信号量 (Counting Semaphore, Stallings Ch5) 及 P/V(wait/signal) 语义？ signal 题必须区分 trap-return 投递点、进程 pending/handler API、IPC 通知和故障信号映射，不能跨题混用。 同步/IPC 题必须区分字节流、离散消息、共享内存、地址等待、条件等待和信号通知；只实现其中一种不能证明另一种。 本题属于同步与 IPC 层，只看锁、等待队列、sleep/wakeup、pipe、futex、signal、条件变量、消息传递、死锁与屏障语义；VFS 接入、trap 返回或进程状态只作为互指证据。",
       "dependencies": [
         "04_process_smp"
@@ -16244,44 +15109,5 @@
         ]
       }
     }
-  ],
-  "llm_field_guide": {
-    "purpose": "这些字段是给弱模型看的作答说明：不要把题目当作文题，必须先填结构化事实，再推出最终答案。",
-    "field_meanings": {
-      "question_id": "稳定题号。回答、证据、fact_result 都必须绑定这个 ID。",
-      "stem": "人类可读题面，只说明要问什么；不能只根据 stem 直接下结论。",
-      "question_type": "题型。tri_state_impl 只能回答 implemented / stub / not_found / unknown。",
-      "choices": "选择题的合法选项。single_choice 必须原样选择其中一个；multi_choice 必须返回数组。",
-      "feature_ids": "本题对应的 OS 机制特征 ID，用于图谱和证据追踪。",
-      "textbook_basis": "本题参考的 Stallings 教材概念范围，用来帮助理解概念边界，不是源码证据。",
-      "concept_boundary": "本题最容易混淆的概念边界。判断前必须先读，防止把相似机制误判为实现。",
-      "diagnostic_checks": "局部判断步骤。弱模型应逐条查，不要直接回答总问题。",
-      "structured_facts": "必须逐项完成的事实表。每个 fact 都要给 status_or_value 和 evidence_id；这是最终 value 的依据。",
-      "answer_contract": "最终答案约束。规定 value 类型、合法值、必须完成哪些 fact，以及证据引用规则。",
-      "evidence_policy": "证据要求。RAG/grep 只是线索；implemented 需要 read/LSP/function body/call site 等强证据。",
-      "tri_state_rule": "三态/四态判定规则。implemented、stub、not_found、unknown 的边界写在这里。",
-      "anti_examples": "反例。命中这些情况时不能判 implemented，避免看到名字就误判。",
-      "negative_search_policy": "判 not_found 前必须覆盖的关键词和目录要求。覆盖不足只能 unknown。",
-      "features": "题单顶层的 feature 汇总，供图谱和跨题审阅使用。"
-    },
-    "status_values": {
-      "yes_strong": "有强源码证据：定义/实现体/调用点/状态变化/数据结构读写/调用链。可参与支撑 implemented。",
-      "yes_weak": "只有 RAG、grep、outline、README 或名字命中。只能当线索，不能单独支撑 implemented。",
-      "stub_or_declaration_only": "只有声明、trait/struct 壳、空实现、固定返回、ENOSYS、unsupported、todo/unimplemented。通常支撑 stub。",
-      "no_after_negative_search": "按 negative_search_policy 搜过关键词和目录后仍未发现。可参与支撑 not_found。",
-      "unknown": "证据不足、覆盖不足、冲突或 fact 未完成。最终应降级 unknown/待核实。"
-    },
-    "required_reasoning_order": [
-      "先读 stem，确认问题对象。",
-      "再读 textbook_basis 和 concept_boundary，确认 OS 概念边界。",
-      "逐项完成 structured_facts；每个 fact 只能引用 evidence_id，不要手写新路径/行号当证据。",
-      "把 RAG/grep 命中标成 yes_weak 或 hint，不要直接推出 implemented。",
-      "若要判 not_found，必须完成 negative_search_coverage fact。",
-      "最后按 answer_contract 和 tri_state_rule 推出 value。"
-    ],
-    "output_expectation": {
-      "draft_answer": "应包含 question_id、value、structured_fact_results、used_evidence_ids、confidence、notes。",
-      "final_answer": "最终 value 必须能由 structured_fact_results 和 evidence_id 追溯出来。"
-    }
-  }
+  ]
 }
