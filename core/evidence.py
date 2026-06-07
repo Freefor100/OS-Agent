@@ -1,0 +1,415 @@
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import re
+import threading
+import time
+from collections import OrderedDict
+from dataclasses import asdict, dataclass, field
+from pathlib import Path
+from threading import Lock
+from typing import Any
+
+
+SOURCE_EXTS = {".c", ".h", ".S", ".s", ".rs", ".cpp", ".cc", ".hpp", ".ld", ".lds", ".toml", ".mk", ".cmake", ".txt", ".md"}
+TEXT_NAMES = {"Makefile", "makefile", "justfile", ".gitignore", ".os_agent_lsp_target"}
+
+
+def stable_id(prefix: str, payload: Any, length: int = 12) -> str:
+    text = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return f"{prefix}_{hashlib.sha256(text.encode('utf-8')).hexdigest()[:length]}"
+
+
+@dataclass
+class EvidenceCandidate:
+    tool: str
+    kind: str
+    path: str = ""
+    line_start: int | None = None
+    line_end: int | None = None
+    symbol: str = ""
+    label: str = ""
+    strength: str = "medium"
+    content: str = ""
+    query: str = ""
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class EvidenceRecord:
+    evidence_id: str
+    verified: bool
+    strength: str
+    tool: str
+    kind: str
+    path: str = ""
+    line_start: int | None = None
+    line_end: int | None = None
+    symbol: str = ""
+    label: str = ""
+    query: str = ""
+    excerpt: str = ""
+    metadata: dict[str, Any] = field(default_factory=dict)
+    verifier_notes: list[str] = field(default_factory=list)
+
+    def compact(self) -> dict[str, Any]:
+        return {
+            "evidence_id": self.evidence_id,
+            "kind": self.kind,
+            "strength": self.strength,
+            "path": self.path,
+            "line_start": self.line_start,
+            "line_end": self.line_end,
+            "symbol": self.symbol,
+            "label": self.label,
+            "verified": self.verified,
+        }
+
+
+def _safe_read_lines(repo_path: str, rel_path: str) -> list[str]:
+    if not rel_path:
+        return []
+    root = Path(repo_path).resolve()
+    path = (root / rel_path).resolve()
+    if root not in path.parents and path != root:
+        return []
+    if not path.is_file():
+        return []
+    if not _is_text_file(path):
+        return []
+    try:
+        return _clean_text(path.read_text(encoding="utf-8", errors="ignore")).splitlines()
+    except OSError:
+        return []
+
+
+class EvidenceStore:
+    """Tool-owned evidence registry.
+
+    Agents request evidence, but only this verifier creates `evidence_id`.
+    Strong conclusions should cite strong source/config/LSP/call-graph evidence.
+    """
+
+    def __init__(self, repo_path: str, persist_path: str | None = None):
+        self.repo_path = repo_path
+        self.records: dict[str, EvidenceRecord] = {}
+        self.offsets: dict[str, int] = {}
+        self.cache: OrderedDict[str, EvidenceRecord] = OrderedDict()
+        self.cache_limit = max(8, int(os.environ.get("AGENT_D_EVIDENCE_CACHE_RECORDS", "128")))
+        self.lock = Lock()
+        self.persist_lock = Lock()
+        self.persist_path = Path(persist_path) if persist_path else None
+        if self.persist_path and self.persist_path.is_file():
+            self._load_jsonl(self.persist_path)
+
+    def add(self, cand: EvidenceCandidate) -> str:
+        record = self._verify(cand)
+        changed = False
+        with self.lock:
+            old = self.records.get(record.evidence_id)
+            if old is None or _rank_strength(record.strength) > _rank_strength(old.strength):
+                self.records[record.evidence_id] = _compact_record(record)
+                self._cache_put(record)
+                changed = True
+        if changed and self.persist_path:
+            with self.persist_lock:
+                self._append_record(record)
+        return record.evidence_id
+
+    def add_source(self, *, kind: str, path: str, line: int, symbol: str = "", label: str = "", strength: str = "strong", metadata: dict[str, Any] | None = None) -> str:
+        return self.add(EvidenceCandidate(
+            tool="source_reader",
+            kind=kind,
+            path=path,
+            line_start=line,
+            symbol=symbol,
+            label=label or symbol,
+            strength=strength,
+            metadata=metadata or {},
+        ))
+
+    def add_negative(self, *, query: str, searched_paths: list[str], label: str = "") -> str:
+        return self.add(EvidenceCandidate(
+            tool="negative_search",
+            kind="negative_search",
+            query=query,
+            label=label or query,
+            strength="medium",
+            metadata={"searched_paths": searched_paths, "matches": 0},
+        ))
+
+    def by_id(self, evidence_id: str) -> EvidenceRecord | None:
+        with self.lock:
+            cached = self.cache.get(evidence_id)
+            if cached is not None:
+                self.cache.move_to_end(evidence_id)
+                return cached
+            compact = self.records.get(evidence_id)
+            offset = self.offsets.get(evidence_id)
+        if compact is None:
+            return None
+        if self.persist_path and offset is not None:
+            try:
+                with self.persist_path.open("rb") as handle:
+                    handle.seek(offset)
+                    raw = json.loads(handle.readline().decode("utf-8"))
+                record = EvidenceRecord(**raw)
+                with self.lock:
+                    self._cache_put(record)
+                return record
+            except (OSError, UnicodeDecodeError, json.JSONDecodeError, TypeError):
+                pass
+        return compact
+
+    def compact_many(self, evidence_ids: list[str]) -> list[dict[str, Any]]:
+        with self.lock:
+            return [self.records[eid].compact() for eid in evidence_ids if eid in self.records]
+
+    def write_jsonl(self, path: str) -> None:
+        target = Path(path)
+        if self.persist_path and target.resolve() == self.persist_path.resolve():
+            return
+        target.parent.mkdir(parents=True, exist_ok=True)
+        rows = sorted(self.iter_full(), key=lambda r: r.evidence_id)
+        content = "".join(json.dumps(asdict(rec), ensure_ascii=False, sort_keys=True) + "\n" for rec in rows)
+        last_error: OSError | None = None
+        for attempt in range(6):
+            tmp = target.with_name(f".{target.name}.{os.getpid()}.{threading.get_ident()}.tmp")
+            try:
+                tmp.write_text(content, encoding="utf-8")
+                os.replace(tmp, target)
+                return
+            except OSError as exc:
+                last_error = exc
+                try:
+                    tmp.unlink(missing_ok=True)
+                except OSError:
+                    pass
+                time.sleep(0.02 * (attempt + 1))
+        raise last_error or OSError(f"failed to write {target}")
+
+    def _load_jsonl(self, path: Path) -> None:
+        loaded: dict[str, EvidenceRecord] = {}
+        offsets: dict[str, int] = {}
+        try:
+            with path.open("rb") as f:
+                while True:
+                    offset = f.tell()
+                    raw_line = f.readline()
+                    if not raw_line:
+                        break
+                    if not raw_line.strip():
+                        continue
+                    try:
+                        raw = json.loads(raw_line.decode("utf-8"))
+                        record = EvidenceRecord(**raw)
+                    except (UnicodeDecodeError, json.JSONDecodeError, TypeError):
+                        continue
+                    old = loaded.get(record.evidence_id)
+                    if old is None or _rank_strength(record.strength) > _rank_strength(old.strength):
+                        loaded[record.evidence_id] = _compact_record(record)
+                        offsets[record.evidence_id] = offset
+        except OSError:
+            return
+        self.records.update(loaded)
+        self.offsets.update(offsets)
+
+    def iter_full(self):
+        with self.lock:
+            evidence_ids = list(self.records)
+        for evidence_id in evidence_ids:
+            record = self.by_id(evidence_id)
+            if record is not None:
+                yield record
+
+    def _cache_put(self, record: EvidenceRecord) -> None:
+        self.cache[record.evidence_id] = record
+        self.cache.move_to_end(record.evidence_id)
+        while len(self.cache) > self.cache_limit:
+            self.cache.popitem(last=False)
+
+    def _append_record(self, record: EvidenceRecord) -> None:
+        if not self.persist_path:
+            return
+        self.persist_path.parent.mkdir(parents=True, exist_ok=True)
+        payload = (json.dumps(asdict(record), ensure_ascii=False, sort_keys=True) + "\n").encode("utf-8")
+        with self.persist_path.open("ab") as handle:
+            offset = handle.tell()
+            handle.write(payload)
+            handle.flush()
+        with self.lock:
+            self.offsets[record.evidence_id] = offset
+
+    def _verify(self, cand: EvidenceCandidate) -> EvidenceRecord:
+        notes: list[str] = []
+        verified = False
+        excerpt = cand.content or ""
+        line_end = cand.line_end
+
+        if cand.kind == "negative_search":
+            verified = cand.tool == "negative_search" and cand.metadata.get("matches", 1) == 0
+            notes.append("negative search verified by tool result" if verified else "negative search missing zero-match proof")
+        elif cand.kind in {"function_definition", "type_definition", "macro_definition", "constant_definition", "config_entry", "linker_symbol", "assembly_label", "source_span", "lsp_definition", "lsp_reference"}:
+            lines = _safe_read_lines(self.repo_path, cand.path)
+            if lines and cand.line_start and 1 <= cand.line_start <= len(lines):
+                start = max(1, cand.line_start - 2)
+                end = min(len(lines), (cand.line_end or cand.line_start) + 8)
+                excerpt = "\n".join(f"{i}: {lines[i - 1]}" for i in range(start, end + 1))
+                line_end = cand.line_end or min(len(lines), cand.line_start + 3)
+                verified = True
+                notes.append("path and line verified by source reader")
+                if cand.symbol and cand.symbol not in excerpt:
+                    notes.append("symbol not found in local excerpt; evidence remains location-based")
+            else:
+                notes.append("path/line could not be verified")
+        elif cand.kind in {"call_edge", "lsp_call_graph"}:
+            verified = bool(cand.metadata.get("src") and cand.metadata.get("dst") or cand.metadata.get("root_symbol"))
+            notes.append("call graph verified by structured tool metadata" if verified else "call graph metadata incomplete")
+        elif cand.kind == "git_history":
+            verified = bool(cand.content or cand.metadata.get("commit"))
+            notes.append("git history evidence from git tool")
+        else:
+            verified = bool(cand.content or cand.path)
+            notes.append("generic evidence accepted as weak/medium")
+
+        strength = cand.strength if verified else "weak"
+        payload = {
+            "tool": cand.tool,
+            "kind": cand.kind,
+            "path": cand.path.replace("\\", "/"),
+            "line_start": cand.line_start,
+            "symbol": cand.symbol,
+            "query": cand.query,
+            "label": cand.label,
+            "meta": cand.metadata,
+        }
+        return EvidenceRecord(
+            evidence_id=stable_id("ev", payload),
+            verified=verified,
+            strength=strength,
+            tool=cand.tool,
+            kind=cand.kind,
+            path=cand.path.replace("\\", "/"),
+            line_start=cand.line_start,
+            line_end=line_end,
+            symbol=cand.symbol,
+            label=cand.label,
+            query=cand.query,
+            excerpt=_clean_text(excerpt)[:4000],
+            metadata=cand.metadata,
+            verifier_notes=notes,
+        )
+
+
+def _rank_strength(v: str) -> int:
+    return {"weak": 1, "medium": 2, "strong": 3}.get(v, 0)
+
+
+def _compact_record(record: EvidenceRecord) -> EvidenceRecord:
+    return EvidenceRecord(
+        evidence_id=record.evidence_id,
+        verified=record.verified,
+        strength=record.strength,
+        tool=record.tool,
+        kind=record.kind,
+        path=record.path,
+        line_start=record.line_start,
+        line_end=record.line_end,
+        symbol=record.symbol,
+        label=record.label,
+        query=record.query,
+        excerpt="",
+        metadata={
+            key: value
+            for key, value in record.metadata.items()
+            if key in {
+                "root_symbol", "src", "dst", "matches", "searched_paths",
+                "semantic_fn_id", "signature", "type_kind", "phase", "node_id",
+                "navigation_only", "tool", "result_count", "commit",
+            }
+        },
+        verifier_notes=record.verifier_notes,
+    )
+
+
+def read_text_head(repo_path: str, rel_path: str, limit: int = 20000) -> str:
+    path = Path(repo_path) / rel_path
+    if not _is_text_file(path):
+        return ""
+    try:
+        return _clean_text(path.read_text(encoding="utf-8", errors="ignore"))[:limit]
+    except OSError:
+        return ""
+
+
+def search_repo(repo_path: str, pattern: str, *, max_hits: int = 20, include_exts: set[str] | None = None) -> list[dict[str, Any]]:
+    flags = re.IGNORECASE
+    rx = re.compile(pattern, flags)
+    root = Path(repo_path)
+    hits: list[dict[str, Any]] = []
+    exts = include_exts or SOURCE_EXTS
+    for dirpath, dirs, files in os.walk(repo_path):
+        dirs[:] = [d for d in dirs if d not in {".git", "target", "build", "dist", "node_modules", "__pycache__", ".pytest_cache"}]
+        for name in files:
+            path = Path(dirpath) / name
+            if path.suffix not in exts and path.name not in TEXT_NAMES:
+                continue
+            if not _is_text_file(path):
+                continue
+            rel = path.relative_to(root).as_posix()
+            try:
+                lines = _clean_text(path.read_text(encoding="utf-8", errors="ignore")).splitlines()
+            except OSError:
+                continue
+            for idx, line in enumerate(lines, 1):
+                if rx.search(line):
+                    hits.append({"path": rel, "line": idx, "text": line.strip()[:300]})
+                    if len(hits) >= max_hits:
+                        return hits
+    return hits
+
+
+def _is_text_file(path: Path) -> bool:
+    if not path.is_file():
+        return False
+    if path.suffix not in SOURCE_EXTS and path.name not in TEXT_NAMES:
+        return False
+    try:
+        data = path.read_bytes()[:4096]
+    except OSError:
+        return False
+    if b"\x00" in data:
+        return False
+    if not data:
+        return True
+    control = sum(1 for b in data if b < 32 and b not in (9, 10, 13))
+    return control / max(1, len(data)) < 0.02
+
+
+def _clean_text(text: str) -> str:
+    return "".join(_visible_char(ch) for ch in text)
+
+
+def _visible_char(ch: str) -> str:
+    code = ord(ch)
+    if ch in "\n\r\t" or code >= 32:
+        return ch
+    return f"\\x{code:02x}"
+
+
+def classify_source_kind(path: str, line_text: str, symbol: str = "") -> str:
+    suffix = Path(path).suffix.lower()
+    text = line_text.strip()
+    if suffix in {".ld", ".lds"} or "ENTRY" in text:
+        return "linker_symbol"
+    if suffix in {".s", ".S"}:
+        return "assembly_label" if text.endswith(":") or re.match(r"^[A-Za-z_.$][\w.$]*:", text) else "source_span"
+    if text.startswith("#define"):
+        return "macro_definition"
+    if re.match(r"^(struct|enum|typedef)\b", text) or (symbol and f"struct {symbol}" in text):
+        return "type_definition"
+    if "=" in text and Path(path).name.lower() in {"makefile", "cargo.toml", "rust-toolchain.toml"}:
+        return "config_entry"
+    return "source_span"

@@ -1,0 +1,33 @@
+# OS-Agent TODO
+
+## 1. 克隆主流教学 OS 原型到 repos/，对原型也跑一遍 Agent D 描述
+目的：建立"原型基线"图谱，让 Agent C 能识别参赛作品是基于哪个原型的变体、
+哪些作品是同一原型的同源变体（genealogy / 同源聚类）。
+
+待 clone（git clone 到 repos/，名字用第二列）：
+- xv6-riscv        https://github.com/mit-pdos/xv6-riscv        (C / RISC-V, MIT 教学原型，最经典)
+- xv6-public       https://github.com/mit-pdos/xv6-public       (C / x86, 老版 xv6)
+- rCore-Tutorial-v3 https://github.com/rcore-os/rCore-Tutorial-v3 (Rust / RISC-V, 国赛主流原型)
+- arceos           https://github.com/arceos-org/arceos         (Rust 模块化 unikernel, 多架构, 国赛主流)
+- Starry           https://github.com/Starry-OS/Starry          (Rust 宏内核, 基于 ArceOS, 国赛常见基底)
+- ucore_os_lab     https://github.com/chyyuu/ucore_os_lab       (C, 清华 uCore 教学)
+- zCore            https://github.com/rcore-os/zCore            (Rust, 基于 zircon 的微内核教学)
+注：以上 URL 部分组织迁移过（arceos 有 arceos-org 与 rcore-os fork；Starry 有
+Starry-OS/Starry 与已归档的 Arceos-monolithic/Starry），clone 前先确认默认分支可用。
+
+跑法：python agent_d.py repos/<name> --repo-name <name> --fresh
+（原型不在参赛 xlsx 里 → submission_meta 自动标"教学原型 OS"）
+
+## 2. Agent C 识别 OS 图谱 / 同源变体聚类
+- 用 Agent D 已产出的 compare_index.json 多层指纹做相似度：
+  design_layer(claim/mechanism tags) + relation_layer(flow/dependency 签名)
+  + code_structure_layer(ast_shape_hash / 归一化 token 指纹 / 调用边指纹) + lineage_layer
+- 目标输出：每个参赛作品 -> 最相似的原型基线 + 相似度分；把同一原型的变体聚成一簇
+- 最强的同源信号：调用图同构（call_edge_fingerprints）——改名/换注释都难改调用拓扑
+- 已定义权重 weights: design0.35 / relation0.25 / code_structure0.25 / lineage0.15，可调
+- 先把 7 个原型基线入库，再批量跑参赛作品做最近邻匹配
+
+## 3. 代码 / 输出目录整理（详见与本次会话讨论）
+- output/ 误被 git 跟踪（1293 文件，含整个仓库副本）；.gitignore 里 output/ 行被注释
+- _kdg 是 _agent_d 的旧命名遗留，无任何 .py 引用，可删
+- 清理冒烟残留目录（*-smoke / *-resume-v2,v3 / *-langgraph-smoke2）与散落 .log
