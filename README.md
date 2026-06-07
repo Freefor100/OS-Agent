@@ -1,4 +1,9 @@
-﻿# OS-Agent: KernelProject Agents
+﻿# 2026年操作系统设计赛（全国赛 ）-OS功能挑战赛
+
+# proj18-面向小型操作系统的分析比对智能体系统设计
+
+
+# OS-Agent: KernelProject Agents
 
 本仓库当前主线是两个公开入口：
 
