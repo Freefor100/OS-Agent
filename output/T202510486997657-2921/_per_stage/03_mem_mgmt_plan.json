@@ -1,0 +1,118 @@
+{
+  "stage_id": "03_mem_mgmt",
+  "goal": "分析 F7LY-OS 内存管理子系统，覆盖物理页分配器、页表映射、缺页处理、mmap/VMA 管理、TLB 刷新、并发控制等核心机制，为 30 道内存管理题单提供代码证据。",
+  "must_cover": [
+    "[Q03_001] 内存管理实现语言/形态（C++ 内核，类 xv6 风格）",
+    "[Q03_002] 物理页帧分配器存在性（BuddySystem 类）",
+    "[Q03_003] 物理分配算法（Buddy System 伙伴系统）",
+    "[Q03_004] 核心数据结构（BuddySystem::tree 数组，NodeState 枚举）",
+    "[Q03_005] 并发控制锁粒度（PhysicalMemoryManager::memlock 全局自旋锁）",
+    "[Q03_006] 页表结构体+walk/map/unmap 实现（PageTable 类）",
+    "[Q03_007] 页表操作 API（walk、map_pages、vmunmap）",
+    "[Q03_008] 页表修改并发控制（VirtualMemoryManager::_virt_mem_lock）",
+    "[Q03_009] 内核与用户地址空间关系（独立页表，SV39 分页）",
+    "[Q03_010] 缺页异常处理（trap.cc::mmap_handler → allocate_vma_page）",
+    "[Q03_011] 缺页链路追踪（usertrap → mmap_handler → allocate_vma_page → map_pages）",
+    "[Q03_012] CoW 实现状态（未发现显式 CoW，fork 使用独立页表）",
+    "[Q03_013] 惰性分配实现（fault 时 allocate_vma_page 分配）",
+    "[Q03_014] swap 实现状态（未发现 swap 机制）",
+    "[Q03_015] mmap 实现（完整支持 MAP_SHARED/PRIVATE/ANON/FIXED）",
+    "[Q03_016] Page Cache 存在性（lwext4 ext4_bcache 模块）",
+    "[Q03_001] 该 OS 的内存管理实现语言/形态更接近哪类？（只选最贴近的一项）",
+    "[Q03_002] 是否存在“物理页帧分配器 (Physical Frame Allocator)”的真实实现？（必须三态）",
+    "[Q03_003] 物理内存分配算法更接近哪种？",
+    "[Q03_004] 物理页帧分配器的核心数据结构是什么？（例如 bitmap 数组、buddy free list、slab cache 表、`struct run` 单链表等；必须引用结构体/字段证据）",
+    "[Q03_005] 物理分配器的并发控制锁粒度是什么？（全局大锁 / per-CPU / 分桶 / 无锁+关中断 / 其他；必须给锁对象类型与持锁范围证据）",
+    "[Q03_006] 是否存在“页表 (page table) 结构体 + walk/map/unmap”的真实实现？（必须三态）"
+  ],
+  "evidence_targets": [
+    "BuddySystem 类定义与 Alloc/Free 实现",
+    "PageTable::walk/map_pages/vmunmap 实现",
+    "trap.cc::mmap_handler 与 allocate_vma_page 调用链",
+    "ProcessManager::mmap 参数验证与 VMA 创建",
+    "TLB 刷新函数（sfence_vma, invtlb, sbi_remote_sfence_vma）",
+    "copy_in/copy_out 中的用户地址校验逻辑",
+    "memlayout.hh 中 PHYSTOP/KERNBASE/PGSIZE 常量",
+    "proc::vma 结构体与 NVMA 定义",
+    "物理页分配",
+    "页表映射",
+    "页故障处理",
+    "堆分配器"
+  ],
+  "seed_paths": [
+    "kernel/mem/buddysystem.cc",
+    "kernel/mem/buddysystem.hh",
+    "kernel/mem/slab.hh",
+    "kernel/mem/physical_memory_manager.cc",
+    "kernel/mem/virtual_memory_manager.cc",
+    "kernel/mem/riscv/pagetable.cc",
+    "kernel/mem/riscv/pagetable.hh",
+    "kernel/trap/riscv/trap.cc",
+    "kernel/proc/proc_manager.cc",
+    "kernel/proc/process_memory_manager.hh",
+    "kernel/mem/memlayout.hh",
+    "kernel/mem/mem.hh",
+    "mm",
+    "memory"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64",
+    "loongarch64"
+  ],
+  "entry_symbols": [
+    "BuddySystem",
+    "PhysicalMemoryManager",
+    "VirtualMemoryManager",
+    "PageTable",
+    "mmap_handler",
+    "allocate_vma_page",
+    "map_pages",
+    "sfence_vma",
+    "copy_in",
+    "copy_out",
+    "handle_page_fault",
+    "alloc_frame"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "busybox",
+    "busybox/loongarch",
+    "busybox/riscv",
+    "docs",
+    "kernel",
+    "kernel/boot",
+    "kernel/devs",
+    "kernel/fs",
+    "kernel/hal"
+  ],
+  "preferred_tools": [
+    "lsp_get_definition",
+    "lsp_get_call_graph",
+    "lsp_get_references",
+    "read_code_segment",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "1. 使用 lsp_get_definition 定位 BuddySystem::Alloc/Free、PageTable::walk/map_pages 的精确实现位置",
+    "2. 使用 lsp_get_call_graph 追踪 mmap_handler → allocate_vma_page → map_pages 的调用链（max_depth=3）",
+    "3. 使用 read_code_segment 精读 buddysystem.cc 的树结构初始化和分配逻辑，提取 NodeState 枚举和 tree 数组证据",
+    "4. 使用 read_code_segment 精读 virtual_memory_manager.cc 的 allocate_vma_page 函数，确认惰性分配和文件映射处理逻辑",
+    "5. 使用 grep_in_repo 搜索 sfence_vma、invtlb、sbi_remote_sfence_vma 确认 TLB 刷新机制和远程 shootdown 实现",
+    "6. 使用 read_code_segment 读取 copy_in/copy_out 函数，提取 VMA 范围校验和用户地址安全检查逻辑",
+    "7. 使用 read_code_segment 读取 memlayout.hh 和 platform.hh，提取 PHYSTOP、PGSIZE、MAXVA 等内存常量证据",
+    "8. 使用 lsp_get_references 查找 PhysicalMemoryManager::memlock 和 VirtualMemoryManager::_virt_mem_lock 的持锁范围，确认并发控制粒度"
+  ]
+}

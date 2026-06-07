@@ -1,0 +1,231 @@
+{
+  "schema_version": "describe_review_v1",
+  "stage_id": "02_boot_trap",
+  "stage_title": "启动/架构与 Trap/系统调用",
+  "confidence": 0.99,
+  "question_reviews": [
+    {
+      "question_id": "Q02_001",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "答案明确给出文件路径与符号，证据摘录直接展示了标签定义，完全符合题面要求。"
+    },
+    {
+      "question_id": "Q02_002",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "单选题选项匹配，证据展示了 SBI 调用与 main 入口参数，支撑固件交接结论。"
+    },
+    {
+      "question_id": "Q02_003",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态结论明确，证据展示了 stvec 设置与 trampoline 切换逻辑，间接证实模式切换环境。"
+    },
+    {
+      "question_id": "Q02_004",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "列举了关键寄存器与位定义，证据摘录包含宏定义与设置代码，支撑充分。"
+    },
+    {
+      "question_id": "Q02_005",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "三态结论为 implemented，证据展示了 satp 写入与页表宏，符合 MMU 启用要求。"
+    },
+    {
+      "question_id": "Q02_006",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "跳转链描述清晰，证据展示了汇编 call 与 C 函数调用，节点明确。"
+    },
+    {
+      "question_id": "Q02_007",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "四项状态均填写，但 BSS 清零证据为 linker script 推断，略弱于直接代码证据。"
+    },
+    {
+      "question_id": "Q02_008",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "三态结论为 not_found，证据说明检索过程与结果，符合负向结论支撑要求。"
+    },
+    {
+      "question_id": "Q02_009",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "三态结论明确，证据直接展示 stvec 设置函数，支撑充分。"
+    },
+    {
+      "question_id": "Q02_010",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "描述了 Makefile 条件编译逻辑，证据摘录展示了 platform 变量与对象文件选择。"
+    },
+    {
+      "question_id": "Q02_011",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "三态结论为 implemented，证据包含 sbi.h 定义与调用点，证实固件链。"
+    },
+    {
+      "question_id": "Q02_012",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "三态结论明确，证据展示了 UART 虚拟地址映射与常量定义，支撑地址切换逻辑。"
+    },
+    {
+      "question_id": "Q02_013",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "三态结论为 implemented，证据展示了 usertrapret 函数与 stvec 重设，路径清晰。"
+    },
+    {
+      "question_id": "Q02_014",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "描述了多平台支持情况，证据展示了 Makefile 中不同平台的 linker 配置。"
+    },
+    {
+      "question_id": "Q02_015",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "明确指出了内核与用户态向量入口，证据摘录展示了 label 定义。"
+    },
+    {
+      "question_id": "Q02_016",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "单选题选项 C 匹配，证据展示了 TRAPFRAME 映射到用户页的逻辑。"
+    },
+    {
+      "question_id": "Q02_017",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "给出了结构体路径与字段细节，证据摘录展示了 struct 定义，信息完整。"
+    },
+    {
+      "question_id": "Q02_018",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "三态结论为 implemented，证据展示了 syscalls 函数指针数组，支撑分发表存在。"
+    },
+    {
+      "question_id": "Q02_019",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "三态结论明确，证据展示了 syscall 函数中的边界检查逻辑。"
+    },
+    {
+      "question_id": "Q02_020",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "追踪路径清晰，证据分别展示了 trap、syscall 分发与具体实现函数。"
+    },
+    {
+      "question_id": "Q02_021",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "列出了多个 syscall 状态，但证据仅展示了分发表注册，未逐一展示实现体代码。"
+    },
+    {
+      "question_id": "Q02_022",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "三态结论为 implemented，证据展示了 copyin 函数中的地址检查逻辑。"
+    },
+    {
+      "question_id": "Q02_023",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "三态结论明确，证据展示了 timer tick 中调用 yield 的代码。"
+    },
+    {
+      "question_id": "Q02_024",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "三态结论为 implemented，证据展示了 sighandle 与 trap 中的信号处理逻辑。"
+    },
+    {
+      "question_id": "Q02_025",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "描述了缺页异常处理入口，证据展示了 trap.c 中调用 handle_stack_page_fault。"
+    },
+    {
+      "question_id": "Q02_026",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "描述了 AP 启动顺序，证据展示了 main 函数中其他 hart 的初始化流程。"
+    },
+    {
+      "question_id": "Q02_027",
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "填写了统计格式，但数量为估算值（约 80 个），证据仅展示数组片段，精确度略低。"
+    },
+    {
+      "question_id": "Q02_028",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "对照了 README 与代码，证据展示了 README 内容，结论合理。"
+    },
+    {
+      "question_id": "Q02_029",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "给出了搜索结论，证据说明检索模式与结果，符合题面要求。"
+    },
+    {
+      "question_id": "Q02_030",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "三态结论为 implemented，证据展示了 devintr 中外部中断处理逻辑。"
+    },
+    {
+      "question_id": "Q02_031",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "三态结论为 not_found，证据说明检索结果与替代行为（SIGTERM），支撑充分。"
+    },
+    {
+      "question_id": "Q02_032",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "列出了支持的粒度，证据展示了 sys_kill、sys_tgkill 等函数定义。"
+    },
+    {
+      "question_id": "Q02_033",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "单选题选项 A 匹配，证据展示了 scause 寄存器判断逻辑。"
+    },
+    {
+      "question_id": "Q02_034",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "三态结论为 not_found，证据展示了 kerneltrap 中中断关闭检查，支撑结论。"
+    }
+  ],
+  "findings": [
+    {
+      "severity": "warn",
+      "message": "材料 B 外层容器显示 baseline_status 为 parse_or_validate_failed，虽内含可评审内容，但表明报告生成或校验阶段存在契约异常。"
+    }
+  ],
+  "summary_zh": "本题单报告整体完成度高，34 题均有作答且格式符合题面约束。证据支撑方面，大部分题目提供了具体的文件路径、符号与代码摘录，能有效支撑结论；少数题目（如 Q02_007 BSS 清零、Q02_021 syscall 实现、Q02_027 统计）证据略显间接或为估算值。全阶段置信度基于各题均值计算，但需注意材料 B 容器状态标记为解析失败，可能影响报告可靠性。",
+  "report_quality_score": 0.99,
+  "_meta": {
+    "quality": {
+      "mean_question_confidence": 0.9934
+    },
+    "review_model": "qwen3.5-plus",
+    "baseline": true,
+    "run_at": "2026-04-24T15:35:42",
+    "baseline_execute_tokens": 725539,
+    "baseline_review_tokens": 20303,
+    "baseline_stage_total_tokens": 745842
+  }
+}

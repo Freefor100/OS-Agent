@@ -1,0 +1,232 @@
+{
+  "schema_version": "describe_review_v1",
+  "stage_id": "02_boot_trap",
+  "stage_title": "启动/架构与 Trap/系统调用",
+  "confidence": 0.98,
+  "question_reviews": [
+    {
+      "question_id": "Q02_001",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "题面要求文件路径 + 符号证据，答案提供了 linker.ld 及两个 entry.S 文件的具体摘录，证据直接支撑入口点结论，完全符合。"
+    },
+    {
+      "question_id": "Q02_002",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "单选题选项与题面 Choice A 完全一致，证据展示了 SBI 引导及 Makefile 配置，有效支撑启动链结论。"
+    },
+    {
+      "question_id": "Q02_003",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "三态值使用正确，证据摘录直接展示了 MPP 设置及特权级切换函数调用，证实了模式切换。"
+    },
+    {
+      "question_id": "Q02_004",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "明确列出了 mepc 和 mstatus.MPP，证据摘录中包含对应的寄存器写操作，与结论完全对应。"
+    },
+    {
+      "question_id": "Q02_005",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "三态值正确，证据展示了 SATP 写入及页表初始化函数，充分证明 MMU 启用。"
+    },
+    {
+      "question_id": "Q02_006",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "列出了 5 个关键节点，符合 3-6 个要求，证据摘录覆盖了 RustSBI 到内核 main 的调用链。"
+    },
+    {
+      "question_id": "Q02_007",
+      "score_evidence": 0.95,
+      "score_consistency": 0.95,
+      "review": "四项状态均给出且附带路径，格式基本符合要求（使用换行分隔），证据摘录对应各项初始化逻辑。"
+    },
+    {
+      "question_id": "Q02_008",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "三态值正确，证据展示了 FPU 状态寄存器初始化代码，直接支撑结论。"
+    },
+    {
+      "question_id": "Q02_009",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "三态值正确，证据展示了 stvec 写入及中断使能，明确证实向量表设置。"
+    },
+    {
+      "question_id": "Q02_010",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "描述了 Makefile 平台变量选择机制，证据摘录展示了条件编译逻辑，符合题面要求。"
+    },
+    {
+      "question_id": "Q02_011",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态值正确，证据展示了 RustSBI 目录及控制权移交代码，证实固件链存在。"
+    },
+    {
+      "question_id": "Q02_012",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态值正确，证据展示了虚拟地址宏定义及映射函数，证实地址切换逻辑。"
+    },
+    {
+      "question_id": "Q02_013",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "三态值正确，证据展示了 usertrapret 及 sret 指令，完整覆盖返回用户态路径。"
+    },
+    {
+      "question_id": "Q02_014",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "明确说明未发现特定板型但支持双平台，证据展示了 Makefile 及入口文件差异，符合题面。"
+    },
+    {
+      "question_id": "Q02_015",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "明确给出 kernelvec 和 uservec，证据摘录展示了汇编标签及 stvec 设置，位置准确。"
+    },
+    {
+      "question_id": "Q02_016",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "单选题选项与题面 Choice C 一致，证据展示了 TRAPFRAME 宏定义及用户页映射注释。"
+    },
+    {
+      "question_id": "Q02_017",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "给出了结构体路径及字节数计算，但证据摘录中包含计算注释（非纯代码），略微影响证据纯度。"
+    },
+    {
+      "question_id": "Q02_018",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "三态值正确，证据展示了 syscalls 函数指针数组，直接证实分发表存在。"
+    },
+    {
+      "question_id": "Q02_019",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "三态值正确，证据展示了边界检查 if 语句，直接证实检查逻辑。"
+    },
+    {
+      "question_id": "Q02_020",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "列出了 4 个关键节点，符合 3-6 个要求，证据摘录完整覆盖了从用户桩到内核实现的调用链。"
+    },
+    {
+      "question_id": "Q02_021",
+      "score_evidence": 0.5,
+      "score_consistency": 0.9,
+      "review": "列出了 10 个 syscall 状态，但仅提供了 5 条证据，违反'每个至少给一条证据'的题面约束，证据覆盖率不足。"
+    },
+    {
+      "question_id": "Q02_022",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "三态值正确，证据展示了 copyin/copyout 及地址检查逻辑，充分证实安全检查。"
+    },
+    {
+      "question_id": "Q02_023",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "三态值正确，证据展示了 timer_tick 中调用 yield 的逻辑，直接证实抢占调度。"
+    },
+    {
+      "question_id": "Q02_024",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "三态值正确，证据展示了 sighandle 及 sigreturn 函数，完整覆盖信号处理链路。"
+    },
+    {
+      "question_id": "Q02_025",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "描述了缺页异常处理函数及分支逻辑，证据摘录展示了 CoW 及 lazy 处理入口，符合题面。"
+    },
+    {
+      "question_id": "Q02_026",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "描述了多核初始化顺序及 IPI 唤醒，证据展示了 main.c 中的核循环及初始化调用，逻辑一致。"
+    },
+    {
+      "question_id": "Q02_027",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "按格式填写了各项统计信息，证据展示了 sysnum.h 及 syscalls 数组，支撑统计依据。"
+    },
+    {
+      "question_id": "Q02_028",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "对照了 README 声称与代码实现，证据展示了文档片段，符合题面要求。"
+    },
+    {
+      "question_id": "Q02_029",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "明确给出搜索结论为未见，证据展示了目录搜索结果说明，符合题面要求。"
+    },
+    {
+      "question_id": "Q02_030",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "三态值正确，证据展示了 plic_claim 及外部中断处理 switch，直接证实分发逻辑。"
+    },
+    {
+      "question_id": "Q02_031",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "三态值 not_found 正确，证据展示了使用 SIGTERM 而非 SIGSEGV 的代码及头文件定义缺失。"
+    },
+    {
+      "question_id": "Q02_032",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "明确说明仅实现进程级 kill，证据展示了 sys_kill 实现及 sysnum.h 定义，符合题面。"
+    },
+    {
+      "question_id": "Q02_033",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "单选题选项与题面 Choice A 一致，证据展示了 scause 判断及中断标志位定义，机制描述准确。"
+    },
+    {
+      "question_id": "Q02_034",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "三态值 not_found 正确，证据展示了中断处理期间关中断断言及无重开指令，充分证实不支持嵌套。"
+    }
+  ],
+  "findings": [
+    {
+      "question_id": "Q02_021",
+      "severity": "warn",
+      "message": "题面要求为列出的 5-10 个 syscall'每个至少给一条证据'，答案列出 10 个但仅提供 5 条证据，证据覆盖率不足 50%，违反题面约束。"
+    }
+  ],
+  "summary_zh": "本报告整体题面相符度高，绝大多数三态题与简答题证据详实、结论明确。主要问题在于 Q02_021 未满足'每个 syscall 至少一条证据'的数量约束，证据密度不足；Q02_017 证据摘录中包含非代码的计算注释。全阶段置信度按各题均值方案 A 汇总，因存在单题证据缺失警告，整体质量略受影响但仍属高可信报告。",
+  "report_quality_score": 0.98,
+  "_meta": {
+    "quality": {
+      "mean_question_confidence": 0.9794
+    },
+    "review_model": "qwen3.5-plus",
+    "baseline": true,
+    "run_at": "2026-04-24T14:10:33",
+    "baseline_execute_tokens": 591486,
+    "baseline_review_tokens": 21645,
+    "baseline_stage_total_tokens": 613131
+  }
+}

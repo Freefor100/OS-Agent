@@ -4,9 +4,10 @@
 from langchain.tools import tool
 import os
 import re
+from typing import Optional
 
 # 允许访问的根目录（相对于工作目录）
-ALLOWED_ROOTS = ["./repos", "./output", "./evaluation", "repos", "output", "evaluation"]
+ALLOWED_ROOTS = ["./repos", "./output", "repos", "output"]
 
 # 最大读取字符数
 MAX_FILE_CHARS = 100000
@@ -25,11 +26,11 @@ def _is_path_allowed(file_path: str) -> bool:
 
 
 @tool
-def read_code_segment(file_path: str, start_line: int = None, end_line: int = None, max_chars: int = None) -> str:
+def read_code_segment(file_path: str, start_line: Optional[int] = None, end_line: Optional[int] = None, max_chars: Optional[int] = None) -> str:
     """
     读取代码文件的指定片段。
     
-    安全限制：只能访问 repos/、output/、evaluation/ 目录下的文件。
+    安全限制：只能访问 repos/、output/ 目录下的文件。
     
     Args:
         file_path: 文件路径（相对于工作目录或绝对路径）
@@ -98,7 +99,7 @@ def read_code_segment(file_path: str, start_line: int = None, end_line: int = No
 
 
 @tool
-def grep_in_repo(repo_path: str, pattern: str, max_results: int = 20, file_extensions: str = None) -> str:
+def grep_in_repo(repo_path: str, pattern: str, max_results: int = 20, file_extensions: Optional[str] = None) -> str:
     """
     在仓库源代码中搜索关键词或正则模式。
     用于验证技术断言：如函数名、结构体名、算法名是否真实存在于源代码中。
@@ -258,3 +259,116 @@ def rag_search_code(repo_path: str, query: str, top_k: int = 3) -> str:
     except Exception as e:
         import traceback
         return f"Error running RAG search: {str(e)}\n{traceback.format_exc()}"
+
+
+@tool
+def confirm_symbol_absent(repo_path: str, patterns: str, file_extensions: Optional[str] = None) -> str:
+    """
+    负向搜索验证工具：确认给定的一组符号/模式在仓库中均不存在。
+    用于为 tri_state_impl 题型的 not_found 结论提供可复核的负向证据。
+
+    与 grep_in_repo 的区别：
+    - 专为"确认缺失"设计，对每个 pattern 独立搜索并汇总
+    - 所有 pattern 均零匹配时返回 CONFIRMED_ABSENT，任意一个有匹配时返回 FOUND
+    - 返回搜索了多少文件，使结论可复核
+
+    使用建议：patterns 应涵盖目标功能的多种写法，例如：
+      "spin_lock,SpinLock,SPIN_LOCK,spinlock_t"（至少 3 种变体）
+
+    Args:
+        repo_path: 仓库本地路径（如 repos/my-os）
+        patterns: 英文逗号或换行分隔的多个搜索模式（支持正则）
+        file_extensions: 可选，逗号分隔的扩展名过滤（如 "rs,c,h"）
+
+    Returns:
+        结构化负向搜索报告，含每个 pattern 的匹配数；
+        全部为零时标注 [CONFIRMED_ABSENT]，任意有匹配时标注 [FOUND]。
+    """
+    if not _is_path_allowed(repo_path):
+        return f"❌ 安全限制：不允许访问 '{repo_path}'。只能搜索 repos/ 目录下的仓库。"
+    if not os.path.isdir(repo_path):
+        return f"Error: 目录不存在: {repo_path}"
+
+    raw_patterns = [p.strip() for p in re.split(r"[,\n]", patterns) if p.strip()]
+    if not raw_patterns:
+        return "Error: patterns 为空，请提供至少一个搜索模式"
+
+    ext_filter = None
+    if file_extensions:
+        ext_filter = set("." + e.strip().lstrip(".") for e in file_extensions.split(","))
+
+    exclude_dirs = {".git", ".github", "target", "node_modules", "vendor", "__pycache__", "build"}
+    default_code_exts = {
+        ".rs", ".c", ".cpp", ".h", ".hpp", ".cc", ".cxx",
+        ".s", ".S", ".asm", ".toml", ".yaml", ".yml", ".ld", ".x", ".mk",
+    }
+
+    # 收集所有待搜索文件路径（一次遍历复用）
+    all_files: list[str] = []
+    for root, dirs, files in os.walk(repo_path):
+        dirs[:] = [d for d in dirs if d not in exclude_dirs]
+        for fname in files:
+            _, ext = os.path.splitext(fname)
+            ext_lower = ext.lower()
+            if ext_filter:
+                if ext_lower not in ext_filter:
+                    continue
+            elif ext_lower not in default_code_exts:
+                continue
+            fpath = os.path.join(root, fname)
+            try:
+                if os.path.getsize(fpath) <= 2 * 1024 * 1024:
+                    all_files.append(fpath)
+            except OSError:
+                continue
+
+    files_searched = len(all_files)
+    pattern_results: list[dict] = []
+
+    for pat in raw_patterns:
+        try:
+            regex = re.compile(pat, re.IGNORECASE)
+        except re.error as e:
+            pattern_results.append({"pattern": pat, "matches": -1, "error": str(e), "examples": []})
+            continue
+
+        match_count = 0
+        examples: list[str] = []
+        for fpath in all_files:
+            try:
+                with open(fpath, "r", encoding="utf-8", errors="ignore") as f:
+                    for line_num, line in enumerate(f, 1):
+                        if regex.search(line):
+                            match_count += 1
+                            if len(examples) < 3:
+                                rel = os.path.relpath(fpath, repo_path).replace("\\", "/")
+                                examples.append(f"  {rel}:{line_num}: {line.rstrip()[:120]}")
+            except Exception:
+                continue
+        pattern_results.append({"pattern": pat, "matches": match_count, "examples": examples})
+
+    all_absent = all(r["matches"] == 0 for r in pattern_results if r.get("matches", -1) >= 0)
+    verdict = "[CONFIRMED_ABSENT]" if all_absent else "[FOUND]"
+
+    lines = [
+        f"负向搜索报告 — {verdict}",
+        f"仓库: {repo_path}  |  搜索文件数: {files_searched}  |  patterns: {len(raw_patterns)}",
+        "",
+    ]
+    for r in pattern_results:
+        if r.get("matches", -1) < 0:
+            lines.append(f"  ✗ [{r['pattern']}] 正则错误: {r.get('error')}")
+        elif r["matches"] == 0:
+            lines.append(f"  ✓ [{r['pattern']}] 零匹配 — 确认不存在")
+        else:
+            lines.append(f"  ✗ [{r['pattern']}] {r['matches']} 处匹配 — 存在")
+            lines.extend(r["examples"])
+
+    lines.append("")
+    if all_absent:
+        lines.append(f"结论: 以上 {len(raw_patterns)} 个 pattern 在 {files_searched} 个文件中均未命中，可作为 not_found 的负向证据。")
+    else:
+        found = [r["pattern"] for r in pattern_results if r.get("matches", 0) > 0]
+        lines.append(f"结论: pattern {found} 存在匹配，不满足 not_found 条件，需进一步分析。")
+
+    return "\n".join(lines)

@@ -1,0 +1,32 @@
+{
+  "task_id": "task_03_mem_protection",
+  "stage_id": "03_mem_mgmt",
+  "question_id": "Q03_024",
+  "question_ids": [
+    "Q03_024"
+  ],
+  "status": "done",
+  "evidence_ids": [
+    "ev_task_03_mem_protection_7f144662",
+    "ev_task_03_mem_protection_5aeeacc8",
+    "ev_task_03_mem_protection_2870b180",
+    "ev_task_03_mem_protection_114d460b",
+    "ev_task_03_mem_protection_9d766db7",
+    "ev_task_03_mem_protection_47d97071",
+    "ev_task_03_mem_protection_d9f092f2",
+    "ev_task_03_mem_protection_dd9a63ce"
+  ],
+  "draft_answer_ids": [
+    "draft_task_03_mem_protection_Q03_024_f8b91e89"
+  ],
+  "findings": [],
+  "confidence": "high",
+  "errors": [],
+  "token_usage": {},
+  "metadata": {
+    "evidence_count": 8,
+    "mode": "react",
+    "summary": "查证了 xv6-k210 内存保护机制：PTE_R/W/X/U 定义于 riscv.h；copyin/copyout 实现于 vm.c；无 access_ok 函数。关于 Stallings Ch8 VM 策略：存在 demand paging（lazy allocation + ELF demand loading），无 prepaging；mmap placement 使用从 VUMMAP 向上扫描首个空闲区间的策略；无 page replacement 算法（LRU 仅用于文件系统 buffer cache）；无 resident set/working set/load control；无 VM cleaning/writeback 策略。",
+    "raw_output_excerpt": "Now I have all the evidence. Let me compile the final structured JSON output.\n\n```json\n{\n  \"status\": \"done\",\n  \"summary\": \"查证了 xv6-k210 内存保护机制：PTE_R/W/X/U 定义于 riscv.h；copyin/copyout 实现于 vm.c；无 access_ok 函数。关于 Stallings Ch8 VM 策略：存在 demand paging（lazy allocation + ELF demand loading），无 prepaging；mmap placement 使用从 VUMMAP 向上扫描首个空闲区间的策略；无 page replacement 算法（LRU 仅用于文件系统 buffer cache）；无 resident set/working set/load control；无 VM cleaning/writeback 策略。\",\n  \"claim\": \"xv6-k210 实现了基于 RISC-V Sv39 页表的 PTE 权限位内存保护，支持 COW 和 lazy allocation 形式的 demand paging，但无传统 VM 的 replacement/resident/cleaning 策略。\",\n  \"structured_fact_results\": [\n    {\n      \"fact_id\": \"Q03_024_01\",\n      \"status_or_value\": \"yes_weak\",\n      \"evidence_candidate_indexes\": [0, 1, 2, 3, 4],\n      \"notes\": \"存在 demand paging：handle_page_fault_loadelf 按需从 ELF 文件加载页，handle_page_fault_lazy 为 HEAP/STACK 按需分配物理页。但无 prepaging 机制。属于 yes_weak 因为只有实现体证据，没有明确的 'fetch policy' 抽象或文档说明。\"\n    },\n    {\n      \"fact_id\": \"Q03_024_02\",\n      \"status_or_value\": \"yes_weak\",\n      \"evidence_candidate_indexes\": [5, 6],\n      \"notes\": \"mmap 的 lookup_segment 从 VUMMAP 基址向上扫描，找到首个足够大的空闲区间放置新段（类似 first-fit 风格）。exec 的 LOAD 段按 ELF 固定地址放置。但无传统 VM 的 placement policy 抽象（如 mmap_base 策略）。\"\n    },\n    {\n      \"fact_id\": \"Q03_024_03\",\n      \"status_or_value\": \"no_after_negative_search\",\n      \"evidence_candidate_indexes\": [7],\n      \"notes\": \"代码库中无任何 VM 级别的 page replacement 算法。LRU 仅用于文件系统 buffer cache（doc/内核设计-IO策略.md），非 VM 页替换。无 Clock/FIFO/SecondChance 等算法。\"\n    },\n    {\n      \"fact_id\": \"Q03_024_04\",\n      \"status_or_value\": \"no_after_negative_search\",\n      \"evidence_candidate_indexes\": [7],\n      \"notes\": \"无 resident set 管理、无 working set 跟踪、无 thrashing 检测、无 load control 机制。\"\n    },\n    {\n      \"fact_id\": \"Q03_024_05\",\n      \"status_or_value\": \"no_after_negative_search\",\n      \"evidence_candidate_indexes\": [7],\n      \"notes\": \"无 VM 级别的 dirty page cleaning 或 background writeback 策略。文件系统有 dirty 标记和写回，但属于 FS 缓存层，非 VM cleaning policy。\"\n    },\n    {\n"
+  }
+}

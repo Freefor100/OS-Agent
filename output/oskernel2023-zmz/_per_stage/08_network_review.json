@@ -1,0 +1,72 @@
+{
+  "schema_version": "describe_review_v1",
+  "stage_id": "08_network",
+  "stage_title": "网络子系统与协议栈",
+  "confidence": 0.75,
+  "question_reviews": [
+    {
+      "question_id": "Q08_001",
+      "score_evidence": 0.95,
+      "score_consistency": 0.95,
+      "review": "三态结论明确，证据通过目录扫描、系统调用表、驱动头文件三方面交叉验证，支撑充分。"
+    },
+    {
+      "question_id": "Q08_002",
+      "score_evidence": 0.95,
+      "score_consistency": 0.85,
+      "review": "证据能支撑未发现协议栈的结论；但单选题 value 建议使用选项键（D），当前使用选项文本，规范性稍欠。"
+    },
+    {
+      "question_id": "Q08_003",
+      "score_evidence": 0.95,
+      "score_consistency": 0.95,
+      "review": "三态结论明确，证据引用 sysnum.h 及 syscall 实现文件，grep 结果直接支撑无 socket 系统调用的结论。"
+    },
+    {
+      "question_id": "Q08_004",
+      "score_evidence": 0.5,
+      "score_consistency": 0.7,
+      "review": "题干要求追踪发送路径，答案称未发现但证据追踪的是 poll/pipe 路径，无法直接支撑“发送路径不存在”的结论（应提供搜索未果证据），且追踪对象与题面要求不符。"
+    },
+    {
+      "question_id": "Q08_005",
+      "score_evidence": 0.95,
+      "score_consistency": 0.95,
+      "review": "三态结论明确，证据覆盖驱动实现文件与中断处理扫描，支撑充分。"
+    },
+    {
+      "question_id": "Q08_006",
+      "score_evidence": 0.95,
+      "score_consistency": 0.75,
+      "review": "证据支撑无协议实现；但题干要求未发现时在 notes 字段注明，答案 JSON 缺少 notes 字段，契约落实不全。"
+    },
+    {
+      "question_id": "Q08_007",
+      "score_evidence": 0.95,
+      "score_consistency": 0.95,
+      "review": "三态结论明确，证据覆盖 DMA 控制器定义及数据拷贝路径，支撑充分。"
+    }
+  ],
+  "findings": [
+    {
+      "severity": "warn",
+      "message": "Q08_004 证据与结论逻辑不匹配：结论为“无发送路径”，证据却展示“轮询路径存在”，未提供否定性搜索证据。"
+    },
+    {
+      "severity": "warn",
+      "message": "Q08_006 违反题面契约：题干要求未找到时填写 notes 字段，实际输出缺失该字段。"
+    },
+    {
+      "severity": "info",
+      "message": "Q08_002 单选题 value 使用文本而非选项键，虽语义正确但建议规范化。"
+    }
+  ],
+  "summary_zh": "本报告在三态实现类题目（Q08_001/003/005/007）上证据扎实，能利用 grep/扫描结果有效支撑“未发现”结论。但在追踪类题目（Q08_004）上证据偏离题面要求（追踪了非目标路径），且部分题目（Q08_002/006）存在选项键值规范及字段缺失的契约落实问题。因 Q08_004 证据支撑度不足，全阶段置信度按规则截断。",
+  "report_quality_score": 0.88,
+  "_meta": {
+    "quality": {
+      "mean_question_confidence": 0.8786
+    },
+    "review_model": "qwen3.5-plus"
+  }
+}

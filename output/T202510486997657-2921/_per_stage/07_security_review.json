@@ -1,0 +1,88 @@
+{
+  "schema_version": "describe_review_v1",
+  "stage_id": "07_security",
+  "stage_title": "安全机制与权限模型",
+  "confidence": 1.0,
+  "question_reviews": [
+    {
+      "question_id": "Q07_001",
+      "confidence": 1.0,
+      "review": "题面相符，选项 value 与 choices 一致。证据引用 CSR 定义、trap 返回路径及 trampoline 汇编，有效支撑用户态/内核态隔离结论。"
+    },
+    {
+      "question_id": "Q07_002",
+      "confidence": 1.0,
+      "review": "题面相符，tri_state 值合法。证据直接展示 Pcb 结构体中包含 UID/GID 字段，支撑 implemented 结论。"
+    },
+    {
+      "question_id": "Q07_003",
+      "confidence": 1.0,
+      "review": "题面相符，tri_state 值合法。证据引用 sys_setuid/setgid 及 faccessat 等具体检查逻辑与返回值，证明 syscall 路径上真实执行了权限检查。"
+    },
+    {
+      "question_id": "Q07_004",
+      "confidence": 1.0,
+      "review": "题面相符，short_answer 格式正确。列出了 5 个入口点与函数节点，并提供了对应文件路径证据，符合链路描述要求。"
+    },
+    {
+      "question_id": "Q07_005",
+      "confidence": 1.0,
+      "review": "题面相符，tri_state 值合法。证据引用 copyin/copyout 封装及 UserspaceStream 类，支撑用户指针验证机制已实现的结论。"
+    },
+    {
+      "question_id": "Q07_006",
+      "confidence": 1.0,
+      "review": "题面相符，tri_state 值合法。证据说明 prctl 仅实现基础功能且无 seccomp 常量，支撑 stub 结论。"
+    },
+    {
+      "question_id": "Q07_007",
+      "confidence": 1.0,
+      "review": "题面相符，tri_state 值合法。证据引用 guard page 宏定义及 uvmclear 清除权限位操作，支撑栈保护机制已实现的结论。"
+    },
+    {
+      "question_id": "Q07_008",
+      "confidence": 1.0,
+      "review": "题面相符，tri_state 值合法。证据说明搜索关键词无命中且现有 signature 仅为魔数，支撑 not_found 结论。"
+    },
+    {
+      "question_id": "Q07_009",
+      "confidence": 1.0,
+      "review": "题面相符，short_answer 格式正确。逐架构（RISC-V/LoongArch）列出了特权级配置与隔离证据，符合作答要求。"
+    },
+    {
+      "question_id": "Q07_010",
+      "confidence": 1.0,
+      "review": "题面相符，tri_state 值合法。证据说明项目语言为 C++ 而非 Rust，故无相关 RAII 机制，逻辑自洽。"
+    },
+    {
+      "question_id": "Q07_011",
+      "confidence": 1.0,
+      "review": "题面相符，tri_state 值合法。证据引用 trampoline.S 页表切换逻辑及 satp 寄存器操作，支撑 KPTI 等价机制已实现的结论。"
+    },
+    {
+      "question_id": "Q07_012",
+      "confidence": 1.0,
+      "review": "题面相符，short_answer 格式正确。明确回答字段在 syscall 路径上强制执行，并提供了具体的检查链代码证据，无矛盾。"
+    },
+    {
+      "question_id": "Q07_013",
+      "confidence": 1.0,
+      "review": "题面相符，选项 value 与 choices 一致。证据引用 Unix 风格权限位检查及 umask 机制，支撑 DAC 模型结论。"
+    },
+    {
+      "question_id": "Q07_014",
+      "confidence": 1.0,
+      "review": "题面相符，tri_state 值合法。证据说明未搜索到 W^X 强制互斥或 Biba/SELinux 相关代码，支撑 not_found 结论。"
+    }
+  ],
+  "dimensions": {
+    "evidence_supports_answers": 1.0,
+    "question_answer_consistency": 1.0,
+    "requirements_fit": 1.0
+  },
+  "findings": [],
+  "summary_zh": "所有 14 道题目均已作答。题面与答案 value 一致，JSON 契约满足（字段齐全、枚举合法）。每题 evidence 均能有效支撑其结论（implemented/stub/not_found 或选项/文本），未发现证据缺失或与结论矛盾的情况。全阶段置信度高。",
+  "_meta": {
+    "review_model": "qwen3.5-plus"
+  }
+}

@@ -1,0 +1,73 @@
+{
+  "schema_version": "describe_review_v1",
+  "stage_id": "08_network",
+  "stage_title": "网络子系统与协议栈",
+  "confidence": 0.91,
+  "question_reviews": [
+    {
+      "question_id": "Q08_001",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "答案三态值 'not_found' 符合题面要求。证据通过检索 sysnum.h、syscall 表及 fs 目录，有效支撑了无网络子系统的结论，摘录虽为搜索总结但逻辑清晰。"
+    },
+    {
+      "question_id": "Q08_002",
+      "score_evidence": 0.9,
+      "score_consistency": 0.85,
+      "review": "结论 '未发现' 与选项 D 文本一致，但单选题值通常建议用选项键（如 'D'）以符合机器契约。证据通过头文件与关键词搜索支撑了无协议栈的结论。"
+    },
+    {
+      "question_id": "Q08_003",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "三态值 'not_found' 合规。证据覆盖系统调用号定义、处理函数表及用户库声明，三层证据链完整支撑无 socket 接口的结论。"
+    },
+    {
+      "question_id": "Q08_004",
+      "score_evidence": 0.9,
+      "score_consistency": 0.9,
+      "review": "题面要求列 3-6 个节点，答案因功能缺失说明 'not_found' 属合理变通。证据通过确认无 syscall 及驱动支撑了无法追踪的结论。"
+    },
+    {
+      "question_id": "Q08_005",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "三态值 'not_found' 合规。证据具体分析了 virtio_disk、sdcard 及中断表，明确排除了网络驱动与中断路径，支撑充分。"
+    },
+    {
+      "question_id": "Q08_006",
+      "score_evidence": 0.9,
+      "score_consistency": 0.75,
+      "review": "值 [] 符合 '未发现则留空' 要求，但题面明确要求 '在 notes 写 not_found'，答案 JSON 缺失 notes 字段，违反题面契约。证据搜索覆盖全面。"
+    },
+    {
+      "question_id": "Q08_007",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "三态值 'not_found' 合规。证据区分了 DMA 用于块设备而非网络，并检查了内存映射与文件拷贝路径，有效支撑无零拷贝网络的结论。"
+    }
+  ],
+  "findings": [
+    {
+      "severity": "warn",
+      "message": "Q08_006 题面要求未发现时在 notes 字段注明 'not_found'，但答案 JSON 中缺失该字段，违反输出契约。"
+    },
+    {
+      "severity": "info",
+      "message": "Q08_002 单选题答案值为选项文本 '未发现' 而非选项键 'D'，建议统一为选项键以增强契约规范性。"
+    }
+  ],
+  "summary_zh": "本报告整体证据支撑度良好，各题均通过代码检索与文件分析有效支撑了 '未发现' 类结论。主要扣分点在于 Q08_006 缺失题面要求的 notes 字段，以及 Q08_002 选项值格式建议优化。全阶段分按各题均值的方案 A 汇总。",
+  "report_quality_score": 0.91,
+  "_meta": {
+    "quality": {
+      "mean_question_confidence": 0.9143
+    },
+    "review_model": "qwen3.5-plus",
+    "baseline": true,
+    "run_at": "2026-04-24T08:16:58",
+    "baseline_execute_tokens": 0,
+    "baseline_review_tokens": 11955,
+    "baseline_stage_total_tokens": 11955
+  }
+}

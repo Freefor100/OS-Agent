@@ -1,0 +1,108 @@
+{
+  "stage_id": "06_sync_ipc",
+  "evidence_targets": [
+    "自旋锁 spinlock 实现 (acquire/release)",
+    "睡眠锁 sleeplock 实现 (acquiresleep/releasesleep)",
+    "信号量 semaphore 实现 (sem_wait/sem_post)",
+    "Futex 系统调用 (sys_futex, futexWait/futexWake)",
+    "管道 pipe 实现 (pipealloc/piperead/pipewrite)",
+    "信号处理 (sys_rt_sigaction, sighandle)",
+    "sleep/wakeup 原语与调度器交互",
+    "锁与同步原语",
+    "IPC",
+    "Futex",
+    "管道/信号"
+  ],
+  "seed_paths": [
+    "kernel/spinlock.c",
+    "kernel/sleeplock.c",
+    "kernel/sem.c",
+    "kernel/futex.c",
+    "kernel/pipe.c",
+    "kernel/signal.c",
+    "kernel/syssig.c",
+    "kernel/proc.c:818-860",
+    "kernel/include/spinlock.h",
+    "kernel/include/sleeplock.h",
+    "kernel/include/sem.h",
+    "kernel/include/futex.h",
+    "sync",
+    "lock"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "acquire",
+    "release",
+    "acquiresleep",
+    "releasesleep",
+    "sem_wait",
+    "sem_post",
+    "futexWait",
+    "futexWake",
+    "sys_futex",
+    "sighandle",
+    "Mutex",
+    "SpinLock"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "doc",
+    "doc/pic",
+    "kernel",
+    "kernel/include",
+    "kernel/lwip",
+    "linker",
+    "tools",
+    "xv6-user"
+  ],
+  "preferred_tools": [
+    "lsp_get_definition",
+    "lsp_get_references",
+    "lsp_get_call_graph",
+    "read_code_segment",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "使用 lsp_get_definition 定位 spinlock.c 中 acquire 函数的完整实现，确认原子操作与中断禁用逻辑",
+    "使用 lsp_get_definition 查看 release 函数，验证解锁与中断恢复顺序",
+    "使用 lsp_get_call_graph (direction=incoming, max_depth=2) 分析 acquire 的调用者，识别关键临界区（如 proc.c、pipe.c、bio.c）",
+    "读取 sleeplock.c 全文，对比 acquiresleep/releasesleep 与 spinlock 的差异，确认其基于 spinlock 封装",
+    "使用 lsp_get_definition 查看 sem.c 中 sem_wait/sem_post，确认其使用 sleep/wakeup 实现阻塞式等待",
+    "读取 futex.c 全文，分析 futexQueue 数据结构及 futexWait/futexWake/futexRequeue 的实现逻辑",
+    "使用 grep_in_repo 搜索 sys_futex 在 syscall.c 中的注册，确认系统调用号与分发路径",
+    "读取 sysproc.c 中 sys_futex 实现，验证参数解析与操作分发（FUTEX_WAIT/WAKE/REQUEUE）",
+    "使用 lsp_get_definition 查看 pipe.c 中 pipealloc，确认管道分配与 file 结构体关联",
+    "读取 piperead/pipewrite 实现，分析其如何使用 spinlock 保护环形缓冲区及 sleep/wakeup 处理阻塞",
+    "使用 lsp_get_call_graph (direction=incoming) 分析 piperead/pipewrite 的调用链，确认 file.c 中的 fileread/filewrite 路径",
+    "读取 signal.c 中 sighandle 函数，理解信号处理函数跳转与 trapframe 修改逻辑",
+    "读取 syssig.c 中 sys_rt_sigaction，验证用户态 sigaction 结构体拷贝与内核态注册流程",
+    "使用 grep_in_repo 搜索 sleep 和 wakeup 在 proc.c 中的定义，确认其与 sched() 的交互",
+    "读取 proc.c 中 sleep 函数（约 818-850 行），分析锁切换（lk -> p->lock）与状态变更",
+    "读取 proc.c 中 wakeup 函数，确认遍历 proc 数组唤醒睡眠进程的逻辑",
+    "使用 lsp_get_references 查询 sleep 符号，收集所有调用 sleep 的位置（如 pipe.c、bio.c、console.c）",
+    "使用 lsp_get_references 查询 wakeup 符号，验证唤醒点分布",
+    "读取 kernel/include/thread.h，确认 thread 结构体中的 state、chan、awakeTime 字段与同步的关系",
+    "读取 kernel/include/proc.h 前 80 行，确认 proc 结构体中的 lock、state、chan 字段",
+    "如有必要，使用 lsp_set_target_arch 设置 riscv64gc-unknown-none-elf 确保 LSP 解析准确",
+    "检查 doc/futex.md 和 doc/signal.md 文档，提取设计意图与实现对照点",
+    "使用 grep_in_repo 搜索 CLONE_THREAD 等线程相关宏，确认线程与进程在同步原语中的关系",
+    "读取 kernel/trap.c 中 usertrap 或相关中断处理，确认信号交付时机（如 sighandle 调用点）",
+    "总结各同步原语的锁持有规则（如 acquire 后必须 release，sleep 前必须持有锁）",
+    "整理 IPC 机制（pipe、futex、signal）的系统调用入口与内核实现映射表"
+  ]
+}

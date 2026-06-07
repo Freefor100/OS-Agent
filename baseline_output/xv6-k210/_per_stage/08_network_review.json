@@ -1,0 +1,69 @@
+{
+  "schema_version": "describe_review_v1",
+  "stage_id": "08_network",
+  "stage_title": "网络子系统与协议栈",
+  "confidence": 0.94,
+  "question_reviews": [
+    {
+      "question_id": "Q08_001",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态值 not_found 符合题面。证据引用 sysnum.h、syscall.c 及 hal 目录搜索结果，直接支撑无网络子系统的结论，摘录清晰且覆盖关键核对点。"
+    },
+    {
+      "question_id": "Q08_002",
+      "score_evidence": 0.95,
+      "score_consistency": 0.9,
+      "review": "证据充分支撑未发现协议栈。但单选题 value 建议使用选项键（如 'D'）而非选项文本 '未发现'，以符合标准契约，此处轻微扣分。"
+    },
+    {
+      "question_id": "Q08_003",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态值 not_found 符合题面。证据覆盖系统调用号定义、用户态 API 声明及内核处理函数，充分证明 socket 接口缺失。"
+    },
+    {
+      "question_id": "Q08_004",
+      "score_evidence": 0.9,
+      "score_consistency": 0.9,
+      "review": "因功能未实现，无法列出 3-6 个节点，回答说明 not_found 合理。证据引用 sysnum 及驱动文件证明路径不存在，支撑结论，但形式上未满足列举节点要求（因客观不可行）。"
+    },
+    {
+      "question_id": "Q08_005",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态值 not_found 符合题面。证据列举 hal 目录驱动列表、中断处理代码及中断号定义，充分证明无网卡驱动及中断路径。"
+    },
+    {
+      "question_id": "Q08_006",
+      "score_evidence": 0.95,
+      "score_consistency": 0.75,
+      "review": "多选题值留空符合未发现情况。但题面明确要求 '在 notes 写 not_found'，答案 JSON 缺少 notes 字段，未遵守题面契约，一致性扣分。"
+    },
+    {
+      "question_id": "Q08_007",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态值 not_found 符合题面。证据区分了 DMA/缓冲用于存储而非网络零拷贝，逻辑清晰，支撑充分。"
+    }
+  ],
+  "findings": [
+    {
+      "severity": "warn",
+      "message": "Q08_006 题面要求未发现时在 notes 字段注明 not_found，但答案 JSON 缺少 notes 字段，违反题面契约。"
+    }
+  ],
+  "summary_zh": "整体报告证据详实，能准确反映网络子系统缺失的现状。Q08_001/003/005/007 证据与结论高度一致。Q08_002 单选题值格式建议规范化。Q08_006 未遵守题面关于 notes 字段的契约要求。全阶段分按各题均值方案 A 汇总。",
+  "report_quality_score": 0.94,
+  "_meta": {
+    "quality": {
+      "mean_question_confidence": 0.9393
+    },
+    "review_model": "qwen3.5-plus",
+    "baseline": true,
+    "run_at": "2026-04-24T14:37:28",
+    "baseline_execute_tokens": 580180,
+    "baseline_review_tokens": 9955,
+    "baseline_stage_total_tokens": 590135
+  }
+}

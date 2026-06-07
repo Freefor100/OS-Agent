@@ -1,0 +1,121 @@
+{
+  "stage_id": "07_security",
+  "goal": "分析 F7LY-OS 的安全机制与权限模型，覆盖特权级隔离、UID/GID 凭证、syscall 权限检查链、用户指针验证、栈保护、多架构安全初始化等 14 个小题。",
+  "must_cover": [
+    "[Q07_001] 特权级隔离形态（RISC-V S/U 模式，LoongArch PLV0/PLV3）",
+    "[Q07_002] UID/GID 凭证数据结构存在性（Pcb 中的_uid/_euid/_gid/_egid 等 8 个字段）",
+    "[Q07_003] syscall 路径上 UID/GID 权限检查证据（sys_setuid/sys_setgid 中的 EPERM 检查）",
+    "[Q07_004] 权限检查入口点与核心函数链路（sys_openat→vfs_openat→ext4_mode_set/vfs_owner_get）",
+    "[Q07_005] 用户指针验证机制（either_copyin/either_copyout, UserspaceStream, copy_in/copy_out）",
+    "[Q07_006] seccomp/prctl 沙箱实现形态（sys_prctl 仅实现 PR_SET_NAME/PR_GET_NAME 等基础功能，无 BPF 过滤）",
+    "[Q07_007] 栈保护机制（KSTACK_GUARD_PAGES, guard page 配置）",
+    "[Q07_008] 审计/安全启动相关逻辑（未发现 audit/secure_boot/signature 实现）",
+    "[Q07_009] 多架构安全初始化（RISC-V: satp/stvec/sstatus SIE; LoongArch: pgdl/pgdh/crmd）",
+    "[Q07_010] Rust RAII/所有权机制（本项目为 C++，使用 EASTL，无 Rust 安全机制）",
+    "[Q07_011] KPTI/页表隔离（trampoline 页面映射，用户/内核页表分离但 trampoline 共享）",
+    "[Q07_012] UID/GID 在 syscall 路径上的真实检查（sys_readlinkat 中有目录搜索权限检查链）",
+    "[Q07_013] 访问控制模型（DAC 自主访问控制，基于 UID/GID/mode 位）",
+    "[Q07_014] 完整性策略（W^X 通过页表权限位 PTE_R/PTE_W/PTE_X 实现，无代码签名）",
+    "[Q07_001] 特权级隔离形态更接近哪种？",
+    "[Q07_002] 是否存在凭证/权限数据结构（UID/GID/Credential/Capability/ACL 等）？（必须三态）",
+    "[Q07_003] 是否能证实在 syscall 路径上真实执行了权限检查（open/exec/write 等）？（必须三态；仅有字段不算 implemented）",
+    "[Q07_004] 若存在权限检查：入口点与核心检查函数链路是什么？（列 2-5 个节点并给证据）",
+    "[Q07_005] 是否实现用户指针验证（access_ok/verify_area/UserInPtr/copyin/copyout 等）？（必须三态）",
+    "[Q07_006] 是否实现 seccomp/prctl/sandbox 等系统调用过滤/沙箱？（必须三态；stub 需说明形态：ENOSYS/return 0）",
+    "[Q07_007] 是否存在栈保护/溢出防护（stack canary/guard page）或等价机制？（必须三态）",
+    "[Q07_008] 是否存在审计/安全启动（audit/secure boot/signature）相关逻辑？（必须三态）"
+  ],
+  "evidence_targets": [
+    "Pcb 结构体中的 8 个 UID/GID 字段（_uid/_euid/_suid/_fsuid/_gid/_egid/_sgid/_fsgid）",
+    "sys_setuid/sys_setgid 中的 EPERM 权限检查逻辑",
+    "sys_readlinkat 中的目录搜索权限检查链（root/owner/group/other）",
+    "either_copyin/either_copyout 函数实现（fat32.cc）",
+    "KSTACK_GUARD_PAGES 定义与 uvmclear 调用",
+    "RISC-V trap 初始化（stvec/sstatus/sie 配置）",
+    "LoongArch trap 初始化（ecfg/tcfg/eentry 配置）",
+    "trampoline.S 中的用户/内核页表切换代码",
+    "sys_prctl 实现（仅支持 PR_SET_NAME/PR_GET_NAME 等基础操作）",
+    "ext4_inode_op 中的 inode_operations 操作表",
+    "vfs_ext_faccessat  stub 实现（return EOK）",
+    "权限模型",
+    "用户身份",
+    "隔离边界",
+    "安全机制"
+  ],
+  "seed_paths": [
+    "kernel/proc/proc.hh",
+    "kernel/sys/syscall_handler.cc",
+    "kernel/trap/riscv/trap.cc",
+    "kernel/trap/loongarch/trap.cc",
+    "kernel/hal/riscv/rv_csr.hh",
+    "kernel/platform.hh",
+    "kernel/mem/riscv/trampoline.S",
+    "kernel/mem/memlayout.hh",
+    "kernel/fs/fat32/fat32.cc",
+    "kernel/fs/vfs/vfs_utils.cc",
+    "kernel/fs/vfs/vfs_ext4_ext.cc",
+    "kernel/mem/userspace_stream.hh",
+    "security",
+    "capability"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64",
+    "loongarch64"
+  ],
+  "entry_symbols": [
+    "sys_setuid",
+    "sys_setgid",
+    "sys_getuid",
+    "sys_prctl",
+    "sys_readlinkat",
+    "sys_openat",
+    "either_copyin",
+    "either_copyout",
+    "trap_manager::inithart",
+    "uservec",
+    "cap",
+    "permission"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "busybox",
+    "busybox/loongarch",
+    "busybox/riscv",
+    "docs",
+    "kernel",
+    "kernel/boot",
+    "kernel/devs",
+    "kernel/fs",
+    "kernel/hal"
+  ],
+  "preferred_tools": [
+    "read_code_segment",
+    "lsp_get_call_graph",
+    "lsp_get_definition",
+    "lsp_get_references",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "1. 使用 lsp_get_definition 定位 Pcb 结构体定义，确认_uid/_euid/_gid/_egid 等 8 个凭证字段的完整列表",
+    "2. 使用 lsp_get_call_graph 追踪 sys_setuid/sys_setgid 的调用链，验证 EPERM 权限检查逻辑是否真实执行",
+    "3. 使用 read_code_segment 精读 sys_readlinkat 中 3470-3530 行的目录搜索权限检查链（root/owner/group/other 四分支）",
+    "4. 使用 read_code_segment 读取 either_copyin/either_copyout 实现（fat32.cc:17-35），确认用户指针验证机制",
+    "5. 使用 read_code_segment 读取 RISC-V trap 初始化代码（trap.cc:45-50）和 LoongArch trap 初始化（trap.cc:45-55），对比两架构特权级配置差异",
+    "6. 使用 read_code_segment 读取 trampoline.S 关键片段（uservec/userret），分析用户/内核页表切换机制是否实现 KPTI",
+    "7. 使用 grep_in_repo 搜索 vfs_ext_faccessat 及 inode_permission 相关调用，确认 VFS 层权限检查是否贯通",
+    "8. 汇总证据，按 must_cover 14 项逐一作答，标注桩函数（🔸）和未实现特性"
+  ]
+}

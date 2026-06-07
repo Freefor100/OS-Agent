@@ -1,0 +1,260 @@
+现在我已经收集了所有必要的证据。让我生成最终的 JSON 输出。
+
+```json
+{
+  "schema_version": "v1",
+  "stage_id": "08_network",
+  "stage_title": "网络子系统与协议栈",
+  "terminology_profile": "stallings_en_zh",
+  "answers": [
+    {
+      "question_id": "Q08_001",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在网络子系统实现（协议栈或 socket 层）？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/net/onpstack/",
+          "symbol_kind": "directory",
+          "symbol_name": "onpstack_protocol_stack",
+          "excerpt": "自研协议栈 onpstack 位于 kernel/net/onpstack/，包含 bsd/socket.cc、ip/tcp.cc、ip/udp.cc、ethernet/arp.cc、ip/icmp.cc 等完整实现"
+        },
+        {
+          "path": "kernel/fs/vfs/file/socket_file.cc",
+          "symbol_kind": "class",
+          "symbol_name": "socket_file",
+          "excerpt": "Socket 文件抽象层实现，封装 onpstack API，提供 send/recv/connect/bind/sendto/recvfrom 等方法（1-930 行）"
+        },
+        {
+          "path": "kernel/net/drivers/virtio_net.cc",
+          "symbol_kind": "file",
+          "symbol_name": "virtio_net_driver",
+          "excerpt": "VirtIO 网卡驱动实现，包含 virtio_net_init、virtio_net_send、virtio_net_recv、virtio_net_intr 等核心函数（1-777 行）"
+        }
+      ]
+    },
+    {
+      "question_id": "Q08_002",
+      "question_type": "single_choice",
+      "stem": "协议栈来源更接近哪种？",
+      "value": "自研协议栈",
+      "evidence": [
+        {
+          "path": "kernel/net/onpstack/ip/tcp.cc",
+          "symbol_kind": "file",
+          "symbol_name": "tcp_implementation",
+          "excerpt": "文件头部注释显示：Copyright 2022-2024 The Onps Project Author，Licensed under Apache 2.0，作者 Neo-T，协议栈为 onpstack 自研（1-10 行）"
+        },
+        {
+          "path": "kernel/net/onpstack/include/port/sys_config.hh",
+          "symbol_kind": "config",
+          "symbol_name": "onps_config",
+          "excerpt": "协议栈配置文件，包含 SUPPORT_IPV6、SUPPORT_ETHERNET、NETTOOLS_DNS_CLIENT 等裁剪选项（107-124 行）"
+        }
+      ]
+    },
+    {
+      "question_id": "Q08_003",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 socket 系统调用接口（socket/bind/connect/sendto/recvfrom 等）？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/sys/syscall_handler.cc",
+          "symbol_kind": "function",
+          "symbol_name": "sys_socket",
+          "excerpt": "sys_socket 实现于 7191 行，支持 AF_UNIX/AF_INET，创建 socket_file 并关联 onps socket 句柄（7191-7360 行）"
+        },
+        {
+          "path": "kernel/sys/syscall_handler.cc",
+          "symbol_kind": "function",
+          "symbol_name": "sys_bind",
+          "excerpt": "sys_bind 实现于 7366 行，从用户空间复制 sockaddr，调用 onps bind()，更新 socket_file 状态（7366-7498 行）"
+        },
+        {
+          "path": "kernel/sys/syscall_handler.cc",
+          "symbol_kind": "function",
+          "symbol_name": "sys_sendto",
+          "excerpt": "sys_sendto 实现于 8085 行，参数校验后调用 socket_file::sendto()，支持 UDP 无连接发送（8085-8192 行）"
+        },
+        {
+          "path": "kernel/sys/syscall_handler.cc",
+          "symbol_kind": "function",
+          "symbol_name": "sys_recvfrom",
+          "excerpt": "sys_recvfrom 实现于 8193 行，调用 socket_file::recvfrom()，UDP 模式下返回源地址信息（8193-8300 行）"
+        },
+        {
+          "path": "kernel/fs/vfs/file/socket_file.cc",
+          "symbol_kind": "method",
+          "symbol_name": "socket_file::sendto",
+          "excerpt": "UDP sendto 调用 onps ::sendto()，TCP 不支持 sendto 返回 -EFAULT（420-490 行）"
+        }
+      ]
+    },
+    {
+      "question_id": "Q08_004",
+      "question_type": "short_answer",
+      "stem": "选择一个发送路径（优先 sys_sendto），追踪：syscall → 协议栈 → 网卡驱动。列 3-6 个关键节点并给证据。",
+      "value": "发送路径追踪（sys_sendto）：\n1. syscall 入口：kernel/sys/syscall_handler.cc:8085 sys_sendto() - 参数解析与校验\n2. VFS 封装层：kernel/fs/vfs/file/socket_file.cc:420 socket_file::sendto() - 调用 onps ::sendto()\n3. 协议栈接口：kernel/net/onpstack/bsd/socket.cc socket() 返回的 onps socket 句柄\n4. 协议处理：kernel/net/onpstack/ip/udp.cc udp_send_packet() - 构建 UDP 头部并计算校验和\n5. 网卡驱动：kernel/net/drivers/virtio_net.cc:418 virtio_net_send() - 填充 VirtIO 描述符并通知设备\n6. 硬件抽象：kernel/net/drivers/virtio_net.cc:508 MMIO_QUEUE_NOTIFY - 通过 MMIO 寄存器通知 VirtIO 设备发送",
+      "evidence": [
+        {
+          "path": "kernel/sys/syscall_handler.cc",
+          "symbol_kind": "function",
+          "symbol_name": "sys_sendto",
+          "excerpt": "8085 行：sys_sendto() 解析 sockfd/buf/len/flags/dest_addr 参数，调用 socket_f->sendto()（8085-8192 行）"
+        },
+        {
+          "path": "kernel/fs/vfs/file/socket_file.cc",
+          "symbol_kind": "method",
+          "symbol_name": "socket_file::sendto",
+          "excerpt": "420-490 行：UDP 模式下调用 ::sendto(_onps_socket, dest_ip_str, dest_port, data, len)，TCP 返回 -EFAULT"
+        },
+        {
+          "path": "kernel/net/onpstack/ip/udp.cc",
+          "symbol_kind": "function",
+          "symbol_name": "udp_send_packet",
+          "excerpt": "1-100 行：构建 ST_UDP_HDR，计算 IPv4 校验和，通过 buf_list 挂载数据（36-100 行）"
+        },
+        {
+          "path": "kernel/net/drivers/virtio_net.cc",
+          "symbol_kind": "function",
+          "symbol_name": "virtio_net_send",
+          "excerpt": "418-520 行：分配 TX 描述符，复制数据到 tx_buffers，设置 descriptor addr/len/flags，写入 MMIO_QUEUE_NOTIFY（418-520 行）"
+        },
+        {
+          "path": "kernel/net/drivers/virtio_net.hh",
+          "symbol_kind": "macro",
+          "symbol_name": "VIRTIO_MMIO_QUEUE_NOTIFY",
+          "excerpt": "0x050 行：VirtIO MMIO 队列通知寄存器，写入队列索引触发设备发送（24 行）"
+        }
+      ]
+    },
+    {
+      "question_id": "Q08_005",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现网卡驱动（virtio-net/e1000 等）与收包中断路径？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/net/drivers/virtio_net.cc",
+          "symbol_kind": "function",
+          "symbol_name": "virtio_net_init",
+          "excerpt": "33-200 行：RISC-V MMIO 初始化（virtio_net_init_mmio），LoongArch PCI 框架（virtio_net_init_pci 未完全实现）（33-200 行）"
+        },
+        {
+          "path": "kernel/net/drivers/virtio_net.cc",
+          "symbol_kind": "function",
+          "symbol_name": "virtio_net_intr",
+          "excerpt": "618-680 行：中断处理函数，读取 MMIO_INTERRUPT_STATUS，处理 TX 完成描述符，唤醒等待进程（618-680 行）"
+        },
+        {
+          "path": "kernel/trap/riscv/trap.cc",
+          "symbol_kind": "function",
+          "symbol_name": "device_intr",
+          "excerpt": "90-94 行：VIRTIO1_IRQ 中断处理，当前代码为 panic(\"virtio1 interrupt not handled yet\")，但 virtio_net_intr 已实现（94 行）"
+        },
+        {
+          "path": "kernel/mem/memlayout.hh",
+          "symbol_kind": "macro",
+          "symbol_name": "VIRTIO1_IRQ",
+          "excerpt": "39 行：#define VIRTIO1_IRQ 2，网络中断号定义为 2"
+        },
+        {
+          "path": "kernel/net/drivers/virtio_net.cc",
+          "symbol_kind": "function",
+          "symbol_name": "virtio_net_recv",
+          "excerpt": "530-610 行：非阻塞收包，检查 rx_used->idx，复制数据并释放描述符，调用 virtio_net_alloc_rx_desc() 补充 RX 描述符（530-610 行）"
+        }
+      ]
+    },
+    {
+      "question_id": "Q08_006",
+      "question_type": "multi_choice",
+      "stem": "协议支持情况（多选；未发现则留空并在 notes 写 not_found）：",
+      "value": ["Ethernet", "ARP", "IPv4/IPv6", "ICMP", "UDP", "TCP", "DHCP"],
+      "evidence": [
+        {
+          "path": "kernel/net/onpstack/ethernet/ethernet.cc",
+          "symbol_kind": "file",
+          "symbol_name": "ethernet_layer",
+          "excerpt": "Ethernet 链路层实现，包含 ethernet_loopback_put_packet()，支持 Ethernet II 帧格式（28-588 行）"
+        },
+        {
+          "path": "kernel/net/onpstack/ethernet/arp.cc",
+          "symbol_kind": "file",
+          "symbol_name": "arp_implementation",
+          "excerpt": "ARP 协议实现，包含 arp_wait_timeout_handler()，维护 l_stcbaEthArp 缓存表（1-737 行）"
+        },
+        {
+          "path": "kernel/net/onpstack/ip/ip.cc",
+          "symbol_kind": "file",
+          "symbol_name": "ipv4_implementation",
+          "excerpt": "IPv4 协议实现，ip_recv() 处理 IP 报文，支持分片与路由（证据来自 grep 与 netif.cc 引用）"
+        },
+        {
+          "path": "kernel/net/onpstack/ip/icmp.cc",
+          "symbol_kind": "file",
+          "symbol_name": "icmp_implementation",
+          "excerpt": "ICMP 协议实现，包含 get_icmp_errdest_description()，支持目的不可达等错误报告（1-469 行）"
+        },
+        {
+          "path": "kernel/net/onpstack/ip/udp.cc",
+          "symbol_kind": "file",
+          "symbol_name": "udp_implementation",
+          "excerpt": "UDP 协议实现，udp_send_packet() 构建 UDP 头部并计算校验和（1-705 行）"
+        },
+        {
+          "path": "kernel/net/onpstack/ip/tcp.cc",
+          "symbol_kind": "file",
+          "symbol_name": "tcp_implementation",
+          "excerpt": "TCP 协议实现，包含 tcpsrv_syn_recv_timeout_handler()、tcp_ack_timeout_handler() 等状态机（1-2080 行）"
+        },
+        {
+          "path": "kernel/net/onpstack/ethernet/dhcpv6.hh",
+          "symbol_kind": "file",
+          "symbol_name": "dhcpv6_client",
+          "excerpt": "DHCPv6 客户端实现，kernel/net/onpstack/ip/udp.cc:683-686 调用 dhcpv6_recv() 处理 DHCPv6 报文"
+        },
+        {
+          "path": "kernel/net/onpstack/include/port/sys_config.hh",
+          "symbol_kind": "config",
+          "symbol_name": "dns_client_config",
+          "excerpt": "NETTOOLS_DNS_CLIENT=1 使能 DNS 查询客户端（107-124 行），但 grep 未发现 gethostbyname/getaddrinfo 实现"
+        }
+      ]
+    },
+    {
+      "question_id": "Q08_007",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在零拷贝/共享缓冲/DMA 描述符等路径（zero-copy）？（必须三态；仅有名词不算 implemented）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/net/drivers/virtio_net.cc",
+          "symbol_kind": "function",
+          "symbol_name": "virtio_net_send",
+          "excerpt": "418-520 行：发送路径使用 memcpy() 将数据复制到 tx_buffers[buf_idx].data，非零拷贝（468-470 行：memcpy(virtio_net.tx_buffers[buf_idx].data + sizeof(*hdr), data, len)）"
+        },
+        {
+          "path": "kernel/net/drivers/virtio_net.cc",
+          "symbol_kind": "function",
+          "symbol_name": "virtio_net_recv",
+          "excerpt": "530-610 行：接收路径使用 memcpy() 从 rx_buffers 复制到用户缓冲区，非零拷贝（578 行：memcpy(data, virtio_net.rx_buffers[buf_idx].data + sizeof(struct virtio_net_hdr), data_len)）"
+        },
+        {
+          "path": "kernel/net/drivers/virtio_net.hh",
+          "symbol_kind": "macro",
+          "symbol_name": "VIRTIO_NET_F_MQ",
+          "excerpt": "55 行/88 行：定义 VIRTIO_NET_F_MQ（多队列）但未在初始化代码中使用，grep 搜索 VIRTIO_NET_F_MQ 仅在头文件中出现，无实际启用逻辑"
+        },
+        {
+          "path": "kernel/net/drivers/virtio_net.cc",
+          "symbol_kind": "search",
+          "symbol_name": "zero_copy_grep",
+          "excerpt": "grep 搜索 'zero.?copy|DMA 描述符零拷贝' 在 net/ 目录下 0 命中；驱动使用 VRingDesc 描述符但数据需拷贝到中间缓冲区"
+        }
+      ]
+    }
+  ]
+}
+```

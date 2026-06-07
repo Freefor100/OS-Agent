@@ -1,0 +1,116 @@
+{
+  "stage_id": "05_fs_drivers",
+  "evidence_targets": [
+    "VFS 设计 (superblock/inode/dentry/file_op)",
+    "FAT32 文件系统实现",
+    "fd table 与 file 结构",
+    "pipe 实现与 sys_pipe",
+    "mmap 实现 (do_mmap/handle_page_fault_mmap)",
+    "驱动框架 (virtio_disk/sdcard)",
+    "中断处理 (plic/intr)",
+    "块设备抽象 (blkdev/bio)",
+    "rootfs/devfs/procfs 初始化",
+    "mount 系统调用与整盘挂载",
+    "VFS 设计",
+    "具体文件系统",
+    "fd table",
+    "pipe/mmap",
+    "驱动框架",
+    "中断注册"
+  ],
+  "seed_paths": [
+    "include/fs/fs.h",
+    "include/fs/file.h",
+    "kernel/fs/fs.c",
+    "kernel/fs/file.c",
+    "kernel/fs/fat32/fat32.c",
+    "kernel/fs/pipe.c",
+    "kernel/fs/mount.c",
+    "kernel/fs/rootfs.c",
+    "kernel/fs/bio.c",
+    "kernel/fs/blkdev.c",
+    "kernel/hal/virtio_disk.c",
+    "kernel/hal/sdcard.c",
+    "fs",
+    "vfs"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "sys_openat",
+    "namei",
+    "rootfs_init",
+    "fat32_init",
+    "do_mount",
+    "pipealloc",
+    "sys_pipe",
+    "virtio_disk_init",
+    "do_mmap",
+    "handle_page_fault_mmap",
+    "sys_open",
+    "vfs_open"
+  ],
+  "repo_hotspots": [
+    "Cargo.toml",
+    "Makefile",
+    "debug",
+    "debug/kendryte_openocd",
+    "debug/openocd_cfg",
+    "doc",
+    "doc/img",
+    "include",
+    "include/fs",
+    "include/hal"
+  ],
+  "preferred_tools": [
+    "lsp_get_call_graph",
+    "lsp_get_definition",
+    "lsp_get_references",
+    "read_code_segment",
+    "rag_search_code"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "使用 lsp_get_definition 定位 sys_openat 的完整实现 (kernel/syscall/sysfile.c)",
+    "使用 lsp_get_call_graph (outgoing, depth=2) 分析 sys_openat 如何调用 namei/create/fdalloc",
+    "使用 lsp_get_definition 定位 namei 函数 (kernel/fs/fs.c)，理解路径解析逻辑",
+    "使用 lsp_get_call_graph (outgoing, depth=2) 分析 namei 如何调用 lookup_path/dirlookup",
+    "读取 kernel/fs/fs.c 的 create 函数 (行 24-110)，取证文件创建流程",
+    "读取 include/fs/fs.h 的 superblock/inode/dentry 结构体定义 (行 21-140)",
+    "读取 include/fs/file.h 的 file/fdtable 结构体定义 (行 18-40)",
+    "使用 lsp_get_definition 定位 rootfs_init (kernel/fs/rootfs.c)，取证 rootfs/devfs/procfs 初始化",
+    "读取 kernel/fs/rootfs.c 的 rootfs_init 实现 (行 280-370)，确认设备节点创建",
+    "使用 lsp_get_definition 定位 fat32_init (kernel/fs/fat32/fat32.c)，分析 FAT32 挂载流程",
+    "读取 kernel/fs/fat32/fat32.c 的 fat32_init 实现 (行 47-150)，取证超级块解析",
+    "使用 lsp_get_definition 定位 do_mount (kernel/fs/mount.c)，分析挂载系统调用",
+    "读取 kernel/fs/mount.c 的 do_mount 实现 (行 93-147)，取证挂载点关联逻辑",
+    "使用 lsp_get_definition 定位 pipealloc (kernel/fs/pipe.c)，分析管道创建",
+    "读取 kernel/fs/pipe.c 的 pipealloc 实现 (行 39-90)，取证读写端初始化",
+    "使用 lsp_get_call_graph (outgoing, depth=2) 分析 sys_pipe 如何调用 pipealloc/fdalloc",
+    "使用 lsp_get_definition 定位 do_mmap (kernel/mm/mmap.c)，分析内存映射",
+    "读取 kernel/mm/mmap.c 的 do_mmap 实现 (行 660-720)，取证 mmap 区域创建",
+    "读取 kernel/mm/mmap.c 的 handle_page_fault_mmap 实现 (行 1047-1080)，取证缺页处理",
+    "使用 lsp_get_definition 定位 virtio_disk_init (kernel/hal/virtio_disk.c)，分析 VirtIO 驱动",
+    "读取 kernel/hal/virtio_disk.c 的 virtio_disk_init 实现 (行 95-165)，取证队列初始化",
+    "读取 kernel/hal/sdcard.c 的 sdcard_init 实现 (行 359-450)，取证 SD 卡驱动",
+    "使用 grep_in_repo 搜索 intr_register 或 plic 相关中断注册代码",
+    "读取 kernel/fs/bio.c 的 binit/bget/bread 实现 (行 84-184)，取证缓冲层",
+    "读取 kernel/fs/blkdev.c 的 fs_install 实现 (行 169-240)，取证文件系统安装",
+    "使用 rag_search_code 搜索 'interrupt handler registration' 确认中断框架",
+    "使用 lsp_get_references 查找 namei 的所有调用点，确认 VFS 入口覆盖",
+    "使用 lsp_get_references 查找 filealloc 的所有调用点，确认文件分配覆盖"
+  ]
+}

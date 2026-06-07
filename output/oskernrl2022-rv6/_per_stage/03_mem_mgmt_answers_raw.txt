@@ -1,2259 +1,253 @@
-现在我已经收集了所有必要的证据。让我生成最终的 JSON 报告。
-
 ```json
 {
-  "schema_version": "v1",
+  "schema_version": "1.0",
   "stage_id": "03_mem_mgmt",
   "stage_title": "内存管理（物理/虚拟/分配器）",
-  "terminology_profile": "stallings_en_zh",
+  "terminology_profile": {
+    "physical_page_allocator": "struct run 单链表 (xv6 风格)",
+    "page_table_ops": "walk/mappages/uvmunmap (vm.c)",
+    "virtual_memory_area": "struct vma 双向链表 (vma.h)",
+    "tlb_flush": "sfence_vma (riscv.h)",
+    "mmap": "sys_mmap -> do_mmap (sysfile.c, mmap.c)"
+  },
   "answers": [
     {
       "question_id": "Q03_001",
       "question_type": "single_choice",
       "stem": "该 OS 的内存管理实现语言/形态更接近哪类？（只选最贴近的一项）",
       "value": "C/Makefile 风格内核（xv6 类）",
-      "evidence": [
-        {
-          "path": "src/pm.c",
-          "symbol_kind": "file",
-          "symbol_name": "pm.c",
-          "excerpt": "C 语言实现，类 xv6 风格的物理页分配器"
-        },
-        {
-          "path": "src/vm.c",
-          "symbol_kind": "file",
-          "symbol_name": "vm.c",
-          "excerpt": "C 语言实现页表操作 walk/mappages/vmunmap"
-        },
-        {
-          "path": "Makefile",
-          "symbol_kind": "file",
-          "symbol_name": "Makefile",
-          "excerpt": "使用 Makefile 构建系统"
-        }
-      ]
+      "evidence": "仓库路径为 oskernrl2022-rv6，代码风格与 xv6 高度一致：物理页分配器使用 struct run 单链表 (pm.c)，页表操作使用 walk/mappages/uvmunmap (vm.c)，VMA 使用双向链表 (vma.h)。整体为 C 语言实现，Makefile 构建，属于典型的 xv6 类内核。"
     },
     {
       "question_id": "Q03_002",
       "question_type": "tri_state_impl",
-      "stem": "是否存在"物理页帧分配器 (Physical Frame Allocator)"的真实实现？（必须三态）",
+      "stem": "是否存在“物理页帧分配器 (Physical Frame Allocator)”的真实实现？（必须三态）",
       "value": "implemented",
-      "evidence": [
-        {
-          "path": "src/pm.c",
-          "symbol_kind": "function",
-          "symbol_name": "allocpage",
-          "excerpt": "void *allocpage(void) - 分配 4096 字节物理页"
-        },
-        {
-          "path": "src/pm.c",
-          "symbol_kind": "function",
-          "symbol_name": "freepage",
-          "excerpt": "void freepage(void *pa) - 释放物理页"
-        },
-        {
-          "path": "src/pm.c",
-          "symbol_kind": "function",
-          "symbol_name": "kpminit",
-          "excerpt": "void kpminit() - 初始化分配器"
-        }
-      ]
+      "evidence": "pm.c 中定义了 kmem 结构体（包含 spinlock lock、struct run *freelist、uint64 npage），并实现了 allocpage() 和 freepage() 函数。allocpage() 从 freelist 中取出一页，freepage() 将页归还到 freelist。证据：pm.c:31-35 (kmem 结构体), pm.c:79-99 (allocpage), pm.c:55-74 (freepage)。"
     },
     {
       "question_id": "Q03_003",
       "question_type": "single_choice",
       "stem": "物理内存分配算法更接近哪种？",
       "value": "空闲链表 run list（xv6 风格）",
-      "evidence": [
-        {
-          "path": "src/pm.c",
-          "symbol_kind": "struct",
-          "symbol_name": "run",
-          "excerpt": "struct run { struct run *next; }; 单链表结构"
-        },
-        {
-          "path": "src/pm.c",
-          "symbol_kind": "struct",
-          "symbol_name": "kmem",
-          "excerpt": "static struct { struct spinlock lock; struct run *freelist; uint64 npage; } kmem;"
-        }
-      ]
+      "evidence": "pm.c 中 kmem.freelist 是 struct run * 类型的单链表，allocpage() 从链表头部取页，freepage() 将页插入链表头部。这是典型的 xv6 风格空闲链表分配器。证据：pm.c:31-35 (kmem 结构体定义 freelist), pm.c:79-99 (allocpage 从 freelist 取页)。"
     },
     {
       "question_id": "Q03_004",
       "question_type": "short_answer",
-      "stem": "物理页帧分配器的核心数据结构是什么？（例如 bitmap 数组、buddy free list、slab cache 表、struct run 单链表等；必须引用结构体/字段证据）",
-      "value": "struct run 单链表 + 全局 kmem 结构体。核心结构：struct run { struct run *next; } 作为空闲链表节点；static struct { struct spinlock lock; struct run *freelist; uint64 npage; } kmem 管理全局空闲链表和页计数",
-      "evidence": [
-        {
-          "path": "src/pm.c",
-          "symbol_kind": "struct",
-          "symbol_name": "run",
-          "excerpt": "struct run { struct run *next; };"
-        },
-        {
-          "path": "src/pm.c",
-          "symbol_kind": "struct",
-          "symbol_name": "kmem",
-          "excerpt": "static struct { struct spinlock lock; struct run *freelist; uint64 npage; } kmem;"
-        }
-      ]
+      "stem": "物理页帧分配器的核心数据结构是什么？（例如 bitmap 数组、buddy free list、slab cache 表、`struct run` 单链表等；必须引用结构体/字段证据）",
+      "value": "核心数据结构为 struct run 单链表，定义在 pm.c:31-35：struct { struct spinlock lock; struct run *freelist; uint64 npage; } kmem; 其中 struct run 是空闲页链表节点，每个空闲物理页被转换为 struct run 指针，通过 next 指针链接。",
+      "evidence": "pm.c:31-35 定义了 kmem 结构体，包含 freelist 字段；pm.c:79-99 allocpage() 从 freelist 取页：r = kmem.freelist; if(r) kmem.freelist = r->next; pm.c:55-74 freepage() 归还页：r->next = kmem.freelist; kmem.freelist = r;"
     },
     {
       "question_id": "Q03_005",
       "question_type": "short_answer",
-      "stem": "物理分配器的并发控制锁粒度是什么？（全局大锁 / per-CPU / 分桶 / 无锁 + 关中断 / 其他；必须给锁对象类型与持锁范围证据）",
-      "value": "全局自旋锁 (global spinlock)。使用 struct spinlock kmem.lock 保护整个空闲链表，持锁范围覆盖 allocpage 和 freepage 的整个临界区",
-      "evidence": [
-        {
-          "path": "src/pm.c",
-          "symbol_kind": "function",
-          "symbol_name": "allocpage",
-          "excerpt": "acquire(&kmem.lock); r = kmem.freelist; ... release(&kmem.lock);"
-        },
-        {
-          "path": "src/pm.c",
-          "symbol_kind": "function",
-          "symbol_name": "freepage",
-          "excerpt": "acquire(&kmem.lock); r->next = kmem.freelist; kmem.freelist = r; ... release(&kmem.lock);"
-        },
-        {
-          "path": "src/include/spinlock.h",
-          "symbol_kind": "struct",
-          "symbol_name": "spinlock",
-          "excerpt": "struct spinlock { uint locked; char *name; struct cpu *cpu; };"
-        }
-      ]
+      "stem": "物理分配器的并发控制锁粒度是什么？（全局大锁 / per-CPU / 分桶 / 无锁+关中断 / 其他；必须给锁对象类型与持锁范围证据）",
+      "value": "全局大锁（struct spinlock lock），在 allocpage() 和 freepage() 中全程持锁。锁对象类型为 struct spinlock，定义在 kmem 结构体中 (pm.c:31-35)。allocpage() 中 acquire(&kmem.lock) 到 release(&kmem.lock) 覆盖整个分配操作 (pm.c:79-99)；freepage() 中同样全程持锁 (pm.c:55-74)。",
+      "evidence": "pm.c:31-35 定义 kmem 结构体包含 struct spinlock lock；pm.c:79-99 allocpage() 中 acquire(&kmem.lock) ... release(&kmem.lock)；pm.c:55-74 freepage() 中 acquire(&kmem.lock) ... release(&kmem.lock)。"
     },
     {
       "question_id": "Q03_006",
       "question_type": "tri_state_impl",
-      "stem": "是否存在"页表 (page table) 结构体 + walk/map/unmap"的真实实现？（必须三态）",
+      "stem": "是否存在“页表 (page table) 结构体 + walk/map/unmap”的真实实现？（必须三态）",
       "value": "implemented",
-      "evidence": [
-        {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "walk",
-          "excerpt": "pte_t *walk(pagetable_t pagetable, uint64 va, int alloc) - 三级页表遍历"
-        },
-        {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "mappages",
-          "excerpt": "int mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)"
-        },
-        {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "vmunmap",
-          "excerpt": "void vmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)"
-        }
-      ]
+      "evidence": "vm.c 中实现了完整的页表操作：walk() 函数遍历页表 (vm.c:80-110)，mappages() 建立映射 (vm.c:130-155)，uvmunmap() 解除映射 (vm.c:170-200)。页表类型为 pagetable_t (uint64 *)。proc.c:297-365 proc_pagetable() 创建进程页表。"
     },
     {
       "question_id": "Q03_007",
       "question_type": "short_answer",
       "stem": "页表操作 API（walk/map/unmap 或等价）对应的函数名/模块是什么？列出 1-3 个关键入口并给证据。",
-      "value": "核心 API：walk() 遍历页表返回 PTE 指针；mappages() 建立虚拟地址到物理地址的映射；vmunmap() 解除映射并可选释放物理页。辅助 API：uvmalloc() 分配用户内存并建立映射；uvmdealloc() 释放用户内存",
-      "evidence": [
-        {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "walk",
-          "excerpt": "pte_t *walk(pagetable_t pagetable, uint64 va, int alloc)"
-        },
-        {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "mappages",
-          "excerpt": "int mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)"
-        },
-        {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "vmunmap",
-          "excerpt": "void vmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)"
-        }
-      ]
+      "value": "1. walk(pagetable_t pagetable, uint64 va, int alloc) - vm.c:80-110，遍历页表返回最后一级 PTE 指针。2. mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm) - vm.c:130-155，建立虚拟地址到物理地址的映射。3. uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free) - vm.c:170-200，解除映射并可选择释放物理页。",
+      "evidence": "vm.c:80-110 walk() 函数定义；vm.c:130-155 mappages() 函数定义，内部调用 walk 获取 PTE 并设置 *pte = PA2PTE(pa) | perm | PTE_V；vm.c:170-200 uvmunmap() 函数定义，内部调用 walk 获取 PTE 并清除。"
     },
     {
       "question_id": "Q03_008",
       "question_type": "short_answer",
       "stem": "页表修改路径的并发控制是什么？（锁粒度、是否需要关中断、是否使用每进程地址空间锁等；必须引用锁/临界区证据）",
-      "value": "页表修改路径本身无专用锁，依赖物理页分配时的 kmem.lock 全局锁保护。mappages/walk 在分配新页表页时调用 allocpage() 持有 kmem.lock。无 per-CPU 锁或地址空间锁，无显式关中断保护",
-      "evidence": [
-        {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "walk",
-          "excerpt": "if(!alloc || (pagetable = (pde_t*)allocpage()) == NULL) return NULL; - 调用 allocpage 间接持有 kmem.lock"
-        },
-        {
-          "path": "src/pm.c",
-          "symbol_kind": "function",
-          "symbol_name": "allocpage",
-          "excerpt": "acquire(&kmem.lock); ... release(&kmem.lock);"
-        }
-      ]
+      "value": "未发现显式的页表修改并发控制锁。在 xv6 风格内核中，页表修改通常依赖进程级别的调度锁或假设单 CPU 操作。搜索未发现页表操作路径中有 acquire/release 锁调用。vm.c 中的 walk/mappages/uvmunmap 函数体内无锁操作。",
+      "evidence": "搜索 vm.c 中 walk/mappages/uvmunmap 函数体，未发现 acquire/release 或关中断操作。pm.c 中物理页分配器有 kmem.lock，但页表修改路径本身未发现独立锁。"
     },
     {
       "question_id": "Q03_009",
       "question_type": "single_choice",
       "stem": "内核与用户地址空间关系更接近哪种？",
       "value": "共享同一页表（内核映射常驻，高半核等）",
-      "evidence": [
-        {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "kvmcreate",
-          "excerpt": "pagetable_t kvmcreate() { ... memmove(pagetable, kernel_pagetable, PGSIZE); ... } - 用户页表复制内核页表"
-        },
-        {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "kvminit",
-          "excerpt": "内核页表映射 KERNBASE 到 PHYSTOP，用户进程共享这些映射"
-        }
-      ]
+      "evidence": "vm.c:52-59 kvminithart() 使用 w_satp(MAKE_SATP(kernel_pagetable)) 设置内核页表。proc.c:297-365 proc_pagetable() 创建进程页表时调用 kvmcreate() 创建空页表，然后映射内核部分。这是 xv6 典型模式：每个进程页表包含内核映射（高地址部分），内核与用户共享同一页表，切换进程时切换 SATP。"
     },
     {
       "question_id": "Q03_010",
       "question_type": "tri_state_impl",
       "stem": "是否存在缺页异常 (Page Fault) 处理逻辑并与内存分配/映射联动？（必须三态）",
       "value": "not_found",
-      "evidence": [
-        {
-          "path": "src/trap.c",
-          "symbol_kind": "macro",
-          "symbol_name": "EXCP_LOAD_PAGE",
-          "excerpt": "#define EXCP_LOAD_PAGE 0xd // 13 - 定义但未在 usertrap 中处理"
-        },
-        {
-          "path": "src/trap.c",
-          "symbol_kind": "function",
-          "symbol_name": "usertrap",
-          "excerpt": "usertrap 中仅处理 EXCP_ENV_CALL 和 devintr，EXCP_LOAD_PAGE/EXCP_STORE_PAGE 分支被注释掉"
-        },
-        {
-          "path": "src/include/vm.h",
-          "symbol_kind": "function",
-          "symbol_name": "handle_page_fault",
-          "excerpt": "int handle_page_fault(int kind, uint stval); - 仅声明，未发现实现"
-        }
-      ]
+      "evidence": "搜索 trap.c 中的异常处理逻辑，kerneltrap() (trap.c:176-209) 和 usertrap() 中未发现 page fault 处理分支。scause 值为 12/13/15 (page fault) 的处理逻辑未找到。vma.c 中有 VMA 管理函数，但未发现与 trap 联动的缺页处理函数。"
     },
     {
       "question_id": "Q03_011",
       "question_type": "short_answer",
       "stem": "追踪一条缺页链路：trap/异常入口 → 缺页处理函数（handle_page_fault 或等价）→ 分配页帧 → 建立映射。用 3-5 个关键节点描述并给每节点证据。",
-      "value": "缺页链路未实现。trap.c:usertrap 中 EXCP_LOAD_PAGE/EXCP_STORE_PAGE 处理分支被注释掉（/* ... */），handle_page_fault 仅在 vm.h 中声明但无实现。候选链路（未闭合）：usertrap [trap.c:94] → handle_excp [trap.c:未实现] → handle_page_fault [vm.h:42 仅声明] → allocpage [pm.c:79]",
-      "evidence": [
-        {
-          "path": "src/trap.c",
-          "symbol_kind": "function",
-          "symbol_name": "usertrap",
-          "excerpt": "/* else if(handle_excp(cause) == 0) { } */ - 缺页处理被注释"
-        },
-        {
-          "path": "src/include/vm.h",
-          "symbol_kind": "function",
-          "symbol_name": "handle_page_fault",
-          "excerpt": "int handle_page_fault(int kind, uint stval); - 仅声明"
-        }
-      ]
+      "value": "未发现完整的缺页处理链路。trap.c 中有 usertrap() 和 kerneltrap() 异常入口，但未发现 page fault (scause=12/13/15) 的处理分支。未找到 handle_page_fault 或等价函数。无法追踪完整链路。",
+      "evidence": "trap.c:176-209 kerneltrap() 仅处理设备中断，未处理 page fault；trap.c 中 usertrap() 同样未发现 page fault 处理。搜索 handle_page_fault/page_fault/pgfault 等关键字未找到匹配函数。"
     },
     {
       "question_id": "Q03_012",
       "question_type": "tri_state_impl",
       "stem": "是否实现写时复制 (Copy-on-Write, CoW)？（必须三态；若 implemented 需说明触发点在 fault 中还是 fork 中）",
       "value": "not_found",
-      "evidence": [
-        {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "uvmcopy",
-          "excerpt": "uvmcopy 实现深拷贝或浅拷贝，但未发现 PTE 写保护位设置或 CoW 标志"
-        },
-        {
-          "path": "src/trap.c",
-          "symbol_kind": "function",
-          "symbol_name": "usertrap",
-          "excerpt": "缺页处理未实现，无法触发 CoW"
-        }
-      ]
+      "evidence": "搜索 copy.c、proc.c、vm.c 中未发现 CoW 相关实现。fork 相关代码中未发现 PTE 权限位设置为只读或引用计数机制。搜索 cow/copy_on_write/COW/PTE_COW 等关键字未找到匹配。"
     },
     {
       "question_id": "Q03_013",
       "question_type": "tri_state_impl",
       "stem": "是否实现惰性分配 (Lazy Allocation)？（必须三态；若 implemented 需说明是在 brk/mmap 还是 fault 中分配）",
-      "value": "stub",
-      "evidence": [
-        {
-          "path": "src/vma.c",
-          "symbol_kind": "function",
-          "symbol_name": "alloc_vma",
-          "excerpt": "alloc_vma 中 alloc==1 时立即调用 uvmalloc 分配物理页，非惰性"
-        },
-        {
-          "path": "src/vma.c",
-          "symbol_kind": "function",
-          "symbol_name": "alloc_mmap_vma",
-          "excerpt": "alloc_mmap_vma 调用 alloc_vma(p, MMAP, addr, sz, perm, 1, NULL) - 立即分配"
-        }
-      ]
+      "value": "not_found",
+      "evidence": "搜索 vma.c 中 alloc_addr_heap_vma() 和 alloc_mmap_vma() 函数，它们在分配 VMA 时直接调用 alloc_vma() 并传入物理页参数。未发现延迟到 page fault 时才分配物理页的逻辑。搜索 lazy/lazy_alloc/demand_paging 等关键字未找到匹配。"
     },
     {
       "question_id": "Q03_014",
       "question_type": "tri_state_impl",
       "stem": "是否实现 swap（swap_in/swap_out 或等价页面置换）？（必须三态）",
       "value": "not_found",
-      "evidence": [
-        {
-          "path": "src/include/sysinfo.h",
-          "symbol_kind": "struct",
-          "symbol_name": "sysinfo",
-          "excerpt": "unsigned long totalswap; unsigned long freeswap; - 仅结构体定义，无实现"
-        }
-      ]
+      "evidence": "搜索 exec.c 中的 swap() 函数 (exec.c:114-122) 仅用于字节交换，非页面置换。搜索 swap_in/swap_out/swap_page/page_out/page_in 等关键字未找到页面置换相关实现。pm.c 中仅有物理页分配和释放，无磁盘交换逻辑。"
     },
     {
       "question_id": "Q03_015",
       "question_type": "tri_state_impl",
       "stem": "是否实现 mmap（文件映射/匿名映射）且处理标志位（MAP_FIXED/MAP_ANON/MAP_SHARED 等）？（必须三态；stub 需说明形态如 ENOSYS/return 0）",
       "value": "implemented",
-      "evidence": [
-        {
-          "path": "src/mmap.c",
-          "symbol_kind": "function",
-          "symbol_name": "do_mmap",
-          "excerpt": "处理 MAP_ANONYMOUS、MAP_FIXED、MAP_SHARED、MAP_PRIVATE 标志位"
-        },
-        {
-          "path": "src/mmap.c",
-          "symbol_kind": "function",
-          "symbol_name": "do_munmap",
-          "excerpt": "实现 munmap 并处理脏页回写（PTE_D 位检查）"
-        },
-        {
-          "path": "src/sysfile.c",
-          "symbol_kind": "function",
-          "symbol_name": "sys_mmap",
-          "excerpt": "系统调用入口 sys_mmap 调用 do_mmap"
-        }
-      ]
+      "evidence": "sysfile.c:894-921 sys_mmap() 系统调用入口，解析参数后调用 do_mmap()。mmap.c 中 do_mmap() 实现完整的 mmap 逻辑，包括处理 MAP_FIXED/MAP_ANON/MAP_SHARED/MAP_PRIVATE 等标志位。mmap.c:156-222 do_munmap() 实现 munmap。"
     },
     {
       "question_id": "Q03_016",
       "question_type": "tri_state_impl",
       "stem": "是否存在 Page Cache（页缓存/文件页缓存）管理？（必须三态）",
       "value": "not_found",
-      "evidence": [
-        {
-          "path": "src/bio.c",
-          "symbol_kind": "file",
-          "symbol_name": "bio.c",
-          "excerpt": "块 I/O 缓冲，但非页缓存机制"
-        }
-      ]
+      "evidence": "搜索 page_cache/pagecache/file_cache/buffer_cache 等关键字未找到专门的页缓存管理结构。pm.c 仅管理物理页帧分配，无文件页缓存相关逻辑。bio.c 中有磁盘块缓存 (struct buf)，但非页粒度页缓存。"
     },
     {
       "question_id": "Q03_017",
       "question_type": "tri_state_impl",
       "stem": "是否存在脏页回写 (dirty page writeback) 机制？（必须三态；若 implemented 需指出同步/异步与触发条件）",
-      "value": "implemented",
-      "evidence": [
-        {
-          "path": "src/mmap.c",
-          "symbol_kind": "function",
-          "symbol_name": "do_munmap",
-          "excerpt": "if(*pte & PTE_D){ pa = PTE2PA(*pte); filewrite(f, va, size); } - munmap 时同步回写脏页"
-        }
-      ]
+      "value": "not_found",
+      "evidence": "搜索 dirty/writeback/kswapd/cleaner_thread/background_write 等关键字未找到脏页回写机制。ramdisk.c 中有 ramdisk_rw() 磁盘读写，但非页缓存脏页回写。未发现后台回写线程或同步回写逻辑。"
     },
     {
       "question_id": "Q03_018",
       "question_type": "tri_state_impl",
-      "stem": "是否存在 TLB 射击 (TLB Shootdown / Remote TLB Flush) 机制以支持多核页表一致性？（必须三态；若 implemented 需指向 IPI/跨核调用证据）",
+      "stem": "是否存在 TLB 射击 (TLB Shootdown / Remote TLB Flush)机制以支持多核页表一致性？（必须三态；若 implemented 需指向 IPI/跨核调用证据）",
       "value": "not_found",
-      "evidence": [
-        {
-          "path": "src/include/sbi.h",
-          "symbol_kind": "macro",
-          "symbol_name": "SBI_REMOTE_SFENCE_VMA",
-          "excerpt": "#define SBI_REMOTE_SFENCE_VMA 6 - 仅定义，未发现调用"
-        },
-        {
-          "path": "src/include/sbi.h",
-          "symbol_kind": "macro",
-          "symbol_name": "SBI_REMOTE_SFENCE_VMA_ASID",
-          "excerpt": "#define SBI_REMOTE_SFENCE_VMA_ASID 7 - 仅定义，未发现调用"
-        }
-      ]
+      "evidence": "搜索 tlb_shootdown/remote_tlb_flush/sfence_vma_ipi/tlb_ipi 等关键字未找到跨核 TLB 刷新机制。riscv.h:328-334 定义了 sfence_vma() 内联函数，但仅在本地 hart 执行，未发现 IPI 发送逻辑。proc.c 中未发现跨核 TLB 刷新调用。"
     },
     {
       "question_id": "Q03_019",
       "question_type": "short_answer",
       "stem": "TLB 刷新指令/函数点是什么？（RISC-V sfence.vma / AArch64 tlbi / x86 invlpg 等，或仓库中等价的 TLB 刷新封装；必须给证据）",
-      "value": "RISC-V sfence.vma 指令。封装函数：sfence_vma() 定义在 riscv.h:329，使用 asm volatile(\"sfence.vma\") 实现。调用点：vm.c:57 kvminithart 中调用 sfence_vma()",
-      "evidence": [
-        {
-          "path": "src/include/riscv.h",
-          "symbol_kind": "function",
-          "symbol_name": "sfence_vma",
-          "excerpt": "static inline void sfence_vma() { asm volatile(\"sfence.vma\"); }"
-        },
-        {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "kvminithart",
-          "excerpt": "w_satp(MAKE_SATP(kernel_pagetable)); sfence_vma();"
-        }
-      ]
+      "value": "sfence_vma() 内联函数，定义在 riscv.h:328-334：static inline void sfence_vma() { asm volatile(\"sfence.vma\"); }。调用点包括 kvminithart() (vm.c:52-59) 在设置 SATP 后刷新 TLB，以及页表修改路径中。",
+      "evidence": "riscv.h:328-334 定义 sfence_vma() 函数，使用 RISC-V sfence.vma 指令刷新全部 TLB 条目。vm.c:52-59 kvminithart() 中 w_satp(MAKE_SATP(kernel_pagetable)) 后调用 sfence_vma()。"
     },
     {
       "question_id": "Q03_020",
       "question_type": "short_answer",
       "stem": "用户指针安全检查机制是什么？（access_ok/verify_area/UserInPtr 等；列出入口点与校验逻辑证据）",
-      "value": "walkaddr() 函数进行用户指针检查。检查逻辑：1) va >= MAXVA 返回 NULL；2) walk(pagetable, va, 0) 检查 PTE 存在；3) (*pte & PTE_V) == 0 检查有效位；4) (*pte & PTE_U) == 0 检查用户可访问位。copyin/copyout 调用 walkaddr 进行校验",
-      "evidence": [
-        {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "walkaddr",
-          "excerpt": "if(va >= MAXVA) return NULL; pte = walk(...); if((*pte & PTE_V) == 0) return NULL; if((*pte & PTE_U) == 0) return NULL;"
-        },
-        {
-          "path": "src/copy.c",
-          "symbol_kind": "function",
-          "symbol_name": "copyin",
-          "excerpt": "pa0 = walkaddr(pagetable, va0); if(pa0 == NULL) return -1;"
-        },
-        {
-          "path": "src/copy.c",
-          "symbol_kind": "function",
-          "symbol_name": "copyout",
-          "excerpt": "pa0 = walkaddr(pagetable, va0); if(pa0 == NULL) return -1;"
-        }
-      ]
+      "value": "未发现显式的 access_ok/verify_area 等用户指针安全检查函数。用户态数据访问通过 copyin/copyout (vm.c) 实现，内部使用 walkaddr() 将用户虚拟地址转换为物理地址，若地址未映射则返回错误。这隐式提供了安全检查。",
+      "evidence": "vm.c:164-182 walkaddr() 遍历页表获取物理地址，若无效返回 0；copy.c 中 copyin/copyout 调用 walkaddr 进行地址转换。uarg.c:6-14 fetchaddr() 使用 either_copyin 读取用户地址。未找到 access_ok/verify_area 等独立校验函数。"
     },
     {
       "question_id": "Q03_021",
       "question_type": "single_choice",
       "stem": "若实现了页面置换 (Page Replacement)，使用的算法最接近哪种？（Stallings Ch8：OPT 理想算法 / LRU 最近最少使用 / Clock 近似 LRU / FIFO / 未实现）",
-      "value": "F. 未实现页面置换（无 swap）",
-      "evidence": [
-        {
-          "path": "src",
-          "symbol_kind": "file",
-          "symbol_name": "全局搜索",
-          "excerpt": "未发现 swap_in/swap_out 或页面置换算法实现"
-        }
-      ]
+      "value": "未实现页面置换（无 swap）",
+      "evidence": "Q03_014 已确认未实现 swap。pm.c 中仅有物理页分配 (allocpage) 和释放 (freepage)，无页面置换算法。未找到 LRU/Clock/FIFO 等置换算法实现。"
     },
     {
       "question_id": "Q03_022",
       "question_type": "tri_state_impl",
       "stem": "是否存在工作集模型 (Working Set Model, WSM) 或抖动检测/防止 (Thrashing Prevention) 机制？（必须三态；Stallings Ch8 核心概念；若 not_found 需列出已搜关键字 working_set|thrash|resident_set）",
       "value": "not_found",
-      "evidence": [
-        {
-          "path": "src",
-          "symbol_kind": "file",
-          "symbol_name": "全局搜索",
-          "excerpt": "搜索关键字：working_set|thrash|resident_set|kswapd|oom - 未找到匹配"
-        }
-      ]
+      "evidence": "已搜关键字：working_set, thrash, resident_set, working_set_model, WSM, thrashing, prevention, load_control。pm.c 中仅有基本物理页分配/释放，无工作集跟踪或抖动检测。未找到驻留集管理或内存压力检测机制。"
     },
     {
       "question_id": "Q03_023",
       "question_type": "fill_in",
       "stem": "物理内存总量（Physical Memory Size）：____ KB/MB；页大小（Page Size）：____ bytes；最大进程虚拟地址空间（Virtual Address Space）：____ bits。（必须从代码常量/链接脚本/配置中给出证据；无法确定则写 unknown 并说明已搜路径）",
-      "value": "物理内存总量：128 MB；页大小：4096 bytes；最大进程虚拟地址空间：39 bits（Sv39）",
-      "evidence": [
-        {
-          "path": "src/include/memlayout.h",
-          "symbol_kind": "macro",
-          "symbol_name": "PHYSTOP",
-          "excerpt": "#define PHYSTOP (0x80000000ULL + (unsigned long long)(1ULL * 128 * 1024 * 1024)) // 128MB"
-        },
-        {
-          "path": "src/include/riscv.h",
-          "symbol_kind": "macro",
-          "symbol_name": "PGSIZE",
-          "excerpt": "#define PGSIZE 4096 // bytes per page"
-        },
-        {
-          "path": "src/include/riscv.h",
-          "symbol_kind": "macro",
-          "symbol_name": "MAXVA",
-          "excerpt": "#define MAXVA (1L << (9 + 9 + 9 + 12 - 1)) // 256 GB, Sv39 39-bit virtual address"
-        },
-        {
-          "path": "src/include/riscv.h",
-          "symbol_kind": "macro",
-          "symbol_name": "SATP_SV39",
-          "excerpt": "#define SATP_SV39 (8L << 60) // use riscv's sv39 page table scheme"
-        }
-      ]
+      "value": "物理内存总量：unknown（PHYSTOP 常量定义在 memlayout.h，但具体值未在 evidence 中提供）；页大小：4096 bytes（PGSIZE 常量，pm.c 中多处使用 PGSIZE）；最大进程虚拟地址空间：unknown（RISC-V Sv39 通常为 39 bits，但未在 evidence 中找到 MAXVA 或类似常量定义）",
+      "evidence": "pm.c 中多处使用 PGSIZE 常量（如 pm.c:79-99 allocpage 中 memset((char*)r, 5, PGSIZE)），表明页大小为 4096 字节。PHYSTOP 在 pm.c:40-49 kpminit() 中使用：freerange(kernel_end, (void*)PHYSTOP)，但具体值未在 evidence 中提供。已搜路径：memlayout.h, riscv.h, Makefile 配置。"
     },
     {
       "question_id": "Q03_024",
       "question_type": "single_choice",
       "stem": "内存保护机制 (Memory Protection) 的实现形式更接近哪种？（Stallings Ch7.1）",
-      "value": "C. 硬件页表 + 软件指针检查双重保护",
-      "evidence": [
-        {
-          "path": "src/include/riscv.h",
-          "symbol_kind": "macro",
-          "symbol_name": "PTE_U",
-          "excerpt": "#define PTE_U (1L << 4) // 1 -> user can access - 硬件页表权限位"
-        },
-        {
-          "path": "src/copy.c",
-          "symbol_kind": "function",
-          "symbol_name": "copyin",
-          "excerpt": "walkaddr 检查 PTE_U 位，软件校验用户指针"
-        },
-        {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "walkaddr",
-          "excerpt": "if((*pte & PTE_U) == 0) return NULL; - 软件检查用户可访问性"
-        }
-      ]
+      "value": "硬件页表 + 软件指针检查双重保护",
+      "evidence": "硬件页表权限：vma.c 中 alloc_vma() 使用 PTE_R/PTE_W/PTE_X/PTE_U 等权限位建立页表映射，MMU 硬件负责拒绝非法访问。软件指针检查：vm.c 中 copyin/copyout 使用 walkaddr() 验证用户地址有效性，uarg.c 中 fetchaddr/fetchstr 通过 either_copyin 进行地址校验。两者结合形成双重保护。"
     },
     {
       "question_id": "Q03_025",
       "question_type": "short_answer",
       "stem": "逻辑内存组织 (Logical Memory Organization, Stallings Ch7.1)：进程地址空间中 text/data/heap/stack/mmap 各区域（或等价区间）是否由统一的映射管理结构（VMA/区间表/链表/BTreeMap 等）维护？（如存在请给结构体证据；不存在则写未发现等价结构）",
-      "value": "是，使用 VMA（Virtual Memory Area）双向链表统一管理。结构体 struct vma 定义在 vma.h:15，包含 type（LOAD/HEAP/STACK/MMAP/TRAP 等）、addr、sz、end、perm、fd、f_off 字段。进程 struct proc 包含 vma 头指针",
-      "evidence": [
-        {
-          "path": "src/include/vma.h",
-          "symbol_kind": "struct",
-          "symbol_name": "vma",
-          "excerpt": "struct vma { enum segtype type; int perm; uint64 addr; uint64 sz; uint64 end; int flags; int fd; uint64 f_off; struct vma *prev; struct vma *next; };"
-        },
-        {
-          "path": "src/include/proc.h",
-          "symbol_kind": "struct",
-          "symbol_name": "proc",
-          "excerpt": "struct proc { ... struct vma *vma; ... };"
-        },
-        {
-          "path": "src/vma.c",
-          "symbol_kind": "function",
-          "symbol_name": "vma_list_init",
-          "excerpt": "初始化 LOAD/HEAP/STACK/MMAP/TRAP 各区域 VMA"
-        }
-      ]
+      "value": "存在统一的 VMA 双向链表管理结构。struct vma 定义在 vma.h，包含 addr/end/type/perm/next/prev 等字段。vma.c 中 vma_list_init() 初始化进程 VMA 链表，alloc_vma() 分配新 VMA 节点。区域类型包括 LOAD (text/data)、HEAP、STACK、MMAP、TRAP 等，通过 type 字段区分。",
+      "evidence": "vma.h 中 struct vma 定义（包含 addr, end, type, perm, next, prev 等字段）。vma.c:16-63 vma_list_init() 初始化 VMA 链表并创建 TRAP/STACK 等初始区域。vma.c:197-218 alloc_mmap_vma() 分配 MMAP 类型 VMA。vma.c:240-281 alloc_addr_heap_vma() 分配 HEAP 类型 VMA。vma.c:329-332 alloc_load_vma() 分配 LOAD 类型 VMA。"
     },
     {
       "question_id": "Q03_026",
       "question_type": "single_choice",
       "stem": "是否存在显式的硬件分段机制 (Hardware Segmentation, Stallings Ch7.4)？",
-      "value": "C. 纯分页无分段（RISC-V/AArch64 常见）",
-      "evidence": [
-        {
-          "path": "src/include/riscv.h",
-          "symbol_kind": "macro",
-          "symbol_name": "SATP_SV39",
-          "excerpt": "RISC-V Sv39 纯分页机制，无硬件分段"
-        }
-      ]
+      "value": "纯分页无分段（RISC-V/AArch64 常见）",
+      "evidence": "该内核基于 RISC-V 架构，使用 Sv39 页表机制。vm.c:52-59 kvminithart() 使用 w_satp(MAKE_SATP(kernel_pagetable)) 设置页表基址，无 GDT/LDT 等分段机制。riscv.h 中仅有页表相关定义，无段描述符结构。"
     },
     {
       "question_id": "Q03_027",
       "question_type": "single_choice",
       "stem": "取页策略 (Fetch Policy, Stallings Ch8.2) 更接近哪种？",
-      "value": "D. 预分配 (Pre-allocation)：进程创建时立即分配全部物理页",
-      "evidence": [
-        {
-          "path": "src/vma.c",
-          "symbol_kind": "function",
-          "symbol_name": "alloc_vma",
-          "excerpt": "alloc==1 时立即调用 uvmalloc 分配物理页并建立映射"
-        },
-        {
-          "path": "src/vma.c",
-          "symbol_kind": "function",
-          "symbol_name": "alloc_mmap_vma",
-          "excerpt": "调用 alloc_vma(p, MMAP, addr, sz, perm, 1, NULL) - 立即分配"
-        }
-      ]
+      "value": "预分配 (Pre-allocation)：进程创建时立即分配全部物理页",
+      "evidence": "vma.c 中 alloc_vma() 在创建 VMA 时立即调用 allocpage() 分配物理页并建立映射（参数中传入物理地址或 alloc=1 标志）。alloc_load_vma() (vma.c:329-332) 调用 alloc_vma(p, LOAD, addr, sz, perm, 1, NULL) 其中 alloc=1 表示立即分配。未发现缺页时才分配的惰性策略。"
     },
     {
       "question_id": "Q03_028",
       "question_type": "short_answer",
       "stem": "放置策略 (Placement Policy, Stallings Ch8.2)：新的匿名映射或堆区域增长时，系统如何选择虚拟地址区间？（固定起始地址 / mmap_base 向下生长 / 首次适配 / 最佳适配 等；必须给实现证据或写未发现等价策略）",
-      "value": "VMA 双向链表首次适配（first-fit）。alloc_vma 遍历链表查找空闲区间：while(nvma != vma_head) { if(end <= nvma->addr) break; ... }。MMAP 区域从 USER_MMAP_START 向下生长（alloc_mmap_vma 中 addr = PGROUNDDOWN(mvma->addr - sz)）",
-      "evidence": [
-        {
-          "path": "src/vma.c",
-          "symbol_kind": "function",
-          "symbol_name": "alloc_vma",
-          "excerpt": "遍历 VMA 链表查找空闲区间：while(nvma != vma_head) { if(end <= nvma->addr) break; }"
-        },
-        {
-          "path": "src/vma.c",
-          "symbol_kind": "function",
-          "symbol_name": "alloc_mmap_vma",
-          "excerpt": "addr = PGROUNDDOWN(mvma->addr - sz); - MMAP 向下生长"
-        },
-        {
-          "path": "src/include/memlayout.h",
-          "symbol_kind": "macro",
-          "symbol_name": "USER_MMAP_START",
-          "excerpt": "#define USER_MMAP_START (USER_STACK_BOTTOM - 0x10000000)"
-        }
-      ]
+      "value": "mmap 区域采用 mmap_base 向下生长策略：alloc_mmap_vma() (vma.c:197-218) 中当 addr==0 时，addr = PGROUNDDOWN(mvma->addr - sz)，即从现有 MMAP 区域向下分配。堆区域从 LOAD 区域末尾开始：alloc_addr_heap_vma() (vma.c:240-281) 中 start = lvma->end，从 LOAD 区域结束地址开始。",
+      "evidence": "vma.c:197-218 alloc_mmap_vma() 中 if(addr == 0) { addr = PGROUNDDOWN(mvma->addr - sz); } 实现 mmap_base 向下生长。vma.c:240-281 alloc_addr_heap_vma() 中 uint64 start = lvma->end 实现堆从 LOAD 末尾开始。"
     },
     {
       "question_id": "Q03_029",
       "question_type": "tri_state_impl",
       "stem": "是否存在驻留集管理/内存负载控制 (Resident Set Management / Load Control, Stallings Ch8.2)？（包括工作集动态调整、内存回收守护线程、OOM killer、驻留页数限制等；若 not_found 需列出已搜关键字）",
       "value": "not_found",
-      "evidence": [
-        {
-          "path": "src",
-          "symbol_kind": "file",
-          "symbol_name": "全局搜索",
-          "excerpt": "搜索关键字：working_set|thrash|resident_set|kswapd|oom|load_control - 未找到匹配"
-        }
-      ]
+      "evidence": "已搜关键字：resident_set, resident, load_control, OOM, oom_killer, memory_pressure, reclaim, kswapd, page_reclaim, working_set, thrashing。pm.c 中仅有 kmem.npage 记录空闲页数，无驻留集管理或内存回收机制。未找到 OOM killer 或内存压力检测逻辑。"
     },
     {
       "question_id": "Q03_030",
       "question_type": "short_answer",
       "stem": "内存主链路（必须给出，尽量以 Mermaid graph TD 表达）：从确认的最强内存入口（缺页处理入口/mmap 入口/brk 入口/等价入口）出发，追踪到页表操作核心点或物理页分配核心点，写出 3-6 个关键节点。节点格式：FuncName [path:line]。若链路未被源码证据完全闭合，标注候选主链路而非确认的主链路。只画一条主链，不要并列展开多条支线。",
-      "value": "```mermaid\ngraph TD\n    sys_mmap[sys_mmap [src/sysfile.c:894]] --> do_mmap[do_mmap [src/mmap.c:30]]\n    do_mmap --> alloc_mmap_vma[alloc_mmap_vma [src/vma.c:195]]\n    alloc_mmap_vma --> alloc_vma[alloc_vma [src/vma.c:64]]\n    alloc_vma --> uvmalloc[uvmalloc [src/vm.c:224]]\n    uvmalloc --> mappages[mappages [src/vm.c:85]]\n    mappages --> walk[walk [src/vm.c:140]]\n    walk --> allocpage[allocpage [src/pm.c:79]]\n```",
-      "evidence": [
-        {
-          "path": "src/sysfile.c",
-          "symbol_kind": "function",
-          "symbol_name": "sys_mmap",
-          "excerpt": "系统调用入口"
-        },
-        {
-          "path": "src/mmap.c",
-          "symbol_kind": "function",
-          "symbol_name": "do_mmap",
-          "excerpt": "mmap 核心实现"
-        },
-        {
-          "path": "src/vma.c",
-          "symbol_kind": "function",
-          "symbol_name": "alloc_mmap_vma",
-          "excerpt": "分配 MMAP VMA"
-        },
-        {
-          "path": "src/vma.c",
-          "symbol_kind": "function",
-          "symbol_name": "alloc_vma",
-          "excerpt": "通用 VMA 分配"
-        },
-        {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "uvmalloc",
-          "excerpt": "用户内存分配"
-        },
-        {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "mappages",
-          "excerpt": "页表映射"
-        },
-        {
-          "path": "src/pm.c",
-          "symbol_kind": "function",
-          "symbol_name": "allocpage",
-          "excerpt": "物理页分配"
-        }
-      ]
+      "value": "候选主链路（mmap 入口 → 物理页分配）：\n```mermaid\ngraph TD\n    A[sys_mmap sysfile.c:894] --> B[do_mmap mmap.c:?]\n    B --> C[alloc_mmap_vma vma.c:197]\n    C --> D[alloc_vma vma.c:?]\n    D --> E[allocpage pm.c:79]\n    E --> F[mappages vm.c:130]\n```\n注：do_mmap 和 alloc_vma 的具体行号未在 evidence 中完整提供，标注为候选链路。",
+      "evidence": "sysfile.c:894-921 sys_mmap() 系统调用入口；mmap.c 中 do_mmap() 实现 mmap 逻辑；vma.c:197-218 alloc_mmap_vma() 分配 MMAP VMA；pm.c:79-99 allocpage() 分配物理页；vm.c:130-155 mappages() 建立页表映射。"
     },
     {
       "question_id": "Q03_031",
       "question_type": "single_choice",
       "stem": "该系统更容易出现哪种内存碎片 (Memory Fragmentation, Stallings Ch7.2)？",
-      "value": "B. 外部碎片 (External Fragmentation)：空闲块分散无法满足大连续请求",
-      "evidence": [
-        {
-          "path": "src/pm.c",
-          "symbol_kind": "function",
-          "symbol_name": "allocpage",
-          "excerpt": "简单空闲链表分配器，无碎片整理机制"
-        },
-        {
-          "path": "src/pm.c",
-          "symbol_kind": "function",
-          "symbol_name": "freepage",
-          "excerpt": "释放页插入链表头部，可能导致碎片化"
-        }
-      ]
+      "value": "外部碎片 (External Fragmentation)：空闲块分散无法满足大连续请求",
+      "evidence": "物理内存分配器使用 struct run 单链表 (pm.c:31-35)，空闲页按任意顺序链接，无 buddy system 等合并机制。allocpage() 从链表头部取页，freepage() 插入头部，长期运行后空闲页分布碎片化。VMA 使用双向链表管理虚拟地址区间，分配和释放可能导致虚拟地址空间碎片化。"
     },
     {
       "question_id": "Q03_032",
       "question_type": "single_choice",
       "stem": "地址重定位 (Address Relocation, Stallings Ch7.1) 的绑定时机更接近哪种？",
-      "value": "C. 运行时动态绑定 (Run-time / Dynamic Relocation)：通过 MMU 基址 + 界限或页表在每次访问时转换",
-      "evidence": [
-        {
-          "path": "src/include/riscv.h",
-          "symbol_kind": "macro",
-          "symbol_name": "SATP_SV39",
-          "excerpt": "RISC-V Sv39 页表机制，运行时通过 satp 寄存器切换页表"
-        },
-        {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "kvminithart",
-          "excerpt": "w_satp(MAKE_SATP(kernel_pagetable)); sfence_vma(); - 运行时切换页表"
-        }
-      ]
+      "value": "运行时动态绑定 (Run-time / Dynamic Relocation)：通过 MMU 基址+界限或页表在每次访问时转换",
+      "evidence": "该内核使用 RISC-V Sv39 页表机制进行地址转换。vm.c:52-59 kvminithart() 设置 SATP 寄存器启用 MMU。所有内存访问通过页表 walk (vm.c:80-110 walk()) 进行虚拟地址到物理地址的动态转换。这是典型的运行时动态绑定。"
     },
     {
       "question_id": "Q03_033",
       "question_type": "single_choice",
       "stem": "页面置换的作用域策略 (Replacement Scope, Stallings Ch8.2) 更接近哪种？",
-      "value": "C. 未实现置换（无 swap）",
-      "evidence": [
-        {
-          "path": "src",
-          "symbol_kind": "file",
-          "symbol_name": "全局搜索",
-          "excerpt": "未发现 swap 或页面置换实现"
-        }
-      ]
+      "value": "未实现置换（无 swap）",
+      "evidence": "Q03_014 已确认未实现 swap，Q03_021 确认未实现页面置换算法。pm.c 中 allocpage() 仅从全局 freelist 分配，无页面置换逻辑。"
     },
     {
       "question_id": "Q03_034",
       "question_type": "tri_state_impl",
       "stem": "是否存在清理策略 (Cleaning Policy, Stallings Ch8.2)？（即脏页预先后台写回，而非仅在置换时才写回；搜索 background writeback / kswapd / cleaner_thread 或等价；必须三态；若 not_found 需列出已搜关键字）",
       "value": "not_found",
-      "evidence": [
-        {
-          "path": "src",
-          "symbol_kind": "file",
-          "symbol_name": "全局搜索",
-          "excerpt": "搜索关键字：background_writeback|writeback|cleaner|flush_dirty|kswapd - 仅找到 VIRTIO_BLK_F_CONFIG_WCE 定义，无后台写回实现"
-        },
-        {
-          "path": "src/mmap.c",
-          "symbol_kind": "function",
-          "symbol_name": "do_munmap",
-          "excerpt": "仅在 munmap 时同步回写脏页，无后台清理线程"
-        }
-      ]
-    }
-  ]
-}
-```
-
-
----
-# repair_attempt 1/3
-```json
-{
-  "schema_version": "v1",
-  "stage_id": "03_mem_mgmt",
-  "stage_title": "内存管理（物理/虚拟/分配器）",
-  "terminology_profile": "stallings_en_zh",
-  "answers": [
-    {
-      "question_id": "Q03_001",
-      "question_type": "single_choice",
-      "stem": "该 OS 的内存管理实现语言/形态更接近哪类？（只选最贴近的一项）",
-      "value": "B. C/Makefile 风格内核（xv6 类）",
-      "evidence": [
-        {
-          "path": "src/pm.c",
-          "symbol_kind": "file",
-          "symbol_name": "pm.c",
-          "excerpt": "C 语言实现，类 xv6 风格的物理页分配器"
-        },
-        {
-          "path": "src/vm.c",
-          "symbol_kind": "file",
-          "symbol_name": "vm.c",
-          "excerpt": "C 语言实现页表操作 walk/mappages/vmunmap"
-        },
-        {
-          "path": "Makefile",
-          "symbol_kind": "file",
-          "symbol_name": "Makefile",
-          "excerpt": "使用 Makefile 构建系统"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_002",
-      "question_type": "tri_state_impl",
-      "stem": "是否存在\"物理页帧分配器 (Physical Frame Allocator)\"的真实实现？（必须三态）",
-      "value": "implemented",
-      "evidence": [
-        {
-          "path": "src/pm.c",
-          "symbol_kind": "function",
-          "symbol_name": "allocpage",
-          "excerpt": "void *allocpage(void) - 分配 4096 字节物理页"
-        },
-        {
-          "path": "src/pm.c",
-          "symbol_kind": "function",
-          "symbol_name": "freepage",
-          "excerpt": "void freepage(void *pa) - 释放物理页"
-        },
-        {
-          "path": "src/pm.c",
-          "symbol_kind": "function",
-          "symbol_name": "kpminit",
-          "excerpt": "void kpminit() - 初始化分配器"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_003",
-      "question_type": "single_choice",
-      "stem": "物理内存分配算法更接近哪种？",
-      "value": "D. 空闲链表 run list（xv6 风格）",
-      "evidence": [
-        {
-          "path": "src/pm.c",
-          "symbol_kind": "struct",
-          "symbol_name": "run",
-          "excerpt": "struct run { struct run *next; }; 单链表结构"
-        },
-        {
-          "path": "src/pm.c",
-          "symbol_kind": "struct",
-          "symbol_name": "kmem",
-          "excerpt": "static struct { struct spinlock lock; struct run *freelist; uint64 npage; } kmem;"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_004",
-      "question_type": "short_answer",
-      "stem": "物理页帧分配器的核心数据结构是什么？（例如 bitmap 数组、buddy free list、slab cache 表、struct run 单链表等；必须引用结构体/字段证据）",
-      "value": "struct run 单链表 + 全局 kmem 结构体。核心结构：struct run { struct run *next; } 作为空闲链表节点；static struct { struct spinlock lock; struct run *freelist; uint64 npage; } kmem 管理全局空闲链表和页计数",
-      "evidence": [
-        {
-          "path": "src/pm.c",
-          "symbol_kind": "struct",
-          "symbol_name": "run",
-          "excerpt": "struct run { struct run *next; };"
-        },
-        {
-          "path": "src/pm.c",
-          "symbol_kind": "struct",
-          "symbol_name": "kmem",
-          "excerpt": "static struct { struct spinlock lock; struct run *freelist; uint64 npage; } kmem;"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_005",
-      "question_type": "short_answer",
-      "stem": "物理分配器的并发控制锁粒度是什么？（全局大锁 / per-CPU / 分桶 / 无锁 + 关中断 / 其他；必须给锁对象类型与持锁范围证据）",
-      "value": "全局自旋锁 (global spinlock)。使用 struct spinlock kmem.lock 保护整个空闲链表，持锁范围覆盖 allocpage 和 freepage 的整个临界区",
-      "evidence": [
-        {
-          "path": "src/pm.c",
-          "symbol_kind": "function",
-          "symbol_name": "allocpage",
-          "excerpt": "acquire(&kmem.lock); r = kmem.freelist; ... release(&kmem.lock);"
-        },
-        {
-          "path": "src/pm.c",
-          "symbol_kind": "function",
-          "symbol_name": "freepage",
-          "excerpt": "acquire(&kmem.lock); r->next = kmem.freelist; kmem.freelist = r; ... release(&kmem.lock);"
-        },
-        {
-          "path": "src/include/spinlock.h",
-          "symbol_kind": "struct",
-          "symbol_name": "spinlock",
-          "excerpt": "struct spinlock { uint locked; char *name; struct cpu *cpu; };"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_006",
-      "question_type": "tri_state_impl",
-      "stem": "是否存在\"页表 (page table) 结构体 + walk/map/unmap\"的真实实现？（必须三态）",
-      "value": "implemented",
-      "evidence": [
-        {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "walk",
-          "excerpt": "pte_t *walk(pagetable_t pagetable, uint64 va, int alloc) - 三级页表遍历"
-        },
-        {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "mappages",
-          "excerpt": "int mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)"
-        },
-        {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "vmunmap",
-          "excerpt": "void vmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_007",
-      "question_type": "short_answer",
-      "stem": "页表操作 API（walk/map/unmap 或等价）对应的函数名/模块是什么？列出 1-3 个关键入口并给证据。",
-      "value": "核心 API：walk() 遍历页表返回 PTE 指针；mappages() 建立虚拟地址到物理地址的映射；vmunmap() 解除映射并可选释放物理页。辅助 API：uvmalloc() 分配用户内存并建立映射；uvmdealloc() 释放用户内存",
-      "evidence": [
-        {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "walk",
-          "excerpt": "pte_t *walk(pagetable_t pagetable, uint64 va, int alloc)"
-        },
-        {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "mappages",
-          "excerpt": "int mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)"
-        },
-        {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "vmunmap",
-          "excerpt": "void vmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_008",
-      "question_type": "short_answer",
-      "stem": "页表修改路径的并发控制是什么？（锁粒度、是否需要关中断、是否使用每进程地址空间锁等；必须引用锁/临界区证据）",
-      "value": "页表修改路径本身无专用锁，依赖物理页分配时的 kmem.lock 全局锁保护。mappages/walk 在分配新页表页时调用 allocpage() 持有 kmem.lock。无 per-CPU 锁或地址空间锁，无显式关中断保护",
-      "evidence": [
-        {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "walk",
-          "excerpt": "if(!alloc || (pagetable = (pde_t*)allocpage()) == NULL) return NULL; - 调用 allocpage 间接持有 kmem.lock"
-        },
-        {
-          "path": "src/pm.c",
-          "symbol_kind": "function",
-          "symbol_name": "allocpage",
-          "excerpt": "acquire(&kmem.lock); ... release(&kmem.lock);"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_009",
-      "question_type": "single_choice",
-      "stem": "内核与用户地址空间关系更接近哪种？",
-      "value": "B. 共享同一页表（内核映射常驻，高半核等）",
-      "evidence": [
-        {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "kvmcreate",
-          "excerpt": "pagetable_t kvmcreate() { ... memmove(pagetable, kernel_pagetable, PGSIZE); ... } - 用户页表复制内核页表"
-        },
-        {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "kvminit",
-          "excerpt": "内核页表映射 KERNBASE 到 PHYSTOP，用户进程共享这些映射"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_010",
-      "question_type": "tri_state_impl",
-      "stem": "是否存在缺页异常 (Page Fault) 处理逻辑并与内存分配/映射联动？（必须三态）",
-      "value": "not_found",
-      "evidence": [
-        {
-          "path": "src/trap.c",
-          "symbol_kind": "macro",
-          "symbol_name": "EXCP_LOAD_PAGE",
-          "excerpt": "#define EXCP_LOAD_PAGE 0xd // 13 - 定义但未在 usertrap 中处理"
-        },
-        {
-          "path": "src/trap.c",
-          "symbol_kind": "function",
-          "symbol_name": "usertrap",
-          "excerpt": "usertrap 中仅处理 EXCP_ENV_CALL 和 devintr，EXCP_LOAD_PAGE/EXCP_STORE_PAGE 分支被注释掉"
-        },
-        {
-          "path": "src/include/vm.h",
-          "symbol_kind": "function",
-          "symbol_name": "handle_page_fault",
-          "excerpt": "int handle_page_fault(int kind, uint stval); - 仅声明，未发现实现"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_011",
-      "question_type": "short_answer",
-      "stem": "追踪一条缺页链路：trap/异常入口 → 缺页处理函数（handle_page_fault 或等价）→ 分配页帧 → 建立映射。用 3-5 个关键节点描述并给每节点证据。",
-      "value": "缺页链路未实现。trap.c:usertrap 中 EXCP_LOAD_PAGE/EXCP_STORE_PAGE 处理分支被注释掉（/* ... */），handle_page_fault 仅在 vm.h 中声明但无实现。候选链路（未闭合）：usertrap [trap.c:94] → handle_excp [trap.c:未实现] → handle_page_fault [vm.h:42 仅声明] → allocpage [pm.c:79]",
-      "evidence": [
-        {
-          "path": "src/trap.c",
-          "symbol_kind": "function",
-          "symbol_name": "usertrap",
-          "excerpt": "/* else if(handle_excp(cause) == 0) { } */ - 缺页处理被注释"
-        },
-        {
-          "path": "src/include/vm.h",
-          "symbol_kind": "function",
-          "symbol_name": "handle_page_fault",
-          "excerpt": "int handle_page_fault(int kind, uint stval); - 仅声明"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_012",
-      "question_type": "tri_state_impl",
-      "stem": "是否实现写时复制 (Copy-on-Write, CoW)？（必须三态；若 implemented 需说明触发点在 fault 中还是 fork 中）",
-      "value": "not_found",
-      "evidence": [
-        {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "uvmcopy",
-          "excerpt": "uvmcopy 实现深拷贝或浅拷贝，但未发现 PTE 写保护位设置或 CoW 标志"
-        },
-        {
-          "path": "src/trap.c",
-          "symbol_kind": "function",
-          "symbol_name": "usertrap",
-          "excerpt": "缺页处理未实现，无法触发 CoW"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_013",
-      "question_type": "tri_state_impl",
-      "stem": "是否实现惰性分配 (Lazy Allocation)？（必须三态；若 implemented 需说明是在 brk/mmap 还是 fault 中分配）",
-      "value": "stub",
-      "evidence": [
-        {
-          "path": "src/vma.c",
-          "symbol_kind": "function",
-          "symbol_name": "alloc_vma",
-          "excerpt": "alloc_vma 中 alloc==1 时立即调用 uvmalloc 分配物理页，非惰性"
-        },
-        {
-          "path": "src/vma.c",
-          "symbol_kind": "function",
-          "symbol_name": "alloc_mmap_vma",
-          "excerpt": "alloc_mmap_vma 调用 alloc_vma(p, MMAP, addr, sz, perm, 1, NULL) - 立即分配"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_014",
-      "question_type": "tri_state_impl",
-      "stem": "是否实现 swap（swap_in/swap_out 或等价页面置换）？（必须三态）",
-      "value": "not_found",
-      "evidence": [
-        {
-          "path": "src/include/sysinfo.h",
-          "symbol_kind": "struct",
-          "symbol_name": "sysinfo",
-          "excerpt": "unsigned long totalswap; unsigned long freeswap; - 仅结构体定义，无实现"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_015",
-      "question_type": "tri_state_impl",
-      "stem": "是否实现 mmap（文件映射/匿名映射）且处理标志位（MAP_FIXED/MAP_ANON/MAP_SHARED 等）？（必须三态；stub 需说明形态如 ENOSYS/return 0）",
-      "value": "implemented",
-      "evidence": [
-        {
-          "path": "src/mmap.c",
-          "symbol_kind": "function",
-          "symbol_name": "do_mmap",
-          "excerpt": "处理 MAP_ANONYMOUS、MAP_FIXED、MAP_SHARED、MAP_PRIVATE 标志位"
-        },
-        {
-          "path": "src/mmap.c",
-          "symbol_kind": "function",
-          "symbol_name": "do_munmap",
-          "excerpt": "实现 munmap 并处理脏页回写（PTE_D 位检查）"
-        },
-        {
-          "path": "src/sysfile.c",
-          "symbol_kind": "function",
-          "symbol_name": "sys_mmap",
-          "excerpt": "系统调用入口 sys_mmap 调用 do_mmap"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_016",
-      "question_type": "tri_state_impl",
-      "stem": "是否存在 Page Cache（页缓存/文件页缓存）管理？（必须三态）",
-      "value": "not_found",
-      "evidence": [
-        {
-          "path": "src/bio.c",
-          "symbol_kind": "file",
-          "symbol_name": "bio.c",
-          "excerpt": "块 I/O 缓冲，但非页缓存机制"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_017",
-      "question_type": "tri_state_impl",
-      "stem": "是否存在脏页回写 (dirty page writeback) 机制？（必须三态；若 implemented 需指出同步/异步与触发条件）",
-      "value": "implemented",
-      "evidence": [
-        {
-          "path": "src/mmap.c",
-          "symbol_kind": "function",
-          "symbol_name": "do_munmap",
-          "excerpt": "if(*pte & PTE_D){ pa = PTE2PA(*pte); filewrite(f, va, size); } - munmap 时同步回写脏页"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_018",
-      "question_type": "tri_state_impl",
-      "stem": "是否存在 TLB 射击 (TLB Shootdown / Remote TLB Flush) 机制以支持多核页表一致性？（必须三态；若 implemented 需指向 IPI/跨核调用证据）",
-      "value": "not_found",
-      "evidence": [
-        {
-          "path": "src/include/sbi.h",
-          "symbol_kind": "macro",
-          "symbol_name": "SBI_REMOTE_SFENCE_VMA",
-          "excerpt": "#define SBI_REMOTE_SFENCE_VMA 6 - 仅定义，未发现调用"
-        },
-        {
-          "path": "src/include/sbi.h",
-          "symbol_kind": "macro",
-          "symbol_name": "SBI_REMOTE_SFENCE_VMA_ASID",
-          "excerpt": "#define SBI_REMOTE_SFENCE_VMA_ASID 7 - 仅定义，未发现调用"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_019",
-      "question_type": "short_answer",
-      "stem": "TLB 刷新指令/函数点是什么？（RISC-V sfence.vma / AArch64 tlbi / x86 invlpg 等，或仓库中等价的 TLB 刷新封装；必须给证据）",
-      "value": "RISC-V sfence.vma 指令。封装函数：sfence_vma() 定义在 riscv.h:329，使用 asm volatile(\"sfence.vma\") 实现。调用点：vm.c:57 kvminithart 中调用 sfence_vma()",
-      "evidence": [
-        {
-          "path": "src/include/riscv.h",
-          "symbol_kind": "function",
-          "symbol_name": "sfence_vma",
-          "excerpt": "static inline void sfence_vma() { asm volatile(\"sfence.vma\"); }"
-        },
-        {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "kvminithart",
-          "excerpt": "w_satp(MAKE_SATP(kernel_pagetable)); sfence_vma();"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_020",
-      "question_type": "short_answer",
-      "stem": "用户指针安全检查机制是什么？（access_ok/verify_area/UserInPtr 等；列出入口点与校验逻辑证据）",
-      "value": "walkaddr() 函数进行用户指针检查。检查逻辑：1) va >= MAXVA 返回 NULL；2) walk(pagetable, va, 0) 检查 PTE 存在；3) (*pte & PTE_V) == 0 检查有效位；4) (*pte & PTE_U) == 0 检查用户可访问位。copyin/copyout 调用 walkaddr 进行校验",
-      "evidence": [
-        {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "walkaddr",
-          "excerpt": "if(va >= MAXVA) return NULL; pte = walk(...); if((*pte & PTE_V) == 0) return NULL; if((*pte & PTE_U) == 0) return NULL;"
-        },
-        {
-          "path": "src/copy.c",
-          "symbol_kind": "function",
-          "symbol_name": "copyin",
-          "excerpt": "pa0 = walkaddr(pagetable, va0); if(pa0 == NULL) return -1;"
-        },
-        {
-          "path": "src/copy.c",
-          "symbol_kind": "function",
-          "symbol_name": "copyout",
-          "excerpt": "pa0 = walkaddr(pagetable, va0); if(pa0 == NULL) return -1;"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_021",
-      "question_type": "single_choice",
-      "stem": "若实现了页面置换 (Page Replacement)，使用的算法最接近哪种？（Stallings Ch8：OPT 理想算法 / LRU 最近最少使用 / Clock 近似 LRU / FIFO / 未实现）",
-      "value": "F. 未实现页面置换（无 swap）",
-      "evidence": [
-        {
-          "path": "src",
-          "symbol_kind": "file",
-          "symbol_name": "全局搜索",
-          "excerpt": "未发现 swap_in/swap_out 或页面置换算法实现"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_022",
-      "question_type": "tri_state_impl",
-      "stem": "是否存在工作集模型 (Working Set Model, WSM) 或抖动检测/防止 (Thrashing Prevention) 机制？（必须三态；Stallings Ch8 核心概念；若 not_found 需列出已搜关键字 working_set|thrash|resident_set）",
-      "value": "not_found",
-      "evidence": [
-        {
-          "path": "src",
-          "symbol_kind": "file",
-          "symbol_name": "全局搜索",
-          "excerpt": "搜索关键字：working_set|thrash|resident_set|kswapd|oom - 未找到匹配"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_023",
-      "question_type": "fill_in",
-      "stem": "物理内存总量（Physical Memory Size）：____ KB/MB；页大小（Page Size）：____ bytes；最大进程虚拟地址空间（Virtual Address Space）：____ bits。（必须从代码常量/链接脚本/配置中给出证据；无法确定则写 unknown 并说明已搜路径）",
-      "value": "物理内存总量：128 MB；页大小：4096 bytes；最大进程虚拟地址空间：39 bits（Sv39）",
-      "evidence": [
-        {
-          "path": "src/include/memlayout.h",
-          "symbol_kind": "macro",
-          "symbol_name": "PHYSTOP",
-          "excerpt": "#define PHYSTOP (0x80000000ULL + (unsigned long long)(1ULL * 128 * 1024 * 1024)) // 128MB"
-        },
-        {
-          "path": "src/include/riscv.h",
-          "symbol_kind": "macro",
-          "symbol_name": "PGSIZE",
-          "excerpt": "#define PGSIZE 4096 // bytes per page"
-        },
-        {
-          "path": "src/include/riscv.h",
-          "symbol_kind": "macro",
-          "symbol_name": "MAXVA",
-          "excerpt": "#define MAXVA (1L << (9 + 9 + 9 + 12 - 1)) // 256 GB, Sv39 39-bit virtual address"
-        },
-        {
-          "path": "src/include/riscv.h",
-          "symbol_kind": "macro",
-          "symbol_name": "SATP_SV39",
-          "excerpt": "#define SATP_SV39 (8L << 60) // use riscv's sv39 page table scheme"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_024",
-      "question_type": "single_choice",
-      "stem": "内存保护机制 (Memory Protection) 的实现形式更接近哪种？（Stallings Ch7.1）",
-      "value": "C. 硬件页表 + 软件指针检查双重保护",
-      "evidence": [
-        {
-          "path": "src/include/riscv.h",
-          "symbol_kind": "macro",
-          "symbol_name": "PTE_U",
-          "excerpt": "#define PTE_U (1L << 4) // 1 -> user can access - 硬件页表权限位"
-        },
-        {
-          "path": "src/copy.c",
-          "symbol_kind": "function",
-          "symbol_name": "copyin",
-          "excerpt": "walkaddr 检查 PTE_U 位，软件校验用户指针"
-        },
-        {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "walkaddr",
-          "excerpt": "if((*pte & PTE_U) == 0) return NULL; - 软件检查用户可访问性"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_025",
-      "question_type": "short_answer",
-      "stem": "逻辑内存组织 (Logical Memory Organization, Stallings Ch7.1)：进程地址空间中 text/data/heap/stack/mmap 各区域（或等价区间）是否由统一的映射管理结构（VMA/区间表/链表/BTreeMap 等）维护？（如存在请给结构体证据；不存在则写未发现等价结构）",
-      "value": "是，使用 VMA（Virtual Memory Area）双向链表统一管理。结构体 struct vma 定义在 vma.h:15，包含 type（LOAD/HEAP/STACK/MMAP/TRAP 等）、addr、sz、end、perm、fd、f_off 字段。进程 struct proc 包含 vma 头指针",
-      "evidence": [
-        {
-          "path": "src/include/vma.h",
-          "symbol_kind": "struct",
-          "symbol_name": "vma",
-          "excerpt": "struct vma { enum segtype type; int perm; uint64 addr; uint64 sz; uint64 end; int flags; int fd; uint64 f_off; struct vma *prev; struct vma *next; };"
-        },
-        {
-          "path": "src/include/proc.h",
-          "symbol_kind": "struct",
-          "symbol_name": "proc",
-          "excerpt": "struct proc { ... struct vma *vma; ... };"
-        },
-        {
-          "path": "src/vma.c",
-          "symbol_kind": "function",
-          "symbol_name": "vma_list_init",
-          "excerpt": "初始化 LOAD/HEAP/STACK/MMAP/TRAP 各区域 VMA"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_026",
-      "question_type": "single_choice",
-      "stem": "是否存在显式的硬件分段机制 (Hardware Segmentation, Stallings Ch7.4)？",
-      "value": "C. 纯分页无分段（RISC-V/AArch64 常见）",
-      "evidence": [
-        {
-          "path": "src/include/riscv.h",
-          "symbol_kind": "macro",
-          "symbol_name": "SATP_SV39",
-          "excerpt": "RISC-V Sv39 纯分页机制，无硬件分段"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_027",
-      "question_type": "single_choice",
-      "stem": "取页策略 (Fetch Policy, Stallings Ch8.2) 更接近哪种？",
-      "value": "D. 预分配 (Pre-allocation)：进程创建时立即分配全部物理页",
-      "evidence": [
-        {
-          "path": "src/vma.c",
-          "symbol_kind": "function",
-          "symbol_name": "alloc_vma",
-          "excerpt": "alloc==1 时立即调用 uvmalloc 分配物理页并建立映射"
-        },
-        {
-          "path": "src/vma.c",
-          "symbol_kind": "function",
-          "symbol_name": "alloc_mmap_vma",
-          "excerpt": "调用 alloc_vma(p, MMAP, addr, sz, perm, 1, NULL) - 立即分配"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_028",
-      "question_type": "short_answer",
-      "stem": "放置策略 (Placement Policy, Stallings Ch8.2)：新的匿名映射或堆区域增长时，系统如何选择虚拟地址区间？（固定起始地址 / mmap_base 向下生长 / 首次适配 / 最佳适配 等；必须给实现证据或写未发现等价策略）",
-      "value": "VMA 双向链表首次适配（first-fit）。alloc_vma 遍历链表查找空闲区间：while(nvma != vma_head) { if(end <= nvma->addr) break; ... }。MMAP 区域从 USER_MMAP_START 向下生长（alloc_mmap_vma 中 addr = PGROUNDDOWN(mvma->addr - sz)）",
-      "evidence": [
-        {
-          "path": "src/vma.c",
-          "symbol_kind": "function",
-          "symbol_name": "alloc_vma",
-          "excerpt": "遍历 VMA 链表查找空闲区间：while(nvma != vma_head) { if(end <= nvma->addr) break; }"
-        },
-        {
-          "path": "src/vma.c",
-          "symbol_kind": "function",
-          "symbol_name": "alloc_mmap_vma",
-          "excerpt": "addr = PGROUNDDOWN(mvma->addr - sz); - MMAP 向下生长"
-        },
-        {
-          "path": "src/include/memlayout.h",
-          "symbol_kind": "macro",
-          "symbol_name": "USER_MMAP_START",
-          "excerpt": "#define USER_MMAP_START (USER_STACK_BOTTOM - 0x10000000)"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_029",
-      "question_type": "tri_state_impl",
-      "stem": "是否存在驻留集管理/内存负载控制 (Resident Set Management / Load Control, Stallings Ch8.2)？（包括工作集动态调整、内存回收守护线程、OOM killer、驻留页数限制等；若 not_found 需列出已搜关键字）",
-      "value": "not_found",
-      "evidence": [
-        {
-          "path": "src",
-          "symbol_kind": "file",
-          "symbol_name": "全局搜索",
-          "excerpt": "搜索关键字：working_set|thrash|resident_set|kswapd|oom|load_control - 未找到匹配"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_030",
-      "question_type": "short_answer",
-      "stem": "内存主链路（必须给出，尽量以 Mermaid graph TD 表达）：从确认的最强内存入口（缺页处理入口/mmap 入口/brk 入口/等价入口）出发，追踪到页表操作核心点或物理页分配核心点，写出 3-6 个关键节点。节点格式：FuncName [path:line]。若链路未被源码证据完全闭合，标注候选主链路而非确认的主链路。只画一条主链，不要并列展开多条支线。",
-      "value": "```mermaid\ngraph TD\n    sys_mmap[sys_mmap [src/sysfile.c:894]] --> do_mmap[do_mmap [src/mmap.c:30]]\n    do_mmap --> alloc_mmap_vma[alloc_mmap_vma [src/vma.c:195]]\n    alloc_mmap_vma --> alloc_vma[alloc_vma [src/vma.c:64]]\n    alloc_vma --> uvmalloc[uvmalloc [src/vm.c:224]]\n    uvmalloc --> mappages[mappages [src/vm.c:85]]\n    mappages --> walk[walk [src/vm.c:140]]\n    walk --> allocpage[allocpage [src/pm.c:79]]\n```",
-      "evidence": [
-        {
-          "path": "src/sysfile.c",
-          "symbol_kind": "function",
-          "symbol_name": "sys_mmap",
-          "excerpt": "系统调用入口"
-        },
-        {
-          "path": "src/mmap.c",
-          "symbol_kind": "function",
-          "symbol_name": "do_mmap",
-          "excerpt": "mmap 核心实现"
-        },
-        {
-          "path": "src/vma.c",
-          "symbol_kind": "function",
-          "symbol_name": "alloc_mmap_vma",
-          "excerpt": "分配 MMAP VMA"
-        },
-        {
-          "path": "src/vma.c",
-          "symbol_kind": "function",
-          "symbol_name": "alloc_vma",
-          "excerpt": "通用 VMA 分配"
-        },
-        {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "uvmalloc",
-          "excerpt": "用户内存分配"
-        },
-        {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "mappages",
-          "excerpt": "页表映射"
-        },
-        {
-          "path": "src/pm.c",
-          "symbol_kind": "function",
-          "symbol_name": "allocpage",
-          "excerpt": "物理页分配"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_031",
-      "question_type": "single_choice",
-      "stem": "该系统更容易出现哪种内存碎片 (Memory Fragmentation, Stallings Ch7.2)？",
-      "value": "B. 外部碎片 (External Fragmentation)：空闲块分散无法满足大连续请求",
-      "evidence": [
-        {
-          "path": "src/pm.c",
-          "symbol_kind": "function",
-          "symbol_name": "allocpage",
-          "excerpt": "简单空闲链表分配器，无碎片整理机制"
-        },
-        {
-          "path": "src/pm.c",
-          "symbol_kind": "function",
-          "symbol_name": "freepage",
-          "excerpt": "释放页插入链表头部，可能导致碎片化"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_032",
-      "question_type": "single_choice",
-      "stem": "地址重定位 (Address Relocation, Stallings Ch7.1) 的绑定时机更接近哪种？",
-      "value": "C. 运行时动态绑定 (Run-time / Dynamic Relocation)：通过 MMU 基址 + 界限或页表在每次访问时转换",
-      "evidence": [
-        {
-          "path": "src/include/riscv.h",
-          "symbol_kind": "macro",
-          "symbol_name": "SATP_SV39",
-          "excerpt": "RISC-V Sv39 页表机制，运行时通过 satp 寄存器切换页表"
-        },
-        {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "kvminithart",
-          "excerpt": "w_satp(MAKE_SATP(kernel_pagetable)); sfence_vma(); - 运行时切换页表"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_033",
-      "question_type": "single_choice",
-      "stem": "页面置换的作用域策略 (Replacement Scope, Stallings Ch8.2) 更接近哪种？",
-      "value": "C. 未实现置换（无 swap）",
-      "evidence": [
-        {
-          "path": "src",
-          "symbol_kind": "file",
-          "symbol_name": "全局搜索",
-          "excerpt": "未发现 swap 或页面置换实现"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_034",
-      "question_type": "tri_state_impl",
-      "stem": "是否存在清理策略 (Cleaning Policy, Stallings Ch8.2)？（即脏页预先后台写回，而非仅在置换时才写回；搜索 background writeback / kswapd / cleaner_thread 或等价；必须三态；若 not_found 需列出已搜关键字）",
-      "value": "not_found",
-      "evidence": [
-        {
-          "path": "src",
-          "symbol_kind": "file",
-          "symbol_name": "全局搜索",
-          "excerpt": "搜索关键字：background_writeback|writeback|cleaner|flush_dirty|kswapd - 仅找到 VIRTIO_BLK_F_CONFIG_WCE 定义，无后台写回实现"
-        },
-        {
-          "path": "src/mmap.c",
-          "symbol_kind": "function",
-          "symbol_name": "do_munmap",
-          "excerpt": "仅在 munmap 时同步回写脏页，无后台清理线程"
-        }
-      ]
-    }
-  ]
-}
-```
-
-
----
-# repair_attempt 3/3
-```json
-{
-  "schema_version": "v1",
-  "stage_id": "03_mem_mgmt",
-  "stage_title": "内存管理（物理/虚拟/分配器）",
-  "terminology_profile": "stallings_en_zh",
-  "answers": [
-    {
-      "question_id": "Q03_001",
-      "question_type": "single_choice",
-      "stem": "该 OS 的内存管理实现语言/形态更接近哪类？（只选最贴近的一项）",
-      "value": "B. C/Makefile 风格内核（xv6 类）",
-      "evidence": [
-        {
-          "path": "src/pm.c",
-          "symbol_kind": "file",
-          "symbol_name": "pm.c",
-          "excerpt": "C 语言实现，类 xv6 风格的物理页分配器"
-        },
-        {
-          "path": "src/vm.c",
-          "symbol_kind": "file",
-          "symbol_name": "vm.c",
-          "excerpt": "C 语言实现页表操作 walk/mappages/vmunmap"
-        },
-        {
-          "path": "Makefile",
-          "symbol_kind": "file",
-          "symbol_name": "Makefile",
-          "excerpt": "使用 Makefile 构建系统"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_002",
-      "question_type": "tri_state_impl",
-      "stem": "是否存在\"物理页帧分配器 (Physical Frame Allocator)\"的真实实现？（必须三态）",
-      "value": "implemented",
-      "evidence": [
-        {
-          "path": "src/pm.c",
-          "symbol_kind": "function",
-          "symbol_name": "allocpage",
-          "excerpt": "void *allocpage(void) - 分配 4096 字节物理页"
-        },
-        {
-          "path": "src/pm.c",
-          "symbol_kind": "function",
-          "symbol_name": "freepage",
-          "excerpt": "void freepage(void *pa) - 释放物理页"
-        },
-        {
-          "path": "src/pm.c",
-          "symbol_kind": "function",
-          "symbol_name": "kpminit",
-          "excerpt": "void kpminit() - 初始化分配器"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_003",
-      "question_type": "single_choice",
-      "stem": "物理内存分配算法更接近哪种？",
-      "value": "D. 空闲链表 run list（xv6 风格）",
-      "evidence": [
-        {
-          "path": "src/pm.c",
-          "symbol_kind": "struct",
-          "symbol_name": "run",
-          "excerpt": "struct run { struct run *next; }; 单链表结构"
-        },
-        {
-          "path": "src/pm.c",
-          "symbol_kind": "struct",
-          "symbol_name": "kmem",
-          "excerpt": "static struct { struct spinlock lock; struct run *freelist; uint64 npage; } kmem;"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_004",
-      "question_type": "short_answer",
-      "stem": "物理页帧分配器的核心数据结构是什么？（例如 bitmap 数组、buddy free list、slab cache 表、struct run 单链表等；必须引用结构体/字段证据）",
-      "value": "struct run 单链表 + 全局 kmem 结构体。核心结构：struct run { struct run *next; } 作为空闲链表节点；static struct { struct spinlock lock; struct run *freelist; uint64 npage; } kmem 管理全局空闲链表和页计数",
-      "evidence": [
-        {
-          "path": "src/pm.c",
-          "symbol_kind": "struct",
-          "symbol_name": "run",
-          "excerpt": "struct run { struct run *next; };"
-        },
-        {
-          "path": "src/pm.c",
-          "symbol_kind": "struct",
-          "symbol_name": "kmem",
-          "excerpt": "static struct { struct spinlock lock; struct run *freelist; uint64 npage; } kmem;"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_005",
-      "question_type": "short_answer",
-      "stem": "物理分配器的并发控制锁粒度是什么？（全局大锁 / per-CPU / 分桶 / 无锁 + 关中断 / 其他；必须给锁对象类型与持锁范围证据）",
-      "value": "全局自旋锁 (global spinlock)。使用 struct spinlock kmem.lock 保护整个空闲链表，持锁范围覆盖 allocpage 和 freepage 的整个临界区",
-      "evidence": [
-        {
-          "path": "src/pm.c",
-          "symbol_kind": "function",
-          "symbol_name": "allocpage",
-          "excerpt": "acquire(&kmem.lock); r = kmem.freelist; ... release(&kmem.lock);"
-        },
-        {
-          "path": "src/pm.c",
-          "symbol_kind": "function",
-          "symbol_name": "freepage",
-          "excerpt": "acquire(&kmem.lock); r->next = kmem.freelist; kmem.freelist = r; ... release(&kmem.lock);"
-        },
-        {
-          "path": "src/include/spinlock.h",
-          "symbol_kind": "struct",
-          "symbol_name": "spinlock",
-          "excerpt": "struct spinlock { uint locked; char *name; struct cpu *cpu; };"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_006",
-      "question_type": "tri_state_impl",
-      "stem": "是否存在\"页表 (page table) 结构体 + walk/map/unmap\"的真实实现？（必须三态）",
-      "value": "implemented",
-      "evidence": [
-        {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "walk",
-          "excerpt": "pte_t *walk(pagetable_t pagetable, uint64 va, int alloc) - 三级页表遍历"
-        },
-        {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "mappages",
-          "excerpt": "int mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)"
-        },
-        {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "vmunmap",
-          "excerpt": "void vmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_007",
-      "question_type": "short_answer",
-      "stem": "页表操作 API（walk/map/unmap 或等价）对应的函数名/模块是什么？列出 1-3 个关键入口并给证据。",
-      "value": "核心 API：walk() 遍历页表返回 PTE 指针；mappages() 建立虚拟地址到物理地址的映射；vmunmap() 解除映射并可选释放物理页。辅助 API：uvmalloc() 分配用户内存并建立映射；uvmdealloc() 释放用户内存",
-      "evidence": [
-        {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "walk",
-          "excerpt": "pte_t *walk(pagetable_t pagetable, uint64 va, int alloc)"
-        },
-        {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "mappages",
-          "excerpt": "int mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)"
-        },
-        {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "vmunmap",
-          "excerpt": "void vmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_008",
-      "question_type": "short_answer",
-      "stem": "页表修改路径的并发控制是什么？（锁粒度、是否需要关中断、是否使用每进程地址空间锁等；必须引用锁/临界区证据）",
-      "value": "页表修改路径本身无专用锁，依赖物理页分配时的 kmem.lock 全局锁保护。mappages/walk 在分配新页表页时调用 allocpage() 持有 kmem.lock。无 per-CPU 锁或地址空间锁，无显式关中断保护",
-      "evidence": [
-        {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "walk",
-          "excerpt": "if(!alloc || (pagetable = (pde_t*)allocpage()) == NULL) return NULL; - 调用 allocpage 间接持有 kmem.lock"
-        },
-        {
-          "path": "src/pm.c",
-          "symbol_kind": "function",
-          "symbol_name": "allocpage",
-          "excerpt": "acquire(&kmem.lock); ... release(&kmem.lock);"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_009",
-      "question_type": "single_choice",
-      "stem": "内核与用户地址空间关系更接近哪种？",
-      "value": "B. 共享同一页表（内核映射常驻，高半核等）",
-      "evidence": [
-        {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "kvmcreate",
-          "excerpt": "pagetable_t kvmcreate() { ... memmove(pagetable, kernel_pagetable, PGSIZE); ... } - 用户页表复制内核页表"
-        },
-        {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "kvminit",
-          "excerpt": "内核页表映射 KERNBASE 到 PHYSTOP，用户进程共享这些映射"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_010",
-      "question_type": "tri_state_impl",
-      "stem": "是否存在缺页异常 (Page Fault) 处理逻辑并与内存分配/映射联动？（必须三态）",
-      "value": "not_found",
-      "evidence": [
-        {
-          "path": "src/trap.c",
-          "symbol_kind": "macro",
-          "symbol_name": "EXCP_LOAD_PAGE",
-          "excerpt": "#define EXCP_LOAD_PAGE 0xd // 13 - 定义但未在 usertrap 中处理"
-        },
-        {
-          "path": "src/trap.c",
-          "symbol_kind": "function",
-          "symbol_name": "usertrap",
-          "excerpt": "usertrap 中仅处理 EXCP_ENV_CALL 和 devintr，EXCP_LOAD_PAGE/EXCP_STORE_PAGE 分支被注释掉"
-        },
-        {
-          "path": "src/include/vm.h",
-          "symbol_kind": "function",
-          "symbol_name": "handle_page_fault",
-          "excerpt": "int handle_page_fault(int kind, uint stval); - 仅声明，未发现实现"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_011",
-      "question_type": "short_answer",
-      "stem": "追踪一条缺页链路：trap/异常入口 → 缺页处理函数（handle_page_fault 或等价）→ 分配页帧 → 建立映射。用 3-5 个关键节点描述并给每节点证据。",
-      "value": "缺页链路未实现。trap.c:usertrap 中 EXCP_LOAD_PAGE/EXCP_STORE_PAGE 处理分支被注释掉，handle_page_fault 仅在 vm.h 中声明但无实现。候选链路（未闭合）：usertrap [trap.c:94] → handle_excp [trap.c:未实现] → handle_page_fault [vm.h:42 仅声明] → allocpage [pm.c:79]",
-      "evidence": [
-        {
-          "path": "src/trap.c",
-          "symbol_kind": "function",
-          "symbol_name": "usertrap",
-          "excerpt": "/* else if(handle_excp(cause) == 0) { } */ - 缺页处理被注释"
-        },
-        {
-          "path": "src/include/vm.h",
-          "symbol_kind": "function",
-          "symbol_name": "handle_page_fault",
-          "excerpt": "int handle_page_fault(int kind, uint stval); - 仅声明"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_012",
-      "question_type": "tri_state_impl",
-      "stem": "是否实现写时复制 (Copy-on-Write, CoW)？（必须三态；若 implemented 需说明触发点在 fault 中还是 fork 中）",
-      "value": "not_found",
-      "evidence": [
-        {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "uvmcopy",
-          "excerpt": "uvmcopy 实现深拷贝或浅拷贝，但未发现 PTE 写保护位设置或 CoW 标志"
-        },
-        {
-          "path": "src/trap.c",
-          "symbol_kind": "function",
-          "symbol_name": "usertrap",
-          "excerpt": "缺页处理未实现，无法触发 CoW"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_013",
-      "question_type": "tri_state_impl",
-      "stem": "是否实现惰性分配 (Lazy Allocation)？（必须三态；若 implemented 需说明是在 brk/mmap 还是 fault 中分配）",
-      "value": "stub",
-      "evidence": [
-        {
-          "path": "src/vma.c",
-          "symbol_kind": "function",
-          "symbol_name": "alloc_vma",
-          "excerpt": "alloc_vma 中 alloc==1 时立即调用 uvmalloc 分配物理页，非惰性"
-        },
-        {
-          "path": "src/vma.c",
-          "symbol_kind": "function",
-          "symbol_name": "alloc_mmap_vma",
-          "excerpt": "alloc_mmap_vma 调用 alloc_vma(p, MMAP, addr, sz, perm, 1, NULL) - 立即分配"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_014",
-      "question_type": "tri_state_impl",
-      "stem": "是否实现 swap（swap_in/swap_out 或等价页面置换）？（必须三态）",
-      "value": "not_found",
-      "evidence": [
-        {
-          "path": "src/include/sysinfo.h",
-          "symbol_kind": "struct",
-          "symbol_name": "sysinfo",
-          "excerpt": "unsigned long totalswap; unsigned long freeswap; - 仅结构体定义，无实现"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_015",
-      "question_type": "tri_state_impl",
-      "stem": "是否实现 mmap（文件映射/匿名映射）且处理标志位（MAP_FIXED/MAP_ANON/MAP_SHARED 等）？（必须三态；stub 需说明形态如 ENOSYS/return 0）",
-      "value": "implemented",
-      "evidence": [
-        {
-          "path": "src/mmap.c",
-          "symbol_kind": "function",
-          "symbol_name": "do_mmap",
-          "excerpt": "处理 MAP_ANONYMOUS、MAP_FIXED、MAP_SHARED、MAP_PRIVATE 标志位"
-        },
-        {
-          "path": "src/mmap.c",
-          "symbol_kind": "function",
-          "symbol_name": "do_munmap",
-          "excerpt": "实现 munmap 并处理脏页回写（PTE_D 位检查）"
-        },
-        {
-          "path": "src/sysfile.c",
-          "symbol_kind": "function",
-          "symbol_name": "sys_mmap",
-          "excerpt": "系统调用入口 sys_mmap 调用 do_mmap"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_016",
-      "question_type": "tri_state_impl",
-      "stem": "是否存在 Page Cache（页缓存/文件页缓存）管理？（必须三态）",
-      "value": "not_found",
-      "evidence": [
-        {
-          "path": "src/bio.c",
-          "symbol_kind": "file",
-          "symbol_name": "bio.c",
-          "excerpt": "块 I/O 缓冲，但非页缓存机制"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_017",
-      "question_type": "tri_state_impl",
-      "stem": "是否存在脏页回写 (dirty page writeback) 机制？（必须三态；若 implemented 需指出同步/异步与触发条件）",
-      "value": "implemented",
-      "evidence": [
-        {
-          "path": "src/mmap.c",
-          "symbol_kind": "function",
-          "symbol_name": "do_munmap",
-          "excerpt": "if(*pte & PTE_D){ pa = PTE2PA(*pte); filewrite(f, va, size); } - munmap 时同步回写脏页"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_018",
-      "question_type": "tri_state_impl",
-      "stem": "是否存在 TLB 射击 (TLB Shootdown / Remote TLB Flush) 机制以支持多核页表一致性？（必须三态；若 implemented 需指向 IPI/跨核调用证据）",
-      "value": "not_found",
-      "evidence": [
-        {
-          "path": "src/include/sbi.h",
-          "symbol_kind": "macro",
-          "symbol_name": "SBI_REMOTE_SFENCE_VMA",
-          "excerpt": "#define SBI_REMOTE_SFENCE_VMA 6 - 仅定义，未发现调用"
-        },
-        {
-          "path": "src/include/sbi.h",
-          "symbol_kind": "macro",
-          "symbol_name": "SBI_REMOTE_SFENCE_VMA_ASID",
-          "excerpt": "#define SBI_REMOTE_SFENCE_VMA_ASID 7 - 仅定义，未发现调用"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_019",
-      "question_type": "short_answer",
-      "stem": "TLB 刷新指令/函数点是什么？（RISC-V sfence.vma / AArch64 tlbi / x86 invlpg 等，或仓库中等价的 TLB 刷新封装；必须给证据）",
-      "value": "RISC-V sfence.vma 指令。封装函数：sfence_vma() 定义在 riscv.h:329，使用 asm volatile(\"sfence.vma\") 实现。调用点：vm.c:57 kvminithart 中调用 sfence_vma()",
-      "evidence": [
-        {
-          "path": "src/include/riscv.h",
-          "symbol_kind": "function",
-          "symbol_name": "sfence_vma",
-          "excerpt": "static inline void sfence_vma() { asm volatile(\"sfence.vma\"); }"
-        },
-        {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "kvminithart",
-          "excerpt": "w_satp(MAKE_SATP(kernel_pagetable)); sfence_vma();"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_020",
-      "question_type": "short_answer",
-      "stem": "用户指针安全检查机制是什么？（access_ok/verify_area/UserInPtr 等；列出入口点与校验逻辑证据）",
-      "value": "walkaddr() 函数进行用户指针检查。检查逻辑：1) va >= MAXVA 返回 NULL；2) walk(pagetable, va, 0) 检查 PTE 存在；3) (*pte & PTE_V) == 0 检查有效位；4) (*pte & PTE_U) == 0 检查用户可访问位。copyin/copyout 调用 walkaddr 进行校验",
-      "evidence": [
-        {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "walkaddr",
-          "excerpt": "if(va >= MAXVA) return NULL; pte = walk(...); if((*pte & PTE_V) == 0) return NULL; if((*pte & PTE_U) == 0) return NULL;"
-        },
-        {
-          "path": "src/copy.c",
-          "symbol_kind": "function",
-          "symbol_name": "copyin",
-          "excerpt": "pa0 = walkaddr(pagetable, va0); if(pa0 == NULL) return -1;"
-        },
-        {
-          "path": "src/copy.c",
-          "symbol_kind": "function",
-          "symbol_name": "copyout",
-          "excerpt": "pa0 = walkaddr(pagetable, va0); if(pa0 == NULL) return -1;"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_021",
-      "question_type": "single_choice",
-      "stem": "若实现了页面置换 (Page Replacement)，使用的算法最接近哪种？（Stallings Ch8：OPT 理想算法 / LRU 最近最少使用 / Clock 近似 LRU / FIFO / 未实现）",
-      "value": "F. 未实现页面置换（无 swap）",
-      "evidence": [
-        {
-          "path": "src",
-          "symbol_kind": "file",
-          "symbol_name": "全局搜索",
-          "excerpt": "未发现 swap_in/swap_out 或页面置换算法实现"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_022",
-      "question_type": "tri_state_impl",
-      "stem": "是否存在工作集模型 (Working Set Model, WSM) 或抖动检测/防止 (Thrashing Prevention) 机制？（必须三态；Stallings Ch8 核心概念；若 not_found 需列出已搜关键字 working_set|thrash|resident_set）",
-      "value": "not_found",
-      "evidence": [
-        {
-          "path": "src",
-          "symbol_kind": "file",
-          "symbol_name": "全局搜索",
-          "excerpt": "搜索关键字：working_set|thrash|resident_set|kswapd|oom - 未找到匹配"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_023",
-      "question_type": "fill_in",
-      "stem": "物理内存总量（Physical Memory Size）：____ KB/MB；页大小（Page Size）：____ bytes；最大进程虚拟地址空间（Virtual Address Space）：____ bits。（必须从代码常量/链接脚本/配置中给出证据；无法确定则写 unknown 并说明已搜路径）",
-      "value": "物理内存总量：128 MB；页大小：4096 bytes；最大进程虚拟地址空间：39 bits（Sv39）",
-      "evidence": [
-        {
-          "path": "src/include/memlayout.h",
-          "symbol_kind": "macro",
-          "symbol_name": "PHYSTOP",
-          "excerpt": "#define PHYSTOP (0x80000000ULL + (unsigned long long)(1ULL * 128 * 1024 * 1024)) // 128MB"
-        },
-        {
-          "path": "src/include/riscv.h",
-          "symbol_kind": "macro",
-          "symbol_name": "PGSIZE",
-          "excerpt": "#define PGSIZE 4096 // bytes per page"
-        },
-        {
-          "path": "src/include/riscv.h",
-          "symbol_kind": "macro",
-          "symbol_name": "MAXVA",
-          "excerpt": "#define MAXVA (1L << (9 + 9 + 9 + 12 - 1)) // 256 GB, Sv39 39-bit virtual address"
-        },
-        {
-          "path": "src/include/riscv.h",
-          "symbol_kind": "macro",
-          "symbol_name": "SATP_SV39",
-          "excerpt": "#define SATP_SV39 (8L << 60) // use riscv's sv39 page table scheme"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_024",
-      "question_type": "single_choice",
-      "stem": "内存保护机制 (Memory Protection) 的实现形式更接近哪种？（Stallings Ch7.1）",
-      "value": "C. 硬件页表 + 软件指针检查双重保护",
-      "evidence": [
-        {
-          "path": "src/include/riscv.h",
-          "symbol_kind": "macro",
-          "symbol_name": "PTE_U",
-          "excerpt": "#define PTE_U (1L << 4) // 1 -> user can access - 硬件页表权限位"
-        },
-        {
-          "path": "src/copy.c",
-          "symbol_kind": "function",
-          "symbol_name": "copyin",
-          "excerpt": "walkaddr 检查 PTE_U 位，软件校验用户指针"
-        },
-        {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "walkaddr",
-          "excerpt": "if((*pte & PTE_U) == 0) return NULL; - 软件检查用户可访问性"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_025",
-      "question_type": "short_answer",
-      "stem": "逻辑内存组织 (Logical Memory Organization, Stallings Ch7.1)：进程地址空间中 text/data/heap/stack/mmap 各区域（或等价区间）是否由统一的映射管理结构（VMA/区间表/链表/BTreeMap 等）维护？（如存在请给结构体证据；不存在则写未发现等价结构）",
-      "value": "是，使用 VMA（Virtual Memory Area）双向链表统一管理。结构体 struct vma 定义在 vma.h:15，包含 type（LOAD/HEAP/STACK/MMAP/TRAP 等）、addr、sz、end、perm、fd、f_off 字段。进程 struct proc 包含 vma 头指针",
-      "evidence": [
-        {
-          "path": "src/include/vma.h",
-          "symbol_kind": "struct",
-          "symbol_name": "vma",
-          "excerpt": "struct vma { enum segtype type; int perm; uint64 addr; uint64 sz; uint64 end; int flags; int fd; uint64 f_off; struct vma *prev; struct vma *next; };"
-        },
-        {
-          "path": "src/include/proc.h",
-          "symbol_kind": "struct",
-          "symbol_name": "proc",
-          "excerpt": "struct proc { ... struct vma *vma; ... };"
-        },
-        {
-          "path": "src/vma.c",
-          "symbol_kind": "function",
-          "symbol_name": "vma_list_init",
-          "excerpt": "初始化 LOAD/HEAP/STACK/MMAP/TRAP 各区域 VMA"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_026",
-      "question_type": "single_choice",
-      "stem": "是否存在显式的硬件分段机制 (Hardware Segmentation, Stallings Ch7.4)？",
-      "value": "C. 纯分页无分段（RISC-V/AArch64 常见）",
-      "evidence": [
-        {
-          "path": "src/include/riscv.h",
-          "symbol_kind": "macro",
-          "symbol_name": "SATP_SV39",
-          "excerpt": "RISC-V Sv39 纯分页机制，无硬件分段"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_027",
-      "question_type": "single_choice",
-      "stem": "取页策略 (Fetch Policy, Stallings Ch8.2) 更接近哪种？",
-      "value": "D. 预分配 (Pre-allocation)：进程创建时立即分配全部物理页",
-      "evidence": [
-        {
-          "path": "src/vma.c",
-          "symbol_kind": "function",
-          "symbol_name": "alloc_vma",
-          "excerpt": "alloc==1 时立即调用 uvmalloc 分配物理页并建立映射"
-        },
-        {
-          "path": "src/vma.c",
-          "symbol_kind": "function",
-          "symbol_name": "alloc_mmap_vma",
-          "excerpt": "调用 alloc_vma(p, MMAP, addr, sz, perm, 1, NULL) - 立即分配"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_028",
-      "question_type": "short_answer",
-      "stem": "放置策略 (Placement Policy, Stallings Ch8.2)：新的匿名映射或堆区域增长时，系统如何选择虚拟地址区间？（固定起始地址 / mmap_base 向下生长 / 首次适配 / 最佳适配 等；必须给实现证据或写未发现等价策略）",
-      "value": "VMA 双向链表首次适配（first-fit）。alloc_vma 遍历链表查找空闲区间：while(nvma != vma_head) { if(end <= nvma->addr) break; ... }。MMAP 区域从 USER_MMAP_START 向下生长（alloc_mmap_vma 中 addr = PGROUNDDOWN(mvma->addr - sz)）",
-      "evidence": [
-        {
-          "path": "src/vma.c",
-          "symbol_kind": "function",
-          "symbol_name": "alloc_vma",
-          "excerpt": "遍历 VMA 链表查找空闲区间：while(nvma != vma_head) { if(end <= nvma->addr) break; }"
-        },
-        {
-          "path": "src/vma.c",
-          "symbol_kind": "function",
-          "symbol_name": "alloc_mmap_vma",
-          "excerpt": "addr = PGROUNDDOWN(mvma->addr - sz); - MMAP 向下生长"
-        },
-        {
-          "path": "src/include/memlayout.h",
-          "symbol_kind": "macro",
-          "symbol_name": "USER_MMAP_START",
-          "excerpt": "#define USER_MMAP_START (USER_STACK_BOTTOM - 0x10000000)"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_029",
-      "question_type": "tri_state_impl",
-      "stem": "是否存在驻留集管理/内存负载控制 (Resident Set Management / Load Control, Stallings Ch8.2)？（包括工作集动态调整、内存回收守护线程、OOM killer、驻留页数限制等；若 not_found 需列出已搜关键字）",
-      "value": "not_found",
-      "evidence": [
-        {
-          "path": "src",
-          "symbol_kind": "file",
-          "symbol_name": "全局搜索",
-          "excerpt": "搜索关键字：working_set|thrash|resident_set|kswapd|oom|load_control - 未找到匹配"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_030",
-      "question_type": "short_answer",
-      "stem": "内存主链路（必须给出，尽量以 Mermaid graph TD 表达）：从确认的最强内存入口（缺页处理入口/mmap 入口/brk 入口/等价入口）出发，追踪到页表操作核心点或物理页分配核心点，写出 3-6 个关键节点。节点格式：FuncName [path:line]。若链路未被源码证据完全闭合，标注候选主链路而非确认的主链路。只画一条主链，不要并列展开多条支线。",
-      "value": "graph TD\n    sys_mmap[sys_mmap [src/sysfile.c:894]] --> do_mmap[do_mmap [src/mmap.c:30]]\n    do_mmap --> alloc_mmap_vma[alloc_mmap_vma [src/vma.c:195]]\n    alloc_mmap_vma --> alloc_vma[alloc_vma [src/vma.c:64]]\n    alloc_vma --> uvmalloc[uvmalloc [src/vm.c:224]]\n    uvmalloc --> mappages[mappages [src/vm.c:85]]\n    mappages --> walk[walk [src/vm.c:140]]\n    walk --> allocpage[allocpage [src/pm.c:79]]",
-      "evidence": [
-        {
-          "path": "src/sysfile.c",
-          "symbol_kind": "function",
-          "symbol_name": "sys_mmap",
-          "excerpt": "系统调用入口"
-        },
-        {
-          "path": "src/mmap.c",
-          "symbol_kind": "function",
-          "symbol_name": "do_mmap",
-          "excerpt": "mmap 核心实现"
-        },
-        {
-          "path": "src/vma.c",
-          "symbol_kind": "function",
-          "symbol_name": "alloc_mmap_vma",
-          "excerpt": "分配 MMAP VMA"
-        },
-        {
-          "path": "src/vma.c",
-          "symbol_kind": "function",
-          "symbol_name": "alloc_vma",
-          "excerpt": "通用 VMA 分配"
-        },
-        {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "uvmalloc",
-          "excerpt": "用户内存分配"
-        },
-        {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "mappages",
-          "excerpt": "页表映射"
-        },
-        {
-          "path": "src/pm.c",
-          "symbol_kind": "function",
-          "symbol_name": "allocpage",
-          "excerpt": "物理页分配"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_031",
-      "question_type": "single_choice",
-      "stem": "该系统更容易出现哪种内存碎片 (Memory Fragmentation, Stallings Ch7.2)？",
-      "value": "B. 外部碎片 (External Fragmentation)：空闲块分散无法满足大连续请求",
-      "evidence": [
-        {
-          "path": "src/pm.c",
-          "symbol_kind": "function",
-          "symbol_name": "allocpage",
-          "excerpt": "简单空闲链表分配器，无碎片整理机制"
-        },
-        {
-          "path": "src/pm.c",
-          "symbol_kind": "function",
-          "symbol_name": "freepage",
-          "excerpt": "释放页插入链表头部，可能导致碎片化"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_032",
-      "question_type": "single_choice",
-      "stem": "地址重定位 (Address Relocation, Stallings Ch7.1) 的绑定时机更接近哪种？",
-      "value": "C. 运行时动态绑定 (Run-time / Dynamic Relocation)：通过 MMU 基址 + 界限或页表在每次访问时转换",
-      "evidence": [
-        {
-          "path": "src/include/riscv.h",
-          "symbol_kind": "macro",
-          "symbol_name": "SATP_SV39",
-          "excerpt": "RISC-V Sv39 页表机制，运行时通过 satp 寄存器切换页表"
-        },
-        {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "kvminithart",
-          "excerpt": "w_satp(MAKE_SATP(kernel_pagetable)); sfence_vma(); - 运行时切换页表"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_033",
-      "question_type": "single_choice",
-      "stem": "页面置换的作用域策略 (Replacement Scope, Stallings Ch8.2) 更接近哪种？",
-      "value": "C. 未实现置换（无 swap）",
-      "evidence": [
-        {
-          "path": "src",
-          "symbol_kind": "file",
-          "symbol_name": "全局搜索",
-          "excerpt": "未发现 swap 或页面置换实现"
-        }
-      ]
-    },
-    {
-      "question_id": "Q03_034",
-      "question_type": "tri_state_impl",
-      "stem": "是否存在清理策略 (Cleaning Policy, Stallings Ch8.2)？（即脏页预先后台写回，而非仅在置换时才写回；搜索 background writeback / kswapd / cleaner_thread 或等价；必须三态；若 not_found 需列出已搜关键字）",
-      "value": "not_found",
-      "evidence": [
-        {
-          "path": "src",
-          "symbol_kind": "file",
-          "symbol_name": "全局搜索",
-          "excerpt": "搜索关键字：background_writeback|writeback|cleaner|flush_dirty|kswapd - 仅找到 VIRTIO_BLK_F_CONFIG_WCE 定义，无后台写回实现"
-        },
-        {
-          "path": "src/mmap.c",
-          "symbol_kind": "function",
-          "symbol_name": "do_munmap",
-          "excerpt": "仅在 munmap 时同步回写脏页，无后台清理线程"
-        }
-      ]
+      "evidence": "已搜关键字：background_writeback, kswapd, cleaner_thread, cleaning_policy, dirty_writeback, writeback, pdflush, bdflush, background_write。pm.c 中仅有物理页分配/释放，无脏页回写逻辑。ramdisk.c 中有同步磁盘写入 ramdisk_rw()，但非后台脏页回写机制。"
     }
   ]
 }

@@ -1,0 +1,41 @@
+{
+  "task_id": "task_03_logical_org",
+  "stage_id": "03_mem_mgmt",
+  "question_id": "Q03_025",
+  "question_ids": [
+    "Q03_025"
+  ],
+  "status": "done",
+  "evidence_ids": [
+    "ev_task_03_logical_org_1fbe65ef",
+    "ev_task_03_logical_org_925e880b",
+    "ev_task_03_logical_org_40489ddd",
+    "ev_task_03_logical_org_eb8210e0",
+    "ev_task_03_logical_org_532bf4b9",
+    "ev_task_03_logical_org_47acd259",
+    "ev_task_03_logical_org_560731ca",
+    "ev_task_03_logical_org_d30f9810",
+    "ev_task_03_logical_org_902f9bbb",
+    "ev_task_03_logical_org_ef14381f",
+    "ev_task_03_logical_org_9080e861",
+    "ev_task_03_logical_org_9fa2e121",
+    "ev_task_03_logical_org_afc848cf",
+    "ev_task_03_logical_org_62d83f5d",
+    "ev_task_03_logical_org_afdbbd09",
+    "ev_task_03_logical_org_ba7b1b2f",
+    "ev_task_03_logical_org_17f97e11"
+  ],
+  "draft_answer_ids": [
+    "draft_task_03_logical_org_Q03_025_7a4bdd2e"
+  ],
+  "findings": [],
+  "confidence": "high",
+  "errors": [],
+  "token_usage": {},
+  "metadata": {
+    "evidence_count": 17,
+    "mode": "react",
+    "summary": "查证 xv6-k210 进程地址空间逻辑组织。发现 struct seg（VMA 等价体）定义在 include/mm/usrmm.h，为链表结构，支持 LOAD/TEXT/DATA/BSS/HEAP/MMAP/STACK 类型。物理页分配器为 freelist 双池（single+multiple）。页表 walk/map/unmap 真实修改 PTE。Sv39 分页由 SATP 寄存器启用，MMU 运行时完成地址转换。PTE 含 R/W/X/U 保护位，SSTATUS_PUM/SUM 控制用户内存访问。",
+    "raw_output_excerpt": "Now I have all the information needed. Let me compile the comprehensive answer.\n\nHere's my analysis:\n\n**Key findings:**\n\n1. **VMA-like structure (`struct seg`)**: Found in `include/mm/usrmm.h` - this is the address space logical organization. It's a linked list of segments with types: LOAD, TEXT, DATA, BSS, HEAP, MMAP, STACK. Each segment has addr, sz, type, flag, mmap pointer, f_off, f_sz.\n\n2. **Memory constants**: Defined in `include/memlayout.h` - KERNBASE=0x80020000, PHYSTOP=0x80600000, PGSIZE=4096, MAXVA, MAXUVA=RUSTSBI_BASE=0x80000000, VUMMAP=0x70000000, VUSTACK=VUMMAP, TRAMPOLINE, TRAPFRAME, etc.\n\n3. **Physical page allocator**: In `kernel/mm/pm.c` - uses a freelist-based allocator with two pools: \"multiple\" (for multi-page allocations) and \"single\" (for single pages). Not bitmap/buddy/slab - it's a simple freelist with merge.\n\n4. **Page table walk/map/unmap**: In `kernel/mm/vm.c` - `walk()` implements Sv39 3-level page table walk, `mappages()` creates PTEs, `unmappages()` removes PTEs. Both modify actual PTE entries.\n\n5. **Protection/relocation**: Sv39 paging via SATP register. PTE flags include R/W/X/U/V. SSTATUS_PUM/SUM for user memory access control. Address translation is done by MMU at runtime (Sv39 paging enabled via satp).\n\n6. **Page fault handler**: In `kernel/mm/vm.c` - handles COW, lazy allocation, ELF loading, and mmap faults. Uses `struct seg` to determine fault type.\n\n7. **exec() sets up segments**: In `kernel/exec.c` - creates LOAD segments from ELF phdrs, then HEAP and STACK segments.\n\nLet me now produce the final JSON.\n\n```json\n{\n  \"status\": \"done\",\n  \"summary\": \"查证 xv6-k210 进程地址空间逻辑组织。发现 struct seg（VMA 等价体）定义在 include/mm/usrmm.h，为链表结构，支持 LOAD/TEXT/DATA/BSS/HEAP/MMAP/STACK 类型。物理页分配器为 freelist 双池（single+multiple）。页表 walk/map/unmap 真实修改 PTE。Sv39 分页由 SATP 寄存器启用，MMU 运行时完成地址转换。PTE 含 R/W/X/U 保护位，SSTATUS_PUM/SUM 控制用户内存访问。\",\n  \"claim\": \"xv6-k210 实现了基于 struct seg 链表的进程地址空间逻辑组织（VMA 等价体），支持 LOAD/HEAP/STACK/MMAP 等段类型，结合 Sv39 页表、freelist 物理页分配器、COW 和 lazy"
+  }
+}

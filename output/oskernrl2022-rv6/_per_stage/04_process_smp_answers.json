@@ -1,0 +1,908 @@
+{
+  "schema_version": "v1",
+  "stage_id": "04_process_smp",
+  "stage_title": "进程/线程/调度与多核",
+  "terminology_profile": "stallings_en_zh",
+  "answers": [
+    {
+      "question_id": "Q04_001",
+      "question_type": "short_answer",
+      "stem": "执行实体 (Execution Entity) 抽象是什么？\n请按以下格式作答（每项必须有代码证据）：\n- 顶层类型名: ___（如 Process / Task / Thread / TaskControlBlock）\n- 结构体路径: ___\n- 关键字段（至少列 3 个）: Context=___, State=___, PID=___, TrapFrame=___\n- 是否区分 PCB 与 TCB: ___（是 / 否 / 待核实）",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "definition",
+          "symbol_name": "lsp_get_definition",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_002",
+      "question_type": "short_answer",
+      "stem": "任务/进程的生命周期状态机有哪些状态与流转点？（Ready/Running/Blocked/Exited 等；需状态枚举/字段证据）",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "definition",
+          "symbol_name": "lsp_get_definition",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "definition",
+          "symbol_name": "lsp_get_definition",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/proc.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_002: 任务/进程的生命周期状态机有哪些状态与流转点？（Ready/Running/Blocked/Exited 等；需状态枚举/字段证据）\n关键词: Ready, Running, Blocked, Exited' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5130 | 文件: repos\\oskernrl2022-rv6\\src\\proc.c:119-152 | 类型: function_definition | 符号名: scheduler\n```\nvoid scheduler(){\n  \n  struct cpu *c = mycpu();\n  c->proc = 0;\n  while(1){\n    struct proc* p = readyq_pop();  //...\n    // printf(\"[scheduler]hart %d enter:%p\\n\",c-cpus,p);\n    if(p){\n      acquire(&p->lock);\n      if(p->state == RUNN"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_003",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在上下文切换 (Context Switch) 实现（switch.S/__switch/swtch/context_switch）？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "实现（switch.S",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_003: 是否存在上下文切换 (Context Switch) 实现（switch.S/__switch/swtch/context_switch）？（必须三态）\n关键词: Context, Switch, __switch, swtch, context_switch, 上下文切换' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4247 | 文件: repos\\oskernrl2022-rv6\\src\\proc.c:520-538 | 类型: function_definition | 符号名: sched\n```\nvoid\nsched(void)\n{\n  int intena;\n  struct proc *p = myproc();\n\n  if(!holding(&p->lock))\n    panic(\"sched p->lock\");\n  if(mycpu()->noff != 1)\n    panic(\"sched locks\");\n  if(p->state == RUNNING)\n    panic(\"s"
+        },
+        {
+          "path": "实现（switch.S",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_003: 是否存在上下文切换 (Context Switch) 实现（switch.S/__switch/swtch/context_switch）？（必须三态）\n关键词: Context, Switch, __switch, swtch, context_switch, 上下文切换' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4247 | 文件: repos\\oskernrl2022-rv6\\src\\proc.c:520-538 | 类型: function_definition | 符号名: sched\n```\nvoid\nsched(void)\n{\n  int intena;\n  struct proc *p = myproc();\n\n  if(!holding(&p->lock))\n    panic(\"sched p->lock\");\n  if(mycpu()->noff != 1)\n    panic(\"sched locks\");\n  if(p->state == RUNNING)\n    panic(\"s"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_004",
+      "question_type": "short_answer",
+      "stem": "上下文切换保存/恢复了哪些寄存器集合？（例如 RISC-V s0-s11；必须引用汇编/结构体证据）",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "definition",
+          "symbol_name": "lsp_get_definition",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "definition",
+          "symbol_name": "lsp_get_definition",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/proc.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_004: 上下文切换保存/恢复了哪些寄存器集合？（例如 RISC-V s0-s11；必须引用汇编/结构体证据）\n关键词: RISC, s11, 上下文切换' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4845 | 文件: repos\\oskernrl2022-rv6\\src\\proc.c:119-152 | 类型: function_definition | 符号名: scheduler\n```\nvoid scheduler(){\n  \n  struct cpu *c = mycpu();\n  c->proc = 0;\n  while(1){\n    struct proc* p = readyq_pop();  //...\n    // printf(\"[scheduler]hart %d enter:%p\\n\",c-cpus,p);\n    if(p){\n      acquire(&p->lock);\n      if(p->state == RUNNABLE) {\n        // Switch to ch"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_005",
+      "question_type": "short_answer",
+      "stem": "调度算法 (Scheduling Algorithm) 属于哪类？\n请按格式作答：\n- 算法名称: ___（必须是以下之一：FCFS / Round-Robin (RR) / Stride/Proportional-Share / MLFQ / CFS / Priority / 其他）\n- 代码证据（关键字段/函数）: ___\n  - RR: timeslice/slice 字段位置=___\n  - Stride: stride 字段与比较逻辑位置=___\n  - MLFQ: 多级队列 VecDeque/数组层级证据=___\n  - Priority: priority 字段参与 pick_next 排序证据=___",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "definition",
+          "symbol_name": "lsp_get_definition",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "definition",
+          "symbol_name": "lsp_get_definition",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/proc.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_005: 调度算法 (Scheduling Algorithm) 属于哪类？\n请按格式作答：\n- 算法名称: ___（必须是以下之一：FCFS / Round-Robin (RR) / Stride/Proportional-Share / MLFQ / CFS / Priority / 其他）\n- 代码证据（关键字段/函数）: ___\n  - RR: timeslice/slice 字段位置=___\n  - Stride: stride 字段与比较逻辑位置=___\n  - MLFQ: 多级队列 VecDeque/数组层级证据=___\n  - Priority: priority 字段参与 pick_next 排序证据=___\n关键词: Scheduling, Algorithm, ___, FCFS, Round, Robin, Stride, Proportional' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5601 | 文件: repos\\oskernrl2022-rv6\\src\\proc.c:119-152"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_006",
+      "question_type": "short_answer",
+      "stem": "调度器 (Scheduler)核心入口/关键函数有哪些？（schedule/pick_next 等；给 1-3 个入口与证据）",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/proc.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_006: 调度器 (Scheduler)核心入口/关键函数有哪些？（schedule/pick_next 等；给 1-3 个入口与证据）\n关键词: Scheduler, schedule, pick_next, 调度' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6738 | 文件: repos\\oskernrl2022-rv6\\src\\proc.c:119-152 | 类型: function_definition | 符号名: scheduler\n```\nvoid scheduler(){\n  \n  struct cpu *c = mycpu();\n  c->proc = 0;\n  while(1){\n    struct proc* p = readyq_pop();  //...\n    // printf(\"[scheduler]hart %d enter:%p\\n\",c-cpus,p);\n    if(p){\n      acquire(&p->lock);\n      if(p->state == RUNN"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_007",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 fork/clone（创建新执行实体）？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/usrinit/user.h",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_007: 是否实现 fork/clone（创建新执行实体）？（必须三态）\n关键词: fork, clone' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6317 | 文件: repos\\oskernrl2022-rv6\\usrinit\\user.h:52-54 | 类型: function_definition | 符号名: fork\n```\nstatic inline int fork(){\n  return clone(0, 0, 0, 0, 0);\n}\n```\n\n[2] 相似度: 0.6294 | 文件: repos\\oskernrl2022-rv6\\src\\proc.c:408-490 | 类型: function_definition | 符号名: clone\n```\nint clone(uint64 flag, uint64 stack, uint64 ptid, uint64 tls, uint64 ctid) {\n  int i, pid;\n  struct proc *np;\n  struct pro"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/usrinit/user.h",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_007: 是否实现 fork/clone（创建新执行实体）？（必须三态）\n关键词: fork, clone' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6317 | 文件: repos\\oskernrl2022-rv6\\usrinit\\user.h:52-54 | 类型: function_definition | 符号名: fork\n```\nstatic inline int fork(){\n  return clone(0, 0, 0, 0, 0);\n}\n```\n\n[2] 相似度: 0.6294 | 文件: repos\\oskernrl2022-rv6\\src\\proc.c:408-490 | 类型: function_definition | 符号名: clone\n```\nint clone(uint64 flag, uint64 stack, uint64 ptid, uint64 tls, uint64 ctid) {\n  int i, pid;\n  struct proc *np;\n  struct pro"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_008",
+      "question_type": "short_answer",
+      "stem": "fork/clone 是否复制地址空间与文件表？（必须给复制路径证据；若 stub 需说明形态）",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/proc.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_008: fork/clone 是否复制地址空间与文件表？（必须给复制路径证据；若 stub 需说明形态）\n关键词: fork, clone, stub' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6437 | 文件: repos\\oskernrl2022-rv6\\src\\proc.c:408-490 | 类型: function_definition | 符号名: clone\n```\nint clone(uint64 flag, uint64 stack, uint64 ptid, uint64 tls, uint64 ctid) {\n  int i, pid;\n  struct proc *np;\n  struct proc *p = myproc();\n  \n  if((flag & CLONE_THREAD) && (flag & CLONE_VM))\n  {\n    // Allocate process.\n    if((np = allocproc(p, 1)) == NULL){\n      retur"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_009",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 exec（装载 ELF/重建地址空间）？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/exec.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_009: 是否实现 exec（装载 ELF/重建地址空间）？（必须三态）\n关键词: exec, ELF' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6356 | 文件: repos\\oskernrl2022-rv6\\src\\exec.c:185-378 | 类型: function_definition | 符号名: exec\n```\nint\nexec(char *path, char **argv, char **env)\n{\n  int shflag = 0;\n  uint64 sp,stackbase,entry;\n  uint64 argc,envnum;\n  uint64 aux[AUX_CNT*2+3] = {0,0,0};\n  uint64 environ[10]={0};\n  uint64 ustack[MAXARG+2];\n  char *last,*s;\n  struct proc* p = myproc();\n  struct proc* np = kmalloc(sizeof(struct pr"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/exec.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_009: 是否实现 exec（装载 ELF/重建地址空间）？（必须三态）\n关键词: exec, ELF' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6356 | 文件: repos\\oskernrl2022-rv6\\src\\exec.c:185-378 | 类型: function_definition | 符号名: exec\n```\nint\nexec(char *path, char **argv, char **env)\n{\n  int shflag = 0;\n  uint64 sp,stackbase,entry;\n  uint64 argc,envnum;\n  uint64 aux[AUX_CNT*2+3] = {0,0,0};\n  uint64 environ[10]={0};\n  uint64 ustack[MAXARG+2];\n  char *last,*s;\n  struct proc* p = myproc();\n  struct proc* np = kmalloc(sizeof(struct pr"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_010",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 wait/waitpid（父子回收同步）？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/proc.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_010: 是否实现 wait/waitpid（父子回收同步）？（必须三态）\n关键词: wait, waitpid' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6123 | 文件: repos\\oskernrl2022-rv6\\src\\proc.c:675-717 | 类型: function_definition | 符号名: wait4pid\n```\nint\nwait4pid(int pid,uint64 addr)\n{\n  int kidpid;\n  struct proc *p = myproc();\n  struct proc* child;\n  struct proc* chan = NULL;\n  // hold p->lock for the whole time to avoid lost\n  // wakeups from a child's exit().\n  acquire(&p->lock);\n  //__debug_warn(\"[wait4pid]pid%d:%s enter\\n\",p->pi"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/proc.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_010: 是否实现 wait/waitpid（父子回收同步）？（必须三态）\n关键词: wait, waitpid' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6123 | 文件: repos\\oskernrl2022-rv6\\src\\proc.c:675-717 | 类型: function_definition | 符号名: wait4pid\n```\nint\nwait4pid(int pid,uint64 addr)\n{\n  int kidpid;\n  struct proc *p = myproc();\n  struct proc* child;\n  struct proc* chan = NULL;\n  // hold p->lock for the whole time to avoid lost\n  // wakeups from a child's exit().\n  acquire(&p->lock);\n  //__debug_warn(\"[wait4pid]pid%d:%s enter\\n\",p->pi"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_011",
+      "question_type": "single_choice",
+      "stem": "waitpid / wait4 的阻塞实现 (Blocking Implementation) 更接近哪种？",
+      "value": "未发现/不支持",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/proc.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_011: waitpid / wait4 的阻塞实现 (Blocking Implementation) 更接近哪种？\n关键词: waitpid, wait4, Blocking, Implementation, wait' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.7056 | 文件: repos\\oskernrl2022-rv6\\src\\proc.c:675-717 | 类型: function_definition | 符号名: wait4pid\n```\nint\nwait4pid(int pid,uint64 addr)\n{\n  int kidpid;\n  struct proc *p = myproc();\n  struct proc* child;\n  struct proc* chan = NULL;\n  // hold p->lock for the whole time to avoid lost\n  // wakeups from a child's exit().\n  acquire(&p->loc"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/proc.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_011: waitpid / wait4 的阻塞实现 (Blocking Implementation) 更接近哪种？\n关键词: waitpid, wait4, Blocking, Implementation, wait' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.7056 | 文件: repos\\oskernrl2022-rv6\\src\\proc.c:675-717 | 类型: function_definition | 符号名: wait4pid\n```\nint\nwait4pid(int pid,uint64 addr)\n{\n  int kidpid;\n  struct proc *p = myproc();\n  struct proc* child;\n  struct proc* chan = NULL;\n  // hold p->lock for the whole time to avoid lost\n  // wakeups from a child's exit().\n  acquire(&p->loc"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_012",
+      "question_type": "short_answer",
+      "stem": "PID 分配器实现是什么？（自增/bitmap/空闲栈复用/只分配不回收；必须给证据）",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/proc.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_012: PID 分配器实现是什么？（自增/bitmap/空闲栈复用/只分配不回收；必须给证据）\n关键词: PID, bitmap' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5534 | 文件: repos\\oskernrl2022-rv6\\src\\proc.c:154-162 | 类型: function_definition | 符号名: allocpid\n```\nint\nallocpid() {\n  int pid;\n  acquire(&pid_lock);\n  pid = nextpid;\n  nextpid = nextpid + 1;\n  release(&pid_lock);\n  return pid;\n}\n```\n\n[2] 相似度: 0.5242 | 文件: repos\\oskernrl2022-rv6\\src\\proc.c:669-671 | 类型: function_definition | 符号名: zombiecond\n```\nint zombiecond(struct proc* p,in"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/proc.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_012: PID 分配器实现是什么？（自增/bitmap/空闲栈复用/只分配不回收；必须给证据）\n关键词: PID, bitmap' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5534 | 文件: repos\\oskernrl2022-rv6\\src\\proc.c:154-162 | 类型: function_definition | 符号名: allocpid\n```\nint\nallocpid() {\n  int pid;\n  acquire(&pid_lock);\n  pid = nextpid;\n  nextpid = nextpid + 1;\n  release(&pid_lock);\n  return pid;\n}\n```\n\n[2] 相似度: 0.5242 | 文件: repos\\oskernrl2022-rv6\\src\\proc.c:669-671 | 类型: function_definition | 符号名: zombiecond\n```\nint zombiecond(struct proc* p,in"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_013",
+      "question_type": "short_answer",
+      "stem": "父子进程树如何存储？（children Vec/链表/parent+sibling 指针；必须给结构体字段证据）",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "definition",
+          "symbol_name": "lsp_get_definition",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_014",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现信号 (signal) 或 futex？（若二者都无则 not_found；若只实现其一需说明并给证据）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/signal.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_014: 是否实现信号 (signal) 或 futex？（若二者都无则 not_found；若只实现其一需说明并给证据）\n关键词: signal, futex, not_found' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5625 | 文件: repos\\oskernrl2022-rv6\\src\\signal.c:20-20 | 类型: struct_specifier | 符号名: \n```\nstruct proc\n```\n\n[2] 相似度: 0.5410 | 文件: repos\\oskernrl2022-rv6\\src\\include\\signal.h:42-50 | 类型: struct_specifier | 符号名: \n```\nstruct sigaction {\n\tunion {\t\t// let's make it simple, only sa_handler is supported \n\t\t__sighandler_t sa_handler;\n\t\t// void (*sa_sigaction)(i"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/signal.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_014: 是否实现信号 (signal) 或 futex？（若二者都无则 not_found；若只实现其一需说明并给证据）\n关键词: signal, futex, not_found' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5625 | 文件: repos\\oskernrl2022-rv6\\src\\signal.c:20-20 | 类型: struct_specifier | 符号名: \n```\nstruct proc\n```\n\n[2] 相似度: 0.5410 | 文件: repos\\oskernrl2022-rv6\\src\\include\\signal.h:42-50 | 类型: struct_specifier | 符号名: \n```\nstruct sigaction {\n\tunion {\t\t// let's make it simple, only sa_handler is supported \n\t\t__sighandler_t sa_handler;\n\t\t// void (*sa_sigaction)(i"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_015",
+      "question_type": "short_answer",
+      "stem": "与 09 多核的交叉一致性：是否存在每核队列/任务迁移/IPI resched？（需与第 9 章互指证据或写不适用）",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/proc.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_015: 与 09 多核的交叉一致性：是否存在每核队列/任务迁移/IPI resched？（需与第 9 章互指证据或写不适用）\n关键词: IPI, resched' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5408 | 文件: repos\\oskernrl2022-rv6\\src\\proc.c:119-152 | 类型: function_definition | 符号名: scheduler\n```\nvoid scheduler(){\n  \n  struct cpu *c = mycpu();\n  c->proc = 0;\n  while(1){\n    struct proc* p = readyq_pop();  //...\n    // printf(\"[scheduler]hart %d enter:%p\\n\",c-cpus,p);\n    if(p){\n      acquire(&p->lock);\n      if(p->state == RUNNABLE) {\n        // Switch t"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/proc.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_015: 与 09 多核的交叉一致性：是否存在每核队列/任务迁移/IPI resched？（需与第 9 章互指证据或写不适用）\n关键词: IPI, resched' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5408 | 文件: repos\\oskernrl2022-rv6\\src\\proc.c:119-152 | 类型: function_definition | 符号名: scheduler\n```\nvoid scheduler(){\n  \n  struct cpu *c = mycpu();\n  c->proc = 0;\n  while(1){\n    struct proc* p = readyq_pop();  //...\n    // printf(\"[scheduler]hart %d enter:%p\\n\",c-cpus,p);\n    if(p){\n      acquire(&p->lock);\n      if(p->state == RUNNABLE) {\n        // Switch t"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_016",
+      "question_type": "short_answer",
+      "stem": "exit() 资源回收路径：调用链是什么？是否真正回收地址空间/文件表/通知父进程？（必须给调用链证据；桩则说明）",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/proc.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_016: exit() 资源回收路径：调用链是什么？是否真正回收地址空间/文件表/通知父进程？（必须给调用链证据；桩则说明）\n关键词: exit' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6293 | 文件: repos\\oskernrl2022-rv6\\src\\proc.c:719-752 | 类型: function_definition | 符号名: exit\n```\nvoid\nexit(int n)\n{\n  struct proc *p = myproc();\n  //if(p == initproc)\n    //panic(\"init exiting\");\n  //__debug_warn(\"[exit]pid %d:%s exit %d\\n\",p->pid,p->name,n);\n  // Close all open files.\n  for(int fd = 0; fd < NOFILE; fd++){\n    if(p->ofile[fd]){\n      struct file *f = p->"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_017",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现进程组/会话（Process Group / Session，pgid/session/set_sid/setpgid）？（必须三态；有则区分真实检查链 vs 仅占位字段）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "definition",
+          "symbol_name": "lsp_get_definition",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_018",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 POSIX 资源限制（rlimit/RLIMIT/getrlimit/setrlimit）？（必须三态；若 implemented 需说明支持的资源类型数量及软/硬限制机制）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "definition",
+          "symbol_name": "lsp_get_definition",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "definition",
+          "symbol_name": "lsp_get_definition",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/include/proc.h",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_018: 是否实现 POSIX 资源限制（rlimit/RLIMIT/getrlimit/setrlimit）？（必须三态；若 implemented 需说明支持的资源类型数量及软/硬限制机制）\n关键词: POSIX, rlimit, getrlimit, setrlimit, implemented' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6608 | 文件: repos\\oskernrl2022-rv6\\src\\include\\proc.h:111-114 | 类型: struct_specifier | 符号名: \n```\nstruct rlimit {\n\trlim_t rlim_cur;\n\trlim_t rlim_max;\n}\n```\n\n[2] 相似度: 0.4574 | 文件: repos\\oskernrl2022-rv6\\src\\sysproc.c:162-169 | 类型: function_definition | 符号名: sys_brk\n```\nuint64\nsys_brk(void)\n{\n  "
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_019",
+      "question_type": "single_choice",
+      "stem": "该 OS 是否区分了 TCB（线程控制块）与 PCB（进程控制块）？",
+      "value": "未发现/待核实",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/bio.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_019: 该 OS 是否区分了 TCB（线程控制块）与 PCB（进程控制块）？\n关键词: TCB, PCB' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4754 | 文件: repos\\oskernrl2022-rv6\\src\\bio.c:103-114 | 类型: function_definition | 符号名: \n```\nstruct buf* \nbread(uint dev, uint sectorno) {\n  struct buf *b;\n  b = bget(dev, sectorno);\n\n  if (!b->valid) {\n    FatFs[dev].disk_read(b,FatFs[dev].image);\n    b->valid = 1;\n  }\n  \n  return b;\n}\n```\n\n[2] 相似度: 0.4508 | 文件: repos\\oskernrl2022-rv6\\usrinit\\busybox_test.c:5-21 | 类型: function_definition |"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/bio.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_019: 该 OS 是否区分了 TCB（线程控制块）与 PCB（进程控制块）？\n关键词: TCB, PCB' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4754 | 文件: repos\\oskernrl2022-rv6\\src\\bio.c:103-114 | 类型: function_definition | 符号名: \n```\nstruct buf* \nbread(uint dev, uint sectorno) {\n  struct buf *b;\n  b = bget(dev, sectorno);\n\n  if (!b->valid) {\n    FatFs[dev].disk_read(b,FatFs[dev].image);\n    b->valid = 1;\n  }\n  \n  return b;\n}\n```\n\n[2] 相似度: 0.4508 | 文件: repos\\oskernrl2022-rv6\\usrinit\\busybox_test.c:5-21 | 类型: function_definition |"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_020",
+      "question_type": "tri_state_impl",
+      "stem": "调度切换路径上是否存在页表切换（w_satp/sfence.vma/写 CR3/TTBR 等）？（必须三态；给调用点 路径 证据）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/include/riscv.h",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_020: 调度切换路径上是否存在页表切换（w_satp/sfence.vma/写 CR3/TTBR 等）？（必须三态；给调用点 路径 证据）\n关键词: w_satp, sfence, vma, CR3, TTBR, 页表, 调度' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4851 | 文件: repos\\oskernrl2022-rv6\\src\\include\\riscv.h:328-334 | 类型: function_definition | 符号名: sfence_vma\n```\nstatic inline void\nsfence_vma()\n{\n  // the zero, zero means flush all TLB entries.\n  // asm volatile(\"sfence.vma zero, zero\");\n  asm volatile(\"sfence.vma\");\n}\n```\n\n[2] 相似度: 0.4844 | 文件: repos\\oskernrl2022-rv6\\src\\proc.c"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_021",
+      "question_type": "single_choice",
+      "stem": "用户线程与内核线程的映射模型 (User-Level Thread to Kernel-Level Thread Mapping) 更接近哪种？（Stallings Ch4）",
+      "value": "无线程（仅进程/Task 不可再分）",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/include/cpu.h",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_021: 用户线程与内核线程的映射模型 (User-Level Thread to Kernel-Level Thread Mapping) 更接近哪种？（Stallings Ch4）\n关键词: User, Level, Thread, Kernel, Mapping, Stallings, Ch4' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4855 | 文件: repos\\oskernrl2022-rv6\\src\\include\\cpu.h:30-35 | 类型: struct_specifier | 符号名: \n```\nstruct cpu {\n  struct proc *proc;          // The process running on this cpu, or null.\n  struct context context;     // swtch() here to enter scheduler().\n  int noff;                   // Depth of pu"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_022",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现线程局部存储 (Thread-Local Storage, TLS)？（必须三态；搜索 thread_local|TLS|__thread|#[thread_local]；若 implemented 需说明 TLS 的访问方式：tp 寄存器/段寄存器/其他）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/include/cpu.h",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_022: 是否实现线程局部存储 (Thread-Local Storage, TLS)？（必须三态；搜索 thread_local|TLS|__thread|#[thread_local]；若 implemented 需说明 TLS 的访问方式：tp 寄存器/段寄存器/其他）\n关键词: Thread, Local, Storage, TLS, thread_local, __thread, implemented' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4231 | 文件: repos\\oskernrl2022-rv6\\src\\include\\cpu.h:30-35 | 类型: struct_specifier | 符号名: \n```\nstruct cpu {\n  struct proc *proc;          // The process running on this cpu, or null.\n  struct context context;     // swtch() here to enter"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/include/cpu.h",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_022: 是否实现线程局部存储 (Thread-Local Storage, TLS)？（必须三态；搜索 thread_local|TLS|__thread|#[thread_local]；若 implemented 需说明 TLS 的访问方式：tp 寄存器/段寄存器/其他）\n关键词: Thread, Local, Storage, TLS, thread_local, __thread, implemented' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4231 | 文件: repos\\oskernrl2022-rv6\\src\\include\\cpu.h:30-35 | 类型: struct_specifier | 符号名: \n```\nstruct cpu {\n  struct proc *proc;          // The process running on this cpu, or null.\n  struct context context;     // swtch() here to enter"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_023",
+      "question_type": "multi_choice",
+      "stem": "调度器是否追踪/优化以下哪些性能指标 (Scheduling Criteria, Stallings Ch9)？（多选；未发现则留空并在 notes 写 not_found）",
+      "value": [
+        "未发现调度性能统计"
+      ],
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/proc.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_023: 调度器是否追踪/优化以下哪些性能指标 (Scheduling Criteria, Stallings Ch9)？（多选；未发现则留空并在 notes 写 not_found）\n关键词: Scheduling, Criteria, Stallings, Ch9, notes, not_found, 调度' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4815 | 文件: repos\\oskernrl2022-rv6\\src\\proc.c:520-538 | 类型: function_definition | 符号名: sched\n```\nvoid\nsched(void)\n{\n  int intena;\n  struct proc *p = myproc();\n\n  if(!holding(&p->lock))\n    panic(\"sched p->lock\");\n  if(mycpu()->noff != 1)\n    panic(\"sched locks\");\n  if(p->state == RUNNING"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/proc.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_023: 调度器是否追踪/优化以下哪些性能指标 (Scheduling Criteria, Stallings Ch9)？（多选；未发现则留空并在 notes 写 not_found）\n关键词: Scheduling, Criteria, Stallings, Ch9, notes, not_found, 调度' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4815 | 文件: repos\\oskernrl2022-rv6\\src\\proc.c:520-538 | 类型: function_definition | 符号名: sched\n```\nvoid\nsched(void)\n{\n  int intena;\n  struct proc *p = myproc();\n\n  if(!holding(&p->lock))\n    panic(\"sched p->lock\");\n  if(mycpu()->noff != 1)\n    panic(\"sched locks\");\n  if(p->state == RUNNING"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_024",
+      "question_type": "tri_state_impl",
+      "stem": "优先级调度是否实现老化 (Aging, Stallings Ch9) 以防止低优先级进程饥饿 (Starvation)？（必须三态；搜索 age/aging/boost_priority 或等价；若 not_found 需说明是否存在饥饿风险）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/proc.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_024: 优先级调度是否实现老化 (Aging, Stallings Ch9) 以防止低优先级进程饥饿 (Starvation)？（必须三态；搜索 age/aging/boost_priority 或等价；若 not_found 需说明是否存在饥饿风险）\n关键词: Aging, Stallings, Ch9, Starvation, age, boost_priority, not_found, 调度' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5184 | 文件: repos\\oskernrl2022-rv6\\src\\proc.c:119-152 | 类型: function_definition | 符号名: scheduler\n```\nvoid scheduler(){\n  \n  struct cpu *c = mycpu();\n  c->proc = 0;\n  while(1){\n    struct proc* p = readyq_pop();  //...\n    // printf(\"[schedule"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/proc.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_024: 优先级调度是否实现老化 (Aging, Stallings Ch9) 以防止低优先级进程饥饿 (Starvation)？（必须三态；搜索 age/aging/boost_priority 或等价；若 not_found 需说明是否存在饥饿风险）\n关键词: Aging, Stallings, Ch9, Starvation, age, boost_priority, not_found, 调度' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5184 | 文件: repos\\oskernrl2022-rv6\\src\\proc.c:119-152 | 类型: function_definition | 符号名: scheduler\n```\nvoid scheduler(){\n  \n  struct cpu *c = mycpu();\n  c->proc = 0;\n  while(1){\n    struct proc* p = readyq_pop();  //...\n    // printf(\"[schedule"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_025",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现公平份额调度 (Fair-Share Scheduling, Stallings Ch9) 或 CPU 配额 (CPU Quota/cgroup)？（必须三态；搜索 fair_share/cgroup/cpu_quota/weight 等）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/proc.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_025: 是否实现公平份额调度 (Fair-Share Scheduling, Stallings Ch9) 或 CPU 配额 (CPU Quota/cgroup)？（必须三态；搜索 fair_share/cgroup/cpu_quota/weight 等）\n关键词: Fair, Share, Scheduling, Stallings, Ch9, CPU, Quota, cgroup' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6036 | 文件: repos\\oskernrl2022-rv6\\src\\proc.c:520-538 | 类型: function_definition | 符号名: sched\n```\nvoid\nsched(void)\n{\n  int intena;\n  struct proc *p = myproc();\n\n  if(!holding(&p->lock))\n    panic(\"sched p->lock\");\n  if(mycpu()->noff != 1)\n    panic(\"s"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/proc.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_025: 是否实现公平份额调度 (Fair-Share Scheduling, Stallings Ch9) 或 CPU 配额 (CPU Quota/cgroup)？（必须三态；搜索 fair_share/cgroup/cpu_quota/weight 等）\n关键词: Fair, Share, Scheduling, Stallings, Ch9, CPU, Quota, cgroup' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6036 | 文件: repos\\oskernrl2022-rv6\\src\\proc.c:520-538 | 类型: function_definition | 符号名: sched\n```\nvoid\nsched(void)\n{\n  int intena;\n  struct proc *p = myproc();\n\n  if(!holding(&p->lock))\n    panic(\"sched p->lock\");\n  if(mycpu()->noff != 1)\n    panic(\"s"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_026",
+      "question_type": "single_choice",
+      "stem": "调度器的抢占模式 (Preemption Mode, Stallings Ch9) 更接近哪种？",
+      "value": "未发现",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/proc.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_026: 调度器的抢占模式 (Preemption Mode, Stallings Ch9) 更接近哪种？\n关键词: Preemption, Mode, Stallings, Ch9, 调度' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6474 | 文件: repos\\oskernrl2022-rv6\\src\\proc.c:520-538 | 类型: function_definition | 符号名: sched\n```\nvoid\nsched(void)\n{\n  int intena;\n  struct proc *p = myproc();\n\n  if(!holding(&p->lock))\n    panic(\"sched p->lock\");\n  if(mycpu()->noff != 1)\n    panic(\"sched locks\");\n  if(p->state == RUNNING)\n    panic(\"sched running\");\n  if(intr_get())\n    panic(\"sch"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_027",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现最短作业优先调度 (Shortest Job First / SJF 或 SRTF, Stallings Ch9)？（必须三态；或等价的基于预测 burst 时间的调度）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/proc.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_027: 是否实现最短作业优先调度 (Shortest Job First / SJF 或 SRTF, Stallings Ch9)？（必须三态；或等价的基于预测 burst 时间的调度）\n关键词: Shortest, Job, First, SJF, SRTF, Stallings, Ch9, burst' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4666 | 文件: repos\\oskernrl2022-rv6\\src\\proc.c:119-152 | 类型: function_definition | 符号名: scheduler\n```\nvoid scheduler(){\n  \n  struct cpu *c = mycpu();\n  c->proc = 0;\n  while(1){\n    struct proc* p = readyq_pop();  //...\n    // printf(\"[scheduler]hart %d enter:%p\\n\",c-cpus,p);\n    if(p){\n    "
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/proc.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_027: 是否实现最短作业优先调度 (Shortest Job First / SJF 或 SRTF, Stallings Ch9)？（必须三态；或等价的基于预测 burst 时间的调度）\n关键词: Shortest, Job, First, SJF, SRTF, Stallings, Ch9, burst' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4666 | 文件: repos\\oskernrl2022-rv6\\src\\proc.c:119-152 | 类型: function_definition | 符号名: scheduler\n```\nvoid scheduler(){\n  \n  struct cpu *c = mycpu();\n  c->proc = 0;\n  while(1){\n    struct proc* p = readyq_pop();  //...\n    // printf(\"[scheduler]hart %d enter:%p\\n\",c-cpus,p);\n    if(p){\n    "
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_028",
+      "question_type": "single_choice",
+      "stem": "该 OS 的多核形态更接近哪种？",
+      "value": "未发现/待核实",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/include/cpu.h",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_028: 该 OS 的多核形态更接近哪种？\n关键词: ' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5642 | 文件: repos\\oskernrl2022-rv6\\src\\include\\cpu.h:30-35 | 类型: struct_specifier | 符号名: \n```\nstruct cpu {\n  struct proc *proc;          // The process running on this cpu, or null.\n  struct context context;     // swtch() here to enter scheduler().\n  int noff;                   // Depth of push_off() nesting.\n  int intena;                 // Were interrupts enabled before push_off()?\n}\n```\n\n[2] 相似度: 0.5503 | 文件: "
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_029",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 Secondary CPU / AP 启动链（BSP 唤醒 AP，上线后进入 idle/调度）？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/proc.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_029: 是否存在 Secondary CPU / AP 启动链（BSP 唤醒 AP，上线后进入 idle/调度）？（必须三态）\n关键词: Secondary, CPU, BSP, idle, 调度' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5509 | 文件: repos\\oskernrl2022-rv6\\src\\proc.c:520-538 | 类型: function_definition | 符号名: sched\n```\nvoid\nsched(void)\n{\n  int intena;\n  struct proc *p = myproc();\n\n  if(!holding(&p->lock))\n    panic(\"sched p->lock\");\n  if(mycpu()->noff != 1)\n    panic(\"sched locks\");\n  if(p->state == RUNNING)\n    panic(\"sched running\");\n  if(intr_get())\n    panic("
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_030",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 IPI（核间中断）发送与处理？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/include/sbi.h",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_030: 是否实现 IPI（核间中断）发送与处理？（必须三态）\n关键词: IPI' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5418 | 文件: repos\\oskernrl2022-rv6\\src\\include\\sbi.h:86-88 | 类型: function_definition | 符号名: send_ipi\n```\nstatic inline void send_ipi(uint64 mask) {\n    a_sbi_ecall(0x735049, 0, mask,0,0,0,0,0);\n}\n```\n\n[2] 相似度: 0.4640 | 文件: repos\\oskernrl2022-rv6\\src\\intr.c:23-40 | 类型: function_definition | 符号名: pop_off\n```\nvoid\npop_off(void)\n{\n  struct cpu *c = mycpu();\n\n  //printf(\"\\e[31mpop_off()\\e[0m: cpuid(): %d\\n"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/include/sbi.h",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_030: 是否实现 IPI（核间中断）发送与处理？（必须三态）\n关键词: IPI' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5418 | 文件: repos\\oskernrl2022-rv6\\src\\include\\sbi.h:86-88 | 类型: function_definition | 符号名: send_ipi\n```\nstatic inline void send_ipi(uint64 mask) {\n    a_sbi_ecall(0x735049, 0, mask,0,0,0,0,0);\n}\n```\n\n[2] 相似度: 0.4640 | 文件: repos\\oskernrl2022-rv6\\src\\intr.c:23-40 | 类型: function_definition | 符号名: pop_off\n```\nvoid\npop_off(void)\n{\n  struct cpu *c = mycpu();\n\n  //printf(\"\\e[31mpop_off()\\e[0m: cpuid(): %d\\n"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_031",
+      "question_type": "short_answer",
+      "stem": "若存在 IPI：发送与处理路径分别在哪些函数/文件？（给关键入口与证据）",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/include/sbi.h",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_031: 若存在 IPI：发送与处理路径分别在哪些函数/文件？（给关键入口与证据）\n关键词: IPI' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5812 | 文件: repos\\oskernrl2022-rv6\\src\\include\\sbi.h:86-88 | 类型: function_definition | 符号名: send_ipi\n```\nstatic inline void send_ipi(uint64 mask) {\n    a_sbi_ecall(0x735049, 0, mask,0,0,0,0,0);\n}\n```\n\n[2] 相似度: 0.4809 | 文件: repos\\oskernrl2022-rv6\\syscall\\syscall.c:1-20 | 类型: function_definition | 符号名: syscall\n```\nvoid\nsyscall(void)\n{\n  int num;\n  struct proc *p = myproc();\n\n  num = p->trapfra"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_032",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 per-CPU 变量/结构（PerCpu、CPU-local storage 等）？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/include/cpu.h",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_032: 是否存在 per-CPU 变量/结构（PerCpu、CPU-local storage 等）？（必须三态）\n关键词: per, CPU, PerCpu, local, storage' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5225 | 文件: repos\\oskernrl2022-rv6\\src\\include\\cpu.h:30-35 | 类型: struct_specifier | 符号名: \n```\nstruct cpu {\n  struct proc *proc;          // The process running on this cpu, or null.\n  struct context context;     // swtch() here to enter scheduler().\n  int noff;                   // Depth of push_off() nesting.\n  int intena;                 // Wer"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/include/cpu.h",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_032: 是否存在 per-CPU 变量/结构（PerCpu、CPU-local storage 等）？（必须三态）\n关键词: per, CPU, PerCpu, local, storage' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5225 | 文件: repos\\oskernrl2022-rv6\\src\\include\\cpu.h:30-35 | 类型: struct_specifier | 符号名: \n```\nstruct cpu {\n  struct proc *proc;          // The process running on this cpu, or null.\n  struct context context;     // swtch() here to enter scheduler().\n  int noff;                   // Depth of push_off() nesting.\n  int intena;                 // Wer"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_033",
+      "question_type": "short_answer",
+      "stem": "per-CPU 的实现方式是什么？（例如 TLS/tp 寄存器/gsbase/数组索引 hartid；需证据）",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/include/cpu.h",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_033: per-CPU 的实现方式是什么？（例如 TLS/tp 寄存器/gsbase/数组索引 hartid；需证据）\n关键词: per, CPU, TLS, gsbase, hartid' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5802 | 文件: repos\\oskernrl2022-rv6\\src\\include\\cpu.h:30-35 | 类型: struct_specifier | 符号名: \n```\nstruct cpu {\n  struct proc *proc;          // The process running on this cpu, or null.\n  struct context context;     // swtch() here to enter scheduler().\n  int noff;                   // Depth of push_off() nesting.\n  int intena;                 // Were"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/include/cpu.h",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_033: per-CPU 的实现方式是什么？（例如 TLS/tp 寄存器/gsbase/数组索引 hartid；需证据）\n关键词: per, CPU, TLS, gsbase, hartid' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5802 | 文件: repos\\oskernrl2022-rv6\\src\\include\\cpu.h:30-35 | 类型: struct_specifier | 符号名: \n```\nstruct cpu {\n  struct proc *proc;          // The process running on this cpu, or null.\n  struct context context;     // swtch() here to enter scheduler().\n  int noff;                   // Depth of push_off() nesting.\n  int intena;                 // Were"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_034",
+      "question_type": "tri_state_impl",
+      "stem": "调度是否存在跨核负载均衡/迁移/亲和性？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/proc.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_034: 调度是否存在跨核负载均衡/迁移/亲和性？（必须三态）\n关键词: 调度' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5108 | 文件: repos\\oskernrl2022-rv6\\src\\proc.c:520-538 | 类型: function_definition | 符号名: sched\n```\nvoid\nsched(void)\n{\n  int intena;\n  struct proc *p = myproc();\n\n  if(!holding(&p->lock))\n    panic(\"sched p->lock\");\n  if(mycpu()->noff != 1)\n    panic(\"sched locks\");\n  if(p->state == RUNNING)\n    panic(\"sched running\");\n  if(intr_get())\n    panic(\"sched interruptible\");\n\n  intena = mycpu()->intena;\n  swtch"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/proc.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_034: 调度是否存在跨核负载均衡/迁移/亲和性？（必须三态）\n关键词: 调度' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5108 | 文件: repos\\oskernrl2022-rv6\\src\\proc.c:520-538 | 类型: function_definition | 符号名: sched\n```\nvoid\nsched(void)\n{\n  int intena;\n  struct proc *p = myproc();\n\n  if(!holding(&p->lock))\n    panic(\"sched p->lock\");\n  if(mycpu()->noff != 1)\n    panic(\"sched locks\");\n  if(p->state == RUNNING)\n    panic(\"sched running\");\n  if(intr_get())\n    panic(\"sched interruptible\");\n\n  intena = mycpu()->intena;\n  swtch"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_035",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 TLB shootdown（跨核页表一致性刷新）？（必须三态；需与 03 互指）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/intr.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_035: 是否实现 TLB shootdown（跨核页表一致性刷新）？（必须三态；需与 03 互指）\n关键词: TLB, shootdown, 页表' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4969 | 文件: repos\\oskernrl2022-rv6\\src\\intr.c:11-21 | 类型: function_definition | 符号名: push_off\n```\nvoid\npush_off(void)\n{\n  int old = intr_get();\n\n  intr_off();\n  //printf(\"\\e[32mpush_off()\\e[0m: cpuid(): %d\\n\", cpuid());\n  if(mycpu()->noff == 0)\n    mycpu()->intena = old;\n  mycpu()->noff += 1;\n}\n```\n\n[2] 相似度: 0.4947 | 文件: repos\\oskernrl2022-rv6\\src\\vm.c:289-309 | 类型: f"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/intr.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_035: 是否实现 TLB shootdown（跨核页表一致性刷新）？（必须三态；需与 03 互指）\n关键词: TLB, shootdown, 页表' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4969 | 文件: repos\\oskernrl2022-rv6\\src\\intr.c:11-21 | 类型: function_definition | 符号名: push_off\n```\nvoid\npush_off(void)\n{\n  int old = intr_get();\n\n  intr_off();\n  //printf(\"\\e[32mpush_off()\\e[0m: cpuid(): %d\\n\", cpuid());\n  if(mycpu()->noff == 0)\n    mycpu()->intena = old;\n  mycpu()->noff += 1;\n}\n```\n\n[2] 相似度: 0.4947 | 文件: repos\\oskernrl2022-rv6\\src\\vm.c:289-309 | 类型: f"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_036",
+      "question_type": "short_answer",
+      "stem": "与 03/04/05/08 章的交叉一致性 (Cross-Chapter Consistency)，按以下四项分别作答（每项须给证据路径或写「单核不适用」）：\n- 03 TLB: 多核页表修改后 TLB 刷新策略=___\n- 04 调度: 每核运行队列/负载均衡/IPI resched=___\n- 05 Trap: per-CPU trap 栈/时钟中断初始化与 AP 上线顺序=___\n- 08 锁: SpinLock 关中断行为在多核下是否安全=___",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/proc.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_036: 与 03/04/05/08 章的交叉一致性 (Cross-Chapter Consistency)，按以下四项分别作答（每项须给证据路径或写「单核不适用」）：\n- 03 TLB: 多核页表修改后 TLB 刷新策略=___\n- 04 调度: 每核运行队列/负载均衡/IPI resched=___\n- 05 Trap: per-CPU trap 栈/时钟中断初始化与 AP 上线顺序=___\n- 08 锁: SpinLock 关中断行为在多核下是否安全=___\n关键词: Cross, Chapter, Consistency, TLB, ___, IPI, resched, Trap' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5734 | 文件: repos\\oskernrl2022-rv6\\src\\proc.c:520-538 | 类型: function_definition | 符号名: sched\n```\nvoid\nsched(void)\n{\n  int intena;\n  struct proc *p "
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_037",
+      "question_type": "single_choice",
+      "stem": "SpinLock 在获取锁时是否禁用中断（关中断保护临界区）？",
+      "value": "未发现/待核实",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/spinlock.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_037: SpinLock 在获取锁时是否禁用中断（关中断保护临界区）？\n关键词: SpinLock, 锁' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.7023 | 文件: repos\\oskernrl2022-rv6\\src\\spinlock.c:79-85 | 类型: function_definition | 符号名: holding\n```\nint\nholding(struct spinlock *lk)\n{\n  int r;\n  r = (lk->locked && lk->cpu == mycpu());\n  return r;\n}\n```\n\n[2] 相似度: 0.6840 | 文件: repos\\oskernrl2022-rv6\\src\\spinlock.c:24-46 | 类型: function_definition | 符号名: acquire\n```\nvoid\nacquire(struct spinlock *lk)\n{\n  push_off(); // disable interrupts to"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/spinlock.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_037: SpinLock 在获取锁时是否禁用中断（关中断保护临界区）？\n关键词: SpinLock, 锁' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.7023 | 文件: repos\\oskernrl2022-rv6\\src\\spinlock.c:79-85 | 类型: function_definition | 符号名: holding\n```\nint\nholding(struct spinlock *lk)\n{\n  int r;\n  r = (lk->locked && lk->cpu == mycpu());\n  return r;\n}\n```\n\n[2] 相似度: 0.6840 | 文件: repos\\oskernrl2022-rv6\\src\\spinlock.c:24-46 | 类型: function_definition | 符号名: acquire\n```\nvoid\nacquire(struct spinlock *lk)\n{\n  push_off(); // disable interrupts to"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_038",
+      "question_type": "short_answer",
+      "stem": "NCPU/MAXCPU（或等价宏）与链接脚本中的每 hart 栈/入口布局是否对应？（搜索 _max_hart_id 等；给宏定义与链接脚本对应证据，或写未发现）",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/include/cpu.h",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_038: NCPU/MAXCPU（或等价宏）与链接脚本中的每 hart 栈/入口布局是否对应？（搜索 _max_hart_id 等；给宏定义与链接脚本对应证据，或写未发现）\n关键词: NCPU, MAXCPU, hart, _max_hart_id' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4811 | 文件: repos\\oskernrl2022-rv6\\src\\include\\cpu.h:30-35 | 类型: struct_specifier | 符号名: \n```\nstruct cpu {\n  struct proc *proc;          // The process running on this cpu, or null.\n  struct context context;     // swtch() here to enter scheduler().\n  int noff;                   // Depth of push_off() nesting.\n  int in"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_039",
+      "question_type": "tri_state_impl",
+      "stem": "是否使用 AtomicUsize/原子变量分配 PID/TID（全局唯一 ID 池）？（必须三态；给实现证据）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/proc.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_039: 是否使用 AtomicUsize/原子变量分配 PID/TID（全局唯一 ID 池）？（必须三态；给实现证据）\n关键词: AtomicUsize, PID, TID' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5059 | 文件: repos\\oskernrl2022-rv6\\src\\proc.c:154-162 | 类型: function_definition | 符号名: allocpid\n```\nint\nallocpid() {\n  int pid;\n  acquire(&pid_lock);\n  pid = nextpid;\n  nextpid = nextpid + 1;\n  release(&pid_lock);\n  return pid;\n}\n```\n\n[2] 相似度: 0.5015 | 文件: repos\\oskernrl2022-rv6\\src\\sysproc.c:139-145 | 类型: function_definition | 符号名: sys_set_tid_address\n``"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/proc.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_039: 是否使用 AtomicUsize/原子变量分配 PID/TID（全局唯一 ID 池）？（必须三态；给实现证据）\n关键词: AtomicUsize, PID, TID' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5059 | 文件: repos\\oskernrl2022-rv6\\src\\proc.c:154-162 | 类型: function_definition | 符号名: allocpid\n```\nint\nallocpid() {\n  int pid;\n  acquire(&pid_lock);\n  pid = nextpid;\n  nextpid = nextpid + 1;\n  release(&pid_lock);\n  return pid;\n}\n```\n\n[2] 相似度: 0.5015 | 文件: repos\\oskernrl2022-rv6\\src\\sysproc.c:139-145 | 类型: function_definition | 符号名: sys_set_tid_address\n``"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_040",
+      "question_type": "tri_state_impl",
+      "stem": "是否支持实时调度 (Real-Time Scheduling, Stallings Ch10)？（必须三态；搜索 SCHED_FIFO / SCHED_RR / realtime / RT priority / deadline 等）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/proc.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_040: 是否支持实时调度 (Real-Time Scheduling, Stallings Ch10)？（必须三态；搜索 SCHED_FIFO / SCHED_RR / realtime / RT priority / deadline 等）\n关键词: Real, Time, Scheduling, Stallings, Ch10, SCHED_FIFO, SCHED_RR, realtime' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5921 | 文件: repos\\oskernrl2022-rv6\\src\\proc.c:520-538 | 类型: function_definition | 符号名: sched\n```\nvoid\nsched(void)\n{\n  int intena;\n  struct proc *p = myproc();\n\n  if(!holding(&p->lock))\n    panic(\"sched p->lock\");\n  if(mycpu()->noff != 1)\n    pan"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/proc.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_040: 是否支持实时调度 (Real-Time Scheduling, Stallings Ch10)？（必须三态；搜索 SCHED_FIFO / SCHED_RR / realtime / RT priority / deadline 等）\n关键词: Real, Time, Scheduling, Stallings, Ch10, SCHED_FIFO, SCHED_RR, realtime' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5921 | 文件: repos\\oskernrl2022-rv6\\src\\proc.c:520-538 | 类型: function_definition | 符号名: sched\n```\nvoid\nsched(void)\n{\n  int intena;\n  struct proc *p = myproc();\n\n  if(!holding(&p->lock))\n    panic(\"sched p->lock\");\n  if(mycpu()->noff != 1)\n    pan"
+        }
+      ]
+    },
+    {
+      "question_id": "Q04_041",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 NUMA (Non-Uniform Memory Access) 感知的内存分配或调度策略？（必须三态；搜索 numa / node_id / local_memory 等；嵌入式单 SoC 可写 not_found 并说明架构）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "LINKER=linker/kernel.ld",
+          "symbol_kind": "build_config",
+          "symbol_name": "parse_build_config",
+          "excerpt": "## Build Config Summary\n- Makefile markers=[qemu-system, -machine, riscv, ENTRY, disk.img]\n  excerpt: K=src U=usrinit SBI=sbi/fw_jump.elf LINKER=linker/kernel.ld  FS?=FAT MAC?=SIFIVE_U  ifeq ($(MAC),SIFIVE_U) DISK:=$K/link_null.o endif  ifeq ($(MAC),QEMU) DISK:=$K/link_disk.o endif  OBJS += \\ \t$K/entry.o \\ \t$K/bio.o \\ \t$(DISK) \\ \t$K/ramdisk.o \\ \t$K/spi.o \\ \t$K/sd.o \\ \t$K/diskio.o \\ \t$K/disk.o \\ \t$K/\n- linker/kernel.ld markers=[riscv, ENTRY]\n  excerpt: OUTPUT_ARCH(riscv) ENTRY(_entry)  BASE_ADDRE"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/pm.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_041: 是否存在 NUMA (Non-Uniform Memory Access) 感知的内存分配或调度策略？（必须三态；搜索 numa / node_id / local_memory 等；嵌入式单 SoC 可写 not_found 并说明架构）\n关键词: NUMA, Non, Uniform, Memory, Access, node_id, local_memory, SoC' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4887 | 文件: repos\\oskernrl2022-rv6\\src\\pm.c:40-49 | 类型: function_definition | 符号名: kpminit\n```\nvoid\nkpminit()\n{\n\tinitlock(&kmem.lock, \"kmem\");\n\tkmem.freelist = 0;\n\tkmem.npage = 0;\n\tallocs = frees = 0;\n\tfreerange(kernel_end, (void*)PHYSTOP);\n\t__debug_i"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/pm.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '进程/线程/调度与多核 / Q04_041: 是否存在 NUMA (Non-Uniform Memory Access) 感知的内存分配或调度策略？（必须三态；搜索 numa / node_id / local_memory 等；嵌入式单 SoC 可写 not_found 并说明架构）\n关键词: NUMA, Non, Uniform, Memory, Access, node_id, local_memory, SoC' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4887 | 文件: repos\\oskernrl2022-rv6\\src\\pm.c:40-49 | 类型: function_definition | 符号名: kpminit\n```\nvoid\nkpminit()\n{\n\tinitlock(&kmem.lock, \"kmem\");\n\tkmem.freelist = 0;\n\tkmem.npage = 0;\n\tallocs = frees = 0;\n\tfreerange(kernel_end, (void*)PHYSTOP);\n\t__debug_i"
+        }
+      ]
+    }
+  ]
+}

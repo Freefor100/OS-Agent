@@ -1,0 +1,184 @@
+{
+  "schema_version": "v1",
+  "stage_id": "08_network",
+  "stage_title": "网络子系统与协议栈",
+  "terminology_profile": "stallings_en_zh",
+  "answers": [
+    {
+      "question_id": "Q08_001",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在网络子系统实现（协议栈或 socket 层）？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/fs/poll.c",
+          "symbol_kind": "scan",
+          "symbol_name": "network_stack_scan",
+          "excerpt": "检查 kernel/ 目录结构，无 net/ 或 network/ 子目录；grep smoltcp|lwip|tcpip|netstack 得 0 命中"
+        },
+        {
+          "path": "include/sysnum.h",
+          "symbol_kind": "scan",
+          "symbol_name": "syscall_table_scan",
+          "excerpt": "sysnum.h 中无 SYS_socket/SYS_bind/SYS_connect/SYS_sendto 等网络相关系统调用号定义"
+        },
+        {
+          "path": "include/hal/virtio.h",
+          "symbol_kind": "read",
+          "symbol_name": "virtio_driver_check",
+          "excerpt": "virtio.h 仅定义 VIRTIO_MMIO_DEVICE_ID 注释提及'1 is net, 2 is disk'，但无 virtio_net 驱动实现代码"
+        }
+      ]
+    },
+    {
+      "question_id": "Q08_002",
+      "question_type": "single_choice",
+      "stem": "协议栈来源更接近哪种？",
+      "value": "未发现",
+      "evidence": [
+        {
+          "path": "Cargo.toml",
+          "symbol_kind": "scan",
+          "symbol_name": "dependency_check",
+          "excerpt": "Cargo.toml 仅 50 字节，无 smoltcp/lwip 等网络库依赖；grep smoltcp|lwip 得 0 命中"
+        },
+        {
+          "path": "kernel/",
+          "symbol_kind": "scan",
+          "symbol_name": "self_impl_check",
+          "excerpt": "kernel/ 目录下无 tcp.c/udp.c/ip.c 等协议栈实现文件；无 struct tcp_sock/struct udp_sock 等结构体定义"
+        }
+      ]
+    },
+    {
+      "question_id": "Q08_003",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 socket 系统调用接口（socket/bind/connect/sendto/recvfrom 等）？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "include/sysnum.h",
+          "symbol_kind": "grep",
+          "symbol_name": "syscall_number_scan",
+          "excerpt": "sysnum.h 定义 SYS_fork/SYS_read/SYS_write 等 80+ 系统调用，但无 SYS_socket/SYS_bind/SYS_connect/SYS_sendto"
+        },
+        {
+          "path": "kernel/syscall/sysfile.c",
+          "symbol_kind": "grep",
+          "symbol_name": "syscall_impl_scan",
+          "excerpt": "grep sys_socket|sys_bind|sys_connect|sys_sendto|sys_recvfrom 得 0 命中；sysfile.c 中仅实现文件/pipe 相关 syscall"
+        },
+        {
+          "path": "include/fs/stat.h",
+          "symbol_kind": "read",
+          "symbol_name": "socket_macro_check",
+          "excerpt": "stat.h:11 定义 S_IFSOCK 宏，但仅为占位定义；无对应 socket 文件操作实现"
+        }
+      ]
+    },
+    {
+      "question_id": "Q08_004",
+      "question_type": "short_answer",
+      "stem": "选择一个发送路径（优先 sys_sendto），追踪：syscall → 协议栈 → 网卡驱动。列 3-6 个关键节点并给证据。",
+      "value": "未发现 sys_sendto 实现。该内核未实现网络发送路径。poll/select 机制已就绪可用于未来 socket 集成：sys_pselect(kernel/syscall/sysfile.c:761) → pselect(kernel/fs/poll.c:127) → file_poll(kernel/fs/poll.c:58) → fp->poll 回调(如 pipepoll kernel/fs/pipe.c:378)",
+      "evidence": [
+        {
+          "path": "kernel/syscall/sysfile.c",
+          "symbol_kind": "read",
+          "symbol_name": "sys_pselect_impl",
+          "excerpt": "sys_pselect:761 调用 pselect() 处理文件描述符多路复用；但无网络相关 syscall"
+        },
+        {
+          "path": "kernel/fs/poll.c",
+          "symbol_kind": "read",
+          "symbol_name": "pselect_impl",
+          "excerpt": "pselect:127 遍历 fdset，调用 file_poll() 检查每个文件描述符的就绪状态"
+        },
+        {
+          "path": "kernel/fs/poll.c",
+          "symbol_kind": "read",
+          "symbol_name": "file_poll_impl",
+          "excerpt": "file_poll:58 检查 fp->poll 回调是否存在，若存在则调用 fp->poll(fp, pt) 返回掩码"
+        },
+        {
+          "path": "kernel/fs/pipe.c",
+          "symbol_kind": "read",
+          "symbol_name": "pipepoll_impl",
+          "excerpt": "pipepoll:378 实现 pipe 的 poll 回调，检查 pi->nwrite - pi->nread 判断是否有数据可读/可写"
+        }
+      ]
+    },
+    {
+      "question_id": "Q08_005",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现网卡驱动（virtio-net/e1000 等）与收包中断路径？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "include/hal/virtio.h",
+          "symbol_kind": "read",
+          "symbol_name": "virtio_header_check",
+          "excerpt": "virtio.h:21 定义 VIRTIO_MMIO_DEVICE_ID，注释提及'1 is net, 2 is disk'，但仅实现 virtio_disk.c 磁盘驱动"
+        },
+        {
+          "path": "kernel/hal/virtio_disk.c",
+          "symbol_kind": "scan",
+          "symbol_name": "virtio_driver_scan",
+          "excerpt": "virtio_disk.c 仅实现块设备驱动（virtio_blk），无 virtio_net 相关代码；grep virtio_net|ethernet|network 得 0 命中"
+        },
+        {
+          "path": "kernel/trap/",
+          "symbol_kind": "scan",
+          "symbol_name": "interrupt_handler_scan",
+          "excerpt": "trap.c 处理外部中断，但无网络中断处理程序；无 net_interrupt_handler 或类似符号"
+        }
+      ]
+    },
+    {
+      "question_id": "Q08_006",
+      "question_type": "multi_choice",
+      "stem": "协议支持情况（多选；未发现则留空并在 notes 写 not_found）：",
+      "value": [],
+      "evidence": [
+        {
+          "path": "kernel/",
+          "symbol_kind": "grep",
+          "symbol_name": "protocol_scan",
+          "excerpt": "grep tcp|udp|ip|icmp|arp|dhcp|dns 于 kernel/ 目录，仅发现 errno.h 中 ENONET/ENOTSOCK 等错误码定义，无实际协议实现"
+        },
+        {
+          "path": "include/",
+          "symbol_kind": "scan",
+          "symbol_name": "protocol_header_scan",
+          "excerpt": "include/ 下无 tcp.h/udp.h/ip.h 等协议头文件；仅 stat.h 中定义 S_IFSOCK 占位宏"
+        }
+      ]
+    },
+    {
+      "question_id": "Q08_007",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在零拷贝/共享缓冲/DMA 描述符等路径（zero-copy）？（必须三态；仅有名词不算 implemented）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "include/hal/dmac.h",
+          "symbol_kind": "scan",
+          "symbol_name": "dma_controller_check",
+          "excerpt": "dmac.h 定义 DMA 控制器寄存器与枚举，但用于通用 DMA 传输，非网络专用；无 tx_ring/rx_ring/dma_desc 网络描述符"
+        },
+        {
+          "path": "kernel/hal/",
+          "symbol_kind": "grep",
+          "symbol_name": "zero_copy_scan",
+          "excerpt": "grep DMA|dma_desc|descriptor.*ring|tx_ring|rx_ring 仅发现 DMAC 通用定义，无网络零拷贝路径；无 mbuf/skbuff 等网络缓冲结构"
+        },
+        {
+          "path": "kernel/fs/file.c",
+          "symbol_kind": "read",
+          "symbol_name": "file_io_path",
+          "excerpt": "fileread/filewrite 使用 copyin/copyout 进行用户态 - 内核态数据拷贝，无零拷贝优化"
+        }
+      ]
+    }
+  ]
+}

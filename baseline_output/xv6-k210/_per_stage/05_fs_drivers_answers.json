@@ -1,0 +1,726 @@
+{
+  "schema_version": "v1",
+  "stage_id": "05_fs_drivers",
+  "stage_title": "文件系统与设备 I/O",
+  "terminology_profile": "stallings_en_zh",
+  "answers": [
+    {
+      "question_id": "Q05_001",
+      "question_type": "short_answer",
+      "stem": "VFS 抽象层 (Virtual File System, VFS)接口是什么形态？（Rust trait / C op 表；必须给接口定义证据）",
+      "value": "C op 表（函数指针结构体）。在 include/fs/fs.h 中定义了 struct fs_op、struct inode_op、struct file_op、struct dentry_op，每个包含一组函数指针作为操作接口。",
+      "evidence": [
+        {
+          "path": "include/fs/fs.h",
+          "symbol_kind": "struct",
+          "symbol_name": "fs_op",
+          "excerpt": "struct fs_op { struct inode *(*alloc_inode)(struct superblock *sb); void (*destroy_inode)(struct inode *ip); int (*write)(struct superblock *sb, int usr, char *src, uint64 blockno, uint64 off, uint64 len); int (*read)(struct superblock *sb, int usr, char *dst, uint64 blockno, uint64 off, uint64 len); ... };"
+        },
+        {
+          "path": "include/fs/fs.h",
+          "symbol_kind": "struct",
+          "symbol_name": "inode_op",
+          "excerpt": "struct inode_op { struct inode *(*create)(struct inode *ip, char *name, int mode); struct inode *(*lookup)(struct inode *dir, char *filename, uint *poff); int (*truncate)(struct inode *ip); int (*unlink)(struct inode *ip); ... };"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_002",
+      "question_type": "single_choice",
+      "stem": "具体文件系统后端 (Concrete File System Backend) 更接近哪种？",
+      "value": "A. 真实磁盘文件系统（FAT32/Ext4/其他，持久化存储）",
+      "evidence": [
+        {
+          "path": "kernel/fs/fat32/fat32.c",
+          "symbol_kind": "function",
+          "symbol_name": "fat32_init",
+          "excerpt": "Initialize FAT32 file system on SD card. FAT32 is a persistent disk file system stored on SD card."
+        },
+        {
+          "path": "Makefile",
+          "symbol_kind": "build_config",
+          "symbol_name": "fs_target",
+          "excerpt": "QEMUOPTS += -drive file=fs.img,if=none,format=raw,id=x0 -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_003",
+      "question_type": "short_answer",
+      "stem": "若支持 FAT32/Ext4：它是自研还是第三方库/crate？（必须引用 Cargo.toml/Cargo.lock 或 Makefile 引入证据）",
+      "value": "自研实现。FAT32 文件系统在 kernel/fs/fat32/ 目录下自主实现，包含 cluster.c、dirent.c、fat.c、fat32.c 等源文件，无第三方库依赖。",
+      "evidence": [
+        {
+          "path": "Makefile",
+          "symbol_kind": "build_config",
+          "symbol_name": "SRC",
+          "excerpt": "SRC += $K/fs/fat32/cluster.c $K/fs/fat32/dirent.c $K/fs/fat32/fat.c $K/fs/fat32/fat32.c"
+        },
+        {
+          "path": "kernel/fs/fat32/fat32.h",
+          "symbol_kind": "header",
+          "symbol_name": "fat32_header",
+          "excerpt": "FAT32 file system implementation header with struct fat32_sb, struct fat32_entry definitions"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_004",
+      "question_type": "short_answer",
+      "stem": "文件打开路径：文件打开入口（sys_open 或等价）→ VFS 层 → 具体 FS open。列出 3-6 个关键节点并给证据。",
+      "value": "1. sys_openat() (kernel/syscall/sysfile.c) - syscall 入口\n2. namei()/nameifrom() (kernel/fs/fs.c) - VFS 路径解析\n3. dirlookup() (kernel/fs/fs.c) - VFS 目录查找\n4. fat_lookup_dir() (kernel/fs/fat32/dirent.c) - FAT32 具体实现\n5. fat_alloc_entry() (kernel/fs/fat32/dirent.c) - FAT32 文件分配",
+      "evidence": [
+        {
+          "path": "kernel/syscall/sysfile.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_openat",
+          "excerpt": "uint64 sys_openat(void) { ... if((ip = nameifrom(dp, path)) == NULL) ... if((f = filealloc()) == NULL || (fd = fdalloc(f, omode & O_CLOEXEC)) < 0)..."
+        },
+        {
+          "path": "kernel/fs/fs.c",
+          "symbol_kind": "function",
+          "symbol_name": "nameifrom",
+          "excerpt": "struct inode *nameifrom(struct inode *ip, char *path) { char name[MAXNAME + 1]; return lookup_path(ip, path, 0, name); }"
+        },
+        {
+          "path": "kernel/fs/fs.c",
+          "symbol_kind": "function",
+          "symbol_name": "dirlookup",
+          "excerpt": "struct inode *dirlookup(struct inode *dir, char *filename, uint *poff) { ... ip = dir->op->lookup(dir, filename, poff); ..."
+        },
+        {
+          "path": "kernel/fs/fat32/dirent.c",
+          "symbol_kind": "function",
+          "symbol_name": "fat_lookup_dir",
+          "excerpt": "struct inode *fat_lookup_dir(struct inode *dir, char *filename, uint *poff) { ... struct fat32_entry *ep = fat_lookup_dir_ent(dir, filename, &off); ..."
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_005",
+      "question_type": "short_answer",
+      "stem": "文件描述符表 (File Descriptor Table, FD Table) 的实现形态是什么？（固定数组/Vec/BTreeMap 等；必须给结构体定义证据）",
+      "value": "链表 + 数组的混合结构。struct fdtable 包含固定大小数组 arr[NOFILE]，并通过 next 指针链接多个 fdtable 形成链表以支持扩展。",
+      "evidence": [
+        {
+          "path": "include/fs/file.h",
+          "symbol_kind": "struct",
+          "symbol_name": "fdtable",
+          "excerpt": "struct fdtable { uint16 basefd; uint16 nextfd; uint16 used; uint16 exec_close; struct file *arr[NOFILE]; struct fdtable *next; };"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_006",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现块缓存/缓冲缓存 (Block Cache / Buffer Cache, bcache)？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/fs/bio.c",
+          "symbol_kind": "function",
+          "symbol_name": "binit",
+          "excerpt": "void binit(void) { initlock(&bcachelock, \"bcache\"); dlist_init(&lru_head); ... for (struct buf *b = bufs; b < bufs + BNUM; b++) ..."
+        },
+        {
+          "path": "include/fs/buf.h",
+          "symbol_kind": "struct",
+          "symbol_name": "buf",
+          "excerpt": "struct buf { uint32 dev; uint32 sectorno; uint32 refcnt; uint16 valid; uint8 dirty; uint8 disk; struct d_list list; list_node_t hash; struct sleeplock lock; uchar data[BSIZE]; };"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_007",
+      "question_type": "short_answer",
+      "stem": "若存在缓存：驱逐策略是什么（LRU/Clock/FIFO/无驱逐）？必须指出判断依据（字段/算法分支）证据。",
+      "value": "LRU (Least Recently Used)。使用 lru_head 双向链表，新访问的 buf 移到链表头部，驱逐时从尾部取最久未使用的 buf。通过 lrucnt[] 数组记录访问计数辅助判断。",
+      "evidence": [
+        {
+          "path": "kernel/fs/bio.c",
+          "symbol_kind": "function",
+          "symbol_name": "bget",
+          "excerpt": "struct d_list *dl = lru_head.prev; if (dl != &lru_head) { b = container_of(dl, struct buf, list); ... dlist_del(&b->list); }"
+        },
+        {
+          "path": "kernel/fs/fat32/fat.c",
+          "symbol_kind": "struct",
+          "symbol_name": "fatcache",
+          "excerpt": "struct { char *page; int allocidx; uint32 fatsec[FAT_CACHE_NSEC]; uint32 lrucnt[FAT_CACHE_NSEC]; int8 dirty[FAT_CACHE_NSEC]; } fatcache;"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_008",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现页缓存 (Page Cache)或与 mmap/文件映射共享缓存页？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "include/mm/mmap.h",
+          "symbol_kind": "struct",
+          "symbol_name": "mmap_page",
+          "excerpt": "struct mmap_page { uint64 f_off; uint64 f_len; void *pa; uint32 ref; int valid; struct rb_node rb; };"
+        },
+        {
+          "path": "kernel/mm/mmap.c",
+          "symbol_kind": "function",
+          "symbol_name": "get_mmap_page",
+          "excerpt": "static struct mmap_page *get_mmap_page(struct rb_root *root, uint64 off) { struct rb_node *node = root->rb_node; while (node) { struct mmap_page *map = rb_entry(node, struct mmap_page, rb); ..."
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_009",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 mmap 的文件映射或匿名映射？（必须三态；若 stub 说明形态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/syscall/sysmem.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_mmap",
+          "excerpt": "uint64 sys_mmap(void) { ... argaddr(0, &start); argaddr(1, &len); argint(2, &prot); argint(3, &flags); argfd(4, &fd, &f); argaddr(5, (uint64*)&off); ... return do_mmap(start, len, prot, flags, f, off); }"
+        },
+        {
+          "path": "kernel/mm/mmap.c",
+          "symbol_kind": "function",
+          "symbol_name": "do_mmap",
+          "excerpt": "uint64 do_mmap(uint64 start, uint64 len, int prot, int flags, struct file *f, int64 off) { ... if (f) ret = mmap_file(new, len, flags, f, off); else ret = mmap_anonymous(new, flags); ..."
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_010",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 poll/select/epoll（或等价事件机制）？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/fs/poll.c",
+          "symbol_kind": "function",
+          "symbol_name": "ppoll",
+          "excerpt": "int ppoll(struct pollfd *pfds, int nfds, struct timespec *timeout, __sigset_t *sigmask) { ... for (int i = 0; i < nfds; i++) { pfds[i].revents = POLLIN|POLLOUT; } return nfds; }"
+        },
+        {
+          "path": "kernel/fs/poll.c",
+          "symbol_kind": "function",
+          "symbol_name": "pselect",
+          "excerpt": "int pselect(int nfds, struct fdset *readfds, struct fdset *writefds, struct fdset *exceptfds, struct timespec *timeout, __sigset_t *sigmask) { ... int ret = pselect(nfds, urfds ? &rfds: NULL, uwfds ? &wfds: NULL, uexfds ? &exfds: NULL, ...);"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_011",
+      "question_type": "tri_state_impl",
+      "stem": "路径解析 (namei/path_walk/lookup) 是否实现并支持绝对/相对路径与 . ..？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/fs/fs.c",
+          "symbol_kind": "function",
+          "symbol_name": "lookup_path",
+          "excerpt": "static struct inode *lookup_path(struct inode *ip, char *path, int parent, char *name) { if (*path == '/') { ip = de_mnt_in(rootfs.root)->inode; ... } else if (*path != '\\0') { if (ip != NULL) ip = idup(ip); else { ip = idup(myproc()->cwd); } }"
+        },
+        {
+          "path": "kernel/fs/fs.c",
+          "symbol_kind": "function",
+          "symbol_name": "dirlookup",
+          "excerpt": "struct inode *dirlookup(struct inode *dir, char *filename, uint *poff) { if (strncmp(filename, \".\", MAXNAME) == 0) { de = de_mnt_in(dir->entry); return idup(de->inode); } else if (strncmp(filename, \"..\", MAXNAME) == 0) { ..."
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_012",
+      "question_type": "tri_state_impl",
+      "stem": "是否支持符号链接 (symlink) 的解析/跟随？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "include/fs/stat.h",
+          "symbol_kind": "macro",
+          "symbol_name": "S_IFLNK",
+          "excerpt": "#define S_IFLNK 0120000 /* symbolic link */ #define S_ISLNK(m) (((m) & S_IFMT) == S_IFLNK)"
+        },
+        {
+          "path": "kernel/fs/fs.c",
+          "symbol_kind": "search",
+          "symbol_name": "symlink_search",
+          "excerpt": "在附件源码中检索 symlink、readlink 相关实现，仅在 stat.h 中定义了 S_IFLNK 宏，但未找到符号链接的创建、解析或跟随的实际实现代码。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_013",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现管道 (pipe/pipe2) 并在 VFS 层作为文件对象？（必须三态；与 08 章 pipe 实现互指）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/fs/pipe.c",
+          "symbol_kind": "function",
+          "symbol_name": "pipealloc",
+          "excerpt": "int pipealloc(struct file **f0, struct file **f1) { ... f0->type = FD_PIPE; f0->readable = 1; f0->writable = 0; f0->pipe = pi; f0->poll = pipepoll; f1->type = FD_PIPE; f1->readable = 0; f1->writable = 1; f1->pipe = pi; ..."
+        },
+        {
+          "path": "include/fs/file.h",
+          "symbol_kind": "enum",
+          "symbol_name": "file_type_e",
+          "excerpt": "typedef enum { FD_NONE, FD_PIPE, FD_INODE, FD_DEVICE, } file_type_e;"
+        },
+        {
+          "path": "kernel/syscall/sysfile.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_pipe",
+          "excerpt": "uint64 sys_pipe(void) { ... if(pipealloc(&rf, &wf) < 0) return -ENOMEM; fd0 = -1; if ((fd0 = fdalloc(rf, 0)) < 0 || (fd1 = fdalloc(wf, 0)) < 0) ..."
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_014",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现网络 socket（作为 VFS 文件对象）？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "include/fs/file.h",
+          "symbol_kind": "search",
+          "symbol_name": "socket_search",
+          "excerpt": "在附件源码中检索 socket、network 相关实现，file_type_e 枚举中只有 FD_NONE、FD_PIPE、FD_INODE、FD_DEVICE，无 socket 类型。未找到 socket 相关的 syscall 或结构体定义。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_015",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现伪文件系统（devfs/procfs/sysfs）？（必须三态；若 implemented 需说明实现形态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/fs/rootfs.c",
+          "symbol_kind": "function",
+          "symbol_name": "rootfs_init",
+          "excerpt": "void rootfs_init() { ... // init devfs ... if ((devfs.root = de_root_generate(&devfs, NULL, \"/\", inum++, S_IFDIR, 0)) == NULL) ... // init procfs ... if ((procfs.root = de_root_generate(&procfs, NULL, \"/\", inum++, S_IFDIR, 0)) == NULL) ..."
+        },
+        {
+          "path": "kernel/fs/rootfs.c",
+          "symbol_kind": "struct",
+          "symbol_name": "superblock",
+          "excerpt": "struct superblock rootfs; struct superblock procfs; struct superblock devfs; ... mountsysfs(&devfs, dir, \"devfs\"); ... mountsysfs(&procfs, dir, \"procfs\");"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_016",
+      "question_type": "single_choice",
+      "stem": "文件描述符表的归属是哪种？",
+      "value": "A. Per-Process（每进程独立 fd 表，fork 时复制/共享）",
+      "evidence": [
+        {
+          "path": "include/sched/proc.h",
+          "symbol_kind": "struct",
+          "symbol_name": "proc",
+          "excerpt": "struct proc { ... struct fdtable fds; // Open files ... };"
+        },
+        {
+          "path": "kernel/sched/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "clone",
+          "excerpt": "// copy parent's memory layout ... // filesystem if (copyfdtable(&p->fds, &np->fds) < 0) { __debug_warn(\"clone\", \"fail to copy fdt\\n\"); freeproc(np); return -1; }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_017",
+      "question_type": "single_choice",
+      "stem": "文件数据块分配方式 (File Allocation Method, Stallings Ch12) 更接近哪种？",
+      "value": "B. 链式分配 (Chained/Linked Allocation)：块通过指针链接",
+      "evidence": [
+        {
+          "path": "kernel/fs/fat32/fat.c",
+          "symbol_kind": "function",
+          "symbol_name": "read_fat",
+          "excerpt": "uint32 read_fat(struct superblock *sb, uint32 cluster) { ... uint32 fat_sec = fat_sec_of_clus(fat, cluster, 1); uint32 sec_off = fat_offset_of_clus(fat, cluster); ... next = *(uint32 *)(fat->fatcache.page + idx * SECSZ + sec_off); ..."
+        },
+        {
+          "path": "kernel/fs/fat32/cluster.c",
+          "symbol_kind": "function",
+          "symbol_name": "reloc_clus",
+          "excerpt": "uint32 reloc_clus(struct inode *ip, uint off, int alloc) { ... clus = read_fat(sb, preclus); // get next cluster number ... table->clus[i] = clus; ..."
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_018",
+      "question_type": "single_choice",
+      "stem": "磁盘/存储空闲空间管理 (Free Space Management, Stallings Ch12) 更接近哪种？",
+      "value": "E. FAT 表内嵌空闲链（FAT32 特有）",
+      "evidence": [
+        {
+          "path": "kernel/fs/fat32/fat.c",
+          "symbol_kind": "function",
+          "symbol_name": "fat_update_next_free",
+          "excerpt": "uint32 fat_update_next_free(struct superblock *sb) { struct fat32_sb *fat = sb2fat(sb); ... for (; cnt > 0; cnt--, fatoff = (fatoff + 1) % FAT_ENTRY_NUM) { if (asecdata[fatoff] == 0) { // found fat->next_free = fatoff + FAT_ENTRY_NUM * (fat->fatcache.fatsec[aidx] - fat->bpb.rsvd_sec_cnt); ..."
+        },
+        {
+          "path": "kernel/fs/fat32/fat32.h",
+          "symbol_kind": "struct",
+          "symbol_name": "fat32_sb",
+          "excerpt": "struct fat32_sb { ... uint32 free_count; // of cluster uint32 next_free; // clus ... };"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_019",
+      "question_type": "single_choice",
+      "stem": "目录结构 (Directory Structure, Stallings Ch12) 更接近哪种？",
+      "value": "C. 树形层次目录 (Tree-Structured Hierarchy)（最常见）",
+      "evidence": [
+        {
+          "path": "include/fs/fs.h",
+          "symbol_kind": "struct",
+          "symbol_name": "dentry",
+          "excerpt": "struct dentry { char filename[MAXNAME + 1]; struct inode *inode; struct dentry *parent; struct dentry *next; struct dentry *child; struct dentry_op *op; struct superblock *mount; };"
+        },
+        {
+          "path": "kernel/fs/fs.c",
+          "symbol_kind": "function",
+          "symbol_name": "lookup_path",
+          "excerpt": "while ((path = skipelem(path, name, MAXNAME)) != 0) { ... if ((next = dirlookup(ip, name, 0)) == NULL) { ... } ip = next; }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_020",
+      "question_type": "single_choice",
+      "stem": "文件内部记录组织 (File Record Organization, Stallings Ch12) 更接近哪种？",
+      "value": "A. 字节流 (Byte Stream / Unstructured)：无固定记录结构",
+      "evidence": [
+        {
+          "path": "kernel/fs/fat32/fat32.c",
+          "symbol_kind": "function",
+          "symbol_name": "fat_read_file",
+          "excerpt": "int fat_read_file(struct inode *ip, int user_dst, uint64 dst, uint off, uint n) { ... for (tot = 0; tot < n; tot += m, off += m, dst += m) { if ((clus = reloc_clus(ip, off, 0)) == 0) { break; } m = bpc - off % bpc; if (n - tot < m) { m = n - tot; } if (fat_rw_clus(ip->sb, clus, 0, user_dst, dst, off % bpc, m) != m) { break; } } return tot; }"
+        },
+        {
+          "path": "kernel/syscall/sysfile.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_read",
+          "excerpt": "uint64 sys_read(void) { struct file *f; int n; uint64 p; if (argfd(0, 0, &f) < 0) return -EBADF; argaddr(1, &p); argint(2, &n); return fileread(f, p, n); }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_021",
+      "question_type": "single_choice",
+      "stem": "设备发现/枚举机制更接近哪种？",
+      "value": "C. 硬编码设备表/固定 MMIO 地址",
+      "evidence": [
+        {
+          "path": "include/memlayout.h",
+          "symbol_kind": "macro",
+          "symbol_name": "MMIO_addresses",
+          "excerpt": "#define UART 0x38000000L #define CLINT 0x02000000L #define PLIC 0x0c000000L #ifndef QEMU #define GPIOHS 0x38001000 #define DMAC 0x50000000 #define GPIO 0x50200000 #define SPI0 0x52000000 #define SYSCTL 0x50440000 #endif"
+        },
+        {
+          "path": "kernel/main.c",
+          "symbol_kind": "function",
+          "symbol_name": "main",
+          "excerpt": "void main(unsigned long hartid, unsigned long dtb_pa) { ... #ifndef QEMU fpioa_pin_init(); dmac_init(); #endif disk_init(); binit(); ..."
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_022",
+      "question_type": "tri_state_impl",
+      "stem": "是否能在代码中证实解析了 `.dtb`/DeviceTree？（必须三态；若 implemented 必须指出解析入口）",
+      "value": "stub",
+      "evidence": [
+        {
+          "path": "bootloader/SBI/rustsbi-qemu/src/main.rs",
+          "symbol_kind": "function",
+          "symbol_name": "count_harts",
+          "excerpt": "unsafe fn count_harts(dtb_pa: usize) -> usize { use device_tree::{DeviceTree, Node}; ... let header = &*(dtb_pa as *const DtbHeader); let magic = u32::from_be(header.magic); if magic == DEVICE_TREE_MAGIC { let size = u32::from_be(header.size); let data = core::slice::from_raw_parts(dtb_pa as *const u8, size as usize); if let Ok(dt) = DeviceTree::load(data) { if let Some(cpu_map) = dt.find(\"/cpus/cpu-map\") { return enumerate_cpu_map(cpu_map) } } }"
+        },
+        {
+          "path": "kernel/main.c",
+          "symbol_kind": "function",
+          "symbol_name": "main",
+          "excerpt": "void main(unsigned long hartid, unsigned long dtb_pa) { ... // dtb_pa is passed but not used for device discovery on K210 #ifndef QEMU fpioa_pin_init(); dmac_init(); #endif"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_023",
+      "question_type": "short_answer",
+      "stem": "驱动框架接口是什么？（Rust Driver trait / C driver ops / 注册表；必须引用接口定义证据）",
+      "value": "C 函数接口，无统一驱动框架。各驱动通过初始化函数直接调用（如 sdcard_init()、disk_init()），无 driver trait 或注册表机制。",
+      "evidence": [
+        {
+          "path": "include/hal/sdcard.h",
+          "symbol_kind": "function",
+          "symbol_name": "sdcard_init",
+          "excerpt": "void sdcard_init(void); void sdcard_read_sector(uint8 *buf, int sectorno); void sdcard_write_sector(uint8 *buf, int sectorno);"
+        },
+        {
+          "path": "include/hal/disk.h",
+          "symbol_kind": "function",
+          "symbol_name": "disk_init",
+          "excerpt": "void disk_init(void); int disk_read(struct buf *b); void disk_write(struct buf *b); int disk_submit(struct buf *b);"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_024",
+      "question_type": "short_answer",
+      "stem": "驱动注册与初始化顺序是什么？（init_drivers/probe/driver_manager 等；列出 3-6 个关键节点并给证据）",
+      "value": "1. cpuinit() - CPU 初始化\n2. consoleinit() - 控制台初始化\n3. kpminit() - 物理内存初始化\n4. kvminit()/kvminithart() - 页表初始化\n5. disk_init() - 磁盘驱动初始化\n6. binit() - 缓冲缓存初始化\n所有驱动在 kernel/main.c 的 main() 函数中顺序调用，无动态注册。",
+      "evidence": [
+        {
+          "path": "kernel/main.c",
+          "symbol_kind": "function",
+          "symbol_name": "main",
+          "excerpt": "void main(unsigned long hartid, unsigned long dtb_pa) { ... cpuinit(); floatinithart(); consoleinit(); printfinit(); kpminit(); kvminit(); kvminithart(); ... #ifndef QEMU fpioa_pin_init(); dmac_init(); #endif disk_init(); binit(); ... userinit(); ..."
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_025",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 UART/Console 驱动用于早期输出？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/console.c",
+          "symbol_kind": "function",
+          "symbol_name": "consoleinit",
+          "excerpt": "void consoleinit(void) { initlock(&cons.lock, \"cons\"); cons.e = cons.w = cons.r = 0; }"
+        },
+        {
+          "path": "kernel/console.c",
+          "symbol_kind": "function",
+          "symbol_name": "consputc",
+          "excerpt": "void consputc(int c) { if(c == BACKSPACE){ sbi_console_putchar('\\b'); sbi_console_putchar(' '); sbi_console_putchar('\\b'); } else { sbi_console_putchar(c); } }"
+        },
+        {
+          "path": "include/sbi.h",
+          "symbol_kind": "function",
+          "symbol_name": "sbi_console_putchar",
+          "excerpt": "static inline void sbi_console_putchar(int ch) { LEGACY_SBI_CALL(SBI_CONSOLE_PUTCHAR, ch); }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_026",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现块设备驱动（virtio-blk/ramdisk/其他）？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/hal/sdcard.c",
+          "symbol_kind": "function",
+          "symbol_name": "sdcard_init",
+          "excerpt": "void sdcard_init(void) { int result = sd_init(); initsleeplock(&sdcard_lock, \"sdcard\"); wait_queue_init(&sd_rqueue, \"sdrq\"); wait_queue_init(&sd_wqueue, \"sdwq\"); ..."
+        },
+        {
+          "path": "kernel/hal/virtio_disk.c",
+          "symbol_kind": "function",
+          "symbol_name": "virtio_disk_init",
+          "excerpt": "void virtio_disk_init(void) { uint32 status = 0; initlock(&disk.vdisk_lock, \"virtio_disk\"); wait_queue_init(&disk.queue, \"vdisk_queue\"); ... *R(VIRTIO_MMIO_STATUS) = status; ..."
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_027",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现网络设备驱动（virtio-net/e1000/rtl8139 等）？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/hal/",
+          "symbol_kind": "search",
+          "symbol_name": "network_driver_search",
+          "excerpt": "在附件源码 kernel/hal/ 目录中检索 network、ethernet、virtio-net 相关实现，未找到任何网络设备驱动文件。仅找到 sdcard.c、virtio_disk.c、dmac.c 等存储相关驱动。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_028",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现中断控制器驱动（PLIC/CLINT/APIC 等）？（必须三态；需指出中断源到 handler 的分发证据）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/hal/plic.c",
+          "symbol_kind": "function",
+          "symbol_name": "plic_claim",
+          "excerpt": "int plic_claim(void) { int hart = cpuid(); int irq; #ifndef QEMU irq = *(uint32*)PLIC_MCLAIM(hart); #else irq = *(uint32*)PLIC_SCLAIM(hart); #endif return irq; }"
+        },
+        {
+          "path": "kernel/trap/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "handle_intr",
+          "excerpt": "int handle_intr(uint64 scause) { ... else if (INTR_SOFTWARE == scause && sbi_xv6_is_ext().value) { int irq = plic_claim(); int c; switch (irq) { case UART_IRQ: c = sbi_console_getchar(); if (-1 != c) consoleintr(c); break; case DISK_IRQ: __debug_info(\"handle_intr\", \"disk\\n\"); disk_intr(); break; ... } if (irq) plic_complete(irq); ..."
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_029",
+      "question_type": "short_answer",
+      "stem": "MMIO 地址来源是什么？（DTB 提供 / 常量硬编码 / 物理→虚拟转换；必须给证据）",
+      "value": "主要是常量硬编码，部分通过 VIRT_OFFSET 进行物理→虚拟转换。K210 平台使用硬编码地址（如 UART 0x38000000L），QEMU 平台部分地址通过设备树获取。",
+      "evidence": [
+        {
+          "path": "include/memlayout.h",
+          "symbol_kind": "macro",
+          "symbol_name": "MMIO_definitions",
+          "excerpt": "#ifdef QEMU #define UART 0x10000000L #else #define UART 0x38000000L #endif #define UART_V (UART + VIRT_OFFSET) #define CLINT 0x02000000L #define CLINT_V (CLINT + VIRT_OFFSET) #define PLIC 0x0c000000L #define PLIC_V (PLIC + VIRT_OFFSET)"
+        },
+        {
+          "path": "include/memlayout.h",
+          "symbol_kind": "macro",
+          "symbol_name": "VIRT_OFFSET",
+          "excerpt": "#define VIRT_OFFSET 0x3F00000000L"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_030",
+      "question_type": "short_answer",
+      "stem": "多平台适配是如何通过构建/条件编译选择驱动的？（features/Kconfig/Makefile 规则；必须给证据）",
+      "value": "通过 Makefile 的 platform 变量和 C 语言的 #ifdef QEMU 条件编译。Makefile 中设置 platform := k210 或 platform := qemu，源码中通过 #ifdef QEMU 区分不同平台的驱动和地址定义。",
+      "evidence": [
+        {
+          "path": "Makefile",
+          "symbol_kind": "build_config",
+          "symbol_name": "platform",
+          "excerpt": "platform := k210 # platform := qemu ... ifeq ($(platform), qemu) CFLAGS += -D QEMU endif ... ifeq ($(platform), k210) SBI := ./sbi/sbi-k210 else SBI := ./sbi/sbi-qemu endif"
+        },
+        {
+          "path": "Makefile",
+          "symbol_kind": "build_config",
+          "symbol_name": "SRC",
+          "excerpt": "ifeq ($(platform), k210) SRC += $K/hal/spi.c $K/hal/gpiohs.c $K/hal/fpioa.c $K/hal/sdcard.c $K/hal/dmac.c $K/hal/sysctl.c $K/utils/utils.c else SRC += $K/hal/virtio_disk.c endif"
+        },
+        {
+          "path": "include/memlayout.h",
+          "symbol_kind": "preprocessor",
+          "symbol_name": "QEMU_check",
+          "excerpt": "#ifdef QEMU #define UART 0x10000000L #else #define UART 0x38000000L #endif ... #ifndef QEMU #define GPIOHS 0x38001000 #define DMAC 0x50000000 ... #endif"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_031",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 MMU 启用前后串口地址切换（phys/virt 切换）逻辑？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/console.c",
+          "symbol_kind": "search",
+          "symbol_name": "uart_address_search",
+          "excerpt": "在附件源码中检索 UART 地址切换逻辑，console.c 中使用 sbi_console_putchar() 通过 SBI 调用输出，未直接使用 MMIO 地址。未找到 MMU 启用前后串口地址切换的显式逻辑。"
+        },
+        {
+          "path": "include/memlayout.h",
+          "symbol_kind": "search",
+          "symbol_name": "uart_virt_search",
+          "excerpt": "虽然定义了 UART_V = (UART + VIRT_OFFSET)，但在实际代码中未找到 MMU 启用后使用 UART_V 而非 UART 的切换逻辑。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_032",
+      "question_type": "single_choice",
+      "stem": "I/O 缓冲模式 (I/O Buffering) 最接近哪种？（Stallings Ch11：单缓冲 Single Buffer / 双缓冲 Double Buffer / 循环缓冲 Circular Buffer / 缓冲池 Buffer Pool / 无缓冲 No Buffer）",
+      "value": "D. 缓冲池 (Buffer Pool)",
+      "evidence": [
+        {
+          "path": "include/fs/buf.h",
+          "symbol_kind": "macro",
+          "symbol_name": "BNUM",
+          "excerpt": "#define BSIZE 512 #define BNUM 2500"
+        },
+        {
+          "path": "kernel/fs/bio.c",
+          "symbol_kind": "variable",
+          "symbol_name": "bufs",
+          "excerpt": "static struct buf bufs[BNUM]; ... void binit(void) { ... for (struct buf *b = bufs; b < bufs + BNUM; b++) { b->refcnt = 0; ... dlist_add_before(&lru_head, &b->list); initsleeplock(&b->lock, \"buffer\"); } }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_033",
+      "question_type": "single_choice",
+      "stem": "块设备（磁盘/eMMC/NVMe）I/O 请求调度算法 (Scheduling Algorithm) (Disk Scheduling Algorithm) 更接近哪种？（Stallings Ch11；若无显式调度则选「FCFS 顺序提交」）",
+      "value": "A. FCFS（先来先服务 First-Come First-Served）",
+      "evidence": [
+        {
+          "path": "kernel/hal/sdcard.c",
+          "symbol_kind": "search",
+          "symbol_name": "disk_scheduling_search",
+          "excerpt": "在附件源码中检索磁盘调度算法，sdcard.c 和 virtio_disk.c 中未找到 SSTF、SCAN、C-SCAN 等调度算法实现。请求按提交顺序处理，无显式调度逻辑。"
+        },
+        {
+          "path": "kernel/fs/bio.c",
+          "symbol_kind": "function",
+          "symbol_name": "bwrite",
+          "excerpt": "void bwrite(struct buf *b) { ... res = disk_submit(b); b->valid = 1; releasesleep(&b->lock); if ((res & 0x1) == 0) bput(b); if ((res & 0x2) == 0) disk_write_start(); }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_034",
+      "question_type": "single_choice",
+      "stem": "I/O 控制技术 (I/O Control Techniques, Stallings Ch11) 更接近哪种？",
+      "value": "D. 混合（小传输用中断，大传输用 DMA）",
+      "evidence": [
+        {
+          "path": "kernel/hal/sdcard.c",
+          "symbol_kind": "function",
+          "symbol_name": "sdcard_read_sectors",
+          "excerpt": "int sdcard_read_sectors(struct buf * restrict bufs[], int nbuf) { ... sd_read_data_dma(bufs[i]->data, BSIZE); ... }"
+        },
+        {
+          "path": "kernel/hal/dmac.c",
+          "symbol_kind": "function",
+          "symbol_name": "dmac_intr",
+          "excerpt": "void dmac_intr(dmac_channel_number_t channel_num) { dmac_channel_interrupt_clear(channel_num); wakeup(dmac_chan); }"
+        },
+        {
+          "path": "kernel/hal/sdcard.c",
+          "symbol_kind": "function",
+          "symbol_name": "sdcard_intr",
+          "excerpt": "void sdcard_intr(void) { ... if (sd_status.busy == BUSY_READ) { dmac_ch_clear_intr(DMAC_CHANNEL0, 1); return; } ... sdcard_multiple_write_wait(); ..."
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_035",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 DMA (Direct Memory Access, Stallings Ch11) 传输路径？（必须三态；搜索 dma_alloc / dma_map / dma_buf / virtio 描述符环等；virtio 的描述符环也算 DMA 等价机制）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/hal/dmac.c",
+          "symbol_kind": "function",
+          "symbol_name": "dmac_init",
+          "excerpt": "void dmac_init(void) { ... sysctl_clock_enable(SYSCTL_CLOCK_DMA); ... dmac_reset.data = readq(&dmac->reset); dmac_reset.reset.rst = 1; writeq(dmac_reset.data, &dmac->reset); ..."
+        },
+        {
+          "path": "kernel/hal/dmac.c",
+          "symbol_kind": "function",
+          "symbol_name": "dmac_set_single_mode",
+          "excerpt": "void dmac_set_single_mode(dmac_channel_number_t channel_num, const void *src, void *dest, dmac_address_increment_t src_inc, dmac_address_increment_t dest_inc, dmac_burst_trans_length_t dmac_burst_size, dmac_transfer_width_t dmac_trans_width, uint64 block_size) { dmac_channel_interrupt_clear(channel_num); dmac_channel_disable(channel_num); dmac_wait_idle(channel_num); dmac_set_channel_param(...);"
+        },
+        {
+          "path": "kernel/hal/virtio.h",
+          "symbol_kind": "struct",
+          "symbol_name": "virtq_desc",
+          "excerpt": "struct virtq_desc { uint64 addr; uint32 len; uint16 flags; uint16 next; }; #define VRING_DESC_F_NEXT 1 #define VRING_DESC_F_WRITE 2"
+        }
+      ]
+    }
+  ]
+}

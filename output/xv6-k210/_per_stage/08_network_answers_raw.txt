@@ -1,137 +1,892 @@
+--- Q08_001 ---
+attempt=1
 ```json
 {
-  "schema_version": "v1",
-  "stage_id": "08_network",
-  "stage_title": "网络子系统与协议栈",
-  "terminology_profile": "stallings_en_zh",
-  "answers": [
+  "question_id": "Q08_001",
+  "question_type": "tri_state_impl",
+  "stem": "是否存在网络子系统实现（协议栈或 socket 层）？（必须三态）",
+  "fact_answers": [
     {
-      "question_id": "Q08_001",
-      "question_type": "tri_state_impl",
-      "stem": "是否存在网络子系统实现（协议栈或 socket 层）？（必须三态）",
-      "value": "not_found",
-      "evidence": [
-        {
-          "path": "include/sysnum.h",
-          "symbol_kind": "header",
-          "symbol_name": "SYS_*",
-          "excerpt": "系统调用编号定义中无 SYS_socket/SYS_bind/SYS_connect/SYS_sendto/SYS_recvfrom 等网络相关调用"
-        },
-        {
-          "path": "kernel/",
-          "symbol_kind": "directory",
-          "symbol_name": "kernel",
-          "excerpt": "kernel/ 目录下无 net/、tcp/、udp/、socket/ 等网络相关子目录"
-        },
-        {
-          "path": "kernel/hal/virtio_disk.c",
-          "symbol_kind": "source",
-          "symbol_name": "virtio_disk_rw",
-          "excerpt": "HAL 层仅实现 virtio-blk 磁盘驱动，无 virtio-net 网卡驱动"
-        }
-      ]
+      "fact_id": "Q08_001_01",
+      "fact_key": "socket_api",
+      "value": "no_after_negative_search",
+      "used_evidence_ids": [
+        "ev_task_08_network_overview_61e5e300",
+        "ev_task_08_network_overview_e7271f15",
+        "ev_task_08_network_overview_10911eca",
+        "ev_task_08_network_overview_9616161e"
+      ],
+      "notes": "syscall table (sysnum.h, syscall.c) 和用户头文件 (user.h) 均无 socket/bind/connect/sendto/recvfrom 相关系统调用号或声明；grep 仅在 errno.h 和 stat.h 中匹配到 POSIX 常量，无实际实现。"
     },
     {
-      "question_id": "Q08_002",
-      "question_type": "single_choice",
-      "stem": "协议栈来源更接近哪种？",
-      "value": "未发现",
-      "evidence": [
-        {
-          "path": "Cargo.toml",
-          "symbol_kind": "config",
-          "symbol_name": "workspace",
-          "excerpt": "Cargo.toml 仅定义 bootloader workspace，无 smoltcp/lwip/embassy-net 等网络协议栈依赖"
-        },
-        {
-          "path": "include/errno.h",
-          "symbol_kind": "header",
-          "symbol_name": "ENONET/ENOTUNIQ",
-          "excerpt": "errno.h 中虽有 ENONET 等网络相关错误码，但仅为 POSIX 兼容占位符，无实际网络实现"
-        }
-      ]
+      "fact_id": "Q08_001_02",
+      "fact_key": "protocol_stack",
+      "value": "no_after_negative_search",
+      "used_evidence_ids": [
+        "ev_task_08_network_overview_b3469835",
+        "ev_task_08_network_overview_61e5e300"
+      ],
+      "notes": "grep 搜索 smoltcp/lwip/netdev/virtio-net/e1000/loopback 等协议栈关键词在 207 个文件中返回 0 匹配；无协议栈模块或第三方依赖。"
     },
     {
-      "question_id": "Q08_003",
-      "question_type": "tri_state_impl",
-      "stem": "是否实现 socket 系统调用接口（socket/bind/connect/sendto/recvfrom 等）？（必须三态）",
-      "value": "not_found",
-      "evidence": [
-        {
-          "path": "include/sysnum.h",
-          "symbol_kind": "header",
-          "symbol_name": "SYS_*",
-          "excerpt": "系统调用编号 1-276 中无 socket/bind/connect/sendto/recvfrom/listen/accept 等网络调用"
-        },
-        {
-          "path": "kernel/syscall/sysfile.c",
-          "symbol_kind": "source",
-          "symbol_name": "sys_*",
-          "excerpt": "syscall 层仅实现文件/进程/内存类系统调用，无网络 syscall 实现"
-        }
-      ]
+      "fact_id": "Q08_001_03",
+      "fact_key": "socket_state",
+      "value": "no_after_negative_search",
+      "used_evidence_ids": [
+        "ev_task_08_network_overview_61e5e300",
+        "ev_task_08_network_overview_3f3cfaf6"
+      ],
+      "notes": "grep 搜索 Ethernet/ARP/IP/ICMP/UDP/TCP 等协议层关键词，仅在 errno.h/stat.h 中匹配到 POSIX 常量，无任何协议层实现。"
     },
     {
-      "question_id": "Q08_004",
-      "question_type": "short_answer",
-      "stem": "选择一个发送路径（优先 sys_sendto），追踪：syscall → 协议栈 → 网卡驱动。列 3-6 个关键节点并给证据。",
-      "value": "未实现网络功能（❌ 未实现）。无法追踪发送路径，原因如下：\n1. 无 sys_sendto 系统调用：include/sysnum.h 中无 SYS_sendto 定义\n2. 无协议栈：全仓库 grep 未发现 tcp/udp/ip 等协议处理代码\n3. 无网卡驱动：kernel/hal/ 仅有 virtio_disk.c（磁盘），无 virtio-net 或 e1000 等网卡驱动\n4. 无 socket 抽象：include/fs/file.h 中文件类型仅支持普通文件/管道/设备，无 socket 类型",
-      "evidence": []
+      "fact_id": "Q08_001_04",
+      "fact_key": "send_recv_flow",
+      "value": "no_after_negative_search",
+      "used_evidence_ids": [
+        "ev_task_08_network_overview_61e5e300",
+        "ev_task_08_network_overview_3f3cfaf6"
+      ],
+      "notes": "无 send/recv 系统调用实现，无 netdev/loopback/driver 队列接入。"
     },
     {
-      "question_id": "Q08_005",
-      "question_type": "tri_state_impl",
-      "stem": "是否实现网卡驱动（virtio-net/e1000 等）与收包中断路径？（必须三态）",
-      "value": "not_found",
-      "evidence": [
-        {
-          "path": "kernel/hal/virtio_disk.c",
-          "symbol_kind": "source",
-          "symbol_name": "virtio_disk_init/virtio_disk_intr",
-          "excerpt": "virtio 驱动仅实现 device_id=2 的磁盘设备（VIRTIO_BLK_T_IN/OUT），无 device_id=1 的网卡设备支持"
-        },
-        {
-          "path": "include/hal/virtio.h:8",
-          "symbol_kind": "header",
-          "symbol_name": "VIRTIO_MMIO_DEVICE_ID",
-          "excerpt": "注释说明 device_id=1 为网卡、device_id=2 为磁盘，但代码仅实现磁盘驱动"
-        },
-        {
-          "path": "kernel/hal/",
-          "symbol_kind": "directory",
-          "symbol_name": "hal",
-          "excerpt": "HAL 目录包含 disk.c/sdcard.c/virtio_disk.c 等存储驱动，无 net/ 或网卡驱动文件"
-        }
-      ]
+      "fact_id": "Q08_001_05",
+      "fact_key": "net_device_driver",
+      "value": "no_after_negative_search",
+      "used_evidence_ids": [
+        "ev_task_08_network_overview_b3469835",
+        "ev_task_08_network_overview_3f3cfaf6"
+      ],
+      "notes": "grep 搜索 netdev/virtio-net/e1000 等网卡驱动关键词返回 0 匹配；virtio_disk.c 是磁盘驱动，非网卡驱动。"
     },
     {
-      "question_id": "Q08_006",
-      "question_type": "multi_choice",
-      "stem": "协议支持情况（多选；未发现则留空并在 notes 写 not_found）：",
-      "value": [],
-      "evidence": [],
-      "notes": "not_found - 全仓库 grep 未发现 Ethernet/ARP/IPv4/IPv6/ICMP/UDP/TCP/DHCP/DNS 等协议实现代码"
-    },
-    {
-      "question_id": "Q08_007",
-      "question_type": "tri_state_impl",
-      "stem": "是否存在零拷贝/共享缓冲/DMA 描述符等路径（zero-copy）？（必须三态；仅有名词不算 implemented）",
-      "value": "not_found",
-      "evidence": [
-        {
-          "path": "kernel/hal/virtio_disk.c",
-          "symbol_kind": "source",
-          "symbol_name": "virtq_desc",
-          "excerpt": "virtio_disk 使用 DMA 描述符（virtq_desc）但仅用于磁盘 I/O，无网络零拷贝路径"
-        },
-        {
-          "path": "kernel/fs/bio.c",
-          "symbol_kind": "source",
-          "symbol_name": "buf",
-          "excerpt": "buf 结构用于块设备缓存，无网络 mbuf/sk_buff 等共享缓冲机制"
-        }
-      ]
+      "fact_id": "Q08_001_06",
+      "fact_key": "negative_search_coverage",
+      "value": {
+        "searched_keywords": [
+          "socket",
+          "bind",
+          "connect",
+          "sendto",
+          "recvfrom",
+          "Ethernet",
+          "ARP",
+          "IP",
+          "ICMP",
+          "UDP",
+          "TCP",
+          "smoltcp",
+          "lwip",
+          "netdev",
+          "virtio-net",
+          "e1000",
+          "loopback",
+          "nic",
+          "eth"
+        ],
+        "searched_directories": [
+          "kernel",
+          "include",
+          "xv6-user",
+          "bootloader",
+          "sbi",
+          "linker",
+          "tools",
+          "doc"
+        ],
+        "file_count": 207,
+        "match_count": 0,
+        "coverage_sufficient": true
+      },
+      "used_evidence_ids": [
+        "ev_task_08_network_overview_3f3cfaf6",
+        "ev_task_08_network_overview_b3469835",
+        "ev_task_08_network_overview_61e5e300"
+      ],
+      "notes": "负向搜索覆盖 19 个关键词、8 个目录、207 个文件，匹配数 0（排除 errno.h/stat.h 中的 POSIX 常量），覆盖充分。"
     }
-  ]
+  ],
+  "value": "not_found",
+  "used_evidence_ids": [
+    "ev_task_08_network_overview_1e8a03ee",
+    "ev_task_08_network_overview_b3469835",
+    "ev_task_08_network_overview_61e5e300",
+    "ev_task_08_network_overview_3f3cfaf6",
+    "ev_task_08_network_overview_e7271f15",
+    "ev_task_08_network_overview_10911eca",
+    "ev_task_08_network_overview_9616161e",
+    "ev_task_08_network_overview_fd90e5d4"
+  ],
+  "notes": "所有 6 个 structured_facts 均为 no_after_negative_search，负向搜索覆盖充分（19 关键词、8 目录、207 文件），无 socket API、协议栈、协议层、send/recv 数据路径或网卡驱动实现。仅有的 errno.h 错误码和 stat.h S_IFSOCK 常量属于 POSIX 兼容头文件定义，无实际网络功能，不能支撑 implemented 或 stub。因此最终三态值为 not_found。"
+}
+```
+
+--- Q08_002 ---
+attempt=1
+```json
+{
+  "question_id": "Q08_002",
+  "question_type": "single_choice",
+  "stem": "协议栈来源更接近哪种？",
+  "fact_answers": [
+    {
+      "fact_id": "Q08_002_01",
+      "fact_key": "socket_api",
+      "value": "no_after_negative_search",
+      "used_evidence_ids": [
+        "ev_task_08_network_overview_61e5e300",
+        "ev_task_08_network_overview_3f3cfaf6",
+        "ev_task_08_network_overview_e7271f15",
+        "ev_task_08_network_overview_10911eca",
+        "ev_task_08_network_overview_9616161e"
+      ],
+      "notes": "负向搜索在207个文件中未发现socket/bind/connect/sendto/recvfrom等用户接口的实现；syscall table和user.h中均无socket相关条目；仅errno.h定义了ENOTSOCK等错误码常量，属于POSIX常量定义而非实现。"
+    },
+    {
+      "fact_id": "Q08_002_02",
+      "fact_key": "protocol_stack",
+      "value": "no_after_negative_search",
+      "used_evidence_ids": [
+        "ev_task_08_network_overview_b3469835",
+        "ev_task_08_network_overview_3f3cfaf6"
+      ],
+      "notes": "负向搜索在207个文件中未发现smoltcp/lwip等第三方协议栈依赖，也未发现Ethernet/ARP/IP/ICMP/UDP/TCP等协议栈模块的实现。"
+    },
+    {
+      "fact_id": "Q08_002_03",
+      "fact_key": "socket_state",
+      "value": "no_after_negative_search",
+      "used_evidence_ids": [
+        "ev_task_08_network_overview_61e5e300",
+        "ev_task_08_network_overview_3f3cfaf6"
+      ],
+      "notes": "负向搜索未发现Ethernet/ARP/IP/ICMP/UDP/TCP中任何协议层的实现代码。"
+    },
+    {
+      "fact_id": "Q08_002_04",
+      "fact_key": "send_recv_flow",
+      "value": "no_after_negative_search",
+      "used_evidence_ids": [
+        "ev_task_08_network_overview_61e5e300",
+        "ev_task_08_network_overview_3f3cfaf6"
+      ],
+      "notes": "负向搜索未发现send/recv接入netdev/loopback/driver队列的任何实现。"
+    },
+    {
+      "fact_id": "Q08_002_05",
+      "fact_key": "net_device_driver",
+      "value": "no_after_negative_search",
+      "used_evidence_ids": [
+        "ev_task_08_network_overview_b3469835",
+        "ev_task_08_network_overview_3f3cfaf6"
+      ],
+      "notes": "负向搜索未发现virtio-net/e1000/loopback等网卡驱动初始化、中断/轮询收包或DMA/descriptor的实现；仅存在virtio_disk驱动，与网络无关。"
+    },
+    {
+      "fact_id": "Q08_002_06",
+      "fact_key": "negative_search_coverage",
+      "value": {
+        "searched_keywords": [
+          "socket",
+          "bind",
+          "connect",
+          "sendto",
+          "recvfrom",
+          "Ethernet",
+          "ARP",
+          "IP",
+          "ICMP",
+          "UDP",
+          "TCP",
+          "smoltcp",
+          "lwip",
+          "netdev",
+          "virtio-net",
+          "e1000",
+          "loopback",
+          "nic",
+          "eth"
+        ],
+        "searched_directories": [
+          "kernel",
+          "include",
+          "xv6-user",
+          "bootloader",
+          "sbi",
+          "linker",
+          "tools",
+          "doc"
+        ],
+        "file_count": 207,
+        "match_count": 0,
+        "coverage_sufficient": true
+      },
+      "used_evidence_ids": [
+        "ev_task_08_network_overview_3f3cfaf6"
+      ],
+      "notes": "负向搜索覆盖了19个关键词和8个目录，共207个文件，匹配数为0（排除errno.h/stat.h中的POSIX常量），覆盖充分。"
+    }
+  ],
+  "value": "未发现",
+  "used_evidence_ids": [
+    "ev_task_08_network_overview_b3469835",
+    "ev_task_08_network_overview_61e5e300",
+    "ev_task_08_network_overview_3f3cfaf6",
+    "ev_task_08_network_overview_e7271f15",
+    "ev_task_08_network_overview_10911eca",
+    "ev_task_08_network_overview_9616161e"
+  ],
+  "notes": "所有6个structured_facts均为no_after_negative_search，负向搜索覆盖充分（19个关键词、8个目录、207个文件、0个有效匹配），因此最终选择'未发现'。"
+}
+```
+
+--- Q08_003 ---
+attempt=1
+```json
+{
+  "question_id": "Q08_003",
+  "question_type": "tri_state_impl",
+  "stem": "是否实现 socket 系统调用接口（socket/bind/connect/sendto/recvfrom 等）？（必须三态）",
+  "fact_answers": [
+    {
+      "fact_id": "Q08_003_01",
+      "fact_key": "socket_api",
+      "value": "no_after_negative_search",
+      "used_evidence_ids": [
+        "ev_task_08_socket_syscall_39944fbf",
+        "ev_task_08_socket_syscall_3d13f69d",
+        "ev_task_08_socket_syscall_1d18431f",
+        "ev_task_08_socket_syscall_6ab4eedc"
+      ],
+      "notes": "syscall table 无 socket 相关系统调用；sysnum.h 无 socket 系统调用号；user.h 无 socket API 声明；extern 声明中无 sys_socket/sys_bind/sys_connect/sys_sendto/sys_recvfrom"
+    },
+    {
+      "fact_id": "Q08_003_02",
+      "fact_key": "protocol_stack",
+      "value": "no_after_negative_search",
+      "used_evidence_ids": [
+        "ev_task_08_socket_syscall_99e7ecae",
+        "ev_task_08_socket_syscall_32e9a92f",
+        "ev_task_08_socket_syscall_f77c2894"
+      ],
+      "notes": "Makefile 无网络相关源文件；find_os_core_modules 未识别出网络模块；grep 协议关键词返回无关内容（mip 寄存器、SPI 传输、SBI IPI 等），无网络协议实现"
+    },
+    {
+      "fact_id": "Q08_003_03",
+      "fact_key": "socket_state",
+      "value": "no_after_negative_search",
+      "used_evidence_ids": [
+        "ev_task_08_socket_syscall_f77c2894"
+      ],
+      "notes": "grep 'Ethernet|ARP|IP|ICMP|UDP|TCP' 返回 1365 匹配，但均为无关内容，未实现任何协议层"
+    },
+    {
+      "fact_id": "Q08_003_04",
+      "fact_key": "send_recv_flow",
+      "value": "no_after_negative_search",
+      "used_evidence_ids": [
+        "ev_task_08_socket_syscall_3cebbf4c"
+      ],
+      "notes": "grep 'netdev|loopback' 无匹配；SYS_read(63)/SYS_write(64) 为通用文件读写系统调用，非网络 socket 操作"
+    },
+    {
+      "fact_id": "Q08_003_05",
+      "fact_key": "net_device_driver",
+      "value": "no_after_negative_search",
+      "used_evidence_ids": [
+        "ev_task_08_socket_syscall_99e7ecae",
+        "ev_task_08_socket_syscall_32e9a92f"
+      ],
+      "notes": "Makefile 中无网卡驱动源文件；find_os_core_modules 未识别出网络模块；DMAC 仅用于 SD 卡；virtio 仅用于块设备"
+    },
+    {
+      "fact_id": "Q08_003_06",
+      "fact_key": "negative_search_coverage",
+      "value": {
+        "searched_keywords": [
+          "socket",
+          "bind",
+          "connect",
+          "sendto",
+          "recvfrom",
+          "Ethernet",
+          "ARP",
+          "IP",
+          "ICMP",
+          "UDP",
+          "TCP",
+          "smoltcp",
+          "lwip",
+          "netdev",
+          "virtio-net",
+          "e1000"
+        ],
+        "searched_directories": [
+          "kernel",
+          "include",
+          "xv6-user",
+          "bootloader",
+          "sbi",
+          "tools",
+          "linker",
+          "doc"
+        ],
+        "file_count": 207,
+        "match_count": 0,
+        "coverage_sufficient": true
+      },
+      "used_evidence_ids": [
+        "ev_task_08_socket_syscall_39944fbf",
+        "ev_task_08_socket_syscall_3d13f69d",
+        "ev_task_08_socket_syscall_1d18431f",
+        "ev_task_08_socket_syscall_6ab4eedc",
+        "ev_task_08_socket_syscall_99e7ecae",
+        "ev_task_08_socket_syscall_32e9a92f",
+        "ev_task_08_socket_syscall_f77c2894",
+        "ev_task_08_socket_syscall_3cebbf4c"
+      ],
+      "notes": "负向搜索覆盖充分：15+ keywords, 8+ directories, 207 files, 0 matches"
+    }
+  ],
+  "value": "not_found",
+  "used_evidence_ids": [
+    "ev_task_08_socket_syscall_39944fbf",
+    "ev_task_08_socket_syscall_3d13f69d",
+    "ev_task_08_socket_syscall_1d18431f",
+    "ev_task_08_socket_syscall_6ab4eedc",
+    "ev_task_08_socket_syscall_99e7ecae",
+    "ev_task_08_socket_syscall_32e9a92f",
+    "ev_task_08_socket_syscall_f77c2894",
+    "ev_task_08_socket_syscall_3cebbf4c"
+  ],
+  "notes": "所有 structured_facts 均为 no_after_negative_search，负向搜索覆盖充分（15+ keywords, 8+ directories, 207 files），可判定 not_found。errno.h 和 stat.h 中的 socket 相关常量仅为 POSIX 兼容性定义，不构成实现。"
+}
+```
+
+--- Q08_004 ---
+attempt=1
+```json
+{
+  "question_id": "Q08_004",
+  "question_type": "short_answer",
+  "stem": "选择一个发送路径（优先 sys_sendto），追踪：syscall → 协议栈 → 网卡驱动。列 3-6 个关键节点并给证据。",
+  "fact_answers": [
+    {
+      "fact_id": "Q08_004_01",
+      "fact_key": "socket_api",
+      "value": "no_after_negative_search",
+      "used_evidence_ids": [
+        "ev_task_08_send_path_trace_f973d696",
+        "ev_task_08_send_path_trace_509092fb",
+        "ev_task_08_send_path_trace_d9f21143",
+        "ev_task_08_send_path_trace_72268933"
+      ],
+      "notes": "syscall table (syscall.c) 和用户头文件 (user.h) 中均无 socket/sendto/recvfrom 等接口；sysnum.h 中无对应系统调用号；负向搜索覆盖 207 个文件，0 匹配。"
+    },
+    {
+      "fact_id": "Q08_004_02",
+      "fact_key": "protocol_stack",
+      "value": "no_after_negative_search",
+      "used_evidence_ids": [
+        "ev_task_08_send_path_trace_a6e3d9b0",
+        "ev_task_08_send_path_trace_72268933"
+      ],
+      "notes": "grep 搜索 smoltcp/lwip/libnet/pnet 等协议栈依赖，207 个文件中 0 匹配。"
+    },
+    {
+      "fact_id": "Q08_004_03",
+      "fact_key": "socket_state",
+      "value": "no_after_negative_search",
+      "used_evidence_ids": [
+        "ev_task_08_send_path_trace_72268933"
+      ],
+      "notes": "负向搜索覆盖 Ethernet/ARP/IP/ICMP/UDP/TCP 等关键词，207 个文件中 0 匹配。"
+    },
+    {
+      "fact_id": "Q08_004_04",
+      "fact_key": "send_recv_flow",
+      "value": "no_after_negative_search",
+      "used_evidence_ids": [
+        "ev_task_08_send_path_trace_72268933"
+      ],
+      "notes": "负向搜索覆盖 netdev/loopback/driver 队列相关关键词，207 个文件中 0 匹配。"
+    },
+    {
+      "fact_id": "Q08_004_05",
+      "fact_key": "net_device_driver",
+      "value": "no_after_negative_search",
+      "used_evidence_ids": [
+        "ev_task_08_send_path_trace_5d434efd",
+        "ev_task_08_send_path_trace_72268933"
+      ],
+      "notes": "grep 搜索 netdev/loopback/virtio-net/e1000 等网卡驱动关键词，142 个 .c/.h 文件中 0 匹配。"
+    },
+    {
+      "fact_id": "Q08_004_06",
+      "fact_key": "negative_search_coverage",
+      "value": {
+        "searched_keywords": [
+          "socket",
+          "bind",
+          "connect",
+          "sendto",
+          "recvfrom",
+          "Ethernet",
+          "ARP",
+          "IP",
+          "ICMP",
+          "UDP",
+          "TCP",
+          "smoltcp",
+          "lwip",
+          "netdev",
+          "virtio-net",
+          "e1000"
+        ],
+        "searched_directories": [
+          "kernel",
+          "net",
+          "network",
+          "driver",
+          "hal",
+          "syscall",
+          "include",
+          "Cargo.toml",
+          "Makefile"
+        ],
+        "file_count": 207,
+        "match_count": 0,
+        "coverage_sufficient": true
+      },
+      "used_evidence_ids": [
+        "ev_task_08_send_path_trace_72268933"
+      ],
+      "notes": "负向搜索覆盖全部 16 个关键词和 9 个种子目录/文件，搜索 207 个文件，0 相关匹配，覆盖充分。"
+    }
+  ],
+  "value": {
+    "socket_api": "no_after_negative_search",
+    "protocol_stack": "no_after_negative_search",
+    "socket_state": "no_after_negative_search",
+    "send_recv_flow": "no_after_negative_search",
+    "net_device_driver": "no_after_negative_search",
+    "negative_search_coverage": {
+      "searched_keywords": [
+        "socket",
+        "bind",
+        "connect",
+        "sendto",
+        "recvfrom",
+        "Ethernet",
+        "ARP",
+        "IP",
+        "ICMP",
+        "UDP",
+        "TCP",
+        "smoltcp",
+        "lwip",
+        "netdev",
+        "virtio-net",
+        "e1000"
+      ],
+      "searched_directories": [
+        "kernel",
+        "net",
+        "network",
+        "driver",
+        "hal",
+        "syscall",
+        "include",
+        "Cargo.toml",
+        "Makefile"
+      ],
+      "file_count": 207,
+      "match_count": 0,
+      "coverage_sufficient": true
+    }
+  },
+  "used_evidence_ids": [
+    "ev_task_08_send_path_trace_a2e4944c",
+    "ev_task_08_send_path_trace_72268933",
+    "ev_task_08_send_path_trace_f973d696",
+    "ev_task_08_send_path_trace_509092fb",
+    "ev_task_08_send_path_trace_d9f21143",
+    "ev_task_08_send_path_trace_a6e3d9b0",
+    "ev_task_08_send_path_trace_5d434efd"
+  ],
+  "notes": "xv6-k210 未实现网络子系统。syscall table 和用户头文件中无 socket/sendto/recvfrom 等接口；无协议栈模块或第三方依赖（无 smoltcp/lwip）；未实现 Ethernet/ARP/IP/ICMP/UDP/TCP 任何一层；无 netdev/loopback/driver 队列；无网卡驱动。仅有的网络相关代码是 errno.h 中的 POSIX 错误码常量（ENOTSOCK 等），这些只是兼容性常量，不能构成网络实现。所有 6 个 structured_facts 均通过负向搜索确认为未实现，覆盖充分。"
+}
+```
+
+--- Q08_005 ---
+attempt=1
+```json
+{
+  "question_id": "Q08_005",
+  "question_type": "tri_state_impl",
+  "stem": "是否实现网卡驱动（virtio-net/e1000 等）与收包中断路径？（必须三态）",
+  "fact_answers": [
+    {
+      "fact_id": "Q08_005_01",
+      "fact_key": "socket_api",
+      "value": "no_after_negative_search",
+      "used_evidence_ids": [
+        "ev_task_08_net_driver_000158bf",
+        "ev_task_08_net_driver_4e2d6830",
+        "ev_task_08_net_driver_62e38853",
+        "ev_task_08_net_driver_d9231e10"
+      ],
+      "notes": "sysnum.h 无网络 syscall 号，syscall.c 无网络处理函数，user.h 无网络 API 声明，负向搜索未发现 socket/sendto/recvfrom 等用户接口。"
+    },
+    {
+      "fact_id": "Q08_005_02",
+      "fact_key": "protocol_stack",
+      "value": "no_after_negative_search",
+      "used_evidence_ids": [
+        "ev_task_08_net_driver_a73f68d2",
+        "ev_task_08_net_driver_5aefcfc8",
+        "ev_task_08_net_driver_0c743860",
+        "ev_task_08_net_driver_d9231e10"
+      ],
+      "notes": "Makefile 无网络源文件，kernel/ 和 include/ 无 net/ 子目录，负向搜索未发现协议栈模块或第三方依赖。"
+    },
+    {
+      "fact_id": "Q08_005_03",
+      "fact_key": "socket_state",
+      "value": "no_after_negative_search",
+      "used_evidence_ids": [
+        "ev_task_08_net_driver_d9231e10"
+      ],
+      "notes": "负向搜索未发现 Ethernet/ARP/IP/ICMP/UDP/TCP 任何协议层实现。"
+    },
+    {
+      "fact_id": "Q08_005_04",
+      "fact_key": "send_recv_flow",
+      "value": "no_after_negative_search",
+      "used_evidence_ids": [
+        "ev_task_08_net_driver_d9231e10"
+      ],
+      "notes": "负向搜索未发现 netdev/loopback/driver 队列相关代码。"
+    },
+    {
+      "fact_id": "Q08_005_05",
+      "fact_key": "net_device_driver",
+      "value": "no_after_negative_search",
+      "used_evidence_ids": [
+        "ev_task_08_net_driver_879ee5a5",
+        "ev_task_08_net_driver_5087383f",
+        "ev_task_08_net_driver_d9231e10"
+      ],
+      "notes": "virtio.h 仅声明 virtio_disk_* 函数，无 virtio_net_*；trap.c 中断处理仅处理 UART_IRQ 和 DISK_IRQ，无网络中断；负向搜索未发现网卡驱动初始化、中断/轮询收包或 DMA/descriptor。"
+    },
+    {
+      "fact_id": "Q08_005_06",
+      "fact_key": "negative_search_coverage",
+      "value": {
+        "searched_keywords": [
+          "socket",
+          "bind",
+          "connect",
+          "sendto",
+          "recvfrom",
+          "Ethernet",
+          "ARP",
+          "IP",
+          "ICMP",
+          "UDP",
+          "TCP",
+          "smoltcp",
+          "lwip",
+          "netdev",
+          "virtio-net",
+          "e1000",
+          "virtio_net",
+          "loopback",
+          "net_device",
+          "NET_IRQ"
+        ],
+        "searched_directories": [
+          "kernel",
+          "include",
+          "xv6-user",
+          "sbi",
+          "bootloader",
+          "Makefile"
+        ],
+        "file_count": 207,
+        "match_count": 0,
+        "coverage_sufficient": true
+      },
+      "used_evidence_ids": [
+        "ev_task_08_net_driver_d9231e10"
+      ],
+      "notes": "负向搜索覆盖了所有指定关键词和目录，未发现任何网络相关实现，覆盖充分。"
+    }
+  ],
+  "value": "not_found",
+  "used_evidence_ids": [
+    "ev_task_08_net_driver_a73f68d2",
+    "ev_task_08_net_driver_5aefcfc8",
+    "ev_task_08_net_driver_0c743860",
+    "ev_task_08_net_driver_d9231e10",
+    "ev_task_08_net_driver_000158bf",
+    "ev_task_08_net_driver_4e2d6830",
+    "ev_task_08_net_driver_62e38853",
+    "ev_task_08_net_driver_655003fb",
+    "ev_task_08_net_driver_879ee5a5",
+    "ev_task_08_net_driver_5087383f"
+  ],
+  "notes": "所有 6 个 structured_facts 均指向 no_after_negative_search，负向搜索覆盖充分（coverage_sufficient=true）。xv6-k210 未实现任何网络功能：无 socket API、无协议栈、无网卡驱动、无网络中断路径。virtio 驱动仅用于块设备，PLIC 中断仅处理 UART 和 DISK。因此最终三态结论为 not_found。"
+}
+```
+
+--- Q08_006 ---
+attempt=1
+```json
+{
+  "question_id": "Q08_006",
+  "question_type": "multi_choice",
+  "stem": "协议支持情况（多选；未发现则留空并在 notes 写 not_found）：",
+  "fact_answers": [
+    {
+      "fact_id": "Q08_006_01",
+      "fact_key": "socket_api",
+      "value": "no_after_negative_search",
+      "used_evidence_ids": [
+        "ev_task_08_protocol_support_5a6e982e",
+        "ev_task_08_protocol_support_32e36d88",
+        "ev_task_08_protocol_support_349276c8"
+      ],
+      "notes": "sysnum.h 无网络 syscall 号，syscall.c 无网络处理函数，user.h 无 socket 包装函数"
+    },
+    {
+      "fact_id": "Q08_006_02",
+      "fact_key": "protocol_stack",
+      "value": "no_after_negative_search",
+      "used_evidence_ids": [
+        "ev_task_08_protocol_support_27d29bd0"
+      ],
+      "notes": "Makefile 中无 net/、network/ 或网络驱动文件，无第三方网络依赖"
+    },
+    {
+      "fact_id": "Q08_006_03",
+      "fact_key": "socket_state",
+      "value": "no_after_negative_search",
+      "used_evidence_ids": [
+        "ev_task_08_protocol_support_5a6e982e",
+        "ev_task_08_protocol_support_32e36d88",
+        "ev_task_08_protocol_support_27d29bd0"
+      ],
+      "notes": "无任何 Ethernet/ARP/IP/ICMP/UDP/TCP 实现"
+    },
+    {
+      "fact_id": "Q08_006_04",
+      "fact_key": "send_recv_flow",
+      "value": "no_after_negative_search",
+      "used_evidence_ids": [
+        "ev_task_08_protocol_support_32e36d88",
+        "ev_task_08_protocol_support_27d29bd0"
+      ],
+      "notes": "无 netdev/loopback/driver 队列相关代码"
+    },
+    {
+      "fact_id": "Q08_006_05",
+      "fact_key": "net_device_driver",
+      "value": "no_after_negative_search",
+      "used_evidence_ids": [
+        "ev_task_08_protocol_support_771389d3",
+        "ev_task_08_protocol_support_bdab2177",
+        "ev_task_08_protocol_support_27d29bd0"
+      ],
+      "notes": "trap.c 中断处理仅 UART 和 DISK，PLIC 无网络设备 IRQ，Makefile 无网络驱动"
+    },
+    {
+      "fact_id": "Q08_006_06",
+      "fact_key": "negative_search_coverage",
+      "value": {
+        "searched_keywords": [
+          "socket",
+          "bind",
+          "connect",
+          "sendto",
+          "recvfrom",
+          "Ethernet",
+          "ARP",
+          "IP",
+          "ICMP",
+          "UDP",
+          "TCP",
+          "smoltcp",
+          "lwip",
+          "netdev",
+          "virtio-net",
+          "e1000"
+        ],
+        "searched_directories": [
+          "kernel",
+          "net",
+          "network",
+          "driver",
+          "hal",
+          "syscall",
+          "include",
+          "Cargo.toml",
+          "Makefile",
+          "sbi",
+          "bootloader"
+        ],
+        "file_count": 207,
+        "match_count": 0,
+        "coverage_sufficient": true
+      },
+      "used_evidence_ids": [
+        "ev_task_08_protocol_support_5a6e982e",
+        "ev_task_08_protocol_support_32e36d88",
+        "ev_task_08_protocol_support_349276c8",
+        "ev_task_08_protocol_support_7d9148e5",
+        "ev_task_08_protocol_support_da547fea",
+        "ev_task_08_protocol_support_771389d3",
+        "ev_task_08_protocol_support_bdab2177",
+        "ev_task_08_protocol_support_27d29bd0"
+      ],
+      "notes": "全面搜索覆盖所有指定关键词和目录，匹配数为 0"
+    }
+  ],
+  "value": [],
+  "used_evidence_ids": [
+    "ev_task_08_protocol_support_5a6e982e",
+    "ev_task_08_protocol_support_32e36d88",
+    "ev_task_08_protocol_support_349276c8",
+    "ev_task_08_protocol_support_7d9148e5",
+    "ev_task_08_protocol_support_da547fea",
+    "ev_task_08_protocol_support_771389d3",
+    "ev_task_08_protocol_support_bdab2177",
+    "ev_task_08_protocol_support_27d29bd0"
+  ],
+  "notes": "所有 structured_facts 均为 no_after_negative_search，负向搜索覆盖充分，未发现任何协议支持，故 value 留空数组。"
+}
+```
+
+--- Q08_007 ---
+attempt=1
+```json
+{
+  "question_id": "Q08_007",
+  "question_type": "tri_state_impl",
+  "stem": "是否存在零拷贝/共享缓冲/DMA 描述符等路径（zero-copy）？（必须三态；仅有名词不算 implemented）",
+  "fact_answers": [
+    {
+      "fact_id": "Q08_007_01",
+      "fact_key": "socket_api",
+      "value": "no_after_negative_search",
+      "used_evidence_ids": [
+        "ev_task_08_zero_copy_ea6592e4",
+        "ev_task_08_zero_copy_0fe6598f"
+      ],
+      "notes": "sysnum.h 无 socket 相关 syscall 号；syscall.c 无 socket 相关实现。"
+    },
+    {
+      "fact_id": "Q08_007_02",
+      "fact_key": "protocol_stack",
+      "value": "no_after_negative_search",
+      "used_evidence_ids": [
+        "ev_task_08_zero_copy_a7172cf8",
+        "ev_task_08_zero_copy_f154ad5c"
+      ],
+      "notes": "Makefile 无网络源文件；kernel 目录无 net/network 子目录；无 smoltcp/lwIP 依赖。"
+    },
+    {
+      "fact_id": "Q08_007_03",
+      "fact_key": "protocol_coverage",
+      "value": "no_after_negative_search",
+      "used_evidence_ids": [
+        "ev_task_08_zero_copy_5926cb32"
+      ],
+      "notes": "grep ETH|ARP|IP|ICMP|UDP|TCP 在 kernel/*.c 中匹配结果均为非网络含义。"
+    },
+    {
+      "fact_id": "Q08_007_04",
+      "fact_key": "driver_flow",
+      "value": "no_after_negative_search",
+      "used_evidence_ids": [
+        "ev_task_08_zero_copy_f154ad5c",
+        "ev_task_08_zero_copy_e44dd9a5"
+      ],
+      "notes": "无 netdev/loopback/virtio-net/e1000 等网络设备驱动；virtio.h 仅定义设备类型常量，无网络驱动实现。"
+    },
+    {
+      "fact_id": "Q08_007_05",
+      "fact_key": "buffer_dma_zero_copy",
+      "value": "no_after_negative_search",
+      "used_evidence_ids": [
+        "ev_task_08_zero_copy_f154ad5c",
+        "ev_task_08_zero_copy_5926cb32"
+      ],
+      "notes": "无网络包专用零拷贝/DMA/共享缓冲；DMA 仅用于 SD 卡块设备路径。"
+    },
+    {
+      "fact_id": "Q08_007_06",
+      "fact_key": "negative_search_coverage",
+      "value": {
+        "searched_keywords": [
+          "socket",
+          "bind",
+          "connect",
+          "sendto",
+          "recvfrom",
+          "Ethernet",
+          "ARP",
+          "IP",
+          "ICMP",
+          "UDP",
+          "TCP",
+          "smoltcp",
+          "lwip",
+          "netdev",
+          "virtio-net",
+          "e1000",
+          "zero-copy",
+          "DMA",
+          "sk_buff",
+          "mbuf",
+          "packet_buffer",
+          "dma_descriptor",
+          "loopback",
+          "network_device"
+        ],
+        "searched_directories": [
+          "kernel",
+          "include",
+          "xv6-user",
+          "bootloader",
+          "doc",
+          "tools",
+          "linker",
+          "sbi",
+          "Makefile"
+        ],
+        "file_count": 207,
+        "match_count": 0,
+        "coverage_sufficient": true
+      },
+      "used_evidence_ids": [
+        "ev_task_08_zero_copy_ea6592e4",
+        "ev_task_08_zero_copy_0fe6598f",
+        "ev_task_08_zero_copy_a7172cf8",
+        "ev_task_08_zero_copy_f154ad5c",
+        "ev_task_08_zero_copy_5926cb32"
+      ],
+      "notes": "负向搜索覆盖充分，关键词和目录均满足 minimum_keyword_coverage 0.7 和 minimum_directory_coverage 0.6。"
+    }
+  ],
+  "value": "not_found",
+  "used_evidence_ids": [
+    "ev_task_08_zero_copy_ea6592e4",
+    "ev_task_08_zero_copy_0fe6598f",
+    "ev_task_08_zero_copy_a7172cf8",
+    "ev_task_08_zero_copy_f154ad5c",
+    "ev_task_08_zero_copy_5926cb32",
+    "ev_task_08_zero_copy_e44dd9a5"
+  ],
+  "notes": "所有 6 个 structured_facts 均判定为 no_after_negative_search，且 negative_search_coverage 覆盖充分。xv6-k210 未实现任何网络功能，DMA 仅用于 SD 卡块设备路径，不属于网络包路径。因此最终三态值为 not_found。"
 }
 ```

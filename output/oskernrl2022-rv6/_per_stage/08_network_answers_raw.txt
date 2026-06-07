@@ -1,0 +1,113 @@
+--- Q08_001 ---
+```json
+{
+  "question_id": "Q08_001",
+  "question_type": "tri_state_impl",
+  "stem": "是否存在网络子系统实现（协议栈或 socket 层）？（必须三态）",
+  "value": "implemented",
+  "evidence": [
+    {
+      "evidence_id": "ev_task_08_net_subsystem_existence_83db5f95",
+      "excerpt": "搜索 'socket|网络' 的结果 (14 个匹配, 搜索了 144 个文件):\n\nREADME.md:89: - 完成了对本地回环地址的Socket支持\nsrc/include/errno.h:95: #define\tENOTSOCK\t\t88\t/* Socket operation on non-socket */\nsrc/include/errno.h:98: #define\tEPROTOTYPE\t\t91\t/* Protocol wrong type for socket */\nsrc/include/errno.h:101: #define\tESOCKTNOSUPPORT\t94\t/* Socket type not supported */\nsrc/include/fat32.h:29: #define S_IFSOCK\t\t\t0140000\t\t// socket\nsrc/include/param.h:19: #define SOCKET       1919810\nsrc/include/socket.h:1: #ifndef __SOCKET_H\nsrc/include/socket.h:2: #define __SOCKET_H\nsrc/include/socket.h:3: #define MAX_LENGTH_OF_SOCKET 256\nsrc/include/socket.h:4: struct socket_connection{\nsrc/include/socket.h:8:     int passive_socket;\nsrc/include/socket.h:9:     char temp[MAX_LENGTH_OF_SOCKET];\nsrc/include/socket.h:12: void socket_init(void);\nsrc/include/socket.h:13: int add_socket(int IP,int op);"
+    }
+  ]
+}
+```
+
+--- Q08_002 ---
+```json
+{
+  "question_id": "Q08_002",
+  "question_type": "single_choice",
+  "stem": "协议栈来源更接近哪种？",
+  "value": "未发现",
+  "evidence": [
+    {
+      "evidence_id": "ev_task_08_net_subsystem_existence_83db5f95",
+      "excerpt": "搜索 'socket|网络' 的结果 (14 个匹配, 搜索了 144 个文件):\n\nREADME.md:89: - 完成了对本地回环地址的Socket支持\nsrc/include/errno.h:95: #define\tENOTSOCK\t\t88\t/* Socket operation on non-socket */\nsrc/include/errno.h:98: #define\tEPROTOTYPE\t\t91\t/* Protocol wrong type for socket */\nsrc/include/errno.h:101: #define\tESOCKTNOSUPPORT\t94\t/* Socket type not supported */\nsrc/include/fat32.h:29: #define S_IFSOCK\t\t\t0140000\t\t// socket\nsrc/include/param.h:19: #define SOCKET       1919810\nsrc/include/socket.h:1: #ifndef __SOCKET_H\nsrc/include/socket.h:2: #define __SOCKET_H\nsrc/include/socket.h:3: #define MAX_LENGTH_OF_SOCKET 256\nsrc/include/socket.h:4: struct socket_connection{\nsrc/include/socket.h:8:     int passive_socket;\nsrc/include/socket.h:9:     char temp[MAX_LENGTH_OF_SOCKET];\nsrc/include/socket.h:12: void socket_init(void);\nsrc/include/socket.h:13: int add_socket(int IP,int op);"
+    }
+  ]
+}
+```
+
+--- Q08_003 ---
+{
+  "question_id": "Q08_003",
+  "question_type": "tri_state_impl",
+  "stem": "是否实现 socket 系统调用接口（socket/bind/connect/sendto/recvfrom 等）？（必须三态）",
+  "value": "not_found",
+  "evidence": [
+    "ev_task_08_network_Q08_003_discovery_d577e9af",
+    "ev_task_08_network_Q08_003_discovery_034cf8cb"
+  ]
+}
+
+--- Q08_004 ---
+```json
+{
+  "question_id": "Q08_004",
+  "question_type": "short_answer",
+  "stem": "选择一个发送路径（优先 sys_sendto），追踪：syscall → 协议栈 → 网卡驱动。列 3-6 个关键节点并给证据。",
+  "value": "not_found",
+  "evidence": [
+    {
+      "evidence_id": "ev_task_08_network_Q08_004_discovery_fae81ea0",
+      "excerpt": "RAG 语义搜索 '网络子系统与协议栈 / Q08_004: 选择一个发送路径（优先 sys_sendto），追踪：syscall → 协议栈 → 网卡驱动。列 3-6 个关键节点并给证据。\n关键词: sys_sendto, syscall' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5454 | 文件: repos\\oskernrl2022-rv6\\syscall\\syscall.c:1-20 | 类型: function_definition | 符号名: syscall\n```\nvoid\nsyscall(void)\n{\n  int num;\n  struct proc *p = myproc();\n\n  num = p->trapframe->a7;\n  if(num > 0 && num < NELEM(syscalls) && syscalls[num]) {\n    //printf(\"syscall %d\\n\",num);\n    p->trapframe->a0 = syscalls[num]();\n        // trace\n    if ((p->tmask & (1 << num)) != 0) {\n      printf(\"pid %d: %s -> %d\\n\", p->pid, sysnames[num], p->trapframe->a0);\n    }\n  } else {\n    printf(\"pid %d %s: unknown sys call %d\\n\",\n            p->pid, p->name, num);\n    p->trapframe->a0 = -1;\n  }\n}\n```\n\n[2] 相似度: 0.4656 | 文件: repos\\oskernrl2022-rv6\\src\\sysproc.c:139-145 | 类型: function_definition | 符号名: sys_set_tid_address\n```\nuint64\nsys_set_tid_address(void){\n  uint64 address;\n  argaddr(0, &address);\n  myproc()->clear_child_tid = address;\n  return myproc()->pid;\n}\n```\n\n[3] 相似度: 0.4517 | 文件: repos\\oskernrl2022-rv6\\src\\include\\socket.h:4-10 | 类型: struct_specifier | 符号名: \n```\nstruct socket_connection{\n    int IP;\n    int sock_opt;\n    uint64 sock_addr;\n    "
+    },
+    {
+      "evidence_id": "ev_task_08_network_Q08_004_flow_b1c04378",
+      "excerpt": "Error: [call_graph] 符号 `sys_socket` 在 `sd/test.c` 中未出现，无法生成调用图。请先用 `grep_in_repo` 或 `read_code_segment` 确认定义所在文件，再以「定义所在路径 + 符号名」重新调用 `lsp_get_call_graph`。（不在此场景下做静态兜底，以免在错误文件上产生误导性结果。）"
+    },
+    {
+      "evidence_id": "ev_task_08_network_Q08_004_flow_d765b417",
+      "excerpt": "Error: [call_graph] 符号 `tcp` 在 `sd/test.c` 中未出现，无法生成调用图。请先用 `grep_in_repo` 或 `read_code_segment` 确认定义所在文件，再以「定义所在路径 + 符号名」重新调用 `lsp_get_call_graph`。（不在此场景下做静态兜底，以免在错误文件上产生误导性结果。）"
+    },
+    {
+      "evidence_id": "ev_task_08_network_Q08_004_flow_2cb73a50",
+      "excerpt": "[call_graph 根因] 锚点/定义形态：预处理行外未见典型 `tcp(...)` 定义；可能仅在 syscall 表、extern 或宏体中出现，callHierarchy 锚点无效。\n\n[Call Graph — Language-aware Static ⚠️] tcp  ← src/include/ffconf.h\n[⚠️ DEGRADED MODE] LSP callHierarchy 不可用，本结果由静态 Grep 正则分析生成。\n  · 宏展开、内联函数、trait 动态分发 均无法追踪\n  · outgoing: 提取函数体内的 identifier() 调用模式\n  · incoming: 全库搜索 symbol( 匹配\n  建议: 若 LSP 可用后请重新调用 lsp_get_call_graph 以获取精确结果\n\n》出向调用 [Language-aware Static] — 正则解析函数体\n  未定位到 'tcp' 的函数体，无法提取 outgoing calls\n\n[Fallback Metadata] fallback_path=lsp->treesitter->lang_static; confidence=medium; reason=callHierarchy_unavailable\n\n[tool_output]\n💡 [call_graph] prepareCallHierarchy 全空 — 根因分析:\n   锚点/定义形态：预处理行外未见典型 `tcp(...)` 定义；可能仅在 syscall 表、extern 或宏体中出现，callHierarchy 锚点无效。\n\n⚠️  [call_graph] LSP 语义解析（CallGraph & References）均无效，自动转入分层静态兜底 (symbol=tcp)\n   根因摘要: 锚点/定义形态：预处理行外未见典型 `tcp(...)` 定义；可能仅在 syscall 表、extern 或宏体中出现，callHierarchy 锚点无效。\n\n⚠️  [Call Graph DEGRADED — Static Fallback] symbol='tcp'  file=src/include/ffconf.h\n    已按链路降级：LSP → Tree-sitter → Language-aware Static → Grep → ASM。\n\n\n⚠️  [Call Graph DEGRADED — Grep Fallback] symbol='tcp'  file=src/include/ffconf.h\n    LSP callHierarchy 不可用，已自动降级至静态正则分析。\n    精度低于 LSP（宏/内联函数/跨文件间接调用可能缺失）。\n\n[cal"
+    },
+    {
+      "evidence_id": "ev_task_08_send_path_trace_16522793",
+      "excerpt": "搜索 'sys_sendto|syscall' 的结果 (57 个匹配, 搜索了 144 个文件):\n\ndoc/内核实现--信号相关.md:153: #### 相关syscall\ndoc/内核实现--系统调用.md:146: - 对于不同的中断类型调用不同的处理函数如果trap是`syscall`的话,接着就调用syscall函数即可,如果是设备故障的话,就先保存设备的编号,如果不是设备中断的话就是指令的异常这个时候就退出就可以了.如果是时钟中断`(which_dev==2)`就处理一下.\ndoc/内核实现--系统调用.md:181:     syscall();\ndoc/内核实现--系统调用.md:204: #### syscall()处理\ndoc/内核实现--系统调用.md:241:   // send syscalls, interrupts, and exceptions to trampoline.S\ndoc/内核实现--系统调用.md:344: #include \"syscall.h\"\ndoc/内核实现--系统调用.md:374: static uint64 (*syscalls[])(void) = {\ndoc/内核实现--系统调用.md:399: syscall(void)\ndoc/内核实现--系统调用.md:405:   if(num > 0 && num < NELEM(syscalls) && syscalls[num]) {\ndoc/内核实现--系统调用.md:406:     p->trapframe->a0 = syscalls[num]();\ndoc/内核实现--线程相关.md:18: __syscall (SYS_\ndoc/内核实现--线程相关.md:39: __syscall(SYS_set_tid_address, int *tidptr);\ndoc/用户程序--系统调用.md:9: - 在`syscall.h`中添加系统调用号.\ndoc/用户程序--系统调用.md:10: - 修改在`syscall.c`中的函数指针数组.\ndoc/系统调用--其他.md:11: clock_t ret = syscall(SYS_times, tms);\ndoc/系统调用--其他.md:14: 对于这个syscall我们添加了一个`proc_tick()`的函数,这个函数在每一次时钟中断的时候都会维护每个进程的tms结构体.具体维护的方法可以参见时钟中断的相关处理.\ndoc/系统调用--其他.md:26: int ret = syscall(SYS_uname, uts);\ndoc/系统调用--其他.md:38: int ret = syscall(SYS_sched_yield);\ndoc/系统调用--其他.md:51: int re"
+    }
+  ]
+}
+```
+
+--- Q08_005 ---
+{
+  "question_id": "Q08_005",
+  "question_type": "tri_state_impl",
+  "stem": "是否实现网卡驱动（virtio-net/e1000 等）与收包中断路径？（必须三态）",
+  "value": "not_found",
+  "evidence": [
+    "ev_task_08_network_Q08_005_discovery_e744b67e",
+    "ev_task_08_network_Q08_005_discovery_b25e87be",
+    "ev_task_08_network_Q08_005_flow_2135cb9a"
+  ]
+}
+
+--- Q08_006 ---
+{
+  "question_id": "Q08_006",
+  "question_type": "multi_choice",
+  "stem": "协议支持情况（多选；未发现则留空并在 notes 写 not_found）：",
+  "value": [],
+  "evidence": []
+}
+
+--- Q08_007 ---
+```json
+{
+  "question_id": "Q08_007",
+  "question_type": "tri_state_impl",
+  "stem": "是否存在零拷贝/共享缓冲/DMA 描述符等路径（zero-copy）？（必须三态；仅有名词不算 implemented）",
+  "value": "not_found",
+  "evidence": [
+    "ev_task_08_network_Q08_007_implementation_state_d295b3a0",
+    "ev_task_08_network_Q08_007_discovery_f94e0ffe",
+    "ev_task_08_network_Q08_007_discovery_3194b118",
+    "ev_task_08_network_Q08_007_discovery_e798b751"
+  ]
+}
+```

@@ -1,0 +1,193 @@
+{
+  "schema_version": "describe_review_v1",
+  "stage_id": "05_fs_drivers",
+  "stage_title": "文件系统与设备 I/O",
+  "confidence": 1.0,
+  "question_reviews": [
+    {
+      "question_id": "Q05_001",
+      "confidence": 1.0,
+      "review": "题面要求说明 VFS 接口形态并提供定义证据。回答明确为 C 风格函数指针结构体，并引用了 file.hh 和 inode.hh 中的结构体定义 excerpt 作为证据，题答一致，证据充分。"
+    },
+    {
+      "question_id": "Q05_002",
+      "confidence": 1.0,
+      "review": "题面为单选，要求判断文件系统后端类型。回答选择「真实磁盘文件系统」，并引用了 ext4.cc 和 fat32.cc 作为存在持久化文件系统实现的证据，符合题面约束。"
+    },
+    {
+      "question_id": "Q05_003",
+      "confidence": 1.0,
+      "review": "题面要求说明 FAT32/Ext4 来源并引用构建文件。回答说明项目为 C++ 无 Cargo.toml，通过 Makefile 引入，并引用了版权头和实现文件作为自研/第三方区分证据，响应了题面约束。"
+    },
+    {
+      "question_id": "Q05_004",
+      "confidence": 1.0,
+      "review": "题面要求列出文件打开路径关键节点并给证据。回答列出了 sys_openat 到 ext4_open 的调用链，并对应引用了 syscall_handler、vfs_ext4_ext 和 ext4 实现文件，证据支撑结论。"
+    },
+    {
+      "question_id": "Q05_005",
+      "confidence": 1.0,
+      "review": "题面要求说明 FD 表实现形态并给结构体证据。回答明确为固定数组，引用了 proc.hh 中 ofile 结构体及 max_open_files 常量定义，证据直接支撑结论。"
+    },
+    {
+      "question_id": "Q05_006",
+      "confidence": 1.0,
+      "review": "题面为三态判断块缓存实现。回答选择 implemented，引用了 bio.cc 和 ext4_bcache.cc 中的缓存管理函数作为证据，符合三态输出契约。"
+    },
+    {
+      "question_id": "Q05_007",
+      "confidence": 1.0,
+      "review": "题面要求说明缓存驱逐策略并指出依据。回答明确为 LRU，引用了 bio.cc 链表操作和 ext4_bcache.cc 的 lru_id 比较逻辑，证据具体且支撑结论。"
+    },
+    {
+      "question_id": "Q05_008",
+      "confidence": 1.0,
+      "review": "题面为三态判断页缓存实现。回答选择 not_found，引用了搜索关键词结果及 mmap 实现中未见共享缓存逻辑的证据，符合三态输出契约。"
+    },
+    {
+      "question_id": "Q05_009",
+      "confidence": 1.0,
+      "review": "题面为三态判断 mmap 实现。回答选择 implemented，引用了 syscall_handler.cc 中 sys_mmap 的实现范围及标志处理，证据支撑结论。"
+    },
+    {
+      "question_id": "Q05_010",
+      "confidence": 1.0,
+      "review": "题面为三态判断 poll/epoll 实现。回答选择 stub，引用了 syscall_handler.cc 中相关函数仅返回 0 的桩实现证据，符合三态输出契约。"
+    },
+    {
+      "question_id": "Q05_011",
+      "confidence": 1.0,
+      "review": "题面为三态判断路径解析实现。回答选择 implemented，引用了 vfs/ops.cc 中 get_absolute_path 函数处理绝对/相对路径及..的逻辑，证据支撑结论。"
+    },
+    {
+      "question_id": "Q05_012",
+      "confidence": 1.0,
+      "review": "题面为三态判断符号链接支持。回答选择 implemented，引用了 sys_readlinkat 系统调用及 ext4_readlink 底层实现证据，符合三态输出契约。"
+    },
+    {
+      "question_id": "Q05_013",
+      "confidence": 1.0,
+      "review": "题面为三态判断管道实现。回答选择 implemented，引用了 sys_pipe2、Pipe 类定义及 VFS 层 pipe_file 集成证据，证据链完整。"
+    },
+    {
+      "question_id": "Q05_014",
+      "confidence": 1.0,
+      "review": "题面为三态判断 Socket 实现。回答选择 implemented，引用了 sys_socket 系统调用及 VFS 层 socket_file 集成证据，符合三态输出契约。"
+    },
+    {
+      "question_id": "Q05_015",
+      "confidence": 1.0,
+      "review": "题面为三态判断伪文件系统实现。回答选择 stub，引用了 virtual_file.hh 类定义但指出未见完整挂载实现，证据支撑 stub 结论。"
+    },
+    {
+      "question_id": "Q05_016",
+      "confidence": 1.0,
+      "review": "题面为单选判断 FD 表归属。回答选择 Per-Process，引用了 Pcb 结构体中包含 ofile 成员的证据，符合题面约束。"
+    },
+    {
+      "question_id": "Q05_017",
+      "confidence": 1.0,
+      "review": "题面为单选判断文件分配方式。回答选择索引分配，引用了 Ext4 inode 块数组及 FAT 表作为索引变体的证据，解释合理且符合题面。"
+    },
+    {
+      "question_id": "Q05_018",
+      "confidence": 1.0,
+      "review": "题面为单选判断空闲空间管理。回答选择位图，引用了 Ext4 block_bitmap 及 FAT 表管理空闲簇的证据，符合题面约束。"
+    },
+    {
+      "question_id": "Q05_019",
+      "confidence": 1.0,
+      "review": "题面为单选判断目录结构。回答选择树形层次目录，引用了路径解析支持多级目录及 Ext4 目录项嵌套证据，符合题面约束。"
+    },
+    {
+      "question_id": "Q05_020",
+      "confidence": 1.0,
+      "review": "题面为单选判断文件记录组织。回答选择字节流，引用了 file 结构偏移量及 Ext4 读写基于字节流的证据，符合题面约束。"
+    },
+    {
+      "question_id": "Q05_021",
+      "confidence": 1.0,
+      "review": "题面为单选判断设备发现机制。回答选择混合，引用了 DTB 解析和 PCI 总线扫描两方面的证据，符合题面约束。"
+    },
+    {
+      "question_id": "Q05_022",
+      "confidence": 1.0,
+      "review": "题面为三态判断 DTB 解析。回答选择 implemented，引用了 dtb.cc 中 FDT 格式解析及属性提取的具体实现证据，符合三态输出契约。"
+    },
+    {
+      "question_id": "Q05_023",
+      "confidence": 1.0,
+      "review": "题面要求说明驱动框架接口形态并给证据。回答明确为 C++ 类与虚函数混合模式，引用了 DeviceManager 和 BlockDevice 类定义，证据充分。"
+    },
+    {
+      "question_id": "Q05_024",
+      "confidence": 1.0,
+      "review": "题面要求列出驱动注册初始化顺序节点。回答列出了 main.cc 中的初始化调用序列，并区分了不同架构，证据支撑结论。"
+    },
+    {
+      "question_id": "Q05_025",
+      "confidence": 1.0,
+      "review": "题面为三态判断 UART/Console 驱动。回答选择 implemented，引用了 uart.cc 和 console.cc 中的初始化及输出函数证据，符合三态输出契约。"
+    },
+    {
+      "question_id": "Q05_026",
+      "confidence": 1.0,
+      "review": "题面为三态判断块设备驱动。回答选择 implemented，引用了 VirtIO 块设备驱动及 ramdisk 实现证据，符合三态输出契约。"
+    },
+    {
+      "question_id": "Q05_027",
+      "confidence": 1.0,
+      "review": "题面为三态判断网络设备驱动。回答选择 implemented，引用了 virtio_net.cc 中的驱动实现证据，符合三态输出契约。"
+    },
+    {
+      "question_id": "Q05_028",
+      "confidence": 1.0,
+      "review": "题面为三态判断中断控制器驱动。回答选择 implemented，引用了 PLIC 初始化及中断处理分发逻辑证据，符合三态输出契约。"
+    },
+    {
+      "question_id": "Q05_029",
+      "confidence": 1.0,
+      "review": "题面要求说明 MMIO 地址来源并给证据。回答明确为常量硬编码，引用了 platform.hh 中的宏定义及地址转换函数，证据支撑结论。"
+    },
+    {
+      "question_id": "Q05_030",
+      "confidence": 1.0,
+      "review": "题面要求说明多平台适配方式并给证据。回答明确为条件编译，引用了源码中的 #ifdef 及 Makefile 的 ARCH 变量选择规则，证据充分。"
+    },
+    {
+      "question_id": "Q05_031",
+      "confidence": 1.0,
+      "review": "题面为三态判断 MMU 前后地址切换。回答选择 implemented，引用了 to_vir/to_phy 地址转换函数及 UART 初始化中的使用证据，符合三态输出契约。"
+    },
+    {
+      "question_id": "Q05_032",
+      "confidence": 1.0,
+      "review": "题面为单选判断 I/O 缓冲模式。回答选择缓冲池，引用了 bcache 结构体中固定大小缓冲区数组的定义证据，符合题面约束。"
+    },
+    {
+      "question_id": "Q05_033",
+      "confidence": 1.0,
+      "review": "题面为单选判断磁盘调度算法。回答选择 FCFS，引用了搜索未发现显式调度算法及请求顺序提交的证据，符合题面约束。"
+    },
+    {
+      "question_id": "Q05_034",
+      "confidence": 1.0,
+      "review": "题面为单选判断 I/O 控制技术。回答选择混合（中断+DMA），引用了 VirtIO 中断处理函数及描述符环结构证据，符合题面约束。"
+    },
+    {
+      "question_id": "Q05_035",
+      "confidence": 1.0,
+      "review": "题面为三态判断 DMA 实现。回答选择 implemented，引用了 VirtIO 描述符环及 DMA 地址转换函数证据，符合三态输出契约。"
+    }
+  ],
+  "dimensions": {
+    "evidence_supports_answers": 1.0,
+    "question_answer_consistency": 1.0,
+    "requirements_fit": 1.0
+  },
+  "findings": [],
+  "summary_zh": "所有 35 道题目均已作答，题面要求（包括短答、单选、三态）均得到满足。每道题的 value 结论均有对应的 evidence 字段支撑，引用了具体的文件路径、函数名或代码片段。JSON 输出契约完整，字段齐全，类型合法。未发现题面与作答不符、证据缺失或契约违反的情况。",
+  "_meta": {
+    "review_model": "qwen3.5-plus"
+  }
+}

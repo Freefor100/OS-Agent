@@ -1,0 +1,119 @@
+{
+  "stage_id": "05_fs_drivers",
+  "evidence_targets": [
+    "VFS 设计 (file 结构体 + dirent 作为 inode 替代)",
+    "FAT32 文件系统实现",
+    "fd table 与 file 分配机制",
+    "pipe 实现 (环形缓冲区)",
+    "mmap 与 vma 管理",
+    "设备驱动框架 (devsw 表)",
+    "中断注册与处理 (PLIC + 设备中断)",
+    "块设备驱动 (virtio-blk + SDIO)",
+    "UART 驱动",
+    "buffer cache 层",
+    "VFS 设计",
+    "具体文件系统",
+    "fd table",
+    "pipe/mmap",
+    "驱动框架",
+    "中断注册"
+  ],
+  "seed_paths": [
+    "kernel/file.c",
+    "kernel/sysfile.c",
+    "kernel/include/file.h",
+    "kernel/include/fat32.h",
+    "kernel/fat32.c",
+    "kernel/pipe.c",
+    "kernel/mmap.c",
+    "kernel/include/vma.h",
+    "kernel/virtio_disk.c",
+    "kernel/sd_final.c",
+    "kernel/uart.c",
+    "kernel/bio.c",
+    "fs",
+    "vfs"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "filealloc",
+    "fdalloc",
+    "open",
+    "sys_open",
+    "sys_openat",
+    "pipealloc",
+    "mmap",
+    "alloc_mmap_vma",
+    "virtio_disk_init",
+    "sd_init",
+    "vfs_open",
+    "openat"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "doc",
+    "doc/pic",
+    "kernel",
+    "kernel/include",
+    "kernel/lwip",
+    "linker",
+    "tools",
+    "xv6-user"
+  ],
+  "preferred_tools": [
+    "lsp_get_call_graph",
+    "lsp_get_definition",
+    "lsp_get_references",
+    "read_code_segment",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "使用 lsp_get_call_graph 分析 open 函数的 outgoing 调用链（max_depth=2），追踪文件打开完整路径",
+    "使用 lsp_get_definition 定位 filealloc 和 fdalloc 的定义，理解 file 表与 fd 分配机制",
+    "读取 kernel/file.c 第 51-100 行，获取 filealloc/fileclose/filedup 实现细节",
+    "读取 kernel/sysfile.c 第 410-460 行，分析 open 和 sys_open 的系统调用边界",
+    "使用 lsp_get_references 查询 dirent 结构体的全局引用，确认其作为 inode 替代的使用模式",
+    "读取 kernel/include/fat32.h 第 38-65 行，记录 dirent 关键字段（first_clus/file_size/lock/ref）",
+    "读取 kernel/fat32.c 第 397-450 行，分析 eget/ename 等目录查找核心函数",
+    "使用 lsp_get_call_graph 分析 pipealloc 的 incoming 调用图，确认 pipe 创建入口",
+    "读取 kernel/pipe.c 第 13-80 行，获取 pipe 环形缓冲区读写实现",
+    "使用 lsp_get_definition 定位 mmap 和 alloc_mmap_vma 的定义",
+    "读取 kernel/mmap.c 第 12-60 行，分析 mmap 如何与 vma 和 file 联动",
+    "读取 kernel/include/vma.h 全文，记录 vma 结构体字段（type/perm/addr/flags/fd）",
+    "使用 grep_in_repo 搜索 devsw 数组的初始化位置，确认设备注册机制",
+    "读取 kernel/file.c 第 20-40 行，查看 devsw 表定义与 console 注册",
+    "使用 lsp_get_call_graph 分析 virtio_disk_init 的 incoming 调用（确认 disk_init 调用链）",
+    "读取 kernel/virtio_disk.c 第 52-120 行，获取 virtio 初始化与队列设置逻辑",
+    "读取 kernel/sd_final.c 第 483-550 行，对比 SDIO 初始化流程",
+    "使用 lsp_get_definition 定位 uartintr 和 disk_intr 的定义",
+    "读取 kernel/uart.c 第 172-185 行，分析 UART 中断处理流程",
+    "读取 kernel/disk.c 第 41-48 行，确认 disk_intr 如何分发到 virtio 或 SDIO",
+    "使用 lsp_get_references 查询 bget 的全局引用，确认 buffer cache 使用点",
+    "读取 kernel/bio.c 第 1-80 行，分析 bget/bread/brelse 的 LRU 实现",
+    "读取 kernel/main.c 第 55-70 行，确认初始化顺序（disk_init/binit/fileinit）",
+    "使用 grep_in_repo 搜索 plicinithart 和设备中断注册代码",
+    "读取 kernel/plic.c 全文，确认中断控制器初始化与使能逻辑",
+    "使用 lsp_get_call_graph 分析 sys_openat 的 outgoing 调用（max_depth=2），对比 openat 与 open 差异",
+    "读取 kernel/sysfile.c 第 916-1020 行，分析 openat 实现",
+    "读取 kernel/include/pipe.h 全文，确认 pipe 结构体定义",
+    "使用 grep_in_repo 搜索 file_send 实现，确认零拷贝或特殊传输机制",
+    "读取 kernel/file.c 第 510-560 行，分析 file_send 实现",
+    "整理 VFS 抽象层次：file → dirent → FAT32 簇链",
+    "整理驱动框架：devsw 表 → 设备读写函数 → 中断处理"
+  ]
+}

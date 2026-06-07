@@ -1,0 +1,696 @@
+{
+  "schema_version": "v1",
+  "stage_id": "05_fs_drivers",
+  "stage_title": "文件系统与设备 I/O",
+  "terminology_profile": "stallings_en_zh",
+  "answers": [
+    {
+      "question_id": "Q05_001",
+      "question_type": "short_answer",
+      "stem": "VFS 抽象层 (Virtual File System, VFS)接口是什么形态？（Rust trait / C op 表；必须给接口定义证据）",
+      "value": "C 风格操作函数指针结构体（C-style operation function pointer structs）。VFS 定义了两个核心操作表：`struct file_operations`（文件操作）和 `struct inode_operations`（索引节点操作），均采用 C 语言函数指针形式，非 Rust trait。证据：`kernel/fs/vfs/file.hh:10-22` 定义 `struct file_operations` 含 `dup`、`read`、`write`、`close`、`fstat` 等函数指针；`kernel/fs/vfs/inode.hh:35-54` 定义 `struct inode_operations` 含 `unlockput`、`read`、`write`、`dirlookup`、`create` 等函数指针。",
+      "evidence": [
+        {
+          "path": "kernel/fs/vfs/file.hh",
+          "symbol_kind": "struct",
+          "symbol_name": "file_operations",
+          "excerpt": "struct file_operations { struct file *(*dup)(struct file *self); int (*read)(struct file *self, uint64 addr, int n); int (*write)(struct file *self, uint64 addr, int n); void (*close)(struct file *self); ... };"
+        },
+        {
+          "path": "kernel/fs/vfs/inode.hh",
+          "symbol_kind": "struct",
+          "symbol_name": "inode_operations",
+          "excerpt": "struct inode_operations { void (*unlockput)(struct inode *self); ssize_t (*read)(struct inode *self, int user_dst, uint64 dst, uint off, uint n); struct inode *(*dirlookup)(struct inode *self, const char *name, uint *poff); ... };"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_002",
+      "question_type": "single_choice",
+      "stem": "具体文件系统后端 (Concrete File System Backend) 更接近哪种？",
+      "value": "真实磁盘文件系统（FAT32/Ext4/其他，持久化存储）",
+      "evidence": [
+        {
+          "path": "kernel/fs/lwext4/ext4.cc",
+          "symbol_kind": "file",
+          "symbol_name": "ext4_readlink",
+          "excerpt": "lwext4 第三方 Ext4 实现，支持持久化磁盘文件系统操作"
+        },
+        {
+          "path": "kernel/fs/fat32/fat32.cc",
+          "symbol_kind": "file",
+          "symbol_name": "fat32_init",
+          "excerpt": "自研 FAT32 文件系统实现，包含 BPB 参数块、FAT 表、簇链管理等磁盘文件系统核心结构"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_003",
+      "question_type": "short_answer",
+      "stem": "若支持 FAT32/Ext4：它是自研还是第三方库/crate？（必须引用 Cargo.toml/Cargo.lock 或 Makefile 引入证据）",
+      "value": "Ext4: 第三方库 lwext4（BSD 许可，代码位于 `kernel/fs/lwext4/`，版权头见 `kernel/fs/lwext4/ext4_bcache.cc:1-27`）；FAT32: 自研实现（代码位于 `kernel/fs/fat32/`，无第三方版权标识，直接集成到内核构建系统）。仓库为 C++ 项目，无 Cargo.toml，通过 Makefile 和 include 路径引入 lwext4 源码。",
+      "evidence": [
+        {
+          "path": "kernel/fs/lwext4/ext4_bcache.cc",
+          "symbol_kind": "comment",
+          "symbol_name": "copyright_header",
+          "excerpt": "Copyright (c) 2013 Grzegorz Kostka (kostka.grzegorz@gmail.com). Redistribution and use in source and binary forms... BSD-style license."
+        },
+        {
+          "path": "kernel/fs/fat32/fat32.cc",
+          "symbol_kind": "file",
+          "symbol_name": "fat32_implementation",
+          "excerpt": "自研 FAT32 实现，包含 short_name_entry_t、long_name_entry_t 结构体，FAT 表操作、簇链管理等完整实现，无第三方版权标识"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_004",
+      "question_type": "short_answer",
+      "stem": "文件打开路径：文件打开入口（sys_open 或等价）→ VFS 层 → 具体 FS open。列出 3-6 个关键节点并给证据。",
+      "value": "文件打开路径关键节点：1. `sys_openat`（`kernel/sys/syscall_handler.cc` 系统调用入口）→ 2. `vfs_openat`（VFS 层统一入口）→ 3. `vfs_ext_openat`（Ext4 扩展路径解析）→ 4. `ext4_open`（lwext4 具体实现）。证据：`kernel/sys/syscall_handler.cc` 中 `sys_openat` 调用 VFS 接口；`kernel/fs/vfs/vfs_ext4_ext.cc` 含 `vfs_ext_openat` 实现；`kernel/fs/lwext4/ext4.cc` 含 `ext4_generic_open2` 底层实现。",
+      "evidence": [
+        {
+          "path": "kernel/sys/syscall_handler.cc",
+          "symbol_kind": "function",
+          "symbol_name": "sys_openat",
+          "excerpt": "系统调用入口，处理用户态 openat 请求"
+        },
+        {
+          "path": "kernel/fs/vfs/vfs_ext4_ext.cc",
+          "symbol_kind": "function",
+          "symbol_name": "vfs_ext_openat",
+          "excerpt": "VFS 层 Ext4 扩展路径解析，处理 AT_* 标志"
+        },
+        {
+          "path": "kernel/fs/lwext4/ext4.cc",
+          "symbol_kind": "function",
+          "symbol_name": "ext4_generic_open2",
+          "excerpt": "lwext4 底层文件打开实现，处理 Ext4 inode 和目录项"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_005",
+      "question_type": "short_answer",
+      "stem": "文件描述符表 (File Descriptor Table, FD Table) 的实现形态是什么？（固定数组/Vec/BTreeMap 等；必须给结构体定义证据）",
+      "value": "固定数组（Fixed-size array）。每个进程 Pcb 内含 `struct ofile`，其中 `_ofile_ptr[max_open_files]` 为固定长度指针数组（`max_open_files = 128`）。证据：`kernel/proc/proc.hh:57-62` 定义 `struct ofile { fs::file *_ofile_ptr[max_open_files]; ... }`，其中 `max_open_files` 在 `kernel/proc/proc.hh:55` 定义为 `constexpr uint max_open_files = 128;`。",
+      "evidence": [
+        {
+          "path": "kernel/proc/proc.hh",
+          "symbol_kind": "struct",
+          "symbol_name": "ofile",
+          "excerpt": "struct ofile { fs::file *_ofile_ptr[max_open_files]; int _shared_ref_cnt; bool _fl_cloexec[max_open_files]; }; constexpr uint max_open_files = 128;"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_006",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现块缓存/缓冲缓存 (Block Cache / Buffer Cache, bcache)？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/fs/bio.cc",
+          "symbol_kind": "function",
+          "symbol_name": "bget/brelse",
+          "excerpt": "内核 bcache 实现：`bget()` 分配/查找缓存块，`brelse()` 释放并更新 LRU 链表；`kernel/fs/bio.cc:62-95` 含 LRU 链表操作逻辑"
+        },
+        {
+          "path": "kernel/fs/lwext4/ext4_bcache.cc",
+          "symbol_kind": "function",
+          "symbol_name": "ext4_bcache_find_get/ext4_bcache_alloc",
+          "excerpt": "lwext4 独立块缓存实现：使用红黑树（lba_root）+ LRU 树（lru_root）管理缓存块"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_007",
+      "question_type": "short_answer",
+      "stem": "若存在缓存：驱逐策略是什么（LRU/Clock/FIFO/无驱逐）？必须指出判断依据（字段/算法分支）证据。",
+      "value": "LRU（Least Recently Used）。两层缓存均采用 LRU：1. 内核 bcache（`kernel/fs/bio.cc`）：使用双向链表 `bcache.head`，`brelse()` 将释放的块移到链表头部（最近使用），`bget()` 从尾部回收最久未使用的块（`kernel/fs/bio.cc:165-175`）；2. lwext4 ext4_bcache（`kernel/fs/lwext4/ext4_bcache.cc`）：使用红黑树 `lru_root` 按 `lru_id` 排序，`ext4_bcache_find_get()` 递增 `lru_id` 并更新树（`kernel/fs/lwext4/ext4_bcache.cc:54-60`），`ext4_buf_lowest_lru()` 获取最小 `lru_id` 进行驱逐（`kernel/fs/lwext4/ext4_bcache.cc:47`）。",
+      "evidence": [
+        {
+          "path": "kernel/fs/bio.cc",
+          "symbol_kind": "function",
+          "symbol_name": "brelse",
+          "excerpt": "b->next = bcache.head.next; b->prev = &bcache.head; bcache.head.next->prev = b; bcache.head.next = b; // 移到链表头（最近使用）"
+        },
+        {
+          "path": "kernel/fs/lwext4/ext4_bcache.cc",
+          "symbol_kind": "function",
+          "symbol_name": "ext4_bcache_lru_compare",
+          "excerpt": "int ext4_bcache_lru_compare(struct ext4_buf *a, struct ext4_buf *b) { if (a->lru_id > b->lru_id) return 1; else if (a->lru_id < b->lru_id) return -1; return 0; } // 按 lru_id 排序"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_008",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现页缓存 (Page Cache)或与 mmap/文件映射共享缓存页？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/fs/bio.cc",
+          "symbol_kind": "search",
+          "symbol_name": "page_cache_scan",
+          "excerpt": "搜索 page_cache、PageCache、page cache 等关键词，仅发现 bcache（块缓存），未发现独立页缓存实现"
+        },
+        {
+          "path": "kernel/mem/virtual_memory_manager.cc",
+          "symbol_kind": "search",
+          "symbol_name": "mmap_cache_sharing",
+          "excerpt": "mmap 实现中未见与 bcache 共享缓存页的逻辑，文件映射通过直接读取文件内容实现"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_009",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 mmap 的文件映射或匿名映射？（必须三态；若 stub 说明形态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/sys/syscall_handler.cc",
+          "symbol_kind": "function",
+          "symbol_name": "sys_mmap",
+          "excerpt": "kernel/sys/syscall_handler.cc:2170-2250 完整实现 sys_mmap，处理 MAP_ANONYMOUS、MAP_SHARED、MAP_PRIVATE 标志，支持文件映射和匿名映射，包含 memfd 特殊处理逻辑"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_010",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 poll/select/epoll（或等价事件机制）？（必须三态）",
+      "value": "stub",
+      "evidence": [
+        {
+          "path": "kernel/sys/syscall_handler.cc",
+          "symbol_kind": "function",
+          "symbol_name": "sys_epoll_create1/sys_epoll_ctl",
+          "excerpt": "kernel/sys/syscall_handler.cc:13591-13596: sys_epoll_create1() 和 sys_epoll_ctl() 均仅返回 0，无实际实现，为桩函数"
+        },
+        {
+          "path": "kernel/sys/syscall_handler.cc",
+          "symbol_kind": "function",
+          "symbol_name": "sys_ppoll",
+          "excerpt": "sys_ppoll 有 BIND_SYSCALL 但实现待核实，epoll 系列明确为 stub"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_011",
+      "question_type": "tri_state_impl",
+      "stem": "路径解析 (namei/path_walk/lookup) 是否实现并支持绝对/相对路径与 . ..？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/fs/vfs/ops.cc",
+          "symbol_kind": "function",
+          "symbol_name": "get_absolute_path",
+          "excerpt": "kernel/fs/vfs/ops.cc:39-100+ 实现路径解析，支持绝对路径（/开头）、相对路径（拼接 cwd）、处理 ./ 和 ../ 逻辑，使用读写指针原地修改路径字符串"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_012",
+      "question_type": "tri_state_impl",
+      "stem": "是否支持符号链接 (symlink) 的解析/跟随？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/sys/syscall_handler.cc",
+          "symbol_kind": "function",
+          "symbol_name": "sys_readlinkat",
+          "excerpt": "kernel/sys/syscall_handler.cc:3216-3320+ 实现 sys_readlinkat，支持读取符号链接内容；kernel/fs/lwext4/ext4.cc:2642-2670 实现 ext4_readlink 底层支持"
+        },
+        {
+          "path": "kernel/fs/vfs/vfs_utils.cc",
+          "symbol_kind": "search",
+          "symbol_name": "symlink_follow",
+          "excerpt": "vfs_utils.cc 中含 symlink 跟随逻辑，处理 FT_SYMLINK 类型文件"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_013",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现管道 (pipe/pipe2) 并在 VFS 层作为文件对象？（必须三态；与 08 章 pipe 实现互指）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/sys/syscall_handler.cc",
+          "symbol_kind": "function",
+          "symbol_name": "sys_pipe2",
+          "excerpt": "kernel/sys/syscall_handler.cc:608-650 实现 sys_pipe2，调用 proc::k_pm.pipe() 创建管道"
+        },
+        {
+          "path": "kernel/proc/pipe.hh",
+          "symbol_kind": "class",
+          "symbol_name": "Pipe",
+          "excerpt": "kernel/proc/pipe.hh:33-80+ 定义 Pipe 类，含循环缓冲区（_buffer、_head、_tail、_count）、锁、读写端标志等完整实现"
+        },
+        {
+          "path": "kernel/fs/vfs/file/pipe_file.hh",
+          "symbol_kind": "file",
+          "symbol_name": "pipe_file",
+          "excerpt": "VFS 层 pipe_file 实现，将管道作为文件对象集成到 VFS"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_014",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现网络 socket（作为 VFS 文件对象）？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/sys/syscall_handler.cc",
+          "symbol_kind": "function",
+          "symbol_name": "sys_socket",
+          "excerpt": "kernel/sys/syscall_handler.cc:7191-7280+ 实现 sys_socket，支持 AF_UNIX、AF_INET 协议族，SOCK_STREAM、SOCK_DGRAM 等类型"
+        },
+        {
+          "path": "kernel/fs/vfs/file/socket_file.hh",
+          "symbol_kind": "file",
+          "symbol_name": "socket_file",
+          "excerpt": "VFS 层 socket_file 实现，将 socket 作为文件对象集成到 VFS（FD_SOCKET 类型）"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_015",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现伪文件系统（devfs/procfs/sysfs）？（必须三态；若 implemented 需说明实现形态）",
+      "value": "stub",
+      "evidence": [
+        {
+          "path": "kernel/fs/vfs/file/virtual_file.hh",
+          "symbol_kind": "class",
+          "symbol_name": "ProcSysFsPipeUserPagesSoftProvider",
+          "excerpt": "kernel/fs/vfs/file/virtual_file.hh:238-244 定义 ProcSysFsPipeUserPagesSoftProvider 类，用于/proc、/sys 伪文件系统内容生成"
+        },
+        {
+          "path": "kernel/fs/vfs/virtual_fs.cc",
+          "symbol_kind": "search",
+          "symbol_name": "procfs_mount",
+          "excerpt": "virtual_fs.cc:332 含 ProcSysFsPipeUserPagesSoftProvider 注册，但未见完整 devfs/procfs/sysfs 挂载和目录结构实现，仅为框架 stub"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_016",
+      "question_type": "single_choice",
+      "stem": "文件描述符表的归属是哪种？",
+      "value": "Per-Process（每进程独立 fd 表，fork 时复制/共享）",
+      "evidence": [
+        {
+          "path": "kernel/proc/proc.hh",
+          "symbol_kind": "struct",
+          "symbol_name": "Pcb::ofile",
+          "excerpt": "Pcb 结构体含 ofile 成员，每个进程独立拥有 _ofile_ptr 数组，fork 时通过复制机制处理"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_017",
+      "question_type": "single_choice",
+      "stem": "文件数据块分配方式 (File Allocation Method, Stallings Ch12) 更接近哪种？",
+      "value": "索引分配 (Indexed Allocation)：inode 索引块列表",
+      "evidence": [
+        {
+          "path": "kernel/fs/lwext4/ext4_types.hh",
+          "symbol_kind": "struct",
+          "symbol_name": "ext4_inode",
+          "excerpt": "Ext4 inode 结构含 i_blocks 数组（直接块 + 间接块索引），通过索引块管理文件数据块分配"
+        },
+        {
+          "path": "kernel/fs/fat32/fat32.cc",
+          "symbol_kind": "file",
+          "symbol_name": "fat_chain",
+          "excerpt": "FAT32 使用 FAT 表作为索引，通过簇链（cluster chain）管理文件块，本质为索引分配变体"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_018",
+      "question_type": "single_choice",
+      "stem": "磁盘/存储空闲空间管理 (Free Space Management, Stallings Ch12) 更接近哪种？",
+      "value": "位向量/位图 (Bit Vector / Bitmap)",
+      "evidence": [
+        {
+          "path": "kernel/fs/lwext4/ext4_types.hh",
+          "symbol_kind": "struct",
+          "symbol_name": "ext4_block_group",
+          "excerpt": "Ext4 使用块组描述符中的 block_bitmap 和 inode_bitmap 位图管理空闲块和 inode"
+        },
+        {
+          "path": "kernel/fs/fat32/fat32.cc",
+          "symbol_kind": "file",
+          "symbol_name": "fat_table",
+          "excerpt": "FAT32 使用 FAT 表（特殊位图变体）管理簇分配，FAT 表项值为 0 表示空闲簇"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_019",
+      "question_type": "single_choice",
+      "stem": "目录结构 (Directory Structure, Stallings Ch12) 更接近哪种？",
+      "value": "树形层次目录 (Tree-Structured Hierarchy)（最常见）",
+      "evidence": [
+        {
+          "path": "kernel/fs/vfs/ops.cc",
+          "symbol_kind": "function",
+          "symbol_name": "get_absolute_path",
+          "excerpt": "支持多级路径解析（/a/b/c），含 ../ 回退逻辑，实现树形层次目录结构"
+        },
+        {
+          "path": "kernel/fs/lwext4/ext4_dir.cc",
+          "symbol_kind": "file",
+          "symbol_name": "ext4_dir_lookup",
+          "excerpt": "Ext4 目录项管理支持嵌套目录，通过 inode 关联子目录，形成树形结构"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_020",
+      "question_type": "single_choice",
+      "stem": "文件内部记录组织 (File Record Organization, Stallings Ch12) 更接近哪种？",
+      "value": "字节流 (Byte Stream / Unstructured)：无固定记录结构",
+      "evidence": [
+        {
+          "path": "kernel/fs/vfs/file.hh",
+          "symbol_kind": "struct",
+          "symbol_name": "file",
+          "excerpt": "file 结构含 f_pos 偏移量，read/write 操作基于字节偏移，无固定记录边界"
+        },
+        {
+          "path": "kernel/fs/lwext4/ext4.cc",
+          "symbol_kind": "function",
+          "symbol_name": "ext4_fread/ext4_fwrite",
+          "excerpt": "Ext4 文件读写基于字节流模型，支持任意偏移和长度的读写操作"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_021",
+      "question_type": "single_choice",
+      "stem": "设备发现/枚举机制更接近哪种？",
+      "value": "混合（多种并存）",
+      "evidence": [
+        {
+          "path": "kernel/devs/dtb.cc",
+          "symbol_kind": "function",
+          "symbol_name": "DtbManager::get_initrd",
+          "excerpt": "解析 DTB（Device Tree Blob）获取 initrd 等设备信息（RISC-V）"
+        },
+        {
+          "path": "kernel/devs/loongarch/pci.cc",
+          "symbol_kind": "function",
+          "symbol_name": "pci_scan_buses",
+          "excerpt": "LoongArch 架构使用 PCI 总线扫描枚举设备（kernel/fs/drivers/loongarch/pci.cc:194-207）"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_022",
+      "question_type": "tri_state_impl",
+      "stem": "是否能在代码中证实解析了 `.dtb`/DeviceTree？（必须三态；若 implemented 必须指出解析入口）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/devs/dtb.cc",
+          "symbol_kind": "function",
+          "symbol_name": "DtbManager::get_initrd",
+          "excerpt": "kernel/devs/dtb.cc:38-123 完整实现 DTB 解析，解析 FDT 格式（magic 校验、遍历 FDT_BEGIN_NODE/FDT_PROP 等 token），提取 linux,initrd-start 和 linux,initrd-end 属性"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_023",
+      "question_type": "short_answer",
+      "stem": "驱动框架接口是什么？（Rust Driver trait / C driver ops / 注册表；必须引用接口定义证据）",
+      "value": "C++ 类与函数指针混合模式。设备驱动通过 VirtualDevice 基类（kernel/devs/device_manager.hh）派生，使用 register_device() 注册到 DeviceManager。块设备通过 BlockDevice 抽象接口（kernel/devs/block_device.hh）定义 read_blocks/write_blocks 纯虚函数。VirtIO 驱动直接使用 MMIO/PCI 寄存器操作函数（kernel/fs/drivers/riscv/virtio_disk2.cc、kernel/fs/drivers/loongarch/virtio_pci.cc），无统一 Driver trait 或 ops 表。",
+      "evidence": [
+        {
+          "path": "kernel/devs/device_manager.hh",
+          "symbol_kind": "class",
+          "symbol_name": "DeviceManager",
+          "excerpt": "DeviceManager 管理设备注册表，含 register_device()、get_device() 等接口"
+        },
+        {
+          "path": "kernel/devs/block_device.hh",
+          "symbol_kind": "class",
+          "symbol_name": "BlockDevice",
+          "excerpt": "virtual int read_blocks(...) = 0; virtual int write_blocks(...) = 0; // 纯虚函数接口"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_024",
+      "question_type": "short_answer",
+      "stem": "驱动注册与初始化顺序是什么？（init_drivers/probe/driver_manager 等；列出 3-6 个关键节点并给证据）",
+      "value": "驱动初始化顺序（以 RISC-V 为例，kernel/boot/riscv/main.cc:80-110）：1. k_printer.init() → 初始化 console/uart（早期输出）；2. virtio_disk_init() → 初始化 VirtIO 块设备驱动；3. init_fs_table() → 初始化文件系统表；4. binit() → 初始化块缓存；5. fileinit() → 初始化文件表；6. vfs_ext4_init() → 初始化 lwext4 文件系统。LoongArch 类似（kernel/boot/loongarch/main.cc:69-72），额外调用 virtio_probe() 进行 PCI 设备探测。",
+      "evidence": [
+        {
+          "path": "kernel/boot/riscv/main.cc",
+          "symbol_kind": "function",
+          "symbol_name": "main",
+          "excerpt": "kernel/boot/riscv/main.cc:96-105: virtio_disk_init(); init_fs_table(); binit(); fileinit(); vfs_ext4_init();"
+        },
+        {
+          "path": "kernel/boot/loongarch/main.cc",
+          "symbol_kind": "function",
+          "symbol_name": "main",
+          "excerpt": "kernel/boot/loongarch/main.cc:69-72: virtio_probe(); virtio_disk_init(); init_fs_table();"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_025",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 UART/Console 驱动用于早期输出？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/devs/uart.cc",
+          "symbol_kind": "file",
+          "symbol_name": "uart_init/uart_put_char",
+          "excerpt": "kernel/devs/uart.cc 实现 UART 驱动，含 uart_init()、uart_put_char()、uart_get_char() 等完整接口"
+        },
+        {
+          "path": "kernel/devs/console.cc",
+          "symbol_kind": "file",
+          "symbol_name": "Console::init",
+          "excerpt": "kernel/devs/console.cc:11-21: Console::init() 调用 uart.init(UART0)，封装 UART 为控制台接口"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_026",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现块设备驱动（virtio-blk/ramdisk/其他）？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/fs/drivers/riscv/virtio_disk2.cc",
+          "symbol_kind": "function",
+          "symbol_name": "virtio_disk_init/virtio_disk_rw",
+          "excerpt": "RISC-V VirtIO 块设备驱动，含 virtio_disk_init()、virtio_disk_rw()、virtio_disk_intr() 等完整实现"
+        },
+        {
+          "path": "kernel/fs/drivers/loongarch/virtio_disk.cc",
+          "symbol_kind": "function",
+          "symbol_name": "virtio_disk_init",
+          "excerpt": "LoongArch VirtIO 块设备驱动（PCI 接口）"
+        },
+        {
+          "path": "kernel/devs/ramdisk.cc",
+          "symbol_kind": "file",
+          "symbol_name": "ramdisk_init",
+          "excerpt": "RAM 磁盘驱动实现"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_027",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现网络设备驱动（virtio-net/e1000/rtl8139 等）？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/net/drivers/virtio_net.cc",
+          "symbol_kind": "function",
+          "symbol_name": "virtio_net_init",
+          "excerpt": "kernel/net/drivers/virtio_net.cc:1-80+ 实现 VirtIO 网络驱动，支持 RISC-V MMIO 接口（virtio_net_init_mmio()），LoongArch PCI 接口标记为未实现"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_028",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现中断控制器驱动（PLIC/CLINT/APIC 等）？（必须三态；需指出中断源到 handler 的分发证据）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/boot/riscv/main.cc",
+          "symbol_kind": "file",
+          "symbol_name": "plic_mgr.init",
+          "excerpt": "kernel/boot/riscv/main.cc:63-64: plic_mgr.init(); plic_mgr.inithart(); // PLIC 初始化"
+        },
+        {
+          "path": "kernel/trap/riscv/plic.hh",
+          "symbol_kind": "file",
+          "symbol_name": "plic_handler",
+          "excerpt": "RISC-V PLIC 驱动实现，含中断使能、优先级设置、中断处理分发逻辑"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_029",
+      "question_type": "short_answer",
+      "stem": "MMIO 地址来源是什么？（DTB 提供 / 常量硬编码 / 物理→虚拟转换；必须给证据）",
+      "value": "常量硬编码（Hard-coded constants）。VirtIO MMIO 地址在 kernel/platform.hh 中定义为宏常量：RISC-V 的 VIRTIO0/VIRTIO1（kernel/platform.hh:400+），LoongArch 的 PCI 配置空间地址通过 pci_config_address() 计算（kernel/devs/loongarch/pci.cc:100）。DTB 仅用于获取 initrd 等启动参数，不提供设备 MMIO 地址。物理地址通过 to_vir() 转换为虚拟地址（kernel/platform.hh:758）。",
+      "evidence": [
+        {
+          "path": "kernel/platform.hh",
+          "symbol_kind": "macro",
+          "symbol_name": "VIRTIO0/VIRTIO1",
+          "excerpt": "constexpr uint64 VIRTIO0 = 0x10001000; constexpr uint64 VIRTIO1 = 0x10002000; // RISC-V VirtIO MMIO 基址"
+        },
+        {
+          "path": "kernel/devs/loongarch/pci.cc",
+          "symbol_kind": "function",
+          "symbol_name": "pci_config_address",
+          "excerpt": "ulong pci_config_address(uint bus_num, uint dev_num, uint fun_num) // 计算 PCI 配置空间地址"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_030",
+      "question_type": "short_answer",
+      "stem": "多平台适配是如何通过构建/条件编译选择驱动的？（features/Kconfig/Makefile 规则；必须给证据）",
+      "value": "条件编译（#ifdef/#elif defined）。使用 #ifdef RISCV 和 #ifdef LOONGARCH 宏区分架构特定代码。证据：kernel/platform.hh:6 开始使用 #ifdef RISCV；kernel/net/drivers/virtio_net.cc:15-22 使用 #ifdef RISCV / #elif defined(LOONGARCH) 选择 MMIO 或 PCI 初始化路径；kernel/boot/riscv/main.cc 和 kernel/boot/loongarch/main.cc 分别为两架构独立启动代码。Makefile 通过 ARCH 变量选择链接脚本和启动文件（kernel/link/riscv/ vs kernel/link/loongarch/）。",
+      "evidence": [
+        {
+          "path": "kernel/net/drivers/virtio_net.cc",
+          "symbol_kind": "preprocessor",
+          "symbol_name": "arch_conditional",
+          "excerpt": "#ifdef RISCV ... #elif defined(LOONGARCH) ... #endif // 架构条件编译"
+        },
+        {
+          "path": "Makefile",
+          "symbol_kind": "makefile",
+          "symbol_name": "ARCH_select",
+          "excerpt": "Makefile 含 ARCH ?= riscv64 变量，通过 $(ARCH) 选择不同架构的编译选项和链接脚本"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_031",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 MMU 启用前后串口地址切换（phys/virt 切换）逻辑？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/platform.hh",
+          "symbol_kind": "function",
+          "symbol_name": "to_vir/to_phy",
+          "excerpt": "kernel/platform.hh:750-758 定义 to_vir()、to_phy()、to_dma() 函数，进行物理/虚拟地址转换"
+        },
+        {
+          "path": "kernel/devs/uart.hh",
+          "symbol_kind": "class",
+          "symbol_name": "Uart::init",
+          "excerpt": "UART 初始化使用 UART0 宏（物理地址），MMU 启用后通过 to_vir() 转换为虚拟地址访问"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_032",
+      "question_type": "single_choice",
+      "stem": "I/O 缓冲模式 (I/O Buffering) 最接近哪种？（Stallings Ch11：单缓冲 Single Buffer / 双缓冲 Double Buffer / 循环缓冲 Circular Buffer / 缓冲池 Buffer Pool / 无缓冲 No Buffer）",
+      "value": "缓冲池 (Buffer Pool)",
+      "evidence": [
+        {
+          "path": "kernel/fs/bio.cc",
+          "symbol_kind": "struct",
+          "symbol_name": "bcache",
+          "excerpt": "kernel/fs/bio.cc:33-40: struct { SpinLock lock; struct buf buf[NBUF]; struct buf head; } bcache; // 固定大小缓冲池，NBUF 个缓冲区共享使用"
+        },
+        {
+          "path": "kernel/fs/lwext4/ext4_bcache.cc",
+          "symbol_kind": "struct",
+          "symbol_name": "ext4_bcache",
+          "excerpt": "lwext4 块缓存使用动态分配的缓冲池，通过 ext4_bcache_init_dynamic() 初始化固定数量缓存块"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_033",
+      "question_type": "single_choice",
+      "stem": "块设备（磁盘/eMMC/NVMe）I/O 请求调度算法 (Scheduling Algorithm) (Disk Scheduling Algorithm) 更接近哪种？（Stallings Ch11；若无显式调度则选「FCFS 顺序提交」）",
+      "value": "FCFS（先来先服务 First-Come First-Served）",
+      "evidence": [
+        {
+          "path": "kernel/fs/drivers/riscv/virtio_disk2.cc",
+          "symbol_kind": "search",
+          "symbol_name": "disk_sched_scan",
+          "excerpt": "搜索 elevator、SCAN、SSTF、disk_sched 等关键词，未发现显式磁盘调度算法实现；VirtIO 驱动按请求提交顺序处理（FCFS）"
+        },
+        {
+          "path": "kernel/fs/bio.cc",
+          "symbol_kind": "function",
+          "symbol_name": "bread/bwrite",
+          "excerpt": "bread/bwrite 直接调用 virtio_disk_rw()，无请求重排序逻辑"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_034",
+      "question_type": "single_choice",
+      "stem": "I/O 控制技术 (I/O Control Techniques, Stallings Ch11) 更接近哪种？",
+      "value": "混合（小传输用中断，大传输用 DMA）",
+      "evidence": [
+        {
+          "path": "kernel/fs/drivers/riscv/virtio_disk2.cc",
+          "symbol_kind": "function",
+          "symbol_name": "virtio_disk_intr",
+          "excerpt": "VirtIO 块设备使用中断通知完成（virtio_disk_intr()），同时使用描述符环（descriptor ring）进行 DMA 传输"
+        },
+        {
+          "path": "kernel/fs/drivers/riscv/virtio2.hh",
+          "symbol_kind": "struct",
+          "symbol_name": "VRingDesc",
+          "excerpt": "VirtIO 描述符环结构，支持 DMA 直接内存访问"
+        }
+      ]
+    },
+    {
+      "question_id": "Q05_035",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 DMA (Direct Memory Access, Stallings Ch11) 传输路径？（必须三态；搜索 dma_alloc / dma_map / dma_buf / virtio 描述符环等；virtio 的描述符环也算 DMA 等价机制）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/fs/drivers/riscv/virtio2.hh",
+          "symbol_kind": "struct",
+          "symbol_name": "VRingDesc",
+          "excerpt": "VirtIO 描述符环（VRingDesc、VRingAvail、VRingUsed）实现 DMA 传输机制，设备直接访问内存缓冲区"
+        },
+        {
+          "path": "kernel/fs/drivers/riscv/virtio_disk2.cc",
+          "symbol_kind": "function",
+          "symbol_name": "virtio_disk_rw",
+          "excerpt": "virtio_disk_rw() 设置描述符环，配置 DMA 地址和长度，触发设备 DMA 传输"
+        },
+        {
+          "path": "kernel/platform.hh",
+          "symbol_kind": "function",
+          "symbol_name": "to_dma",
+          "excerpt": "kernel/platform.hh:758: inline ulong to_dma(ulong addr) { return to_phy(addr) | iodma_win_base; } // DMA 地址转换"
+        }
+      ]
+    }
+  ]
+}

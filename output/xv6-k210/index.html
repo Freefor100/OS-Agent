@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>xv6-k210 - OS技术分析报告</title>
+<style>
+
+:root {
+    --bg: #f8f9fa;
+    --card-bg: #ffffff;
+    --text: #2c3e50;
+    --text-muted: #6c757d;
+    --border: #dee2e6;
+    --code-bg: #f1f3f5;
+    --link: #2980b9;
+    --accent: #3498db;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans SC", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    padding: 0;
+}
+.container { max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem; }
+h1 { font-size: 1.8rem; margin-bottom: 0.5rem; }
+h2 { font-size: 1.5rem; margin: 2rem 0 0.8rem; padding-bottom: 0.4rem; border-bottom: 2px solid var(--border); }
+h3 { font-size: 1.25rem; margin: 1.5rem 0 0.6rem; color: var(--text); }
+h4 { font-size: 1.1rem; margin: 1.2rem 0 0.4rem; }
+p { margin: 0.6rem 0; }
+ul, ol { margin: 0.6rem 0 0.6rem 1.5rem; }
+li { margin: 0.3rem 0; }
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+code {
+    background: var(--code-bg);
+    padding: 0.15em 0.4em;
+    border-radius: 3px;
+    font-size: 0.88em;
+    font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+}
+pre {
+    background: #1e1e2e;
+    color: #cdd6f4;
+    padding: 1rem 1.2rem;
+    border-radius: 8px;
+    overflow-x: auto;
+    margin: 1rem 0;
+    font-size: 0.85rem;
+    line-height: 1.5;
+}
+pre code { background: none; padding: 0; color: inherit; }
+blockquote {
+    border-left: 4px solid var(--accent);
+    padding: 0.5rem 1rem;
+    margin: 1rem 0;
+    background: #eef6fc;
+    border-radius: 0 6px 6px 0;
+}
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+    font-size: 0.9rem;
+    overflow-x: auto;
+    display: block;
+}
+thead { background: #f1f3f5; }
+th, td {
+    padding: 0.6rem 0.8rem;
+    border: 1px solid var(--border);
+    text-align: left;
+    vertical-align: top;
+}
+tr:nth-child(even) { background: #f8f9fa; }
+tr:hover { background: #e9ecef; }
+.evidence-link {
+    display: inline-block;
+    background: #fff3cd;
+    color: #856404;
+    padding: 0.1em 0.5em;
+    border-radius: 12px;
+    font-size: 0.78em;
+    font-family: monospace;
+    cursor: pointer;
+    border: 1px solid #ffc107;
+    transition: all 0.2s;
+}
+.evidence-link:hover {
+    background: #ffc107;
+    color: #1a1a1a;
+    text-decoration: none;
+    transform: scale(1.05);
+}
+.evidence-anchor {
+    display: inline-block;
+    background: #d4edda;
+    color: #155724;
+    padding: 0.1em 0.5em;
+    border-radius: 12px;
+    font-size: 0.78em;
+    font-family: monospace;
+    border: 1px solid #28a745;
+    scroll-margin-top: 80px;
+}
+.evidence-anchor:target {
+    background: #ffc107;
+    color: #1a1a1a;
+    box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.4);
+    animation: pulse 0.6s ease-out;
+}
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}
+hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+
+/* --- PLACEHOLDER_NAV --- */
+
+
+.top-nav {
+    position: sticky;
+    top: 0;
+    background: rgba(255,255,255,0.95);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border);
+    padding: 0.7rem 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    z-index: 100;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+.top-nav a {
+    padding: 0.3rem 0.8rem;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    transition: background 0.2s;
+}
+.top-nav a:hover { background: #e9ecef; text-decoration: none; }
+.top-nav .spacer { flex: 1; }
+.nav-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 1rem;
+    margin: 2rem 0;
+}
+.nav-card {
+    display: block;
+    padding: 1.2rem 1rem;
+    border-radius: 12px;
+    color: #fff;
+    font-weight: 600;
+    font-size: 1rem;
+    text-align: center;
+    transition: transform 0.2s, box-shadow 0.2s;
+    text-decoration: none;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+}
+.nav-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.18);
+    text-decoration: none;
+}
+.nav-card .chapter-num {
+    display: block;
+    font-size: 0.75rem;
+    opacity: 0.85;
+    margin-bottom: 0.3rem;
+}
+.header-info {
+    background: var(--card-bg);
+    border-radius: 12px;
+    padding: 1.5rem 2rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    border: 1px solid var(--border);
+}
+.header-info h1 { color: var(--accent); }
+.header-info .meta-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 0.5rem 2rem;
+    margin-top: 1rem;
+}
+.header-info .meta-item { font-size: 0.92rem; }
+.header-info .meta-label { color: var(--text-muted); font-weight: 500; }
+.chapter-badge {
+    display: inline-block;
+    padding: 0.3rem 1rem;
+    border-radius: 20px;
+    color: #fff;
+    font-weight: 600;
+    font-size: 0.85rem;
+    margin-bottom: 1rem;
+}
+
+
+</style>
+</head>
+<body>
+
+<div class="container">
+<div class="header-info">
+<h1>xv6-k210 操作系统技术分析报告</h1>
+<div class="meta-grid">
+<div class="meta-item"><span class="meta-label">年份：</span>2021</div>
+<div class="meta-item"><span class="meta-label">赛事：</span>操作系统赛</div>
+<div class="meta-item"><span class="meta-label">子赛事：</span>内核实现赛道</div>
+<div class="meta-item"><span class="meta-label">学校：</span>华中科技大学</div>
+<div class="meta-item"><span class="meta-label">队伍名称：</span>3Los</div>
+<div class="meta-item"><span class="meta-label">仓库地址：</span><a href="https://gitlab.eduxiji.net/retrhelo/xv6-k210">https://gitlab.eduxiji.net/retrhelo/xv6-k210</a></div>
+<div class="meta-item"><span class="meta-label">分析日期：</span>2026年05月26日</div>
+<div class="meta-item"><span class="meta-label">分析工具：</span>OS-Agent-D Multi-Agent</div>
+<div class="meta-item"><span class="meta-label">报告质量：</span><strong>85/100</strong></div>
+</div></div>
+<h2>章节导航</h2>
+<div class="nav-cards">
+<a href="html/02.html" class="nav-card" style="background:#e74c3c"><span class="chapter-num">第 02 章</span>启动架构与 Trap/系统调用</a>
+<a href="html/03.html" class="nav-card" style="background:#2ecc71"><span class="chapter-num">第 03 章</span>内存管理（物理/虚拟/分配器）</a>
+<a href="html/04.html" class="nav-card" style="background:#3498db"><span class="chapter-num">第 04 章</span>进程/线程/调度与多核</a>
+<a href="html/05.html" class="nav-card" style="background:#9b59b6"><span class="chapter-num">第 05 章</span>文件系统与设备 I/O</a>
+<a href="html/06.html" class="nav-card" style="background:#1abc9c"><span class="chapter-num">第 06 章</span>同步互斥与进程间通信</a>
+<a href="html/07.html" class="nav-card" style="background:#e67e22"><span class="chapter-num">第 07 章</span>安全机制与权限模型</a>
+<a href="html/08.html" class="nav-card" style="background:#5b2c6f"><span class="chapter-num">第 08 章</span>网络子系统与协议栈</a>
+<a href="html/09.html" class="nav-card" style="background:#34495e"><span class="chapter-num">第 09 章</span>调试机制与错误处理</a>
+</div>
+<h2>Call Graph 概览</h2>
+<div style="overflow-x:auto;margin:1rem 0"><svg width="1931.3400000000001" height="874.0" xmlns="http://www.w3.org/2000/svg" font-family='system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif' font-size='13'>
+<defs><marker id="arr" markerWidth="10" markerHeight="10" refX="9" refY="3.5" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L0,7 L10,3.5 z" fill="#444"/></marker></defs>
+<rect width="1931.3400000000001" height="874.0" fill="#fafafa"/>
+<line x1="142.0" y1="46.0" x2="1911.3400000000001" y2="46.0" stroke="#ddd" stroke-width="1"/>
+<line x1="142.0" y1="86.0" x2="1911.3400000000001" y2="86.0" stroke="#ddd" stroke-width="1"/>
+<line x1="142.0" y1="182.0" x2="1911.3400000000001" y2="182.0" stroke="#ddd" stroke-width="1"/>
+<line x1="142.0" y1="410.0" x2="1911.3400000000001" y2="410.0" stroke="#ddd" stroke-width="1"/>
+<line x1="142.0" y1="814.0" x2="1911.3400000000001" y2="814.0" stroke="#ddd" stroke-width="1"/>
+<line x1="142.0" y1="854.0" x2="1911.3400000000001" y2="854.0" stroke="#ddd" stroke-width="1"/>
+<line x1="158.0" y1="46.0" x2="158.0" y2="854.0" stroke="#ddd" stroke-width="1"/>
+<line x1="370.7" y1="46.0" x2="370.7" y2="854.0" stroke="#ddd" stroke-width="1"/>
+<line x1="600.1" y1="46.0" x2="600.1" y2="854.0" stroke="#ddd" stroke-width="1"/>
+<line x1="789.3" y1="46.0" x2="789.3" y2="854.0" stroke="#ddd" stroke-width="1"/>
+<line x1="1051.0" y1="46.0" x2="1051.0" y2="854.0" stroke="#ddd" stroke-width="1"/>
+<line x1="1272.3" y1="46.0" x2="1272.3" y2="854.0" stroke="#ddd" stroke-width="1"/>
+<line x1="1485.7" y1="46.0" x2="1485.7" y2="854.0" stroke="#ddd" stroke-width="1"/>
+<line x1="1747.3" y1="46.0" x2="1747.3" y2="854.0" stroke="#ddd" stroke-width="1"/>
+<line x1="1829.3" y1="46.0" x2="1829.3" y2="854.0" stroke="#ddd" stroke-width="1"/>
+<line x1="1911.3" y1="46.0" x2="1911.3" y2="854.0" stroke="#ddd" stroke-width="1"/>
+<text x="137.0" y="71.0" text-anchor="end" fill="#111827" font-size="12" font-weight="600">userspace</text>
+<text x="137.0" y="139.0" text-anchor="end" fill="#111827" font-size="12" font-weight="600">syscall_boundary</text>
+<text x="137.0" y="301.0" text-anchor="end" fill="#111827" font-size="12" font-weight="600">kernel</text>
+<text x="137.0" y="617.0" text-anchor="end" fill="#111827" font-size="12" font-weight="600">hardware</text>
+<text x="137.0" y="839.0" text-anchor="end" fill="#111827" font-size="12" font-weight="600">unknown</text>
+<text text-anchor="middle" font-size="13" font-weight="600" fill="#111827"><tspan x="264.4" y="19.0">arch</tspan><tspan x="264.4" dy="12.0">platform</tspan></text>
+<text text-anchor="middle" font-size="13" font-weight="600" fill="#111827"><tspan x="485.4" y="19.0">trap</tspan><tspan x="485.4" dy="12.0">syscall</tspan></text>
+<text text-anchor="middle" font-size="13" font-weight="600" fill="#111827"><tspan x="694.7" y="19.0">process</tspan><tspan x="694.7" dy="12.0">sched</tspan></text>
+<text text-anchor="middle" font-size="13" font-weight="600" fill="#111827"><tspan x="920.1" y="19.0">memory</tspan><tspan x="920.1" dy="12.0">vm</tspan></text>
+<text text-anchor="middle" font-size="13" font-weight="600" fill="#111827"><tspan x="1161.7" y="19.0">fs</tspan><tspan x="1161.7" dy="12.0">storage</tspan></text>
+<text text-anchor="middle" font-size="13" font-weight="600" fill="#111827"><tspan x="1379.0" y="19.0">sync</tspan><tspan x="1379.0" dy="12.0">ipc</tspan></text>
+<text text-anchor="middle" font-size="13" font-weight="600" fill="#111827"><tspan x="1616.5" y="19.0">runtime</tspan><tspan x="1616.5" dy="12.0">common</tspan></text>
+<text text-anchor="middle" font-size="12" font-weight="600" fill="#111827"><tspan x="1788.3" y="19.0">user</tspan><tspan x="1788.3" dy="12.0">programs</tspan></text>
+<text x="1870.3" y="30.0" text-anchor="middle" font-size="12" font-weight="600" fill="#111827">unknown</text>
+<path d="M264.4,450.9 C264.4,453.9 264.4,455.8 264.4,458.9" stroke="#f4d03f" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M612.1,212.0 C512.9,212.0 450.2,432.4 351.0,432.4" stroke="#3498db" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M612.1,212.0 C612.1,312.8 346.9,376.5 346.9,477.3" stroke="#3498db" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M1320.6,204.8 C1114.1,204.8 983.7,212.0 777.3,212.0" stroke="#e67e22" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M1320.6,204.8 C950.6,204.8 716.9,567.1 346.9,567.1" stroke="#e67e22" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M1320.6,204.8 C950.6,204.8 716.9,522.2 346.9,522.2" stroke="#e67e22" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M1320.6,204.8 C952.1,204.8 719.4,432.4 351.0,432.4" stroke="#e67e22" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M1320.6,204.8 C950.6,204.8 716.9,477.3 346.9,477.3" stroke="#e67e22" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M777.3,268.0 C983.7,268.0 1114.1,341.6 1320.6,341.6" stroke="#3498db" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M694.7,244.0 C694.7,241.0 694.7,239.0 694.7,236.0" stroke="#3498db" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M777.3,268.0 C983.7,268.0 1114.1,204.8 1320.6,204.8" stroke="#3498db" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M612.1,268.0 C511.4,268.0 447.7,477.3 346.9,477.3" stroke="#3498db" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M612.1,268.0 C512.9,268.0 450.2,432.4 351.0,432.4" stroke="#3498db" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M612.1,268.0 C612.1,381.7 346.9,453.4 346.9,567.1" stroke="#3498db" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M612.1,268.0 C511.4,268.0 447.7,522.2 346.9,522.2" stroke="#3498db" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M694.7,292.0 C694.7,474.8 264.4,590.3 264.4,773.1" stroke="#3498db" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M612.1,268.0 C612.1,415.8 346.9,509.1 346.9,656.9" stroke="#3498db" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M694.7,292.0 C694.7,457.8 264.4,562.5 264.4,728.2" stroke="#3498db" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M612.1,268.0 C612.1,398.7 346.9,481.3 346.9,612.0" stroke="#3498db" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M1379.0,231.6 C1379.0,228.6 1379.0,226.6 1379.0,223.6" stroke="#e67e22" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M1284.3,250.4 C928.1,250.4 703.1,567.1 346.9,567.1" stroke="#e67e22" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M1284.3,250.4 C928.1,250.4 703.1,522.2 346.9,522.2" stroke="#e67e22" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M1284.3,250.4 C1091.7,250.4 970.0,212.0 777.3,212.0" stroke="#e67e22" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M1284.3,250.4 C929.7,250.4 705.6,432.4 351.0,432.4" stroke="#e67e22" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M1284.3,250.4 C928.1,250.4 703.1,477.3 346.9,477.3" stroke="#e67e22" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M1379.0,314.8 C1379.0,317.8 1379.0,319.8 1379.0,322.8" stroke="#e67e22" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M1284.3,296.0 C1091.7,296.0 970.0,212.0 777.3,212.0" stroke="#e67e22" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M1284.3,296.0 C929.7,296.0 705.6,432.4 351.0,432.4" stroke="#e67e22" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M1284.3,296.0 C928.1,296.0 703.1,477.3 346.9,477.3" stroke="#e67e22" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M1284.3,296.0 C928.1,296.0 703.1,791.6 346.9,791.6" stroke="#e67e22" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M1284.3,296.0 C928.1,296.0 703.1,656.9 346.9,656.9" stroke="#e67e22" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M1284.3,296.0 C928.1,296.0 703.1,746.7 346.9,746.7" stroke="#e67e22" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M1284.3,296.0 C928.1,296.0 703.1,612.0 346.9,612.0" stroke="#e67e22" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M1550.0,212.0 C1550.0,243.9 1473.7,264.1 1473.7,296.0" stroke="#95a5a6" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M1550.0,212.0 C1088.3,212.0 796.6,296.0 334.8,296.0" stroke="#95a5a6" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M1550.0,212.0 C1521.0,212.0 1502.7,250.4 1473.7,250.4" stroke="#95a5a6" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M1550.0,212.0 C1256.4,212.0 1070.9,212.0 777.3,212.0" stroke="#95a5a6" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M1550.0,212.0 C1094.4,212.0 806.6,432.4 351.0,432.4" stroke="#95a5a6" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M1550.0,212.0 C1092.9,212.0 804.1,477.3 346.9,477.3" stroke="#95a5a6" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M1550.0,212.0 C1550.0,261.2 1437.4,292.4 1437.4,341.6" stroke="#95a5a6" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M1550.0,212.0 C1092.9,212.0 804.1,791.6 346.9,791.6" stroke="#95a5a6" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M1550.0,212.0 C1092.9,212.0 804.1,656.9 346.9,656.9" stroke="#95a5a6" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M1550.0,212.0 C1092.9,212.0 804.1,746.7 346.9,746.7" stroke="#95a5a6" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M1550.0,212.0 C1092.9,212.0 804.1,612.0 346.9,612.0" stroke="#95a5a6" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M1550.0,212.0 C1507.2,212.0 1480.2,204.8 1437.4,204.8" stroke="#95a5a6" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M1550.0,212.0 C1092.9,212.0 804.1,567.1 346.9,567.1" stroke="#95a5a6" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M1550.0,212.0 C1092.9,212.0 804.1,522.2 346.9,522.2" stroke="#95a5a6" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M1320.6,341.6 C950.6,341.6 716.9,791.6 346.9,791.6" stroke="#e67e22" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M1320.6,341.6 C950.6,341.6 716.9,746.7 346.9,746.7" stroke="#e67e22" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M1320.6,341.6 C1114.1,341.6 983.7,212.0 777.3,212.0" stroke="#e67e22" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M1320.6,341.6 C950.6,341.6 716.9,656.9 346.9,656.9" stroke="#e67e22" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M1320.6,341.6 C950.6,341.6 716.9,612.0 346.9,612.0" stroke="#e67e22" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M1320.6,341.6 C952.1,341.6 719.4,432.4 351.0,432.4" stroke="#e67e22" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M1320.6,341.6 C950.6,341.6 716.9,477.3 346.9,477.3" stroke="#e67e22" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M264.4,548.7 C264.4,545.6 264.4,543.7 264.4,540.7" stroke="#f4d03f" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M1002.7,212.0 C1109.7,212.0 1177.3,296.0 1284.3,296.0" stroke="#2ecc71" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M1002.7,212.0 C1210.7,212.0 1342.1,212.0 1550.0,212.0" stroke="#2ecc71" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M920.1,236.0 C920.1,239.0 920.1,241.0 920.1,244.0" stroke="#2ecc71" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M1002.7,212.0 C1109.7,212.0 1177.3,250.4 1284.3,250.4" stroke="#2ecc71" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M837.5,212.0 C814.6,212.0 800.2,212.0 777.3,212.0" stroke="#2ecc71" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M837.5,212.0 C652.6,212.0 535.9,432.4 351.0,432.4" stroke="#2ecc71" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M837.5,212.0 C651.1,212.0 533.4,477.3 346.9,477.3" stroke="#2ecc71" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M1002.7,212.0 C1123.5,212.0 1199.8,341.6 1320.6,341.6" stroke="#2ecc71" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M837.5,212.0 C837.5,432.2 346.9,571.3 346.9,791.6" stroke="#2ecc71" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M837.5,212.0 C651.1,212.0 533.4,656.9 346.9,656.9" stroke="#2ecc71" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M837.5,212.0 C837.5,415.2 346.9,543.5 346.9,746.7" stroke="#2ecc71" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M837.5,212.0 C651.1,212.0 533.4,612.0 346.9,612.0" stroke="#2ecc71" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M1002.7,212.0 C1109.7,212.0 1177.3,387.2 1284.3,387.2" stroke="#2ecc71" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M920.1,236.0 C920.1,260.3 920.1,275.7 920.1,300.0" stroke="#2ecc71" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M837.5,212.0 C646.5,212.0 525.9,296.0 334.8,296.0" stroke="#2ecc71" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M694.7,300.0 C694.7,297.0 694.7,295.0 694.7,292.0" stroke="#3498db" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M612.1,324.0 C512.9,324.0 450.2,432.4 351.0,432.4" stroke="#3498db" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M777.3,324.0 C970.0,324.0 1091.7,296.0 1284.3,296.0" stroke="#3498db" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M777.3,324.0 C970.0,324.0 1091.7,250.4 1284.3,250.4" stroke="#3498db" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M694.7,300.0 C694.7,275.7 694.7,260.3 694.7,236.0" stroke="#3498db" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M612.1,324.0 C511.4,324.0 447.7,477.3 346.9,477.3" stroke="#3498db" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M777.3,324.0 C983.7,324.0 1114.1,204.8 1320.6,204.8" stroke="#3498db" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M777.3,324.0 C1070.9,324.0 1256.4,212.0 1550.0,212.0" stroke="#3498db" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M777.3,324.0 C983.7,324.0 1114.1,341.6 1320.6,341.6" stroke="#3498db" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M612.1,324.0 C511.4,324.0 447.7,522.2 346.9,522.2" stroke="#3498db" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M612.1,324.0 C511.4,324.0 447.7,567.1 346.9,567.1" stroke="#3498db" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M612.1,324.0 C506.8,324.0 440.2,296.0 334.8,296.0" stroke="#3498db" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M612.1,324.0 C612.1,484.6 346.9,586.1 346.9,746.7" stroke="#3498db" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M612.1,324.0 C612.1,433.4 346.9,502.6 346.9,612.0" stroke="#3498db" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M694.7,348.0 C531.2,348.0 427.9,773.1 264.4,773.1" stroke="#3498db" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M612.1,324.0 C612.1,450.5 346.9,530.4 346.9,656.9" stroke="#3498db" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M1260.3,296.0 C1350.5,296.0 1407.5,324.0 1497.7,324.0" stroke="#9b59b6" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M264.4,728.2 C264.4,691.1 264.4,667.6 264.4,630.4" stroke="#f4d03f" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M264.4,320.0 C264.4,458.1 264.4,545.3 264.4,683.3" stroke="#f4d03f" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M264.4,773.1 C264.4,736.0 264.4,712.5 264.4,675.3" stroke="#f4d03f" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M612.1,380.0 C512.9,380.0 450.2,432.4 351.0,432.4" stroke="#3498db" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M612.1,380.0 C511.4,380.0 447.7,477.3 346.9,477.3" stroke="#3498db" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M777.3,380.0 C970.0,380.0 1091.7,250.4 1284.3,250.4" stroke="#3498db" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M777.3,380.0 C970.0,380.0 1091.7,296.0 1284.3,296.0" stroke="#3498db" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M777.3,380.0 C983.7,380.0 1114.1,341.6 1320.6,341.6" stroke="#3498db" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M612.1,380.0 C511.4,380.0 447.7,522.2 346.9,522.2" stroke="#3498db" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M612.1,380.0 C511.4,380.0 447.7,567.1 346.9,567.1" stroke="#3498db" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M612.1,380.0 C511.4,380.0 447.7,612.0 346.9,612.0" stroke="#3498db" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M612.1,380.0 C612.1,485.2 346.9,551.7 346.9,656.9" stroke="#3498db" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M612.1,380.0 C612.1,519.3 346.9,607.3 346.9,746.7" stroke="#3498db" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M612.1,380.0 C612.1,536.4 346.9,635.2 346.9,791.6" stroke="#3498db" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M694.7,356.0 C694.7,310.4 694.7,281.6 694.7,236.0" stroke="#3498db" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M777.3,380.0 C983.7,380.0 1114.1,204.8 1320.6,204.8" stroke="#3498db" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M1002.7,324.0 C1109.7,324.0 1177.3,296.0 1284.3,296.0" stroke="#2ecc71" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M1002.7,324.0 C1109.7,324.0 1177.3,250.4 1284.3,250.4" stroke="#2ecc71" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M837.5,324.0 C651.1,324.0 533.4,612.0 346.9,612.0" stroke="#2ecc71" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M1002.7,324.0 C1109.7,324.0 1177.3,387.2 1284.3,387.2" stroke="#2ecc71" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M837.5,324.0 C651.1,324.0 533.4,656.9 346.9,656.9" stroke="#2ecc71" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M837.5,324.0 C651.1,324.0 533.4,746.7 346.9,746.7" stroke="#2ecc71" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M837.5,324.0 C646.5,324.0 525.9,296.0 334.8,296.0" stroke="#2ecc71" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M837.5,324.0 C651.1,324.0 533.4,791.6 346.9,791.6" stroke="#2ecc71" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M837.5,324.0 C837.5,281.4 777.3,254.6 777.3,212.0" stroke="#2ecc71" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M837.5,324.0 C652.6,324.0 535.9,432.4 351.0,432.4" stroke="#2ecc71" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M837.5,324.0 C651.1,324.0 533.4,477.3 346.9,477.3" stroke="#2ecc71" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M1002.7,324.0 C1123.5,324.0 1199.8,341.6 1320.6,341.6" stroke="#2ecc71" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M1002.7,324.0 C1123.5,324.0 1199.8,204.8 1320.6,204.8" stroke="#2ecc71" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M837.5,324.0 C651.1,324.0 533.4,567.1 346.9,567.1" stroke="#2ecc71" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M1002.7,324.0 C1210.7,324.0 1342.1,212.0 1550.0,212.0" stroke="#2ecc71" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M837.5,324.0 C655.6,324.0 540.7,701.8 358.7,701.8" stroke="#2ecc71" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M588.1,110.0 C588.1,170.0 612.1,208.0 612.1,268.0" stroke="#e74c3c" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M588.1,110.0 C953.7,110.0 1184.5,212.0 1550.0,212.0" stroke="#e74c3c" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M485.4,130.0 C485.4,237.9 264.4,306.1 264.4,414.0" stroke="#e74c3c" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M588.1,110.0 C588.1,148.8 612.1,173.2 612.1,212.0" stroke="#e74c3c" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M485.4,130.0 C485.4,255.0 264.4,333.9 264.4,458.9" stroke="#e74c3c" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M588.1,110.0 C866.5,110.0 1042.3,204.8 1320.6,204.8" stroke="#e74c3c" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M588.1,110.0 C866.5,110.0 1042.3,341.6 1320.6,341.6" stroke="#e74c3c" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M485.4,130.0 C485.4,272.0 264.4,361.7 264.4,503.8" stroke="#e74c3c" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M485.4,130.0 C485.4,289.1 264.4,389.6 264.4,548.7" stroke="#e74c3c" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M485.4,130.0 C485.4,306.2 264.4,417.4 264.4,593.6" stroke="#e74c3c" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M485.4,130.0 C485.4,323.2 264.4,445.2 264.4,638.4" stroke="#e74c3c" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M485.4,130.0 C485.4,357.3 264.4,500.9 264.4,728.2" stroke="#e74c3c" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M382.7,110.0 C382.7,180.7 334.8,225.3 334.8,296.0" stroke="#e74c3c" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M485.4,130.0 C485.4,374.4 264.4,528.7 264.4,773.1" stroke="#e74c3c" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M857.7,380.0 C857.7,337.4 777.3,310.6 777.3,268.0" stroke="#2ecc71" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M857.7,380.0 C857.7,316.2 777.3,275.8 777.3,212.0" stroke="#2ecc71" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M857.7,380.0 C665.1,380.0 543.5,432.4 351.0,432.4" stroke="#2ecc71" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M857.7,380.0 C663.6,380.0 541.0,477.3 346.9,477.3" stroke="#2ecc71" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M982.5,380.0 C1111.0,380.0 1192.1,204.8 1320.6,204.8" stroke="#2ecc71" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M857.7,380.0 C663.6,380.0 541.0,567.1 346.9,567.1" stroke="#2ecc71" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M857.7,380.0 C663.6,380.0 541.0,522.2 346.9,522.2" stroke="#2ecc71" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M982.5,380.0 C1111.0,380.0 1192.1,341.6 1320.6,341.6" stroke="#2ecc71" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M857.7,380.0 C663.6,380.0 541.0,791.6 346.9,791.6" stroke="#2ecc71" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M857.7,380.0 C663.6,380.0 541.0,656.9 346.9,656.9" stroke="#2ecc71" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M857.7,380.0 C663.6,380.0 541.0,746.7 346.9,746.7" stroke="#2ecc71" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M857.7,380.0 C663.6,380.0 541.0,612.0 346.9,612.0" stroke="#2ecc71" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M588.1,158.0 C588.1,199.8 612.1,226.2 612.1,268.0" stroke="#e74c3c" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M588.1,158.0 C953.7,158.0 1184.5,212.0 1550.0,212.0" stroke="#e74c3c" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M485.4,178.0 C485.4,267.7 264.4,324.3 264.4,414.0" stroke="#e74c3c" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M588.1,158.0 C588.1,178.5 612.1,191.5 612.1,212.0" stroke="#e74c3c" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M485.4,178.0 C485.4,284.7 264.4,352.2 264.4,458.9" stroke="#e74c3c" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M588.1,158.0 C866.5,158.0 1042.3,204.8 1320.6,204.8" stroke="#e74c3c" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M588.1,158.0 C866.5,158.0 1042.3,341.6 1320.6,341.6" stroke="#e74c3c" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M485.4,178.0 C485.4,301.8 264.4,380.0 264.4,503.8" stroke="#e74c3c" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M485.4,178.0 C485.4,318.9 264.4,407.8 264.4,548.7" stroke="#e74c3c" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M485.4,178.0 C485.4,335.9 264.4,435.6 264.4,593.6" stroke="#e74c3c" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M485.4,178.0 C485.4,353.0 264.4,463.5 264.4,638.4" stroke="#e74c3c" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M485.4,178.0 C485.4,387.1 264.4,519.1 264.4,728.2" stroke="#e74c3c" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M382.7,158.0 C382.7,210.4 334.8,243.6 334.8,296.0" stroke="#e74c3c" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<path d="M485.4,178.0 C485.4,404.1 264.4,547.0 264.4,773.1" stroke="#e74c3c" stroke-width="2" fill="none" marker-end="url(#arr)" opacity="0.88"/>
+<rect x="177.8" y="414.0" width="173.2" height="36.9" rx="6.0" fill="#f4d03f" stroke="#fff" stroke-width="1"/>
+<text x="264.4" y="429.5" text-anchor="middle" font-weight="bold" font-size="15.0" fill="#222">cpuid</text>
+<text x="264.4" y="442.8" text-anchor="middle" fill="#555" font-size="13.0">include/sched/proc.h</text>
+<rect x="612.1" y="188.0" width="165.1" height="48.0" rx="6.0" fill="#3498db" stroke="#fff" stroke-width="1"/>
+<text x="694.7" y="205.0" text-anchor="middle" font-weight="bold" font-size="15.0" fill="#222">mycpu</text>
+<text x="694.7" y="220.0" text-anchor="middle" fill="#555" font-size="13.0">kernel/sched/proc.c</text>
+<rect x="181.8" y="458.9" width="165.1" height="36.9" rx="6.0" fill="#f4d03f" stroke="#fff" stroke-width="1"/>
+<text x="264.4" y="474.4" text-anchor="middle" font-weight="bold" font-size="15.0" fill="#222">r_tp</text>
+<text x="264.4" y="487.7" text-anchor="middle" fill="#555" font-size="13.0">include/hal/riscv.h</text>
+<rect x="1320.6" y="186.0" width="116.8" height="37.6" rx="6.0" fill="#e67e22" stroke="#fff" stroke-width="1"/>
+<text x="1379.0" y="201.8" text-anchor="middle" font-weight="bold" font-size="15.0" fill="#222">pop_off</text>
+<text x="1379.0" y="215.3" text-anchor="middle" fill="#555" font-size="13.0">kernel/intr.c</text>
+<rect x="612.1" y="244.0" width="165.1" height="48.0" rx="6.0" fill="#3498db" stroke="#fff" stroke-width="1"/>
+<text x="694.7" y="261.0" text-anchor="middle" font-weight="bold" font-size="15.0" fill="#222">myproc</text>
+<text x="694.7" y="276.0" text-anchor="middle" fill="#555" font-size="13.0">kernel/sched/proc.c</text>
+<rect x="1284.3" y="231.6" width="189.3" height="37.6" rx="6.0" fill="#e67e22" stroke="#fff" stroke-width="1"/>
+<text x="1379.0" y="247.4" text-anchor="middle" font-weight="bold" font-size="15.0" fill="#222">release</text>
+<text x="1379.0" y="260.9" text-anchor="middle" fill="#555" font-size="13.0">kernel/sync/spinlock.c</text>
+<rect x="1284.3" y="277.2" width="189.3" height="37.6" rx="6.0" fill="#e67e22" stroke="#fff" stroke-width="1"/>
+<text x="1379.0" y="293.0" text-anchor="middle" font-weight="bold" font-size="15.0" fill="#222">acquire</text>
+<text x="1379.0" y="306.5" text-anchor="middle" fill="#555" font-size="13.0">kernel/sync/spinlock.c</text>
+<rect x="1550.0" y="188.0" width="132.9" height="48.0" rx="6.0" fill="#95a5a6" stroke="#fff" stroke-width="1"/>
+<text x="1616.5" y="205.0" text-anchor="middle" font-weight="bold" font-size="15.0" fill="#222">printf</text>
+<text x="1616.5" y="220.0" text-anchor="middle" fill="#555" font-size="13.0">kernel/printf.c</text>
+<rect x="1320.6" y="322.8" width="116.8" height="37.6" rx="6.0" fill="#e67e22" stroke="#fff" stroke-width="1"/>
+<text x="1379.0" y="338.6" text-anchor="middle" font-weight="bold" font-size="15.0" fill="#222">push_off</text>
+<text x="1379.0" y="352.1" text-anchor="middle" fill="#555" font-size="13.0">kernel/intr.c</text>
+<rect x="181.8" y="503.8" width="165.1" height="36.9" rx="6.0" fill="#f4d03f" stroke="#fff" stroke-width="1"/>
+<text x="264.4" y="519.3" text-anchor="middle" font-weight="bold" font-size="15.0" fill="#222">set_sstatus_bit</text>
+<text x="264.4" y="532.6" text-anchor="middle" fill="#555" font-size="13.0">include/hal/riscv.h</text>
+<rect x="181.8" y="548.7" width="165.1" height="36.9" rx="6.0" fill="#f4d03f" stroke="#fff" stroke-width="1"/>
+<text x="264.4" y="564.2" text-anchor="middle" font-weight="bold" font-size="15.0" fill="#222">intr_on</text>
+<text x="264.4" y="577.4" text-anchor="middle" fill="#555" font-size="13.0">include/hal/riscv.h</text>
+<rect x="1525.9" y="244.0" width="181.3" height="48.0" rx="6.0" fill="#95a5a6" stroke="#fff" stroke-width="1"/>
+<text x="1616.5" y="261.0" text-anchor="middle" font-weight="bold" font-size="15.0" fill="#222">memset</text>
+<text x="1616.5" y="276.0" text-anchor="middle" fill="#555" font-size="13.0">kernel/utils/string.c</text>
+<rect x="1497.7" y="300.0" width="237.7" height="48.0" rx="6.0" fill="#95a5a6" stroke="#fff" stroke-width="1"/>
+<text x="1616.5" y="317.0" text-anchor="middle" font-weight="bold" font-size="15.0" fill="#222">container_of</text>
+<text x="1616.5" y="332.0" text-anchor="middle" fill="#555" font-size="13.0">宏（#define） · include/types.h</text>
+<rect x="837.5" y="188.0" width="165.1" height="48.0" rx="6.0" fill="#2ecc71" stroke="#fff" stroke-width="1"/>
+<text x="920.1" y="205.0" text-anchor="middle" font-weight="bold" font-size="15.0" fill="#222">kfree</text>
+<text x="920.1" y="220.0" text-anchor="middle" fill="#555" font-size="13.0">kernel/mm/kmalloc.c</text>
+<rect x="612.1" y="300.0" width="165.1" height="48.0" rx="6.0" fill="#3498db" stroke="#fff" stroke-width="1"/>
+<text x="694.7" y="317.0" text-anchor="middle" font-weight="bold" font-size="15.0" fill="#222">exit</text>
+<text x="694.7" y="332.0" text-anchor="middle" fill="#555" font-size="13.0">kernel/sched/proc.c</text>
+<rect x="181.8" y="593.6" width="165.1" height="36.9" rx="6.0" fill="#f4d03f" stroke="#fff" stroke-width="1"/>
+<text x="264.4" y="609.0" text-anchor="middle" font-weight="bold" font-size="15.0" fill="#222">clr_sstatus_bit</text>
+<text x="264.4" y="622.3" text-anchor="middle" fill="#555" font-size="13.0">include/hal/riscv.h</text>
+<rect x="1284.3" y="368.4" width="189.3" height="37.6" rx="6.0" fill="#e67e22" stroke="#fff" stroke-width="1"/>
+<text x="1379.0" y="384.2" text-anchor="middle" font-weight="bold" font-size="15.0" fill="#222">initlock</text>
+<text x="1379.0" y="397.7" text-anchor="middle" fill="#555" font-size="13.0">kernel/sync/spinlock.c</text>
+<rect x="181.8" y="638.4" width="165.1" height="36.9" rx="6.0" fill="#f4d03f" stroke="#fff" stroke-width="1"/>
+<text x="264.4" y="653.9" text-anchor="middle" font-weight="bold" font-size="15.0" fill="#222">r_sstatus</text>
+<text x="264.4" y="667.2" text-anchor="middle" fill="#555" font-size="13.0">include/hal/riscv.h</text>
+<rect x="1063.0" y="272.0" width="197.4" height="48.0" rx="6.0" fill="#9b59b6" stroke="#fff" stroke-width="1"/>
+<text x="1161.7" y="289.0" text-anchor="middle" font-weight="bold" font-size="15.0" fill="#222">sb2fat</text>
+<text x="1161.7" y="304.0" text-anchor="middle" fill="#555" font-size="13.0">kernel/fs/fat32/fat32.h</text>
+<rect x="801.3" y="244.0" width="237.7" height="48.0" rx="6.0" fill="#2ecc71" stroke="#fff" stroke-width="1"/>
+<text x="920.1" y="261.0" text-anchor="middle" font-weight="bold" font-size="15.0" fill="#222">freepage</text>
+<text x="920.1" y="276.0" text-anchor="middle" fill="#555" font-size="13.0">宏（#define） · include/mm/pm.h</text>
+<rect x="170.0" y="683.3" width="188.7" height="36.9" rx="6.0" fill="#f4d03f" stroke="#fff" stroke-width="1"/>
+<text x="264.4" y="698.8" text-anchor="middle" font-weight="bold" font-size="15.0" fill="#222">sbi_console_putchar</text>
+<text x="264.4" y="712.1" text-anchor="middle" fill="#555" font-size="13.0">include/sbi.h</text>
+<rect x="181.8" y="728.2" width="165.1" height="36.9" rx="6.0" fill="#f4d03f" stroke="#fff" stroke-width="1"/>
+<text x="264.4" y="743.7" text-anchor="middle" font-weight="bold" font-size="15.0" fill="#222">intr_off</text>
+<text x="264.4" y="757.0" text-anchor="middle" fill="#555" font-size="13.0">include/hal/riscv.h</text>
+<rect x="193.9" y="272.0" width="141.0" height="48.0" rx="6.0" fill="#f4d03f" stroke="#fff" stroke-width="1"/>
+<text x="264.4" y="289.0" text-anchor="middle" font-weight="bold" font-size="15.0" fill="#222">consputc</text>
+<text x="264.4" y="304.0" text-anchor="middle" fill="#555" font-size="13.0">kernel/console.c</text>
+<rect x="181.8" y="773.1" width="165.1" height="36.9" rx="6.0" fill="#f4d03f" stroke="#fff" stroke-width="1"/>
+<text x="264.4" y="788.6" text-anchor="middle" font-weight="bold" font-size="15.0" fill="#222">intr_get</text>
+<text x="264.4" y="801.9" text-anchor="middle" fill="#555" font-size="13.0">include/hal/riscv.h</text>
+<rect x="1525.9" y="356.0" width="181.3" height="48.0" rx="6.0" fill="#95a5a6" stroke="#fff" stroke-width="1"/>
+<text x="1616.5" y="373.0" text-anchor="middle" font-weight="bold" font-size="15.0" fill="#222">memmove</text>
+<text x="1616.5" y="388.0" text-anchor="middle" fill="#555" font-size="13.0">kernel/utils/string.c</text>
+<rect x="612.1" y="356.0" width="165.1" height="48.0" rx="6.0" fill="#3498db" stroke="#fff" stroke-width="1"/>
+<text x="694.7" y="373.0" text-anchor="middle" font-weight="bold" font-size="15.0" fill="#222">wakeup</text>
+<text x="694.7" y="388.0" text-anchor="middle" fill="#555" font-size="13.0">kernel/sched/proc.c</text>
+<rect x="837.5" y="300.0" width="165.1" height="48.0" rx="6.0" fill="#2ecc71" stroke="#fff" stroke-width="1"/>
+<text x="920.1" y="317.0" text-anchor="middle" font-weight="bold" font-size="15.0" fill="#222">kmalloc</text>
+<text x="920.1" y="332.0" text-anchor="middle" fill="#555" font-size="13.0">kernel/mm/kmalloc.c</text>
+<rect x="382.7" y="90.0" width="205.4" height="40.0" rx="6.0" fill="#e74c3c" stroke="#fff" stroke-width="1"/>
+<text x="485.4" y="106.8" text-anchor="middle" font-weight="bold" font-size="15.0" fill="#222">argaddr</text>
+<text x="485.4" y="121.2" text-anchor="middle" fill="#555" font-size="13.0">kernel/syscall/syscall.c</text>
+<rect x="857.7" y="356.0" width="124.8" height="48.0" rx="6.0" fill="#2ecc71" stroke="#fff" stroke-width="1"/>
+<text x="920.1" y="373.0" text-anchor="middle" font-weight="bold" font-size="15.0" fill="#222">safememmove</text>
+<text x="920.1" y="388.0" text-anchor="middle" fill="#555" font-size="13.0">kernel/mm/vm.c</text>
+<rect x="382.7" y="138.0" width="205.4" height="40.0" rx="6.0" fill="#e74c3c" stroke="#fff" stroke-width="1"/>
+<text x="485.4" y="154.8" text-anchor="middle" font-weight="bold" font-size="15.0" fill="#222">argint</text>
+<text x="485.4" y="169.2" text-anchor="middle" fill="#555" font-size="13.0">kernel/syscall/syscall.c</text>
+</svg></div>
+<h2>项目概览与技术栈</h2>
+<p>好的，Stage Writer Agent 已就绪。根据您提供的 Evidence 和前置章节摘要，我将严格按照要求撰写 <code>01_overview</code> 章节。</p>
+<hr>
+<h2 id="快速总览">快速总览</h2>
+<p><strong>一句话定位</strong>：xv6-k210 基于 xv6 的自研 RISC-V 教学内核，主要语言 C，最突出技术点为完整实现三级页表与缺页异常处理。</p>
+<h2 id="评测与交付适配">评测与交付适配</h2>
+<ul>
+<li><strong>Delivery</strong>：未发现仓库内评测专用适配信号。<code>Makefile</code> 通过 <code>platform</code> 变量选择 <code>k210</code> 或 <code>qemu</code> 平台，生成 <code>kernel.bin</code> 等产物，但无 <code>kernel-rv</code>、<code>kernel-la</code>、<code>disk.img</code> 等固定产物名。</li>
+<li><strong>Harness</strong>：未发现仓库内评测专用适配信号。未发现自测主控、固定输出标记、扫盘跑脚本、关机等输出契约相关代码或 README 描述。</li>
+<li><strong>PlatformProfile</strong>：README/QEMU 命令与代码中 QEMU <code>virt</code> 平台一致，支持多 virtio 设备（块设备），SMP 配置（NCPU=2）与 <code>04</code> 章结论一致。</li>
+<li><strong>SubsystemDepth</strong>：README 未声称可跑 libc/LTP/压测等。<code>02</code> 章确认系统调用框架完整，<code>05</code> 章确认 FAT32 文件系统实现，<code>08</code> 章确认无网络协议栈，存在显著功能缺口。</li>
+</ul>
+<h2 id="各模块技术全景-基于-02-10-章报告提取">各模块技术全景（基于 02–10 章报告提取）</h2>
+<h3 id="02-启动-架构与-trap-系统调用">02 启动/架构与 Trap/系统调用</h3>
+<h4 id="技术清单">技术清单</h4>
+<ul>
+<li>启动链与引导交接：SBI (RustSBI) 在 M 态完成初始化后，通过 <code>mret</code> 进入 S 态内核入口 <code><em>entry</code>/<code></em>start</code>。</li>
+<li>特权级与执行模式（硬件隔离模型）：RISC-V S 模式（内核）与 U 模式（用户）隔离，通过 <code>sstatus.SPP</code> 等 CSR 管理。</li>
+<li>MMU 与内核地址空间初建：<code>kvminit()</code> 创建内核页表，<code>kvminithart()</code> 写入 <code>SATP_SV39</code> 启用分页。</li>
+<li>同步异常与用户态陷阱入口（含 syscall 路径）：用户态通过 <code>ecall</code> 陷入，<code>uservec</code> 保存上下文，<code>usertrap</code> 分发处理。</li>
+<li>异步设备中断与中断控制器抽象：PLIC 中断控制器驱动，<code>plic<em>claim()</code>/<code>plic</em>complete()</code> 分发外部中断。</li>
+<li>时钟源与定时中断（tick/计账/抢占触发）：<code>timer<em>tick()</code> 处理时钟中断，<code>proc</em>tick()</code> 递减时间片并触发抢占。</li>
+<li>用户内存访问与系统调用参数安全（copyin/out 等）：<code>copyin</code>/<code>copyout</code> 系列函数通过 <code>walkaddr()</code> 验证页表权限。</li>
+</ul>
+<h4 id="关键实现-证据与细粒度锚点">关键实现、证据与细粒度锚点</h4>
+<ul>
+<li>启动入口链：<code>linker/linker64.ld</code> 指定 <code>ENTRY(_entry)</code>，<code>kernel/entry.S</code> 设置栈并调用 <code>main</code>。</li>
+<li>特权级切换：SBI 设置 <code>mstatus.MPP=Supervisor</code> 后 <code>mret</code> 进入 S 态，内核通过 <code>ecall</code> 陷入 M 态。</li>
+<li>MMU 初始化：<code>kernel/main.c</code> 中 <code>kvminit()</code> 和 <code>kvminithart()</code> 被调用，<code>include/memlayout.h</code> 定义了 <code>KERNBASE</code> 等地址常量。</li>
+<li>Trap 向量设置：<code>trapinithart()</code> 设置 <code>stvec</code> 为 <code>kernelvec</code>（内核态）或 <code>uservec</code>（用户态）。</li>
+<li>系统调用分发：<code>kernel/syscall/syscall.c</code> 中的 <code>syscalls[]</code> 函数指针数组，通过 <code>syscall()</code> 函数分发。</li>
+<li>用户指针安全：<code>kernel/mm/vm.c</code> 中的 <code>copyout()</code> 通过 <code>walkaddr()</code> 检查 <code>PTE_U</code> 位。</li>
+</ul>
+<h4 id="依赖与工具">依赖与工具</h4>
+<ul>
+<li>依赖 RustSBI 作为 M 态固件（<code>bootloader/SBI/rustsbi-k210</code> 和 <code>bootloader/SBI/rustsbi-qemu</code>）。</li>
+<li>使用标准 GCC 交叉编译工具链（<code>riscv64-unknown-elf-gcc</code>）和 Makefile 构建系统。</li>
+</ul>
+<h4 id="与相邻模块的衔接">与相邻模块的衔接</h4>
+<ul>
+<li>为第 03 章内存管理提供页表切换（<code>w<em>satp</code>/<code>sfence</em>vma</code>）和缺页异常入口（<code>handle<em>page</em>fault</code>）。</li>
+<li>为第 04 章进程调度提供时钟中断触发抢占（<code>proc_tick</code> → <code>yield</code>）和上下文切换路径。</li>
+</ul>
+<h3 id="03-内存管理">03 内存管理</h3>
+<h4 id="技术清单">技术清单</h4>
+<ul>
+<li>物理内存组织与页帧分配器：基于 <code>struct run</code> 空闲链表的物理页帧分配器（<code>kernel/mm/pm.c</code>）。</li>
+<li>页表、地址空间与虚实地址转换：RISC-V Sv39 三级页表，<code>walk()</code>/<code>mappages()</code>/<code>unmappages()</code> 操作 API。</li>
+<li>缺页与页面错误处理（含按需分页/惰性路径）：<code>handle<em>page</em>fault()</code> 处理缺页，支持惰性分配（<code>handle<em>page</em>fault_lazy</code>）。</li>
+<li>进程虚拟地址空间布局与映射接口：<code>struct seg</code> 管理进程地址空间段（TEXT/HEAP/STACK/MMAP）。</li>
+<li>高级策略（CoW/Lazy/换页/mmap 等）：实现写时复制（CoW）和文件/匿名 <code>mmap</code>，未实现页面置换（swap）。</li>
+<li>页缓存或与 FS 块缓存的边界（归入本章或与第 05 章交叉说明）：存在块缓存（<code>bcache</code>），但无统一页缓存（Page Cache）。</li>
+</ul>
+<h4 id="关键实现-证据与细粒度锚点">关键实现、证据与细粒度锚点</h4>
+<ul>
+<li>物理页分配器：<code>kernel/mm/pm.c</code> 中的 <code>_<em>mul</em>alloc<em>no</em>lock()</code> 和 <code>_<em>mul</em>free<em>no</em>lock()</code> 实现 freelist 分配。</li>
+<li>页表操作：<code>kernel/mm/vm.c</code> 中的 <code>walk()</code>、<code>mappages()</code>、<code>unmappages()</code> 函数。</li>
+<li>缺页处理：<code>kernel/mm/vm.c</code> 中的 <code>handle<em>page</em>fault()</code> 函数，根据 <code>scause</code> 和 <code>stval</code> 分发。</li>
+<li>写时复制：<code>fork</code> 时 <code>uvmcopy()</code> 设置 <code>PTE<em>COW</code>，缺页时 <code>handle</em>store<em>page</em>fault_cow()</code> 处理。</li>
+<li>惰性分配：<code>growproc()</code> 仅更新堆边界，缺页时 <code>handle<em>page</em>fault_lazy()</code> 分配物理页。</li>
+<li>mmap 实现：<code>sys<em>mmap()</code> 系统调用，<code>handle</em>page<em>fault</em>mmap()</code> 处理缺页。</li>
+</ul>
+<h4 id="依赖与工具">依赖与工具</h4>
+<ul>
+<li>无外部 crate/库依赖，所有内存管理代码为自研 C 实现。</li>
+<li>依赖 RISC-V 硬件 MMU 和 <code>sfence.vma</code> 指令进行 TLB 管理。</li>
+</ul>
+<h4 id="与相邻模块的衔接">与相邻模块的衔接</h4>
+<ul>
+<li>为第 02 章 Trap 处理提供缺页异常处理入口（<code>handle<em>page</em>fault</code>），并联动 CoW/Lazy 等特性。</li>
+<li>为第 04 章进程创建（<code>fork</code>）提供地址空间复制（<code>uvmcopy</code>）和页表切换支持。</li>
+</ul>
+<h3 id="04-进程-调度与多核">04 进程/调度与多核</h3>
+<h4 id="技术清单">技术清单</h4>
+<ul>
+<li>进程或线程抽象与调度实体（PCB/TCB）：<code>struct proc</code> 作为统一 PCB，包含 <code>pid</code>、<code>state</code>、<code>context</code>、<code>pagetable</code> 等。</li>
+<li>调度策略与就绪队列结构：三级优先级队列（<code>PRIORITY<em>TIMEOUT</code>/<code>IRQ</code>/<code>NORMAL</code>），全局数组 <code>proc</em>runnable[3]</code>。</li>
+<li>抢占模型与时间片/优先级（可协作则注明）：时钟中断触发抢占，<code>proc_tick()</code> 递减时间片，超时降级。</li>
+<li>上下文切换与内核栈/寄存器约定：<code>swtch.S</code> 保存/恢复 <code>ra, sp, s0-s11</code>，<code>scheduler()</code> 中切换页表。</li>
+<li>生命周期（创建/执行/阻塞/退出/wait 与僵尸）：<code>allocproc</code> → <code>scheduler</code> → <code>sleep</code>/<code>exit</code> → <code>wait4</code> → <code>freeproc</code>。</li>
+<li>多核、每 CPU 状态与 IPI/迁移（若适用）：支持双核（NCPU=2），<code>cpus[]</code> 数组，<code>sbi<em>send</em>ipi</code> 发送 IPI，无负载均衡。</li>
+</ul>
+<h4 id="关键实现-证据与细粒度锚点">关键实现、证据与细粒度锚点</h4>
+<ul>
+<li>PCB 定义：<code>include/sched/proc.h</code> 中的 <code>struct proc</code>，包含 <code>state</code>、<code>context</code>、<code>trapframe</code>、<code>pagetable</code> 等字段。</li>
+<li>调度器主循环：<code>kernel/sched/proc.c</code> 中的 <code>scheduler()</code> 函数，遍历就绪队列选择进程。</li>
+<li>上下文切换：<code>kernel/swtch.S</code> 汇编实现，保存/恢复被调用者保存的寄存器。</li>
+<li>进程创建：<code>kernel/sched/proc.c</code> 中的 <code>clone()</code> 函数，复制地址空间和文件表。</li>
+<li>进程退出：<code>kernel/sched/proc.c</code> 中的 <code>exit()</code> 函数，释放资源并唤醒父进程。</li>
+<li>多核启动：<code>kernel/main.c</code> 中 <code>hartid != 0</code> 的分支，AP 核初始化后进入 <code>scheduler()</code>。</li>
+</ul>
+<h4 id="依赖与工具">依赖与工具</h4>
+<ul>
+<li>无外部 crate/库依赖。</li>
+<li>依赖 RISC-V 的 <code>tp</code> 寄存器作为每 CPU 数据指针。</li>
+</ul>
+<h4 id="与相邻模块的衔接">与相邻模块的衔接</h4>
+<ul>
+<li>与第 02 章 Trap 联动，时钟中断通过 <code>proc_tick()</code> 驱动调度抢占。</li>
+<li>与第 03 章内存管理联动，进程创建时复制地址空间（<code>copysegs</code>），切换时切换页表（<code>w_satp</code>）。</li>
+</ul>
+<h3 id="05-文件系统与设备-i-o">05 文件系统与设备 I/O</h3>
+<h4 id="技术清单">技术清单</h4>
+<ul>
+<li>VFS 与 inode/file 等对象模型：<code>struct inode</code>、<code>struct file</code>、<code>struct dentry</code>、<code>struct superblock</code> 及操作表。</li>
+<li>路径解析与挂载/命名空间：<code>lookup_path()</code> 支持绝对/相对路径，<code>mountsysfs()</code> 挂载伪文件系统。</li>
+<li>具体文件系统实现形态：自研 FAT32 文件系统后端（<code>kernel/fs/fat32/</code>）。</li>
+<li>文件描述符与打开文件表：<code>struct fdtable</code> 内嵌于进程，固定数组 <code>arr[NOFILE]</code>。</li>
+<li>块缓存、写回与磁盘 I/O 路径：<code>struct buf</code> 的 buffer cache，LRU 驱逐策略，支持脏页写回。</li>
+<li>字符设备与块设备驱动框架（含 virtio 等）：<code>console.c</code> 字符设备，<code>virtio_disk.c</code>/<code>sdcard.c</code> 块设备，通过 <code>disk.c</code> 抽象。</li>
+</ul>
+<h4 id="关键实现-证据与细粒度锚点">关键实现、证据与细粒度锚点</h4>
+<ul>
+<li>VFS 对象定义：<code>include/fs/fs.h</code> 中的 <code>struct inode</code>、<code>struct file</code>、<code>struct dentry</code>。</li>
+<li>FAT32 实现：<code>kernel/fs/fat32/</code> 目录下的 <code>fat32.c</code>、<code>fat32_fs.c</code> 等文件。</li>
+<li>文件描述符表：<code>include/fs/file.h</code> 中的 <code>struct fdtable</code>，包含 <code>arr</code> 数组。</li>
+<li>块缓存：<code>kernel/fs/bio.c</code> 中的 <code>struct buf</code> 数组 <code>bufs[BNUM]</code>，<code>bget()</code>/<code>brelse()</code> 管理。</li>
+<li>块设备驱动：<code>kernel/driver/virtio_disk.c</code>（QEMU）和 <code>kernel/driver/sdcard.c</code>（K210）。</li>
+<li>伪文件系统：<code>kernel/fs/rootfs.c</code> 实现 <code>devfs</code> 和 <code>procfs</code>。</li>
+</ul>
+<h4 id="依赖与工具">依赖与工具</h4>
+<ul>
+<li>无外部 crate/库依赖，FAT32 和驱动均为自研。</li>
+<li>依赖 QEMU 的 virtio-mmio 设备或 K210 的 SD 卡外设。</li>
+</ul>
+<h4 id="与相邻模块的衔接">与相邻模块的衔接</h4>
+<ul>
+<li>为第 03 章 <code>mmap</code> 提供文件映射支持，缺页时从文件读取数据。</li>
+<li>为第 06 章管道提供 <code>FD_PIPE</code> 类型的文件对象，通过 VFS 层进行读写。</li>
+</ul>
+<h3 id="06-同步与-ipc">06 同步与 IPC</h3>
+<h4 id="技术清单">技术清单</h4>
+<ul>
+<li>自旋锁与中断上下文临界区规则：<code>struct spinlock</code>，<code>acquire()</code> 使用原子操作并关中断（<code>push_off</code>）。</li>
+<li>可睡眠互斥与锁序/死锁约束（若述及）：<code>struct sleeplock</code>，<code>acquiresleep()</code> 阻塞等待，存在锁顺序注释。</li>
+<li>等待队列、睡眠与唤醒：<code>sleep()</code>/<code>wakeup()</code> 机制，基于 <code>chan</code> 的等待队列。</li>
+<li>管道等字节流 IPC：<code>struct pipe</code>，环形缓冲区，<code>pipewrite()</code>/<code>piperead()</code> 阻塞读写。</li>
+<li>信号与异步通知：<code>struct sigaction</code>，<code>sighandle()</code> 处理，<code>sigreturn()</code> 恢复上下文。</li>
+<li>共享内存或 futex 等（若本仓库有）：未实现 futex 或 SysV 共享内存。</li>
+</ul>
+<h4 id="关键实现-证据与细粒度锚点">关键实现、证据与细粒度锚点</h4>
+<ul>
+<li>自旋锁实现：<code>kernel/sync/spinlock.c</code> 中的 <code>acquire()</code> 和 <code>release()</code>。</li>
+<li>睡眠锁实现：<code>kernel/sync/sleeplock.c</code> 中的 <code>acquiresleep()</code> 和 <code>releasesleep()</code>。</li>
+<li>睡眠与唤醒：<code>kernel/sched/proc.c</code> 中的 <code>sleep()</code> 和 <code>wakeup()</code> 函数。</li>
+<li>管道实现：<code>kernel/fs/pipe.c</code> 中的 <code>pipealloc()</code>、<code>pipewrite()</code>、<code>piperead()</code>。</li>
+<li>信号处理：<code>kernel/signal/signal.c</code> 中的 <code>sighandle()</code> 和 <code>sys_sigreturn()</code>。</li>
+</ul>
+<h4 id="依赖与工具">依赖与工具</h4>
+<ul>
+<li>无外部 crate/库依赖。</li>
+<li>依赖 GCC 内建的原子操作 <code>_<em>sync</em>lock<em>test</em>and<em>set</code> 和 <code></em><em>sync</em>lock_release</code>。</li>
+</ul>
+<h4 id="与相邻模块的衔接">与相邻模块的衔接</h4>
+<ul>
+<li>为第 04 章进程调度提供 <code>sleep()</code>/<code>wakeup()</code> 阻塞/唤醒原语。</li>
+<li>为第 05 章文件系统提供 <code>sleeplock</code> 保护 inode 等元数据，为管道提供 IPC 机制。</li>
+</ul>
+<h3 id="07-安全机制">07 安全机制</h3>
+<h4 id="技术清单">技术清单</h4>
+<ul>
+<li>硬件隔离与特权域模型：RISC-V S/U 模式隔离，通过 <code>sstatus.SPP</code>、<code>PUM</code>/<code>SUM</code> 位管理。</li>
+<li>访问控制模型（DAC/MAC/Capability 等，无则写不适用）：不适用，仅有基于文件 <code>readable</code>/<code>writable</code> 标志的简单检查。</li>
+<li>用户指针验证与内核/用户空间数据拷贝边界：<code>copyin</code>/<code>copyout</code> 通过 <code>walkaddr()</code> 验证 <code>PTE_U</code> 位。</li>
+<li>可执行空间保护与权限位策略（W^X 等）：页表权限位（<code>PTE_R/W/X</code>）实现代码段只读可执行，数据段可读写。</li>
+<li>其他沙箱或策略（seccomp/namespace/cgroup 等，无则写不适用）：不适用，未实现。</li>
+</ul>
+<h4 id="关键实现-证据与细粒度锚点">关键实现、证据与细粒度锚点</h4>
+<ul>
+<li>特权级隔离：<code>include/hal/riscv.h</code> 中 <code>SSTATUS<em>SPP</code>、<code>SSTATUS</em>PUM</code>、<code>SSTATUS_SUM</code> 定义。</li>
+<li>用户指针验证：<code>kernel/mm/vm.c</code> 中的 <code>copyout()</code> 通过 <code>walkaddr()</code> 检查 <code>PTE<em>V</code> 和 <code>PTE</em>U</code>。</li>
+<li>页表权限：<code>include/hal/riscv.h</code> 中 <code>PTE<em>R</code>、<code>PTE</em>W</code>、<code>PTE<em>X</code>、<code>PTE</em>U</code> 定义。</li>
+<li>系统调用参数安全：<code>kernel/syscall/syscall.c</code> 中的 <code>argint()</code>、<code>argaddr()</code>、<code>argstr()</code> 通过 <code>copyin</code> 安全读取。</li>
+</ul>
+<h4 id="依赖与工具">依赖与工具</h4>
+<ul>
+<li>无外部 crate/库依赖。</li>
+<li>依赖 RISC-V 硬件页表权限位和 S/U 模式隔离机制。</li>
+</ul>
+<h4 id="与相邻模块的衔接">与相邻模块的衔接</h4>
+<ul>
+<li>与第 02 章 Trap 联动，在 <code>usertrap</code> 中处理非法访问并设置 <code>p->killed</code>。</li>
+<li>与第 03 章内存管理联动，页表权限位（<code>PTE_U</code>）是实现用户/内核隔离的基础。</li>
+</ul>
+<h3 id="08-网络协议栈">08 网络协议栈</h3>
+<h4 id="技术清单">技术清单</h4>
+<ul>
+<li>套接字抽象与用户态 API：不适用，未实现。</li>
+<li>协议栈分层与数据面实现形态：不适用，未实现。</li>
+<li>网卡驱动与收发包/DMA 路径：不适用，未实现。</li>
+<li>与协议栈缓冲与 sk_buff 类抽象（若适用）：不适用，未实现。</li>
+<li>与文件层或块设备的衔接（若适用）：不适用，未实现。</li>
+</ul>
+<h4 id="关键实现-证据与细粒度锚点">关键实现、证据与细粒度锚点</h4>
+<ul>
+<li>未发现网络子系统实现。<code>syscall</code> 表中无 <code>socket</code>、<code>bind</code>、<code>connect</code> 等系统调用。</li>
+<li>未发现协议栈代码或第三方依赖（如 <code>lwIP</code>、<code>smoltcp</code>）。</li>
+<li>未发现网卡驱动（如 <code>virtio-net</code>、<code>e1000</code>）。</li>
+<li>负向搜索覆盖充分，确认无网络功能实现。</li>
+</ul>
+<h4 id="依赖与工具">依赖与工具</h4>
+<ul>
+<li>不适用。</li>
+</ul>
+<h4 id="与相邻模块的衔接">与相邻模块的衔接</h4>
+<ul>
+<li>不适用，网络子系统未实现，与第 05 章文件系统或第 06 章 IPC 无衔接。</li>
+</ul>
+<h3 id="09-调试与错误处理">09 调试与错误处理</h3>
+<h4 id="技术清单">技术清单</h4>
+<ul>
+<li>Panic/oops 与致命错误停机路径：<code>panic()</code> 宏输出诊断信息后进入死循环。</li>
+<li>日志级别与可观测输出：<code>printf()</code> 用于输出，<code>DEBUG</code> 宏用于条件编译，无运行时日志级别。</li>
+<li>栈回溯与符号化/调试钩子：<code>backtrace()</code> 函数遍历栈帧输出返回地址。</li>
+<li>断言与运行时检查：<code>assert()</code> 宏用于运行时条件检查。</li>
+<li>系统调用级追踪或 strace 类能力：<code>SYS_trace</code> 系统调用和 <code>tmask</code> 字段实现最小化 syscall 跟踪。</li>
+</ul>
+<h4 id="关键实现-证据与细粒度锚点">关键实现、证据与细粒度锚点</h4>
+<ul>
+<li>Panic 路径：<code>kernel/printf.c</code> 中的 <code>__panic()</code> 函数，输出消息后调用 <code>backtrace()</code> 并停机。</li>
+<li>栈回溯：<code>kernel/printf.c</code> 中的 <code>backtrace()</code> 函数，遍历 <code>fp</code> 和 <code>ra</code> 寄存器。</li>
+<li>错误码：<code>include/errno.h</code> 定义了 POSIX 风格错误码（<code>EPERM</code>、<code>EINVAL</code> 等）。</li>
+<li>Syscall 跟踪：<code>kernel/syscall/syscall.c</code> 中的 <code>syscall()</code> 函数，检查 <code>p->tmask</code> 并输出跟踪信息。</li>
+</ul>
+<h4 id="依赖与工具">依赖与工具</h4>
+<ul>
+<li>无外部 crate/库依赖。</li>
+<li>依赖 RISC-V 的 <code>fp</code> 和 <code>ra</code> 寄存器进行栈回溯。</li>
+</ul>
+<h4 id="与相邻模块的衔接">与相邻模块的衔接</h4>
+<ul>
+<li>与第 02 章 Trap 联动，<code>kerneltrap</code> 中未处理的异常会调用 <code>panic()</code>。</li>
+<li>与第 04 章进程调度联动，<code>exit()</code> 和 <code>kill()</code> 等路径会设置进程状态并可能触发调试输出。</li>
+</ul>
+<h3 id="10-演进与历史">10 演进与历史</h3>
+<h4 id="技术清单">技术清单</h4>
+<ul>
+<li>活跃时间范围与提交规模：未发现。</li>
+<li>核心贡献者与模块分工：未发现。</li>
+<li>重大重构或技术里程碑：未发现。</li>
+<li>文档与工程化沉淀：未发现。</li>
+</ul>
+<h4 id="关键实现-证据与细粒度锚点">关键实现、证据与细粒度锚点</h4>
+<ul>
+<li>该章无可用内容，待结合仓库核实。</li>
+<li>未发现关于项目演进、历史提交、贡献者或重大重构的文档或注释。</li>
+<li>代码库结构清晰，但缺乏演进历史记录。</li>
+</ul>
+<h4 id="依赖与工具">依赖与工具</h4>
+<ul>
+<li>不适用。</li>
+</ul>
+<h4 id="与相邻模块的衔接">与相邻模块的衔接</h4>
+<ul>
+<li>该章无可用内容，无法评估与第 03–09 章的演进关系。</li>
+</ul>
+<h2 id="技术栈与构建-编程语言版本-框架-依赖-支持的架构完整列表">技术栈与构建（编程语言版本、框架、依赖、支持的架构完整列表）</h2>
+<ul>
+<li><strong>编程语言</strong>：C (GCC)，少量汇编 (RISC-V)。</li>
+<li><strong>构建系统</strong>：GNU Make。</li>
+<li><strong>框架依赖</strong>：基于 xv6 教学内核设计，自研实现。</li>
+<li><strong>外部依赖</strong>：RustSBI（作为 M 态固件，位于 <code>bootloader/SBI/</code>）。</li>
+<li><strong>支持的架构</strong>：仅支持 RISC-V 64 (<code>riscv64</code>)。</li>
+<li><strong>目标平台</strong>：QEMU <code>virt</code> 模拟器和 Kendryte K210 开发板。</li>
+</ul>
+<h2 id="目录结构导读-关键目录与源码入口">目录结构导读（关键目录与源码入口）</h2>
+<ul>
+<li><code>kernel/</code>：内核核心代码，包含 <code>main.c</code>（主入口）、<code>entry.S</code>/<code>entry_k210.S</code>（汇编入口）、<code>swtch.S</code>（上下文切换）。</li>
+<li><code>kernel/mm/</code>：内存管理，<code>pm.c</code>（物理页分配器）、<code>vm.c</code>（页表与缺页处理）。</li>
+<li><code>kernel/sched/</code>：进程调度，<code>proc.c</code>（进程管理、调度器、<code>sleep</code>/<code>wakeup</code>）。</li>
+<li><code>kernel/fs/</code>：文件系统，<code>bio.c</code>（块缓存）、<code>pipe.c</code>（管道）、<code>fat32/</code>（FAT32 实现）。</li>
+<li><code>kernel/syscall/</code>：系统调用，<code>syscall.c</code>（分发表）、<code>sysfile.c</code>、<code>sysproc.c</code> 等。</li>
+<li><code>kernel/driver/</code>：设备驱动，<code>virtio_disk.c</code>、<code>sdcard.c</code>、<code>console.c</code>。</li>
+<li><code>kernel/sync/</code>：同步原语，<code>spinlock.c</code>、<code>sleeplock.c</code>。</li>
+<li><code>kernel/signal/</code>：信号处理，<code>signal.c</code>。</li>
+<li><code>include/</code>：头文件，<code>sched/proc.h</code>（PCB 定义）、<code>mm/vm.h</code>（内存管理接口）、<code>fs/fs.h</code>（VFS 定义）。</li>
+<li><code>linker/</code>：链接脚本，<code>linker64.ld</code>（K210）、<code>qemu.ld</code>（QEMU）。</li>
+<li><code>bootloader/SBI/</code>：RustSBI 固件源码。</li>
+</ul>
+<p><strong>内核入口</strong>：<code>kernel/entry.S</code> 中的 <code><em>entry</code> 符号（QEMU）或 <code>kernel/entry</em>k210.S</code> 中的 <code>_start</code> 符号（K210），最终调用 <code>kernel/main.c</code> 中的 <code>main()</code> 函数。</p>
+<h2 id="总结评价-完成度评估">总结评价（完成度评估）</h2>
+<p>本项目是一个基于 xv6 的 RISC-V 教学内核，核心子系统实现完整。启动链、Trap 处理、系统调用框架、内存管理（含 CoW、Lazy、mmap）、进程调度（含多核基础支持）、文件系统（VFS + FAT32 + 块缓存）、同步原语（SpinLock、SleepLock、Pipe）和信号机制均已实现，形成了从硬件启动到用户态程序运行的基本闭环。安全机制依赖于 RISC-V 硬件特权级和页表权限，未实现更细粒度的访问控制。网络协议栈和高级调试功能缺失。整体上，该项目是一个功能完备、结构清晰的教学操作系统，覆盖了操作系统核心概念，但在安全、网络和工程化方面仍有较大扩展空间。</p>
+<h2>开发历史与里程碑</h2>
+<p>好的，作为 OS-Agent D 的 Stage Writer Agent，我将根据提供的证据，为 stage<em>id=10</em>history “开发历史与里程碑” 撰写 Markdown 技术章节。</p>
+<hr>
+<h3 id="10-开发历史与里程碑">10. 开发历史与里程碑</h3>
+<p>本章节基于项目文档与源代码，梳理了 xv6-k210 操作系统的关键开发历程与重要里程碑。</p>
+<h4 id="10-1-核心功能移植与实现">10.1 核心功能移植与实现</h4>
+<p>项目早期工作的核心是将 xv6 移植到 K210 平台，并实现了一系列基础功能。根据项目进度文档及开发报告，已完成的核心功能包括：</p>
+<ul>
+<li><strong>多核启动</strong>：实现了在 K210 双核 RISC-V 处理器上的多核启动。源代码 <code>kernel/entry.S</code> 中定义了多核入口点 <code><em>entry</code>，通过硬件线程 ID (<code>hartid</code>) 为每个核心分配独立的启动栈，并跳转到 <code>main</code> 函数进行初始化 (<code>ev</em>task<em>10</em>history<em>discovery</em>740b37d9</code>)。<code>kernel/main.c</code> 中的 <code>main</code> 函数进一步展示了主核心 (hart 0) 初始化全局资源后，通过 SBI 发送核间中断 (IPI) 唤醒从核心 (hart 1) 的完整流程 (<code>ev<em>task</em>10<em>history</em>discovery_9c056d9d</code>)。</li>
+<li><strong>裸机 printf</strong>：实现了不依赖操作系统的底层 <code>printf</code> 功能，用于内核调试信息输出。</li>
+<li><strong>内存管理</strong>：实现了物理内存分配 (<code>kpminit</code>)、内核页表创建与启用 (<code>kvminit</code>, <code>kvminithart</code>) 以及内核小型物理内存分配器 (<code>kmallocinit</code>) (<code>ev<em>task</em>10<em>history</em>discovery_9c056d9d</code>)。</li>
+<li><strong>中断与异常处理</strong>：支持时钟中断、S 态外部中断，并安装了内核陷阱向量 (<code>trapinithart</code>) (<code>ev<em>task</em>10<em>history</em>discovery_9c056d9d</code>)。</li>
+<li><strong>设备驱动</strong>：实现了 SD 卡驱动、UARTHS 串口数据接收以及稳定的键盘输入 (K210) (<code>ev<em>task</em>10<em>history</em>discovery<em>4e534bd0</code>, <code>ev</em>task<em>10</em>history<em>discovery</em>21ae0f19</code>)。</li>
+<li><strong>进程与文件系统</strong>：实现了进程管理、文件系统支持以及用户程序的加载与运行 (<code>ev<em>task</em>10<em>history</em>discovery<em>4e534bd0</code>, <code>ev</em>task<em>10</em>history<em>discovery</em>21ae0f19</code>)。</li>
+</ul>
+<p>一份详细的移植工作清单在项目报告 <code>doc/report<em>2020</em>12<em>26.md</code> 和 <code>doc/xv6-k210-report-车春池.md</code> 中均有列出，内容与上述功能高度吻合 (<code>ev</em>task<em>10</em>history<em>discovery</em>e0ec8750</code>, <code>ev<em>task</em>10<em>history</em>discovery_77908619</code>)。</p>
+<h4 id="10-2-重大开发里程碑">10.2 重大开发里程碑</h4>
+<p>在完成基础移植后，项目进入深度优化与功能增强阶段。根据开发总纲文档 <code>doc/总言.md</code> 的记录，以下为开发过程中的重大里程碑 (<code>ev<em>task</em>10<em>history</em>discovery_19110440</code>)：</p>
+<ol>
+<li><strong>平台基础支持</strong>：完成 K210 平台的时钟、外部中断支持，并实现其 SD 卡驱动。</li>
+<li><strong>文件系统支持</strong>：为 xv6-k210 提供了 FAT32 文件系统支持，并实现了虚拟文件系统 (VFS) 以支持不同的文件设备。</li>
+<li><strong>系统调用与竞赛支持</strong>：设计并实现了第一批操作系统竞赛要求的系统调用 (Syscall)，并顺利通过初赛。</li>
+<li><strong>内核内存优化</strong>：</li>
+</ol>
+<p>    -   实现了内核中的动态内存分配器。</p>
+<p>    -   基于动态内存分配器，对文件系统代码进行了重写。</p>
+<p>    -   实现了 <strong>COW (Copy on Write)</strong> 和 <strong>Lazy Allocation</strong> 等内存优化策略。</p>
+<p>    -   采用了新的内存映射策略，使得用户页表和内核页表能够共享相同的内存存储。</p>
+<ol>
+<li><strong>进程调度优化</strong>：重写了 xv6-riscv 的进程调度器，实现了基于队列的动态进程管理策略。</li>
+<li><strong>竞赛复赛支持</strong>：实现了复赛要求的系统调用，并成功支持了 <strong>busybox</strong> 的运行。</li>
+<li><strong>底层软件重构</strong>：</li>
+</ol>
+<p>    -   使用 Rust 语言重新实现了 SBI (RustSBI)，并作为新的独立项目 <strong>PsicaSBI</strong> 进行维护。</p>
+<p>    -   对文件系统与底层 SD 卡驱动进行了重写，实现了异步的 SD 卡写策略。</p>
+<h4 id="10-3-代码演进历史">10.3 代码演进历史</h4>
+<p>通过对核心文件 <code>kernel/main.c</code> 的 Git 历史进行分析，可以观察到项目的关键演进节点 (<code>ev<em>task</em>10<em>history</em>git<em>history</em>f89fd70d</code>)：</p>
+<ul>
+<li><strong>初始提交 (2020-10-19)</strong>：包含基本的启动逻辑。</li>
+<li><strong>2021-05-22</strong>：开始支持多硬件线程 (multihart)。</li>
+<li><strong>2021-08-08 至 2021-08-09</strong>：引入并完成对 PsicaSBI 的移植。</li>
+<li><strong>2021-08-21</strong>：最终的多核支持提交。</li>
+</ul>
+<p>该文件在开发周期内经历了约 30 次修改，反映了内核初始化流程的持续迭代与优化。</p>
+<h4 id="10-4-未发现的内容">10.4 未发现的内容</h4>
+<p>根据现有证据，未发现关于项目在特定硬件平台（除 K210 外）上的移植计划、性能基准测试数据或用户态应用程序生态建设的详细里程碑记录。</p>
+<footer style="margin-top:3rem;padding:1.5rem 0;border-top:1px solid var(--border);color:var(--text-muted);font-size:0.85rem;text-align:center">
+本报告由 OS-Agent-D Multi-Agent 自动生成</footer>
+</div></body></html>

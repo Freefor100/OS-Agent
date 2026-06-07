@@ -1,0 +1,102 @@
+{
+  "stage_id": "09_debug_error",
+  "evidence_targets": [
+    "panic handler 实现与调用点",
+    "backtrace 栈回溯机制",
+    "serious_print/debug_print 日志系统",
+    "trapframedump 寄存器转储",
+    "syslog 日志缓冲机制",
+    "DEBUG 条件编译控制",
+    "错误码定义 (error.h)",
+    "内核/用户态 panic 差异",
+    "panic/debug",
+    "日志系统",
+    "回溯",
+    "错误处理"
+  ],
+  "seed_paths": [
+    "kernel/printf.c",
+    "kernel/include/printf.h",
+    "kernel/trap.c",
+    "kernel/include/trap.h",
+    "kernel/include/error.h",
+    "kernel/sysfile.c:26-32",
+    "kernel/include/sysinfo.h:24-25",
+    "kernel/main.c:50-51",
+    "debug",
+    "log",
+    "panic",
+    "assert",
+    "backtrace",
+    "kernel/entry_qemu.S:3"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "panic",
+    "backtrace",
+    "serious_print",
+    "debug_print",
+    "trapframedump",
+    "initlogbuffer",
+    "sys_syslog",
+    "kerneltrap",
+    "usertrap",
+    "panic_handler",
+    "log",
+    "assert"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "doc",
+    "doc/pic",
+    "kernel",
+    "kernel/include",
+    "kernel/lwip",
+    "linker",
+    "tools",
+    "xv6-user"
+  ],
+  "preferred_tools": [
+    "lsp_get_definition",
+    "lsp_get_references",
+    "lsp_get_call_graph",
+    "read_code_segment",
+    "grep_in_repo",
+    "rag_search_code"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "使用 lsp_get_definition 定位 panic 符号在 printf.c:16 的完整定义",
+    "使用 lsp_get_references 获取 panic 的所有调用点（已见 bio.c/exec.c/fat32.c 等）",
+    "使用 lsp_get_call_graph (direction=incoming, max_depth=2) 分析 panic 的调用链路",
+    "读取 printf.c:266-289 完整 panic 和 backtrace 实现代码段",
+    "使用 lsp_get_definition 定位 backtrace 符号并分析其栈帧遍历逻辑",
+    "读取 printf.c:127-190 serious_print 和 debug_print 实现，对比两者差异",
+    "使用 grep_in_repo 搜索 #ifdef DEBUG 和 #ifndef EXAM 的所有使用位置",
+    "读取 trap.c:85-100 usertrap 中异常处理路径如何调用 serious_print 和 trapframedump",
+    "读取 trap.c:164-185 kerneltrap 中内核态异常处理逻辑",
+    "使用 lsp_get_definition 定位 trapframedump 并读取其完整实现 (trap.c:241-274)",
+    "读取 sysfile.c:26-32 和 1282-1295 分析 syslogbuffer 初始化和 sys_syslog 实现",
+    "使用 grep_in_repo 搜索 SYSLOG_ACTION_* 宏确认日志系统调用接口",
+    "读取 include/error.h 确认 ErrorCode 枚举和 errno 风格错误码定义",
+    "使用 lsp_get_call_graph (direction=outgoing, max_depth=2) 分析 panic 调用了哪些函数",
+    "对比 kernel/printf.c 和 xv6-user/sh.c 中 panic 的用户态/内核态实现差异",
+    "使用 rag_search_code 搜索 \"assert\" 确认是否有 ASSERT 宏或断言机制",
+    "读取 main.c:48-52 确认 printfinit 和 DEBUG 日志初始化时机",
+    "使用 lsp_get_references 分析 serious_print 的所有调用点以评估日志覆盖范围"
+  ]
+}

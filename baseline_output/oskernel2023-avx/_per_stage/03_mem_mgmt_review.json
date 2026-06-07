@@ -1,0 +1,231 @@
+{
+  "schema_version": "describe_review_v1",
+  "stage_id": "03_mem_mgmt",
+  "stage_title": "内存管理（物理/虚拟/分配器）",
+  "confidence": 0.97,
+  "question_reviews": [
+    {
+      "question_id": "Q03_001",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "答案选择 B，证据引用 kalloc.c/Makefile/README，直接支撑 C/Makefile 风格结论，符合题面。"
+    },
+    {
+      "question_id": "Q03_002",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态值 implemented，证据列出 kalloc/kfree 函数摘录，有效证明物理分配器存在。"
+    },
+    {
+      "question_id": "Q03_003",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "选择 D（空闲链表），证据展示 struct run 及 freelist，与 xv6 风格一致，符合题面。"
+    },
+    {
+      "question_id": "Q03_004",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "短答指出 struct run 单链表，证据包含结构体定义及 kmem 字段，满足引用结构体/字段要求。"
+    },
+    {
+      "question_id": "Q03_005",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "短答说明全局锁 kmem.lock，证据展示 acquire/release 调用，满足锁对象与范围证据要求。"
+    },
+    {
+      "question_id": "Q03_006",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态值 implemented，证据列出 walk/mappages 函数，证明页表结构及操作存在。"
+    },
+    {
+      "question_id": "Q03_007",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "列出 walk/mappages/vmunmap 三个入口，证据为函数签名，符合 1-3 个关键入口要求。"
+    },
+    {
+      "question_id": "Q03_008",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "说明依赖调用者锁，证据指出 mappages 内部无锁及 fork 上下文，逻辑自洽但证据为描述性摘录。"
+    },
+    {
+      "question_id": "Q03_009",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "选择 A（独立页表），证据展示 proc_pagetable 及 w_satp，支撑切换 CR3/SATP 结论。"
+    },
+    {
+      "question_id": "Q03_010",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态值 implemented，证据展示 usertrap 捕获及 handle_stack_page_fault 处理，支撑缺页联动。"
+    },
+    {
+      "question_id": "Q03_011",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "链路 5 节点清晰，证据对应各函数调用关系，符合 3-5 节点及证据要求。"
+    },
+    {
+      "question_id": "Q03_012",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态值 not_found，证据展示 uvmcopy 直接复制内容，反证无 CoW，逻辑有效。"
+    },
+    {
+      "question_id": "Q03_013",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态值 implemented，证据展示 fault 中分配，说明惰性分配机制，符合题面。"
+    },
+    {
+      "question_id": "Q03_014",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态值 not_found，证据为搜索 swap 无结果，支撑无 swap 结论。"
+    },
+    {
+      "question_id": "Q03_015",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态值 implemented，证据列出 mmap/sys_mmap 函数，支撑 mmap 实现结论。"
+    },
+    {
+      "question_id": "Q03_016",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "三态值 implemented，证据指向 bio.c buffer cache，作为页缓存等价实现，逻辑合理。"
+    },
+    {
+      "question_id": "Q03_017",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态值 stub，证据展示 bwrite 同步且无后台线程，支撑脏页回写机制缺失结论。"
+    },
+    {
+      "question_id": "Q03_018",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态值 not_found，证据为搜索 shootdown 无结果，支撑无 TLB 射击结论。"
+    },
+    {
+      "question_id": "Q03_019",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "短答指出 sfence.vma，证据为封装函数汇编，满足指令/函数点证据要求。"
+    },
+    {
+      "question_id": "Q03_020",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "短答说明 copyin/walkaddr 检查，证据展示 PTE_U 校验逻辑，满足入口与逻辑证据。"
+    },
+    {
+      "question_id": "Q03_021",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "选择 F（未实现），证据为搜索 swap 无结果，与 Q03_014 一致，符合题面。"
+    },
+    {
+      "question_id": "Q03_022",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态值 not_found，证据列出搜索关键字，满足 not_found 需列关键字要求。"
+    },
+    {
+      "question_id": "Q03_023",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "填空给出具体数值，证据引用 PGSIZE/PHYSTOP/MAXVA 宏，满足代码常量证据要求。"
+    },
+    {
+      "question_id": "Q03_024",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "选择 C（双重保护），证据结合 PTE_U 硬件位与 copyin 软件检查，支撑结论。"
+    },
+    {
+      "question_id": "Q03_025",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "短答指出 struct vma 链表，证据展示结构体定义，满足结构体证据要求。"
+    },
+    {
+      "question_id": "Q03_026",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "选择 C（纯分页），证据引用 riscv.h 说明无分段，符合 RISC-V 架构事实。"
+    },
+    {
+      "question_id": "Q03_027",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "选择 A（按需调页），证据展示 fault 中分配，支撑 Demand Paging 结论。"
+    },
+    {
+      "question_id": "Q03_028",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "短答说明首次适配，证据展示 alloc_vma 遍历链表，逻辑合理但摘录较简。"
+    },
+    {
+      "question_id": "Q03_029",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态值 not_found，证据列出搜索关键字，满足 not_found 需列关键字要求。"
+    },
+    {
+      "question_id": "Q03_030",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "提供 Mermaid 链路，证据对应关键函数调用，满足 3-6 节点及格式要求。"
+    },
+    {
+      "question_id": "Q03_031",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "选择 B（外部碎片），证据说明 kfree 不合并，逻辑支撑外部碎片风险。"
+    },
+    {
+      "question_id": "Q03_032",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "选择 C（运行时），证据引用 satp 寄存器，支撑动态重定位结论。"
+    },
+    {
+      "question_id": "Q03_033",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "选择 C（未实现），证据为搜索 swap 无结果，与 Q03_021 一致。"
+    },
+    {
+      "question_id": "Q03_034",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态值 not_found，证据列出搜索关键字及 bwrite 同步事实，满足要求。"
+    }
+  ],
+  "findings": [
+    {
+      "severity": "blocker",
+      "message": "Material B `baseline_status` 为 `parse_or_validate_failed`，`answers` 数组嵌套于 `raw_model_output_excerpt` 字符串内，未置于 JSON 根层级，违反 Answer JSON 标准契约。"
+    }
+  ],
+  "summary_zh": "各题答案与题面相符，证据引用充分且逻辑自洽，内容质量较高。但材料 B 整体为解析错误报告结构，`answers` 未直接暴露于根层级，违反 JSON 契约。报告内容可信但容器结构不可靠，建议关注解析状态。",
+  "report_quality_score": 0.97,
+  "_meta": {
+    "quality": {
+      "mean_question_confidence": 0.9721
+    },
+    "review_model": "qwen3.5-plus",
+    "baseline": true,
+    "run_at": "2026-04-24T15:43:20",
+    "baseline_execute_tokens": 728035,
+    "baseline_review_tokens": 22594,
+    "baseline_stage_total_tokens": 750629
+  }
+}

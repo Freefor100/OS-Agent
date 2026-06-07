@@ -1,0 +1,998 @@
+{
+  "schema_version": "v1",
+  "stage_id": "08_network",
+  "stage_title": "网络子系统与协议栈",
+  "terminology_profile": "stallings_en_zh",
+  "answers": [
+    {
+      "question_id": "Q08_001",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在网络子系统实现（协议栈或 socket 层）？（必须三态）",
+      "fact_answers": [
+        {
+          "fact_id": "Q08_001_01",
+          "fact_key": "socket_api",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q08_001_net_neg_01",
+            "codex_ev_Q08_001_not_net_02"
+          ],
+          "notes": "socket_api 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q08_001_02",
+          "fact_key": "protocol_stack",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q08_001_net_neg_01",
+            "codex_ev_Q08_001_not_net_02"
+          ],
+          "notes": "protocol_stack 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q08_001_03",
+          "fact_key": "socket_state",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q08_001_net_neg_01",
+            "codex_ev_Q08_001_not_net_02"
+          ],
+          "notes": "socket_state 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q08_001_04",
+          "fact_key": "send_recv_flow",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q08_001_net_neg_01",
+            "codex_ev_Q08_001_not_net_02"
+          ],
+          "notes": "send_recv_flow 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q08_001_05",
+          "fact_key": "net_device_driver",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q08_001_net_neg_01",
+            "codex_ev_Q08_001_not_net_02"
+          ],
+          "notes": "net_device_driver 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q08_001_06",
+          "fact_key": "negative_search_coverage",
+          "value": {
+            "searched_keywords": [
+              "socket",
+              "bind",
+              "connect",
+              "sendto",
+              "recvfrom",
+              "Ethernet",
+              "ARP",
+              "IP",
+              "ICMP",
+              "UDP",
+              "TCP",
+              "smoltcp",
+              "lwip",
+              "netdev",
+              "virtio-net",
+              "e1000",
+              "zero-copy",
+              "DMA"
+            ],
+            "searched_directories": [
+              "kernel",
+              "include",
+              "xv6-user",
+              "Makefile",
+              "doc"
+            ],
+            "file_count": 125,
+            "match_count": 5,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [
+            "codex_ev_Q08_001_net_neg_01"
+          ],
+          "notes": "negative_search_coverage 见本题证据。"
+        }
+      ],
+      "value": "not_found",
+      "notes": "未发现 socket API、协议栈、网络设备驱动或 send/recv 数据路径。",
+      "used_evidence_ids": [
+        "codex_ev_Q08_001_net_neg_01",
+        "codex_ev_Q08_001_not_net_02"
+      ],
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q08_001_net_neg_01",
+          "path": "<negative_search>",
+          "symbol_kind": "search",
+          "symbol_name": "net_neg",
+          "excerpt": "No socket syscall table entries, network protocol stack modules, network device driver, or send/recv path found; only socket errno/stat constants and block/SPI DMA references matched; searched_keywords=socket, bind, connect, sendto, recvfrom, Ethernet, ARP, IP, ICMP, UDP, TCP, smoltcp, lwip, netdev, virtio-net, e1000, zero-copy, DMA; searched_directories=kernel, include, xv6-user, Makefile, doc; file_count=125; match_count=5; coverage_sufficient=true",
+          "line_start": null,
+          "line_end": null,
+          "evidence_type": "negative_search",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "negative_search"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q08_001_not_net_02",
+          "path": "repos/xv6-k210/kernel/hal/virtio_disk.c",
+          "symbol_kind": "file",
+          "symbol_name": "virtio_disk",
+          "excerpt": "virtio driver comments and functions identify a qemu virtio disk block device, not virtio-net/e1000; DMA descriptors are block-device request descriptors.",
+          "line_start": 1,
+          "line_end": 96,
+          "evidence_type": "definition",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "negative_search",
+            "classification"
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "Q08_002",
+      "question_type": "single_choice",
+      "stem": "协议栈来源更接近哪种？",
+      "fact_answers": [
+        {
+          "fact_id": "Q08_002_01",
+          "fact_key": "socket_api",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q08_002_net_neg_01",
+            "codex_ev_Q08_002_not_net_02"
+          ],
+          "notes": "socket_api 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q08_002_02",
+          "fact_key": "protocol_stack",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q08_002_net_neg_01",
+            "codex_ev_Q08_002_not_net_02"
+          ],
+          "notes": "protocol_stack 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q08_002_03",
+          "fact_key": "socket_state",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q08_002_net_neg_01",
+            "codex_ev_Q08_002_not_net_02"
+          ],
+          "notes": "socket_state 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q08_002_04",
+          "fact_key": "send_recv_flow",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q08_002_net_neg_01",
+            "codex_ev_Q08_002_not_net_02"
+          ],
+          "notes": "send_recv_flow 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q08_002_05",
+          "fact_key": "net_device_driver",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q08_002_net_neg_01",
+            "codex_ev_Q08_002_not_net_02"
+          ],
+          "notes": "net_device_driver 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q08_002_06",
+          "fact_key": "negative_search_coverage",
+          "value": {
+            "searched_keywords": [
+              "socket",
+              "bind",
+              "connect",
+              "sendto",
+              "recvfrom",
+              "Ethernet",
+              "ARP",
+              "IP",
+              "ICMP",
+              "UDP",
+              "TCP",
+              "smoltcp",
+              "lwip",
+              "netdev",
+              "virtio-net",
+              "e1000",
+              "zero-copy",
+              "DMA"
+            ],
+            "searched_directories": [
+              "kernel",
+              "include",
+              "xv6-user",
+              "Makefile",
+              "doc"
+            ],
+            "file_count": 125,
+            "match_count": 5,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [
+            "codex_ev_Q08_002_net_neg_01"
+          ],
+          "notes": "negative_search_coverage 见本题证据。"
+        }
+      ],
+      "value": "未发现",
+      "notes": "未发现 smoltcp/lwip/自研协议栈模块。",
+      "used_evidence_ids": [
+        "codex_ev_Q08_002_net_neg_01",
+        "codex_ev_Q08_002_not_net_02"
+      ],
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q08_002_net_neg_01",
+          "path": "<negative_search>",
+          "symbol_kind": "search",
+          "symbol_name": "net_neg",
+          "excerpt": "No socket syscall table entries, network protocol stack modules, network device driver, or send/recv path found; only socket errno/stat constants and block/SPI DMA references matched; searched_keywords=socket, bind, connect, sendto, recvfrom, Ethernet, ARP, IP, ICMP, UDP, TCP, smoltcp, lwip, netdev, virtio-net, e1000, zero-copy, DMA; searched_directories=kernel, include, xv6-user, Makefile, doc; file_count=125; match_count=5; coverage_sufficient=true",
+          "line_start": null,
+          "line_end": null,
+          "evidence_type": "negative_search",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "negative_search"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q08_002_not_net_02",
+          "path": "repos/xv6-k210/kernel/hal/virtio_disk.c",
+          "symbol_kind": "file",
+          "symbol_name": "virtio_disk",
+          "excerpt": "virtio driver comments and functions identify a qemu virtio disk block device, not virtio-net/e1000; DMA descriptors are block-device request descriptors.",
+          "line_start": 1,
+          "line_end": 96,
+          "evidence_type": "definition",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "negative_search",
+            "classification"
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "Q08_003",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 socket 系统调用接口（socket/bind/connect/sendto/recvfrom 等）？（必须三态）",
+      "fact_answers": [
+        {
+          "fact_id": "Q08_003_01",
+          "fact_key": "socket_api",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q08_003_net_neg_01",
+            "codex_ev_Q08_003_not_net_02"
+          ],
+          "notes": "socket_api 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q08_003_02",
+          "fact_key": "protocol_stack",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q08_003_net_neg_01",
+            "codex_ev_Q08_003_not_net_02"
+          ],
+          "notes": "protocol_stack 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q08_003_03",
+          "fact_key": "socket_state",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q08_003_net_neg_01",
+            "codex_ev_Q08_003_not_net_02"
+          ],
+          "notes": "socket_state 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q08_003_04",
+          "fact_key": "send_recv_flow",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q08_003_net_neg_01",
+            "codex_ev_Q08_003_not_net_02"
+          ],
+          "notes": "send_recv_flow 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q08_003_05",
+          "fact_key": "net_device_driver",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q08_003_net_neg_01",
+            "codex_ev_Q08_003_not_net_02"
+          ],
+          "notes": "net_device_driver 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q08_003_06",
+          "fact_key": "negative_search_coverage",
+          "value": {
+            "searched_keywords": [
+              "socket",
+              "bind",
+              "connect",
+              "sendto",
+              "recvfrom",
+              "Ethernet",
+              "ARP",
+              "IP",
+              "ICMP",
+              "UDP",
+              "TCP",
+              "smoltcp",
+              "lwip",
+              "netdev",
+              "virtio-net",
+              "e1000",
+              "zero-copy",
+              "DMA"
+            ],
+            "searched_directories": [
+              "kernel",
+              "include",
+              "xv6-user",
+              "Makefile",
+              "doc"
+            ],
+            "file_count": 125,
+            "match_count": 5,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [
+            "codex_ev_Q08_003_net_neg_01"
+          ],
+          "notes": "negative_search_coverage 见本题证据。"
+        }
+      ],
+      "value": "not_found",
+      "notes": "未发现 socket API、协议栈、网络设备驱动或 send/recv 数据路径。",
+      "used_evidence_ids": [
+        "codex_ev_Q08_003_net_neg_01",
+        "codex_ev_Q08_003_not_net_02"
+      ],
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q08_003_net_neg_01",
+          "path": "<negative_search>",
+          "symbol_kind": "search",
+          "symbol_name": "net_neg",
+          "excerpt": "No socket syscall table entries, network protocol stack modules, network device driver, or send/recv path found; only socket errno/stat constants and block/SPI DMA references matched; searched_keywords=socket, bind, connect, sendto, recvfrom, Ethernet, ARP, IP, ICMP, UDP, TCP, smoltcp, lwip, netdev, virtio-net, e1000, zero-copy, DMA; searched_directories=kernel, include, xv6-user, Makefile, doc; file_count=125; match_count=5; coverage_sufficient=true",
+          "line_start": null,
+          "line_end": null,
+          "evidence_type": "negative_search",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "negative_search"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q08_003_not_net_02",
+          "path": "repos/xv6-k210/kernel/hal/virtio_disk.c",
+          "symbol_kind": "file",
+          "symbol_name": "virtio_disk",
+          "excerpt": "virtio driver comments and functions identify a qemu virtio disk block device, not virtio-net/e1000; DMA descriptors are block-device request descriptors.",
+          "line_start": 1,
+          "line_end": 96,
+          "evidence_type": "definition",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "negative_search",
+            "classification"
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "Q08_004",
+      "question_type": "short_answer",
+      "stem": "选择一个发送路径（优先 sys_sendto），追踪：syscall → 协议栈 → 网卡驱动。列 3-6 个关键节点并给证据。",
+      "fact_answers": [
+        {
+          "fact_id": "Q08_004_01",
+          "fact_key": "socket_api",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q08_004_net_neg_01",
+            "codex_ev_Q08_004_not_net_02"
+          ],
+          "notes": "socket_api 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q08_004_02",
+          "fact_key": "protocol_stack",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q08_004_net_neg_01",
+            "codex_ev_Q08_004_not_net_02"
+          ],
+          "notes": "protocol_stack 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q08_004_03",
+          "fact_key": "socket_state",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q08_004_net_neg_01",
+            "codex_ev_Q08_004_not_net_02"
+          ],
+          "notes": "socket_state 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q08_004_04",
+          "fact_key": "send_recv_flow",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q08_004_net_neg_01",
+            "codex_ev_Q08_004_not_net_02"
+          ],
+          "notes": "send_recv_flow 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q08_004_05",
+          "fact_key": "net_device_driver",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q08_004_net_neg_01",
+            "codex_ev_Q08_004_not_net_02"
+          ],
+          "notes": "net_device_driver 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q08_004_06",
+          "fact_key": "negative_search_coverage",
+          "value": {
+            "searched_keywords": [
+              "socket",
+              "bind",
+              "connect",
+              "sendto",
+              "recvfrom",
+              "Ethernet",
+              "ARP",
+              "IP",
+              "ICMP",
+              "UDP",
+              "TCP",
+              "smoltcp",
+              "lwip",
+              "netdev",
+              "virtio-net",
+              "e1000",
+              "zero-copy",
+              "DMA"
+            ],
+            "searched_directories": [
+              "kernel",
+              "include",
+              "xv6-user",
+              "Makefile",
+              "doc"
+            ],
+            "file_count": 125,
+            "match_count": 5,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [
+            "codex_ev_Q08_004_net_neg_01"
+          ],
+          "notes": "negative_search_coverage 见本题证据。"
+        }
+      ],
+      "value": {
+        "socket_api": "not_found：无 sys_sendto/socket/bind/connect/recvfrom。",
+        "protocol_stack": "not_found：无协议栈模块或第三方依赖。",
+        "socket_state": "not_found：未发现 Ethernet/ARP/IP/ICMP/UDP/TCP 状态机。",
+        "send_recv_flow": "not_found：无法追踪 sys_sendto -> 协议栈 -> 网卡驱动链路。",
+        "net_device_driver": "not_found：virtio_disk 是块设备，不是网卡驱动。",
+        "negative_search_coverage": {
+          "searched_keywords": [
+            "socket",
+            "bind",
+            "connect",
+            "sendto",
+            "recvfrom",
+            "Ethernet",
+            "ARP",
+            "IP",
+            "ICMP",
+            "UDP",
+            "TCP",
+            "smoltcp",
+            "lwip",
+            "netdev",
+            "virtio-net",
+            "e1000",
+            "zero-copy",
+            "DMA"
+          ],
+          "searched_directories": [
+            "kernel",
+            "include",
+            "xv6-user",
+            "Makefile",
+            "doc"
+          ],
+          "file_count": 125,
+          "match_count": 5,
+          "coverage_sufficient": true
+        }
+      },
+      "notes": "发送路径不存在，因此只能给负向链路。",
+      "used_evidence_ids": [
+        "codex_ev_Q08_004_net_neg_01",
+        "codex_ev_Q08_004_not_net_02"
+      ],
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q08_004_net_neg_01",
+          "path": "<negative_search>",
+          "symbol_kind": "search",
+          "symbol_name": "net_neg",
+          "excerpt": "No socket syscall table entries, network protocol stack modules, network device driver, or send/recv path found; only socket errno/stat constants and block/SPI DMA references matched; searched_keywords=socket, bind, connect, sendto, recvfrom, Ethernet, ARP, IP, ICMP, UDP, TCP, smoltcp, lwip, netdev, virtio-net, e1000, zero-copy, DMA; searched_directories=kernel, include, xv6-user, Makefile, doc; file_count=125; match_count=5; coverage_sufficient=true",
+          "line_start": null,
+          "line_end": null,
+          "evidence_type": "negative_search",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "negative_search"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q08_004_not_net_02",
+          "path": "repos/xv6-k210/kernel/hal/virtio_disk.c",
+          "symbol_kind": "file",
+          "symbol_name": "virtio_disk",
+          "excerpt": "virtio driver comments and functions identify a qemu virtio disk block device, not virtio-net/e1000; DMA descriptors are block-device request descriptors.",
+          "line_start": 1,
+          "line_end": 96,
+          "evidence_type": "definition",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "negative_search",
+            "classification"
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "Q08_005",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现网卡驱动（virtio-net/e1000 等）与收包中断路径？（必须三态）",
+      "fact_answers": [
+        {
+          "fact_id": "Q08_005_01",
+          "fact_key": "socket_api",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q08_005_net_neg_01",
+            "codex_ev_Q08_005_not_net_02"
+          ],
+          "notes": "socket_api 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q08_005_02",
+          "fact_key": "protocol_stack",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q08_005_net_neg_01",
+            "codex_ev_Q08_005_not_net_02"
+          ],
+          "notes": "protocol_stack 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q08_005_03",
+          "fact_key": "socket_state",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q08_005_net_neg_01",
+            "codex_ev_Q08_005_not_net_02"
+          ],
+          "notes": "socket_state 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q08_005_04",
+          "fact_key": "send_recv_flow",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q08_005_net_neg_01",
+            "codex_ev_Q08_005_not_net_02"
+          ],
+          "notes": "send_recv_flow 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q08_005_05",
+          "fact_key": "net_device_driver",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q08_005_net_neg_01",
+            "codex_ev_Q08_005_not_net_02"
+          ],
+          "notes": "net_device_driver 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q08_005_06",
+          "fact_key": "negative_search_coverage",
+          "value": {
+            "searched_keywords": [
+              "socket",
+              "bind",
+              "connect",
+              "sendto",
+              "recvfrom",
+              "Ethernet",
+              "ARP",
+              "IP",
+              "ICMP",
+              "UDP",
+              "TCP",
+              "smoltcp",
+              "lwip",
+              "netdev",
+              "virtio-net",
+              "e1000",
+              "zero-copy",
+              "DMA"
+            ],
+            "searched_directories": [
+              "kernel",
+              "include",
+              "xv6-user",
+              "Makefile",
+              "doc"
+            ],
+            "file_count": 125,
+            "match_count": 5,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [
+            "codex_ev_Q08_005_net_neg_01"
+          ],
+          "notes": "negative_search_coverage 见本题证据。"
+        }
+      ],
+      "value": "not_found",
+      "notes": "未发现 socket API、协议栈、网络设备驱动或 send/recv 数据路径。",
+      "used_evidence_ids": [
+        "codex_ev_Q08_005_net_neg_01",
+        "codex_ev_Q08_005_not_net_02"
+      ],
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q08_005_net_neg_01",
+          "path": "<negative_search>",
+          "symbol_kind": "search",
+          "symbol_name": "net_neg",
+          "excerpt": "No socket syscall table entries, network protocol stack modules, network device driver, or send/recv path found; only socket errno/stat constants and block/SPI DMA references matched; searched_keywords=socket, bind, connect, sendto, recvfrom, Ethernet, ARP, IP, ICMP, UDP, TCP, smoltcp, lwip, netdev, virtio-net, e1000, zero-copy, DMA; searched_directories=kernel, include, xv6-user, Makefile, doc; file_count=125; match_count=5; coverage_sufficient=true",
+          "line_start": null,
+          "line_end": null,
+          "evidence_type": "negative_search",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "negative_search"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q08_005_not_net_02",
+          "path": "repos/xv6-k210/kernel/hal/virtio_disk.c",
+          "symbol_kind": "file",
+          "symbol_name": "virtio_disk",
+          "excerpt": "virtio driver comments and functions identify a qemu virtio disk block device, not virtio-net/e1000; DMA descriptors are block-device request descriptors.",
+          "line_start": 1,
+          "line_end": 96,
+          "evidence_type": "definition",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "negative_search",
+            "classification"
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "Q08_006",
+      "question_type": "multi_choice",
+      "stem": "协议支持情况（多选；未发现则留空并在 notes 写 not_found）：",
+      "fact_answers": [
+        {
+          "fact_id": "Q08_006_01",
+          "fact_key": "socket_api",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q08_006_net_neg_01",
+            "codex_ev_Q08_006_not_net_02"
+          ],
+          "notes": "socket_api 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q08_006_02",
+          "fact_key": "protocol_stack",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q08_006_net_neg_01",
+            "codex_ev_Q08_006_not_net_02"
+          ],
+          "notes": "protocol_stack 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q08_006_03",
+          "fact_key": "socket_state",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q08_006_net_neg_01",
+            "codex_ev_Q08_006_not_net_02"
+          ],
+          "notes": "socket_state 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q08_006_04",
+          "fact_key": "send_recv_flow",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q08_006_net_neg_01",
+            "codex_ev_Q08_006_not_net_02"
+          ],
+          "notes": "send_recv_flow 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q08_006_05",
+          "fact_key": "net_device_driver",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q08_006_net_neg_01",
+            "codex_ev_Q08_006_not_net_02"
+          ],
+          "notes": "net_device_driver 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q08_006_06",
+          "fact_key": "negative_search_coverage",
+          "value": {
+            "searched_keywords": [
+              "socket",
+              "bind",
+              "connect",
+              "sendto",
+              "recvfrom",
+              "Ethernet",
+              "ARP",
+              "IP",
+              "ICMP",
+              "UDP",
+              "TCP",
+              "smoltcp",
+              "lwip",
+              "netdev",
+              "virtio-net",
+              "e1000",
+              "zero-copy",
+              "DMA"
+            ],
+            "searched_directories": [
+              "kernel",
+              "include",
+              "xv6-user",
+              "Makefile",
+              "doc"
+            ],
+            "file_count": 125,
+            "match_count": 5,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [
+            "codex_ev_Q08_006_net_neg_01"
+          ],
+          "notes": "negative_search_coverage 见本题证据。"
+        }
+      ],
+      "value": [],
+      "notes": "Ethernet/ARP/IPv4/IPv6/ICMP/UDP/TCP/DHCP/DNS 均未发现协议实现。",
+      "used_evidence_ids": [
+        "codex_ev_Q08_006_net_neg_01",
+        "codex_ev_Q08_006_not_net_02"
+      ],
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q08_006_net_neg_01",
+          "path": "<negative_search>",
+          "symbol_kind": "search",
+          "symbol_name": "net_neg",
+          "excerpt": "No socket syscall table entries, network protocol stack modules, network device driver, or send/recv path found; only socket errno/stat constants and block/SPI DMA references matched; searched_keywords=socket, bind, connect, sendto, recvfrom, Ethernet, ARP, IP, ICMP, UDP, TCP, smoltcp, lwip, netdev, virtio-net, e1000, zero-copy, DMA; searched_directories=kernel, include, xv6-user, Makefile, doc; file_count=125; match_count=5; coverage_sufficient=true",
+          "line_start": null,
+          "line_end": null,
+          "evidence_type": "negative_search",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "negative_search"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q08_006_not_net_02",
+          "path": "repos/xv6-k210/kernel/hal/virtio_disk.c",
+          "symbol_kind": "file",
+          "symbol_name": "virtio_disk",
+          "excerpt": "virtio driver comments and functions identify a qemu virtio disk block device, not virtio-net/e1000; DMA descriptors are block-device request descriptors.",
+          "line_start": 1,
+          "line_end": 96,
+          "evidence_type": "definition",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "negative_search",
+            "classification"
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "Q08_007",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在零拷贝/共享缓冲/DMA 描述符等路径（zero-copy）？（必须三态；仅有名词不算 implemented）",
+      "fact_answers": [
+        {
+          "fact_id": "Q08_007_01",
+          "fact_key": "socket_api",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q08_007_net_neg_01",
+            "codex_ev_Q08_007_not_net_02"
+          ],
+          "notes": "socket_api 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q08_007_02",
+          "fact_key": "protocol_stack",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q08_007_net_neg_01",
+            "codex_ev_Q08_007_not_net_02"
+          ],
+          "notes": "protocol_stack 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q08_007_03",
+          "fact_key": "protocol_coverage",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q08_007_net_neg_01",
+            "codex_ev_Q08_007_not_net_02"
+          ],
+          "notes": "protocol_coverage 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q08_007_04",
+          "fact_key": "driver_flow",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q08_007_net_neg_01",
+            "codex_ev_Q08_007_not_net_02"
+          ],
+          "notes": "driver_flow 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q08_007_05",
+          "fact_key": "buffer_dma_zero_copy",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q08_007_net_neg_01",
+            "codex_ev_Q08_007_not_net_02"
+          ],
+          "notes": "buffer_dma_zero_copy 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q08_007_06",
+          "fact_key": "negative_search_coverage",
+          "value": {
+            "searched_keywords": [
+              "socket",
+              "bind",
+              "connect",
+              "sendto",
+              "recvfrom",
+              "Ethernet",
+              "ARP",
+              "IP",
+              "ICMP",
+              "UDP",
+              "TCP",
+              "smoltcp",
+              "lwip",
+              "netdev",
+              "virtio-net",
+              "e1000",
+              "zero-copy",
+              "DMA"
+            ],
+            "searched_directories": [
+              "kernel",
+              "include",
+              "xv6-user",
+              "Makefile",
+              "doc"
+            ],
+            "file_count": 125,
+            "match_count": 5,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [
+            "codex_ev_Q08_007_net_neg_01"
+          ],
+          "notes": "negative_search_coverage 见本题证据。"
+        }
+      ],
+      "value": "not_found",
+      "notes": "未发现网络包路径中的 zero-copy/shared-buffer/DMA；命中的 DMA/virtio 均为块设备或 SD/SPI。",
+      "used_evidence_ids": [
+        "codex_ev_Q08_007_net_neg_01",
+        "codex_ev_Q08_007_not_net_02"
+      ],
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q08_007_net_neg_01",
+          "path": "<negative_search>",
+          "symbol_kind": "search",
+          "symbol_name": "net_neg",
+          "excerpt": "No socket syscall table entries, network protocol stack modules, network device driver, or send/recv path found; only socket errno/stat constants and block/SPI DMA references matched; searched_keywords=socket, bind, connect, sendto, recvfrom, Ethernet, ARP, IP, ICMP, UDP, TCP, smoltcp, lwip, netdev, virtio-net, e1000, zero-copy, DMA; searched_directories=kernel, include, xv6-user, Makefile, doc; file_count=125; match_count=5; coverage_sufficient=true",
+          "line_start": null,
+          "line_end": null,
+          "evidence_type": "negative_search",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "negative_search"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q08_007_not_net_02",
+          "path": "repos/xv6-k210/kernel/hal/virtio_disk.c",
+          "symbol_kind": "file",
+          "symbol_name": "virtio_disk",
+          "excerpt": "virtio driver comments and functions identify a qemu virtio disk block device, not virtio-net/e1000; DMA descriptors are block-device request descriptors.",
+          "line_start": 1,
+          "line_end": 96,
+          "evidence_type": "definition",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "negative_search",
+            "classification"
+          ]
+        }
+      ]
+    }
+  ]
+}

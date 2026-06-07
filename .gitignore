@@ -11,10 +11,50 @@ __pycache__/
 .vscode/
 .idea/
 
+# ---------- Git LFS ----------
+# repos/xv6-k210.git.bundle 由 LFS 托管（规则见仓库根目录 .gitattributes）。
+# 推送包含该文件的提交：本机必须安装 Git LFS（https://git-lfs.com），并在仓库至少执行过一次：
+#   git lfs install
+# 否则远端会拒收超过 100MB 的普通 Git  blob；安装 LFS 后 push 会上传指针 + LFS 对象。
+#
+# 他人 clone / pull 后若 bundle 仅为几行指针、体积异常小，在项目根目录执行：
+#   git lfs pull
+# Pull 的机器同样需要已安装 Git LFS。
+docs/
 # Output
 # output/
+output/_lsp_sidecar/
 repos/
-# evaluation/
+mag/
+texcode/
+# !repos/xv6-k210/
+# !repos/xv6-k210/**
+# xv6-k210 完整 Git 历史（bundle），需随仓库分发
+# !repos/xv6-k210.git.bundle
+# 嵌套仓库的 .git 对象库勿纳入 OS-Agent（体量与嵌套语义原因；本地开发保留 .git 不影响）
+# repos/xv6-k210/.git/
+#
+# ---------- xv6-k210：从 bundle 恢复嵌套 Git（analyze_git_history / git_ops 依赖 repos/xv6-k210/.git）----------
+# OS-Agent 不提交 xv6-k210/.git；完整历史放在 repos/xv6-k210.git.bundle（勿删）。下游 clone 后若无 .git：
+#
+# （在 OS-Agent 根目录打开终端，PowerShell）
+#   cd repos
+#   git clone xv6-k210.git.bundle xv6_k210_git_tmp
+#   Remove-Item -Recurse -Force .\xv6-k210\.git -ErrorAction SilentlyContinue
+#   Move-Item -Force .\xv6_k210_git_tmp\.git .\xv6-k210\.git
+#   Remove-Item -Recurse -Force .\xv6_k210_git_tmp
+#
+# （Bash）
+#   cd repos && git clone xv6-k210.git.bundle xv6_k210_git_tmp
+#   rm -rf xv6-k210/.git && mv xv6_k210_git_tmp/.git xv6-k210/.git && rm -rf xv6_k210_git_tmp
+#
+# 已有 repos/xv6-k210/.git 后，对齐嵌套仓库工作区与 HEAD（消除大量「已删除」；会覆盖未提交改动，请先备份）：
+#   git -C repos/xv6-k210 restore .
+#   （Git 较旧无 restore：git -C repos/xv6-k210 checkout -- .）
+#
+# 校验：git -C repos/xv6-k210 rev-parse HEAD
+# （bundle 内含 scene/main 等分支；恢复后可用 git -C repos/xv6-k210 status 查看工作区）
+# ---------- end xv6-k210 bundle ----------
 # Env
 # .env
 # *.env
@@ -22,6 +62,7 @@ repos/
 # Temp
 *.log
 *.tmp
+hf_cache/
 
 # Local textbook PDFs (not tracked)
 Operating Systems Internals and Design Principles/

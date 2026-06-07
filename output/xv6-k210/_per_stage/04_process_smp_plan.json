@@ -1,39 +1,6 @@
 {
   "stage_id": "04_process_smp",
-  "goal": "分析 xv6-k210 的进程/线程模型、调度器实现、上下文切换机制、多核 SMP 支持及相关系统调用",
-  "must_cover": [
-    "[Q04_001] 执行实体抽象：struct proc (PCB)，含 context/trapframe/state/pid 等字段",
-    "[Q04_002] 状态机：RUNNABLE/RUNNING/SLEEPING/ZOMBIE 四态，流转点在 scheduler/yield/sleep/exit",
-    "[Q04_003] 上下文切换：swtch.S 实现，保存/恢复 ra/sp/s0-s11 共 14 个寄存器",
-    "[Q04_004] 调度算法：多级优先级队列 (PRIORITY_TIMEOUT/IRQ/NORMAL)，带 timer 超时机制",
-    "[Q04_005] 调度器入口：scheduler() 主循环、__get_runnable_no_lock() 选进程、sched() 触发切换",
-    "[Q04_006] fork/clone：clone() 实现，复制地址空间/文件表/信号处理，返回子进程 PID",
-    "[Q04_007] exec：sys_exec/sys_execve 调用 execve() 重建地址空间",
-    "[Q04_008] wait/wait4：wait4() 阻塞等待 ZOMBIE 子进程，支持 -1/指定 PID",
-    "[Q04_009] PID 分配：全局自增 __pid，无回收机制 (简单递增)",
-    "[Q04_010] 父子树：child/sibling_next/sibling_pprev 链表存储",
-    "[Q04_011] 信号：实现 sigaction/sigprocmask/signal 处理，无 futex",
-    "[Q04_012] 多核 SMP：hart0 初始化后 IPI 唤醒其他 hart，每核 cpu 结构体独立",
-    "[Q04_013] exit 回收：释放地址空间/文件表，子进程重父为 init，状态变 ZOMBIE",
-    "[Q04_014] 进程组/会话：未实现 (grep 无 setpgid/setsid)",
-    "[Q04_015] rlimit：仅 stub sys_prlimit64 返回 0，未真实实现",
-    "[Q04_016] PCB/TCB：未区分，仅 struct proc 统一表示",
-    "[Q04_001] 执行实体 (Execution Entity) 抽象是什么？",
-    "顶层类型名: ___（如 Process / Task / Thread / TaskControlBlock）",
-    "结构体路径: ___",
-    "关键字段（至少列 3 个）: Context=___, State=___, PID=___, TrapFrame=___",
-    "是否区分 PCB 与 TCB: ___（是 / 否 / 待核实）",
-    "[Q04_002] 任务/进程的生命周期状态机有哪些状态与流转点？（Ready/Running/Blocked/Exited 等；需状态枚举/字段证据）"
-  ],
   "evidence_targets": [
-    "任务模型 (struct proc)",
-    "调度器 (scheduler/__get_runnable_no_lock)",
-    "上下文切换 (swtch.S)",
-    "信号机制 (signal.c)",
-    "多核启动 (main.c hart 循环)",
-    "CPU 本地状态 (struct cpu)",
-    "IPI 唤醒 (sbi_send_ipi)",
-    "并发保护 (proc_lock/spinlock)",
     "任务模型",
     "调度器",
     "上下文切换",
@@ -44,20 +11,18 @@
     "并发保护"
   ],
   "seed_paths": [
-    "kernel/sched/proc.c",
-    "kernel/sched/swtch.S",
-    "include/sched/proc.h",
-    "kernel/sched/signal.c",
-    "include/sched/signal.h",
-    "kernel/syscall/sysproc.c",
-    "kernel/main.c",
-    "kernel/exec.c",
     "task",
     "proc",
     "process",
     "sched",
     "kernel/task",
-    "kernel/proc"
+    "kernel/proc",
+    "smp",
+    "cpu",
+    "hart",
+    "interrupt",
+    "include/fs",
+    "include/mm"
   ],
   "framework_guess": [
     "xv6"
@@ -66,21 +31,18 @@
     "riscv64"
   ],
   "entry_symbols": [
-    "scheduler",
-    "swtch",
-    "clone",
-    "exit",
-    "wait4",
-    "yield",
-    "sleep",
-    "wakeup",
-    "cpuinit",
-    "mycpu",
     "schedule",
-    "sys_fork"
+    "sys_fork",
+    "spawn",
+    "switch_to",
+    "Task",
+    "start_secondary",
+    "boot_secondary",
+    "cpu_init",
+    "ipi",
+    "_start"
   ],
   "repo_hotspots": [
-    "Cargo.toml",
     "Makefile",
     "bootloader",
     "bootloader/SBI",
@@ -89,14 +51,14 @@
     "debug/openocd_cfg",
     "doc",
     "doc/img",
-    "include"
+    "include",
+    "include/fs"
   ],
   "preferred_tools": [
-    "read_code_segment",
+    "rag_search_code",
     "lsp_get_call_graph",
     "lsp_get_definition",
-    "lsp_get_references",
-    "grep_in_repo"
+    "read_code_segment"
   ],
   "avoid_tools": [
     "blind_read_large_files",
@@ -109,13 +71,434 @@
     "max_memory_items": 8
   },
   "execution_steps": [
-    "精读 include/sched/proc.h 中 struct proc 和 struct cpu 定义，记录关键字段 (context/state/pid/trapframe/child/sibling 等)",
-    "分析 kernel/sched/swtch.S 汇编，确认保存/恢复的寄存器集合 (ra/sp/s0-s11)",
-    "追踪 scheduler() → __get_runnable_no_lock() → swtch() 调用链，理解调度循环和优先级队列机制",
-    "分析 clone() 函数，确认地址空间复制 (copysegs)、文件表复制 (copyfdtable)、父子关系建立",
-    "分析 exit() 调用链 (已获取 call graph)，确认资源回收路径 (delsegs/dropfdtable/iput) 和 ZOMBIE 状态处理",
-    "分析 wait4() 实现，确认阻塞机制 (sleep 在子进程 ZOMBIE 状态) 和参数处理",
-    "检查 kernel/sched/signal.c 和 include/sched/signal.h，确认信号处理实现程度",
-    "分析 main.c 中多核启动流程，确认 IPI 唤醒机制和每核 cpu 结构体使用情况"
+    "对照 seed_paths、entry_symbols，用 rag_search_code / list_repo_structure / LSP 锁定与本阶段相关的关键文件与符号。",
+    "对核心入口使用 lsp_get_document_outline → lsp_get_call_graph（单入口、浅深度）→ 必要时 read_code_segment 精读。",
+    "按题单逐项输出结论，每条附反引号源码路径；无实现则显式写「未发现/桩函数」等，勿臆测。"
+  ],
+  "task_plan": [
+    {
+      "task_id": "task_04_exec_entity",
+      "question_ids": [
+        "Q04_001",
+        "Q04_002",
+        "Q04_019",
+        "Q04_021"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证执行实体（Task/Process/Thread）的顶层类型、结构体定义、关键字段（Context, State, PID, TrapFrame）、状态枚举（Ready/Running/Blocked/Exited等）、是否区分PCB与TCB、用户线程与内核线程映射模型。需填充fact_id: Q04_001_01~Q04_001_06, Q04_002_01~Q04_002_06, Q04_019_01~Q04_019_06, Q04_021_01~Q04_021_06",
+      "group_reason": "四题均围绕执行实体的结构、状态、PCB/TCB区分和线程映射模型，共享同一组结构体定义和状态枚举证据",
+      "query": "在include/sched、kernel/sched、kernel/proc、include/task等目录下搜索Task/Process/Thread/PCB/TCB结构体定义，读取其字段；搜索状态枚举RUNNABLE/SLEEPING/ZOMBIE等；搜索clone/fork系统调用入口，判断是否区分PCB与TCB；搜索用户态线程库或clone标志位判断映射模型",
+      "seed_paths": [
+        "include/sched",
+        "kernel/sched",
+        "kernel/proc",
+        "include/task",
+        "kernel/syscall",
+        "include/fs",
+        "include/mm"
+      ],
+      "entry_symbols": [
+        "Task",
+        "Process",
+        "Thread",
+        "PCB",
+        "TCB",
+        "RUNNABLE",
+        "SLEEPING",
+        "ZOMBIE",
+        "sys_fork",
+        "sys_clone"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ]
+    },
+    {
+      "task_id": "task_04_context_switch",
+      "question_ids": [
+        "Q04_003",
+        "Q04_004",
+        "Q04_020"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证上下文切换实现（switch.S/__switch/swtch/context_switch），保存/恢复的寄存器集合（如RISC-V s0-s11），以及调度切换路径上是否存在页表切换（w_satp/sfence.vma）。需填充fact_id: Q04_003_01~Q04_003_06, Q04_004_01~Q04_004_06, Q04_020_01~Q04_020_06",
+      "group_reason": "三题均围绕上下文切换的汇编/函数实现、寄存器保存恢复、以及页表切换，共享同一组switch.S/context_switch代码证据",
+      "query": "在kernel/sched、kernel/proc、arch/riscv64等目录下搜索switch.S/__switch/swtch/context_switch函数定义和实现体；读取汇编代码确认保存/恢复的寄存器列表；搜索w_satp/sfence.vma/写CR3/TTBR等页表切换指令在调度路径中的调用点",
+      "seed_paths": [
+        "kernel/sched",
+        "kernel/proc",
+        "arch",
+        "include/sched"
+      ],
+      "entry_symbols": [
+        "switch_to",
+        "__switch",
+        "swtch",
+        "context_switch",
+        "w_satp",
+        "sfence.vma"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ]
+    },
+    {
+      "task_id": "task_04_scheduler",
+      "question_ids": [
+        "Q04_005",
+        "Q04_006",
+        "Q04_023",
+        "Q04_024",
+        "Q04_025",
+        "Q04_026",
+        "Q04_027",
+        "Q04_040",
+        "Q04_042"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证调度算法类型（FCFS/RR/Stride/MLFQ/CFS/Priority等）、核心入口函数（schedule/pick_next）、抢占模式、是否追踪性能指标（CPU利用率/吞吐量/周转时间等）、是否实现老化、公平份额调度、SJF/SRTF、实时调度（SCHED_FIFO/SCHED_RR）、调度层级（短程/中程/长程）。需填充fact_id: Q04_005_01~Q04_005_06, Q04_006_01~Q04_006_06, Q04_023_01~Q04_023_06, Q04_024_01~Q04_024_06, Q04_025_01~Q04_025_06, Q04_026_01~Q04_026_06, Q04_027_01~Q04_027_06, Q04_040_01~Q04_040_06, Q04_042_01~Q04_042_05",
+      "group_reason": "九题均围绕调度器的算法、入口、策略、性能指标、抢占模式、调度层级，共享同一组schedule/pick_next/ready_queue代码证据",
+      "query": "在kernel/sched、include/sched等目录下搜索schedule/pick_next函数定义和实现体；搜索ready_queue/runqueue结构体定义；搜索timeslice/priority/aging/fair_share/quota/SJF/SRTF/SCHED_FIFO/deadline/realtime等字段或常量；搜索CPU利用率/吞吐量/周转时间等统计代码；搜索suspended/swapped-out/挂起状态和准入控制逻辑",
+      "seed_paths": [
+        "kernel/sched",
+        "include/sched",
+        "kernel/proc",
+        "kernel/timer",
+        "kernel/trap"
+      ],
+      "entry_symbols": [
+        "schedule",
+        "pick_next",
+        "yield",
+        "runqueue",
+        "priority",
+        "timeslice",
+        "aging",
+        "fair_share",
+        "quota",
+        "SJF",
+        "SRTF",
+        "preempt",
+        "SCHED_FIFO",
+        "deadline",
+        "realtime",
+        "suspend",
+        "swapped"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ]
+    },
+    {
+      "task_id": "task_04_fork_exec_wait_exit",
+      "question_ids": [
+        "Q04_007",
+        "Q04_008",
+        "Q04_009",
+        "Q04_010",
+        "Q04_011",
+        "Q04_016"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证fork/clone（创建新执行实体）是否实现、是否复制地址空间与文件表、exec（装载ELF/重建地址空间）是否实现、wait/waitpid（父子回收同步）是否实现及其阻塞实现方式、exit()资源回收路径。需填充fact_id: Q04_007_01~Q04_007_06, Q04_008_01~Q04_008_06, Q04_009_01~Q04_009_06, Q04_010_01~Q04_010_06, Q04_011_01~Q04_011_06, Q04_016_01~Q04_016_06",
+      "group_reason": "六题均围绕进程创建（fork/clone）、程序加载（exec）、同步回收（wait/waitpid）和终止（exit），共享同一组syscall实现和资源管理代码证据",
+      "query": "在kernel/syscall、kernel/proc、kernel/fs等目录下搜索sys_fork/sys_clone/sys_exec/sys_wait/sys_exit函数定义和实现体；搜索地址空间复制（如uvmcopy/copy_mm）、文件表复制（如dup_fd）的调用点；搜索ELF加载器（load_elf）实现；搜索wait/waitpid阻塞机制（WaitQueue/条件变量/轮询）；搜索exit资源回收链（释放地址空间、关闭文件、通知父进程）",
+      "seed_paths": [
+        "kernel/syscall",
+        "kernel/proc",
+        "kernel/fs",
+        "kernel/mm",
+        "include/fs",
+        "include/mm"
+      ],
+      "entry_symbols": [
+        "sys_fork",
+        "sys_clone",
+        "sys_exec",
+        "sys_wait",
+        "sys_exit",
+        "uvmcopy",
+        "copy_mm",
+        "dup_fd",
+        "load_elf",
+        "wait_queue"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ]
+    },
+    {
+      "task_id": "task_04_pid_proctree",
+      "question_ids": [
+        "Q04_012",
+        "Q04_013"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证PID分配器实现（自增/bitmap/空闲栈复用/只分配不回收）和父子进程树存储方式（children Vec/链表/parent+sibling指针）。需填充fact_id: Q04_012_01~Q04_012_06, Q04_013_01~Q04_013_06",
+      "group_reason": "两题均围绕进程标识和进程关系管理，共享同一组PID分配和进程树结构体字段证据",
+      "query": "在kernel/proc、include/sched等目录下搜索PID分配函数（alloc_pid/next_pid）定义和实现体；搜索pid位图/空闲栈/自增计数器；搜索进程结构体中的parent/children/sibling字段定义",
+      "seed_paths": [
+        "kernel/proc",
+        "include/sched",
+        "kernel/sched"
+      ],
+      "entry_symbols": [
+        "alloc_pid",
+        "next_pid",
+        "pid",
+        "parent",
+        "children",
+        "sibling"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ]
+    },
+    {
+      "task_id": "task_04_signal_futex",
+      "question_ids": [
+        "Q04_014"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证是否实现信号（signal）或futex。需填充fact_id: Q04_014_01~Q04_014_06",
+      "group_reason": "单题独立，信号和futex是独立的进程间通信/同步机制",
+      "query": "在kernel/syscall、kernel/sync、include/sync等目录下搜索signal/futex相关系统调用（sys_signal/sys_futex）定义和实现体；搜索信号结构体（sigaction/signal_struct）和futex结构体定义",
+      "seed_paths": [
+        "kernel/syscall",
+        "kernel/sync",
+        "include/sync",
+        "kernel/signal"
+      ],
+      "entry_symbols": [
+        "sys_signal",
+        "sys_futex",
+        "sigaction",
+        "futex"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ]
+    },
+    {
+      "task_id": "task_04_pgid_session_rlimit_tls",
+      "question_ids": [
+        "Q04_017",
+        "Q04_018",
+        "Q04_022"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证是否实现进程组/会话（pgid/session/set_sid/setpgid）、POSIX资源限制（rlimit/RLIMIT/getrlimit/setrlimit）、线程局部存储（TLS）。需填充fact_id: Q04_017_01~Q04_017_06, Q04_018_01~Q04_018_06, Q04_022_01~Q04_022_06",
+      "group_reason": "三题均涉及进程/线程的附加属性（组、资源限制、局部存储），共享同一组进程结构体字段和系统调用证据",
+      "query": "在kernel/syscall、include/sched等目录下搜索sys_setpgid/sys_setsid/sys_getrlimit/sys_setrlimit函数定义和实现体；搜索进程结构体中的pgid/session/rlimit字段；搜索thread_local/TLS/__thread/#[thread_local]相关实现和tp寄存器使用",
+      "seed_paths": [
+        "kernel/syscall",
+        "include/sched",
+        "kernel/sched",
+        "kernel/proc"
+      ],
+      "entry_symbols": [
+        "sys_setpgid",
+        "sys_setsid",
+        "sys_getrlimit",
+        "sys_setrlimit",
+        "pgid",
+        "session",
+        "rlimit",
+        "thread_local",
+        "TLS"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ]
+    },
+    {
+      "task_id": "task_04_smp_cross_ref",
+      "question_ids": [
+        "Q04_015",
+        "Q04_036"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证与本阶段SMP/多核题的交叉一致性：每核队列/任务迁移/IPI resched、TLB刷新策略、per-CPU trap栈/时钟中断初始化与AP上线顺序、SpinLock关中断行为在多核下是否安全。需填充fact_id: Q04_015_01~Q04_015_06, Q04_036_01~Q04_036_06",
+      "group_reason": "两题均要求跨章节交叉验证SMP一致性，共享同一组多核机制证据",
+      "query": "搜索每核运行队列（per-CPU runqueue）、任务迁移（migrate_task）、IPI resched（ipi_send/ipi_handler）的实现；搜索TLB shootdown（flush_tlb_all/sfence.vma）在多核下的调用；搜索per-CPU trap栈初始化与AP上线顺序；搜索SpinLock实现中是否关中断（local_irq_save/local_irq_restore）",
+      "seed_paths": [
+        "kernel/sched",
+        "kernel/smp",
+        "kernel/trap",
+        "kernel/sync",
+        "include/sched",
+        "include/sync"
+      ],
+      "entry_symbols": [
+        "runqueue",
+        "migrate_task",
+        "ipi_send",
+        "ipi_handler",
+        "flush_tlb_all",
+        "sfence.vma",
+        "local_irq_save",
+        "local_irq_restore",
+        "spin_lock"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ]
+    },
+    {
+      "task_id": "task_04_smp_ap_ipi_percpu",
+      "question_ids": [
+        "Q04_028",
+        "Q04_029",
+        "Q04_030",
+        "Q04_031",
+        "Q04_032",
+        "Q04_033",
+        "Q04_034",
+        "Q04_035",
+        "Q04_038",
+        "Q04_039",
+        "Q04_041"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证多核形态（SMP/ASMP/单核）、Secondary CPU/AP启动链、IPI发送与处理、per-CPU变量/结构及其实现方式（TLS/tp寄存器/数组索引hartid）、跨核负载均衡/迁移/亲和性、TLB shootdown、NCPU/MAXCPU与链接脚本对应、AtomicUsize/原子变量分配PID/TID、NUMA感知。需填充fact_id: Q04_028_01~Q04_028_06, Q04_029_01~Q04_029_06, Q04_030_01~Q04_030_06, Q04_031_01~Q04_031_06, Q04_032_01~Q04_032_06, Q04_033_01~Q04_033_06, Q04_034_01~Q04_034_06, Q04_035_01~Q04_035_06, Q04_038_01~Q04_038_06, Q04_039_01~Q04_039_06, Q04_041_01~Q04_041_06",
+      "group_reason": "十一题均围绕SMP多核机制（AP启动、IPI、per-CPU、负载均衡、TLB shootdown、拓扑、原子ID、NUMA），共享同一组多核启动和通信代码证据",
+      "query": "在kernel/smp、arch、include/smp等目录下搜索AP启动链（start_secondary/boot_secondary）、IPI发送（ipi_send）和处理（ipi_handler）函数定义和实现体；搜索per-CPU结构体（PerCpu/cpu_local）定义和访问方式（tp寄存器/数组索引）；搜索负载均衡（load_balance）和亲和性（affinity）实现；搜索TLB shootdown（flush_tlb_all）实现；搜索NCPU/MAXCPU宏定义和链接脚本（linker.ld）中每hart栈/入口布局；搜索AtomicUsize/原子变量分配PID；搜索NUMA相关（numa/node_id/local_memory）",
+      "seed_paths": [
+        "kernel/smp",
+        "arch",
+        "include/smp",
+        "kernel/sched",
+        "kernel/proc",
+        "linker",
+        "include/atomic"
+      ],
+      "entry_symbols": [
+        "start_secondary",
+        "boot_secondary",
+        "ipi_send",
+        "ipi_handler",
+        "PerCpu",
+        "cpu_local",
+        "tp",
+        "load_balance",
+        "affinity",
+        "flush_tlb_all",
+        "NCPU",
+        "MAXCPU",
+        "AtomicUsize",
+        "numa",
+        "node_id"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ]
+    },
+    {
+      "task_id": "task_04_spinlock",
+      "question_ids": [
+        "Q04_037"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证SpinLock在获取锁时是否禁用中断（关中断保护临界区）。需填充fact_id: Q04_037_01~Q04_037_06",
+      "group_reason": "单题独立，SpinLock关中断行为是独立的同步原语特性",
+      "query": "在kernel/sync、include/sync等目录下搜索SpinLock实现（spin_lock/spin_unlock）函数定义和实现体；搜索是否调用关中断函数（local_irq_save/local_irq_disable）和恢复函数（local_irq_restore/local_irq_enable）",
+      "seed_paths": [
+        "kernel/sync",
+        "include/sync"
+      ],
+      "entry_symbols": [
+        "spin_lock",
+        "spin_unlock",
+        "local_irq_save",
+        "local_irq_restore",
+        "local_irq_disable",
+        "local_irq_enable"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ]
+    },
+    {
+      "task_id": "task_04_priority_inversion",
+      "question_ids": [
+        "Q04_043"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证是否实现优先级反转处理（priority inheritance / priority ceiling / 禁用抢占临界区）。需填充fact_id: Q04_043_01~Q04_043_05",
+      "group_reason": "单题独立，优先级反转处理是实时调度和同步的高级特性",
+      "query": "在kernel/sync、kernel/sched、include/sync等目录下搜索priority inheritance/priority ceiling/pi_mutex/rt_mutex相关结构体和函数定义；搜索锁结构体中的owner/waiter priority字段；搜索等待路径中提升持有者优先级的逻辑；搜索unlock路径中恢复优先级的逻辑",
+      "seed_paths": [
+        "kernel/sync",
+        "kernel/sched",
+        "include/sync",
+        "include/sched"
+      ],
+      "entry_symbols": [
+        "priority_inheritance",
+        "priority_ceiling",
+        "pi_mutex",
+        "rt_mutex",
+        "inherit_priority",
+        "boost_priority"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ]
+    }
   ]
 }

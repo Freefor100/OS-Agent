@@ -1,0 +1,68 @@
+{
+  "schema_version": "describe_review_v1",
+  "stage_id": "08_network",
+  "stage_title": "网络子系统与协议栈",
+  "confidence": 0.95,
+  "question_reviews": [
+    {
+      "question_id": "Q08_001",
+      "confidence": 0.95,
+      "review": "题面要求三态，回答 `implemented` 符合枚举。证据列出协议栈目录及 socket 函数实现，直接支撑存在性结论，无跑题。"
+    },
+    {
+      "question_id": "Q08_002",
+      "confidence": 0.95,
+      "review": "题面单选，回答文字与选项 A 一致。证据显示 lwIP 源码目录及标准文件结构，支撑“第三方库”分类，契约符合。"
+    },
+    {
+      "question_id": "Q08_003",
+      "confidence": 0.95,
+      "review": "题面要求三态，回答 `implemented`。证据列出 sys_socket/bind/sendto/recvfrom 具体函数及 syscall 表注册项，覆盖题干列举接口，证据充分。"
+    },
+    {
+      "question_id": "Q08_004",
+      "confidence": 0.95,
+      "review": "题面要求 3-6 个节点及证据。回答列出 5 个关键节点，在允许范围内。证据逐一对应各节点函数路径及行号，且注明回环限制，符合追踪要求。"
+    },
+    {
+      "question_id": "Q08_005",
+      "confidence": 0.95,
+      "review": "题面要求三态，回答 `not_found`。证据通过关键词搜索负结果及文档说明证实无真实网卡驱动，支撑“未发现”结论，逻辑自洽。"
+    },
+    {
+      "question_id": "Q08_006",
+      "confidence": 0.95,
+      "review": "题面多选，回答列出 5 项协议。证据通过配置文件开关（LWIP_*）及源码文件证实各协议支持，与选项对应良好，无漏选或错选迹象。"
+    },
+    {
+      "question_id": "Q08_007",
+      "confidence": 0.95,
+      "review": "题面要求三态，回答 `not_found`。证据指出具体拷贝函数（copyin/copyout）及搜索负结果，支撑无零拷贝结论，符合“仅有名词不算”的约束。"
+    }
+  ],
+  "dimensions": {
+    "evidence_supports_answers": 0.95,
+    "question_answer_consistency": 1.0,
+    "requirements_fit": 1.0
+  },
+  "findings": [],
+  "summary_zh": "本报告整体质量较高。所有题目均满足 JSON 契约与题面约束（如三态、节点数量范围）。证据链完整，摘录包含具体路径、函数名及行号，能有效支撑 `value` 结论。Q08_004 路径追踪详细且注明了实现限制（回环），Q08_005/007 的否定结论均有搜索或代码行为证据支持。全阶段置信度按各题均值计算。",
+  "report_quality_score": 0.98,
+  "_meta": {
+    "quality": {
+      "excerpt_coverage": 1.0,
+      "evidence_richness": 1.0,
+      "total_evidence_items": 27,
+      "nonempty_excerpt_items": 27,
+      "mean_question_confidence": 0.95,
+      "mean_dimensions": 0.9833,
+      "weights": {
+        "w_mean": 0.45,
+        "w_excerpt": 0.25,
+        "w_rich": 0.2,
+        "w_dim": 0.1
+      }
+    },
+    "review_model": "qwen3.5-plus"
+  }
+}

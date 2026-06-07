@@ -1,0 +1,94 @@
+{
+  "stage_id": "07_security",
+  "evidence_targets": [
+    "权限模型 (UID/GID 基础身份)",
+    "用户身份系统调用 (getuid/setuid/getgid/setgid)",
+    "文件访问权限检查 (faccessat 实现)",
+    "隔离边界 (proc 结构体中的 uid/gid 字段)",
+    "安全机制缺失 (无 chmod/chown/capability)",
+    "权限模型",
+    "用户身份",
+    "隔离边界",
+    "安全机制"
+  ],
+  "seed_paths": [
+    "kernel/include/proc.h",
+    "kernel/sysproc.c",
+    "kernel/sysfile.c",
+    "kernel/include/sysnum.h",
+    "kernel/include/file.h",
+    "kernel/include/stat.h",
+    "kernel/fat32.c",
+    "kernel/syscall.c",
+    "xv6-user/user.h",
+    "security",
+    "capability",
+    "uid",
+    "perm",
+    "auth"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "sys_getuid",
+    "sys_setuid",
+    "sys_getgid",
+    "sys_setgid",
+    "sys_faccessat",
+    "sys_umask",
+    "proc.uid",
+    "proc.gid",
+    "cap",
+    "permission",
+    "check_perm",
+    "main"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "doc",
+    "doc/pic",
+    "kernel",
+    "kernel/include",
+    "kernel/lwip",
+    "linker",
+    "tools",
+    "xv6-user"
+  ],
+  "preferred_tools": [
+    "read_code_segment",
+    "lsp_get_definition",
+    "lsp_get_references",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "读取 kernel/include/proc.h 中 struct proc 的 uid/gid 字段定义，确认身份存储结构",
+    "读取 kernel/sysproc.c 中 sys_getuid/sys_setuid/sys_getgid/sys_setgid 的完整实现",
+    "使用 lsp_get_references 追踪 uid/gid 在 proc.c 中的所有赋值点",
+    "读取 kernel/sysfile.c 中 sys_faccessat 的权限检查逻辑",
+    "读取 kernel/fat32.c 中 stat 相关函数，确认 st_uid/st_gid 的填充逻辑",
+    "使用 grep_in_repo 搜索 chmod/chown/capability 关键词，验证是否缺失",
+    "读取 kernel/include/sysnum.h 确认系统调用表中权限相关调用完整性",
+    "读取 kernel/syscall.c 中 syscall 数组，确认权限系统调用注册情况",
+    "使用 lsp_get_call_graph 分析 sys_faccessat 的调用链 (incoming, depth=2)",
+    "检查 xv6-user/user.h 中用户空间权限相关 API 声明",
+    "读取 kernel/proc.c 中 allocproc 函数，确认 uid/gid 初始化逻辑",
+    "使用 grep_in_repo 搜索 S_IRUSR/S_IWUSR 等权限宏，确认权限位定义",
+    "读取 kernel/include/file.h 中 R_OK/W_OK/X_OK 定义",
+    "对比 sys_setuid 实现，确认是否缺少 root 权限检查",
+    "汇总证据，形成安全机制与权限模型分析报告"
+  ]
+}

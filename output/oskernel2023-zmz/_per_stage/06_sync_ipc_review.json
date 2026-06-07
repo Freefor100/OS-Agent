@@ -1,0 +1,137 @@
+{
+  "schema_version": "describe_review_v1",
+  "stage_id": "06_sync_ipc",
+  "stage_title": "同步互斥与进程间通信",
+  "confidence": 0.95,
+  "question_reviews": [
+    {
+      "question_id": "Q06_001",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "答案完整列出三种原语，证据 excerpts 直接展示了对应 struct 定义及关键字段，与 value 描述完全一致，无缺失。"
+    },
+    {
+      "question_id": "Q06_002",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "选项选择正确，证据展示了 acquiresleep 中调用 sleep 的关键逻辑，能支撑阻塞结论，但 excerpt 较简短，未展示完整上下文。"
+    },
+    {
+      "question_id": "Q06_003",
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "三态结论正确，证据覆盖了 struct 定义及 sleep/wakeup 函数。但 wait_queue 的 excerpt 中混入了非代码的描述性文字，略微影响证据纯度。"
+    },
+    {
+      "question_id": "Q06_004",
+      "score_evidence": 0.8,
+      "score_consistency": 0.9,
+      "review": "填空内容完整，但 value 中声称的具体行号（如:569）在 evidence 中未体现，需读者自行推断；锁持有逻辑的证据 excerpt 较碎片化，需结合多段代码理解。"
+    },
+    {
+      "question_id": "Q06_005",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "实现结论明确，证据链完整（分配、读写、系统调用入口），直接支撑 implemented 结论。"
+    },
+    {
+      "question_id": "Q06_006",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "选项匹配准确，证据中 PIPESIZE 定义与取模运算代码直接证明了环形缓冲区形态。"
+    },
+    {
+      "question_id": "Q06_007",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "选项匹配准确，pipelock 中调用 sleep 的代码片段直接证明了阻塞语义。"
+    },
+    {
+      "question_id": "Q06_008",
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "not_found 结论合理，证据为搜索零命中。虽为负面证据，但覆盖了 syscall 表与头文件，支撑度尚可。"
+    },
+    {
+      "question_id": "Q06_009",
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "not_found 结论合理，证据为搜索零命中，覆盖 syscall 与 sysnum，符合三态要求。"
+    },
+    {
+      "question_id": "Q06_010",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "implemented 结论证据充分，覆盖了 sigaction/kill/sigreturn/trampoline 全链路代码片段。"
+    },
+    {
+      "question_id": "Q06_011",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "详细描述了上下文构建与恢复过程，证据 excerpts 展示了关键字段赋值（tf->epc, frame->tf），支撑有力。"
+    },
+    {
+      "question_id": "Q06_012",
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "not_found 结论基于搜索证据，覆盖了 sync 目录及全仓库，符合三态要求，但属负面证据。"
+    },
+    {
+      "question_id": "Q06_013",
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "选项选择“自定义汇编”，证据展示的是 GCC builtin 函数及注释说明。虽注释解释了底层汇编行为，但源码层面非纯汇编，证据支撑度略减。"
+    },
+    {
+      "question_id": "Q06_014",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "四条件逐条作答，证据覆盖了 acquire/sleep/pipelock 关键路径。循环等待的“可能成立”结论基于无锁顺序证据，逻辑自洽。"
+    },
+    {
+      "question_id": "Q06_015",
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "忽略策略结论基于搜索零命中，证据覆盖了检测/预防关键词及锁顺序注释搜索，支撑合理。"
+    },
+    {
+      "question_id": "Q06_016",
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "not_found 结论基于关键词搜索及代码扫描，指出了嵌套锁但无注释规范，证据充分。"
+    },
+    {
+      "question_id": "Q06_017",
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "not_found 结论基于 Condvar/Monitor 关键词搜索，覆盖了 sync 模块扫描，符合三态要求。"
+    },
+    {
+      "question_id": "Q06_018",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "三问题均作答。生产者 - 消费者证据引用 Pipe 实现（模式匹配），非专用测试代码，支撑度略低于直接实现证据。"
+    },
+    {
+      "question_id": "Q06_019",
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "not_found 结论基于消息传递相关关键词搜索，覆盖 syscall 与 sysnum，证据链完整。"
+    },
+    {
+      "question_id": "Q06_020",
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "not_found 结论基于 barrier 关键词搜索及头文件扫描，符合三态要求。"
+    }
+  ],
+  "findings": [],
+  "summary_zh": "本报告整体质量较高，题面相符度好，三态/单选题均严格遵守约束。证据支撑方面，实现类题目（如 Pipe/Signal）证据详实直接；未实现类题目（如 SysV IPC/Futex）主要依赖搜索零命中的负面证据，支撑度略低于代码实证。Q06_004 填空行号与证据未对齐、Q06_013 汇编来源证据为 Builtin 而非纯汇编，略有瑕疵。全阶段分按各题均值方案 A 汇总。",
+  "report_quality_score": 0.95,
+  "_meta": {
+    "quality": {
+      "mean_question_confidence": 0.9463
+    },
+    "review_model": "qwen3.5-plus"
+  }
+}

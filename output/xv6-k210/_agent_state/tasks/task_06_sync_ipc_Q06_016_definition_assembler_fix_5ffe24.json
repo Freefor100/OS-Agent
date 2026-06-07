@@ -1,0 +1,33 @@
+{
+  "task_id": "task_06_sync_ipc_Q06_016_definition_assembler_fix_5ffe24",
+  "stage_id": "06_sync_ipc",
+  "question_id": "Q06_016",
+  "question_ids": [
+    "Q06_016"
+  ],
+  "status": "done",
+  "evidence_ids": [
+    "ev_task_06_sync_ipc_Q06_016_definition_assembler_fix_5ffe24_d7904493",
+    "ev_task_06_sync_ipc_Q06_016_definition_assembler_fix_5ffe24_03f07d6e",
+    "ev_task_06_sync_ipc_Q06_016_definition_assembler_fix_5ffe24_0c9db5c1",
+    "ev_task_06_sync_ipc_Q06_016_definition_assembler_fix_5ffe24_80896e06",
+    "ev_task_06_sync_ipc_Q06_016_definition_assembler_fix_5ffe24_41e4b2cf",
+    "ev_task_06_sync_ipc_Q06_016_definition_assembler_fix_5ffe24_274031fa",
+    "ev_task_06_sync_ipc_Q06_016_definition_assembler_fix_5ffe24_d3656079",
+    "ev_task_06_sync_ipc_Q06_016_definition_assembler_fix_5ffe24_f8116eca",
+    "ev_task_06_sync_ipc_Q06_016_definition_assembler_fix_5ffe24_a39a2ed4"
+  ],
+  "draft_answer_ids": [
+    "draft_task_06_sync_ipc_Q06_016_definition_assembler_fix_5ffe24_Q06_016_806941d3"
+  ],
+  "findings": [],
+  "confidence": "high",
+  "errors": [],
+  "token_usage": {},
+  "metadata": {
+    "evidence_count": 9,
+    "mode": "react",
+    "summary": "xv6-k210 内核中存在 ad-hoc 锁顺序注释（如 proc_lock 应最后获取、exit() 中先获取 parent->lk 再获取 proc_lock、sleep() 中先释放 proc_lock 再获取 lk）以及 trysleeplock() 用于避免死锁，但不存在全局/正式的锁顺序规范文档，也没有 lockdep/ABBA 检测机制。",
+    "raw_output_excerpt": "Now I have all the evidence I need. Let me produce the final structured JSON.\n\n{\n  \"status\": \"done\",\n  \"summary\": \"xv6-k210 内核中存在 ad-hoc 锁顺序注释（如 proc_lock 应最后获取、exit() 中先获取 parent->lk 再获取 proc_lock、sleep() 中先释放 proc_lock 再获取 lk）以及 trysleeplock() 用于避免死锁，但不存在全局/正式的锁顺序规范文档，也没有 lockdep/ABBA 检测机制。\",\n  \"claim\": \"xv6-k210 存在局部锁顺序注释和 trysleeplock 避免死锁，但无全局锁顺序规范或 ABBA 检测代码。\",\n  \"structured_fact_results\": [\n    {\n      \"fact_id\": \"Q06_016_01\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [0, 1, 2],\n      \"notes\": \"spinlock 和 sleeplock 提供互斥访问；spinlock 通过原子 swap 实现，sleeplock 基于 spinlock+等待队列。代码中存在多处 acquire/release 调用，互斥条件成立。\"\n    },\n    {\n      \"fact_id\": \"Q06_016_02\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [3, 4, 5],\n      \"notes\": \"exit() 中持有 parent->lk 的同时获取 proc_lock（候选3）；sleep() 中持有 proc_lock 的同时释放调用者锁（候选4）；rename() 中持有 dstdir 锁的同时尝试获取 iold->lock（候选5）。持有并等待条件成立。\"\n    },\n    {\n      \"fact_id\": \"Q06_016_03\",\n      \"status_or_value\": \"yes_weak\",\n      \"evidence_candidate_indexes\": [6],\n      \"notes\": \"spinlock acquire() 调用 push_off() 关中断，防止被当前 CPU 上的其他执行流抢占，但其他 CPU 仍可自旋等待；sleeplock 可被调度器抢占。不可剥夺条件部分成立（spinlock 层面），但非完全。\"\n    },\n    {\n      \"fact_id\": \"Q06_016_04\",\n      \"status_or_value\": \"yes_weak\",\n      \"evidence_candidate_indexes\": [3, 4, 5, 7],\n      \"notes\": \"存在 ad-hoc 锁顺序注释：proc_lock 应最后获取（候选7）、exit() 中 parent->lk 先于 proc_lock（候选3）、sleep() 中先释放 proc_lock 再获取 lk（候选4）。rename() 使用 trysleeplock 避免死锁（候选5）。但无全局锁顺序规范文档，无 lockdep/ABBA 检测。\"\n    },\n    {\n      \"fact_id\": \"Q06_016_05\",\n      \"status_or_value\": \"yes_weak\",\n      \"evidence_candidate_indexes\": [3, 4, 5, 6, 7],\n      \"notes\": \"死锁处理策略为 ad-hoc prevention：通过注释约定锁获取顺序、trysleeplock 避免阻塞、spinlock 关中断防止单 CPU 死锁。但无系统化的预防策略文档、无 Banker 算法、无检测恢复机制。\"\n    },\n    {\n      \"fact_id\": \"Q06_016_06\",\n      \"status_or_value\": {\n        \"searched_keywords\": [\"deadlock\", \"lock ordering\", \"circular wait\", \"ABBA\", \"lockdep\", \"trylock\", \"lock hierarchy\", \"lock nesting\"],\n     "
+  }
+}

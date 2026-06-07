@@ -1,0 +1,111 @@
+{
+  "stage_id": "01_overview",
+  "evidence_targets": [
+    "语言与框架来源: C/xv6-riscv 派生，非 Rust",
+    "支持架构: riscv64 (QEMU + VisionFive 双平台)",
+    "入口函数: _entry (QEMU) / _start (VisionFive) → main()",
+    "关键目录: kernel/, kernel/lwip/, xv6-user/, linker/, doc/",
+    "README 构建与运行命令: make all / make qemu-run / make gdb-server|gdb-client",
+    "评测/交付产物信号: target/kernel, kernel-qemu.bin (build-grading)",
+    "网络子系统: lwip 2.x 集成 + 简化 socket 回环 (ring_buffer)",
+    "线程模型: 内核级线程 (thread.c, proc 含 main_thread)",
+    "文件系统: FAT32 + bio/buffer cache + sysfile.c",
+    "特权级隔离: user/kernel mode 通过 trampoline/entry 切换",
+    "语言与框架来源",
+    "支持架构",
+    "入口函数",
+    "关键目录",
+    "README 构建与运行命令",
+    "评测/交付产物信号(kernel-rv等)"
+  ],
+  "seed_paths": [
+    "README.md",
+    "Makefile",
+    "kernel/main.c",
+    "kernel/entry_qemu.S",
+    "kernel/entry_visionfive.S",
+    "linker/qemu.ld",
+    "linker/visionfive.ld",
+    "kernel/lwip/",
+    "kernel/proc.c",
+    "kernel/thread.c",
+    "kernel/syscall.c",
+    "doc/net.md",
+    "docs",
+    "Cargo.toml"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "_entry",
+    "_start",
+    "main",
+    "scheduler",
+    "userinit",
+    "trapinithart",
+    "kvminithart",
+    "threadInit",
+    "tcpip_init_with_loopback",
+    "sys_socket",
+    "kernel_main",
+    "rust_main"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "doc",
+    "doc/pic",
+    "kernel",
+    "kernel/include",
+    "kernel/lwip",
+    "linker",
+    "tools",
+    "xv6-user"
+  ],
+  "preferred_tools": [
+    "list_repo_structure",
+    "analyze_tech_stack",
+    "find_os_core_modules",
+    "read_code_segment",
+    "grep_in_repo",
+    "lsp_get_document_outline",
+    "lsp_get_definition",
+    "lsp_get_references"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 12000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 18,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "读取 README.md 与 Makefile 前 100 行，确认构建/运行/调试命令与平台切换方式",
+    "读取 kernel/entry_qemu.S 与 entry_visionfive.S，确认 _entry/_start 到 main() 的启动链",
+    "读取 linker/qemu.ld 与 visionfive.ld，确认 ENTRY 符号与基地址 0x80200000",
+    "读取 kernel/main.c 全文，梳理 init 顺序：cpuinit→kinit→kvminit→trapinithart→procinit→tcpip_init_with_loopback→scheduler",
+    "grep 搜索 'sys_socket|sys_bind|sys_connect|sys_sendto|sys_recvfrom' 定位 socket 系统调用实现文件",
+    "读取 kernel/syssocket.c 与 kernel/socket_new.c，确认 socket 结构与 ring_buffer 集成方式",
+    "读取 kernel/thread.c 与 kernel/proc.c 关键段，确认线程状态机与 main_thread 调度单位",
+    "读取 kernel/trap.c 与 kernel/trampoline.S，确认用户/内核态切换与中断入口",
+    "读取 kernel/vm.c 与 kernel/kalloc.c，确认页表初始化与物理页分配器",
+    "读取 kernel/fat32.c 与 kernel/bio.c，确认 FAT32 解析与 buffer cache 初始化",
+    "读取 kernel/lwip/api/sockets.c 与 lwipopts.h，确认 lwip 配置与 socket 适配层",
+    "使用 lsp_get_document_outline 对 kernel/main.c 与 kernel/proc.c 生成函数/结构体大纲",
+    "使用 lsp_get_definition 定位 main、scheduler、userinit、threadInit 的精确定义位置",
+    "使用 lsp_get_references 追踪 sys_socket 在内核中的调用点（如 sysfile.c 或 syscall 表）",
+    "对 main() 使用 lsp_get_call_graph(direction='outgoing', max_depth=2) 获取初始化调用快照",
+    "对 scheduler() 使用 lsp_get_call_graph(direction='incoming', max_depth=2) 确认谁触发调度",
+    "使用 rag_search_code 查询 'page table init' 与 'thread create' 补充 vm 与线程证据",
+    "读取 xv6-user/init.c 与 usertests.c 片段，确认用户态入口与测试覆盖信号",
+    "检查 Makefile 中 build-grading 目标，确认 kernel-qemu.bin 为交付产物",
+    "汇总证据：语言(C)、架构(riscv64)、入口(_entry/_start→main)、网络(lwip+ring_buffer)、线程(内核级)、文件系统(FAT32)",
+    "输出阶段结论：项目概览与技术栈画像（含构建命令、平台、核心模块、交付物）"
+  ]
+}

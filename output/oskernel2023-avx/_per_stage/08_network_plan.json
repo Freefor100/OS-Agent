@@ -1,0 +1,103 @@
+{
+  "stage_id": "08_network",
+  "evidence_targets": [
+    "lwIP 协议栈集成",
+    "socket 系统调用实现 (sys_socket/sys_bind/sys_listen/sys_accept/sys_connect/sys_sendto/sys_recvfrom)",
+    "select/pselect6 I/O 多路复用",
+    "ring_buffer 本地回环机制",
+    "struct file 中 FD_SOCK 类型抽象",
+    "lwip_select 与 pselect 的联动",
+    "协议栈",
+    "socket API",
+    "poll/epoll",
+    "驱动接入"
+  ],
+  "seed_paths": [
+    "kernel/syssocket.c",
+    "kernel/socket_new.c",
+    "kernel/pselect.c",
+    "kernel/include/socket.h",
+    "kernel/include/file.h",
+    "kernel/lwip/api/sockets.c",
+    "kernel/lwip/core/tcp.c",
+    "kernel/lwip/core/udp.c",
+    "doc/net.md",
+    "kernel/syscall.c",
+    "net",
+    "tcp",
+    "udp",
+    "socket"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "sys_socket",
+    "sys_bind",
+    "sys_listen",
+    "sys_accept",
+    "sys_connect",
+    "sys_sendto",
+    "sys_recvfrom",
+    "sys_pselect6",
+    "do_lwip_select",
+    "tcpip_init_with_loopback",
+    "tcp",
+    "udp"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "doc",
+    "doc/pic",
+    "kernel",
+    "kernel/include",
+    "kernel/lwip",
+    "linker",
+    "tools",
+    "xv6-user"
+  ],
+  "preferred_tools": [
+    "lsp_get_call_graph",
+    "lsp_get_definition",
+    "lsp_get_references",
+    "read_code_segment",
+    "rag_search_code"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "使用 lsp_get_call_graph 分析 sys_socket 的入向调用链，确认 syscall 分发路径",
+    "使用 lsp_get_definition 定位 do_socket 在 socket_new.c 中的实现，确认其调用 lwip_socket",
+    "使用 read_code_segment 读取 kernel/syssocket.c 中 sys_bind/sys_listen/sys_accept 的实现片段 (各约 30 行)",
+    "使用 lsp_get_references 追踪 FD_SOCK 在 file.c 中的处理逻辑，确认 socket 文件操作分流",
+    "使用 read_code_segment 读取 kernel/pselect.c 中 sys_pselect6 的核心循环 (行 80-140)",
+    "使用 lsp_get_definition 定位 do_lwip_select 在 socket_new.c 中的实现，分析其调用 lwip_select 的逻辑",
+    "使用 read_code_segment 读取 kernel/lwip/api/sockets.c 中 lwip_select 函数实现 (约 50 行)",
+    "使用 rag_search_code 搜索 'ring_buffer' 相关代码，定位 socket 数据收发缓冲区实现",
+    "使用 lsp_get_call_graph 分析 sys_pselect6 的入向调用，确认其被 syscall 分发",
+    "使用 read_code_segment 读取 kernel/include/socket.h 中 tcpip_init_with_loopback 声明及关键宏",
+    "使用 grep_in_repo 搜索 'lwip_socket|lwip_bind|lwip_listen' 验证 lwIP API 封装完整性",
+    "使用 read_code_segment 读取 kernel/file.c 中 FD_SOCK 分支的处理代码 (行 95-200)",
+    "使用 lsp_get_definition 定位 struct file 中 socketnum 字段的引用，追踪其与 lwIP socket 句柄的映射",
+    "使用 read_code_segment 读取 doc/net.md 中 ring_buffer 结构体定义及操作接口文档",
+    "使用 grep_in_repo 搜索 'tcp_start_listen' 确认 listen/connect 同步机制",
+    "使用 lsp_get_references 追踪 tcpip_init_with_loopback 的调用位置，确认协议栈初始化时机",
+    "使用 read_code_segment 读取 kernel/lwip/core/tcp.c 中 tcp 连接建立相关函数 (如 tcp_connect)",
+    "使用 read_code_segment 读取 kernel/lwip/core/udp.c 中 udp 发送接收相关函数",
+    "使用 lsp_get_call_graph 分析 do_accept 的出向调用链，确认其如何创建新 socket 文件描述符",
+    "使用 grep_in_repo 搜索 'SOCK_STREAM|SOCK_DGRAM' 确认支持的 socket 类型",
+    "使用 read_code_segment 读取 kernel/syscall.c 中 socket 相关 syscall 表项 (行 295-305)",
+    "使用 lsp_get_definition 定位 lwip_select 在 lwIP 源码中的实现，分析其等待队列机制"
+  ]
+}

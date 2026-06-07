@@ -1,0 +1,103 @@
+{
+  "stage_id": "10_history",
+  "evidence_targets": [
+    "作者贡献分布与模块分工",
+    "初始提交与核心模块引入",
+    "重大重构提交（信号系统、exec 路径）",
+    "关键文件演进轨迹",
+    "CI/调试工具链演进",
+    "作者贡献",
+    "重大提交",
+    "模块演进",
+    "当前缺口",
+    "CI/产物名/自测相关演进(有工具证据时)"
+  ],
+  "seed_paths": [
+    "Makefile",
+    "README.md",
+    "kernel/main.c",
+    "kernel/exec.c",
+    "kernel/fs/fs.c",
+    "include/sched/signal.h",
+    "kernel/mesg/signal.c",
+    "debug/",
+    "sbi/",
+    "tools/",
+    "git",
+    "history",
+    "scripts",
+    ".github"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "_start",
+    "main",
+    "exec",
+    "fork",
+    "sigaction",
+    "kill",
+    "yield",
+    "allocpage",
+    "git",
+    "start"
+  ],
+  "repo_hotspots": [
+    "Cargo.toml",
+    "Makefile",
+    "debug",
+    "debug/kendryte_openocd",
+    "debug/openocd_cfg",
+    "doc",
+    "doc/img",
+    "include",
+    "include/fs",
+    "include/hal"
+  ],
+  "preferred_tools": [
+    "get_git_history_summary",
+    "analyze_authors_contribution",
+    "trace_file_evolution",
+    "get_commit_diff_summary",
+    "find_symbol_first_commit",
+    "read_code_segment"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 4000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "使用 get_git_history_summary 获取全量提交概览，识别里程碑式提交（如初始提交、信号修复、exec 重构）",
+    "使用 analyze_authors_contribution 分析两位作者的模块分工与贡献热力图",
+    "使用 find_symbol_first_commit 追踪 _start、main、exec、fork 等核心符号的首次引入 commit",
+    "使用 trace_file_evolution 追踪 kernel/main.c 的生命周期，识别启动流程变更",
+    "使用 trace_file_evolution 追踪 kernel/exec.c 的演进，定位 exec 路径重构节点",
+    "使用 trace_file_evolution 追踪 include/sched/signal.h 与 kernel/mesg/signal.c（或移动后的路径）的信号系统演进",
+    "使用 get_commit_diff_summary 深入分析初始提交 b7ffeecc 的代码引入规模与结构",
+    "使用 get_commit_diff_summary 分析 df1fdc35（信号修复）的核心变更内容",
+    "使用 get_commit_diff_summary 分析 d17dd26f（用户程序添加）的变更范围",
+    "使用 read_code_segment 小段读取 Makefile 的关键构建规则（平台选择、SBI 集成）",
+    "使用 read_code_segment 读取 README.md 的进度清单与 TODO，确认项目完成度",
+    "使用 read_code_segment 读取 debug/ 目录下的 openocd 配置，了解硬件调试支持",
+    "使用 read_code_segment 读取 sbi/psicasbi/Cargo.toml 确认 SBI 实现语言与依赖",
+    "使用 read_code_segment 读取 kernel/main.c 的启动代码，确认多核初始化逻辑",
+    "使用 read_code_segment 读取 kernel/exec.c 的关键片段，对比初始与最终版本的 exec 实现差异",
+    "使用 read_code_segment 读取 include/sched/signal.h 的结构定义，确认信号系统数据结构",
+    "检查 tools/ 目录下的 kflash.py/ktool.py 确认烧录工具链演进",
+    "检查 doc/img/ 目录下的图片文件提交时间，推断文档/演示材料的制作阶段",
+    "汇总作者贡献、核心模块引入时间、重大重构节点，形成开发时间线",
+    "识别当前缺口：如网络子系统缺失、权限检查桩实现、测试覆盖率不足等",
+    "整理 CI/产物证据：Makefile 中的 qemu/k210 双平台支持、SBI 二进制产物、fs.img 生成流程",
+    "输出最终历史分析报告，包含里程碑、作者分工、模块演进、当前状态与缺口"
+  ]
+}

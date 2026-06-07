@@ -1,0 +1,70 @@
+{
+  "schema_version": "describe_review_v1",
+  "stage_id": "09_debug_error",
+  "stage_title": "调试机制与错误处理",
+  "confidence": 0.97,
+  "question_reviews": [
+    {
+      "question_id": "Q09_001",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "题面相符，三态值合法。证据中第 1 条 excerpt 为总结性描述而非代码原文，略减证据分，但其余证据（Makefile/头文件）充分支撑日志系统与级别控制结论。"
+    },
+    {
+      "question_id": "Q09_002",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "题面相符，证据直接展示 panic 函数实现（打印、回溯、死循环）与全局标志，有效支撑 implemented 结论。"
+    },
+    {
+      "question_id": "Q09_003",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "简答内容具体列出输出项，证据引用了 panic 函数体、backtrace 实现及 trapframedump 定义，与结论中关于寄存器 dump 的说明一致。"
+    },
+    {
+      "question_id": "Q09_004",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "题面相符，证据显示帧指针链遍历逻辑（while 循环更新 fp），满足题干“仅打印 ra 不算”的排除条件，支撑 implemented。"
+    },
+    {
+      "question_id": "Q09_005",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "题面相符，值为 not_found。证据说明了用户态 shell 与内核态监视器的区别，并指出内核主循环无命令解析，逻辑自洽。"
+    },
+    {
+      "question_id": "Q09_006",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "题面相符，值为 not_found。证据指出依赖 QEMU 外部 stub 且内核源码搜索无相关符号，支撑充分。"
+    },
+    {
+      "question_id": "Q09_007",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "简答内容清晰描述 errno 体系，证据包含错误码定义头文件与系统调用返回示例（传播点），支撑充分。"
+    },
+    {
+      "question_id": "Q09_008",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "题面相符，值 stub 合理反映基础跟踪掩码存在但无完整基础设施（ftrace/perf），证据区分了两者，支撑充分。"
+    }
+  ],
+  "findings": [],
+  "summary_zh": "整体报告质量高，题面约束遵守良好，三态值与简答内容均符合题型要求。大部分题目证据详实且直接引用代码，仅 Q09_001 部分证据摘录为总结性文字而非代码原文，轻微影响证据分。全阶段分按各题均值方案 A 汇总。",
+  "report_quality_score": 0.97,
+  "_meta": {
+    "quality": {
+      "mean_question_confidence": 0.9719
+    },
+    "review_model": "qwen3.5-plus",
+    "baseline": true,
+    "run_at": "2026-04-24T09:33:33",
+    "baseline_execute_tokens": 184659,
+    "baseline_review_tokens": 11459,
+    "baseline_stage_total_tokens": 196118
+  }
+}

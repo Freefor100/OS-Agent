@@ -1,0 +1,69 @@
+{
+  "schema_version": "describe_review_v1",
+  "stage_id": "08_network",
+  "stage_title": "网络子系统与协议栈",
+  "confidence": 0.95,
+  "question_reviews": [
+    {
+      "question_id": "Q08_001",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "证据引用了头文件、系统调用列表及文件类型定义，具体指出了缺失的实现部分，充分支撑未发现结论。三态值符合题面要求。"
+    },
+    {
+      "question_id": "Q08_002",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "结论未发现与选项 D 文本一致。证据为全局关键词检索，虽未展示详细匹配日志但逻辑足以支撑无协议栈的结论。"
+    },
+    {
+      "question_id": "Q08_003",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "证据链完整（syscall 生成脚本、函数指针数组、文件类型枚举），多角度证实无 socket 系统调用，支撑有力。"
+    },
+    {
+      "question_id": "Q08_004",
+      "score_evidence": 0.9,
+      "score_consistency": 0.9,
+      "review": "短答题。因无实现而无法列出节点，回答未发现符合逻辑事实。证据支撑了不存在发送路径的结论。略微扣分因未显式回应列 3-6 个节点的格式要求。"
+    },
+    {
+      "question_id": "Q08_005",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "证据具体到中断处理函数及驱动文件搜索，明确排除了网卡驱动与收包中断，支撑充分。"
+    },
+    {
+      "question_id": "Q08_006",
+      "score_evidence": 0.95,
+      "score_consistency": 0.8,
+      "review": "值留空符合未发现情况。但题干明确要求在 notes 写 not_found，答案 JSON 缺失 notes 字段，属题面指令未完全落实，扣一致性分。"
+    },
+    {
+      "question_id": "Q08_007",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "证据分析了 sendfile 实现及通用拷贝函数，明确排除了零拷贝路径，支撑未发现结论。"
+    }
+  ],
+  "findings": [
+    {
+      "severity": "warn",
+      "message": "Q08_006 题干要求在未发现时于 notes 字段注明 not_found，但答案 JSON 缺失该字段。"
+    }
+  ],
+  "summary_zh": "整体报告质量较高，证据引用具体且能有效支撑未发现的结论。多数题目题面相符度高。主要瑕疵在于 Q08_006 未遵循题干关于 notes 字段的明确指令，以及 Q08_004 在无法列出节点时未做格式上的显式说明。全阶段分按各题均值的方案 A 汇总。",
+  "report_quality_score": 0.95,
+  "_meta": {
+    "quality": {
+      "mean_question_confidence": 0.9464
+    },
+    "review_model": "qwen3.5-plus",
+    "baseline": true,
+    "run_at": "2026-04-24T09:30:54",
+    "baseline_execute_tokens": 183874,
+    "baseline_review_tokens": 19262,
+    "baseline_stage_total_tokens": 203136
+  }
+}

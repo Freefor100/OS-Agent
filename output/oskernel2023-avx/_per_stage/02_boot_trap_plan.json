@@ -1,0 +1,109 @@
+{
+  "stage_id": "02_boot_trap",
+  "evidence_targets": [
+    "启动入口 _entry 与 main() 的关系",
+    "模式切换与页表初始化 (kvminit/kvminithart)",
+    "trap 向量设置 (w_stvec)",
+    "trap 入口 uservec/usertrap/kerneltrap",
+    "syscall 分发机制 (syscall() 函数)",
+    "TrapFrame 结构体定义与使用",
+    "用户指针校验 (fetchaddr/fetchstr/copyin)",
+    "QEMU vs VisionFive 平台差异",
+    "链接脚本与内存布局 (qemu.ld)",
+    "trampoline.S 的作用",
+    "启动入口",
+    "模式切换",
+    "页表/MMU",
+    "trap 向量",
+    "trap 入口",
+    "syscall 分发"
+  ],
+  "seed_paths": [
+    "kernel/entry_qemu.S",
+    "kernel/entry_visionfive.S",
+    "kernel/main.c",
+    "kernel/trap.c",
+    "kernel/trampoline.S",
+    "kernel/kernelvec.S",
+    "kernel/syscall.c",
+    "kernel/include/trap.h",
+    "kernel/include/sysnum.h",
+    "linker/qemu.ld",
+    "linker/visionfive.ld",
+    "Makefile",
+    "arch",
+    "boot"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "_entry",
+    "main",
+    "trapinithart",
+    "usertrap",
+    "kerneltrap",
+    "syscall",
+    "uservec",
+    "userret",
+    "usertrapret",
+    "devintr",
+    "_start",
+    "start"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "doc",
+    "doc/pic",
+    "kernel",
+    "kernel/include",
+    "kernel/lwip",
+    "linker",
+    "tools",
+    "xv6-user"
+  ],
+  "preferred_tools": [
+    "lsp_get_call_graph",
+    "lsp_get_definition",
+    "lsp_get_references",
+    "read_code_segment",
+    "lsp_get_document_outline"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "使用 lsp_get_call_graph 分析 main() 函数的 outgoing 调用链 (max_depth=2)，确认初始化顺序",
+    "使用 lsp_get_definition 定位 trapinithart() 的定义，确认 stvec 设置",
+    "使用 lsp_get_definition 定位 uservec 符号（在 trampoline.S 中），理解 trap 入口",
+    "使用 read_code_segment 精读 trampoline.S 的 uservec 和 userret 段（各约 50 行）",
+    "使用 lsp_get_call_graph 分析 usertrap() 的 outgoing 调用链，追踪 syscall() 和 devintr()",
+    "使用 lsp_get_definition 定位 syscall() 函数，理解系统调用分发逻辑",
+    "使用 read_code_segment 读取 syscall.c 中 syscalls[] 数组定义部分（约 100 行）",
+    "使用 lsp_get_definition 定位 struct trapframe 的定义（已在 trap.h 中）",
+    "使用 lsp_get_references 查询 trapframe 在 proc.c 中的引用，理解分配与映射",
+    "使用 read_code_segment 读取 proc.c 中 allocproc() 函数（约 80 行），理解 trapframe 分配",
+    "使用 lsp_get_definition 定位 fetchaddr() 和 fetchstr()，理解用户指针校验机制",
+    "使用 read_code_segment 读取 syscall.c 中 fetchaddr/fetchstr/argint 等辅助函数（约 60 行）",
+    "使用 lsp_get_call_graph 分析 kerneltrap() 的 incoming 调用者（应为 kernelvec.S）",
+    "使用 read_code_segment 对比 entry_qemu.S 和 entry_visionfive.S 的启动差异",
+    "使用 read_code_segment 读取 linker/qemu.ld，确认 BASE_ADDRESS 和 trampoline 位置",
+    "使用 grep_in_repo 搜索 'SSTATUS_SPP|SSTATUS_SPIE' 确认模式切换标志位",
+    "使用 lsp_get_definition 定位 kvminit() 和 kvminithart()，理解页表初始化",
+    "使用 read_code_segment 读取 vm.c 中 kvminit() 函数（约 50 行）",
+    "使用 lsp_get_references 查询 usertrapret() 的调用位置，确认返回用户态路径",
+    "使用 read_code_segment 读取 trap.c 中 usertrapret() 函数（约 40 行）",
+    "使用 grep_in_repo 搜索 'TRAPFRAME|TRAMPOLINE' 确认关键宏定义",
+    "使用 read_code_segment 读取 kernel/include/memlayout.h 中相关宏定义"
+  ]
+}

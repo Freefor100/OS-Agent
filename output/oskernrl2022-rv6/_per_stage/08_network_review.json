@@ -1,0 +1,233 @@
+{
+  "schema_version": "describe_review_v1",
+  "stage_id": "08_network",
+  "stage_title": "网络子系统与协议栈",
+  "confidence": 0.53,
+  "question_reviews": [
+    {
+      "question_id": "Q08_001",
+      "score_evidence": 0.55,
+      "score_consistency": 1.0,
+      "review": "题面要求三态，答案给出 implemented，格式合规。但证据仅展示了 socket.h 头文件中的结构体声明和函数原型，以及 errno.h 中的错误码定义，这些只能证明存在 socket 相关的类型和常量定义，无法直接证明存在可运行的协议栈或 socket 层实现（如缺少协议处理、数据收发等核心逻辑的证据）。证据与结论之间存在明显差距。",
+      "fix_hints": {
+        "finding_type": "weak_evidence",
+        "missing_evidence_types": [
+          "implementation_body",
+          "call_site",
+          "usage_flow"
+        ],
+        "recommended_keywords": [
+          "socket_init",
+          "add_socket",
+          "socket_connection",
+          "tcp",
+          "udp",
+          "ip",
+          "net",
+          "recv",
+          "send"
+        ],
+        "recommended_seed_paths": [
+          "src/",
+          "kernel/",
+          "net/"
+        ],
+        "fix_goal": "找到 socket_init 或 add_socket 等函数的实现体，以及协议处理（如 TCP/UDP/IP 层）的核心代码，证明网络子系统不仅仅是头文件声明，而是有实际实现。"
+      }
+    },
+    {
+      "question_id": "Q08_002",
+      "score_evidence": 0.3,
+      "score_consistency": 0.4,
+      "review": "题面要求从四个选项中选择协议栈来源，答案却填写了“未发现”，这并非题面提供的选项，严重违反单选题契约。同时，证据与 Q08_001 完全相同，仅展示了 socket 头文件声明，无法支撑任何关于协议栈来源的结论。",
+      "fix_hints": {
+        "finding_type": "contract_only",
+        "missing_evidence_types": [],
+        "recommended_keywords": [],
+        "recommended_seed_paths": [],
+        "fix_goal": "答案必须从题面提供的四个选项（第三方库/自研协议栈/混合/未发现）中选择一个，并确保 value 字段使用选项原文。"
+      }
+    },
+    {
+      "question_id": "Q08_003",
+      "score_evidence": 0.1,
+      "score_consistency": 1.0,
+      "review": "三态格式合规，答案为 not_found。但所有证据均为对不存在的文件 sd/test.c 的错误调用，excerpt 全是 'Error: 文件未找到'，属于完全无效的证据。无法支撑任何结论。",
+      "fix_hints": {
+        "finding_type": "wrong_evidence",
+        "missing_evidence_types": [
+          "definition",
+          "implementation_body",
+          "search"
+        ],
+        "recommended_keywords": [
+          "sys_socket",
+          "sys_bind",
+          "sys_connect",
+          "sys_sendto",
+          "sys_recvfrom",
+          "socketcall",
+          "syscall"
+        ],
+        "recommended_seed_paths": [
+          "src/",
+          "kernel/",
+          "syscall/",
+          "user/"
+        ],
+        "fix_goal": "在正确的仓库路径下搜索 socket 相关系统调用（如 sys_socket, sys_bind, sys_connect, sys_sendto, sys_recvfrom 等）的定义或调用，以确认是否实现。"
+      }
+    },
+    {
+      "question_id": "Q08_004",
+      "score_evidence": 0.15,
+      "score_consistency": 0.6,
+      "review": "题面要求列出 3-6 个关键节点并给证据，答案直接写 not_found，未尝试列出任何节点，与题面要求不符。证据中包含大量错误调用、无关的文档搜索结果和降级失败的调用图，唯一可能相关的 syscall 函数定义也无法串联起发送路径。证据完全不足以支撑 not_found 的结论。",
+      "fix_hints": {
+        "finding_type": "weak_evidence",
+        "missing_evidence_types": [
+          "definition",
+          "implementation_body",
+          "call_site",
+          "usage_flow"
+        ],
+        "recommended_keywords": [
+          "sys_sendto",
+          "sys_write",
+          "sock_send",
+          "tcp_output",
+          "ip_output",
+          "netif",
+          "virtio",
+          "e1000",
+          "send_packet"
+        ],
+        "recommended_seed_paths": [
+          "src/",
+          "kernel/",
+          "net/",
+          "drivers/"
+        ],
+        "fix_goal": "搜索 sys_sendto 或类似发送路径的入口函数，追踪其调用链，找到至少 3 个关键节点（如系统调用入口、协议栈处理函数、驱动发送函数），并提供每个节点的代码摘录。"
+      }
+    },
+    {
+      "question_id": "Q08_005",
+      "score_evidence": 0.2,
+      "score_consistency": 1.0,
+      "review": "三态格式合规，答案为 not_found。证据中包含对不存在文件的错误调用，以及一个与网卡驱动无关的 SD 卡驱动代码片段。virtio.h 中的 VRingDesc 结构体定义仅能说明存在 virtio 相关类型，但无法证明实现了网卡驱动或收包中断路径。证据严重不足。",
+      "fix_hints": {
+        "finding_type": "weak_evidence",
+        "missing_evidence_types": [
+          "definition",
+          "implementation_body",
+          "usage_flow"
+        ],
+        "recommended_keywords": [
+          "virtio_net",
+          "e1000",
+          "nic",
+          "net_rx",
+          "net_tx",
+          "interrupt",
+          "virtio_disk",
+          "pci"
+        ],
+        "recommended_seed_paths": [
+          "src/",
+          "drivers/",
+          "kernel/"
+        ],
+        "fix_goal": "搜索 virtio-net 或 e1000 网卡驱动的初始化、发送、接收函数，以及中断处理函数，确认是否存在网卡驱动实现。"
+      }
+    },
+    {
+      "question_id": "Q08_006",
+      "score_evidence": 0.1,
+      "score_consistency": 0.8,
+      "review": "多选格式合规，答案为空数组表示未发现。但证据仅展示了 socket_connection 结构体和 spi 结构体片段，与题面要求的 Ethernet/ARP/IP/ICMP/UDP/TCP/DHCP/DNS 等协议完全无关。证据无法支撑任何结论。",
+      "fix_hints": {
+        "finding_type": "weak_evidence",
+        "missing_evidence_types": [
+          "definition",
+          "implementation_body",
+          "search"
+        ],
+        "recommended_keywords": [
+          "ether",
+          "arp",
+          "ipv4",
+          "ipv6",
+          "icmp",
+          "udp",
+          "tcp",
+          "dhcp",
+          "dns",
+          "protocol",
+          "net"
+        ],
+        "recommended_seed_paths": [
+          "src/",
+          "net/",
+          "include/"
+        ],
+        "fix_goal": "搜索 Ethernet、ARP、IP、ICMP、UDP、TCP、DHCP、DNS 等协议相关的头文件、结构体定义或处理函数，确认各协议的支持情况。"
+      }
+    },
+    {
+      "question_id": "Q08_007",
+      "score_evidence": 0.15,
+      "score_consistency": 1.0,
+      "review": "三态格式合规，答案为 not_found。证据中包含磁盘驱动的读写函数和中断处理函数，以及一个错误调用，均与网络子系统的零拷贝/DMA 描述符路径无关。证据完全无法支撑结论。",
+      "fix_hints": {
+        "finding_type": "weak_evidence",
+        "missing_evidence_types": [
+          "definition",
+          "implementation_body",
+          "search"
+        ],
+        "recommended_keywords": [
+          "DMA",
+          "zero_copy",
+          "virtqueue",
+          "VRingDesc",
+          "buffer",
+          "mbuf",
+          "sk_buff",
+          "netbuf"
+        ],
+        "recommended_seed_paths": [
+          "src/",
+          "drivers/",
+          "net/",
+          "include/"
+        ],
+        "fix_goal": "搜索网络子系统中与 DMA 描述符、共享缓冲区、零拷贝相关的代码，如 virtqueue 操作、网络缓冲区管理（mbuf/sk_buff）等，确认是否存在零拷贝路径。"
+      }
+    }
+  ],
+  "findings": [
+    {
+      "question_id": "Q08_002",
+      "severity": "blocker",
+      "message": "单选题答案“未发现”不在题面提供的四个选项（第三方库/自研协议栈/混合/未发现）之内，严重违反契约。"
+    },
+    {
+      "question_id": "Q08_003",
+      "severity": "blocker",
+      "message": "所有证据均为对不存在文件 sd/test.c 的错误调用，excerpt 全是错误信息，完全无效。"
+    },
+    {
+      "question_id": "Q08_004",
+      "severity": "warn",
+      "message": "题面要求列出 3-6 个关键节点，答案直接写 not_found 且未列出任何节点，与题面要求不符。"
+    }
+  ],
+  "summary_zh": "本阶段报告质量整体较差。Q08_001 勉强有头文件证据但缺乏实现体支撑；Q08_002 答案违反单选题契约；Q08_003 证据全部为错误调用；Q08_004 未按题面要求列出节点；Q08_005 证据与网卡驱动无关；Q08_006 证据与协议支持无关；Q08_007 证据与零拷贝无关。多数题目证据严重不足或完全无效，导致全阶段置信度极低。",
+  "report_quality_score": 0.53,
+  "_meta": {
+    "quality": {
+      "mean_question_confidence": 0.525
+    }
+  }
+}

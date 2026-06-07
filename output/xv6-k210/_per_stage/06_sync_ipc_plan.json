@@ -1,57 +1,24 @@
 {
   "stage_id": "06_sync_ipc",
-  "goal": "分析 xv6-k210 的同步互斥原语（SpinLock/SleepLock/WaitQueue）与 IPC 机制（Pipe/Signal），验证 sleep/wakeup 不变量、管道实现形态、信号处理流程，并确认缺失的 IPC 原语（f",
-  "must_cover": [
-    "[Q06_001] 同步原语类型：SpinLock、SleepLock（基于 spinlock+sleep）、WaitQueue（双向链表实现）",
-    "[Q06_002] Mutex 实现形态：SleepLock 作为 mutex 使用（见 fs.h 注释 mutex, I/O control）",
-    "[Q06_003] WaitQueue 存在性：implemented（include/sync/waitqueue.h + kernel/sched/proc.c 的 sleep/wakeup）",
-    "[Q06_004] sleep/wakeup 不变量：sleep 入口 proc.c:582，持锁检查条件，wakeup proc.c:392 先唤醒后释放",
-    "[Q06_005] Pipe 实现：implemented（kernel/fs/pipe.c，环形缓冲 PIPE_SIZE=512）",
-    "[Q06_006] pipe 缓冲形态：环形缓冲（circular buffer，nread/nwrite 模运算）",
-    "[Q06_007] pipe 阻塞语义：阻塞式（pipelock/pipeunlock + wait_queue + sleep/wakeup）",
-    "[Q06_008] SysV IPC：not_found（无 msgget/semget/shmget 系统调用）",
-    "[Q06_009] futex：not_found（无 futex_wait/futex_wake 实现）",
-    "[Q06_010] 信号机制：implemented（sys_rt_sigaction/sys_kill/sys_rt_sigreturn，见 kernel/sched/signal.c）",
-    "[Q06_011] signal handler 上下文：sig_frame 保存 trapframe，sigreturn 恢复（kernel/sched/signal.c:244-283）",
-    "[Q06_012] RwLock：not_found（无读写锁实现）",
-    "[Q06_013] 原子操作来源：RISC-V 原生原子指令（include/hal/riscv.h 中的原子操作）",
-    "[Q06_014] 死锁四条件：成立（互斥/占有等待/不可抢占/循环等待均可能）",
-    "[Q06_015] 死锁处理策略：prevention（锁顺序注释，如 proc.c:249/454/603）",
-    "[Q06_016] 全局锁顺序规范：implemented（proc_lock 优先于其他锁，见 proc.c 注释）",
-    "[Q06_001] 该内核提供了哪些同步原语？（SpinLock/Mutex/RwLock/Semaphore/Condvar/WaitQueue 等；列出类型定义证据）",
-    "[Q06_002] Mutex 更接近哪种实现？",
-    "[Q06_003] 是否存在等待队列 (Wait Queue, WaitQueue) 与 sleep/wakeup（或等价阻塞/唤醒）实现？（必须三态）",
-    "[Q06_004] sleep / wakeup 不变量 (Sleep-Wakeup Invariant) 分析，按格式填写：",
-    "sleep 入口函数: ___（路径）",
-    "入睡前持有的锁: ___（无则写 none）"
-  ],
   "evidence_targets": [
-    "SpinLock/SleepLock 定义（include/sync/spinlock.h, sleeplock.h）",
-    "WaitQueue 实现（include/sync/waitqueue.h）",
-    "sleep/wakeup 实现（kernel/sched/proc.c:392/582）",
-    "Pipe 环形缓冲与阻塞语义（kernel/fs/pipe.c）",
-    "信号处理流程（kernel/sched/signal.c, kernel/trap/trap.c）",
-    "锁顺序注释（kernel/sched/proc.c:249/454/603）",
     "锁与同步原语",
     "IPC",
     "Futex",
     "管道/信号"
   ],
   "seed_paths": [
-    "include/sync/spinlock.h",
-    "include/sync/sleeplock.h",
-    "include/sync/waitqueue.h",
-    "kernel/sync/spinlock.c",
-    "kernel/sync/sleeplock.c",
-    "kernel/sched/proc.c",
-    "kernel/fs/pipe.c",
-    "include/fs/pipe.h",
-    "kernel/sched/signal.c",
-    "include/sched/signal.h",
-    "kernel/trap/trap.c",
-    "kernel/syscall/syssignal.c",
     "sync",
-    "lock"
+    "lock",
+    "ipc",
+    "futex",
+    "pipe",
+    "signal",
+    "include/fs",
+    "include/mm",
+    "include/sync",
+    "kernel/fs",
+    "kernel/mm",
+    "kernel/sync"
   ],
   "framework_guess": [
     "xv6"
@@ -60,21 +27,15 @@
     "riscv64"
   ],
   "entry_symbols": [
-    "acquire",
-    "release",
-    "sleep",
-    "wakeup",
-    "acquiresleep",
-    "releasesleep",
-    "wait_queue_init",
-    "pipealloc",
-    "piperead",
-    "pipewrite",
     "Mutex",
-    "SpinLock"
+    "SpinLock",
+    "futex_wait",
+    "pipe_write",
+    "signal",
+    "_start",
+    "start"
   ],
   "repo_hotspots": [
-    "Cargo.toml",
     "Makefile",
     "bootloader",
     "bootloader/SBI",
@@ -83,14 +44,14 @@
     "debug/openocd_cfg",
     "doc",
     "doc/img",
-    "include"
+    "include",
+    "include/fs"
   ],
   "preferred_tools": [
-    "read_code_segment",
-    "lsp_get_definition",
-    "lsp_get_references",
+    "rag_search_code",
     "lsp_get_call_graph",
-    "grep_in_repo"
+    "lsp_get_definition",
+    "read_code_segment"
   ],
   "avoid_tools": [
     "blind_read_large_files",
@@ -103,13 +64,258 @@
     "max_memory_items": 8
   },
   "execution_steps": [
-    "1. 读取 kernel/sched/proc.c 的 sleep() 和 wakeup() 完整实现（行 392-420, 582-620），分析持锁顺序与防丢 wakeup 机制",
-    "2. 读取 kernel/fs/pipe.c 的 pipelock/pipeunlock/pipewakeup 实现，验证 wait_queue 与 sleep/wakeup 的协作流程",
-    "3. 读取 kernel/sched/signal.c 的 sighandle() 和 sigreturn()，确认用户态 handler 上下文构建与恢复流程",
-    "4. 使用 lsp_get_references 追踪 sleep/wakeup 的所有调用点，验证不变量在 pipe/bio/wait4 中的一致性",
-    "5. 使用 grep_in_repo 搜索 futex/SysV IPC/Barrier/Condvar 等关键词，确认缺失的原语并记录证据",
-    "6. 读取 kernel/sched/proc.c 中关于锁顺序的注释（行 249/454/603），整理死锁预防策略",
-    "7. 对照 must_cover 清单，逐项填写 Q06_001 至 Q06_020 的答案与证据路径",
-    "8. 生成最终 JSON 题单作答，确保每个三态问题都有 implemented/not_found 状态与代码证据"
+    "对照 seed_paths、entry_symbols，用 rag_search_code / list_repo_structure / LSP 锁定与本阶段相关的关键文件与符号。",
+    "对核心入口使用 lsp_get_document_outline → lsp_get_call_graph（单入口、浅深度）→ 必要时 read_code_segment 精读。",
+    "按题单逐项输出结论，每条附反引号源码路径；无实现则显式写「未发现/桩函数」等，勿臆测。"
+  ],
+  "task_plan": [
+    {
+      "task_id": "task_06_sync_primitives",
+      "question_ids": [
+        "Q06_001",
+        "Q06_002",
+        "Q06_003",
+        "Q06_004",
+        "Q06_012",
+        "Q06_013",
+        "Q06_017",
+        "Q06_020",
+        "Q06_021"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证内核同步原语（SpinLock, Mutex, RwLock, Semaphore, Condvar, WaitQueue, Barrier, 原子操作）的定义、实现体、操作语义、调度器阻塞/唤醒集成、lost wakeup 防护、死锁防护，并区分概念边界。完成 fact_id: Q06_001_01~Q06_001_06, Q06_002_01~Q06_002_06, Q06_003_01~Q06_003_06, Q06_004_01~Q06_004_06, Q06_012_01~Q06_012_06, Q06_013_01~Q06_013_06, Q06_017_01~Q06_017_06, Q06_020_01~Q06_020_06, Q06_021_01~Q06_021_05",
+      "group_reason": "这些题共享同一实现线索：同步原语的定义、实现体、操作语义、调度器集成、死锁防护。需要统一搜索 kernel/sync, include/sync, kernel/sched, include/sched 等目录，并利用 LSP 追踪调用链。",
+      "query": "搜索并读取 kernel/sync, include/sync, kernel/sched, include/sched 目录下的文件，查找 SpinLock, Mutex, RwLock, Semaphore, Condvar, WaitQueue, Barrier 等同步原语的结构定义、lock/unlock/wait/signal/wakeup 等操作实现体、是否接入调度器阻塞/唤醒状态机、是否有 lost wakeup 防护、死锁防护机制。同时查找原子操作来源（Rust core::sync::atomic 或自定义汇编）。",
+      "seed_paths": [
+        "kernel/sync",
+        "include/sync",
+        "kernel/sched",
+        "include/sched",
+        "kernel/proc",
+        "include/proc"
+      ],
+      "entry_symbols": [
+        "SpinLock",
+        "Mutex",
+        "RwLock",
+        "Semaphore",
+        "Condvar",
+        "WaitQueue",
+        "Barrier",
+        "sleep",
+        "wakeup",
+        "atomic"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ]
+    },
+    {
+      "task_id": "task_06_pipe",
+      "question_ids": [
+        "Q06_005",
+        "Q06_006",
+        "Q06_007"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证管道 (Pipe) 是否实现，包括 pipe 结构定义、pipe_write/pipe_read 实现体、缓冲形态（环形缓冲区/页级传递）、阻塞语义（挂起等待队列/返回 EAGAIN/忙等）。完成 fact_id: Q06_005_01~Q06_005_06, Q06_006_01~Q06_006_06, Q06_007_01~Q06_007_06",
+      "group_reason": "这些题共享同一实现线索：管道 (Pipe) 的实现。需要搜索 kernel/fs, include/fs 等目录，查找 pipe 相关结构、读写函数、缓冲机制和阻塞语义。",
+      "query": "搜索并读取 kernel/fs, include/fs 目录下的文件，查找 pipe 结构定义、pipe_write/pipe_read 函数实现体、缓冲区的实现方式（环形缓冲区/页级传递）、阻塞/非阻塞/忙等语义。",
+      "seed_paths": [
+        "kernel/fs",
+        "include/fs",
+        "kernel/ipc",
+        "include/ipc"
+      ],
+      "entry_symbols": [
+        "pipe",
+        "pipe_write",
+        "pipe_read",
+        "Pipe"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ]
+    },
+    {
+      "task_id": "task_06_sysv_ipc",
+      "question_ids": [
+        "Q06_008",
+        "Q06_019"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证 SysV IPC（消息队列/信号量/共享内存）是否实现，包括 syscall table 入口、内核对象、权限/ID 分配、阻塞/唤醒、资源释放。完成 fact_id: Q06_008_01~Q06_008_05, Q06_019_01~Q06_019_05",
+      "group_reason": "这些题共享同一实现线索：SysV IPC (msg/sem/shm) 的实现。需要搜索 kernel/ipc, kernel/syscall, include/ipc 等目录，查找 msgget/msgsnd/msgrcv/semget/semop/shmget/shmat 等系统调用入口和内核对象。",
+      "query": "搜索并读取 kernel/ipc, kernel/syscall, include/ipc 目录下的文件，查找 msgget/msgsnd/msgrcv/semget/semop/shmget/shmat 等系统调用入口、内核对象定义、权限/ID 分配、阻塞/唤醒、资源释放的实现。",
+      "seed_paths": [
+        "kernel/ipc",
+        "kernel/syscall",
+        "include/ipc",
+        "kernel/proc",
+        "include/proc"
+      ],
+      "entry_symbols": [
+        "msgget",
+        "msgsnd",
+        "msgrcv",
+        "semget",
+        "semop",
+        "shmget",
+        "shmat",
+        "SYS_msg",
+        "SYS_sem",
+        "SYS_shm"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ]
+    },
+    {
+      "task_id": "task_06_futex",
+      "question_ids": [
+        "Q06_009"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证 futex 是否实现，包括 sys_futex 入口、用户地址值比较、FUTEX_WAIT 挂起任务到等待队列、FUTEX_WAKE 按 key 唤醒、timeout/错误地址/并发竞态处理。完成 fact_id: Q06_009_01~Q06_009_06",
+      "group_reason": "这些题共享同一实现线索：futex 的实现。需要搜索 kernel/sync, kernel/ipc, kernel/syscall 等目录，查找 sys_futex 入口、FUTEX_WAIT/FUTEX_WAKE 实现体、等待队列管理。",
+      "query": "搜索并读取 kernel/sync, kernel/ipc, kernel/syscall 目录下的文件，查找 sys_futex 系统调用入口、FUTEX_WAIT/FUTEX_WAKE 实现体、用户地址值比较、等待队列挂载/唤醒、timeout/错误地址/并发竞态处理。",
+      "seed_paths": [
+        "kernel/sync",
+        "kernel/ipc",
+        "kernel/syscall",
+        "include/sync",
+        "include/ipc"
+      ],
+      "entry_symbols": [
+        "futex",
+        "sys_futex",
+        "FUTEX_WAIT",
+        "FUTEX_WAKE"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ]
+    },
+    {
+      "task_id": "task_06_signal",
+      "question_ids": [
+        "Q06_010",
+        "Q06_011"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证信号机制（sigaction/kill/sigreturn/trampoline）是否实现，包括信号结构定义、系统调用入口、用户态 handler 上下文构建、sigreturn 恢复原 trap frame。完成 fact_id: Q06_010_01~Q06_010_06, Q06_011_01~Q06_011_06",
+      "group_reason": "这些题共享同一实现线索：信号机制 (signal) 的实现。需要搜索 kernel/signal, kernel/syscall, include/signal 等目录，查找 sigaction/kill/sigreturn/trampoline 等系统调用入口和实现体。",
+      "query": "搜索并读取 kernel/signal, kernel/syscall, include/signal, kernel/trap 目录下的文件，查找 sigaction/kill/sigreturn/trampoline 等系统调用入口、信号结构定义、用户态 handler 上下文构建、sigreturn 恢复原 trap frame 的实现。",
+      "seed_paths": [
+        "kernel/signal",
+        "kernel/syscall",
+        "include/signal",
+        "kernel/trap",
+        "include/trap"
+      ],
+      "entry_symbols": [
+        "sigaction",
+        "kill",
+        "sigreturn",
+        "trampoline",
+        "signal"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ]
+    },
+    {
+      "task_id": "task_06_deadlock",
+      "question_ids": [
+        "Q06_014",
+        "Q06_015",
+        "Q06_016"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证死锁四必要条件（互斥/持有并等待/不可剥夺/循环等待）是否成立、死锁处理策略（预防/避免/检测恢复/忽略）、全局锁顺序规范或 ABBA 检测。完成 fact_id: Q06_014_01~Q06_014_06, Q06_015_01~Q06_015_06, Q06_016_01~Q06_016_06",
+      "group_reason": "这些题共享同一实现线索：死锁相关机制。需要搜索 kernel/sync, kernel/sched, kernel/fs, kernel/mm 等目录，查找锁实现、嵌套调用、注释规范、trylock/timeout/lockdep/ABBA 检测等。",
+      "query": "搜索并读取 kernel/sync, kernel/sched, kernel/fs, kernel/mm, include/sync, include/sched 目录下的文件，查找锁实现、嵌套调用、注释规范、trylock/timeout/lockdep/ABBA 检测等，分析死锁四必要条件是否成立、死锁处理策略、全局锁顺序规范。",
+      "seed_paths": [
+        "kernel/sync",
+        "kernel/sched",
+        "kernel/fs",
+        "kernel/mm",
+        "include/sync",
+        "include/sched"
+      ],
+      "entry_symbols": [
+        "deadlock",
+        "lock ordering",
+        "trylock",
+        "lockdep",
+        "ABBA"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ]
+    },
+    {
+      "task_id": "task_06_classic_sync",
+      "question_ids": [
+        "Q06_018"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证经典同步问题（生产者-消费者/读者-写者/哲学家就餐）是否有对应实现或测试。完成 fact_id: Q06_018_01~Q06_018_06",
+      "group_reason": "这些题共享同一实现线索：经典同步问题的实现或测试。需要搜索 kernel, user, test 等目录，查找 producer-consumer, readers-writers, dining philosophers 相关代码。",
+      "query": "搜索并读取 kernel, user, test 目录下的文件，查找 producer-consumer, readers-writers, dining philosophers 相关实现或测试代码。",
+      "seed_paths": [
+        "kernel",
+        "user",
+        "test",
+        "xv6-user"
+      ],
+      "entry_symbols": [
+        "producer",
+        "consumer",
+        "bounded buffer",
+        "reader",
+        "writer",
+        "dining",
+        "philosopher"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ]
+    }
   ]
 }

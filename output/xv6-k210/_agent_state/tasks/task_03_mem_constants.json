@@ -1,0 +1,31 @@
+{
+  "task_id": "task_03_mem_constants",
+  "stage_id": "03_mem_mgmt",
+  "question_id": "Q03_023",
+  "question_ids": [
+    "Q03_023"
+  ],
+  "status": "done",
+  "evidence_ids": [
+    "ev_task_03_mem_constants_8e591012",
+    "ev_task_03_mem_constants_e8369432",
+    "ev_task_03_mem_constants_acb2943f",
+    "ev_task_03_mem_constants_88d25744",
+    "ev_task_03_mem_constants_4c55e3b6",
+    "ev_task_03_mem_constants_fa3b4fc2",
+    "ev_task_03_mem_constants_81f251a2"
+  ],
+  "draft_answer_ids": [
+    "draft_task_03_mem_constants_Q03_023_c68d63f1"
+  ],
+  "findings": [],
+  "confidence": "high",
+  "errors": [],
+  "token_usage": {},
+  "metadata": {
+    "evidence_count": 7,
+    "mode": "react",
+    "summary": "查证了物理内存常量 PHYSTOP=0x80600000, PGSIZE=4096, MAXVA=2^38, 以及虚拟内存策略。存在 demand paging (lazy allocation + ELF demand loading)，无 page replacement、resident load control、cleaning policy。",
+    "raw_output_excerpt": "Now I have all the evidence. Let me produce the final JSON.\n\n{\n  \"status\": \"done\",\n  \"summary\": \"查证了物理内存常量 PHYSTOP=0x80600000, PGSIZE=4096, MAXVA=2^38, 以及虚拟内存策略。存在 demand paging (lazy allocation + ELF demand loading)，无 page replacement、resident load control、cleaning policy。\",\n  \"claim\": \"xv6-k210 使用 Sv39 分页，物理内存 0x80020000~0x80600000 (~6MB)，页大小 4096 字节，MAXVA=2^38。实现了 demand paging（lazy allocation + ELF demand loading on page fault），无 page replacement 算法，无 resident set/working set 管理，无 VM dirty page cleaning 策略。\",\n  \"structured_fact_results\": [\n    {\n      \"fact_id\": \"Q03_023_01\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [0, 1, 2, 3],\n      \"notes\": \"存在 demand paging 取页策略：handle_page_fault_lazy() 在 HEAP/STACK 段缺页时分配物理页；handle_page_fault_loadelf() 在 LOAD 段缺页时从 ELF 文件按需加载。这是典型的 demand paging (fetch policy)。\"\n    },\n    {\n      \"fact_id\": \"Q03_023_02\",\n      \"status_or_value\": \"no_after_negative_search\",\n      \"evidence_candidate_indexes\": [4, 5, 6],\n      \"notes\": \"无虚拟地址 placement 策略。newseg() 在 segment 链表中顺序查找空隙插入，无 first-fit/best-fit 等算法。物理页分配器使用简单 freelist（first block with enough pages）。无 mmap_base 或虚拟区间选择策略。\"\n    },\n    {\n      \"fact_id\": \"Q03_023_03\",\n      \"status_or_value\": \"no_after_negative_search\",\n      \"evidence_candidate_indexes\": [4, 5, 6],\n      \"notes\": \"无 page replacement 算法。无 LRU/Clock/FIFO 用于 VM 页替换。mmap.c 中 __page_file_swap() 被注释掉，未启用。buffer cache (bio.c) 有 LRU 但那是 FS 缓存，非 VM 页替换。\"\n    },\n    {\n      \"fact_id\": \"Q03_023_04\",\n      \"status_or_value\": \"no_after_negative_search\",\n      \"evidence_candidate_indexes\": [4, 5, 6],\n      \"notes\": \"无 resident set/working set 管理。无 thrashing 检测、无 load control、无 OOM killer。物理内存用完时 allocpage() 返回 NULL，缺页处理返回 -ENOMEM。\"\n    },\n    {\n      \"fact_id\": \"Q03_023_05\",\n      \"status_or_value\": \"no_after_negative_search\",\n      \"evidence_candidate_indexes\": [4, 5, 6],\n      \"notes\": \"无 VM dirty page cleaning 策略。FS buffer cache 有 dirty writeback (bio.c, fat.c)，但那是文件系统缓存策略，非 VM 清理策略。无 kswapd"
+  }
+}

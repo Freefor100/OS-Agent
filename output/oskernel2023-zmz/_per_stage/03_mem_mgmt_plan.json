@@ -1,0 +1,104 @@
+{
+  "stage_id": "03_mem_mgmt",
+  "evidence_targets": [
+    "物理页分配器 (pm.c: _allocpage, __mul_alloc_no_lock, __sin_alloc_no_lock)",
+    "页表遍历与映射 (vm.c: walk, mappages, unmappages)",
+    "页故障处理流程 (vm.c: handle_page_fault, handle_page_fault_lazy, handle_page_fault_mmap)",
+    "内核堆分配器 (kmalloc.c: kmalloc, kfree, kmallocinit)",
+    "用户空间内存管理 (vm.c: uvmalloc, uvmcopy, uvmfree)",
+    "段管理机制 (usrmm.h: struct seg, locateseg, newseg)",
+    "物理页分配",
+    "页表映射",
+    "页故障处理",
+    "堆分配器"
+  ],
+  "seed_paths": [
+    "kernel/mm/pm.c",
+    "kernel/mm/vm.c",
+    "kernel/mm/kmalloc.c",
+    "kernel/mm/mmap.c",
+    "kernel/mm/usrmm.c",
+    "include/mm/pm.h",
+    "include/mm/vm.h",
+    "include/mm/usrmm.h",
+    "include/hal/riscv.h",
+    "kernel/trap/trap.c",
+    "mm",
+    "memory",
+    "vm",
+    "kernel/mm"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "handle_page_fault",
+    "_allocpage",
+    "walk",
+    "mappages",
+    "uvmalloc",
+    "uvmcopy",
+    "kmalloc",
+    "kfree",
+    "locateseg",
+    "pagetable_t",
+    "alloc_frame",
+    "map_page"
+  ],
+  "repo_hotspots": [
+    "Cargo.toml",
+    "Makefile",
+    "debug",
+    "debug/kendryte_openocd",
+    "debug/openocd_cfg",
+    "doc",
+    "doc/img",
+    "include",
+    "include/fs",
+    "include/hal"
+  ],
+  "preferred_tools": [
+    "read_code_segment",
+    "lsp_get_definition",
+    "lsp_get_references",
+    "lsp_get_call_graph",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "精读 kernel/mm/pm.c 第 1-100 行，理解物理页分配器数据结构 (struct run, struct pm_allocator) 与初始化流程 kpminit",
+    "精读 kernel/mm/pm.c 第 149-180 行，分析 __sin_alloc_no_lock 与 __mul_alloc_no_lock 的单页/多页分配策略",
+    "精读 kernel/mm/pm.c 第 232-280 行，追踪 _allocpage 与 _freepage 的完整实现",
+    "精读 kernel/mm/vm.c 第 210-235 行，理解 walk 函数的三级页表遍历逻辑",
+    "精读 kernel/mm/vm.c 第 296-335 行，分析 mappages 如何建立虚拟地址到物理地址的映射",
+    "精读 kernel/mm/vm.c 第 333-375 行，理解 unmappages 的解映射与页释放逻辑",
+    "精读 kernel/mm/vm.c 第 412-455 行，分析 uvmalloc 如何分配用户空间内存并调用 mappages",
+    "精读 kernel/mm/vm.c 第 553-615 行，理解 uvmcopy 的写时复制 (COW) 实现",
+    "精读 kernel/mm/vm.c 第 1025-1091 行，完整分析 handle_page_fault 的页故障处理流程",
+    "精读 kernel/mm/vm.c 第 988-1020 行，理解 handle_page_fault_lazy 与 handle_page_fault_mmap 的惰性分配机制",
+    "精读 kernel/mm/kmalloc.c 第 70-120 行，分析 kmallocinit 与 get_allocator 的初始化与哈希表查找",
+    "精读 kernel/mm/kmalloc.c 第 157-230 行，理解 kmalloc 的对象分配与 kfree 的回收逻辑",
+    "精读 include/mm/usrmm.h 第 1-50 行，理解 struct seg 段结构与 segtype 枚举定义",
+    "使用 lsp_get_references 追踪 mappages 在 exec.c、usrmm.c 中的调用点，验证映射流程",
+    "使用 lsp_get_call_graph 分析 uvmcopy 的出向调用，确认 COW 相关函数调用链",
+    "grep 搜索 PTE_V、PTE_W、PTE_R、PTE_U 等页表项标志位定义，理解权限控制",
+    "精读 include/hal/riscv.h 第 400-420 行，确认 pagetable_t 类型与页表项宏定义",
+    "分析 kernel/trap/trap.c 中 handle_excp 如何调用 handle_page_fault，建立中断到页故障的调用链",
+    "对比 kernel/mm/vm.c 中 kvmmap 与 mappages 的差异，理解内核页表与用户页表的不同处理",
+    "检查 kernel/mm/mmap.c 中 handle_page_fault_mmap 对匿名映射与共享映射的处理逻辑",
+    "使用 grep 搜索 copysegs、freeseg、locateseg，验证段管理在 fork/exec 中的使用",
+    "整理物理页分配→页表映射→页故障处理→堆分配的完整证据链，准备撰写分析报告"
+  ]
+}

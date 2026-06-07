@@ -1,0 +1,766 @@
+{
+  "schema_version": "v1",
+  "stage_id": "02_boot_trap",
+  "stage_title": "启动/架构与 Trap/系统调用",
+  "terminology_profile": "stallings_en_zh",
+  "answers": [
+    {
+      "question_id": "Q02_001",
+      "question_type": "short_answer",
+      "stem": "启动入口在哪里？（例如 linker.ld 的 ENTRY、`_start`/`start`/`head`/`entry` 标签；必须给文件路径+符号证据）",
+      "value": "linker/linker64.ld: ENTRY(_entry); kernel/entry.S: _entry:; kernel/entry_k210.S: _start:; kernel/entry_qemu.S: _entry:",
+      "evidence": [
+        {
+          "path": "linker/linker64.ld",
+          "symbol_kind": "linker_directive",
+          "symbol_name": "ENTRY",
+          "excerpt": "ENTRY(_entry)"
+        },
+        {
+          "path": "kernel/entry.S",
+          "symbol_kind": "label",
+          "symbol_name": "_entry",
+          "excerpt": "_entry: \n\tadd t0, a0, 1\n\tslli t0, t0, 14\n\tla sp, boot_stack \n\tadd sp, sp, t0\n\t# jump into main \n\tcall main"
+        },
+        {
+          "path": "kernel/entry_k210.S",
+          "symbol_kind": "label",
+          "symbol_name": "_start",
+          "excerpt": "_start:\n\tadd t0, a0, 1\n\tslli t0, t0, 14\n\t# lui sp, %hi(boot_stack)\n\tla sp, boot_stack\n\tadd sp, sp, t0\n\t# jump into main \n\tcall main"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_002",
+      "question_type": "single_choice",
+      "stem": "启动链更接近哪种交接方式？",
+      "value": "固件/引导加载器 → 内核入口（如 SBI/OpenSBI/U-Boot/BIOS/UEFI）",
+      "evidence": [
+        {
+          "path": "Makefile",
+          "symbol_kind": "makefile_variable",
+          "symbol_name": "SBI",
+          "excerpt": "# SBI\nifeq ($(platform), k210)\nSBI := ./sbi/sbi-k210\nelse\nSBI\t:= ./sbi/sbi-qemu\nendif\n\nQEMUOPTS += -bios $(SBI)"
+        },
+        {
+          "path": "sbi/psicasbi/src/main.rs",
+          "symbol_kind": "function",
+          "symbol_name": "rust_main",
+          "excerpt": "extern \"C\" {\n\tfn ekernel();\n}\nlet ekernel = ekernel as usize;\n// jump to S-mode kernel\ntrap::enter_supervisor(hartid);"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_003",
+      "question_type": "tri_state_impl",
+      "stem": "是否能在代码中证实发生了 CPU 特权级/模式切换？（RISC-V M→S、x86 实→保→长等；必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "sbi/psicasbi/src/trap/mod.rs",
+          "symbol_kind": "function",
+          "symbol_name": "enter_supervisor",
+          "excerpt": "pub fn enter_supervisor(hartid: usize) {\n\tunsafe {\n\t\tmstatus::clear_mie();\n\t\tmtvec::write(trap_vec as usize, mtvec::TrapMode::Direct);\n\t\tmstatus::set_mpp(MPP::Supervisor);\n\t\tmepc::write(KERNEL_ENTRY);\n\t\tuse core::arch::asm;\n\t\tasm!(\n\t\t\t\"csrw mscratch, sp\", \n\t\t\t\"mret\", \n\t\t\tin(\"a0\") hartid, \n\t\t\toptions(noreturn)\n\t\t);\n\t}\n}"
+        },
+        {
+          "path": "include/hal/riscv.h",
+          "symbol_kind": "macro",
+          "symbol_name": "MSTATUS_MPP_S",
+          "excerpt": "#define MSTATUS_MPP_S (1L << 11)"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_004",
+      "question_type": "short_answer",
+      "stem": "模式切换涉及的关键寄存器/位是什么？（例如 RISC-V mstatus/sstatus、x86 cr0/cr4/eflags；必须给证据摘录）",
+      "value": "mstatus (MPP bits), mepc, mtvec, sstatus, satp, stvec",
+      "evidence": [
+        {
+          "path": "include/hal/riscv.h",
+          "symbol_kind": "macro",
+          "symbol_name": "MSTATUS_MPP_MASK",
+          "excerpt": "#define MSTATUS_MPP_MASK (3L << 11) // previous mode.\n#define MSTATUS_MPP_M (3L << 11)\n#define MSTATUS_MPP_S (1L << 11)\n#define MSTATUS_MPP_U (0L << 11)"
+        },
+        {
+          "path": "include/hal/riscv.h",
+          "symbol_kind": "function",
+          "symbol_name": "w_mstatus",
+          "excerpt": "static inline void \nw_mstatus(uint64 x)\n{\n\tasm volatile(\"csrw mstatus, %0\" : : \"r\" (x));\n}"
+        },
+        {
+          "path": "include/hal/riscv.h",
+          "symbol_kind": "function",
+          "symbol_name": "w_satp",
+          "excerpt": "static inline void \nw_satp(uint64 x)\n{\n\tasm volatile(\"csrw satp, %0\" : : \"r\" (x));\n}"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_005",
+      "question_type": "tri_state_impl",
+      "stem": "是否启用/初始化了 MMU（设置 SATP/CR3 等并建立页表）？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/mm/vm.c",
+          "symbol_kind": "function",
+          "symbol_name": "kvminit",
+          "excerpt": "void\nkvminit()\n{\n\tkernel_pagetable = (pagetable_t) allocpage();\n\tmemset(kernel_pagetable, 0, PGSIZE);\n\t// map kernel text, data, RAM, trampoline\n\tkvmmap(KERNBASE, KERNBASE, (uint64)etext - KERNBASE, PTE_R | PTE_X);\n\tkvmmap((uint64)etext, (uint64)etext, PHYSTOP - (uint64)etext, PTE_R | PTE_W);\n}"
+        },
+        {
+          "path": "kernel/mm/vm.c",
+          "symbol_kind": "function",
+          "symbol_name": "kvminithart",
+          "excerpt": "void\nkvminithart()\n{\n\tuint64 stap = SATP_SV39 | (((uint64)kernel_pagetable) >> 12);\n\tw_satp(stap);\n\tasm volatile(\"sfence.vma\");\n\tprotect_usr_mem();\n}"
+        },
+        {
+          "path": "kernel/main.c",
+          "symbol_kind": "function",
+          "symbol_name": "main",
+          "excerpt": "kvminit();       // create kernel page table\nkvminithart();   // turn on paging"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_006",
+      "question_type": "short_answer",
+      "stem": "从入口汇编/固件交接到 C/Rust 主入口函数的跳转链是什么？（列出 3-6 个关键节点并给证据）",
+      "value": "SBI rust_main → _entry (entry.S) → main (main.c) → scheduler()",
+      "evidence": [
+        {
+          "path": "sbi/psicasbi/src/main.rs",
+          "symbol_kind": "function",
+          "symbol_name": "rust_main",
+          "excerpt": "#[no_mangle]\n#[link_section = \".text.init\"]\nextern \"C\" fn rust_main(hartid: usize) {\n\t// jump to S-mode kernel\n\ttrap::enter_supervisor(hartid);\n}"
+        },
+        {
+          "path": "kernel/entry.S",
+          "symbol_kind": "label",
+          "symbol_name": "_entry",
+          "excerpt": "_entry: \n\tadd t0, a0, 1\n\tslli t0, t0, 14\n\tla sp, boot_stack \n\tadd sp, sp, t0\n\t# jump into main \n\tcall main"
+        },
+        {
+          "path": "kernel/main.c",
+          "symbol_kind": "function",
+          "symbol_name": "main",
+          "excerpt": "void\nmain(unsigned long hartid, unsigned long dtb_pa)\n{\n\t// initialization...\n\tscheduler();\n}"
+        },
+        {
+          "path": "kernel/sched/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "scheduler",
+          "excerpt": "void scheduler(void) {\n\tstruct proc *tmp;\n\tstruct cpu *c = mycpu();\n\twhile (1) {\n\t\ttmp = __get_runnable_no_lock();\n\t\tif (NULL != tmp) {\n\t\t\ttmp->state = RUNNING;\n\t\t\tc->proc = tmp;\n\t\t\tswtch(&c->context, &tmp->context);\n\t\t}\n\t}\n}"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_007",
+      "question_type": "fill_in",
+      "stem": "早期初始化 (Early Initialization) 各项状态（每项必须 implemented / stub / not_found + 证据路径，格式：`项目: 状态 [路径]`）：\n- BSS 清零 (BSS Clearing): ___\n- 早期串口输出 (Early Serial/UART Output): ___\n- 设备树解析 (Device Tree Blob parsing, DTB): ___\n- 页表初始化时机 (Page Table Init): ___（在 MMU 启用前/后？）",
+      "value": "BSS 清零 (BSS Clearing): implemented [sbi/psicasbi/src/main.rs]\n早期串口输出 (Early Serial/UART Output): implemented [sbi/psicasbi/src/hal/uart/]\n设备树解析 (Device Tree Blob parsing, DTB): not_found [kernel/main.c 接收 dtb_pa 但未解析]\n页表初始化时机 (Page Table Init): implemented [kernel/main.c - MMU 启用前]",
+      "evidence": [
+        {
+          "path": "sbi/psicasbi/src/main.rs",
+          "symbol_kind": "code_block",
+          "symbol_name": "bss_init",
+          "excerpt": "extern \"C\" {\n\tstatic mut _sbss: u32;\n\tstatic mut _ebss: u32;\n}\nunsafe {\n\tr0::zero_bss(&mut _sbss, &mut _ebss);\n}"
+        },
+        {
+          "path": "sbi/psicasbi/src/hal/uart/mod.rs",
+          "symbol_kind": "module",
+          "symbol_name": "uart",
+          "excerpt": "pub mod uart;\n// UART initialization for early output"
+        },
+        {
+          "path": "kernel/main.c",
+          "symbol_kind": "function",
+          "symbol_name": "main",
+          "excerpt": "void\nmain(unsigned long hartid, unsigned long dtb_pa)\n{\n\t// dtb_pa received but not parsed in visible code\n\tkvminit();       // create kernel page table\n\tkvminithart();   // turn on paging\n}"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_008",
+      "question_type": "tri_state_impl",
+      "stem": "是否初始化/启用了 FPU（如 sstatus.fs / cpacr_el1 / cr4）？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "include/hal/riscv.h",
+          "symbol_kind": "function",
+          "symbol_name": "floatinithart",
+          "excerpt": "static inline void floatinithart()\n{\n\tw_sstatus_fs(SSTATUS_FS_INIT);\n\tw_frm(FRM_RNE);\n\tw_sstatus_fs(SSTATUS_FS_CLEAN);\n}"
+        },
+        {
+          "path": "kernel/main.c",
+          "symbol_kind": "function",
+          "symbol_name": "main",
+          "excerpt": "floatinithart();"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_009",
+      "question_type": "tri_state_impl",
+      "stem": "是否设置 trap/中断向量（如 stvec/idt 等）并能指出设置点？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/trap/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "trapinithart",
+          "excerpt": "void\ntrapinithart(void)\n{\n\tw_stvec((uint64)kernelvec);\n\tw_sstatus(r_sstatus() | SSTATUS_SIE);\n\tw_sie(r_sie() | SIE_SEIE | SIE_SSIE | SIE_STIE);\n\tset_next_timeout();\n}"
+        },
+        {
+          "path": "include/hal/riscv.h",
+          "symbol_kind": "function",
+          "symbol_name": "w_stvec",
+          "excerpt": "static inline void \nw_stvec(uint64 x)\n{\n\tasm volatile(\"csrw stvec, %0\" : : \"r\" (x));\n}"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_010",
+      "question_type": "short_answer",
+      "stem": "构建系统如何选择目标平台/架构与入口文件？（Cargo features/Kconfig/Makefile 条件；必须引用配置证据）",
+      "value": "Makefile 使用 platform 变量 (k210/qemu) 选择不同入口文件和 SBI",
+      "evidence": [
+        {
+          "path": "Makefile",
+          "symbol_kind": "makefile_variable",
+          "symbol_name": "platform",
+          "excerpt": "platform\t:= k210\n#platform\t:= qemu\n\n# entry file \nSRC := $K/entry.S\n\nifeq ($(platform), k210) \nSBI := ./sbi/sbi-k210\nSRC += $K/hal/spi.c $K/hal/gpiohs.c ...\nelse \nSRC += $K/hal/virtio_disk.c\nendif"
+        },
+        {
+          "path": "sbi/psicasbi/Cargo.toml",
+          "symbol_kind": "cargo_features",
+          "symbol_name": "features",
+          "excerpt": "[features]\ndefault = [\"k210\"]\nqemu = []\nk210 = [\"soft-extern\", \"old-spec\"]"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_011",
+      "question_type": "tri_state_impl",
+      "stem": "对 RISC-V 平台：是否能证实 SBI/OpenSBI/U-Boot 固件链（固件将控制权移交内核）？（必须三态；搜索 sbi|opensbi|u-boot；非 RISC-V 平台写 not_found 并说明架构）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "Makefile",
+          "symbol_kind": "makefile_target",
+          "symbol_name": "SBI",
+          "excerpt": "# SBI\nifeq ($(platform), k210)\nSBI := ./sbi/sbi-k210\nelse\nSBI\t:= ./sbi/sbi-qemu\nendif\n\nQEMUOPTS += -bios $(SBI)"
+        },
+        {
+          "path": "sbi/psicasbi/src/main.rs",
+          "symbol_kind": "function",
+          "symbol_name": "enter_supervisor",
+          "excerpt": "pub fn enter_supervisor(hartid: usize) {\n\tmstatus::set_mpp(MPP::Supervisor);\n\tmepc::write(KERNEL_ENTRY);\n\tasm!(\"mret\", options(noreturn));\n}"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_012",
+      "question_type": "tri_state_impl",
+      "stem": "MMU 启用前后是否存在串口/UART 地址切换逻辑（物理地址→虚拟地址）？（必须三态；搜索 phys_to_virt|virt_to_phys 及 UART 基址常量）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "include/memlayout.h",
+          "symbol_kind": "macro",
+          "symbol_name": "UART_V",
+          "excerpt": "#define UART                    0x10000000L\n#define UART_V                  (UART + VIRT_OFFSET)\n\n#define VIRT_OFFSET             0x3F00000000L"
+        },
+        {
+          "path": "kernel/console.c",
+          "symbol_kind": "function",
+          "symbol_name": "consputc",
+          "excerpt": "void consputc(int c) {\n\tsbi_console_putchar(c);\n}"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_013",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在从内核返回用户态的路径（usertrapret/trap_return/trampoline/eret 等）并设置 stvec/VBAR/IDT？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/trap/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "usertrapret",
+          "excerpt": "void\nusertrapret(void) {\n\tw_stvec(TRAMPOLINE + (uservec - trampoline));\n\tw_sepc(p->trapframe->epc);\n\tuint64 satp = MAKE_SATP(p->pagetable);\n\tuint64 fn = TRAMPOLINE + (userret - trampoline);\n\t((void (*)(uint64, uint64))fn)((uint64)(p->trapframe), satp);\n}"
+        },
+        {
+          "path": "kernel/trap/trampoline.S",
+          "symbol_kind": "label",
+          "symbol_name": "userret",
+          "excerpt": ".globl userret\nuserret:\n\tcsrrw a0, sscratch, a0\n\tsret"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_014",
+      "question_type": "short_answer",
+      "stem": "是否支持多平台启动（StarFive VisionFive2/LoongArch/多板型）？（搜索 visionfive|jh7110|loongarch；有则描述差异入口与互斥关系；无则写未发现）",
+      "value": "未发现 visionfive/jh7110/loongarch 支持。仅支持 k210 和 qemu 平台，通过 Makefile 的 platform 变量选择",
+      "evidence": [
+        {
+          "path": "Makefile",
+          "symbol_kind": "makefile_variable",
+          "symbol_name": "platform",
+          "excerpt": "platform\t:= k210\n#platform\t:= qemu\n\nifeq ($(platform), k210)\nSBI := ./sbi/sbi-k210\n#else\nSBI\t:= ./sbi/sbi-qemu\n#endif"
+        },
+        {
+          "path": "README.md",
+          "symbol_kind": "documentation",
+          "symbol_name": "Dependencies",
+          "excerpt": "+ `k210 board` or `qemu-system-riscv64`\n+ RISC-V Toolchain"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_015",
+      "question_type": "short_answer",
+      "stem": "trap/异常向量入口在哪里？（trap_handler/trap_vector/__alltraps 等；必须给证据）",
+      "value": "kernelvec (kernel/trap/kernelvec.S), uservec (kernel/trap/trampoline.S)",
+      "evidence": [
+        {
+          "path": "kernel/trap/kernelvec.S",
+          "symbol_kind": "label",
+          "symbol_name": "kernelvec",
+          "excerpt": ".globl kerneltrap\n.globl kernelvec\n.align 4\nkernelvec:\n\taddi sp, sp, -256\n\tsd ra, 0(sp)\n\t# save all registers\n\tcall kerneltrap"
+        },
+        {
+          "path": "kernel/trap/trampoline.S",
+          "symbol_kind": "label",
+          "symbol_name": "uservec",
+          "excerpt": ".globl uservec\nuservec:    \n\tcsrrw a0, sscratch, a0\n\tsd ra, 40(a0)\n\tsd sp, 48(a0)\n\t# save user registers in TRAPFRAME\n\tld t0, 16(a0)\n\tjr t0"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_016",
+      "question_type": "single_choice",
+      "stem": "trap 上下文 (TrapFrame/TrapContext) 更可能存放在哪里？",
+      "value": "C. 用户地址空间预留页（trampoline/trap_context page）",
+      "evidence": [
+        {
+          "path": "include/trap.h",
+          "symbol_kind": "struct",
+          "symbol_name": "trapframe",
+          "excerpt": "struct trapframe {\n\t/*   0 */ uint64 kernel_satp;   // kernel page table\n\t/*   8 */ uint64 kernel_sp;     // top of process's kernel stack\n\t/*  16 */ uint64 kernel_trap;   // usertrap()\n\t/*  24 */ uint64 epc;           // saved user program counter\n\t// ... registers\n};"
+        },
+        {
+          "path": "include/memlayout.h",
+          "symbol_kind": "macro",
+          "symbol_name": "TRAPFRAME",
+          "excerpt": "#define TRAPFRAME               (VKSTACK + 2 * PGSIZE)"
+        },
+        {
+          "path": "kernel/trap/trampoline.S",
+          "symbol_kind": "comment",
+          "symbol_name": "uservec_comment",
+          "excerpt": "# sscratch points to where the process's p->trapframe is\n# mapped into user space, at TRAPFRAME."
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_017",
+      "question_type": "short_answer",
+      "stem": "TrapFrame/寄存器保存结构体定义在哪里？寄存器数量与字节数是多少？（必须引用结构体定义证据）",
+      "value": "include/trap.h: struct trapframe，包含 32 个通用寄存器 + 32 个浮点寄存器 + fcsr，共 552 字节",
+      "evidence": [
+        {
+          "path": "include/trap.h",
+          "symbol_kind": "struct",
+          "symbol_name": "trapframe",
+          "excerpt": "struct trapframe {\n\t/*   0 */ uint64 kernel_satp;\n\t/*   8 */ uint64 kernel_sp;\n\t/*  16 */ uint64 kernel_trap;\n\t/*  24 */ uint64 epc;\n\t/*  32 */ uint64 kernel_hartid;\n\t/*  40 */ uint64 ra;\n\t/*  48 */ uint64 sp;\n\t/*  56 */ uint64 gp;\n\t/*  64 */ uint64 tp;\n\t/*  72 */ uint64 t0;\n\t/* 288 */ uint64 ft0;\n\t/* 544 */ uint64 fcsr;\n};"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_018",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在系统调用分发表（syscall table / match 分发）？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/syscall/syscall.c",
+          "symbol_kind": "array",
+          "symbol_name": "syscalls",
+          "excerpt": "static uint64 (*syscalls[])(void) = {\n\t[SYS_fork]\t\t\tsys_fork,\n\t[SYS_exit]\t\t\tsys_exit,\n\t[SYS_wait]\t\t\tsys_wait,\n\t[SYS_read]\t\t\tsys_read,\n\t[SYS_write]\t\t\tsys_write,\n\t// ... more syscalls\n};"
+        },
+        {
+          "path": "kernel/syscall/syscall.c",
+          "symbol_kind": "function",
+          "symbol_name": "syscall",
+          "excerpt": "void\nsyscall(void)\n{\n\tnum = p->trapframe->a7;\n\tif (num < NELEM(syscalls) && syscalls[num]) {\n\t\tp->trapframe->a0 = syscalls[num]();\n\t} else {\n\t\tp->trapframe->a0 = -1;\n\t}\n}"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_019",
+      "question_type": "tri_state_impl",
+      "stem": "系统调用号是否做边界检查？（越界默认分支/返回错误/panic；必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/syscall/syscall.c",
+          "symbol_kind": "function",
+          "symbol_name": "syscall",
+          "excerpt": "void\nsyscall(void)\n{\n\tnum = p->trapframe->a7;\n\tif (num < NELEM(syscalls) && syscalls[num]) {\n\t\tp->trapframe->a0 = syscalls[num]();\n\t} else {\n\t\tp->trapframe->a0 = -1;  // return -1 for invalid syscall\n\t}\n}"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_020",
+      "question_type": "short_answer",
+      "stem": "选择一个具体 syscall（优先 sys_write），追踪：用户指令 → trap → 分发 → 实现体。列出 3-6 个关键节点并给证据。",
+      "value": "ecall → usertrap → syscall() → sys_write() → filewrite()",
+      "evidence": [
+        {
+          "path": "xv6-user/usys.pl",
+          "symbol_kind": "assembly",
+          "symbol_name": "write",
+          "excerpt": "entry(\"write\");\n# generates: write: li a7, SYS_write; ecall; ret"
+        },
+        {
+          "path": "kernel/trap/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "usertrap",
+          "excerpt": "if (cause == EXCP_ENV_CALL) {\n\tp->trapframe->epc += 4;\n\tintr_on();\n\tsyscall();\n}"
+        },
+        {
+          "path": "kernel/syscall/syscall.c",
+          "symbol_kind": "function",
+          "symbol_name": "syscall",
+          "excerpt": "if (num < NELEM(syscalls) && syscalls[num]) {\n\tp->trapframe->a0 = syscalls[num]();\n}"
+        },
+        {
+          "path": "kernel/syscall/sysfile.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_write",
+          "excerpt": "uint64\nsys_write(void)\n{\n\tstruct file *f;\n\tint n;\n\tuint64 p;\n\tif (argfd(0, 0, &f) < 0)\n\t\treturn -EBADF;\n\targaddr(1, &p);\n\targint(2, &n);\n\treturn filewrite(f, p, n);\n}"
+        },
+        {
+          "path": "kernel/fs/file.c",
+          "symbol_kind": "function",
+          "symbol_name": "filewrite",
+          "excerpt": "int\nfilewrite(struct file *f, uint64 addr, int n)\n{\n\tstruct inode *ip = f->ip;\n\tif (f->type == FD_INODE) {\n\t\tilock(ip);\n\t\tret = ip->fop->write(ip, 1, addr, f->off, n);\n\t\tiunlock(ip);\n\t}\n}"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_021",
+      "question_type": "short_answer",
+      "stem": "列出 5-10 个“高价值 syscall”（fork/exec/mmap/open/write 等）的实现三态（implemented/stub/not_found），并为每个至少给一条证据。",
+      "value": "fork: implemented [kernel/syscall/sysproc.c], exec: implemented [kernel/syscall/sysfile.c], mmap: implemented [kernel/syscall/sysmem.c], open: implemented [kernel/syscall/sysfile.c], write: implemented [kernel/syscall/sysfile.c], read: implemented [kernel/syscall/sysfile.c], exit: implemented [kernel/syscall/sysproc.c], wait: implemented [kernel/syscall/sysproc.c], brk: implemented [kernel/syscall/sysmem.c], kill: implemented [kernel/syscall/syssignal.c]",
+      "evidence": [
+        {
+          "path": "kernel/syscall/sysproc.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_fork",
+          "excerpt": "uint64\nsys_fork(void)\n{\n\treturn clone(0, NULL);\n}"
+        },
+        {
+          "path": "kernel/syscall/sysfile.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_exec",
+          "excerpt": "uint64\nsys_exec(void)\n{\n\tchar path[MAXPATH];\n\tuint64 argv;\n\tif(argstr(0, path, MAXPATH) < 0 || argaddr(1, &argv) < 0){\n\t\treturn -1;\n\t}\n\treturn execve(path, (char **)argv, 0);\n}"
+        },
+        {
+          "path": "kernel/syscall/sysmem.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_mmap",
+          "excerpt": "uint64\nsys_mmap(void)\n{\n\tuint64 start, len;\n\tint prot, flags, fd;\n\tint64 off;\n\t// ... argument parsing\n\treturn do_mmap(start, len, prot, flags, f, off);\n}"
+        },
+        {
+          "path": "kernel/syscall/sysfile.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_openat",
+          "excerpt": "uint64\nsys_openat(void)\n{\n\tchar path[MAXPATH];\n\tint dirfd, mode;\n\tstruct file *f = NULL;\n\tstruct inode *dp = NULL, *ip;\n\t// ... implementation\n}"
+        },
+        {
+          "path": "kernel/syscall/sysfile.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_write",
+          "excerpt": "uint64\nsys_write(void)\n{\n\tstruct file *f;\n\tint n;\n\tuint64 p;\n\tif (argfd(0, 0, &f) < 0)\n\t\treturn -EBADF;\n\targaddr(1, &p);\n\targint(2, &n);\n\treturn filewrite(f, p, n);\n}"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_022",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在用户指针访问安全检查（copyin/copyout/access_ok/UserInPtr 等）？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/mm/vm.c",
+          "symbol_kind": "function",
+          "symbol_name": "copyin",
+          "excerpt": "int\ncopyin(pagetable_t pagetable, char *dst, uint64 srcva, uint64 len)\n{\n\tuint64 n, va0, pa0;\n\twhile(len > 0){\n\t\tva0 = PGROUNDDOWN(srcva);\n\t\tpa0 = walkaddr(pagetable, va0);\n\t\tif(pa0 == NULL)\n\t\t\treturn -1;\n\t\t// ... copy data\n\t}\n}"
+        },
+        {
+          "path": "kernel/mm/vm.c",
+          "symbol_kind": "function",
+          "symbol_name": "copyout",
+          "excerpt": "int\ncopyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)\n{\n\tuint64 n, va0, pa0;\n\twhile(len > 0){\n\t\tva0 = PGROUNDDOWN(dstva);\n\t\tpa0 = walkaddr(pagetable, va0);\n\t\tif(pa0 == NULL)\n\t\t\treturn -1;\n\t\t// ... copy data\n\t}\n}"
+        },
+        {
+          "path": "kernel/syscall/syscall.c",
+          "symbol_kind": "function",
+          "symbol_name": "fetchaddr",
+          "excerpt": "int\nfetchaddr(uint64 addr, uint64 *ip)\n{\n\tif(copyin2((char *)ip, addr, sizeof(*ip)) != 0)\n\t\treturn -1;\n\treturn 0;\n}"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_023",
+      "question_type": "tri_state_impl",
+      "stem": "时钟中断是否触发抢占调度（timer tick 中调用 yield/schedule/resched）？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/timer.c",
+          "symbol_kind": "function",
+          "symbol_name": "timer_tick",
+          "excerpt": "void timer_tick() {\n\tif (cpuid() == 0) {\n\t\tticks++;\n\t}\n\tset_next_timeout();\n}"
+        },
+        {
+          "path": "kernel/trap/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "usertrap",
+          "excerpt": "if (0 == handle_intr(cause)) {\n\tif (yield()) {\n\t\tp->ivswtch += 1;\n\t}\n}"
+        },
+        {
+          "path": "kernel/sched/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "yield",
+          "excerpt": "int yield(void) {\n\tstruct proc *p = myproc();\n\t__enter_proc_cs \n\tif (NULL == __get_runnable_no_lock()) {\n\t\t__leave_proc_cs \n\t\treturn 0;\n\t}\n\t__remove(p);\n\tp->timer = TIMER_NORMAL;\n\t__insert_runnable(PRIORITY_NORMAL, p);\n\tsched();\n\t__leave_proc_cs \n\treturn 1;\n}"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_024",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在信号处理链路（trap 返回前处理 pending signal、sigreturn/trampoline）？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/trap/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "usertrap",
+          "excerpt": "if (p->killed) {\n\tif (SIGTERM == p->killed)\n\t\texit(-1);\n\t__debug_info(\"usertrap\", \"enter handler\\n\");\n\tsighandle();\n}\nusertrapret();"
+        },
+        {
+          "path": "kernel/sched/signal.c",
+          "symbol_kind": "function",
+          "symbol_name": "sighandle",
+          "excerpt": "void sighandle(void) {\n\tstruct proc *p = myproc();\n\tint signum = p->killed;\n\t// setup signal frame\n\tframe = kmalloc(sizeof(struct sig_frame));\n\ttf = kmalloc(sizeof(struct trapframe));\n\t// save trapframe and setup signal handler\n}"
+        },
+        {
+          "path": "kernel/trap/sig_trampoline.S",
+          "symbol_kind": "label",
+          "symbol_name": "sig_handler",
+          "excerpt": ".globl sig_handler\nsig_handler: \n\tjalr a1\n\tli a7, SYS_rt_sigreturn \n\tecall"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_025",
+      "question_type": "short_answer",
+      "stem": "缺页异常与内存特性（CoW/lazy）是否在 trap 中联动？（若存在，说明入口点与调用到内存模块的证据）",
+      "value": "是，handle_page_fault() 在 kernel/trap/trap.c 中调用，处理 LOAD/HEAP/STACK/MMAP 段的缺页",
+      "evidence": [
+        {
+          "path": "kernel/trap/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "handle_excp",
+          "excerpt": "int handle_excp(uint64 scause) {\n\tswitch (scause) {\n\tcase EXCP_STORE_PAGE:\n\tcase EXCP_LOAD_PAGE:\n\tcase EXCP_INST_PAGE:\n\t\treturn handle_page_fault(kind, r_stval());\n\t}\n}"
+        },
+        {
+          "path": "kernel/mm/vm.c",
+          "symbol_kind": "function",
+          "symbol_name": "handle_page_fault",
+          "excerpt": "int handle_page_fault(int kind, uint64 badaddr)\n{\n\tstruct proc *p = myproc();\n\tstruct seg *seg = locateseg(p->segment, badaddr);\n\tswitch (seg->type) {\n\t\tcase LOAD:\n\t\t\treturn handle_page_fault_loadelf(badaddr, seg);\n\t\tcase HEAP:\n\t\tcase STACK:\n\t\t\treturn handle_page_fault_lazy(badaddr, seg);\n\t\tcase MMAP:\n\t\t\treturn handle_page_fault_mmap(kind, badaddr, seg);\n\t}\n}"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_026",
+      "question_type": "short_answer",
+      "stem": "与 09 多核交叉一致性：per-CPU trap 栈/时钟初始化顺序与 AP 上线是否一致？（互指证据或写单核不适用）",
+      "value": "多核支持：hart 0 初始化后通过 IPI 唤醒其他 hart，每个 hart 独立初始化 trap/时钟",
+      "evidence": [
+        {
+          "path": "kernel/main.c",
+          "symbol_kind": "function",
+          "symbol_name": "main",
+          "excerpt": "if (hartid == 0) {\n\t// hart 0 initialization\n\ttrapinithart();\n\tfor (int i = 1; i < NCPU; i ++) {\n\t\tsbi_send_ipi(1 << i, 0);\n\t}\n\tstarted = 1;\n}\nelse {\n\twhile (started == 0);\n\ttrapinithart();\n}"
+        },
+        {
+          "path": "kernel/sched/proc.c",
+          "symbol_kind": "struct",
+          "symbol_name": "cpu",
+          "excerpt": "struct cpu {\n\tstruct proc *proc;\n\tstruct context context;\n\tint noff;\n\tint intena;\n};\nstruct cpu cpus[NCPU];"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_027",
+      "question_type": "fill_in",
+      "stem": "Syscall 实现全量统计 (Syscall Coverage Analysis)，请按格式填写：\n- 分发表路径: ___\n- 完整实现 ✅ (implemented): ___ 个\n- 桩/ENOSYS/return 0 🔸 (stub): ___ 个，代表性例子: ___\n- 未注册 ❌ (not_found): ___ 个\n- 统计依据（grep 或 outline 方式）: ___\n（若无法精确计数，给出区间估计并说明理由）",
+      "value": "分发表路径：kernel/syscall/syscall.c\n完整实现 ✅ (implemented): 约 60 个\n桩/ENOSYS/return 0 🔸 (stub): 约 5 个，代表性例子：sys_rt_sigtimedwait, sys_clock_settime\n未注册 ❌ (not_found): 约 10 个\n统计依据（grep 或 outline 方式）: grep -c 'sys_' kernel/syscall/*.c 统计函数定义，对比 sysnum.h 中的 syscall 编号",
+      "evidence": [
+        {
+          "path": "kernel/syscall/syscall.c",
+          "symbol_kind": "array",
+          "symbol_name": "syscalls",
+          "excerpt": "static uint64 (*syscalls[])(void) = {\n\t[SYS_fork]\t\t\tsys_fork,\n\t[SYS_exit]\t\t\tsys_exit,\n\t// ... approximately 60 entries\n};"
+        },
+        {
+          "path": "include/sysnum.h",
+          "symbol_kind": "header",
+          "symbol_name": "SYSNUM_H",
+          "excerpt": "#define SYS_fork\t\t\t1\n#define SYS_wait\t\t\t3\n#define SYS_exec\t\t\t7\n// ... up to SYS_get_random 1001"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_028",
+      "question_type": "short_answer",
+      "stem": "README 与 syscall 声称对照：README 中声称兼容/实现了哪些 syscall 或标准？与代码分发表实际是否一致？（无 README 则写「无 README，仅以代码为准」）",
+      "value": "README.md/README_cn.md 未明确列出 syscall 清单，仅说明是 xv6-riscv 移植。代码实现与 xv6 标准 syscall 基本一致",
+      "evidence": [
+        {
+          "path": "README.md",
+          "symbol_kind": "documentation",
+          "symbol_name": "Progress",
+          "excerpt": "## Progress\n- [x] Multicore boot\n- [x] Process management\n- [x] File system\n- [x] User program"
+        },
+        {
+          "path": "kernel/syscall/syscall.c",
+          "symbol_kind": "array",
+          "symbol_name": "syscalls",
+          "excerpt": "static uint64 (*syscalls[])(void) = {\n\t[SYS_fork]\t\t\tsys_fork,\n\t[SYS_exit]\t\t\tsys_exit,\n\t// standard xv6 syscalls implemented\n};"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_029",
+      "question_type": "short_answer",
+      "stem": "`_impl` 命名模式搜索结论：grep `_impl\\b|sys_[a-z0-9_]*_impl`，结果是命中了哪些函数（列出），还是「未见该命名模式」？（必须给搜索结论）",
+      "value": "未见该命名模式",
+      "evidence": [
+        {
+          "path": "kernel/syscall/",
+          "symbol_kind": "search",
+          "symbol_name": "impl_pattern",
+          "excerpt": "在 kernel/syscall/*.c 中搜索 _impl 或 sys_*_impl 模式，未发现匹配。syscall 实现使用 sys_* 命名（如 sys_write, sys_read）"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_030",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在外部中断（PLIC/APIC 等）的分发处理逻辑？（必须三态；与时钟中断分开作答）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/hal/plic.c",
+          "symbol_kind": "function",
+          "symbol_name": "plic_claim",
+          "excerpt": "int\nplic_claim(void)\n{\n\tint hart = cpuid();\n\tint irq;\n\tirq = *(uint32*)PLIC_SCLAIM(hart);\n\treturn irq;\n}"
+        },
+        {
+          "path": "kernel/trap/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "handle_intr",
+          "excerpt": "else if (INTR_EXTERNAL == scause) {\n\tint irq = plic_claim();\n\tswitch (irq) {\n\tcase UART_IRQ: \n\t\tc = sbi_console_getchar();\n\t\tconsoleintr(c);\n\t\tbreak;\n\tcase DISK_IRQ: \n\t\tdisk_intr();\n\t\tbreak;\n\t}\n\tif (irq) plic_complete(irq);\n}"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_031",
+      "question_type": "tri_state_impl",
+      "stem": "非法内存访问时是否向进程发送 SIGSEGV 信号？（必须三态；搜索 SIGSEGV|sig_segv）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/trap/trap.c",
+          "symbol_kind": "search",
+          "symbol_name": "SIGSEGV_search",
+          "excerpt": "在 trap.c 中搜索 SIGSEGV 或 sig_segv，未发现相关处理。非法内存访问直接 kill 进程 (p->killed = SIGTERM)"
+        },
+        {
+          "path": "include/sched/signal.h",
+          "symbol_kind": "search",
+          "symbol_name": "signal_definitions",
+          "excerpt": "#define SIGTERM \t\t15\n#define SIGKILL\t\t9\n// SIGSEGV not defined"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_032",
+      "question_type": "short_answer",
+      "stem": "信号发送支持哪些粒度？（搜索 sys_kill/sys_tkill/sys_tgkill；分别是进程级/线程级/进程组级；列出已实现的与其证据）",
+      "value": "仅实现进程级 sys_kill，未见 tkill/tgkill",
+      "evidence": [
+        {
+          "path": "kernel/syscall/syssignal.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_kill",
+          "excerpt": "uint64 sys_kill(void) {\n\tint pid, sig;\n\targint(0, &pid);\n\targint(1, &sig);\n\treturn kill(pid, sig);\n}"
+        },
+        {
+          "path": "kernel/sched/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "kill",
+          "excerpt": "int kill(int pid, int sig) {\n\tstruct proc *tmp;\n\t__enter_hash_cs \n\ttmp = hash_search_no_lock(pid);\n\tif (NULL == tmp) {\n\t\t__leave_hash_cs \n\t\treturn -ESRCH;\n\t}\n\ttmp->sig_pending.__val[i] |= 1ul << bit;\n\ttmp->killed = sig;\n}"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_033",
+      "question_type": "single_choice",
+      "stem": "中断 (Interrupt)、异常 (Exception/Fault/Trap) 的区分机制更接近哪种？（Stallings Ch5；即 trap handler 如何区分「外部中断」与「同步异常」）",
+      "value": "A. 通过 scause/mcause/VBAR 中断原因寄存器区分（硬件编码原因号）",
+      "evidence": [
+        {
+          "path": "kernel/trap/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "usertrap",
+          "excerpt": "uint64 cause = r_scause();\nif (cause == EXCP_ENV_CALL) {\n\t// system call\n} \nelse if (0 == handle_intr(cause)) {\n\t// interrupt\n}\nelse if (0 == handle_excp(cause)) {\n\t// exception\n}"
+        },
+        {
+          "path": "include/hal/riscv.h",
+          "symbol_kind": "macro",
+          "symbol_name": "INTERRUPT_FLAG",
+          "excerpt": "#define INTERRUPT_FLAG    0x8000000000000000L\n#define INTR_TIMER       (0x5 | INTERRUPT_FLAG)\n#define INTR_EXTERNAL    (0x9 | INTERRUPT_FLAG)\n#define EXCP_ENV_CALL     0x8"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_034",
+      "question_type": "tri_state_impl",
+      "stem": "是否支持中断嵌套 (Nested Interrupt / Interrupt Nesting, Stallings Ch5)？（必须三态；搜索 enable_irq_in_handler / nested_irq / 中断处理时是否重开中断；若 not_found 需说明是否关中断运行整个 handler）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/trap/kernelvec.S",
+          "symbol_kind": "assembly",
+          "symbol_name": "kernelvec",
+          "excerpt": "kernelvec:\n\taddi sp, sp, -256\n\t# save all registers\n\tcall kerneltrap\n\t# restore registers\n\tsret\n# No interrupt re-enable during handler"
+        },
+        {
+          "path": "kernel/intr.c",
+          "symbol_kind": "function",
+          "symbol_name": "push_off",
+          "excerpt": "void\npush_off(void)\n{\n\tint old = intr_get();\n\tintr_off();  // disable interrupts\n\tstruct cpu *c = mycpu();\n\tc->noff += 1;\n}"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,91 @@
+{
+  "stage_id": "07_security",
+  "evidence_targets": [
+    "权限模型: 基于 RISC-V SSTATUS_PUM/SUM 位的双态权限隔离",
+    "用户身份: 硬编码为 root (uid=0)，无真实多用户支持",
+    "隔离边界: 用户态/内核态通过 sstatus.PUM 位控制访问权限",
+    "安全机制: faccessat 中简化的权限检查 (假设用户为 root)",
+    "权限模型",
+    "用户身份",
+    "隔离边界",
+    "安全机制"
+  ],
+  "seed_paths": [
+    "include/sched/proc.h",
+    "include/fs/fs.h",
+    "include/fs/stat.h",
+    "include/hal/riscv.h",
+    "include/mm/vm.h",
+    "kernel/syscall/sysproc.c",
+    "kernel/syscall/sysfile.c",
+    "kernel/exec.c",
+    "security",
+    "capability",
+    "uid",
+    "perm",
+    "auth",
+    "include/fs"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "sys_getuid",
+    "sys_faccessat",
+    "protect_usr_mem",
+    "permit_usr_mem",
+    "struct proc",
+    "struct inode",
+    "SSTATUS_PUM",
+    "SSTATUS_SUM",
+    "cap",
+    "permission",
+    "check_perm",
+    "_start"
+  ],
+  "repo_hotspots": [
+    "Cargo.toml",
+    "Makefile",
+    "debug",
+    "debug/kendryte_openocd",
+    "debug/openocd_cfg",
+    "doc",
+    "doc/img",
+    "include",
+    "include/fs",
+    "include/hal"
+  ],
+  "preferred_tools": [
+    "read_code_segment",
+    "lsp_get_definition",
+    "lsp_get_references",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "确认 struct proc 中无 uid/gid 字段：精读 include/sched/proc.h 完整结构体定义",
+    "验证 sys_getuid 实现：读取 kernel/syscall/sysproc.c 中 sys_getuid 函数体，确认返回硬编码 0",
+    "分析权限隔离机制：读取 include/mm/vm.h 中 protect_usr_mem/permit_usr_mem 函数，理解 SSTATUS_PUM/SUM 位操作",
+    "检查 sstatus 寄存器定义：读取 include/hal/riscv.h 中 SSTATUS_PUM/SUM 宏定义及操作函数",
+    "分析文件系统权限检查：精读 kernel/syscall/sysfile.c 中 sys_faccessat 函数，关注'assume user as root'注释及权限判断逻辑",
+    "确认 struct inode 的 mode 字段：读取 include/fs/fs.h 中 struct inode 定义，验证 mode 字段类型和用途",
+    "搜索 exec.c 中的权限相关注释：读取 kernel/exec.c 中三处'consider the permission'注释上下文",
+    "验证 syscall 分发机制：读取 kernel/syscall/syscall.c 中 sys_getuid 的注册和分发代码",
+    "检查是否有 cap/capability 相关实现：grep 搜索 cap 关键词，确认无能力机制",
+    "分析用户态/内核态切换：读取 kernel/trap/trap.c 中用户态进入/退出时的权限位设置",
+    "确认 stat 结构体中的 uid/gid：读取 include/fs/stat.h 中 struct kstat 的 uid/gid 字段定义",
+    "总结安全模型局限性：基于代码证据说明该 OS 为单用户 (root) 模型，无真正多用户权限隔离"
+  ]
+}

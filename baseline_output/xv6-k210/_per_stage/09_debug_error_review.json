@@ -1,0 +1,70 @@
+{
+  "schema_version": "describe_review_v1",
+  "stage_id": "09_debug_error",
+  "stage_title": "调试机制与错误处理",
+  "confidence": 0.92,
+  "question_reviews": [
+    {
+      "question_id": "Q09_001",
+      "score_evidence": 0.85,
+      "score_consistency": 0.95,
+      "review": "答案声明 `implemented` 符合题面三态要求。证据列举了宏定义与编译选项，但 `excerpt` 多为功能描述摘要而非代码原文，直接证明力略弱，不过逻辑上能支撑结论。"
+    },
+    {
+      "question_id": "Q09_002",
+      "score_evidence": 0.85,
+      "score_consistency": 0.95,
+      "review": "答案声明 `implemented` 符合题面。证据覆盖了 `__panic` 与陷阱处理路径，但 `excerpt` 仍为行为描述摘要，未直接展示关键代码行，证据充分性稍减。"
+    },
+    {
+      "question_id": "Q09_003",
+      "score_evidence": 0.9,
+      "score_consistency": 0.95,
+      "review": "短答题，答案详细描述了输出内容与寄存器转储情况。证据引用了具体函数逻辑（如帧指针遍历），能较好支撑关于诊断信息的结论。"
+    },
+    {
+      "question_id": "Q09_004",
+      "score_evidence": 0.9,
+      "score_consistency": 0.95,
+      "review": "答案声明 `implemented`。证据展示了帧指针遍历逻辑而非仅打印 ra，符合题面关于栈回溯的定义要求，证据与结论匹配度高。"
+    },
+    {
+      "question_id": "Q09_005",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "答案声明 `not_found` 完全符合题面关于内核监视器的严格定义。证据明确排除了用户态 shell 并说明了内核中仅为调试触发器，题面相符度极高。"
+    },
+    {
+      "question_id": "Q09_006",
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "答案声明 `not_found` 符合题面。证据区分了 QEMU GDB 服务器与内核 stub，搜索结果为负向证据，逻辑自洽，但缺乏代码搜索的具体负向日志摘录。"
+    },
+    {
+      "question_id": "Q09_007",
+      "score_evidence": 0.85,
+      "score_consistency": 0.95,
+      "review": "短答题，答案描述了 errno 体系。证据列出了头文件定义与系统调用返回点，但 `excerpt` 为摘要形式，未直接展示错误码数值定义原文。"
+    },
+    {
+      "question_id": "Q09_008",
+      "score_evidence": 0.85,
+      "score_consistency": 0.95,
+      "review": "答案声明 `stub` 符合题面三态。证据展示了基于 tmask 的简单追踪实现，支撑了非完整 ftrace/perf 的结论，证据与 `stub` 定性一致。"
+    }
+  ],
+  "findings": [],
+  "summary_zh": "本报告整体题面相符度高，三态判断与短答结论均能对应题面约束。主要不足在于多数 `evidence.excerpt` 采用功能描述摘要而非代码原文，导致证据直接支撑度（score_evidence）普遍在 0.85-0.90 区间，未达 1.00。Q09_005 与 Q09_006 对否定结论的论证逻辑清晰。全阶段置信度按各题均值方案 A 汇总计算。",
+  "report_quality_score": 0.92,
+  "_meta": {
+    "quality": {
+      "mean_question_confidence": 0.9156
+    },
+    "review_model": "qwen3.5-plus",
+    "baseline": true,
+    "run_at": "2026-04-24T14:40:32",
+    "baseline_execute_tokens": 580940,
+    "baseline_review_tokens": 9900,
+    "baseline_stage_total_tokens": 590840
+  }
+}

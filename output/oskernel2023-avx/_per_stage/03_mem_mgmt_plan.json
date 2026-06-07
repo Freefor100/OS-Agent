@@ -1,0 +1,99 @@
+{
+  "stage_id": "03_mem_mgmt",
+  "evidence_targets": [
+    "物理页分配器 kalloc/kfree 实现",
+    "页表遍历 walk 函数与三级页表结构",
+    "页故障处理 usertrap -> handle_stack_page_fault 路径",
+    "堆分配 sbrk/growproc 机制",
+    "VMA 管理与动态栈扩展",
+    "用户/内核页表映射 mappages",
+    "物理页分配",
+    "页表映射",
+    "页故障处理",
+    "堆分配器"
+  ],
+  "seed_paths": [
+    "kernel/kalloc.c",
+    "kernel/vm.c",
+    "kernel/vma.c",
+    "kernel/trap.c",
+    "kernel/proc.c",
+    "kernel/sysproc.c",
+    "kernel/include/vm.h",
+    "kernel/include/kalloc.h",
+    "kernel/include/vma.h",
+    "kernel/include/proc.h",
+    "doc/memory.md",
+    "linker/qemu.ld",
+    "mm",
+    "memory"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "kalloc",
+    "kfree",
+    "walk",
+    "mappages",
+    "usertrap",
+    "handle_stack_page_fault",
+    "growproc",
+    "sys_sbrk",
+    "uvmalloc",
+    "uvmalloc1",
+    "handle_page_fault",
+    "alloc_frame"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "doc",
+    "doc/pic",
+    "kernel",
+    "kernel/include",
+    "kernel/lwip",
+    "linker",
+    "tools",
+    "xv6-user"
+  ],
+  "preferred_tools": [
+    "lsp_get_call_graph",
+    "lsp_get_definition",
+    "lsp_get_references",
+    "read_code_segment",
+    "lsp_get_document_outline"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "使用 lsp_get_document_outline 查看 kernel/kalloc.c 完整结构，确认 kmem 全局变量与 freelist 链表设计",
+    "使用 read_code_segment 精读 kalloc.c:28-90，取证 kinit/freerange/kfree/kalloc 实现细节",
+    "使用 lsp_get_definition 定位 walk 函数定义（vm.c:91），读取 walk 函数完整实现（vm.c:91-110）",
+    "使用 read_code_segment 读取 vm.c:173-202 mappages 函数，分析页表映射循环逻辑",
+    "使用 lsp_get_call_graph 分析 usertrap 的出向调用（max_depth=2），确认 handle_stack_page_fault 调用路径",
+    "使用 read_code_segment 读取 trap.c:51-120 usertrap 函数，分析 scause 判断与页故障分发逻辑",
+    "使用 read_code_segment 读取 vma.c:288-320 handle_stack_page_fault，取证动态栈扩展机制",
+    "使用 lsp_get_definition 定位 growproc 定义（proc.c:424），读取 growproc 实现（proc.c:424-440）",
+    "使用 read_code_segment 读取 sysproc.c:272-295 sys_sbrk，分析 sbrk 系统调用参数处理",
+    "使用 lsp_get_references 查询 mappages 的全局引用，确认其在 uvmalloc/uvminit/fork 中的调用点",
+    "使用 read_code_segment 读取 vm.c:262-298 uvmalloc1，分析物理页分配 + 页表映射的组合操作",
+    "使用 read_code_segment 读取 vm.c:299-334 uvmalloc，对比 uvmalloc1 的差异（双页表支持）",
+    "使用 lsp_get_document_outline 查看 kernel/include/vm.h，确认页表相关 API 声明",
+    "使用 read_code_segment 读取 kernel/include/memlayout.h 关键段，确认 PHYSTOP/MAXVA/PGSIZE 等常量",
+    "使用 grep_in_repo 搜索 PTE_R|PTE_W|PTE_U|PTE_V 等页表权限位定义（riscv.h）",
+    "使用 read_code_segment 读取 vma.c:14-80 vma_init/alloc_vma，分析 VMA 链表初始化",
+    "使用 lsp_get_call_graph 分析 fork 中 uvmcopy 的调用链（如有必要）",
+    "读取 doc/memory.md 全文，对照代码验证设计文档与实现的一致性"
+  ]
+}

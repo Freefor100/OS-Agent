@@ -1,0 +1,268 @@
+{
+  "schema_version": "describe_review_v1",
+  "stage_id": "04_process_smp",
+  "stage_title": "进程/线程/调度与多核",
+  "confidence": 0.97,
+  "question_reviews": [
+    {
+      "question_id": "Q04_001",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "题面格式要求完全满足（类型/路径/字段/区分）。证据摘录展示了 struct proc 关键字段，虽含省略号但核心字段可见，支撑充分。"
+    },
+    {
+      "question_id": "Q04_002",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "状态枚举证据确凿。流转点证据通过函数名及注释体现，虽未展示完整状态机图，但关键转换函数（allocproc/exit/sleep）已覆盖，符合短答要求。"
+    },
+    {
+      "question_id": "Q04_003",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "三态结论明确。证据包含汇编 swtch 及 C 语言调用点，直接证明上下文切换实现，证据链完整。"
+    },
+    {
+      "question_id": "Q04_004",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "寄存器列表与汇编摘录逐行对应（ra, sp, s0-s11），证据极其详实，完全支撑结论。"
+    },
+    {
+      "question_id": "Q04_005",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "算法名称与证据格式符合题面。优先级队列数组及遍历逻辑摘录直接支撑 Priority 调度结论。"
+    },
+    {
+      "question_id": "Q04_006",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "核心入口 scheduler 及关键函数 yield 等证据清晰，符合 1-3 个入口的要求。"
+    },
+    {
+      "question_id": "Q04_007",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态结论 implemented。sys_fork 与 clone 函数证据直接对应创建执行实体，支撑充分。"
+    },
+    {
+      "question_id": "Q04_008",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "地址空间与文件表复制路径均有对应函数摘录（copysegs, copyfdtable, uvmcopy），证据覆盖全面。"
+    },
+    {
+      "question_id": "Q04_009",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "execve 实现证据确凿，包含 ELF 加载与页表重建逻辑摘录，支撑 implemented 结论。"
+    },
+    {
+      "question_id": "Q04_010",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "wait4 及 sys_wait 证据展示父子回收与睡眠逻辑，支撑同步机制实现。"
+    },
+    {
+      "question_id": "Q04_011",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "选项 A 与证据吻合。sleep 函数摘录显示移出就绪队列（__remove），exit 显示唤醒，符合真正阻塞定义。"
+    },
+    {
+      "question_id": "Q04_012",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "自增分配器结论有全局变量及 allocproc 中自增逻辑支撑，证据直接。"
+    },
+    {
+      "question_id": "Q04_013",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "结构体字段（child/parent/sibling）及 clone 中链表链接逻辑摘录，清晰展示树存储方式。"
+    },
+    {
+      "question_id": "Q04_014",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "信号实现证据充分（头文件/系统调用/kill 函数）。虽为 tri_state，但证据为正向代码，质量高。"
+    },
+    {
+      "question_id": "Q04_015",
+      "score_evidence": 0.9,
+      "score_consistency": 0.95,
+      "review": "每核队列与 IPI 证据存在。任务迁移描述为独立调度，证据支撑每核队列，但迁移逻辑未展示代码，略扣分。"
+    },
+    {
+      "question_id": "Q04_016",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "exit 调用链证据详尽，包含资源回收各步骤函数调用，支撑真正回收结论。"
+    },
+    {
+      "question_id": "Q04_017",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "not_found 结论基于搜索证据。虽无代码正面证明，但搜索路径合理，符合负向证据规范。"
+    },
+    {
+      "question_id": "Q04_018",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "rlimit 未实现结论基于系统调用号及目录搜索，证据逻辑自洽。"
+    },
+    {
+      "question_id": "Q04_019",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "选项 B 与 proc 结构体唯一性证据一致，clone 创建完整 proc 支撑无独立 TCB 结论。"
+    },
+    {
+      "question_id": "Q04_020",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "页表切换证据包含 w_satp 及 sfence_vma 调用，直接对应题干要求的寄存器/指令证据。"
+    },
+    {
+      "question_id": "Q04_021",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "选项 D 基于无线程库搜索结果。证据为负向搜索，逻辑合理，但缺乏正面代码排除，略降证据分。"
+    },
+    {
+      "question_id": "Q04_022",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "TLS 未实现基于关键字搜索。证据符合 not_found 预期，搜索范围覆盖 kernel/include。"
+    },
+    {
+      "question_id": "Q04_023",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "多选 F 基于结构体仅有切换计数无性能统计证据。分析合理，支撑未发现结论。"
+    },
+    {
+      "question_id": "Q04_024",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "老化机制未实现基于关键字搜索及 proc_tick 分析。证据支撑 not_found。"
+    },
+    {
+      "question_id": "Q04_025",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "公平份额调度未实现基于关键字搜索。证据符合 tri_state 负向要求。"
+    },
+    {
+      "question_id": "Q04_026",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "完全抢占结论有时钟中断处理及 proc_tick 触发 yield 证据支撑，逻辑链完整。"
+    },
+    {
+      "question_id": "Q04_027",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "SJF 未实现基于搜索及调度逻辑分析。证据支撑 not_found。"
+    },
+    {
+      "question_id": "Q04_028",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "SMP 结论有 NCPU 宏、cpus 数组及 AP 唤醒代码支撑，证据充分。"
+    },
+    {
+      "question_id": "Q04_029",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "AP 启动链证据包含 main 中 IPI 发送及 AP 进入 scheduler，支撑 implemented。"
+    },
+    {
+      "question_id": "Q04_030",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "IPI 发送与处理证据分别对应 sbi_send_ipi 及 handle_intr 中软件中断处理，支撑充分。"
+    },
+    {
+      "question_id": "Q04_031",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "发送/处理路径函数名及文件路径明确，证据摘录对应关键调用点。"
+    },
+    {
+      "question_id": "Q04_032",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "per-CPU 变量证据包含 cpus 数组、cpu 结构体及 mycpu 访问函数，支撑 implemented。"
+    },
+    {
+      "question_id": "Q04_033",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "tp 寄存器 + 数组索引实现方式有 r_tp、cpuid、mycpu 代码逐层支撑，证据极详实。"
+    },
+    {
+      "question_id": "Q04_034",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "负载均衡未实现基于搜索及 scheduler 独立运行分析。证据支撑 not_found。"
+    },
+    {
+      "question_id": "Q04_035",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "TLB shootdown 未实现基于搜索证据。符合多核一致性负向报告规范。"
+    },
+    {
+      "question_id": "Q04_036",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "四项交叉一致性均有对应证据路径。TLB 刷新策略证据指出仅本地，支撑结论。"
+    },
+    {
+      "question_id": "Q04_037",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "选项 A 与 acquire 中 push_off 证据完全一致，关中断逻辑明确。"
+    },
+    {
+      "question_id": "Q04_038",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "NCPU 宏与 entry.S 栈偏移计算证据对应，链接脚本虽未显式定义但汇编逻辑清晰。"
+    },
+    {
+      "question_id": "Q04_039",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "非原子变量结论有 int __pid 及锁保护证据支撑，准确区分原子变量与锁保护。"
+    },
+    {
+      "question_id": "Q04_040",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "实时调度未实现基于关键字搜索。证据符合 tri_state 负向要求。"
+    },
+    {
+      "question_id": "Q04_041",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "NUMA 未实现基于搜索及架构说明。证据支撑 not_found，含硬件架构备注。"
+    }
+  ],
+  "findings": [],
+  "summary_zh": "本报告整体质量较高，题面相符度好，绝大多数题目严格遵循输出契约。证据支撑方面，正向实现题（如上下文切换、页表切换、per-CPU 实现）提供了详细的代码摘录，证据强度高；负向未实现题（如信号组、NUMA、老化）均采用搜索证据，逻辑自洽。部分题目（如状态机流转、交叉一致性）证据虽覆盖关键点但略显分散，故证据分略有区分。全阶段置信度按各题均值方案 A 汇总，无低分截断。",
+  "report_quality_score": 0.97,
+  "_meta": {
+    "quality": {
+      "mean_question_confidence": 0.9671
+    },
+    "review_model": "qwen3.5-plus",
+    "baseline": true,
+    "run_at": "2026-04-24T14:20:59",
+    "baseline_execute_tokens": 593127,
+    "baseline_review_tokens": 23296,
+    "baseline_stage_total_tokens": 616423
+  }
+}

@@ -1,0 +1,109 @@
+{
+  "stage_id": "10_history",
+  "evidence_targets": [
+    "作者贡献分布与模块分工",
+    "lwIP协议栈引入里程碑 (2023-08-14)",
+    "动态链接器实现演进 (exec.c/mmap.c/vma.c)",
+    "线程/信号/futex子系统发展轨迹",
+    "网络socket系统调用完善过程",
+    "文档化进程 (doc/目录下各模块文档)",
+    "测试框架与benchmark集成 (lmbench/iozone/libctest)",
+    "作者贡献",
+    "重大提交",
+    "模块演进",
+    "当前缺口",
+    "CI/产物名/自测相关演进(有工具证据时)"
+  ],
+  "seed_paths": [
+    "README.md",
+    "taskList.md",
+    "doc/",
+    "kernel/proc.c",
+    "kernel/syscall.c",
+    "kernel/exec.c",
+    "kernel/mmap.c",
+    "kernel/vma.c",
+    "kernel/lwip/",
+    "kernel/socket_new.c",
+    "kernel/signal.c",
+    "kernel/futex.c",
+    "git",
+    "history"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "lwip_netconn_do_newconn",
+    "load_elf_interp",
+    "mmap",
+    "free_vma_list",
+    "threadalloc",
+    "sys_futex",
+    "sys_signal",
+    "sys_socket",
+    "sys_execve",
+    "main",
+    "git"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "doc",
+    "doc/pic",
+    "kernel",
+    "kernel/include",
+    "kernel/lwip",
+    "linker",
+    "tools",
+    "xv6-user"
+  ],
+  "preferred_tools": [
+    "get_git_history_summary",
+    "analyze_authors_contribution",
+    "trace_file_evolution",
+    "find_symbol_first_commit",
+    "get_commit_diff_summary",
+    "read_code_segment",
+    "lsp_get_document_outline",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 4000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "读取 README.md 和 taskList.md 了解项目目标与待办",
+    "调用 get_git_history_summary 获取200次提交的全局概览",
+    "调用 analyze_authors_contribution 分析5位核心贡献者的模块分工",
+    "使用 find_symbol_first_commit 定位 lwip/socket/thread/dynamic/mmap/futex/signal 首次引入的commit",
+    "对 lwIP 引入commit (60b91579) 调用 get_commit_diff_summary 查看协议栈移植细节",
+    "对动态链接关键commit (732909cb) 调用 get_commit_diff_summary 分析exec.c/mmap.c/vma.c变更",
+    "调用 trace_file_evolution 追踪 kernel/proc.c 的20次演进，提取线程/信号相关修改",
+    "调用 trace_file_evolution 追踪 kernel/syscall.c 的15次演进，提取syscall扩展记录",
+    "调用 trace_file_evolution 追踪 kernel/exec.c 的演进，验证动态链接器实现路径",
+    "列出 doc/ 目录下所有.md文件，确认各模块文档覆盖情况",
+    "读取 doc/thread.md 和 doc/net.md 提取设计文档中的里程碑描述",
+    "grep_in_repo 搜索 'AVX512' 或 'AVX' 关键词，确认仓库名称中的AVX是否有关联实现",
+    "读取 kernel/lwip/lwipopts.h 确认lwIP配置选项与功能裁剪",
+    "读取 xv6-user/busybox_test.c 提取libctest_dy测试用例列表，确认动态链接测试覆盖",
+    "调用 get_commit_diff_summary 查看网络相关commit (如ed241858) 的地址空间修复细节",
+    "grep_in_repo 搜索 'panic' 或 'printf' 确认日志级别控制宏的实现位置",
+    "读取 kernel/proc.c 中 threadalloc 和 freeproc 函数，验证线程生命周期管理",
+    "读取 kernel/syscall.c 的系统调用表，统计已实现的syscall数量与分类",
+    "检查 Makefile 中 net.mk 的集成方式，确认lwIP编译链接流程",
+    "读取 kernel/include/elf.h 确认动态链接相关的ELF宏定义",
+    "调用 trace_file_evolution 追踪 kernel/vma.c 验证VMA链表管理演进",
+    "读取 kernel/signal.c 和 kernel/futex.c 确认同步与信号处理实现",
+    "分析 .gitignore 和 tools/ 目录，确认CI/构建产物与辅助脚本",
+    "汇总所有证据，按时间线整理5大里程碑：初始提交、动态链接、线程完善、lwIP移植、文档化"
+  ]
+}

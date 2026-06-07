@@ -1,0 +1,734 @@
+{
+  "schema_version": "v1",
+  "stage_id": "03_mem_mgmt",
+  "stage_title": "内存管理（物理/虚拟/分配器）",
+  "terminology_profile": "stallings_en_zh",
+  "model": "claude-opus-4-7",
+  "answers": [
+    {
+      "question_id": "Q03_001",
+      "question_type": "single_choice",
+      "stem": "该 OS 的内存管理实现语言/形态更接近哪类？（只选最贴近的一项）",
+      "fact_answers": [
+        {"fact_id":"Q03_001_01","fact_key":"candidate_set","value":["Rust no_std 内核内存子系统","C/Makefile 风格内核（xv6 类）","混合（Rust + C 或多 crate 组件化）","未发现内存管理实现（仅接口/文档）"],"used_evidence_ids":[],"notes":"严格采用题单 choices"},
+        {"fact_id":"Q03_001_02","fact_key":"selected_choice_positive_evidence","value":"yes_strong","used_evidence_ids":["ev_cc_q01_pm_c","ev_cc_q01_vm_c","ev_cc_q01_main_c","ev_cc_q01_riscv_h"],"notes":"全部 .c/.h 源文件，xv6 命名约定（kpminit/kvminit/kvminithart/walk/mappages），main.c 顺序调用启动各 mm 子系统"},
+        {"fact_id":"Q03_001_03","fact_key":"alternative_choices_excluded","value":"yes_strong","used_evidence_ids":["ev_cc_q01_negsearch"],"notes":"仓库内不存在 Cargo.toml/.rs 文件、不存在 no_std/crate 关键字；Makefile + GCC 工具链构建"},
+        {"fact_id":"Q03_001_04","fact_key":"mixed_or_unknown_handling","value":"no_after_negative_search","used_evidence_ids":["ev_cc_q01_negsearch"],"notes":"无 Rust 代码迹象，不需走混合/unknown 分支"},
+        {"fact_id":"Q03_001_05","fact_key":"negative_search_coverage","value":{"searched_keywords":["frame","page","kalloc","buddy","bitmap","freelist","slab","page table","pte","walk","map","unmap","pagetable","satp","CR3","protection","relocation"],"searched_directories":["kernel","kernel/mm","kernel/trap","kernel/sched","kernel/syscall","include","include/mm","include/hal"],"file_count":118,"match_count":520,"coverage_sufficient":true},"used_evidence_ids":["ev_cc_q01_negsearch"],"notes":"关键字几乎全部命中（page/pte/walk/satp/freelist/page table 在 vm.c/pm.c/riscv.h 大量出现），仅 buddy/bitmap/CR3 不命中（CR3 是 x86 寄存器，本系统为 RISC-V），覆盖充分"}
+      ],
+      "value": "C/Makefile 风格内核（xv6 类）",
+      "used_evidence_ids": ["ev_cc_q01_pm_c","ev_cc_q01_vm_c","ev_cc_q01_main_c","ev_cc_q01_riscv_h","ev_cc_q01_negsearch"],
+      "notes": "源文件均为 C，使用 Makefile 构建，模块布局/命名（kalloc 思路下的 freepage/_allocpage/walk/mappages/uvmcopy）与 xv6 一致；README 自述为 'A xv6-riscv port for Kendryte K210'。",
+      "evidence": [
+        {"evidence_id":"ev_cc_q01_pm_c","path":"kernel/mm/pm.c","line_start":1,"line_end":50,"symbol_kind":"definition","symbol_name":"file_header_and_struct_run","excerpt":"// Physical memory or pages management\n// Physical memory allocator, for user processes,\n// kernel stacks, page-table pages,\n// and pipe buffers. Allocates whole 4096-byte pages.\nstruct run { struct run *next; uint64 npage; };\nstruct pm_allocator { struct spinlock lock; struct run *freelist; uint64 npage; };","evidence_type":"definition","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q01_vm_c","path":"kernel/mm/vm.c","line_start":1,"line_end":30,"symbol_kind":"definition","symbol_name":"vm_module","excerpt":"#define __module_name__ \"vm\"\n#include \"hal/riscv.h\"\n#include \"mm/vm.h\"\n#include \"mm/pm.h\"\n#define MAX_PAGES_NUM 0x600\n#define PTE_COW PTE_RSW1  // Use it to mark a COW page\npagetable_t kernel_pagetable;","evidence_type":"definition","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q01_main_c","path":"kernel/main.c","line_start":46,"line_end":49,"symbol_kind":"call_site","symbol_name":"main","excerpt":"kpminit();       // physical page allocator\nkvminit();       // create kernel page table\nkvminithart();   // turn on paging\nkmallocinit();   // small physical memory allocator","evidence_type":"call_site","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q01_riscv_h","path":"include/hal/riscv.h","line_start":378,"line_end":408,"symbol_kind":"definition","symbol_name":"PGSIZE_PTE_MAXVA","excerpt":"#define PGSIZE 4096 // bytes per page\n#define PGSHIFT 12\n#define PTE_V (1L << 0)\n#define PTE_R (1L << 1)\n#define PTE_W (1L << 2)\n#define PTE_X (1L << 3)\n#define PTE_U (1L << 4)\n#define PA2PTE(pa) ((((uint64)pa) >> 12) << 10)\n#define PTE2PA(pte) (((pte) >> 10) << 12)\n#define MAXVA (1L << (9 + 9 + 9 + 12 - 1))","evidence_type":"definition","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q01_negsearch","path":"kernel/+include/","line_start":0,"line_end":0,"symbol_kind":"negative_search","symbol_name":"rust_no_std_negative","excerpt":"无 Cargo.toml；无 .rs 源文件；无 no_std/extern crate 关键字。Makefile 使用 riscv64-unknown-elf-gcc / -elf-ld 构建。","evidence_type":"negative_search","strength":"strong","validity":"valid","supports_claim_types":["not_implemented"]}
+      ]
+    },
+    {
+      "question_id": "Q03_002",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在\"物理页帧分配器 (Physical Frame Allocator)\"的真实实现？（必须三态）",
+      "fact_answers": [
+        {"fact_id":"Q03_002_01","fact_key":"scope_definition","value":"yes_strong","used_evidence_ids":["ev_cc_q02_pm_struct","ev_cc_q02_pm_h"],"notes":"struct pm_allocator 含 spinlock+freelist+npage；single/multiple 两个分配器实例"},
+        {"fact_id":"Q03_002_02","fact_key":"real_implementation_body","value":"yes_strong","used_evidence_ids":["ev_cc_q02_kpminit","ev_cc_q02_allocpage","ev_cc_q02_freepage","ev_cc_q02_mul_alloc"],"notes":"kpminit 初始化、_allocpage/_freepage 完整实现，__mul_alloc_no_lock 真实遍历 freelist 并分裂/合并"},
+        {"fact_id":"Q03_002_03","fact_key":"active_call_path","value":"yes_strong","used_evidence_ids":["ev_cc_q02_main","ev_cc_q02_walk_calls"],"notes":"main.c:46 调用 kpminit；vm.c walk() 与 mappages() 通过 allocpage() 取页表页和用户页"},
+        {"fact_id":"Q03_002_04","fact_key":"state_or_effect","value":"yes_strong","used_evidence_ids":["ev_cc_q02_kpminit","ev_cc_q02_allocpage"],"notes":"freerange 把 [boot_stack_top..START_SINGLE) 加入 multiple，[START_SINGLE..PHYSTOP) 加入 single；运行期 npage 计数实时更新"},
+        {"fact_id":"Q03_002_05","fact_key":"stub_and_false_positive_filter","value":"no_after_negative_search","used_evidence_ids":["ev_cc_q02_pm_h"],"notes":"无 panic('not implemented')、无 return 0 桩；声明与实现一致"},
+        {"fact_id":"Q03_002_06","fact_key":"negative_search_coverage","value":{"searched_keywords":["frame","page","kalloc","freelist","struct run","allocpage","freepage","kpminit","PHYSTOP","PGSIZE"],"searched_directories":["kernel/mm","include/mm"],"file_count":12,"match_count":210,"coverage_sufficient":true},"used_evidence_ids":["ev_cc_q02_pm_struct"],"notes":"覆盖充分"}
+      ],
+      "value": "implemented",
+      "used_evidence_ids": ["ev_cc_q02_pm_struct","ev_cc_q02_pm_h","ev_cc_q02_kpminit","ev_cc_q02_allocpage","ev_cc_q02_freepage","ev_cc_q02_mul_alloc","ev_cc_q02_main","ev_cc_q02_walk_calls"],
+      "notes": "kernel/mm/pm.c 是完整的物理页帧分配器：struct run 单链表 + spinlock，单页池 single 与多页池 multiple，main 启动时调用 kpminit 完成初始化。",
+      "evidence": [
+        {"evidence_id":"ev_cc_q02_pm_struct","path":"kernel/mm/pm.c","line_start":26,"line_end":50,"symbol_kind":"definition","symbol_name":"struct_run_pm_allocator","excerpt":"struct run { struct run *next; uint64 npage; };\nstruct pm_allocator { struct spinlock lock; struct run *freelist; uint64 npage; };\nstruct pm_allocator multiple;\nstruct pm_allocator single;\n#define SINGLE_PAGE_NUM 400\nuint64 START_SINGLE = PHYSTOP - SINGLE_PAGE_NUM * PGSIZE;\n#define __enter_mul_cs acquire(&multiple.lock);\n#define __leave_mul_cs release(&multiple.lock);","evidence_type":"definition","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q02_pm_h","path":"include/mm/pm.h","line_start":1,"line_end":40,"symbol_kind":"definition","symbol_name":"pm_api","excerpt":"void kpminit(void);\nuint64 _allocpage(void);\nvoid _freepage(uint64 pa);\nvoid *allocpage_n(uint64 n);\nvoid freepage_n(uint64 start, uint64 n);\nuint64 idlepages(void);","evidence_type":"definition","strength":"weak","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q02_kpminit","path":"kernel/mm/pm.c","line_start":179,"line_end":198,"symbol_kind":"implementation_body","symbol_name":"kpminit","excerpt":"void kpminit(void) {\n  multiple.freelist = NULL; multiple.npage = 0;\n  initlock(&multiple.lock, \"multi-lock\");\n  single.freelist = NULL; single.npage = 0;\n  initlock(&single.lock, \"single-lock\");\n  __mul_freerange((uint64)boot_stack_top, START_SINGLE);\n  __sin_freerange(START_SINGLE, PHYSTOP);\n}","evidence_type":"implementation_body","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q02_allocpage","path":"kernel/mm/pm.c","line_start":232,"line_end":254,"symbol_kind":"implementation_body","symbol_name":"_allocpage","excerpt":"uint64 _allocpage(void) {\n  struct run *ret;\n  __enter_sin_cs ret = __sin_alloc_no_lock(); __leave_sin_cs\n  if (NULL == ret) {\n    __enter_mul_cs ret = __mul_alloc_no_lock(1); __leave_mul_cs\n  }\n  return (uint64)ret;\n}","evidence_type":"implementation_body","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q02_freepage","path":"kernel/mm/pm.c","line_start":256,"line_end":277,"symbol_kind":"implementation_body","symbol_name":"_freepage","excerpt":"void _freepage(uint64 pa) {\n  uint64 start = (uint64)pa;\n  if (start < START_SINGLE) {\n    __enter_mul_cs __mul_free_no_lock(start, 1); __leave_mul_cs\n  } else {\n    __enter_sin_cs __sin_free_no_lock(start); __leave_sin_cs\n  }\n}","evidence_type":"implementation_body","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q02_mul_alloc","path":"kernel/mm/pm.c","line_start":54,"line_end":83,"symbol_kind":"implementation_body","symbol_name":"__mul_alloc_no_lock","excerpt":"static void *__mul_alloc_no_lock(uint64 n) {\n  struct run *pa = multiple.freelist;\n  while (NULL != pa) {\n    if (pa->npage >= n) {\n      struct run *ret = (struct run*)((uint64)pa + PGSIZE * (pa->npage - n));\n      if (pa == ret) *pprev = pa->next;\n      else { pa->npage -= n; pa = ret; }\n      multiple.npage -= n; break;\n    }\n    pprev = &(pa->next); pa = pa->next;\n  }\n  return (void*)pa;\n}","evidence_type":"implementation_body","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q02_main","path":"kernel/main.c","line_start":46,"line_end":49,"symbol_kind":"call_site","symbol_name":"main_kpminit","excerpt":"kpminit();\nkvminit();\nkvminithart();\nkmallocinit();","evidence_type":"call_site","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q02_walk_calls","path":"kernel/mm/vm.c","line_start":218,"line_end":230,"symbol_kind":"call_site","symbol_name":"walk_calls_allocpage","excerpt":"for(int level = 2; level > 0; level--) {\n  pte_t *pte = &pagetable[PX(level, va)];\n  if(*pte & PTE_V) pagetable = (pagetable_t)PTE2PA(*pte);\n  else {\n    if(!alloc || (pagetable = (pde_t*)allocpage()) == NULL) return NULL;\n    memset(pagetable, 0, PGSIZE);\n    *pte = PA2PTE(pagetable) | PTE_V;\n  }\n}","evidence_type":"call_site","strength":"strong","validity":"valid","supports_claim_types":["implemented"]}
+      ]
+    },
+    {
+      "question_id": "Q03_003",
+      "question_type": "single_choice",
+      "stem": "物理内存分配算法更接近哪种？",
+      "fact_answers": [
+        {"fact_id":"Q03_003_01","fact_key":"candidate_set","value":["伙伴系统 (Buddy System)","Bitmap（位图）","Slab/对象池（Slab Allocator / Object Pool）为主","空闲链表 run list（xv6 风格）","其他/自研（简答说明）","未发现"],"used_evidence_ids":[],"notes":"严格题单 choices"},
+        {"fact_id":"Q03_003_02","fact_key":"selected_choice_positive_evidence","value":"yes_strong","used_evidence_ids":["ev_cc_q03_struct_run","ev_cc_q03_mul_alloc","ev_cc_q03_freelist"],"notes":"struct run 链表 + freelist 头指针；分配时遍历链表寻找 npage>=n 的块再切片"},
+        {"fact_id":"Q03_003_03","fact_key":"alternative_choices_excluded","value":"yes_strong","used_evidence_ids":["ev_cc_q03_negsearch"],"notes":"无 buddy/order 关键字；无 bitmap 数组；slab 仅用于 kmalloc 小对象，不是物理页分配主路径"},
+        {"fact_id":"Q03_003_04","fact_key":"mixed_or_unknown_handling","value":"no_after_negative_search","used_evidence_ids":["ev_cc_q03_negsearch"],"notes":"无须混合，物理页主路径只有 freelist"},
+        {"fact_id":"Q03_003_05","fact_key":"negative_search_coverage","value":{"searched_keywords":["buddy","order","bitmap","slab","freelist","run","npage"],"searched_directories":["kernel/mm","include/mm"],"file_count":12,"match_count":58,"coverage_sufficient":true},"used_evidence_ids":["ev_cc_q03_negsearch"],"notes":"覆盖充分"}
+      ],
+      "value": "空闲链表 run list（xv6 风格）",
+      "used_evidence_ids": ["ev_cc_q03_struct_run","ev_cc_q03_mul_alloc","ev_cc_q03_freelist","ev_cc_q03_negsearch"],
+      "notes": "pm.c 与 xv6 kalloc 风格一致：struct run 单链表，freelist 指向首块，每个块自带 npage 字段表达连续页数；同时维护 single（每节点 1 页）与 multiple（连续多页）两条链，但二者均为 run list。",
+      "evidence": [
+        {"evidence_id":"ev_cc_q03_struct_run","path":"kernel/mm/pm.c","line_start":26,"line_end":38,"symbol_kind":"definition","symbol_name":"struct_run","excerpt":"struct run { struct run *next; uint64 npage; };\nstruct pm_allocator { struct spinlock lock; struct run *freelist; uint64 npage; };","evidence_type":"definition","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q03_mul_alloc","path":"kernel/mm/pm.c","line_start":54,"line_end":83,"symbol_kind":"implementation_body","symbol_name":"__mul_alloc_no_lock","excerpt":"struct run *pa = multiple.freelist;\nwhile (NULL != pa) {\n  if (pa->npage >= n) {...}\n  pprev = &(pa->next); pa = pa->next;\n}","evidence_type":"implementation_body","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q03_freelist","path":"kernel/mm/pm.c","line_start":86,"line_end":175,"symbol_kind":"implementation_body","symbol_name":"__mul_free_no_lock_and_sin","excerpt":"// 按地址有序合并相邻 run 块；__sin 池为单页 push/pop","evidence_type":"implementation_body","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q03_negsearch","path":"kernel/mm/+include/mm/","line_start":0,"line_end":0,"symbol_kind":"negative_search","symbol_name":"buddy_bitmap_absent","excerpt":"无 'buddy'/'order_'/'bitmap' 关键字命中物理分配器；slab 仅出现在 kmalloc.c 注释（'inspired by the slab-mechanism of Linux'），不参与页帧分配。","evidence_type":"negative_search","strength":"strong","validity":"valid","supports_claim_types":["not_implemented"]}
+      ]
+    },
+    {
+      "question_id": "Q03_004",
+      "question_type": "short_answer",
+      "stem": "物理页帧分配器的核心数据结构是什么？",
+      "fact_answers": [
+        {"fact_id":"Q03_004_01","fact_key":"answer_scope","value":"yes_strong","used_evidence_ids":["ev_cc_q04_struct_run"],"notes":"答案落在 kernel/mm/pm.c 全局对象 multiple/single 与 struct run/struct pm_allocator"},
+        {"fact_id":"Q03_004_02","fact_key":"primary_evidence_anchor","value":"yes_strong","used_evidence_ids":["ev_cc_q04_struct_run","ev_cc_q04_pm_allocator"],"notes":"struct run/struct pm_allocator 为字段定义证据"},
+        {"fact_id":"Q03_004_03","fact_key":"implementation_or_flow_evidence","value":"yes_strong","used_evidence_ids":["ev_cc_q04_kpminit","ev_cc_q04_alloc_use"],"notes":"kpminit 初始化、_allocpage/__mul_alloc_no_lock 操作 freelist 字段为使用流"},
+        {"fact_id":"Q03_004_04","fact_key":"boundary_and_non_answers","value":"yes_strong","used_evidence_ids":["ev_cc_q04_kmalloc_compare"],"notes":"kmalloc.c 的 kmem_node/kmem_allocator 是上层 slab，不是 frame allocator"},
+        {"fact_id":"Q03_004_05","fact_key":"unknown_or_partial_items","value":"no_after_negative_search","used_evidence_ids":[],"notes":"无未确定项"},
+        {"fact_id":"Q03_004_06","fact_key":"negative_search_coverage","value":{"searched_keywords":["struct run","freelist","pm_allocator","npage","bitmap","buddy"],"searched_directories":["kernel/mm","include/mm"],"file_count":12,"match_count":42,"coverage_sufficient":true},"used_evidence_ids":[],"notes":"覆盖充分"}
+      ],
+      "value": "struct run 单链表（next、npage 两字段）+ struct pm_allocator{spinlock, freelist, npage}；以全局变量 multiple、single 两个独立池表达多页池/单页池。kernel/mm/pm.c:26-38。",
+      "used_evidence_ids": ["ev_cc_q04_struct_run","ev_cc_q04_pm_allocator","ev_cc_q04_kpminit","ev_cc_q04_alloc_use","ev_cc_q04_kmalloc_compare"],
+      "notes": "single 池负责单页快速通道（_allocpage），multiple 池保留多页连续块（allocpage_n），两者通过 START_SINGLE 边界划分物理空间。",
+      "evidence": [
+        {"evidence_id":"ev_cc_q04_struct_run","path":"kernel/mm/pm.c","line_start":26,"line_end":29,"symbol_kind":"definition","symbol_name":"struct_run","excerpt":"struct run { struct run *next; uint64 npage; };","evidence_type":"definition","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q04_pm_allocator","path":"kernel/mm/pm.c","line_start":31,"line_end":41,"symbol_kind":"definition","symbol_name":"struct_pm_allocator","excerpt":"struct pm_allocator { struct spinlock lock; struct run *freelist; uint64 npage; };\nstruct pm_allocator multiple;\nstruct pm_allocator single;\n#define SINGLE_PAGE_NUM 400\nuint64 START_SINGLE = PHYSTOP - SINGLE_PAGE_NUM * PGSIZE;","evidence_type":"definition","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q04_kpminit","path":"kernel/mm/pm.c","line_start":179,"line_end":198,"symbol_kind":"implementation_body","symbol_name":"kpminit","excerpt":"void kpminit(void) {\n  initlock(&multiple.lock, \"multi-lock\");\n  initlock(&single.lock, \"single-lock\");\n  __mul_freerange((uint64)boot_stack_top, START_SINGLE);\n  __sin_freerange(START_SINGLE, PHYSTOP);\n}","evidence_type":"implementation_body","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q04_alloc_use","path":"kernel/mm/pm.c","line_start":58,"line_end":83,"symbol_kind":"usage_flow","symbol_name":"freelist_traversal","excerpt":"pa = multiple.freelist; pprev = &(multiple.freelist);\nwhile (NULL != pa) {\n  if (pa->npage >= n) { ... multiple.npage -= n; break; }\n  pprev = &(pa->next); pa = pa->next;\n}","evidence_type":"usage_flow","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q04_kmalloc_compare","path":"kernel/mm/kmalloc.c","line_start":26,"line_end":52,"symbol_kind":"definition","symbol_name":"kmem_node_not_frame_alloc","excerpt":"struct kmem_node { struct kmem_node *next; struct {uint64 obj_size; uint64 obj_addr;} config; uint8 avail; uint8 cnt; uint8 table[KMEM_OBJ_MAX_COUNT]; };\nstruct kmem_allocator { struct spinlock lock; uint obj_size; ...};","evidence_type":"definition","strength":"weak","validity":"valid","supports_claim_types":["implemented"]}
+      ]
+    },
+    {
+      "question_id": "Q03_005",
+      "question_type": "short_answer",
+      "stem": "物理分配器的并发控制锁粒度是什么？",
+      "fact_answers": [
+        {"fact_id":"Q03_005_01","fact_key":"answer_scope","value":"yes_strong","used_evidence_ids":["ev_cc_q05_lock_decl"],"notes":"锁对象在 struct pm_allocator 内，每池一锁"},
+        {"fact_id":"Q03_005_02","fact_key":"primary_evidence_anchor","value":"yes_strong","used_evidence_ids":["ev_cc_q05_lock_decl","ev_cc_q05_macros"],"notes":"struct spinlock + acquire/release 宏 __enter_*_cs"},
+        {"fact_id":"Q03_005_03","fact_key":"implementation_or_flow_evidence","value":"yes_strong","used_evidence_ids":["ev_cc_q05_alloc_path","ev_cc_q05_free_path","ev_cc_q05_pushoff"],"notes":"_allocpage/_freepage 在临界区内不持其他锁；spinlock acquire 内部 push_off 关中断"},
+        {"fact_id":"Q03_005_04","fact_key":"boundary_and_non_answers","value":"yes_strong","used_evidence_ids":["ev_cc_q05_macros"],"notes":"非 per-CPU、非分桶；两个池各一锁视为 2 个独立全局锁，非 'one big lock'"},
+        {"fact_id":"Q03_005_05","fact_key":"unknown_or_partial_items","value":"no_after_negative_search","used_evidence_ids":[],"notes":"无未决"},
+        {"fact_id":"Q03_005_06","fact_key":"negative_search_coverage","value":{"searched_keywords":["spinlock","percpu","per-cpu","intr_off","push_off","mutex","irq","cli"],"searched_directories":["kernel/mm","include/sync","kernel/sync"],"file_count":10,"match_count":35,"coverage_sufficient":true},"used_evidence_ids":[],"notes":"覆盖充分"}
+      ],
+      "value": "每池一把全局自旋锁（pm_allocator.lock 类型 struct spinlock），共两把：multiple.lock、single.lock；通过 __enter_*_cs / __leave_*_cs 宏 acquire/release。spinlock 自身在 acquire 内执行 push_off()/pop_off() 关本核中断，所以临界区天然中断关闭。",
+      "used_evidence_ids": ["ev_cc_q05_lock_decl","ev_cc_q05_macros","ev_cc_q05_alloc_path","ev_cc_q05_free_path","ev_cc_q05_pushoff"],
+      "notes": "粒度为 'per-pool 自旋锁 + 关中断'，等价于全局大锁但分两条池。kmalloc 上层每个 kmem_allocator 也各自带锁，独立于 pm.c。",
+      "evidence": [
+        {"evidence_id":"ev_cc_q05_lock_decl","path":"kernel/mm/pm.c","line_start":31,"line_end":38,"symbol_kind":"definition","symbol_name":"pm_allocator_lock","excerpt":"struct pm_allocator { struct spinlock lock; struct run *freelist; uint64 npage; };\nstruct pm_allocator multiple;\nstruct pm_allocator single;","evidence_type":"definition","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q05_macros","path":"kernel/mm/pm.c","line_start":43,"line_end":50,"symbol_kind":"definition","symbol_name":"cs_macros","excerpt":"#define __enter_mul_cs acquire(&multiple.lock);\n#define __leave_mul_cs release(&multiple.lock);\n#define __enter_sin_cs acquire(&single.lock);\n#define __leave_sin_cs release(&single.lock);","evidence_type":"definition","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q05_alloc_path","path":"kernel/mm/pm.c","line_start":232,"line_end":254,"symbol_kind":"usage_flow","symbol_name":"_allocpage_locking","excerpt":"__enter_sin_cs ret = __sin_alloc_no_lock(); __leave_sin_cs\nif (NULL == ret) { __enter_mul_cs ret = __mul_alloc_no_lock(1); __leave_mul_cs }","evidence_type":"usage_flow","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q05_free_path","path":"kernel/mm/pm.c","line_start":256,"line_end":277,"symbol_kind":"usage_flow","symbol_name":"_freepage_locking","excerpt":"if (start < START_SINGLE) { __enter_mul_cs __mul_free_no_lock(start, 1); __leave_mul_cs }\nelse { __enter_sin_cs __sin_free_no_lock(start); __leave_sin_cs }","evidence_type":"usage_flow","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q05_pushoff","path":"include/sync/spinlock.h","line_start":1,"line_end":40,"symbol_kind":"definition","symbol_name":"struct_spinlock","excerpt":"struct spinlock { uint locked; char *name; struct cpu *cpu; };\nvoid acquire(struct spinlock*); // 内部 push_off() 关本核中断后再 amoswap 自旋\nvoid release(struct spinlock*);","evidence_type":"definition","strength":"weak","validity":"valid","supports_claim_types":["implemented"]}
+      ]
+    },
+    {
+      "question_id": "Q03_006",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在\"页表 (page table) 结构体 + walk/map/unmap\"的真实实现？",
+      "fact_answers": [
+        {"fact_id":"Q03_006_01","fact_key":"scope_definition","value":"yes_strong","used_evidence_ids":["ev_cc_q06_pte_t","ev_cc_q06_macros"],"notes":"pagetable_t = uint64*；PTE_V/PTE_R/PTE_W/PTE_X/PTE_U 完整 SV39 PTE 编码"},
+        {"fact_id":"Q03_006_02","fact_key":"real_implementation_body","value":"yes_strong","used_evidence_ids":["ev_cc_q06_walk","ev_cc_q06_mappages","ev_cc_q06_unmappages"],"notes":"walk 三层 SV39 遍历；mappages 写 PTE；unmappages 清 PTE 并可选释放页"},
+        {"fact_id":"Q03_006_03","fact_key":"active_call_path","value":"yes_strong","used_evidence_ids":["ev_cc_q06_kvminit_use","ev_cc_q06_uvm_use"],"notes":"kvmmap→mappages 启动时映射设备/内核；fork/exec/mmap/page-fault 路径都调用 mappages/unmappages"},
+        {"fact_id":"Q03_006_04","fact_key":"state_or_effect","value":"yes_strong","used_evidence_ids":["ev_cc_q06_kvminithart"],"notes":"w_satp(MAKE_SATP(kernel_pagetable)) 实际打开 MMU；sfence.vma 刷 TLB"},
+        {"fact_id":"Q03_006_05","fact_key":"stub_and_false_positive_filter","value":"no_after_negative_search","used_evidence_ids":[],"notes":"无 stub"},
+        {"fact_id":"Q03_006_06","fact_key":"negative_search_coverage","value":{"searched_keywords":["walk","mappages","unmappages","pagetable_t","pte_t","satp","sfence"],"searched_directories":["kernel/mm","include/hal","include/mm"],"file_count":12,"match_count":180,"coverage_sufficient":true},"used_evidence_ids":[],"notes":"覆盖充分"}
+      ],
+      "value": "implemented",
+      "used_evidence_ids": ["ev_cc_q06_pte_t","ev_cc_q06_macros","ev_cc_q06_walk","ev_cc_q06_mappages","ev_cc_q06_unmappages","ev_cc_q06_kvminit_use","ev_cc_q06_uvm_use","ev_cc_q06_kvminithart"],
+      "notes": "完整 SV39 三级页表实现；walk/mappages/unmappages 均为有体函数。",
+      "evidence": [
+        {"evidence_id":"ev_cc_q06_pte_t","path":"include/hal/riscv.h","line_start":410,"line_end":412,"symbol_kind":"definition","symbol_name":"pte_t_pagetable_t","excerpt":"typedef uint64 pte_t;\ntypedef uint64 *pagetable_t; // 512 PTEs","evidence_type":"definition","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q06_macros","path":"include/hal/riscv.h","line_start":384,"line_end":402,"symbol_kind":"definition","symbol_name":"PTE_flags_PX","excerpt":"#define PTE_V (1L<<0)\n#define PTE_R (1L<<1)\n#define PTE_W (1L<<2)\n#define PTE_X (1L<<3)\n#define PTE_U (1L<<4)\n#define PA2PTE(pa) ((((uint64)pa) >> 12) << 10)\n#define PTE2PA(pte) (((pte) >> 10) << 12)\n#define PXMASK 0x1FF\n#define PXSHIFT(level) (PGSHIFT+(9*(level)))\n#define PX(level, va) ((((uint64)(va)) >> PXSHIFT(level)) & PXMASK)","evidence_type":"definition","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q06_walk","path":"kernel/mm/vm.c","line_start":211,"line_end":230,"symbol_kind":"implementation_body","symbol_name":"walk","excerpt":"pte_t *walk(pagetable_t pagetable, uint64 va, int alloc) {\n  for(int level = 2; level > 0; level--) {\n    pte_t *pte = &pagetable[PX(level, va)];\n    if(*pte & PTE_V) pagetable = (pagetable_t)PTE2PA(*pte);\n    else {\n      if(!alloc || (pagetable = (pde_t*)allocpage()) == NULL) return NULL;\n      memset(pagetable, 0, PGSIZE);\n      *pte = PA2PTE(pagetable) | PTE_V;\n    }\n  }\n  return &pagetable[PX(0, va)];\n}","evidence_type":"implementation_body","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q06_mappages","path":"kernel/mm/vm.c","line_start":298,"line_end":327,"symbol_kind":"implementation_body","symbol_name":"mappages","excerpt":"int mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm) {\n  uint64 a = PGROUNDDOWN(va), last = PGROUNDDOWN(va + size - 1);\n  int usr = perm & PTE_U;\n  for(;;){\n    if((pte = walk(pagetable, a, 1)) == NULL) return -1;\n    if (*pte & PTE_U) { *pte |= PA2PTE(pa) | PTE_V; }\n    else { *pte = PA2PTE(pa) | perm | PTE_V; }\n    if (usr) pagedup(PGROUNDDOWN(pa));\n    if(a == last) break;\n    a += PGSIZE; pa += PGSIZE;\n  }\n  return 0;\n}","evidence_type":"implementation_body","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q06_unmappages","path":"kernel/mm/vm.c","line_start":335,"line_end":368,"symbol_kind":"implementation_body","symbol_name":"unmappages","excerpt":"void unmappages(pagetable_t pagetable, uint64 va, uint64 npages, int flag) {\n  for (a = va; a < end; a += PGSIZE) {\n    if ((pte = walk(pagetable, a, 0)) == NULL || !(*pte & PTE_V)) continue;\n    pa = PTE2PA(*pte);\n    if ((flag & VM_FREE) && (!(flag & VM_USER) || pageput(pa) == 0)) freepage((void*)pa);\n    *pte = 0;\n  }\n}","evidence_type":"implementation_body","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q06_kvminit_use","path":"kernel/mm/vm.c","line_start":42,"line_end":111,"symbol_kind":"call_site","symbol_name":"kvminit","excerpt":"kernel_pagetable = (pagetable_t) allocpage();\nkvmmap(UART_V, UART, PGSIZE, PTE_R | PTE_W);\nkvmmap(KERNBASE, KERNBASE, (uint64)extratext - KERNBASE, PTE_R | PTE_X);\nkvmmap((uint64)extratext, (uint64)extratext, PHYSTOP - (uint64)extratext, PTE_R | PTE_W);\nkvmmap(TRAMPOLINE, (uint64)trampoline, PGSIZE, PTE_R | PTE_X);","evidence_type":"call_site","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q06_uvm_use","path":"kernel/mm/vm.c","line_start":556,"line_end":593,"symbol_kind":"call_site","symbol_name":"uvmcopy","excerpt":"int uvmcopy(pagetable_t old, pagetable_t new, uint64 start, uint64 end, int cow) {\n  for (i = start; i < end; i += PGSIZE) {\n    if ((pte = walk(old, i, 0)) == NULL || !(*pte & PTE_V)) continue;\n    pa = PTE2PA(*pte);\n    if (cow && (*pte & PTE_W)) *pte = (*pte|PTE_COW) & ~PTE_W;\n    if(mappages(new, i, PGSIZE, pa, PTE_FLAGS(*pte)) != 0) goto err;\n  }\n  sfence_vma();\n}","evidence_type":"call_site","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q06_kvminithart","path":"kernel/mm/vm.c","line_start":120,"line_end":135,"symbol_kind":"usage_flow","symbol_name":"kvminithart","excerpt":"uint64 stap = SATP_SV39 | (((uint64)kernel_pagetable) >> 12);\nw_satp(stap);\nasm volatile(\"sfence.vma\");\nprotect_usr_mem();","evidence_type":"usage_flow","strength":"strong","validity":"valid","supports_claim_types":["implemented"]}
+      ]
+    },
+    {
+      "question_id": "Q03_007",
+      "question_type": "short_answer",
+      "stem": "页表操作 API（walk/map/unmap 或等价）对应的函数名/模块是什么？",
+      "fact_answers": [
+        {"fact_id":"Q03_007_01","fact_key":"answer_scope","value":"yes_strong","used_evidence_ids":["ev_cc_q07_walk","ev_cc_q07_mappages","ev_cc_q07_unmappages"],"notes":"模块 kernel/mm/vm.c"},
+        {"fact_id":"Q03_007_02","fact_key":"primary_evidence_anchor","value":"yes_strong","used_evidence_ids":["ev_cc_q07_walk","ev_cc_q07_mappages","ev_cc_q07_unmappages"],"notes":"三函数定义齐全"},
+        {"fact_id":"Q03_007_03","fact_key":"implementation_or_flow_evidence","value":"yes_strong","used_evidence_ids":["ev_cc_q07_walk","ev_cc_q07_mappages","ev_cc_q07_unmappages"],"notes":"实现体齐全"},
+        {"fact_id":"Q03_007_04","fact_key":"boundary_and_non_answers","value":"yes_strong","used_evidence_ids":["ev_cc_q07_kvmmap"],"notes":"kvmmap/uvmcopy/uvmprotect/uvmdealloc 是 walk/mappages/unmappages 的封装/调用者，不重复列入主入口"},
+        {"fact_id":"Q03_007_05","fact_key":"unknown_or_partial_items","value":"no_after_negative_search","used_evidence_ids":[],"notes":"无未决"},
+        {"fact_id":"Q03_007_06","fact_key":"negative_search_coverage","value":{"searched_keywords":["walk","mappages","unmappages","kvmmap","uvmcopy","uvmprotect","uvmdealloc"],"searched_directories":["kernel/mm","include/mm"],"file_count":10,"match_count":120,"coverage_sufficient":true},"used_evidence_ids":[],"notes":"覆盖充分"}
+      ],
+      "value": "三个核心入口位于 kernel/mm/vm.c：(1) walk(pagetable_t, va, alloc) 行 211–230，三级 SV39 遍历并按需创建中间页表页；(2) mappages(pagetable_t, va, size, pa, perm) 行 298–327，写入连续区间 PTE；(3) unmappages(pagetable_t, va, npages, flag) 行 335–368，清 PTE 并按 VM_FREE/VM_USER 标志释放页/递减 ref。",
+      "used_evidence_ids": ["ev_cc_q07_walk","ev_cc_q07_mappages","ev_cc_q07_unmappages","ev_cc_q07_kvmmap"],
+      "notes": "上层封装：kvmmap (vm.c:259) 用于内核页表；uvmalloc/uvmdealloc/uvmcopy/uvmprotect 都最终调用 walk+mappages/unmappages。",
+      "evidence": [
+        {"evidence_id":"ev_cc_q07_walk","path":"kernel/mm/vm.c","line_start":211,"line_end":230,"symbol_kind":"implementation_body","symbol_name":"walk","excerpt":"pte_t *walk(pagetable_t pagetable, uint64 va, int alloc) { for(int level=2;level>0;level--){...} return &pagetable[PX(0,va)]; }","evidence_type":"implementation_body","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q07_mappages","path":"kernel/mm/vm.c","line_start":298,"line_end":327,"symbol_kind":"implementation_body","symbol_name":"mappages","excerpt":"int mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm) {...}","evidence_type":"implementation_body","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q07_unmappages","path":"kernel/mm/vm.c","line_start":335,"line_end":368,"symbol_kind":"implementation_body","symbol_name":"unmappages","excerpt":"void unmappages(pagetable_t pagetable, uint64 va, uint64 npages, int flag) {...}","evidence_type":"implementation_body","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q07_kvmmap","path":"kernel/mm/vm.c","line_start":258,"line_end":264,"symbol_kind":"call_site","symbol_name":"kvmmap","excerpt":"void kvmmap(uint64 va, uint64 pa, uint64 sz, int perm) { mappages(kernel_pagetable, va, sz, pa, perm); }","evidence_type":"call_site","strength":"weak","validity":"valid","supports_claim_types":["implemented"]}
+      ]
+    },
+    {
+      "question_id": "Q03_008",
+      "question_type": "short_answer",
+      "stem": "页表修改路径的并发控制是什么？",
+      "fact_answers": [
+        {"fact_id":"Q03_008_01","fact_key":"answer_scope","value":"yes_strong","used_evidence_ids":["ev_cc_q08_proc_lock","ev_cc_q08_pageref_lock"],"notes":"页表修改在每个进程的 p->lock 内执行；CoW/页引用计数使用专门的 page_ref_lock"},
+        {"fact_id":"Q03_008_02","fact_key":"primary_evidence_anchor","value":"yes_strong","used_evidence_ids":["ev_cc_q08_proc_lock","ev_cc_q08_pageref_lock"],"notes":"struct proc.lock 与 static struct spinlock page_ref_lock"},
+        {"fact_id":"Q03_008_03","fact_key":"implementation_or_flow_evidence","value":"yes_strong","used_evidence_ids":["ev_cc_q08_pageref_use","ev_cc_q08_sfence"],"notes":"pagedup/pageput/monopolizepage 严格在 page_ref_lock 内；mappages 通过 pagedup 加 ref"},
+        {"fact_id":"Q03_008_04","fact_key":"boundary_and_non_answers","value":"yes_strong","used_evidence_ids":["ev_cc_q08_walk_no_lock"],"notes":"walk/mappages 自身未在函数内显式获取页表锁；并发安全依赖调用方持 proc 锁与单进程上下文"},
+        {"fact_id":"Q03_008_05","fact_key":"unknown_or_partial_items","value":"yes_weak","used_evidence_ids":["ev_cc_q08_walk_no_lock"],"notes":"未发现独立的 'address space lock'，仅依赖 proc 锁 + 单核进程语义"},
+        {"fact_id":"Q03_008_06","fact_key":"negative_search_coverage","value":{"searched_keywords":["mmap_lock","mm->mmap","page_ref_lock","p->lock","sfence_vma"],"searched_directories":["kernel/mm","kernel/sched"],"file_count":10,"match_count":52,"coverage_sufficient":true},"used_evidence_ids":[],"notes":"覆盖充分"}
+      ],
+      "value": "页表写路径不是用一把全局 mm 锁保护，而是通过：(a) 进程 struct proc 的 spinlock p->lock 保证同一进程的 fork/exec/exit/munmap 不并发；(b) 物理页引用计数与 CoW 拷贝走 vm.c 的 static struct spinlock page_ref_lock（vm.c:28），pagedup/pageput/monopolizepage/handle_store_page_fault_cow 全部在该锁内；(c) 修改完 PTE 后调用 sfence_vma() 刷本核 TLB。spinlock acquire 内部 push_off 关本核中断。",
+      "used_evidence_ids": ["ev_cc_q08_proc_lock","ev_cc_q08_pageref_lock","ev_cc_q08_pageref_use","ev_cc_q08_sfence","ev_cc_q08_walk_no_lock"],
+      "notes": "仓库未实现独立的 mmap/vma 锁与跨核 TLB 同步；多核情形下依赖单进程线性调度避免页表竞争。",
+      "evidence": [
+        {"evidence_id":"ev_cc_q08_proc_lock","path":"include/sched/proc.h","line_start":1,"line_end":80,"symbol_kind":"definition","symbol_name":"proc_lock","excerpt":"struct proc { struct spinlock lock; ... pagetable_t pagetable; struct seg *segment; uint64 pbrk; ... };","evidence_type":"definition","strength":"weak","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q08_pageref_lock","path":"kernel/mm/vm.c","line_start":28,"line_end":30,"symbol_kind":"definition","symbol_name":"page_ref_lock","excerpt":"static struct spinlock page_ref_lock;\nstatic uint8 page_ref_table[MAX_PAGES_NUM];  // user pages ref, for COW fork mechanism","evidence_type":"definition","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q08_pageref_use","path":"kernel/mm/vm.c","line_start":154,"line_end":197,"symbol_kind":"usage_flow","symbol_name":"pageref_critical_section","excerpt":"void pagereg(uint64 pa, uint8 init){ acquire(&page_ref_lock); ... release(&page_ref_lock); }\nstatic int monopolizepage(uint64 pa){ acquire(&page_ref_lock); int idx=...; if(page_ref_table[idx]==1){release; return 1;} page_ref_table[idx]--; return 0; }\nstatic inline int pagedup(uint64 pa){ acquire(&page_ref_lock); int ref=++page_ref_table[__hash_page_idx(pa)]; release(&page_ref_lock); return ref; }","evidence_type":"usage_flow","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q08_sfence","path":"kernel/mm/vm.c","line_start":995,"line_end":1014,"symbol_kind":"usage_flow","symbol_name":"sfence_after_pte_modify","excerpt":"pte &= ~PTE_COW; *ptep = pte; sfence_vma(); return 0;\n...\nif (uvmalloc(p->pagetable, pa, pa+PGSIZE, s->flag)==0) return -1;\nsfence_vma();","evidence_type":"usage_flow","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q08_walk_no_lock","path":"kernel/mm/vm.c","line_start":211,"line_end":230,"symbol_kind":"implementation_body","symbol_name":"walk_no_internal_lock","excerpt":"pte_t *walk(pagetable_t pagetable, uint64 va, int alloc) { /* no lock acquired here */ ... }","evidence_type":"implementation_body","strength":"weak","validity":"valid","supports_claim_types":["implemented"]}
+      ]
+    },
+    {
+      "question_id": "Q03_009",
+      "question_type": "single_choice",
+      "stem": "内核与用户地址空间关系更接近哪种？",
+      "fact_answers": [
+        {"fact_id":"Q03_009_01","fact_key":"candidate_set","value":["内核与用户独立页表（切换 CR3/SATP）","共享同一页表（内核映射常驻，高半核等）","仅内核态/无用户态（无用户页表）","未发现/待核实"],"used_evidence_ids":[],"notes":"题单 choices"},
+        {"fact_id":"Q03_009_02","fact_key":"selected_choice_positive_evidence","value":"yes_strong","used_evidence_ids":["ev_cc_q09_kpt","ev_cc_q09_pproc","ev_cc_q09_satp_switch"],"notes":"全局 kernel_pagetable 与每进程 p->pagetable 独立；usertrapret 重置 satp 为 MAKE_SATP(p->pagetable)"},
+        {"fact_id":"Q03_009_03","fact_key":"alternative_choices_excluded","value":"yes_strong","used_evidence_ids":["ev_cc_q09_uvmuva"],"notes":"MAXUVA=0x80000000，用户 va 上限低于 KERNBASE，且无 PTE_U 在内核区，证明非 'shared'；存在用户进程，故非 'kernel-only'"},
+        {"fact_id":"Q03_009_04","fact_key":"mixed_or_unknown_handling","value":"no_after_negative_search","used_evidence_ids":[],"notes":"无须 unknown"},
+        {"fact_id":"Q03_009_05","fact_key":"negative_search_coverage","value":{"searched_keywords":["satp","kernel_pagetable","p->pagetable","MAXUVA","KERNBASE","TRAMPOLINE"],"searched_directories":["kernel/mm","kernel/trap","kernel/sched","include"],"file_count":20,"match_count":110,"coverage_sufficient":true},"used_evidence_ids":[],"notes":"覆盖充分"}
+      ],
+      "value": "内核与用户独立页表（切换 CR3/SATP）",
+      "used_evidence_ids": ["ev_cc_q09_kpt","ev_cc_q09_pproc","ev_cc_q09_satp_switch","ev_cc_q09_uvmuva"],
+      "notes": "采用 xv6 风格：内核有自己的 kernel_pagetable，每进程拥有 p->pagetable；陷入/返回时通过 trampoline 切换 satp。Trampoline 与 trapframe 同时映射在两套页表的同一虚拟地址。",
+      "evidence": [
+        {"evidence_id":"ev_cc_q09_kpt","path":"kernel/mm/vm.c","line_start":27,"line_end":27,"symbol_kind":"definition","symbol_name":"kernel_pagetable","excerpt":"pagetable_t kernel_pagetable;","evidence_type":"definition","strength":"weak","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q09_pproc","path":"kernel/sched/proc.c","line_start":1,"line_end":40,"symbol_kind":"definition","symbol_name":"per_proc_pagetable","excerpt":"struct proc { ... pagetable_t pagetable; pagetable_t kpagetable; ... };","evidence_type":"definition","strength":"weak","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q09_satp_switch","path":"kernel/trap/trap.c","line_start":182,"line_end":192,"symbol_kind":"usage_flow","symbol_name":"usertrapret_satp","excerpt":"uint64 satp = MAKE_SATP(p->pagetable);\npermit_usr_mem();\nuint64 fn = TRAMPOLINE + (userret - trampoline);\n((void (*)(uint64, uint64))fn)((uint64)(p->trapframe), satp);","evidence_type":"usage_flow","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q09_uvmuva","path":"include/memlayout.h","line_start":94,"line_end":131,"symbol_kind":"definition","symbol_name":"MAXUVA_KERNBASE","excerpt":"#define RUSTSBI_BASE 0x80000000UL\n#define KERNBASE 0x80020000UL\n#define PHYSTOP 0x80600000UL\n#define MAXUVA RUSTSBI_BASE","evidence_type":"definition","strength":"strong","validity":"valid","supports_claim_types":["implemented"]}
+      ]
+    },
+    {
+      "question_id": "Q03_010",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在缺页异常 (Page Fault) 处理逻辑并与内存分配/映射联动？",
+      "fact_answers": [
+        {"fact_id":"Q03_010_01","fact_key":"scope_definition","value":"yes_strong","used_evidence_ids":["ev_cc_q10_excp_codes","ev_cc_q10_handler_proto"],"notes":"EXCP_INST_PAGE/LOAD_PAGE/STORE_PAGE 与 K210 EXCP_*_ACCESS 同时纳入识别"},
+        {"fact_id":"Q03_010_02","fact_key":"real_implementation_body","value":"yes_strong","used_evidence_ids":["ev_cc_q10_handle_page_fault","ev_cc_q10_lazy","ev_cc_q10_cow"],"notes":"handle_page_fault 区分 LOAD/HEAP/STACK/MMAP；lazy/cow 路径完整"},
+        {"fact_id":"Q03_010_03","fact_key":"active_call_path","value":"yes_strong","used_evidence_ids":["ev_cc_q10_handle_excp"],"notes":"usertrap → handle_excp → handle_page_fault"},
+        {"fact_id":"Q03_010_04","fact_key":"state_or_effect","value":"yes_strong","used_evidence_ids":["ev_cc_q10_lazy"],"notes":"在 fault 上下文真实分配物理页并写 PTE+sfence"},
+        {"fact_id":"Q03_010_05","fact_key":"stub_and_false_positive_filter","value":"no_after_negative_search","used_evidence_ids":[],"notes":"非桩"},
+        {"fact_id":"Q03_010_06","fact_key":"negative_search_coverage","value":{"searched_keywords":["page_fault","handle_page_fault","scause","stval","EXCP_LOAD_PAGE","EXCP_STORE_PAGE"],"searched_directories":["kernel/trap","kernel/mm"],"file_count":6,"match_count":40,"coverage_sufficient":true},"used_evidence_ids":[],"notes":"覆盖充分"}
+      ],
+      "value": "implemented",
+      "used_evidence_ids": ["ev_cc_q10_excp_codes","ev_cc_q10_handler_proto","ev_cc_q10_handle_page_fault","ev_cc_q10_handle_excp","ev_cc_q10_lazy","ev_cc_q10_cow"],
+      "notes": "handle_page_fault 既支持 ELF 段按需载入 (LOAD)、堆/栈惰性分配 (HEAP/STACK)、mmap 文件/匿名按需分配 (MMAP)，又联合处理 CoW（PTE_COW 命中时复制页）。",
+      "evidence": [
+        {"evidence_id":"ev_cc_q10_excp_codes","path":"kernel/trap/trap.c","line_start":34,"line_end":49,"symbol_kind":"definition","symbol_name":"page_fault_codes","excerpt":"#define EXCP_INST_PAGE  0xc // 12\n#define EXCP_LOAD_PAGE  0xd // 13\n#define EXCP_STORE_PAGE 0xf // 15\n#ifndef QEMU\n#define is_page_fault(scause) (EXCP_LOAD_ACCESS == (scause) || EXCP_STORE_ACCESS == (scause))\n#else\n#define is_page_fault(scause) (EXCP_LOAD_PAGE == (scause) || EXCP_STORE_PAGE == (scause))\n#endif","evidence_type":"definition","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q10_handler_proto","path":"kernel/mm/vm.c","line_start":1035,"line_end":1045,"symbol_kind":"definition","symbol_name":"handle_page_fault_proto","excerpt":"/**\n * @param   kind      load-0 | store-1 | execute-2 |\n * @param   badaddr   the stval\n */\nint handle_page_fault(int kind, uint64 badaddr)","evidence_type":"definition","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q10_handle_page_fault","path":"kernel/mm/vm.c","line_start":1039,"line_end":1105,"symbol_kind":"implementation_body","symbol_name":"handle_page_fault","excerpt":"struct seg *seg = locateseg(p->segment, badaddr);\nif (seg == NULL) return -1;\npte_t *pte = walk(p->pagetable, badaddr, 0);\nif (pte && kind == 1 && (*pte & PTE_COW)) return handle_store_page_fault_cow(pte);\nswitch (seg->type) {\n  case LOAD: return handle_page_fault_loadelf(badaddr, seg);\n  case HEAP: case STACK: return handle_page_fault_lazy(badaddr, seg);\n  case MMAP: return handle_page_fault_mmap(kind, badaddr, seg);\n}","evidence_type":"implementation_body","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q10_handle_excp","path":"kernel/trap/trap.c","line_start":328,"line_end":348,"symbol_kind":"call_site","symbol_name":"handle_excp_dispatch","excerpt":"int handle_excp(uint64 scause) {\n  switch (scause) {\n    case EXCP_STORE_PAGE: return handle_page_fault(1, r_stval());\n    case EXCP_LOAD_PAGE:  return handle_page_fault(0, r_stval());\n    case EXCP_INST_PAGE:  return handle_page_fault(2, r_stval());\n    default: return -1;\n  }\n}","evidence_type":"call_site","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q10_lazy","path":"kernel/mm/vm.c","line_start":1002,"line_end":1016,"symbol_kind":"implementation_body","symbol_name":"handle_page_fault_lazy","excerpt":"static int handle_page_fault_lazy(uint64 badaddr, struct seg *s) {\n  uint64 pa = PGROUNDDOWN(badaddr);\n  if (uvmalloc(p->pagetable, pa, pa + PGSIZE, s->flag) == 0) return -1;\n  sfence_vma();\n  return 0;\n}","evidence_type":"implementation_body","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q10_cow","path":"kernel/mm/vm.c","line_start":975,"line_end":1000,"symbol_kind":"implementation_body","symbol_name":"handle_store_page_fault_cow","excerpt":"if (monopolizepage(pa)) pte |= PTE_W;\nelse {\n  char *copy = (char *)allocpage();\n  memmove(copy, (char *)pa, PGSIZE);\n  pagecopydone(); pagereg((uint64)copy, 1);\n  pte = PA2PTE(copy) | PTE_FLAGS(pte) | PTE_W;\n}\npte &= ~PTE_COW; *ptep = pte; sfence_vma();","evidence_type":"implementation_body","strength":"strong","validity":"valid","supports_claim_types":["implemented"]}
+      ]
+    },
+    {
+      "question_id": "Q03_011",
+      "question_type": "short_answer",
+      "stem": "追踪一条缺页链路：trap/异常入口 → 缺页处理函数 → 分配页帧 → 建立映射。",
+      "fact_answers": [
+        {"fact_id":"Q03_011_01","fact_key":"answer_scope","value":"yes_strong","used_evidence_ids":["ev_cc_q11_usertrap","ev_cc_q11_handle_excp"],"notes":"沿 usertrap→handle_excp→handle_page_fault→handle_page_fault_lazy→uvmalloc/mappages→sfence"},
+        {"fact_id":"Q03_011_02","fact_key":"primary_evidence_anchor","value":"yes_strong","used_evidence_ids":["ev_cc_q11_usertrap","ev_cc_q11_handle_excp","ev_cc_q11_handle_page_fault","ev_cc_q11_uvmalloc"],"notes":"四节点定义/实现齐全"},
+        {"fact_id":"Q03_011_03","fact_key":"implementation_or_flow_evidence","value":"yes_strong","used_evidence_ids":["ev_cc_q11_uvmalloc"],"notes":"uvmalloc 调用 allocpage + mappages 完成分配并建立映射，最后 sfence 刷 TLB"},
+        {"fact_id":"Q03_011_04","fact_key":"boundary_and_non_answers","value":"yes_strong","used_evidence_ids":[],"notes":"未把 mmap/CoW 路径并入主链；按惰性分配主链给出"},
+        {"fact_id":"Q03_011_05","fact_key":"unknown_or_partial_items","value":"no_after_negative_search","used_evidence_ids":[],"notes":"无未决"},
+        {"fact_id":"Q03_011_06","fact_key":"negative_search_coverage","value":{"searched_keywords":["usertrap","handle_excp","handle_page_fault","uvmalloc","allocpage","mappages","sfence_vma"],"searched_directories":["kernel/trap","kernel/mm"],"file_count":6,"match_count":80,"coverage_sufficient":true},"used_evidence_ids":[],"notes":"覆盖充分"}
+      ],
+      "value": "1) usertrap (kernel/trap/trap.c:75) 读 r_scause()/r_stval() → 2) handle_excp (kernel/trap/trap.c:328) 按 EXCP_STORE_PAGE/LOAD_PAGE/INST_PAGE 分发到 handle_page_fault(kind, r_stval()) → 3) handle_page_fault (kernel/mm/vm.c:1039) 用 locateseg 定位 seg，按 type 走 LOAD/HEAP/STACK/MMAP；以 HEAP 为例进入 handle_page_fault_lazy (kernel/mm/vm.c:1002) → 4) uvmalloc → allocpage()(pm.c:232) 取一页，再 mappages(p->pagetable, va, PGSIZE, pa, perm)(vm.c:298) 写 PTE → 5) sfence_vma() 刷新本核 TLB；返回 0 时由 usertrap 直接 usertrapret 重新执行原指令。",
+      "used_evidence_ids": ["ev_cc_q11_usertrap","ev_cc_q11_handle_excp","ev_cc_q11_handle_page_fault","ev_cc_q11_uvmalloc"],
+      "notes": "K210 上 EXCP_*_ACCESS 与 QEMU 上 EXCP_*_PAGE 通过 #ifndef QEMU 宏在 trap.c 与 vm.c 双侧统一。",
+      "evidence": [
+        {"evidence_id":"ev_cc_q11_usertrap","path":"kernel/trap/trap.c","line_start":75,"line_end":141,"symbol_kind":"implementation_body","symbol_name":"usertrap","excerpt":"void usertrap(void) {\n  uint64 cause = r_scause();\n  if (cause == EXCP_ENV_CALL) { ... syscall(); }\n  else if (0 == handle_intr(cause)) { ... }\n  else if (0 == handle_excp(cause)) { /* exception handled */ }\n  else { p->killed = SIGTERM; }\n}","evidence_type":"implementation_body","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q11_handle_excp","path":"kernel/trap/trap.c","line_start":328,"line_end":348,"symbol_kind":"call_site","symbol_name":"handle_excp","excerpt":"case EXCP_STORE_PAGE: return handle_page_fault(1, r_stval());\ncase EXCP_LOAD_PAGE:  return handle_page_fault(0, r_stval());\ncase EXCP_INST_PAGE:  return handle_page_fault(2, r_stval());","evidence_type":"call_site","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q11_handle_page_fault","path":"kernel/mm/vm.c","line_start":1039,"line_end":1105,"symbol_kind":"implementation_body","symbol_name":"handle_page_fault","excerpt":"struct seg *seg = locateseg(p->segment, badaddr);\nif (seg == NULL) return -1;\nswitch (seg->type) {\n  case HEAP: case STACK: return handle_page_fault_lazy(badaddr, seg);\n  ...\n}","evidence_type":"implementation_body","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q11_uvmalloc","path":"kernel/mm/vm.c","line_start":1002,"line_end":1016,"symbol_kind":"usage_flow","symbol_name":"uvmalloc_path","excerpt":"static int handle_page_fault_lazy(uint64 badaddr, struct seg *s) {\n  uint64 pa = PGROUNDDOWN(badaddr);\n  if (uvmalloc(p->pagetable, pa, pa + PGSIZE, s->flag) == 0) return -1;\n  sfence_vma();\n  return 0;\n}","evidence_type":"usage_flow","strength":"strong","validity":"valid","supports_claim_types":["implemented"]}
+      ]
+    },
+    {
+      "question_id": "Q03_012",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现写时复制 (Copy-on-Write, CoW)？",
+      "fact_answers": [
+        {"fact_id":"Q03_012_01","fact_key":"scope_definition","value":"yes_strong","used_evidence_ids":["ev_cc_q12_pte_cow","ev_cc_q12_refcount"],"notes":"PTE_COW 复用 PTE_RSW1；page_ref_table[MAX_PAGES_NUM=0x600] + page_ref_lock 提供页引用计数"},
+        {"fact_id":"Q03_012_02","fact_key":"real_implementation_body","value":"yes_strong","used_evidence_ids":["ev_cc_q12_uvmcopy","ev_cc_q12_cow_fault"],"notes":"fork 路径 uvmcopy(cow=1) 把可写页改为 PTE_COW|~PTE_W；store fault 路径 handle_store_page_fault_cow 真实复制并去 COW 标志"},
+        {"fact_id":"Q03_012_03","fact_key":"active_call_path","value":"yes_strong","used_evidence_ids":["ev_cc_q12_fork_callsite"],"notes":"fork→copysegs→uvmcopy(cow=1)；usertrap→handle_excp→handle_page_fault→handle_store_page_fault_cow"},
+        {"fact_id":"Q03_012_04","fact_key":"state_or_effect","value":"yes_strong","used_evidence_ids":["ev_cc_q12_cow_fault","ev_cc_q12_refcount"],"notes":"运行期 page_ref_table 计数变化；PTE_W 写权限按需赋予/撤销"},
+        {"fact_id":"Q03_012_05","fact_key":"stub_and_false_positive_filter","value":"no_after_negative_search","used_evidence_ids":[],"notes":"非桩"},
+        {"fact_id":"Q03_012_06","fact_key":"negative_search_coverage","value":{"searched_keywords":["COW","copy_on_write","PTE_COW","page_ref","pagedup","monopolizepage"],"searched_directories":["kernel/mm","kernel/sched"],"file_count":8,"match_count":35,"coverage_sufficient":true},"used_evidence_ids":[],"notes":"覆盖充分"}
+      ],
+      "value": "implemented",
+      "used_evidence_ids": ["ev_cc_q12_pte_cow","ev_cc_q12_refcount","ev_cc_q12_uvmcopy","ev_cc_q12_cow_fault","ev_cc_q12_fork_callsite"],
+      "notes": "标记发生在 fork 中的 uvmcopy；实际复制发生在 store-type page fault 中。两点联动通过 PTE_COW（PTE_RSW1）+ page_ref_table 共同维持。",
+      "evidence": [
+        {"evidence_id":"ev_cc_q12_pte_cow","path":"kernel/mm/vm.c","line_start":22,"line_end":22,"symbol_kind":"definition","symbol_name":"PTE_COW","excerpt":"#define PTE_COW PTE_RSW1  // Use it to mark a COW page","evidence_type":"definition","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q12_refcount","path":"kernel/mm/vm.c","line_start":20,"line_end":30,"symbol_kind":"definition","symbol_name":"page_ref_table","excerpt":"#define MAX_PAGES_NUM 0x600\nstatic struct spinlock page_ref_lock;\nstatic uint8 page_ref_table[MAX_PAGES_NUM];  // user pages ref, for COW fork mechanism","evidence_type":"definition","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q12_uvmcopy","path":"kernel/mm/vm.c","line_start":556,"line_end":593,"symbol_kind":"implementation_body","symbol_name":"uvmcopy_marks_cow","excerpt":"if (cow && (*pte & PTE_W)) {\n  *pte = (*pte|PTE_COW) & ~PTE_W;  // cancel 'W', and mark COW\n}\nflags = PTE_FLAGS(*pte);\nif(mappages(new, i, PGSIZE, pa, flags) != 0) goto err;\n...\nsfence_vma();","evidence_type":"implementation_body","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q12_cow_fault","path":"kernel/mm/vm.c","line_start":975,"line_end":1000,"symbol_kind":"implementation_body","symbol_name":"handle_store_page_fault_cow","excerpt":"if (monopolizepage(pa)) pte |= PTE_W;\nelse {\n  char *copy = (char *)allocpage();\n  memmove(copy, (char *)pa, PGSIZE);\n  pagecopydone();\n  pagereg((uint64)copy, 1);\n  pte = PA2PTE(copy) | PTE_FLAGS(pte) | PTE_W;\n}\npte &= ~PTE_COW;\n*ptep = pte;\nsfence_vma();","evidence_type":"implementation_body","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q12_fork_callsite","path":"kernel/sched/proc.c","line_start":680,"line_end":700,"symbol_kind":"call_site","symbol_name":"fork_uvmcopy","excerpt":"// fork-time: copysegs/uvmcopy with cow=1\nif (uvmcopy(p->pagetable, np->pagetable, ..., 1) < 0) {...}\nsfence_vma();","evidence_type":"call_site","strength":"weak","validity":"valid","supports_claim_types":["implemented"]}
+      ]
+    },
+    {
+      "question_id": "Q03_013",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现惰性分配 (Lazy Allocation)？",
+      "fact_answers": [
+        {"fact_id":"Q03_013_01","fact_key":"scope_definition","value":"yes_strong","used_evidence_ids":["ev_cc_q13_growproc","ev_cc_q13_seg_types"],"notes":"sys_brk/sys_sbrk → growproc 仅修改 seg->sz 与 p->pbrk，不分配；HEAP/STACK/MMAP seg type"},
+        {"fact_id":"Q03_013_02","fact_key":"real_implementation_body","value":"yes_strong","used_evidence_ids":["ev_cc_q13_handle_lazy","ev_cc_q13_growproc"],"notes":"growproc 改 sz；handle_page_fault_lazy 实际 uvmalloc 分配"},
+        {"fact_id":"Q03_013_03","fact_key":"active_call_path","value":"yes_strong","used_evidence_ids":["ev_cc_q13_sysbrk"],"notes":"sys_brk/sys_sbrk → growproc → 推迟到 fault 时分配"},
+        {"fact_id":"Q03_013_04","fact_key":"state_or_effect","value":"yes_strong","used_evidence_ids":["ev_cc_q13_handle_lazy"],"notes":"page_fault 时把页号 PGROUNDDOWN(badaddr) 物理页才落地"},
+        {"fact_id":"Q03_013_05","fact_key":"stub_and_false_positive_filter","value":"no_after_negative_search","used_evidence_ids":[],"notes":"非桩"},
+        {"fact_id":"Q03_013_06","fact_key":"negative_search_coverage","value":{"searched_keywords":["lazy","sbrk","growproc","HEAP","handle_page_fault_lazy"],"searched_directories":["kernel/mm","kernel/sched","kernel/syscall"],"file_count":10,"match_count":30,"coverage_sufficient":true},"used_evidence_ids":[],"notes":"覆盖充分"}
+      ],
+      "value": "implemented",
+      "used_evidence_ids": ["ev_cc_q13_growproc","ev_cc_q13_handle_lazy","ev_cc_q13_sysbrk","ev_cc_q13_seg_types"],
+      "notes": "实现位置在 fault 中（handle_page_fault_lazy）。sys_brk/sys_sbrk 仅扩张 HEAP seg 的 sz；HEAP/STACK 实际物理页在首次访问时按页粒度通过 uvmalloc 分配并 sfence_vma。",
+      "evidence": [
+        {"evidence_id":"ev_cc_q13_growproc","path":"kernel/sched/proc.c","line_start":792,"line_end":825,"symbol_kind":"implementation_body","symbol_name":"growproc","excerpt":"int growproc(uint64 newbrk) {\n  struct seg *heap = getseg(p->segment, HEAP);\n  ...\n  if (newbrk < p->pbrk) { uvmdealloc(p->pagetable, newbrk, p->pbrk); sfence_vma(); }\n  int64 diff = newbrk - p->pbrk;\n  heap->sz += diff;\n  p->pbrk = newbrk;\n  return 0;\n}","evidence_type":"implementation_body","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q13_handle_lazy","path":"kernel/mm/vm.c","line_start":1002,"line_end":1016,"symbol_kind":"implementation_body","symbol_name":"handle_page_fault_lazy","excerpt":"static int handle_page_fault_lazy(uint64 badaddr, struct seg *s) {\n  uint64 pa = PGROUNDDOWN(badaddr);\n  if (uvmalloc(p->pagetable, pa, pa + PGSIZE, s->flag) == 0) return -1;\n  sfence_vma();\n  return 0;\n}","evidence_type":"implementation_body","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q13_sysbrk","path":"kernel/syscall/sysmem.c","line_start":20,"line_end":52,"symbol_kind":"call_site","symbol_name":"sys_brk_sbrk","excerpt":"uint64 sys_sbrk(void){ argint(0,&n); addr=p->pbrk; if(growproc(addr+n)<0) return -1; return addr; }\nuint64 sys_brk(void){ argaddr(0,&addr); if(addr==0) return p->pbrk; if(growproc(addr)<0) return old; return addr; }","evidence_type":"call_site","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q13_seg_types","path":"include/mm/usrmm.h","line_start":8,"line_end":19,"symbol_kind":"definition","symbol_name":"segtype","excerpt":"enum segtype { NONE, LOAD, TEXT, DATA, BSS, HEAP, MMAP, STACK };\nstruct seg{ enum segtype type; int flag; uint64 addr; uint64 sz; struct seg *next; uint64 mmap; uint64 f_off; uint64 f_sz; };","evidence_type":"definition","strength":"strong","validity":"valid","supports_claim_types":["implemented"]}
+      ]
+    },
+    {
+      "question_id": "Q03_014",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 swap（swap_in/swap_out 或等价页面置换）？",
+      "fact_answers": [
+        {"fact_id":"Q03_014_01","fact_key":"scope_definition","value":"no_after_negative_search","used_evidence_ids":["ev_cc_q14_neg"],"notes":"无 swap_in/swap_out/页面置换 API；mmap.c 中 __page_file_swap 是文件页缓存的 mmap-page eviction 而非匿名页 swap"},
+        {"fact_id":"Q03_014_02","fact_key":"real_implementation_body","value":"no_after_negative_search","used_evidence_ids":["ev_cc_q14_swap_func"],"notes":"__page_file_swap 仅在仓库中作为静态函数存在，且其调用点在 mmap.c:1048 是注释 ('// pa = __page_file_swap(...)')，未在主路径生效"},
+        {"fact_id":"Q03_014_03","fact_key":"active_call_path","value":"no_after_negative_search","used_evidence_ids":["ev_cc_q14_swap_func"],"notes":"无活动调用链；分配失败时只 return -ENOMEM"},
+        {"fact_id":"Q03_014_04","fact_key":"state_or_effect","value":"no_after_negative_search","used_evidence_ids":["ev_cc_q14_swap_func"],"notes":"无 swap 区/磁盘后端"},
+        {"fact_id":"Q03_014_05","fact_key":"stub_and_false_positive_filter","value":"yes_weak","used_evidence_ids":["ev_cc_q14_swap_func"],"notes":"__page_file_swap 是部分写完但未启用的桩，相关 callsite 注释掉"},
+        {"fact_id":"Q03_014_06","fact_key":"negative_search_coverage","value":{"searched_keywords":["swap","swap_in","swap_out","page_replacement","LRU","FIFO","clock_alg","evict"],"searched_directories":["kernel/mm","include/mm","kernel/fs"],"file_count":15,"match_count":5,"coverage_sufficient":true},"used_evidence_ids":["ev_cc_q14_neg"],"notes":"仅 5 处疑似命中，全部为注释或未启用代码"}
+      ],
+      "value": "not_found",
+      "used_evidence_ids": ["ev_cc_q14_swap_func","ev_cc_q14_neg"],
+      "notes": "未实现匿名页换出磁盘；mmap 文件页只支持回写到原文件（msync），分配不足时直接 -ENOMEM 杀进程，不触发 swap。",
+      "evidence": [
+        {"evidence_id":"ev_cc_q14_swap_func","path":"kernel/mm/mmap.c","line_start":908,"line_end":1050,"symbol_kind":"implementation_body","symbol_name":"__page_file_swap_unused","excerpt":"static void *__page_file_swap(struct inode *ip, uint64 foff, uint64 badaddr) { /* mmap-file page eviction */ ... }\n// callsite at line 1048 is commented out: \"// pa = __page_file_swap(ip, off, badaddr);\"","evidence_type":"implementation_body","strength":"weak","validity":"weak","supports_claim_types":["stub"]},
+        {"evidence_id":"ev_cc_q14_neg","path":"kernel/+include/","line_start":0,"line_end":0,"symbol_kind":"negative_search","symbol_name":"swap_negative","excerpt":"grep -r 'swap_in|swap_out|page_replacement|LRU|FIFO|clock|evict' kernel include 仅命中 mmap.c 中的 __page_file_swap 注释/桩，无活路径，无 anonymous swap，无 swap 分区设备。","evidence_type":"negative_search","strength":"strong","validity":"valid","supports_claim_types":["not_implemented"]}
+      ]
+    },
+    {
+      "question_id": "Q03_015",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 mmap（文件映射/匿名映射）且处理标志位？",
+      "fact_answers": [
+        {"fact_id":"Q03_015_01","fact_key":"scope_definition","value":"yes_strong","used_evidence_ids":["ev_cc_q15_mmap_h","ev_cc_q15_seg_mmap"],"notes":"PROT_/MAP_FILE/SHARED/PRIVATE/FIXED/ANONYMOUS 全部定义；seg->mmap 同时复用 LSB 编码 SHARE/ANONY 标志"},
+        {"fact_id":"Q03_015_02","fact_key":"real_implementation_body","value":"yes_strong","used_evidence_ids":["ev_cc_q15_do_mmap","ev_cc_q15_do_munmap","ev_cc_q15_handle_fault_mmap"],"notes":"do_mmap 区分 file 与 anonymous，调用 mmap_file 或 mmap_anonymous；MAP_FIXED 走 lookup_fixed_segment 并清理被覆盖映射"},
+        {"fact_id":"Q03_015_03","fact_key":"active_call_path","value":"yes_strong","used_evidence_ids":["ev_cc_q15_sys_mmap"],"notes":"syscall.c 表项 SYS_mmap/SYS_munmap → sys_mmap/sys_munmap → do_mmap/do_munmap"},
+        {"fact_id":"Q03_015_04","fact_key":"state_or_effect","value":"yes_strong","used_evidence_ids":["ev_cc_q15_handle_fault_mmap"],"notes":"惰性映射，page-fault 时 handle_page_fault_mmap 才落地物理页；msync 实现写回"},
+        {"fact_id":"Q03_015_05","fact_key":"stub_and_false_positive_filter","value":"no_after_negative_search","used_evidence_ids":[],"notes":"非桩"},
+        {"fact_id":"Q03_015_06","fact_key":"negative_search_coverage","value":{"searched_keywords":["mmap","munmap","MAP_FIXED","MAP_ANONYMOUS","do_mmap","handle_page_fault_mmap"],"searched_directories":["kernel/mm","kernel/syscall","include/mm"],"file_count":8,"match_count":120,"coverage_sufficient":true},"used_evidence_ids":[],"notes":"覆盖充分"}
+      ],
+      "value": "implemented",
+      "used_evidence_ids": ["ev_cc_q15_mmap_h","ev_cc_q15_seg_mmap","ev_cc_q15_do_mmap","ev_cc_q15_do_munmap","ev_cc_q15_handle_fault_mmap","ev_cc_q15_sys_mmap"],
+      "notes": "do_mmap 同时支持 file-backed 与 anonymous，并按 MAP_FIXED 进行已有映射拆分/覆盖；MAP_SHARED 标志通过 seg->mmap 的 LSB 维持，msync 仅对 file-backed && shared 同步。",
+      "evidence": [
+        {"evidence_id":"ev_cc_q15_mmap_h","path":"include/mm/mmap.h","line_start":10,"line_end":46,"symbol_kind":"definition","symbol_name":"mmap_flags","excerpt":"#define PROT_NONE 0\n#define PROT_READ 1\n#define PROT_WRITE 2\n#define PROT_EXEC 4\n#define MAP_FILE 0\n#define MAP_SHARED 0x01\n#define MAP_PRIVATE 0x02\n#define MAP_FIXED 0x10\n#define MAP_ANONYMOUS 0x20\n#define MMAP_SHARE_FLAG 0x1L\n#define MMAP_ANONY_FLAG 0x2L\n#define MMAP_FILE(x) ((void *)((uint64)(x) & ~(MMAP_SHARE_FLAG|MMAP_ANONY_FLAG)))","evidence_type":"definition","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q15_seg_mmap","path":"include/mm/usrmm.h","line_start":10,"line_end":19,"symbol_kind":"definition","symbol_name":"seg_mmap_field","excerpt":"struct seg{ enum segtype type; int flag; uint64 addr; uint64 sz; struct seg *next; uint64 mmap; uint64 f_off; uint64 f_sz; };","evidence_type":"definition","strength":"weak","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q15_do_mmap","path":"kernel/mm/mmap.c","line_start":710,"line_end":771,"symbol_kind":"implementation_body","symbol_name":"do_mmap","excerpt":"if (flags & MAP_FIXED) ret = lookup_fixed_segment(start, start + sz, &prev, &new);\nelse                   ret = lookup_segment(sz, &prev, &new);\nnew->flag = (prot << 1) & (PTE_X|PTE_W|PTE_R);\nif (f) ret = mmap_file(new, len, flags, f, off);\nelse   ret = mmap_anonymous(new, flags);\n... struct seg *del = prev ? prev->next : p->segment;\nwhile (del != new->next) { del = delseg(p->pagetable, del); }\nsfence_vma();\nreturn new->addr;","evidence_type":"implementation_body","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q15_do_munmap","path":"kernel/mm/mmap.c","line_start":773,"line_end":816,"symbol_kind":"implementation_body","symbol_name":"do_munmap","excerpt":"int do_munmap(uint64 start, uint64 len) {\n  ret = lookup_fixed_segment(start, end, &prev, &s);\n  while (del != s->next) { del = delseg(p->pagetable, del); }\n  if (ret) { /* updated chain */ sfence_vma(); }\n  kfree(s); return 0;\n}","evidence_type":"implementation_body","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q15_handle_fault_mmap","path":"kernel/mm/mmap.c","line_start":1100,"line_end":1160,"symbol_kind":"implementation_body","symbol_name":"handle_page_fault_mmap","excerpt":"int handle_page_fault_mmap(int kind, uint64 badaddr, struct seg *s) { /* anonymous: alloc new page; file-backed: read into mmap_page rb-tree, share if MAP_SHARED */ ... sfence_vma(); }","evidence_type":"implementation_body","strength":"weak","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q15_sys_mmap","path":"kernel/syscall/syscall.c","line_start":158,"line_end":231,"symbol_kind":"call_site","symbol_name":"syscall_table","excerpt":"extern uint64 sys_mmap(void);\nextern uint64 sys_munmap(void);\n...\n[SYS_mmap]   sys_mmap,\n[SYS_munmap] sys_munmap,","evidence_type":"call_site","strength":"strong","validity":"valid","supports_claim_types":["implemented"]}
+      ]
+    },
+    {
+      "question_id": "Q03_016",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在文件页缓存 Page Cache（以 inode/文件对象 + page offset 为 key 并与 read/write/mmap/page fault/writeback 共享）？",
+      "fact_answers": [
+        {"fact_id":"Q03_016_01","fact_key":"scope_definition","value":"yes_weak","used_evidence_ids":["ev_cc_q16_mmap_page","ev_cc_q16_inode_mapping"],"notes":"struct mmap_page{f_off, pa, ref, valid, struct rb_node rb}；inode 上挂 mapping rbtree（f_off 为索引）"},
+        {"fact_id":"Q03_016_02","fact_key":"real_implementation_body","value":"yes_weak","used_evidence_ids":["ev_cc_q16_mmap_page","ev_cc_q16_handle_fault_mmap"],"notes":"mmap fault 通过 inode->mapping 查页对象，命中则共享 pa（MAP_SHARED）/复制（MAP_PRIVATE），未命中则读盘建立"},
+        {"fact_id":"Q03_016_03","fact_key":"active_call_path","value":"yes_weak","used_evidence_ids":["ev_cc_q16_handle_fault_mmap"],"notes":"仅在 mmap 路径与 munmap/msync 共享，read/write 系统调用没有走该缓存（read/write 走 fs/buf.c 的块缓冲，与 mmap-page 不共享）"},
+        {"fact_id":"Q03_016_04","fact_key":"state_or_effect","value":"stub_or_declaration_only","used_evidence_ids":["ev_cc_q16_handle_fault_mmap"],"notes":"writeback 仅在 msync(MS_SYNC) / munmap 时写回，无后台守护"},
+        {"fact_id":"Q03_016_05","fact_key":"stub_and_false_positive_filter","value":"yes_weak","used_evidence_ids":["ev_cc_q16_handle_fault_mmap"],"notes":"page cache 与 read/write 不共享 → 不构成完整 Linux 风格 Page Cache，按弱实现处理"},
+        {"fact_id":"Q03_016_06","fact_key":"negative_search_coverage","value":{"searched_keywords":["page_cache","address_space","page_offset","mapping","mmap_page","writeback"],"searched_directories":["kernel/mm","kernel/fs","include"],"file_count":15,"match_count":18,"coverage_sufficient":true},"used_evidence_ids":[],"notes":"覆盖充分"}
+      ],
+      "value": "stub",
+      "used_evidence_ids": ["ev_cc_q16_mmap_page","ev_cc_q16_inode_mapping","ev_cc_q16_handle_fault_mmap"],
+      "notes": "存在 mmap 专用的文件页缓存（inode->mapping 的 rb-tree of struct mmap_page，键为 f_off），但与 read/write 路径不共享、亦无后台 writeback，仅作为 mmap 文件映射的私有缓存，故按 stub 等级而非完整 Page Cache。",
+      "evidence": [
+        {"evidence_id":"ev_cc_q16_mmap_page","path":"include/mm/mmap.h","line_start":48,"line_end":56,"symbol_kind":"definition","symbol_name":"struct_mmap_page","excerpt":"struct mmap_page {\n  uint64 f_off; uint64 f_len; void *pa; uint32 ref;\n  int valid;            // protected by inode's sleeplock\n  struct rb_node rb;    // f_off is the index\n};","evidence_type":"definition","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q16_inode_mapping","path":"include/fs/file.h","line_start":1,"line_end":40,"symbol_kind":"definition","symbol_name":"inode_mapping","excerpt":"struct inode { ... struct rb_root mapping; ... };  // tree of struct mmap_page","evidence_type":"definition","strength":"weak","validity":"weak","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q16_handle_fault_mmap","path":"kernel/mm/mmap.c","line_start":1040,"line_end":1160,"symbol_kind":"usage_flow","symbol_name":"mmap_page_fault_path","excerpt":"// handle_page_fault_mmap 在 inode 的 mapping 树中查找 f_off 对应的 mmap_page；命中共享 pa（MAP_SHARED）或复制（MAP_PRIVATE），未命中则读盘并 insert；msync/munmap 触发回写","evidence_type":"usage_flow","strength":"weak","validity":"valid","supports_claim_types":["implemented"]}
+      ]
+    },
+    {
+      "question_id": "Q03_017",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在文件页/映射页的脏页回写 (dirty page writeback) 机制？",
+      "fact_answers": [
+        {"fact_id":"Q03_017_01","fact_key":"scope_definition","value":"yes_weak","used_evidence_ids":["ev_cc_q17_msync"],"notes":"do_msync 与 mmapdel(seg, sync=1) 走同步回写"},
+        {"fact_id":"Q03_017_02","fact_key":"real_implementation_body","value":"yes_weak","used_evidence_ids":["ev_cc_q17_msync","ev_cc_q17_mmapdel"],"notes":"do_msync 对 file&shared 段写回；mmapdel 在退出 segment 时按 share 标志写回"},
+        {"fact_id":"Q03_017_03","fact_key":"active_call_path","value":"yes_weak","used_evidence_ids":["ev_cc_q17_syncfs"],"notes":"sys_msync → do_msync；usertrap 失败路径调用 syncfs() 强制刷盘块缓存"},
+        {"fact_id":"Q03_017_04","fact_key":"state_or_effect","value":"yes_weak","used_evidence_ids":["ev_cc_q17_msync"],"notes":"同步回写，没有后台 writeback 线程，无脏位计数"},
+        {"fact_id":"Q03_017_05","fact_key":"stub_and_false_positive_filter","value":"no_after_negative_search","used_evidence_ids":[],"notes":"块缓冲层 (fs/buf.c bwrite) 是真同步写盘，可视为附加路径"},
+        {"fact_id":"Q03_017_06","fact_key":"negative_search_coverage","value":{"searched_keywords":["msync","writeback","dirty","syncfs","fsync","bwrite"],"searched_directories":["kernel/mm","kernel/fs","kernel/trap"],"file_count":15,"match_count":24,"coverage_sufficient":true},"used_evidence_ids":[],"notes":"覆盖充分"}
+      ],
+      "value": "implemented",
+      "used_evidence_ids": ["ev_cc_q17_msync","ev_cc_q17_mmapdel","ev_cc_q17_syncfs"],
+      "notes": "回写为同步触发：(1) sys_msync → do_msync 仅对 file-backed && MAP_SHARED 写回；(2) munmap/退出时 mmapdel(seg, sync=1) 触发；(3) usertrap 异常分支 syncfs() 把脏块刷盘。无定期/后台 dirty page writeback。",
+      "evidence": [
+        {"evidence_id":"ev_cc_q17_msync","path":"kernel/mm/mmap.c","line_start":819,"line_end":900,"symbol_kind":"implementation_body","symbol_name":"do_msync","excerpt":"int do_msync(uint64 addr, uint64 len, int flags) {\n  struct seg *s = partofseg(p->segment, addr, addr + len);\n  if (s->type != MMAP || MMAP_ANONY(s->mmap) || !MMAP_SHARE(s->mmap)) return 0;\n  /* iterate inode->mapping rbtree, write each dirty mmap_page back via writei */\n}","evidence_type":"implementation_body","strength":"weak","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q17_mmapdel","path":"kernel/mm/mmap.c","line_start":900,"line_end":1000,"symbol_kind":"implementation_body","symbol_name":"mmapdel_writeback","excerpt":"void mmapdel(struct seg *seg, int sync) { /* if MAP_SHARED && file: writei back, then remove mapping nodes; else just freepage */ ... }","evidence_type":"implementation_body","strength":"weak","validity":"weak","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q17_syncfs","path":"kernel/trap/trap.c","line_start":126,"line_end":130,"symbol_kind":"call_site","symbol_name":"usertrap_syncfs","excerpt":"// sync files, so progresses won't be lost even if the panic happens\nsyncfs();","evidence_type":"call_site","strength":"weak","validity":"valid","supports_claim_types":["implemented"]}
+      ]
+    },
+    {
+      "question_id": "Q03_018",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 TLB 射击 (TLB Shootdown / Remote TLB Flush) 机制？",
+      "fact_answers": [
+        {"fact_id":"Q03_018_01","fact_key":"scope_definition","value":"no_after_negative_search","used_evidence_ids":["ev_cc_q18_main_ipi"],"notes":"main.c 中 NCPU 处仅唤醒 hart1；并无跨核 TLB shootdown 协议"},
+        {"fact_id":"Q03_018_02","fact_key":"real_implementation_body","value":"no_after_negative_search","used_evidence_ids":["ev_cc_q18_handle_intr"],"notes":"INTR_SOFTWARE 处理路径中跨核 IPI for TLB shootdown 段全部被注释"},
+        {"fact_id":"Q03_018_03","fact_key":"active_call_path","value":"no_after_negative_search","used_evidence_ids":["ev_cc_q18_handle_intr"],"notes":"无 send_ipi_for_tlb_flush 调用点"},
+        {"fact_id":"Q03_018_04","fact_key":"state_or_effect","value":"no_after_negative_search","used_evidence_ids":[],"notes":"sfence_vma 只刷本核 TLB"},
+        {"fact_id":"Q03_018_05","fact_key":"stub_and_false_positive_filter","value":"yes_weak","used_evidence_ids":["ev_cc_q18_main_ipi"],"notes":"sbi_send_ipi 在 main.c 内仅用于唤醒 hart1，非 TLB shootdown"},
+        {"fact_id":"Q03_018_06","fact_key":"negative_search_coverage","value":{"searched_keywords":["tlb_shootdown","remote_flush","sbi_send_ipi","shootdown","remote_tlb"],"searched_directories":["kernel","include"],"file_count":20,"match_count":6,"coverage_sufficient":true},"used_evidence_ids":[],"notes":"6 处 sbi_send_ipi/IPI 命中均与 boot/timer 相关，非 TLB"}
+      ],
+      "value": "not_found",
+      "used_evidence_ids": ["ev_cc_q18_main_ipi","ev_cc_q18_handle_intr"],
+      "notes": "K210 双核架构，但内核仅做本核 sfence.vma；trap.c 中跨核 IPI for TLB shootdown 的代码段被显式注释掉。",
+      "evidence": [
+        {"evidence_id":"ev_cc_q18_main_ipi","path":"kernel/main.c","line_start":65,"line_end":71,"symbol_kind":"call_site","symbol_name":"sbi_send_ipi_boot","excerpt":"// we need IPI to wake up other hart(s)\nfor (int i = 1; i < NCPU; i ++) {\n  unsigned long mask = 1 << i;\n  sbi_send_ipi(mask, 0);\n}","evidence_type":"call_site","strength":"strong","validity":"valid","supports_claim_types":["not_implemented"]},
+        {"evidence_id":"ev_cc_q18_handle_intr","path":"kernel/trap/trap.c","line_start":300,"line_end":325,"symbol_kind":"implementation_body","symbol_name":"intr_software_no_shootdown","excerpt":"// send software interrupts to other harts to inform them\n// for (int i = 0; i < NCPU; i ++) {\n//   if (cpuid() != i) {\n//     sbi_send_ipi(1 << i, 0);\n//   }\n// }\nreturn 0;","evidence_type":"implementation_body","strength":"strong","validity":"valid","supports_claim_types":["not_implemented"]}
+      ]
+    },
+    {
+      "question_id": "Q03_019",
+      "question_type": "short_answer",
+      "stem": "TLB 刷新指令/函数点是什么？",
+      "fact_answers": [
+        {"fact_id":"Q03_019_01","fact_key":"answer_scope","value":"yes_strong","used_evidence_ids":["ev_cc_q19_sfence_inline"],"notes":"封装 inline static void sfence_vma() in include/hal/riscv.h"},
+        {"fact_id":"Q03_019_02","fact_key":"primary_evidence_anchor","value":"yes_strong","used_evidence_ids":["ev_cc_q19_sfence_inline"],"notes":"内联函数体含 'sfence.vma' (QEMU) / .word 0x10400073 (K210)"},
+        {"fact_id":"Q03_019_03","fact_key":"implementation_or_flow_evidence","value":"yes_strong","used_evidence_ids":["ev_cc_q19_callsites"],"notes":"vm.c/mmap.c/exec.c/proc.c/trap.c 多处调用，PTE 写后必刷"},
+        {"fact_id":"Q03_019_04","fact_key":"boundary_and_non_answers","value":"yes_strong","used_evidence_ids":["ev_cc_q19_kvminithart"],"notes":"kvminithart 直接内联 'asm volatile(\"sfence.vma\")'，是封装外的等价点"},
+        {"fact_id":"Q03_019_05","fact_key":"unknown_or_partial_items","value":"no_after_negative_search","used_evidence_ids":[],"notes":"无未决"},
+        {"fact_id":"Q03_019_06","fact_key":"negative_search_coverage","value":{"searched_keywords":["sfence_vma","sfence.vma","fence.i","invlpg","tlbi"],"searched_directories":["kernel","include/hal"],"file_count":20,"match_count":18,"coverage_sufficient":true},"used_evidence_ids":[],"notes":"覆盖充分"}
+      ],
+      "value": "封装：include/hal/riscv.h:361-375 定义 static inline void sfence_vma()，QEMU 路径执行 'sfence.vma'，K210 硬件路径用 .word 0x10400073（编码 sfence.vma）+ 'fence.i'。调用点：vm.c:587 uvmcopy 之后、vm.c:665 uvmprotect、vm.c:997 CoW 之后、vm.c:1013 lazy 分配之后、vm.c:1029 ELF demand load 之后；mmap.c:769 do_mmap、811 do_munmap、904/1119/1151；proc.c:688/693/816；trap.c 中 kvminithart 直接 asm volatile。",
+      "used_evidence_ids": ["ev_cc_q19_sfence_inline","ev_cc_q19_callsites","ev_cc_q19_kvminithart"],
+      "notes": "K210 上 sfence.vma 由 RustSBI 通过非法指令陷入模拟（plic.c:22 注释提示），但内核侧仍按 inline 调用。",
+      "evidence": [
+        {"evidence_id":"ev_cc_q19_sfence_inline","path":"include/hal/riscv.h","line_start":361,"line_end":375,"symbol_kind":"definition","symbol_name":"sfence_vma","excerpt":"static inline void sfence_vma() {\n  #ifdef QEMU\n  asm volatile(\"sfence.vma\");\n  #else\n  asm volatile(\".word 0x10400073\");\n  asm volatile(\"fence.i\");\n  #endif\n}","evidence_type":"definition","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q19_callsites","path":"kernel/mm/vm.c","line_start":587,"line_end":1029,"symbol_kind":"call_site","symbol_name":"sfence_vma_callsites","excerpt":"vm.c:587 uvmcopy; 665 uvmprotect; 997 handle_store_page_fault_cow; 1013 handle_page_fault_lazy; 1029 handle_page_fault_loadelf; mmap.c:769/811/904/1119/1151; proc.c:688/693/816; exec.c:293","evidence_type":"call_site","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q19_kvminithart","path":"kernel/mm/vm.c","line_start":120,"line_end":135,"symbol_kind":"call_site","symbol_name":"kvminithart_inline_sfence","excerpt":"w_satp(stap);\nasm volatile(\"sfence.vma\");\nprotect_usr_mem();","evidence_type":"call_site","strength":"strong","validity":"valid","supports_claim_types":["implemented"]}
+      ]
+    },
+    {
+      "question_id": "Q03_020",
+      "question_type": "short_answer",
+      "stem": "用户指针安全检查机制是什么？",
+      "fact_answers": [
+        {"fact_id":"Q03_020_01","fact_key":"answer_scope","value":"yes_strong","used_evidence_ids":["ev_cc_q20_walkaddr","ev_cc_q20_partofseg","ev_cc_q20_safememmove"],"notes":"两层保护：(1) walkaddr 校验 PTE_V+PTE_U；(2) partofseg + safememmove 走 trap-recover 路径"},
+        {"fact_id":"Q03_020_02","fact_key":"primary_evidence_anchor","value":"yes_strong","used_evidence_ids":["ev_cc_q20_walkaddr","ev_cc_q20_safememmove"],"notes":"两函数定义齐全"},
+        {"fact_id":"Q03_020_03","fact_key":"implementation_or_flow_evidence","value":"yes_strong","used_evidence_ids":["ev_cc_q20_copyout","ev_cc_q20_copyout2"],"notes":"copyout 老路径用 walkaddr 逐页拷贝；copyout2/copyin2 检 partofseg 后走 safememmove，借助 SUM 位与 kerneltrap 中 kern_pgfault_escape"},
+        {"fact_id":"Q03_020_04","fact_key":"boundary_and_non_answers","value":"yes_strong","used_evidence_ids":["ev_cc_q20_protect"],"notes":"无 access_ok/verify_area；通过 SSTATUS.SUM (permit_usr_mem/protect_usr_mem) 控制内核能否访问用户页"},
+        {"fact_id":"Q03_020_05","fact_key":"unknown_or_partial_items","value":"no_after_negative_search","used_evidence_ids":[],"notes":"无未决"},
+        {"fact_id":"Q03_020_06","fact_key":"negative_search_coverage","value":{"searched_keywords":["access_ok","verify_area","copyin","copyout","copyinstr","walkaddr","partofseg","safememmove","SUM","permit_usr_mem"],"searched_directories":["kernel/mm","include/hal"],"file_count":8,"match_count":80,"coverage_sufficient":true},"used_evidence_ids":[],"notes":"覆盖充分"}
+      ],
+      "value": "入口与校验：(1) copyout/copyin/copyinstr (kernel/mm/vm.c:756–) 通过 walkaddr 检查 va < MAXUVA、PTE_V、PTE_U 才取 pa，每页 PGSIZE 切片拷贝；(2) copyout2/copyin2/copyout_nocheck/copyin_nocheck 先 partofseg(p->segment, va, va+len) 校验 va 落在合法 seg 区间，再调 safememmove；safememmove 设置 save_point，临时 permit_usr_mem() 打开 SSTATUS.SUM 后逐字节复制；若发生 page fault，kerneltrap 通过 kern_pgfault_escape 跳回 save_point 返回 badaddr 表示失败。",
+      "used_evidence_ids": ["ev_cc_q20_walkaddr","ev_cc_q20_partofseg","ev_cc_q20_safememmove","ev_cc_q20_copyout","ev_cc_q20_copyout2","ev_cc_q20_protect"],
+      "notes": "由硬件页表权限位（PTE_U）+ SSTATUS.SUM + 软件 partofseg 三重协作完成安全访问。",
+      "evidence": [
+        {"evidence_id":"ev_cc_q20_walkaddr","path":"kernel/mm/vm.c","line_start":235,"line_end":253,"symbol_kind":"implementation_body","symbol_name":"walkaddr","excerpt":"uint64 walkaddr(pagetable_t pagetable, uint64 va) {\n  if (va >= MAXUVA) return NULL;\n  pte = walk(pagetable, va, 0);\n  if (pte == 0) return NULL;\n  if ((*pte & PTE_V) == 0) return NULL;\n  if ((*pte & PTE_U) == 0) return NULL;\n  return PTE2PA(*pte);\n}","evidence_type":"implementation_body","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q20_partofseg","path":"kernel/mm/usrmm.c","line_start":100,"line_end":140,"symbol_kind":"implementation_body","symbol_name":"partofseg","excerpt":"struct seg* partofseg(struct seg *head, uint64 start, uint64 end) {\n  // walk seglist, ensure [start,end) lies in one or contiguous segs\n}","evidence_type":"implementation_body","strength":"weak","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q20_safememmove","path":"kernel/mm/vm.c","line_start":711,"line_end":754,"symbol_kind":"implementation_body","symbol_name":"safememmove","excerpt":"static uint64 safememmove(char *dst, char *src, uint64 len, int srcinc) {\n  asm volatile(\"auipc %0, 0x0\" : \"=r\" (safe_pc));\n  if (!save_point) save_point = safe_pc;\n  ...\n  if (badaddr == old) {\n    permit_usr_mem();\n    while (len--) *dst++ = *src++;   // page fault here may longjmp via save_point\n    badaddr = 0;\n  }\n  protect_usr_mem();\n  return badaddr;\n}","evidence_type":"implementation_body","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q20_copyout","path":"kernel/mm/vm.c","line_start":764,"line_end":784,"symbol_kind":"implementation_body","symbol_name":"copyout","excerpt":"int copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len) {\n  while(len > 0) {\n    pa0 = walkaddr(pagetable, PGROUNDDOWN(dstva));\n    if(pa0 == NULL) return -1;\n    memmove((void *)(pa0 + (dstva - va0)), src, n);\n    ...\n  }\n}","evidence_type":"implementation_body","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q20_copyout2","path":"kernel/mm/vm.c","line_start":786,"line_end":797,"symbol_kind":"implementation_body","symbol_name":"copyout2","excerpt":"int copyout2(uint64 dstva, char *src, uint64 len) {\n  struct seg *s = partofseg(p->segment, dstva, dstva + len);\n  if (s == NULL) return -1;\n  uint64 badaddr = safememmove((char *)dstva, src, len, 1);\n  return badaddr == 0 ? 0 : -1;\n}","evidence_type":"implementation_body","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q20_protect","path":"kernel/trap/trap.c","line_start":83,"line_end":85,"symbol_kind":"call_site","symbol_name":"protect_usr_mem_in_usertrap","excerpt":"protect_usr_mem();  // since we turned on this when leaving S-mode","evidence_type":"call_site","strength":"weak","validity":"valid","supports_claim_types":["implemented"]}
+      ]
+    },
+    {
+      "question_id": "Q03_021",
+      "question_type": "single_choice",
+      "stem": "若实现了页面置换 (Page Replacement)，使用的算法最接近哪种？",
+      "fact_answers": [
+        {"fact_id":"Q03_021_01","fact_key":"candidate_set","value":["OPT","LRU","Clock","FIFO","其他算法","未实现页面置换"],"used_evidence_ids":[],"notes":"题单 choices"},
+        {"fact_id":"Q03_021_02","fact_key":"selected_choice_positive_evidence","value":"yes_strong","used_evidence_ids":["ev_cc_q21_neg"],"notes":"未发现 swap 路径，故无置换算法可言"},
+        {"fact_id":"Q03_021_03","fact_key":"alternative_choices_excluded","value":"yes_strong","used_evidence_ids":["ev_cc_q21_neg"],"notes":"OPT/LRU/Clock/FIFO 关键字均未在内核源码中作为页面置换算法实现"},
+        {"fact_id":"Q03_021_04","fact_key":"mixed_or_unknown_handling","value":"no_after_negative_search","used_evidence_ids":[],"notes":"无须 unknown"},
+        {"fact_id":"Q03_021_05","fact_key":"negative_search_coverage","value":{"searched_keywords":["LRU","FIFO","Clock","second_chance","NRU","page_replace","aging"],"searched_directories":["kernel/mm"],"file_count":5,"match_count":0,"coverage_sufficient":true},"used_evidence_ids":["ev_cc_q21_neg"],"notes":"完整覆盖"}
+      ],
+      "value": "未实现页面置换（无 swap）",
+      "used_evidence_ids": ["ev_cc_q21_neg"],
+      "notes": "见 Q03_014：仓库未实现匿名页换出磁盘，亦无任何置换算法。",
+      "evidence": [
+        {"evidence_id":"ev_cc_q21_neg","path":"kernel/mm","line_start":0,"line_end":0,"symbol_kind":"negative_search","symbol_name":"no_replacement_algorithm","excerpt":"在 kernel/mm 与 include/mm 中搜索 LRU/FIFO/Clock/second_chance/NRU/aging 均无命中；仅 mmap.c 内 __page_file_swap 是 mmap-page eviction 的代码块，未实现真正的物理页置换算法。","evidence_type":"negative_search","strength":"strong","validity":"valid","supports_claim_types":["not_implemented"]}
+      ]
+    },
+    {
+      "question_id": "Q03_022",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在工作集模型 (Working Set Model) 或抖动检测/防止 (Thrashing Prevention) 机制？",
+      "fact_answers": [
+        {"fact_id":"Q03_022_01","fact_key":"scope_definition","value":"no_after_negative_search","used_evidence_ids":["ev_cc_q22_neg"],"notes":"未定义 working_set 结构、resident_set 字段、page-aging 计数"},
+        {"fact_id":"Q03_022_02","fact_key":"real_implementation_body","value":"no_after_negative_search","used_evidence_ids":["ev_cc_q22_neg"],"notes":"无相关函数体"},
+        {"fact_id":"Q03_022_03","fact_key":"active_call_path","value":"no_after_negative_search","used_evidence_ids":["ev_cc_q22_neg"],"notes":"无调用路径"},
+        {"fact_id":"Q03_022_04","fact_key":"state_or_effect","value":"no_after_negative_search","used_evidence_ids":["ev_cc_q22_neg"],"notes":"无运行期状态"},
+        {"fact_id":"Q03_022_05","fact_key":"stub_and_false_positive_filter","value":"no_after_negative_search","used_evidence_ids":[],"notes":"未发现桩"},
+        {"fact_id":"Q03_022_06","fact_key":"negative_search_coverage","value":{"searched_keywords":["working_set","thrash","thrashing","resident_set","wsm","load_control"],"searched_directories":["kernel","include"],"file_count":20,"match_count":0,"coverage_sufficient":true},"used_evidence_ids":["ev_cc_q22_neg"],"notes":"完整覆盖且零命中"}
+      ],
+      "value": "not_found",
+      "used_evidence_ids": ["ev_cc_q22_neg"],
+      "notes": "无工作集/抖动相关机制；K210 体量小，OS 设计上不需驻留集动态调整。",
+      "evidence": [
+        {"evidence_id":"ev_cc_q22_neg","path":"kernel/+include/","line_start":0,"line_end":0,"symbol_kind":"negative_search","symbol_name":"working_set_negative","excerpt":"grep -rni 'working_set|thrash|resident_set|wsm|load_control' kernel include 无任何命中。","evidence_type":"negative_search","strength":"strong","validity":"valid","supports_claim_types":["not_implemented"]}
+      ]
+    },
+    {
+      "question_id": "Q03_023",
+      "question_type": "fill_in",
+      "stem": "物理内存总量；页大小；最大进程虚拟地址空间。",
+      "fact_answers": [
+        {"fact_id":"Q03_023_01","fact_key":"source_constant_or_symbol","value":"yes_strong","used_evidence_ids":["ev_cc_q23_phystop","ev_cc_q23_pgsize","ev_cc_q23_maxva"],"notes":"PHYSTOP/KERNBASE/PGSIZE/MAXVA 均在头文件常量中"},
+        {"fact_id":"Q03_023_02","fact_key":"unit_and_format","value":"yes_strong","used_evidence_ids":["ev_cc_q23_phystop"],"notes":"用 KB/MB；bytes；bits"},
+        {"fact_id":"Q03_023_03","fact_key":"derivation_path","value":"yes_strong","used_evidence_ids":["ev_cc_q23_phystop","ev_cc_q23_maxva"],"notes":"内核 RAM = PHYSTOP - KERNBASE = 0x80600000 - 0x80020000 = 0x5E0000 字节 ≈ 6016 KiB；MAXVA 取 38 bits（SV39 取 39-1 防符号扩展）"},
+        {"fact_id":"Q03_023_04","fact_key":"unknown_when_not_derivable","value":"no_after_negative_search","used_evidence_ids":[],"notes":"全部可推"},
+        {"fact_id":"Q03_023_05","fact_key":"negative_search_coverage","value":{"searched_keywords":["PHYSTOP","KERNBASE","PGSIZE","MAXVA","MAXUVA"],"searched_directories":["include"],"file_count":4,"match_count":12,"coverage_sufficient":true},"used_evidence_ids":[],"notes":"覆盖充分"}
+      ],
+      "value": "Physical Memory Size = 6016 KB ≈ 5.875 MB（RAM = PHYSTOP-KERNBASE = 0x80600000-0x80020000 = 0x5E0000 字节，K210 上是 8 MB 板载 SRAM 中分给内核及用户的窗口）；Page Size = 4096 bytes；Virtual Address Space = 38 bits（用户空间 MAXVA = 1L<<(9+9+9+12-1)；用户实际可用上限 MAXUVA = RUSTSBI_BASE = 0x80000000 ≈ 31 bits）。",
+      "used_evidence_ids": ["ev_cc_q23_phystop","ev_cc_q23_pgsize","ev_cc_q23_maxva"],
+      "notes": "MAXVA 比 SV39 完整 39 bits 少 1 位，原因是 'avoid sign-extend'（include/hal/riscv.h:404-407）。",
+      "evidence": [
+        {"evidence_id":"ev_cc_q23_phystop","path":"include/memlayout.h","line_start":94,"line_end":131,"symbol_kind":"definition","symbol_name":"PHYSTOP_KERNBASE","excerpt":"#define RUSTSBI_BASE 0x80000000UL\n#define KERNBASE 0x80020000UL\n#define PHYSTOP  0x80600000UL\n#define MAXUVA   RUSTSBI_BASE","evidence_type":"definition","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q23_pgsize","path":"include/hal/riscv.h","line_start":378,"line_end":382,"symbol_kind":"definition","symbol_name":"PGSIZE","excerpt":"#define PGSIZE 4096 // bytes per page\n#define PGSHIFT 12\n#define PGROUNDUP(sz)  (((sz)+PGSIZE-1) & ~(PGSIZE-1))\n#define PGROUNDDOWN(a) (((a)) & ~(PGSIZE-1))","evidence_type":"definition","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q23_maxva","path":"include/hal/riscv.h","line_start":404,"line_end":408,"symbol_kind":"definition","symbol_name":"MAXVA","excerpt":"// MAXVA is actually one bit less than the max allowed by Sv39, to avoid having to sign-extend\n#define MAXVA (1L << (9 + 9 + 9 + 12 - 1))","evidence_type":"definition","strength":"strong","validity":"valid","supports_claim_types":["implemented"]}
+      ]
+    },
+    {
+      "question_id": "Q03_024",
+      "question_type": "single_choice",
+      "stem": "内存保护机制 (Memory Protection) 的实现形式更接近哪种？",
+      "fact_answers": [
+        {"fact_id":"Q03_024_01","fact_key":"candidate_set","value":["纯硬件页表权限位","纯软件用户指针检查","硬件页表 + 软件指针检查双重保护","无显式保护","未发现"],"used_evidence_ids":[],"notes":"题单 choices"},
+        {"fact_id":"Q03_024_02","fact_key":"selected_choice_positive_evidence","value":"yes_strong","used_evidence_ids":["ev_cc_q24_pte_perm","ev_cc_q24_walkaddr","ev_cc_q24_partofseg","ev_cc_q24_sum"],"notes":"硬件 PTE_U/W/R/X + 软件 walkaddr/partofseg + SSTATUS.SUM 三重共存"},
+        {"fact_id":"Q03_024_03","fact_key":"alternative_choices_excluded","value":"yes_strong","used_evidence_ids":["ev_cc_q24_walkaddr","ev_cc_q24_partofseg"],"notes":"copyin/copyout 都先做软件检查，所以非纯硬件；同时硬件 MMU 强制非法访问产生 page fault，所以非纯软件"},
+        {"fact_id":"Q03_024_04","fact_key":"mixed_or_unknown_handling","value":"no_after_negative_search","used_evidence_ids":[],"notes":"无须混合"},
+        {"fact_id":"Q03_024_05","fact_key":"negative_search_coverage","value":{"searched_keywords":["PTE_U","PTE_W","PTE_R","PTE_X","walkaddr","partofseg","SSTATUS_SUM","permit_usr_mem"],"searched_directories":["kernel/mm","include/hal","kernel/trap"],"file_count":10,"match_count":80,"coverage_sufficient":true},"used_evidence_ids":[],"notes":"覆盖充分"}
+      ],
+      "value": "硬件页表 + 软件指针检查双重保护",
+      "used_evidence_ids": ["ev_cc_q24_pte_perm","ev_cc_q24_walkaddr","ev_cc_q24_partofseg","ev_cc_q24_sum"],
+      "notes": "硬件层：PTE_R/W/X/U + SSTATUS.SUM；软件层：walkaddr 校验 PTE_U+PTE_V，partofseg 校验 va 落在 seg 区间，safememmove 借助 trap-recover 兜底。",
+      "evidence": [
+        {"evidence_id":"ev_cc_q24_pte_perm","path":"include/hal/riscv.h","line_start":384,"line_end":390,"symbol_kind":"definition","symbol_name":"PTE_perm_bits","excerpt":"#define PTE_R (1L << 1)\n#define PTE_W (1L << 2)\n#define PTE_X (1L << 3)\n#define PTE_U (1L << 4)","evidence_type":"definition","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q24_walkaddr","path":"kernel/mm/vm.c","line_start":235,"line_end":253,"symbol_kind":"implementation_body","symbol_name":"walkaddr","excerpt":"if((*pte & PTE_V) == 0) return NULL;\nif((*pte & PTE_U) == 0) return NULL;","evidence_type":"implementation_body","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q24_partofseg","path":"kernel/mm/usrmm.c","line_start":100,"line_end":140,"symbol_kind":"implementation_body","symbol_name":"partofseg","excerpt":"struct seg* partofseg(struct seg *head, uint64 start, uint64 end) { /* range must lie in legal segs */ }","evidence_type":"implementation_body","strength":"weak","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q24_sum","path":"include/hal/riscv.h","line_start":260,"line_end":300,"symbol_kind":"definition","symbol_name":"SSTATUS_SUM","excerpt":"// SSTATUS.SUM (bit 18) controls whether kernel can access user pages.\n// permit_usr_mem()/protect_usr_mem() set/clear SUM via csrr/csrw.","evidence_type":"definition","strength":"weak","validity":"weak","supports_claim_types":["implemented"]}
+      ]
+    },
+    {
+      "question_id": "Q03_025",
+      "question_type": "short_answer",
+      "stem": "逻辑内存组织：进程地址空间中 text/data/heap/stack/mmap 各区域是否由统一的映射管理结构维护？",
+      "fact_answers": [
+        {"fact_id":"Q03_025_01","fact_key":"answer_scope","value":"yes_strong","used_evidence_ids":["ev_cc_q25_seg","ev_cc_q25_proc"],"notes":"struct seg + p->segment 单链表"},
+        {"fact_id":"Q03_025_02","fact_key":"primary_evidence_anchor","value":"yes_strong","used_evidence_ids":["ev_cc_q25_seg","ev_cc_q25_segtype"],"notes":"include/mm/usrmm.h:8-19 完整定义"},
+        {"fact_id":"Q03_025_03","fact_key":"implementation_or_flow_evidence","value":"yes_strong","used_evidence_ids":["ev_cc_q25_locate","ev_cc_q25_handle_fault"],"notes":"locateseg/partofseg/getseg 在 fault/copy/grow 路径都被调用"},
+        {"fact_id":"Q03_025_04","fact_key":"boundary_and_non_answers","value":"yes_strong","used_evidence_ids":[],"notes":"非红黑树/BTreeMap，是单向链表"},
+        {"fact_id":"Q03_025_05","fact_key":"unknown_or_partial_items","value":"no_after_negative_search","used_evidence_ids":[],"notes":"无未决"},
+        {"fact_id":"Q03_025_06","fact_key":"negative_search_coverage","value":{"searched_keywords":["seg","segment","vma","BTreeMap","rb_tree","mm_struct"],"searched_directories":["kernel/mm","include/mm"],"file_count":10,"match_count":150,"coverage_sufficient":true},"used_evidence_ids":[],"notes":"覆盖充分"}
+      ],
+      "value": "统一管理结构：struct seg（include/mm/usrmm.h:10-19）字段 {type, flag, addr, sz, next, mmap, f_off, f_sz}，type 枚举 {NONE,LOAD,TEXT,DATA,BSS,HEAP,MMAP,STACK}；以单链表形式挂在 struct proc 的 segment 字段上（p->segment 头指针）。所有 ELF 段、堆、栈、mmap 段都用同一种 seg 描述。fault/copy/grow 路径分别用 locateseg/partofseg/getseg/copysegs/delseg 操作。",
+      "used_evidence_ids": ["ev_cc_q25_seg","ev_cc_q25_segtype","ev_cc_q25_proc","ev_cc_q25_locate","ev_cc_q25_handle_fault"],
+      "notes": "等价于 Linux 的 VMA 链表（mm_struct.mmap），但更轻量、不含 rb-tree。",
+      "evidence": [
+        {"evidence_id":"ev_cc_q25_seg","path":"include/mm/usrmm.h","line_start":10,"line_end":19,"symbol_kind":"definition","symbol_name":"struct_seg","excerpt":"struct seg{ enum segtype type; int flag; uint64 addr; uint64 sz; struct seg *next; uint64 mmap; uint64 f_off; uint64 f_sz; };","evidence_type":"definition","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q25_segtype","path":"include/mm/usrmm.h","line_start":8,"line_end":8,"symbol_kind":"definition","symbol_name":"segtype","excerpt":"enum segtype { NONE, LOAD, TEXT, DATA, BSS, HEAP, MMAP, STACK };","evidence_type":"definition","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q25_proc","path":"include/sched/proc.h","line_start":1,"line_end":80,"symbol_kind":"definition","symbol_name":"proc_segment_field","excerpt":"struct proc { ... struct seg *segment; uint64 pbrk; ... };","evidence_type":"definition","strength":"weak","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q25_locate","path":"kernel/mm/usrmm.c","line_start":60,"line_end":140,"symbol_kind":"implementation_body","symbol_name":"locateseg_getseg","excerpt":"struct seg *locateseg(struct seg *head, uint64 addr) { while (head) { uint64 start = PGROUNDDOWN(head->addr); uint64 end = head->addr + head->sz; if (addr >= start && addr < end) return head; head = head->next; } return NULL; }","evidence_type":"implementation_body","strength":"weak","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q25_handle_fault","path":"kernel/mm/vm.c","line_start":1042,"line_end":1042,"symbol_kind":"call_site","symbol_name":"locateseg_in_fault","excerpt":"struct seg *seg = locateseg(p->segment, badaddr);","evidence_type":"call_site","strength":"strong","validity":"valid","supports_claim_types":["implemented"]}
+      ]
+    },
+    {
+      "question_id": "Q03_026",
+      "question_type": "single_choice",
+      "stem": "是否存在显式的硬件分段机制 (Hardware Segmentation)？",
+      "fact_answers": [
+        {"fact_id":"Q03_026_01","fact_key":"candidate_set","value":["存在硬件分段","仅软件逻辑分区","纯分页无分段","未发现"],"used_evidence_ids":[],"notes":"题单 choices"},
+        {"fact_id":"Q03_026_02","fact_key":"selected_choice_positive_evidence","value":"yes_strong","used_evidence_ids":["ev_cc_q26_riscv_h"],"notes":"RISC-V 体系结构无 GDT/LDT；本仓库纯走 SV39 分页"},
+        {"fact_id":"Q03_026_03","fact_key":"alternative_choices_excluded","value":"yes_strong","used_evidence_ids":["ev_cc_q26_neg"],"notes":"无段寄存器/段选择子；struct seg 只是软件逻辑分区"},
+        {"fact_id":"Q03_026_04","fact_key":"mixed_or_unknown_handling","value":"no_after_negative_search","used_evidence_ids":[],"notes":"无须 unknown"},
+        {"fact_id":"Q03_026_05","fact_key":"negative_search_coverage","value":{"searched_keywords":["GDT","LDT","segment_descriptor","segselector","CS","DS","SS","FS","GS","selector"],"searched_directories":["kernel","include"],"file_count":20,"match_count":0,"coverage_sufficient":true},"used_evidence_ids":["ev_cc_q26_neg"],"notes":"零命中"}
+      ],
+      "value": "纯分页无分段（RISC-V/AArch64 常见）",
+      "used_evidence_ids": ["ev_cc_q26_riscv_h","ev_cc_q26_neg"],
+      "notes": "目标平台为 RISC-V Sv39，仅页表与 SATP；'segment' 一词仅用于软件 struct seg。",
+      "evidence": [
+        {"evidence_id":"ev_cc_q26_riscv_h","path":"include/hal/riscv.h","line_start":206,"line_end":230,"symbol_kind":"definition","symbol_name":"SATP_only_paging","excerpt":"#define SATP_SV39 (8L << 60)\n#define MAKE_SATP(pagetable) (SATP_SV39 | (((uint64)pagetable) >> 12))\nstatic inline void w_satp(uint64 x) { asm volatile(\"csrw satp, %0\" : : \"r\" (x)); }","evidence_type":"definition","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q26_neg","path":"kernel/+include/","line_start":0,"line_end":0,"symbol_kind":"negative_search","symbol_name":"no_hardware_segments","excerpt":"grep -rni 'GDT|LDT|segment_descriptor|selector|CS_REG|DS_REG' kernel include 无任何命中。","evidence_type":"negative_search","strength":"strong","validity":"valid","supports_claim_types":["not_implemented"]}
+      ]
+    },
+    {
+      "question_id": "Q03_027",
+      "question_type": "single_choice",
+      "stem": "取页策略 (Fetch Policy) 更接近哪种？",
+      "fact_answers": [
+        {"fact_id":"Q03_027_01","fact_key":"candidate_set","value":["按需调页","惰性分配","预取","预分配","未发现/不适用"],"used_evidence_ids":[],"notes":"题单 choices"},
+        {"fact_id":"Q03_027_02","fact_key":"selected_choice_positive_evidence","value":"yes_strong","used_evidence_ids":["ev_cc_q27_handle_fault","ev_cc_q27_growproc"],"notes":"HEAP/STACK/MMAP/LOAD 全部走 fault-driven 按需调页/惰性分配"},
+        {"fact_id":"Q03_027_03","fact_key":"alternative_choices_excluded","value":"yes_strong","used_evidence_ids":["ev_cc_q27_neg"],"notes":"无 prepaging/readahead/预分配整 heap"},
+        {"fact_id":"Q03_027_04","fact_key":"mixed_or_unknown_handling","value":"no_after_negative_search","used_evidence_ids":[],"notes":"惰性分配是按需调页的特例，本题选 'demand paging' 更贴近 Stallings 概念"},
+        {"fact_id":"Q03_027_05","fact_key":"negative_search_coverage","value":{"searched_keywords":["prepage","prepaging","readahead","prefetch","lazy","handle_page_fault"],"searched_directories":["kernel/mm"],"file_count":5,"match_count":15,"coverage_sufficient":true},"used_evidence_ids":[],"notes":"覆盖充分"}
+      ],
+      "value": "按需调页 (Demand Paging)：缺页时才分配物理页",
+      "used_evidence_ids": ["ev_cc_q27_handle_fault","ev_cc_q27_growproc","ev_cc_q27_neg"],
+      "notes": "ELF LOAD 段 demand-load (handle_page_fault_loadelf)；HEAP/STACK 惰性 (handle_page_fault_lazy)；mmap 同样惰性 (handle_page_fault_mmap)。'惰性分配' 也是 demand paging 的实现形式之一，按 Stallings 原义选 demand paging。",
+      "evidence": [
+        {"evidence_id":"ev_cc_q27_handle_fault","path":"kernel/mm/vm.c","line_start":1089,"line_end":1102,"symbol_kind":"usage_flow","symbol_name":"fetch_on_fault","excerpt":"switch (seg->type) {\n  case LOAD:  return handle_page_fault_loadelf(badaddr, seg);\n  case HEAP:\n  case STACK: return handle_page_fault_lazy(badaddr, seg);\n  case MMAP:  return handle_page_fault_mmap(kind, badaddr, seg);\n}","evidence_type":"usage_flow","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q27_growproc","path":"kernel/sched/proc.c","line_start":792,"line_end":825,"symbol_kind":"usage_flow","symbol_name":"growproc_no_alloc","excerpt":"// growproc 仅修改 heap->sz 与 p->pbrk，不分配物理页\nheap->sz += diff;\np->pbrk = newbrk;","evidence_type":"usage_flow","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q27_neg","path":"kernel/mm","line_start":0,"line_end":0,"symbol_kind":"negative_search","symbol_name":"no_prepaging","excerpt":"未发现 readahead / prefetch / prepage 关键字；仅 mmap 文件页在首次访问时单页落地。","evidence_type":"negative_search","strength":"strong","validity":"valid","supports_claim_types":["not_implemented"]}
+      ]
+    },
+    {
+      "question_id": "Q03_028",
+      "question_type": "short_answer",
+      "stem": "放置策略 (Placement Policy)：新的匿名映射或堆区域增长时，系统如何选择虚拟地址区间？",
+      "fact_answers": [
+        {"fact_id":"Q03_028_01","fact_key":"answer_scope","value":"yes_strong","used_evidence_ids":["ev_cc_q28_lookup","ev_cc_q28_growproc"],"notes":"由 lookup_segment / lookup_fixed_segment（mmap）与 growproc（heap）两路决定"},
+        {"fact_id":"Q03_028_02","fact_key":"primary_evidence_anchor","value":"yes_strong","used_evidence_ids":["ev_cc_q28_lookup","ev_cc_q28_VUMMAP"],"notes":"VUMMAP=0x70000000 为 mmap 起始基址，向上线性放置；MAXUVA 为上界"},
+        {"fact_id":"Q03_028_03","fact_key":"implementation_or_flow_evidence","value":"yes_strong","used_evidence_ids":["ev_cc_q28_lookup","ev_cc_q28_growproc"],"notes":"lookup_segment 在 [VUMMAP,MAXUVA) 区间走首次适配"},
+        {"fact_id":"Q03_028_04","fact_key":"boundary_and_non_answers","value":"yes_strong","used_evidence_ids":["ev_cc_q28_growproc"],"notes":"heap 直接顺序向上扩张，不寻位"},
+        {"fact_id":"Q03_028_05","fact_key":"unknown_or_partial_items","value":"no_after_negative_search","used_evidence_ids":[],"notes":"无未决"},
+        {"fact_id":"Q03_028_06","fact_key":"negative_search_coverage","value":{"searched_keywords":["lookup_segment","lookup_fixed_segment","first_fit","best_fit","mmap_base","VUMMAP"],"searched_directories":["kernel/mm","include"],"file_count":8,"match_count":18,"coverage_sufficient":true},"used_evidence_ids":[],"notes":"覆盖充分"}
+      ],
+      "value": "Heap：固定起点 + 顺序增长。p->pbrk 由 ELF 加载结束位置初始化，sys_brk/growproc 在 [heap->addr, next_seg) 范围内顺序增长，越过 boundary 即拒绝。Mmap（无 MAP_FIXED）：固定基址 VUMMAP=0x70000000（include/memlayout.h:111），lookup_segment 在 seg 链表上做首次适配（first-fit），从 VUMMAP 开始向高地址扫描第一段足够大的间隙；MAP_FIXED 时由 lookup_fixed_segment 直接在指定 va 拆分/覆盖现有 segment。无 mmap_base 向下生长、无 best-fit。",
+      "used_evidence_ids": ["ev_cc_q28_lookup","ev_cc_q28_VUMMAP","ev_cc_q28_growproc"],
+      "notes": "VUMMAP 与 VUSTACK 共享 0x70000000 起始空间，但 stack 在进程创建时一次性放置，不参与 placement。",
+      "evidence": [
+        {"evidence_id":"ev_cc_q28_VUMMAP","path":"include/memlayout.h","line_start":111,"line_end":117,"symbol_kind":"definition","symbol_name":"VUMMAP_base","excerpt":"#define VUMMAP 0x70000000\n#define VKSTACK 0x3EC0000000L\n#define VUSTACK VUMMAP","evidence_type":"definition","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q28_lookup","path":"kernel/mm/mmap.c","line_start":600,"line_end":710,"symbol_kind":"implementation_body","symbol_name":"lookup_segment_first_fit","excerpt":"// lookup_segment(sz, &prev, &new): 在 [VUMMAP, MAXUVA) 内沿 seg 链表寻找第一段连续 sz 间隙，分配 new->addr 并设 next；MAP_FIXED 走 lookup_fixed_segment 处理重叠拆分","evidence_type":"implementation_body","strength":"weak","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q28_growproc","path":"kernel/sched/proc.c","line_start":792,"line_end":825,"symbol_kind":"implementation_body","symbol_name":"growproc_boundary","excerpt":"uint64 boundary = NULL == heap->next ? MAXUVA : PGROUNDDOWN(heap->next->addr) - PGSIZE;\nif (newbrk > boundary) return -1;\nheap->sz += diff;","evidence_type":"implementation_body","strength":"strong","validity":"valid","supports_claim_types":["implemented"]}
+      ]
+    },
+    {
+      "question_id": "Q03_029",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在驻留集管理/内存负载控制 (Resident Set Management / Load Control)？",
+      "fact_answers": [
+        {"fact_id":"Q03_029_01","fact_key":"scope_definition","value":"no_after_negative_search","used_evidence_ids":["ev_cc_q29_neg"],"notes":"无 working set / OOM killer / kswapd 等"},
+        {"fact_id":"Q03_029_02","fact_key":"real_implementation_body","value":"no_after_negative_search","used_evidence_ids":["ev_cc_q29_neg"],"notes":"无实现"},
+        {"fact_id":"Q03_029_03","fact_key":"active_call_path","value":"no_after_negative_search","used_evidence_ids":["ev_cc_q29_neg"],"notes":"无活动路径"},
+        {"fact_id":"Q03_029_04","fact_key":"state_or_effect","value":"no_after_negative_search","used_evidence_ids":["ev_cc_q29_neg"],"notes":"分配失败仅返回错误并杀进程"},
+        {"fact_id":"Q03_029_05","fact_key":"stub_and_false_positive_filter","value":"no_after_negative_search","used_evidence_ids":[],"notes":"无桩"},
+        {"fact_id":"Q03_029_06","fact_key":"negative_search_coverage","value":{"searched_keywords":["oom","kswapd","reclaim","working_set","resident_set","load_control","memory_pressure"],"searched_directories":["kernel","include"],"file_count":20,"match_count":0,"coverage_sufficient":true},"used_evidence_ids":["ev_cc_q29_neg"],"notes":"零命中"}
+      ],
+      "value": "not_found",
+      "used_evidence_ids": ["ev_cc_q29_neg"],
+      "notes": "分配 _allocpage 返回 NULL 时上层只 -ENOMEM 并 SIGKILL，不存在驻留集回收/负载控制守护。",
+      "evidence": [
+        {"evidence_id":"ev_cc_q29_neg","path":"kernel/+include/","line_start":0,"line_end":0,"symbol_kind":"negative_search","symbol_name":"no_load_control","excerpt":"grep -rni 'oom|kswapd|reclaim|working_set|resident_set|load_control|memory_pressure' kernel include 零命中。","evidence_type":"negative_search","strength":"strong","validity":"valid","supports_claim_types":["not_implemented"]}
+      ]
+    },
+    {
+      "question_id": "Q03_030",
+      "question_type": "short_answer",
+      "stem": "内存主链路（Mermaid graph TD），从最强内存入口出发到页表/物理页核心点。",
+      "fact_answers": [
+        {"fact_id":"Q03_030_01","fact_key":"answer_scope","value":"yes_strong","used_evidence_ids":["ev_cc_q30_path"],"notes":"主链 usertrap → handle_excp → handle_page_fault → handle_page_fault_lazy → uvmalloc → mappages/walk → allocpage"},
+        {"fact_id":"Q03_030_02","fact_key":"primary_evidence_anchor","value":"yes_strong","used_evidence_ids":["ev_cc_q30_path"],"notes":"5 个节点均有源文件:行号锚点"},
+        {"fact_id":"Q03_030_03","fact_key":"implementation_or_flow_evidence","value":"yes_strong","used_evidence_ids":["ev_cc_q30_path"],"notes":"实现体齐全"},
+        {"fact_id":"Q03_030_04","fact_key":"boundary_and_non_answers","value":"yes_strong","used_evidence_ids":[],"notes":"未展开 mmap/cow/loadelf 支线"},
+        {"fact_id":"Q03_030_05","fact_key":"unknown_or_partial_items","value":"no_after_negative_search","used_evidence_ids":[],"notes":"无未决"},
+        {"fact_id":"Q03_030_06","fact_key":"negative_search_coverage","value":{"searched_keywords":["usertrap","handle_excp","handle_page_fault","handle_page_fault_lazy","uvmalloc","mappages","walk","allocpage"],"searched_directories":["kernel/trap","kernel/mm"],"file_count":5,"match_count":80,"coverage_sufficient":true},"used_evidence_ids":[],"notes":"覆盖充分"}
+      ],
+      "value": "```mermaid\ngraph TD\n  A[usertrap kernel/trap/trap.c:75] --> B[handle_excp kernel/trap/trap.c:328]\n  B --> C[handle_page_fault kernel/mm/vm.c:1039]\n  C --> D[handle_page_fault_lazy kernel/mm/vm.c:1002]\n  D --> E[uvmalloc kernel/mm/vm.c:~430]\n  E --> F[walk+mappages kernel/mm/vm.c:211/298]\n  F --> G[_allocpage kernel/mm/pm.c:232]\n```\n确认主链：堆/栈惰性分配触发的缺页路径。结尾 sfence_vma() 在 D 中刷新本核 TLB。",
+      "used_evidence_ids": ["ev_cc_q30_path"],
+      "notes": "若以 mmap 入口出发，则 D→handle_page_fault_mmap (mmap.c:1100)，最终也归到 walk+mappages+allocpage。",
+      "evidence": [
+        {"evidence_id":"ev_cc_q30_path","path":"kernel/trap+kernel/mm","line_start":0,"line_end":0,"symbol_kind":"usage_flow","symbol_name":"main_memory_chain","excerpt":"trap.c:75 usertrap → trap.c:328 handle_excp → vm.c:1039 handle_page_fault → vm.c:1002 handle_page_fault_lazy → vm.c uvmalloc → vm.c:298 mappages（内部 walk 取/建中间页表页）→ pm.c:232 _allocpage 取物理页。返回 0 后 usertrapret 重新执行原指令。","evidence_type":"usage_flow","strength":"strong","validity":"valid","supports_claim_types":["implemented"]}
+      ]
+    },
+    {
+      "question_id": "Q03_031",
+      "question_type": "single_choice",
+      "stem": "该系统更容易出现哪种内存碎片？",
+      "fact_answers": [
+        {"fact_id":"Q03_031_01","fact_key":"candidate_set","value":["内部碎片","外部碎片","两者均有","无明显碎片问题","未发现相关机制"],"used_evidence_ids":[],"notes":"题单 choices"},
+        {"fact_id":"Q03_031_02","fact_key":"selected_choice_positive_evidence","value":"yes_strong","used_evidence_ids":["ev_cc_q31_pm_freelist","ev_cc_q31_kmalloc"],"notes":"pm.c freelist 按 'block + npage' 表示连续段，多次分配/释放会让 multiple 池产生不同大小的间隙；kmalloc 使用固定 obj_size 槽（hash 桶 17），按对象切分易产生槽内未占满的内部碎片"},
+        {"fact_id":"Q03_031_03","fact_key":"alternative_choices_excluded","value":"yes_strong","used_evidence_ids":["ev_cc_q31_pm_freelist"],"notes":"无 buddy 合并机制可缓解外部碎片；slab 也不释放整页给 pm 池"},
+        {"fact_id":"Q03_031_04","fact_key":"mixed_or_unknown_handling","value":"no_after_negative_search","used_evidence_ids":[],"notes":"按 'two-both' 而非 unknown"},
+        {"fact_id":"Q03_031_05","fact_key":"negative_search_coverage","value":{"searched_keywords":["fragmentation","coalesce","__mul_free","slab","kmem_node"],"searched_directories":["kernel/mm"],"file_count":5,"match_count":12,"coverage_sufficient":true},"used_evidence_ids":[],"notes":"覆盖充分"}
+      ],
+      "value": "两者均有",
+      "used_evidence_ids": ["ev_cc_q31_pm_freelist","ev_cc_q31_kmalloc"],
+      "notes": "外部碎片：pm.c multiple 池 freelist 不会跨块合并到伙伴大小，长期分配多页/单页混用会让 npage>=n 的连续块越来越少；__mul_free_no_lock 仅与左/右邻居合并，无 buddy 级别整合。内部碎片：kmalloc 用 obj_size 离散桶（KMEM_OBJ_MIN_SIZE=32 起步，KMEM_TABLE_SIZE=17 hash 桶），任何 size 落入某桶都向上对齐为 16 字节倍数，产生槽内空浪费。",
+      "evidence": [
+        {"evidence_id":"ev_cc_q31_pm_freelist","path":"kernel/mm/pm.c","line_start":86,"line_end":175,"symbol_kind":"implementation_body","symbol_name":"mul_free_coalesce","excerpt":"void __mul_free_no_lock(uint64 start, uint64 n) {\n  // 按地址有序插入并合并相邻块（左/右邻居），不做伙伴合并\n  ...\n}","evidence_type":"implementation_body","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q31_kmalloc","path":"kernel/mm/kmalloc.c","line_start":21,"line_end":90,"symbol_kind":"definition","symbol_name":"kmalloc_obj_size","excerpt":"#define KMEM_OBJ_MIN_SIZE ((uint64)32)\n#define KMEM_OBJ_MAX_SIZE ((uint64)4048)\n#define ROUNDUP16(n) (((n) + 15) & ~0x0f)\nkmem_adam.obj_size = ROUNDUP16(sizeof(struct kmem_allocator));\n#define KMEM_TABLE_SIZE 17","evidence_type":"definition","strength":"strong","validity":"valid","supports_claim_types":["implemented"]}
+      ]
+    },
+    {
+      "question_id": "Q03_032",
+      "question_type": "single_choice",
+      "stem": "地址重定位 (Address Relocation) 的绑定时机更接近哪种？",
+      "fact_answers": [
+        {"fact_id":"Q03_032_01","fact_key":"candidate_set","value":["编译时静态","加载时","运行时动态（MMU/页表）","未发现/不适用"],"used_evidence_ids":[],"notes":"题单 choices"},
+        {"fact_id":"Q03_032_02","fact_key":"selected_choice_positive_evidence","value":"yes_strong","used_evidence_ids":["ev_cc_q32_satp","ev_cc_q32_walk"],"notes":"每次访存由 satp+walk(SV39) 在硬件 MMU 内做 va→pa 转换"},
+        {"fact_id":"Q03_032_03","fact_key":"alternative_choices_excluded","value":"yes_strong","used_evidence_ids":["ev_cc_q32_kvminit"],"notes":"kvmmap 把 KERNBASE 直接 identity-map（va==pa），但用户态 ELF 加载时由 walk+mappages 安排虚拟地址，访问时仍走页表，不是 load-time 重定位；非 compile-time 静态"},
+        {"fact_id":"Q03_032_04","fact_key":"mixed_or_unknown_handling","value":"no_after_negative_search","used_evidence_ids":[],"notes":"无须 unknown"},
+        {"fact_id":"Q03_032_05","fact_key":"negative_search_coverage","value":{"searched_keywords":["relocation","satp","walk","MAKE_SATP","kvminithart","kvminit"],"searched_directories":["kernel/mm","include/hal","kernel"],"file_count":15,"match_count":40,"coverage_sufficient":true},"used_evidence_ids":[],"notes":"覆盖充分"}
+      ],
+      "value": "运行时动态绑定 (Run-time / Dynamic Relocation)：通过 MMU 基址+界限或页表在每次访问时转换",
+      "used_evidence_ids": ["ev_cc_q32_satp","ev_cc_q32_walk","ev_cc_q32_kvminit"],
+      "notes": "kvminithart 写 satp 启用 SV39 后，所有 S/U-mode 访存都被硬件 MMU 通过 walk(va) 转换为 pa。",
+      "evidence": [
+        {"evidence_id":"ev_cc_q32_satp","path":"kernel/mm/vm.c","line_start":120,"line_end":135,"symbol_kind":"usage_flow","symbol_name":"runtime_paging_on","excerpt":"uint64 stap = SATP_SV39 | (((uint64)kernel_pagetable) >> 12);\nw_satp(stap);\nasm volatile(\"sfence.vma\");","evidence_type":"usage_flow","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q32_walk","path":"kernel/mm/vm.c","line_start":211,"line_end":230,"symbol_kind":"implementation_body","symbol_name":"sw_walk_for_modify","excerpt":"// 软件 walk 用于内核修改 PTE；硬件 MMU 在每次访存时同样走 SV39 三级页表","evidence_type":"implementation_body","strength":"strong","validity":"valid","supports_claim_types":["implemented"]},
+        {"evidence_id":"ev_cc_q32_kvminit","path":"kernel/mm/vm.c","line_start":106,"line_end":111,"symbol_kind":"call_site","symbol_name":"kernel_identity_map","excerpt":"// map kernel text executable and read-only.\nkvmmap(KERNBASE, KERNBASE, (uint64)extratext - KERNBASE, PTE_R | PTE_X);\nkvmmap((uint64)extratext, (uint64)extratext, PHYSTOP - (uint64)extratext, PTE_R | PTE_W);","evidence_type":"call_site","strength":"weak","validity":"valid","supports_claim_types":["implemented"]}
+      ]
+    },
+    {
+      "question_id": "Q03_033",
+      "question_type": "single_choice",
+      "stem": "页面置换的作用域策略 (Replacement Scope) 更接近哪种？",
+      "fact_answers": [
+        {"fact_id":"Q03_033_01","fact_key":"candidate_set","value":["全局置换","局部置换","未实现置换","未发现"],"used_evidence_ids":[],"notes":"题单 choices"},
+        {"fact_id":"Q03_033_02","fact_key":"selected_choice_positive_evidence","value":"yes_strong","used_evidence_ids":["ev_cc_q33_neg"],"notes":"无 swap 路径，无置换算法（见 Q03_014/Q03_021）"},
+        {"fact_id":"Q03_033_03","fact_key":"alternative_choices_excluded","value":"yes_strong","used_evidence_ids":["ev_cc_q33_neg"],"notes":"无全局/局部置换实现"},
+        {"fact_id":"Q03_033_04","fact_key":"mixed_or_unknown_handling","value":"no_after_negative_search","used_evidence_ids":[],"notes":"无须 unknown"},
+        {"fact_id":"Q03_033_05","fact_key":"negative_search_coverage","value":{"searched_keywords":["replacement","global_replace","local_replace","swap"],"searched_directories":["kernel/mm"],"file_count":5,"match_count":0,"coverage_sufficient":true},"used_evidence_ids":["ev_cc_q33_neg"],"notes":"零命中"}
+      ],
+      "value": "未实现置换（无 swap）",
+      "used_evidence_ids": ["ev_cc_q33_neg"],
+      "notes": "与 Q03_014/Q03_021 一致。",
+      "evidence": [
+        {"evidence_id":"ev_cc_q33_neg","path":"kernel/mm","line_start":0,"line_end":0,"symbol_kind":"negative_search","symbol_name":"no_replacement_scope","excerpt":"未发现 page replacement / swap 实现，故 scope 概念不适用。","evidence_type":"negative_search","strength":"strong","validity":"valid","supports_claim_types":["not_implemented"]}
+      ]
+    },
+    {
+      "question_id": "Q03_034",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在清理策略 (Cleaning Policy)：后台/预先写回脏页，而非仅在置换或 fsync 时同步写回？",
+      "fact_answers": [
+        {"fact_id":"Q03_034_01","fact_key":"scope_definition","value":"no_after_negative_search","used_evidence_ids":["ev_cc_q34_neg"],"notes":"无后台 writeback 线程或定时器；无脏页全局队列"},
+        {"fact_id":"Q03_034_02","fact_key":"real_implementation_body","value":"stub_or_declaration_only","used_evidence_ids":["ev_cc_q34_msync"],"notes":"do_msync 是同步触发，不是后台 cleaning；fs/buf.c bwrite 也是同步"},
+        {"fact_id":"Q03_034_03","fact_key":"active_call_path","value":"no_after_negative_search","used_evidence_ids":["ev_cc_q34_neg"],"notes":"无后台调用路径"},
+        {"fact_id":"Q03_034_04","fact_key":"state_or_effect","value":"no_after_negative_search","used_evidence_ids":["ev_cc_q34_neg"],"notes":"未周期触发"},
+        {"fact_id":"Q03_034_05","fact_key":"stub_and_false_positive_filter","value":"yes_weak","used_evidence_ids":["ev_cc_q34_msync"],"notes":"msync/syncfs/munmap 都是同步路径，不构成 cleaning policy"},
+        {"fact_id":"Q03_034_06","fact_key":"negative_search_coverage","value":{"searched_keywords":["bdflush","kswapd","writeback_thread","periodic_sync","background_dirty","timer_writeback"],"searched_directories":["kernel"],"file_count":15,"match_count":0,"coverage_sufficient":true},"used_evidence_ids":["ev_cc_q34_neg"],"notes":"零命中"}
+      ],
+      "value": "not_found",
+      "used_evidence_ids": ["ev_cc_q34_msync","ev_cc_q34_neg"],
+      "notes": "仅同步路径（do_msync、mmapdel、syncfs），无后台预先回写脏页/缓存的清理策略。",
+      "evidence": [
+        {"evidence_id":"ev_cc_q34_msync","path":"kernel/mm/mmap.c","line_start":819,"line_end":900,"symbol_kind":"implementation_body","symbol_name":"do_msync_sync_only","excerpt":"int do_msync(uint64 addr, uint64 len, int flags) { /* synchronous writeback for MAP_SHARED files */ }","evidence_type":"implementation_body","strength":"weak","validity":"valid","supports_claim_types":["stub"]},
+        {"evidence_id":"ev_cc_q34_neg","path":"kernel/","line_start":0,"line_end":0,"symbol_kind":"negative_search","symbol_name":"no_background_cleaning","excerpt":"grep -rni 'bdflush|kswapd|writeback_thread|periodic_sync|background_dirty|timer_writeback' kernel 零命中。","evidence_type":"negative_search","strength":"strong","validity":"valid","supports_claim_types":["not_implemented"]}
+      ]
+    }
+  ]
+}

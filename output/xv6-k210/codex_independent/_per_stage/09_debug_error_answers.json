@@ -1,0 +1,1377 @@
+{
+  "schema_version": "v1",
+  "stage_id": "09_debug_error",
+  "stage_title": "调试机制与错误处理",
+  "terminology_profile": "stallings_en_zh",
+  "answers": [
+    {
+      "question_id": "Q09_001",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在日志系统（log/printk/println 宏）与日志级别控制？（必须三态）",
+      "fact_answers": [
+        {
+          "fact_id": "Q09_001_01",
+          "fact_key": "debug_entry",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q09_001_debug_macros_01",
+            "codex_ev_Q09_001_printf_02",
+            "codex_ev_Q09_001_panic_bt_03",
+            "codex_ev_Q09_001_panic_macro_04"
+          ],
+          "notes": "debug_entry 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q09_001_02",
+          "fact_key": "specialized_mechanism",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q09_001_debug_macros_01",
+            "codex_ev_Q09_001_printf_02",
+            "codex_ev_Q09_001_panic_bt_03",
+            "codex_ev_Q09_001_panic_macro_04"
+          ],
+          "notes": "specialized_mechanism 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q09_001_03",
+          "fact_key": "runtime_integration",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q09_001_debug_macros_01",
+            "codex_ev_Q09_001_printf_02",
+            "codex_ev_Q09_001_panic_bt_03",
+            "codex_ev_Q09_001_panic_macro_04"
+          ],
+          "notes": "runtime_integration 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q09_001_04",
+          "fact_key": "output_or_storage",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q09_001_debug_macros_01",
+            "codex_ev_Q09_001_printf_02",
+            "codex_ev_Q09_001_panic_bt_03",
+            "codex_ev_Q09_001_panic_macro_04"
+          ],
+          "notes": "output_or_storage 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q09_001_05",
+          "fact_key": "external_or_userland_boundary",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q09_001_debug_macros_01",
+            "codex_ev_Q09_001_printf_02",
+            "codex_ev_Q09_001_panic_bt_03",
+            "codex_ev_Q09_001_panic_macro_04"
+          ],
+          "notes": "external_or_userland_boundary 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q09_001_06",
+          "fact_key": "negative_search_coverage",
+          "value": {
+            "searched_keywords": [
+              "log",
+              "printk",
+              "printf",
+              "panic",
+              "backtrace",
+              "unwind",
+              "gdb",
+              "gdbstub",
+              "monitor",
+              "trace",
+              "ftrace",
+              "perf",
+              "errno",
+              "Error",
+              "Result"
+            ],
+            "searched_directories": [
+              "kernel",
+              "include",
+              "debug",
+              "xv6-user",
+              "Makefile"
+            ],
+            "file_count": 113,
+            "match_count": 1166,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [],
+          "notes": "negative_search_coverage 见本题证据。"
+        }
+      ],
+      "value": "implemented",
+      "notes": "存在 printf、DEBUG 门控、INFO/WARN/ERROR 宏和 panic/backtrace 输出。",
+      "used_evidence_ids": [
+        "codex_ev_Q09_001_debug_macros_01",
+        "codex_ev_Q09_001_printf_02",
+        "codex_ev_Q09_001_panic_bt_03",
+        "codex_ev_Q09_001_panic_macro_04"
+      ],
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q09_001_debug_macros_01",
+          "path": "repos/xv6-k210/include/utils/debug.h",
+          "symbol_kind": "macro",
+          "symbol_name": "__INFO/__WARN/__ERROR/__debug_info",
+          "excerpt": "Debug macros define colored INFO/WARN/ERROR prefixes; __debug_msg prints only under DEBUG, and __debug_assert panics only in DEBUG.",
+          "line_start": 9,
+          "line_end": 46,
+          "evidence_type": "definition",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q09_001_printf_02",
+          "path": "repos/xv6-k210/kernel/printf.c",
+          "symbol_kind": "function",
+          "symbol_name": "printf/printfinit",
+          "excerpt": "printf serializes console output with pr.lock, formats %d/%x/%p/%s, and printfinit initializes the lock.",
+          "line_start": 18,
+          "line_end": 150,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q09_001_panic_bt_03",
+          "path": "repos/xv6-k210/kernel/printf.c",
+          "symbol_kind": "function",
+          "symbol_name": "__panic/backtrace",
+          "excerpt": "__panic prints an ERROR panic prefix, the panic string, newline, calls backtrace, sets panicked, disables interrupts, and loops; backtrace walks frame pointers and prints return addresses.",
+          "line_start": 123,
+          "line_end": 144,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q09_001_panic_macro_04",
+          "path": "repos/xv6-k210/include/printf.h",
+          "symbol_kind": "macro",
+          "symbol_name": "panic",
+          "excerpt": "panic macro prints module name, hart id, source file and line, then calls __panic.",
+          "line_start": 11,
+          "line_end": 17,
+          "evidence_type": "definition",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_002",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 panic/崩溃处理路径（panic_handler/oom/abort 等）？（必须三态）",
+      "fact_answers": [
+        {
+          "fact_id": "Q09_002_01",
+          "fact_key": "debug_entry",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q09_002_debug_macros_01",
+            "codex_ev_Q09_002_printf_02",
+            "codex_ev_Q09_002_panic_bt_03",
+            "codex_ev_Q09_002_panic_macro_04"
+          ],
+          "notes": "debug_entry 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q09_002_02",
+          "fact_key": "specialized_mechanism",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q09_002_debug_macros_01",
+            "codex_ev_Q09_002_printf_02",
+            "codex_ev_Q09_002_panic_bt_03",
+            "codex_ev_Q09_002_panic_macro_04"
+          ],
+          "notes": "specialized_mechanism 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q09_002_03",
+          "fact_key": "runtime_integration",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q09_002_debug_macros_01",
+            "codex_ev_Q09_002_printf_02",
+            "codex_ev_Q09_002_panic_bt_03",
+            "codex_ev_Q09_002_panic_macro_04"
+          ],
+          "notes": "runtime_integration 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q09_002_04",
+          "fact_key": "output_or_storage",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q09_002_debug_macros_01",
+            "codex_ev_Q09_002_printf_02",
+            "codex_ev_Q09_002_panic_bt_03",
+            "codex_ev_Q09_002_panic_macro_04"
+          ],
+          "notes": "output_or_storage 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q09_002_05",
+          "fact_key": "external_or_userland_boundary",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q09_002_debug_macros_01",
+            "codex_ev_Q09_002_printf_02",
+            "codex_ev_Q09_002_panic_bt_03",
+            "codex_ev_Q09_002_panic_macro_04"
+          ],
+          "notes": "external_or_userland_boundary 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q09_002_06",
+          "fact_key": "negative_search_coverage",
+          "value": {
+            "searched_keywords": [
+              "log",
+              "printk",
+              "printf",
+              "panic",
+              "backtrace",
+              "unwind",
+              "gdb",
+              "gdbstub",
+              "monitor",
+              "trace",
+              "ftrace",
+              "perf",
+              "errno",
+              "Error",
+              "Result"
+            ],
+            "searched_directories": [
+              "kernel",
+              "include",
+              "debug",
+              "xv6-user",
+              "Makefile"
+            ],
+            "file_count": 113,
+            "match_count": 1166,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [],
+          "notes": "negative_search_coverage 见本题证据。"
+        }
+      ],
+      "value": "implemented",
+      "notes": "panic 宏和 __panic 路径完整：打印位置/消息/backtrace，关中断并停机。",
+      "used_evidence_ids": [
+        "codex_ev_Q09_002_debug_macros_01",
+        "codex_ev_Q09_002_printf_02",
+        "codex_ev_Q09_002_panic_bt_03",
+        "codex_ev_Q09_002_panic_macro_04"
+      ],
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q09_002_debug_macros_01",
+          "path": "repos/xv6-k210/include/utils/debug.h",
+          "symbol_kind": "macro",
+          "symbol_name": "__INFO/__WARN/__ERROR/__debug_info",
+          "excerpt": "Debug macros define colored INFO/WARN/ERROR prefixes; __debug_msg prints only under DEBUG, and __debug_assert panics only in DEBUG.",
+          "line_start": 9,
+          "line_end": 46,
+          "evidence_type": "definition",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q09_002_printf_02",
+          "path": "repos/xv6-k210/kernel/printf.c",
+          "symbol_kind": "function",
+          "symbol_name": "printf/printfinit",
+          "excerpt": "printf serializes console output with pr.lock, formats %d/%x/%p/%s, and printfinit initializes the lock.",
+          "line_start": 18,
+          "line_end": 150,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q09_002_panic_bt_03",
+          "path": "repos/xv6-k210/kernel/printf.c",
+          "symbol_kind": "function",
+          "symbol_name": "__panic/backtrace",
+          "excerpt": "__panic prints an ERROR panic prefix, the panic string, newline, calls backtrace, sets panicked, disables interrupts, and loops; backtrace walks frame pointers and prints return addresses.",
+          "line_start": 123,
+          "line_end": 144,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q09_002_panic_macro_04",
+          "path": "repos/xv6-k210/include/printf.h",
+          "symbol_kind": "macro",
+          "symbol_name": "panic",
+          "excerpt": "panic macro prints module name, hart id, source file and line, then calls __panic.",
+          "line_start": 11,
+          "line_end": 17,
+          "evidence_type": "definition",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_003",
+      "question_type": "short_answer",
+      "stem": "panic 路径会输出哪些诊断？（寄存器 dump/栈回溯/停机；必须引用实现证据）",
+      "fact_answers": [
+        {
+          "fact_id": "Q09_003_01",
+          "fact_key": "debug_entry",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q09_003_debug_macros_01",
+            "codex_ev_Q09_003_printf_02",
+            "codex_ev_Q09_003_panic_bt_03",
+            "codex_ev_Q09_003_panic_macro_04",
+            "codex_ev_Q09_003_trap_dump_05"
+          ],
+          "notes": "debug_entry 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q09_003_02",
+          "fact_key": "specialized_mechanism",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q09_003_debug_macros_01",
+            "codex_ev_Q09_003_printf_02",
+            "codex_ev_Q09_003_panic_bt_03",
+            "codex_ev_Q09_003_panic_macro_04",
+            "codex_ev_Q09_003_trap_dump_05"
+          ],
+          "notes": "specialized_mechanism 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q09_003_03",
+          "fact_key": "runtime_integration",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q09_003_debug_macros_01",
+            "codex_ev_Q09_003_printf_02",
+            "codex_ev_Q09_003_panic_bt_03",
+            "codex_ev_Q09_003_panic_macro_04",
+            "codex_ev_Q09_003_trap_dump_05"
+          ],
+          "notes": "runtime_integration 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q09_003_04",
+          "fact_key": "output_or_storage",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q09_003_debug_macros_01",
+            "codex_ev_Q09_003_printf_02",
+            "codex_ev_Q09_003_panic_bt_03",
+            "codex_ev_Q09_003_panic_macro_04",
+            "codex_ev_Q09_003_trap_dump_05"
+          ],
+          "notes": "output_or_storage 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q09_003_05",
+          "fact_key": "external_or_userland_boundary",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q09_003_debug_macros_01",
+            "codex_ev_Q09_003_printf_02",
+            "codex_ev_Q09_003_panic_bt_03",
+            "codex_ev_Q09_003_panic_macro_04",
+            "codex_ev_Q09_003_trap_dump_05"
+          ],
+          "notes": "external_or_userland_boundary 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q09_003_06",
+          "fact_key": "negative_search_coverage",
+          "value": {
+            "searched_keywords": [
+              "log",
+              "printk",
+              "printf",
+              "panic",
+              "backtrace",
+              "unwind",
+              "gdb",
+              "gdbstub",
+              "monitor",
+              "trace",
+              "ftrace",
+              "perf",
+              "errno",
+              "Error",
+              "Result"
+            ],
+            "searched_directories": [
+              "kernel",
+              "include",
+              "debug",
+              "xv6-user",
+              "Makefile"
+            ],
+            "file_count": 113,
+            "match_count": 1166,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [],
+          "notes": "negative_search_coverage 见本题证据。"
+        }
+      ],
+      "value": {
+        "debug_entry": "panic 宏先输出 module、hart、源文件和行号。",
+        "specialized_mechanism": "__panic 输出 ERROR panic 前缀、panic 字符串并调用 backtrace。",
+        "runtime_integration": "多处内核代码调用 panic/__assert；trap 异常路径还会打印 scause/sepc/stval，trapframedump 可打印寄存器。",
+        "output_or_storage": "输出到 console/consputc；未发现持久化日志存储。",
+        "external_or_userland_boundary": "这是内核 panic/诊断路径，不依赖用户态 shell。",
+        "negative_search_coverage": {
+          "searched_keywords": [
+            "log",
+            "printk",
+            "printf",
+            "panic",
+            "backtrace",
+            "unwind",
+            "gdb",
+            "gdbstub",
+            "monitor",
+            "trace",
+            "ftrace",
+            "perf",
+            "errno",
+            "Error",
+            "Result"
+          ],
+          "searched_directories": [
+            "kernel",
+            "include",
+            "debug",
+            "xv6-user",
+            "Makefile"
+          ],
+          "file_count": 113,
+          "match_count": 1166,
+          "coverage_sufficient": true
+        }
+      },
+      "notes": "panic 诊断包括 hart/file/line、panic 文本、backtrace；异常路径可输出 scause/sepc/stval/寄存器。",
+      "used_evidence_ids": [
+        "codex_ev_Q09_003_debug_macros_01",
+        "codex_ev_Q09_003_printf_02",
+        "codex_ev_Q09_003_panic_bt_03",
+        "codex_ev_Q09_003_panic_macro_04",
+        "codex_ev_Q09_003_trap_dump_05"
+      ],
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q09_003_debug_macros_01",
+          "path": "repos/xv6-k210/include/utils/debug.h",
+          "symbol_kind": "macro",
+          "symbol_name": "__INFO/__WARN/__ERROR/__debug_info",
+          "excerpt": "Debug macros define colored INFO/WARN/ERROR prefixes; __debug_msg prints only under DEBUG, and __debug_assert panics only in DEBUG.",
+          "line_start": 9,
+          "line_end": 46,
+          "evidence_type": "definition",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q09_003_printf_02",
+          "path": "repos/xv6-k210/kernel/printf.c",
+          "symbol_kind": "function",
+          "symbol_name": "printf/printfinit",
+          "excerpt": "printf serializes console output with pr.lock, formats %d/%x/%p/%s, and printfinit initializes the lock.",
+          "line_start": 18,
+          "line_end": 150,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q09_003_panic_bt_03",
+          "path": "repos/xv6-k210/kernel/printf.c",
+          "symbol_kind": "function",
+          "symbol_name": "__panic/backtrace",
+          "excerpt": "__panic prints an ERROR panic prefix, the panic string, newline, calls backtrace, sets panicked, disables interrupts, and loops; backtrace walks frame pointers and prints return addresses.",
+          "line_start": 123,
+          "line_end": 144,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q09_003_panic_macro_04",
+          "path": "repos/xv6-k210/include/printf.h",
+          "symbol_kind": "macro",
+          "symbol_name": "panic",
+          "excerpt": "panic macro prints module name, hart id, source file and line, then calls __panic.",
+          "line_start": 11,
+          "line_end": 17,
+          "evidence_type": "definition",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q09_003_trap_dump_05",
+          "path": "repos/xv6-k210/kernel/trap/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "trapframedump",
+          "excerpt": "trapframedump can print a0-a7, t0-t6, s0-s11, ra, sp, gp, tp, epc; unexpected traps print scause/sepc/stval.",
+          "line_start": 231,
+          "line_end": 384,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_004",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现栈回溯 (backtrace/unwind/stack_trace)？（必须三态；仅打印 ra 不算）",
+      "fact_answers": [
+        {
+          "fact_id": "Q09_004_01",
+          "fact_key": "debug_entry",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q09_004_debug_macros_01",
+            "codex_ev_Q09_004_printf_02",
+            "codex_ev_Q09_004_panic_bt_03",
+            "codex_ev_Q09_004_panic_macro_04"
+          ],
+          "notes": "debug_entry 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q09_004_02",
+          "fact_key": "specialized_mechanism",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q09_004_debug_macros_01",
+            "codex_ev_Q09_004_printf_02",
+            "codex_ev_Q09_004_panic_bt_03",
+            "codex_ev_Q09_004_panic_macro_04"
+          ],
+          "notes": "specialized_mechanism 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q09_004_03",
+          "fact_key": "runtime_integration",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q09_004_debug_macros_01",
+            "codex_ev_Q09_004_printf_02",
+            "codex_ev_Q09_004_panic_bt_03",
+            "codex_ev_Q09_004_panic_macro_04"
+          ],
+          "notes": "runtime_integration 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q09_004_04",
+          "fact_key": "output_or_storage",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q09_004_debug_macros_01",
+            "codex_ev_Q09_004_printf_02",
+            "codex_ev_Q09_004_panic_bt_03",
+            "codex_ev_Q09_004_panic_macro_04"
+          ],
+          "notes": "output_or_storage 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q09_004_05",
+          "fact_key": "external_or_userland_boundary",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q09_004_debug_macros_01",
+            "codex_ev_Q09_004_printf_02",
+            "codex_ev_Q09_004_panic_bt_03",
+            "codex_ev_Q09_004_panic_macro_04"
+          ],
+          "notes": "external_or_userland_boundary 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q09_004_06",
+          "fact_key": "negative_search_coverage",
+          "value": {
+            "searched_keywords": [
+              "log",
+              "printk",
+              "printf",
+              "panic",
+              "backtrace",
+              "unwind",
+              "gdb",
+              "gdbstub",
+              "monitor",
+              "trace",
+              "ftrace",
+              "perf",
+              "errno",
+              "Error",
+              "Result"
+            ],
+            "searched_directories": [
+              "kernel",
+              "include",
+              "debug",
+              "xv6-user",
+              "Makefile"
+            ],
+            "file_count": 113,
+            "match_count": 1166,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [],
+          "notes": "negative_search_coverage 见本题证据。"
+        }
+      ],
+      "value": "implemented",
+      "notes": "backtrace 从 frame pointer 逐帧读取返回地址并打印，不只是单次打印 ra。",
+      "used_evidence_ids": [
+        "codex_ev_Q09_004_debug_macros_01",
+        "codex_ev_Q09_004_printf_02",
+        "codex_ev_Q09_004_panic_bt_03",
+        "codex_ev_Q09_004_panic_macro_04"
+      ],
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q09_004_debug_macros_01",
+          "path": "repos/xv6-k210/include/utils/debug.h",
+          "symbol_kind": "macro",
+          "symbol_name": "__INFO/__WARN/__ERROR/__debug_info",
+          "excerpt": "Debug macros define colored INFO/WARN/ERROR prefixes; __debug_msg prints only under DEBUG, and __debug_assert panics only in DEBUG.",
+          "line_start": 9,
+          "line_end": 46,
+          "evidence_type": "definition",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q09_004_printf_02",
+          "path": "repos/xv6-k210/kernel/printf.c",
+          "symbol_kind": "function",
+          "symbol_name": "printf/printfinit",
+          "excerpt": "printf serializes console output with pr.lock, formats %d/%x/%p/%s, and printfinit initializes the lock.",
+          "line_start": 18,
+          "line_end": 150,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q09_004_panic_bt_03",
+          "path": "repos/xv6-k210/kernel/printf.c",
+          "symbol_kind": "function",
+          "symbol_name": "__panic/backtrace",
+          "excerpt": "__panic prints an ERROR panic prefix, the panic string, newline, calls backtrace, sets panicked, disables interrupts, and loops; backtrace walks frame pointers and prints return addresses.",
+          "line_start": 123,
+          "line_end": 144,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q09_004_panic_macro_04",
+          "path": "repos/xv6-k210/include/printf.h",
+          "symbol_kind": "macro",
+          "symbol_name": "panic",
+          "excerpt": "panic macro prints module name, hart id, source file and line, then calls __panic.",
+          "line_start": 11,
+          "line_end": 17,
+          "evidence_type": "definition",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_005",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 **内核驻留的交互式调试监视器（kernel debug monitor）**？（本题指内核态命令解释器/调试控制台；不要与 Stallings Ch5 的 Monitor/Condition Variable 同步构造混淆；不包括仅在用户态运行的常规 shell。必须三态；若 implemented，须给出 3-10 个用户可键入的 monitor 命令名及对应内核内解析/分发入口证据。）",
+      "fact_answers": [
+        {
+          "fact_id": "Q09_005_01",
+          "fact_key": "debug_entry",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q09_005_dbg_neg_01"
+          ],
+          "notes": "debug_entry 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q09_005_02",
+          "fact_key": "specialized_mechanism",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q09_005_dbg_neg_01"
+          ],
+          "notes": "specialized_mechanism 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q09_005_03",
+          "fact_key": "runtime_integration",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q09_005_dbg_neg_01"
+          ],
+          "notes": "runtime_integration 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q09_005_04",
+          "fact_key": "output_or_storage",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q09_005_dbg_neg_01"
+          ],
+          "notes": "output_or_storage 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q09_005_05",
+          "fact_key": "external_or_userland_boundary",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q09_005_dbg_neg_01"
+          ],
+          "notes": "external_or_userland_boundary 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q09_005_06",
+          "fact_key": "negative_search_coverage",
+          "value": {
+            "searched_keywords": [
+              "log",
+              "printk",
+              "printf",
+              "panic",
+              "backtrace",
+              "unwind",
+              "gdb",
+              "gdbstub",
+              "monitor",
+              "trace",
+              "ftrace",
+              "perf",
+              "errno",
+              "Error",
+              "Result"
+            ],
+            "searched_directories": [
+              "kernel",
+              "include",
+              "debug",
+              "xv6-user",
+              "Makefile"
+            ],
+            "file_count": 113,
+            "match_count": 1166,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [
+            "codex_ev_Q09_005_dbg_neg_01"
+          ],
+          "notes": "negative_search_coverage 见本题证据。"
+        }
+      ],
+      "value": "not_found",
+      "notes": "未发现内核态交互式调试监视器。",
+      "used_evidence_ids": [
+        "codex_ev_Q09_005_dbg_neg_01"
+      ],
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q09_005_dbg_neg_01",
+          "path": "<negative_search>",
+          "symbol_kind": "search",
+          "symbol_name": "dbg_neg",
+          "excerpt": "No kernel-resident interactive monitor command parser/dispatcher or built-in monitor commands found; user shell is outside kernel; searched_keywords=log, printk, printf, panic, backtrace, unwind, gdb, gdbstub, monitor, trace, ftrace, perf, errno, Error, Result; searched_directories=kernel, include, debug, xv6-user, Makefile; file_count=113; match_count=1166; coverage_sufficient=true",
+          "line_start": null,
+          "line_end": null,
+          "evidence_type": "negative_search",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "negative_search"
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_006",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 GDB stub（需数据包解析循环，如 handle_gdb_packet）？（必须三态）",
+      "fact_answers": [
+        {
+          "fact_id": "Q09_006_01",
+          "fact_key": "packet_loop",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q09_006_dbg_neg_01",
+            "codex_ev_Q09_006_external_gdb_02"
+          ],
+          "notes": "packet_loop 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q09_006_02",
+          "fact_key": "checksum_ack",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q09_006_dbg_neg_01",
+            "codex_ev_Q09_006_external_gdb_02"
+          ],
+          "notes": "checksum_ack 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q09_006_03",
+          "fact_key": "command_handlers",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q09_006_dbg_neg_01",
+            "codex_ev_Q09_006_external_gdb_02"
+          ],
+          "notes": "command_handlers 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q09_006_04",
+          "fact_key": "trap_integration",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q09_006_dbg_neg_01",
+            "codex_ev_Q09_006_external_gdb_02"
+          ],
+          "notes": "trap_integration 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q09_006_05",
+          "fact_key": "not_external_config",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q09_006_dbg_neg_01",
+            "codex_ev_Q09_006_external_gdb_02"
+          ],
+          "notes": "not_external_config 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q09_006_06",
+          "fact_key": "negative_search_coverage",
+          "value": {
+            "searched_keywords": [
+              "log",
+              "printk",
+              "printf",
+              "panic",
+              "backtrace",
+              "unwind",
+              "gdb",
+              "gdbstub",
+              "monitor",
+              "trace",
+              "ftrace",
+              "perf",
+              "errno",
+              "Error",
+              "Result"
+            ],
+            "searched_directories": [
+              "kernel",
+              "include",
+              "debug",
+              "xv6-user",
+              "Makefile"
+            ],
+            "file_count": 113,
+            "match_count": 1166,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [
+            "codex_ev_Q09_006_dbg_neg_01"
+          ],
+          "notes": "negative_search_coverage 见本题证据。"
+        }
+      ],
+      "value": "not_found",
+      "notes": "只有外部 QEMU/OpenOCD GDB 配置，未发现内核 GDB stub。",
+      "used_evidence_ids": [
+        "codex_ev_Q09_006_dbg_neg_01",
+        "codex_ev_Q09_006_external_gdb_02"
+      ],
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q09_006_dbg_neg_01",
+          "path": "<negative_search>",
+          "symbol_kind": "search",
+          "symbol_name": "dbg_neg",
+          "excerpt": "No in-kernel GDB remote stub packet parser, checksum/ack loop, or command handler found; searched_keywords=log, printk, printf, panic, backtrace, unwind, gdb, gdbstub, monitor, trace, ftrace, perf, errno, Error, Result; searched_directories=kernel, include, debug, xv6-user, Makefile; file_count=113; match_count=1166; coverage_sufficient=true",
+          "line_start": null,
+          "line_end": null,
+          "evidence_type": "negative_search",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "negative_search"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q09_006_external_gdb_02",
+          "path": "repos/xv6-k210/Makefile",
+          "symbol_kind": "configuration",
+          "symbol_name": "QEMU -gdb",
+          "excerpt": "Makefile only adds QEMUOPTS += -gdb tcp::1234 in debug mode; debug/openocd_cfg only sets external gdb_port 3333.",
+          "line_start": 64,
+          "line_end": 65,
+          "evidence_type": "configuration",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "negative_search",
+            "classification"
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_007",
+      "question_type": "short_answer",
+      "stem": "错误码/错误类型体系是什么？（errno/Result/Error enum；给类型定义与传播点证据）",
+      "fact_answers": [
+        {
+          "fact_id": "Q09_007_01",
+          "fact_key": "debug_entry",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q09_007_errno_01",
+            "codex_ev_Q09_007_errno_ret_02",
+            "codex_ev_Q09_007_errno_usercopy_03"
+          ],
+          "notes": "debug_entry 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q09_007_02",
+          "fact_key": "specialized_mechanism",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q09_007_errno_01",
+            "codex_ev_Q09_007_errno_ret_02",
+            "codex_ev_Q09_007_errno_usercopy_03"
+          ],
+          "notes": "specialized_mechanism 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q09_007_03",
+          "fact_key": "runtime_integration",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q09_007_errno_01",
+            "codex_ev_Q09_007_errno_ret_02",
+            "codex_ev_Q09_007_errno_usercopy_03"
+          ],
+          "notes": "runtime_integration 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q09_007_04",
+          "fact_key": "output_or_storage",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q09_007_errno_01",
+            "codex_ev_Q09_007_errno_ret_02",
+            "codex_ev_Q09_007_errno_usercopy_03"
+          ],
+          "notes": "output_or_storage 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q09_007_05",
+          "fact_key": "external_or_userland_boundary",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q09_007_errno_01",
+            "codex_ev_Q09_007_errno_ret_02",
+            "codex_ev_Q09_007_errno_usercopy_03"
+          ],
+          "notes": "external_or_userland_boundary 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q09_007_06",
+          "fact_key": "negative_search_coverage",
+          "value": {
+            "searched_keywords": [
+              "log",
+              "printk",
+              "printf",
+              "panic",
+              "backtrace",
+              "unwind",
+              "gdb",
+              "gdbstub",
+              "monitor",
+              "trace",
+              "ftrace",
+              "perf",
+              "errno",
+              "Error",
+              "Result"
+            ],
+            "searched_directories": [
+              "kernel",
+              "include",
+              "debug",
+              "xv6-user",
+              "Makefile"
+            ],
+            "file_count": 113,
+            "match_count": 1166,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [],
+          "notes": "negative_search_coverage 见本题证据。"
+        }
+      ],
+      "value": {
+        "debug_entry": "错误码体系是 C 宏 errno 常量。",
+        "specialized_mechanism": "未发现 Result/Error enum；syscall 以负 errno 返回。",
+        "runtime_integration": "sysfile/syssignal/sysmem 等路径返回 -EFAULT/-EINVAL/-EBADF/-EPERM 等。",
+        "output_or_storage": "错误通常作为 syscall 返回值传播，panic/debug 另走 printf。",
+        "external_or_userland_boundary": "用户态通过系统调用返回值观察错误码。",
+        "negative_search_coverage": {
+          "searched_keywords": [
+            "log",
+            "printk",
+            "printf",
+            "panic",
+            "backtrace",
+            "unwind",
+            "gdb",
+            "gdbstub",
+            "monitor",
+            "trace",
+            "ftrace",
+            "perf",
+            "errno",
+            "Error",
+            "Result"
+          ],
+          "searched_directories": [
+            "kernel",
+            "include",
+            "debug",
+            "xv6-user",
+            "Makefile"
+          ],
+          "file_count": 113,
+          "match_count": 1166,
+          "coverage_sufficient": true
+        }
+      },
+      "notes": "错误体系是 errno 宏 + 负 errno 返回传播。",
+      "used_evidence_ids": [
+        "codex_ev_Q09_007_errno_01",
+        "codex_ev_Q09_007_errno_ret_02",
+        "codex_ev_Q09_007_errno_usercopy_03"
+      ],
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q09_007_errno_01",
+          "path": "repos/xv6-k210/include/errno.h",
+          "symbol_kind": "macro",
+          "symbol_name": "errno constants",
+          "excerpt": "errno.h defines EPERM, ENOENT, ESRCH, EINTR, EIO, EACCES, EFAULT, ENOSYS, ENOTSOCK and many other numeric error constants.",
+          "line_start": 4,
+          "line_end": 99,
+          "evidence_type": "definition",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q09_007_errno_ret_02",
+          "path": "repos/xv6-k210/kernel/syscall/sysfile.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_openat/sys_ioctl/sys_statfs",
+          "excerpt": "syscalls propagate negative errno values such as -EBADF, -ENAMETOOLONG, -EISDIR, -ENOTDIR, -ENOMEM, -EPERM and -EFAULT.",
+          "line_start": 198,
+          "line_end": 1014,
+          "evidence_type": "usage_flow",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q09_007_errno_usercopy_03",
+          "path": "repos/xv6-k210/kernel/syscall/syssignal.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_rt_sigaction",
+          "excerpt": "sys_rt_sigaction returns -EFAULT on copyin2/copyout2 failure and -EINVAL on invalid set_sigaction.",
+          "line_start": 53,
+          "line_end": 82,
+          "evidence_type": "usage_flow",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_008",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 trace/perf/ftrace 等跟踪机制或 tracepoints？（必须三态）",
+      "fact_answers": [
+        {
+          "fact_id": "Q09_008_01",
+          "fact_key": "trace_abstraction",
+          "value": "stub_or_declaration_only",
+          "used_evidence_ids": [
+            "codex_ev_Q09_008_trace_sys_01",
+            "codex_ev_Q09_008_trace_print_02",
+            "codex_ev_Q09_008_trace_neg_03"
+          ],
+          "notes": "trace_abstraction 只有字段、固定返回或弱接口，未闭合强制语义。"
+        },
+        {
+          "fact_id": "Q09_008_02",
+          "fact_key": "event_storage",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q09_008_trace_sys_01",
+            "codex_ev_Q09_008_trace_print_02",
+            "codex_ev_Q09_008_trace_neg_03"
+          ],
+          "notes": "event_storage 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q09_008_03",
+          "fact_key": "instrumentation_sites",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q09_008_trace_sys_01",
+            "codex_ev_Q09_008_trace_print_02",
+            "codex_ev_Q09_008_trace_neg_03"
+          ],
+          "notes": "instrumentation_sites 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q09_008_04",
+          "fact_key": "control_readout",
+          "value": "stub_or_declaration_only",
+          "used_evidence_ids": [
+            "codex_ev_Q09_008_trace_sys_01",
+            "codex_ev_Q09_008_trace_print_02",
+            "codex_ev_Q09_008_trace_neg_03"
+          ],
+          "notes": "control_readout 只有字段、固定返回或弱接口，未闭合强制语义。"
+        },
+        {
+          "fact_id": "Q09_008_05",
+          "fact_key": "not_logging",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q09_008_trace_sys_01",
+            "codex_ev_Q09_008_trace_print_02",
+            "codex_ev_Q09_008_trace_neg_03"
+          ],
+          "notes": "not_logging 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q09_008_06",
+          "fact_key": "negative_search_coverage",
+          "value": {
+            "searched_keywords": [
+              "log",
+              "printk",
+              "printf",
+              "panic",
+              "backtrace",
+              "unwind",
+              "gdb",
+              "gdbstub",
+              "monitor",
+              "trace",
+              "ftrace",
+              "perf",
+              "errno",
+              "Error",
+              "Result"
+            ],
+            "searched_directories": [
+              "kernel",
+              "include",
+              "debug",
+              "xv6-user",
+              "Makefile"
+            ],
+            "file_count": 113,
+            "match_count": 1166,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [
+            "codex_ev_Q09_008_trace_neg_03"
+          ],
+          "notes": "negative_search_coverage 见本题证据。"
+        }
+      ],
+      "value": "stub",
+      "notes": "只有 syscall trace 打印开关，未发现 tracepoint/perf/ftrace/ring buffer/readout，故为桩/弱实现。",
+      "used_evidence_ids": [
+        "codex_ev_Q09_008_trace_sys_01",
+        "codex_ev_Q09_008_trace_print_02",
+        "codex_ev_Q09_008_trace_neg_03"
+      ],
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q09_008_trace_sys_01",
+          "path": "repos/xv6-k210/kernel/syscall/sysproc.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_trace",
+          "excerpt": "sys_trace ignores a mask argument and sets myproc()->tmask = 1, then returns 0.",
+          "line_start": 255,
+          "line_end": 264,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "stub",
+            "implementation_body"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q09_008_trace_print_02",
+          "path": "repos/xv6-k210/kernel/syscall/syscall.c",
+          "symbol_kind": "function",
+          "symbol_name": "syscall trace printing",
+          "excerpt": "syscall() checks p->tmask and prints pid/name/arguments before the syscall and \") -> return\" after it; it does not store trace events.",
+          "line_start": 350,
+          "line_end": 357,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "stub",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q09_008_trace_neg_03",
+          "path": "<negative_search>",
+          "symbol_kind": "search",
+          "symbol_name": "trace_neg",
+          "excerpt": "No ftrace/perf/tracepoint/probe abstraction, ring-buffer event storage, or trace readout interface found; searched_keywords=log, printk, printf, panic, backtrace, unwind, gdb, gdbstub, monitor, trace, ftrace, perf, errno, Error, Result; searched_directories=kernel, include, debug, xv6-user, Makefile; file_count=113; match_count=1166; coverage_sufficient=true",
+          "line_start": null,
+          "line_end": null,
+          "evidence_type": "negative_search",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "negative_search"
+          ]
+        }
+      ]
+    }
+  ]
+}

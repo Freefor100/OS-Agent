@@ -742,7 +742,7 @@ def _format_caller_hints(
 
 
 def _extract_token_usage_from_response(response) -> Dict[str, int]:
-    """与 os_agent_d_describe.print_step / core.vectorizer 一致，从 LLM 响应取 token。"""
+    """从 LLM 响应中提取 token usage。"""
     metadata = getattr(response, "response_metadata", None) or {}
     usage = metadata.get("token_usage", {}) or {}
     return {
@@ -1595,29 +1595,17 @@ def _compose_callgraph_markdown(
     )
     return f"""## Call Graph 概览
 
-> 先以 Tree-sitter 扫描全库，再对 C/C++ 用 **Clang AST**（与仓库根 `compile_flags.txt` / `compile_commands.json` 一致）剔除**条件编译未进入翻译单元**的函数节点，得到参与 PageRank 的 **{G.number_of_nodes()}** 个函数、**{G.number_of_edges()}** 条调用边。
-{sem_line}> 用 **PageRank** 选出架构枢纽 **Top-{len(top_k_nodes)}** 个函数（参数 **k={top_k}**；若全库可排名节点不足 k，则实际个数可能小于 k）。
-> 按 **domain（列）× layer（行）** 二维网格布局（**domain/layer 由 LLM 根据函数名与代码片段分类**），
-> 同格多节点限制在格内排布；连线体现调用关系。
-> **可变网格**：在 **k={top_k}** 配置下，**未出现**的 domain 列、layer 行会**压缩**宽高，把画布让给有节点的列/行。
-> **layer 为何常落在 kernel**：PageRank 枢纽多为调度/内存/VFS 等**内核通用逻辑**，且 `kernel` 表示「既非 syscall 入口、也非直接 MMIO」的广义内核代码，模型容易默认成 kernel；已对 **`sys_*` 命名**做确定性修正为 `syscall_boundary`。缓存随 **compile 配置 / git / 管线版本** 自动失效；需强制全量重算时可调用 `generate_callgraph_section(..., force_regenerate=True)`。
 
 ### 函数级 Call Graph（PageRank Top-{top_k}，图示 {len(top_k_nodes)} 个函数）
 
 {figure_block}
 
-**图例**：列 = domain 分类，行 = layer 层次（**userspace** → **syscall_boundary** → **kernel** → **hardware**）
-节点颜色：{" / ".join(f"`{d}`={c}" for d, c in list(_DOMAIN_COLOR.items())[:5])}
-节点**第一行**仅为**符号名**；**第二行**：**函数定义**只写相对源路径；**宏**、**类型别名（typedef）**、**仅引用（调用侧）**等在第二行用**中文**标明类别并附路径或调用方文件（来自静态解析或调用边）。
-列宽按该 domain 列下最长节点标签**动态**估算（有上下限），避免固定死宽度。
 
-### 文件级调用关系
+节点**第一行**仅为**符号名**；
+**第二行**：**函数定义**只写相对源路径；
+**宏**、**类型别名（typedef）**、**仅引用（调用侧）**等在第二行用**中文**标明类别并附路径或调用方文件（来自静态解析或调用边）。
 
-{render_file_table(FG, classified, fn_meta)}
 
-### PageRank Top-{len(top_k_nodes)} 枢纽函数（k={top_k}）
-
-{render_node_table(top_k_nodes, classified)}
 """
 
 

@@ -1,0 +1,3615 @@
+{
+  "schema_version": "v1",
+  "stage_id": "06_sync_ipc",
+  "stage_title": "同步互斥与进程间通信",
+  "terminology_profile": "stallings_en_zh",
+  "answers": [
+    {
+      "question_id": "Q06_001",
+      "question_type": "short_answer",
+      "stem": "该内核提供了哪些同步原语？（SpinLock/Mutex/RwLock/Semaphore/Condvar/WaitQueue 等；列出类型定义证据）",
+      "fact_answers": [
+        {
+          "fact_id": "Q06_001_01",
+          "fact_key": "primitive_or_ipc_object",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q06_001_spinlock_01",
+            "codex_ev_Q06_001_spinlock_02",
+            "codex_ev_Q06_001_sleeplock_01",
+            "codex_ev_Q06_001_sleeplock_02",
+            "codex_ev_Q06_001_waitqueue_01",
+            "codex_ev_Q06_001_sleep_wakeup_02",
+            "codex_ev_Q06_001_pipe_def_01",
+            "codex_ev_Q06_001_pipe_alloc_02",
+            "codex_ev_Q06_001_pipe_rw_03",
+            "codex_ev_Q06_001_pipe_syscall_04",
+            "codex_ev_Q06_001_signal_sys_01",
+            "codex_ev_Q06_001_signal_syscall_02",
+            "codex_ev_Q06_001_signal_handle_03",
+            "codex_ev_Q06_001_signal_tramp_04",
+            "codex_ev_Q06_001_sync_neg_09"
+          ],
+          "notes": "primitive_or_ipc_object 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q06_001_02",
+          "fact_key": "operation_impl",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q06_001_spinlock_01",
+            "codex_ev_Q06_001_spinlock_02",
+            "codex_ev_Q06_001_sleeplock_01",
+            "codex_ev_Q06_001_sleeplock_02",
+            "codex_ev_Q06_001_waitqueue_01",
+            "codex_ev_Q06_001_sleep_wakeup_02",
+            "codex_ev_Q06_001_pipe_def_01",
+            "codex_ev_Q06_001_pipe_alloc_02",
+            "codex_ev_Q06_001_pipe_rw_03",
+            "codex_ev_Q06_001_pipe_syscall_04",
+            "codex_ev_Q06_001_signal_sys_01",
+            "codex_ev_Q06_001_signal_syscall_02",
+            "codex_ev_Q06_001_signal_handle_03",
+            "codex_ev_Q06_001_signal_tramp_04",
+            "codex_ev_Q06_001_sync_neg_09"
+          ],
+          "notes": "operation_impl 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q06_001_03",
+          "fact_key": "scheduler_blocking",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q06_001_spinlock_01",
+            "codex_ev_Q06_001_spinlock_02",
+            "codex_ev_Q06_001_sleeplock_01",
+            "codex_ev_Q06_001_sleeplock_02",
+            "codex_ev_Q06_001_waitqueue_01",
+            "codex_ev_Q06_001_sleep_wakeup_02",
+            "codex_ev_Q06_001_pipe_def_01",
+            "codex_ev_Q06_001_pipe_alloc_02",
+            "codex_ev_Q06_001_pipe_rw_03",
+            "codex_ev_Q06_001_pipe_syscall_04",
+            "codex_ev_Q06_001_signal_sys_01",
+            "codex_ev_Q06_001_signal_syscall_02",
+            "codex_ev_Q06_001_signal_handle_03",
+            "codex_ev_Q06_001_signal_tramp_04",
+            "codex_ev_Q06_001_sync_neg_09"
+          ],
+          "notes": "scheduler_blocking 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q06_001_04",
+          "fact_key": "race_deadlock_guard",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q06_001_spinlock_01",
+            "codex_ev_Q06_001_spinlock_02",
+            "codex_ev_Q06_001_sleeplock_01",
+            "codex_ev_Q06_001_sleeplock_02",
+            "codex_ev_Q06_001_waitqueue_01",
+            "codex_ev_Q06_001_sleep_wakeup_02",
+            "codex_ev_Q06_001_pipe_def_01",
+            "codex_ev_Q06_001_pipe_alloc_02",
+            "codex_ev_Q06_001_pipe_rw_03",
+            "codex_ev_Q06_001_pipe_syscall_04",
+            "codex_ev_Q06_001_signal_sys_01",
+            "codex_ev_Q06_001_signal_syscall_02",
+            "codex_ev_Q06_001_signal_handle_03",
+            "codex_ev_Q06_001_signal_tramp_04",
+            "codex_ev_Q06_001_sync_neg_09"
+          ],
+          "notes": "race_deadlock_guard 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q06_001_05",
+          "fact_key": "semantic_boundary",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q06_001_spinlock_01",
+            "codex_ev_Q06_001_spinlock_02",
+            "codex_ev_Q06_001_sleeplock_01",
+            "codex_ev_Q06_001_sleeplock_02",
+            "codex_ev_Q06_001_waitqueue_01",
+            "codex_ev_Q06_001_sleep_wakeup_02",
+            "codex_ev_Q06_001_pipe_def_01",
+            "codex_ev_Q06_001_pipe_alloc_02",
+            "codex_ev_Q06_001_pipe_rw_03",
+            "codex_ev_Q06_001_pipe_syscall_04",
+            "codex_ev_Q06_001_signal_sys_01",
+            "codex_ev_Q06_001_signal_syscall_02",
+            "codex_ev_Q06_001_signal_handle_03",
+            "codex_ev_Q06_001_signal_tramp_04",
+            "codex_ev_Q06_001_sync_neg_09"
+          ],
+          "notes": "semantic_boundary 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q06_001_06",
+          "fact_key": "negative_search_coverage",
+          "value": {
+            "searched_keywords": [
+              "spinlock",
+              "mutex",
+              "rwlock",
+              "semaphore",
+              "condvar",
+              "monitor",
+              "waitqueue",
+              "sleep",
+              "wakeup",
+              "atomic",
+              "deadlock",
+              "lock ordering",
+              "barrier",
+              "message passing",
+              "pipe",
+              "futex",
+              "msgget",
+              "semop",
+              "shmget"
+            ],
+            "searched_directories": [
+              "kernel",
+              "include",
+              "xv6-user",
+              "Makefile"
+            ],
+            "file_count": 101,
+            "match_count": 1702,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [
+            "codex_ev_Q06_001_sync_neg_09"
+          ],
+          "notes": "negative_search_coverage 见本题证据。"
+        }
+      ],
+      "value": {
+        "primitive_or_ipc_object": "已实现 SpinLock、Sleeplock(阻塞 mutex 型锁)、WaitQueue、sleep/wakeup、Pipe、signal；未发现 RwLock、Counting Semaphore、Condvar/Monitor、futex、SysV msg/sem/shm、barrier。",
+        "operation_impl": "spinlock 使用 __sync 原子交换忙等；sleeplock 通过 sleep/wakeup 阻塞；pipe 使用 wait_queue 和环形缓冲；signal 有 sigaction/kill/sigreturn/trampoline。",
+        "scheduler_blocking": "sleep(chan,lk) 原子释放调用者锁、挂入 SLEEPING 并 sched；wakeup 将同 chan 睡眠进程转 RUNNABLE。",
+        "race_deadlock_guard": "spinlock push_off 防中断重入；sleep 在 proc_lock 与调用锁之间切换防丢 wakeup；未发现全局锁顺序。",
+        "semantic_boundary": "这些主要是内核内部同步，pipe/signal 是用户可见 IPC；未把 mutex 等同于 counting semaphore。",
+        "negative_search_coverage": {
+          "searched_keywords": [
+            "spinlock",
+            "mutex",
+            "rwlock",
+            "semaphore",
+            "condvar",
+            "monitor",
+            "waitqueue",
+            "sleep",
+            "wakeup",
+            "atomic",
+            "deadlock",
+            "lock ordering",
+            "barrier",
+            "message passing",
+            "pipe",
+            "futex",
+            "msgget",
+            "semop",
+            "shmget"
+          ],
+          "searched_directories": [
+            "kernel",
+            "include",
+            "xv6-user",
+            "Makefile"
+          ],
+          "file_count": 101,
+          "match_count": 1702,
+          "coverage_sufficient": true
+        }
+      },
+      "notes": "同步原语强证据集中在 sync、sched、fs/pipe、sched/signal；若题面列出的原语未列为已实现，均由负向搜索支撑。",
+      "used_evidence_ids": [
+        "codex_ev_Q06_001_spinlock_01",
+        "codex_ev_Q06_001_spinlock_02",
+        "codex_ev_Q06_001_sleeplock_01",
+        "codex_ev_Q06_001_sleeplock_02",
+        "codex_ev_Q06_001_waitqueue_01",
+        "codex_ev_Q06_001_sleep_wakeup_02",
+        "codex_ev_Q06_001_pipe_def_01",
+        "codex_ev_Q06_001_pipe_alloc_02",
+        "codex_ev_Q06_001_pipe_rw_03",
+        "codex_ev_Q06_001_pipe_syscall_04",
+        "codex_ev_Q06_001_signal_sys_01",
+        "codex_ev_Q06_001_signal_syscall_02",
+        "codex_ev_Q06_001_signal_handle_03",
+        "codex_ev_Q06_001_signal_tramp_04",
+        "codex_ev_Q06_001_sync_neg_09"
+      ],
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q06_001_spinlock_01",
+          "path": "repos/xv6-k210/include/sync/spinlock.h",
+          "symbol_kind": "struct",
+          "symbol_name": "spinlock",
+          "excerpt": "struct spinlock { uint locked; char *name; struct cpu *cpu; }; declares initlock/acquire/release/holding.",
+          "line_start": 7,
+          "line_end": 28,
+          "evidence_type": "definition",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q06_001_spinlock_02",
+          "path": "repos/xv6-k210/kernel/sync/spinlock.c",
+          "symbol_kind": "function",
+          "symbol_name": "acquire/release",
+          "excerpt": "acquire disables interrupts then loops on __sync_lock_test_and_set(&lk->locked,1); release fences and __sync_lock_release(&lk->locked), then pop_off().",
+          "line_start": 24,
+          "line_end": 70,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q06_001_sleeplock_01",
+          "path": "repos/xv6-k210/include/sync/sleeplock.h",
+          "symbol_kind": "struct",
+          "symbol_name": "sleeplock",
+          "excerpt": "struct sleeplock has locked, embedded spinlock lk, name, pid; declares acquiresleep/releasesleep/holdingsleep/trysleeplock.",
+          "line_start": 10,
+          "line_end": 23,
+          "evidence_type": "definition",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q06_001_sleeplock_02",
+          "path": "repos/xv6-k210/kernel/sync/sleeplock.c",
+          "symbol_kind": "function",
+          "symbol_name": "acquiresleep/releasesleep",
+          "excerpt": "acquiresleep holds lk and while locked calls sleep(lk,&lk->lk), then marks locked/pid; releasesleep clears locked/pid, calls wakeup(lk), releases lk.",
+          "line_start": 22,
+          "line_end": 40,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q06_001_waitqueue_01",
+          "path": "repos/xv6-k210/include/sync/waitqueue.h",
+          "symbol_kind": "struct",
+          "symbol_name": "wait_queue/wait_node",
+          "excerpt": "wait_queue is a spinlock plus doubly-linked list head; wait_node stores chan and list; helpers add/delete/next/is_first.",
+          "line_start": 17,
+          "line_end": 71,
+          "evidence_type": "definition",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q06_001_sleep_wakeup_02",
+          "path": "repos/xv6-k210/kernel/sched/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "sleep/wakeup",
+          "excerpt": "sleep enters proc critical section, releases caller lock, sets p->chan, removes runnable proc, inserts sleeping proc, calls sched, then reacquires lk; wakeup moves sleepers on chan runnable.",
+          "line_start": 392,
+          "line_end": 606,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q06_001_pipe_def_01",
+          "path": "repos/xv6-k210/include/fs/pipe.h",
+          "symbol_kind": "struct",
+          "symbol_name": "pipe",
+          "excerpt": "struct pipe contains spinlock, writer/reader wait_queue, nread/nwrite counters, readopen/writeopen, pdata and fixed data[PIPE_SIZE]; PIPESIZE(pi) shifts buffer size.",
+          "line_start": 13,
+          "line_end": 27,
+          "evidence_type": "definition",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q06_001_pipe_alloc_02",
+          "path": "repos/xv6-k210/kernel/fs/pipe.c",
+          "symbol_kind": "function",
+          "symbol_name": "pipealloc",
+          "excerpt": "pipealloc allocates two files and a pipe, initializes nread/nwrite/readopen/writeopen, initlock, wait_queue_init for write/read queues, and sets both FDs to FD_PIPE.",
+          "line_start": 40,
+          "line_end": 80,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q06_001_pipe_rw_03",
+          "path": "repos/xv6-k210/kernel/fs/pipe.c",
+          "symbol_kind": "function",
+          "symbol_name": "pipewrite/piperead",
+          "excerpt": "pipewritable sleeps on full pipe and wakes readers; pipereadable sleeps on empty pipe and wakes writers; pipewrite/piperead copy through circular pdata using nwrite/nread modulo PIPESIZE.",
+          "line_start": 166,
+          "line_end": 346,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q06_001_pipe_syscall_04",
+          "path": "repos/xv6-k210/kernel/syscall/sysfile.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_pipe",
+          "excerpt": "sys_pipe calls pipealloc(&rf,&wf) and copyout2 to return fd pair to user space.",
+          "line_start": 330,
+          "line_end": 343,
+          "evidence_type": "call_site",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q06_001_signal_sys_01",
+          "path": "repos/xv6-k210/kernel/syscall/syscall.c",
+          "symbol_kind": "array",
+          "symbol_name": "syscalls",
+          "excerpt": "syscall table registers SYS_rt_sigaction -> sys_rt_sigaction; syscall() special-cases SYS_rt_sigreturn to call sigreturn without saving a return value.",
+          "line_start": 226,
+          "line_end": 347,
+          "evidence_type": "call_site",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q06_001_signal_syscall_02",
+          "path": "repos/xv6-k210/kernel/syscall/syssignal.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_rt_sigaction/sys_kill",
+          "excerpt": "sys_rt_sigaction copyin2/copyout2 handler fields and calls set_sigaction; sys_kill reads pid/sig and calls kill(pid,sig).",
+          "line_start": 17,
+          "line_end": 143,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q06_001_signal_handle_03",
+          "path": "repos/xv6-k210/kernel/sched/signal.c",
+          "symbol_kind": "function",
+          "symbol_name": "sighandle/sigreturn",
+          "excerpt": "sighandle allocates sig_frame and trapframe, saves old trapframe, sets epc to sig_handler trampoline and a0/a1 to signum/handler; sigreturn frees current trapframe and restores saved frame.",
+          "line_start": 177,
+          "line_end": 281,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q06_001_signal_tramp_04",
+          "path": "repos/xv6-k210/kernel/trap/sig_trampoline.S",
+          "symbol_kind": "function",
+          "symbol_name": "sig_handler/default_sigaction",
+          "excerpt": "sig_handler jalr a1 then issues SYS_rt_sigreturn ecall; default_sigaction exits with -1.",
+          "line_start": 9,
+          "line_end": 23,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q06_001_sync_neg_09",
+          "path": "<negative_search>",
+          "symbol_kind": "search",
+          "symbol_name": "sync_neg",
+          "excerpt": "Search also covered rwlock/semaphore/condvar/futex/SysV/barrier and found no implemented objects; searched_keywords=spinlock, mutex, rwlock, semaphore, condvar, monitor, waitqueue, sleep, wakeup, atomic, deadlock, lock ordering, barrier, message passing, pipe, futex, msgget, semop, shmget; searched_directories=kernel, include, xv6-user, Makefile; file_count=101; match_count=1702; coverage_sufficient=true",
+          "line_start": null,
+          "line_end": null,
+          "evidence_type": "negative_search",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "negative_search"
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_002",
+      "question_type": "single_choice",
+      "stem": "Mutex 更接近哪种实现？",
+      "fact_answers": [
+        {
+          "fact_id": "Q06_002_01",
+          "fact_key": "primitive_or_ipc_object",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q06_002_sleeplock_01",
+            "codex_ev_Q06_002_sleeplock_02"
+          ],
+          "notes": "primitive_or_ipc_object 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q06_002_02",
+          "fact_key": "operation_impl",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q06_002_sleeplock_01",
+            "codex_ev_Q06_002_sleeplock_02"
+          ],
+          "notes": "operation_impl 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q06_002_03",
+          "fact_key": "scheduler_blocking",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q06_002_sleeplock_01",
+            "codex_ev_Q06_002_sleeplock_02"
+          ],
+          "notes": "scheduler_blocking 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q06_002_04",
+          "fact_key": "race_deadlock_guard",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q06_002_sleeplock_01",
+            "codex_ev_Q06_002_sleeplock_02"
+          ],
+          "notes": "race_deadlock_guard 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q06_002_05",
+          "fact_key": "semantic_boundary",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q06_002_sleeplock_01",
+            "codex_ev_Q06_002_sleeplock_02"
+          ],
+          "notes": "semantic_boundary 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q06_002_06",
+          "fact_key": "negative_search_coverage",
+          "value": {
+            "searched_keywords": [
+              "spinlock",
+              "mutex",
+              "rwlock",
+              "semaphore",
+              "condvar",
+              "monitor",
+              "waitqueue",
+              "sleep",
+              "wakeup",
+              "atomic",
+              "deadlock",
+              "lock ordering",
+              "barrier",
+              "message passing",
+              "pipe",
+              "futex",
+              "msgget",
+              "semop",
+              "shmget"
+            ],
+            "searched_directories": [
+              "kernel",
+              "include",
+              "xv6-user",
+              "Makefile"
+            ],
+            "file_count": 101,
+            "match_count": 1702,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [],
+          "notes": "negative_search_coverage 见本题证据。"
+        }
+      ],
+      "value": "阻塞锁（Blocking Mutex，进入等待队列并挂起）",
+      "notes": "sleeplock 是最接近 Mutex 的实现：被占用时 sleep(lk,&lk->lk)，释放时 wakeup(lk)。",
+      "used_evidence_ids": [
+        "codex_ev_Q06_002_sleeplock_01",
+        "codex_ev_Q06_002_sleeplock_02"
+      ],
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q06_002_sleeplock_01",
+          "path": "repos/xv6-k210/include/sync/sleeplock.h",
+          "symbol_kind": "struct",
+          "symbol_name": "sleeplock",
+          "excerpt": "struct sleeplock has locked, embedded spinlock lk, name, pid; declares acquiresleep/releasesleep/holdingsleep/trysleeplock.",
+          "line_start": 10,
+          "line_end": 23,
+          "evidence_type": "definition",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q06_002_sleeplock_02",
+          "path": "repos/xv6-k210/kernel/sync/sleeplock.c",
+          "symbol_kind": "function",
+          "symbol_name": "acquiresleep/releasesleep",
+          "excerpt": "acquiresleep holds lk and while locked calls sleep(lk,&lk->lk), then marks locked/pid; releasesleep clears locked/pid, calls wakeup(lk), releases lk.",
+          "line_start": 22,
+          "line_end": 40,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_003",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在等待队列 (Wait Queue, WaitQueue) 与 sleep/wakeup（或等价阻塞/唤醒）实现？（必须三态）",
+      "fact_answers": [
+        {
+          "fact_id": "Q06_003_01",
+          "fact_key": "primitive_or_ipc_object",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q06_003_waitqueue_01",
+            "codex_ev_Q06_003_sleep_wakeup_02"
+          ],
+          "notes": "primitive_or_ipc_object 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q06_003_02",
+          "fact_key": "operation_impl",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q06_003_waitqueue_01",
+            "codex_ev_Q06_003_sleep_wakeup_02"
+          ],
+          "notes": "operation_impl 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q06_003_03",
+          "fact_key": "scheduler_blocking",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q06_003_waitqueue_01",
+            "codex_ev_Q06_003_sleep_wakeup_02"
+          ],
+          "notes": "scheduler_blocking 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q06_003_04",
+          "fact_key": "race_deadlock_guard",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q06_003_waitqueue_01",
+            "codex_ev_Q06_003_sleep_wakeup_02"
+          ],
+          "notes": "race_deadlock_guard 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q06_003_05",
+          "fact_key": "semantic_boundary",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q06_003_waitqueue_01",
+            "codex_ev_Q06_003_sleep_wakeup_02"
+          ],
+          "notes": "semantic_boundary 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q06_003_06",
+          "fact_key": "negative_search_coverage",
+          "value": {
+            "searched_keywords": [
+              "spinlock",
+              "mutex",
+              "rwlock",
+              "semaphore",
+              "condvar",
+              "monitor",
+              "waitqueue",
+              "sleep",
+              "wakeup",
+              "atomic",
+              "deadlock",
+              "lock ordering",
+              "barrier",
+              "message passing",
+              "pipe",
+              "futex",
+              "msgget",
+              "semop",
+              "shmget"
+            ],
+            "searched_directories": [
+              "kernel",
+              "include",
+              "xv6-user",
+              "Makefile"
+            ],
+            "file_count": 101,
+            "match_count": 1702,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [],
+          "notes": "negative_search_coverage 见本题证据。"
+        }
+      ],
+      "value": "implemented",
+      "notes": "存在 wait_queue 结构和 sleep/wakeup 调度器阻塞/唤醒实现。",
+      "used_evidence_ids": [
+        "codex_ev_Q06_003_waitqueue_01",
+        "codex_ev_Q06_003_sleep_wakeup_02"
+      ],
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q06_003_waitqueue_01",
+          "path": "repos/xv6-k210/include/sync/waitqueue.h",
+          "symbol_kind": "struct",
+          "symbol_name": "wait_queue/wait_node",
+          "excerpt": "wait_queue is a spinlock plus doubly-linked list head; wait_node stores chan and list; helpers add/delete/next/is_first.",
+          "line_start": 17,
+          "line_end": 71,
+          "evidence_type": "definition",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q06_003_sleep_wakeup_02",
+          "path": "repos/xv6-k210/kernel/sched/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "sleep/wakeup",
+          "excerpt": "sleep enters proc critical section, releases caller lock, sets p->chan, removes runnable proc, inserts sleeping proc, calls sched, then reacquires lk; wakeup moves sleepers on chan runnable.",
+          "line_start": 392,
+          "line_end": 606,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_004",
+      "question_type": "fill_in",
+      "stem": "sleep / wakeup 不变量 (Sleep-Wakeup Invariant) 分析，按格式填写：\n- sleep 入口函数: ___（路径）\n- 入睡前持有的锁: ___（无则写 none）\n- 防丢 wakeup (Lost Wakeup Prevention) 机制: ___（如：持队列锁检查条件 / 无防护）\n- wakeup 函数: ___（路径）\n- 唤醒与锁释放顺序: ___（先唤醒后释放 / 先释放后唤醒 / 其他）",
+      "fact_answers": [
+        {
+          "fact_id": "Q06_004_01",
+          "fact_key": "primitive_or_ipc_object",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q06_004_waitqueue_01",
+            "codex_ev_Q06_004_sleep_wakeup_02",
+            "codex_ev_Q06_004_pipe_def_01",
+            "codex_ev_Q06_004_pipe_alloc_02",
+            "codex_ev_Q06_004_pipe_rw_03",
+            "codex_ev_Q06_004_pipe_syscall_04"
+          ],
+          "notes": "primitive_or_ipc_object 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q06_004_02",
+          "fact_key": "operation_impl",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q06_004_waitqueue_01",
+            "codex_ev_Q06_004_sleep_wakeup_02",
+            "codex_ev_Q06_004_pipe_def_01",
+            "codex_ev_Q06_004_pipe_alloc_02",
+            "codex_ev_Q06_004_pipe_rw_03",
+            "codex_ev_Q06_004_pipe_syscall_04"
+          ],
+          "notes": "operation_impl 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q06_004_03",
+          "fact_key": "scheduler_blocking",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q06_004_waitqueue_01",
+            "codex_ev_Q06_004_sleep_wakeup_02",
+            "codex_ev_Q06_004_pipe_def_01",
+            "codex_ev_Q06_004_pipe_alloc_02",
+            "codex_ev_Q06_004_pipe_rw_03",
+            "codex_ev_Q06_004_pipe_syscall_04"
+          ],
+          "notes": "scheduler_blocking 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q06_004_04",
+          "fact_key": "race_deadlock_guard",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q06_004_waitqueue_01",
+            "codex_ev_Q06_004_sleep_wakeup_02",
+            "codex_ev_Q06_004_pipe_def_01",
+            "codex_ev_Q06_004_pipe_alloc_02",
+            "codex_ev_Q06_004_pipe_rw_03",
+            "codex_ev_Q06_004_pipe_syscall_04"
+          ],
+          "notes": "race_deadlock_guard 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q06_004_05",
+          "fact_key": "semantic_boundary",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q06_004_waitqueue_01",
+            "codex_ev_Q06_004_sleep_wakeup_02",
+            "codex_ev_Q06_004_pipe_def_01",
+            "codex_ev_Q06_004_pipe_alloc_02",
+            "codex_ev_Q06_004_pipe_rw_03",
+            "codex_ev_Q06_004_pipe_syscall_04"
+          ],
+          "notes": "semantic_boundary 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q06_004_06",
+          "fact_key": "negative_search_coverage",
+          "value": {
+            "searched_keywords": [
+              "spinlock",
+              "mutex",
+              "rwlock",
+              "semaphore",
+              "condvar",
+              "monitor",
+              "waitqueue",
+              "sleep",
+              "wakeup",
+              "atomic",
+              "deadlock",
+              "lock ordering",
+              "barrier",
+              "message passing",
+              "pipe",
+              "futex",
+              "msgget",
+              "semop",
+              "shmget"
+            ],
+            "searched_directories": [
+              "kernel",
+              "include",
+              "xv6-user",
+              "Makefile"
+            ],
+            "file_count": 101,
+            "match_count": 1702,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [],
+          "notes": "negative_search_coverage 见本题证据。"
+        }
+      ],
+      "value": {
+        "primitive_or_ipc_object": "sleep 入口函数: repos/xv6-k210/kernel/sched/proc.c:sleep；wakeup 函数: repos/xv6-k210/kernel/sched/proc.c:wakeup。",
+        "operation_impl": "sleep 入睡前持有的锁为调用者传入的 spinlock lk；若 lk 不是 proc_lock，则先进入 proc_lock 临界区再 release(lk)。",
+        "scheduler_blocking": "入睡流程设置 p->chan、从 runnable 移除、插入 sleep 队列并 sched；返回后先离开 proc 临界区再 acquire(lk)。",
+        "race_deadlock_guard": "防丢 wakeup 机制是睡眠路径在 proc_lock 与调用锁之间原子切换；pipe 还在 pi->lock 下检查条件并 sleep，wakeup 时持相应队列/pipe 锁。",
+        "semantic_boundary": "wakeup 与锁释放顺序在 pipeunlock 中是先 wakeup(next->chan) 再 release(queue->lock)；sleeplock releasesleep 中也是 wakeup(lk) 后 release(&lk->lk)。",
+        "negative_search_coverage": {
+          "searched_keywords": [
+            "spinlock",
+            "mutex",
+            "rwlock",
+            "semaphore",
+            "condvar",
+            "monitor",
+            "waitqueue",
+            "sleep",
+            "wakeup",
+            "atomic",
+            "deadlock",
+            "lock ordering",
+            "barrier",
+            "message passing",
+            "pipe",
+            "futex",
+            "msgget",
+            "semop",
+            "shmget"
+          ],
+          "searched_directories": [
+            "kernel",
+            "include",
+            "xv6-user",
+            "Makefile"
+          ],
+          "file_count": 101,
+          "match_count": 1702,
+          "coverage_sufficient": true
+        }
+      },
+      "notes": "sleep/wakeup 不变量可由 proc.c 的 sleep 和 pipe/sleeplock 的调用方式闭合。",
+      "used_evidence_ids": [
+        "codex_ev_Q06_004_waitqueue_01",
+        "codex_ev_Q06_004_sleep_wakeup_02",
+        "codex_ev_Q06_004_pipe_def_01",
+        "codex_ev_Q06_004_pipe_alloc_02",
+        "codex_ev_Q06_004_pipe_rw_03",
+        "codex_ev_Q06_004_pipe_syscall_04"
+      ],
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q06_004_waitqueue_01",
+          "path": "repos/xv6-k210/include/sync/waitqueue.h",
+          "symbol_kind": "struct",
+          "symbol_name": "wait_queue/wait_node",
+          "excerpt": "wait_queue is a spinlock plus doubly-linked list head; wait_node stores chan and list; helpers add/delete/next/is_first.",
+          "line_start": 17,
+          "line_end": 71,
+          "evidence_type": "definition",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q06_004_sleep_wakeup_02",
+          "path": "repos/xv6-k210/kernel/sched/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "sleep/wakeup",
+          "excerpt": "sleep enters proc critical section, releases caller lock, sets p->chan, removes runnable proc, inserts sleeping proc, calls sched, then reacquires lk; wakeup moves sleepers on chan runnable.",
+          "line_start": 392,
+          "line_end": 606,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q06_004_pipe_def_01",
+          "path": "repos/xv6-k210/include/fs/pipe.h",
+          "symbol_kind": "struct",
+          "symbol_name": "pipe",
+          "excerpt": "struct pipe contains spinlock, writer/reader wait_queue, nread/nwrite counters, readopen/writeopen, pdata and fixed data[PIPE_SIZE]; PIPESIZE(pi) shifts buffer size.",
+          "line_start": 13,
+          "line_end": 27,
+          "evidence_type": "definition",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q06_004_pipe_alloc_02",
+          "path": "repos/xv6-k210/kernel/fs/pipe.c",
+          "symbol_kind": "function",
+          "symbol_name": "pipealloc",
+          "excerpt": "pipealloc allocates two files and a pipe, initializes nread/nwrite/readopen/writeopen, initlock, wait_queue_init for write/read queues, and sets both FDs to FD_PIPE.",
+          "line_start": 40,
+          "line_end": 80,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q06_004_pipe_rw_03",
+          "path": "repos/xv6-k210/kernel/fs/pipe.c",
+          "symbol_kind": "function",
+          "symbol_name": "pipewrite/piperead",
+          "excerpt": "pipewritable sleeps on full pipe and wakes readers; pipereadable sleeps on empty pipe and wakes writers; pipewrite/piperead copy through circular pdata using nwrite/nread modulo PIPESIZE.",
+          "line_start": 166,
+          "line_end": 346,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q06_004_pipe_syscall_04",
+          "path": "repos/xv6-k210/kernel/syscall/sysfile.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_pipe",
+          "excerpt": "sys_pipe calls pipealloc(&rf,&wf) and copyout2 to return fd pair to user space.",
+          "line_start": 330,
+          "line_end": 343,
+          "evidence_type": "call_site",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_005",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现管道 (Pipe)？（必须三态）",
+      "fact_answers": [
+        {
+          "fact_id": "Q06_005_01",
+          "fact_key": "primitive_or_ipc_object",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q06_005_pipe_def_01",
+            "codex_ev_Q06_005_pipe_alloc_02",
+            "codex_ev_Q06_005_pipe_rw_03",
+            "codex_ev_Q06_005_pipe_syscall_04"
+          ],
+          "notes": "primitive_or_ipc_object 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q06_005_02",
+          "fact_key": "operation_impl",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q06_005_pipe_def_01",
+            "codex_ev_Q06_005_pipe_alloc_02",
+            "codex_ev_Q06_005_pipe_rw_03",
+            "codex_ev_Q06_005_pipe_syscall_04"
+          ],
+          "notes": "operation_impl 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q06_005_03",
+          "fact_key": "scheduler_blocking",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q06_005_pipe_def_01",
+            "codex_ev_Q06_005_pipe_alloc_02",
+            "codex_ev_Q06_005_pipe_rw_03",
+            "codex_ev_Q06_005_pipe_syscall_04"
+          ],
+          "notes": "scheduler_blocking 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q06_005_04",
+          "fact_key": "race_deadlock_guard",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q06_005_pipe_def_01",
+            "codex_ev_Q06_005_pipe_alloc_02",
+            "codex_ev_Q06_005_pipe_rw_03",
+            "codex_ev_Q06_005_pipe_syscall_04"
+          ],
+          "notes": "race_deadlock_guard 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q06_005_05",
+          "fact_key": "semantic_boundary",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q06_005_pipe_def_01",
+            "codex_ev_Q06_005_pipe_alloc_02",
+            "codex_ev_Q06_005_pipe_rw_03",
+            "codex_ev_Q06_005_pipe_syscall_04"
+          ],
+          "notes": "semantic_boundary 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q06_005_06",
+          "fact_key": "negative_search_coverage",
+          "value": {
+            "searched_keywords": [
+              "spinlock",
+              "mutex",
+              "rwlock",
+              "semaphore",
+              "condvar",
+              "monitor",
+              "waitqueue",
+              "sleep",
+              "wakeup",
+              "atomic",
+              "deadlock",
+              "lock ordering",
+              "barrier",
+              "message passing",
+              "pipe",
+              "futex",
+              "msgget",
+              "semop",
+              "shmget"
+            ],
+            "searched_directories": [
+              "kernel",
+              "include",
+              "xv6-user",
+              "Makefile"
+            ],
+            "file_count": 101,
+            "match_count": 1702,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [],
+          "notes": "negative_search_coverage 见本题证据。"
+        }
+      ],
+      "value": "implemented",
+      "notes": "pipe 有结构、系统调用分配、读写和阻塞唤醒路径。",
+      "used_evidence_ids": [
+        "codex_ev_Q06_005_pipe_def_01",
+        "codex_ev_Q06_005_pipe_alloc_02",
+        "codex_ev_Q06_005_pipe_rw_03",
+        "codex_ev_Q06_005_pipe_syscall_04"
+      ],
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q06_005_pipe_def_01",
+          "path": "repos/xv6-k210/include/fs/pipe.h",
+          "symbol_kind": "struct",
+          "symbol_name": "pipe",
+          "excerpt": "struct pipe contains spinlock, writer/reader wait_queue, nread/nwrite counters, readopen/writeopen, pdata and fixed data[PIPE_SIZE]; PIPESIZE(pi) shifts buffer size.",
+          "line_start": 13,
+          "line_end": 27,
+          "evidence_type": "definition",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q06_005_pipe_alloc_02",
+          "path": "repos/xv6-k210/kernel/fs/pipe.c",
+          "symbol_kind": "function",
+          "symbol_name": "pipealloc",
+          "excerpt": "pipealloc allocates two files and a pipe, initializes nread/nwrite/readopen/writeopen, initlock, wait_queue_init for write/read queues, and sets both FDs to FD_PIPE.",
+          "line_start": 40,
+          "line_end": 80,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q06_005_pipe_rw_03",
+          "path": "repos/xv6-k210/kernel/fs/pipe.c",
+          "symbol_kind": "function",
+          "symbol_name": "pipewrite/piperead",
+          "excerpt": "pipewritable sleeps on full pipe and wakes readers; pipereadable sleeps on empty pipe and wakes writers; pipewrite/piperead copy through circular pdata using nwrite/nread modulo PIPESIZE.",
+          "line_start": 166,
+          "line_end": 346,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q06_005_pipe_syscall_04",
+          "path": "repos/xv6-k210/kernel/syscall/sysfile.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_pipe",
+          "excerpt": "sys_pipe calls pipealloc(&rf,&wf) and copyout2 to return fd pair to user space.",
+          "line_start": 330,
+          "line_end": 343,
+          "evidence_type": "call_site",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_006",
+      "question_type": "single_choice",
+      "stem": "pipe 缓冲形态更接近哪种？",
+      "fact_answers": [
+        {
+          "fact_id": "Q06_006_01",
+          "fact_key": "primitive_or_ipc_object",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q06_006_pipe_def_01",
+            "codex_ev_Q06_006_pipe_alloc_02",
+            "codex_ev_Q06_006_pipe_rw_03",
+            "codex_ev_Q06_006_pipe_syscall_04"
+          ],
+          "notes": "primitive_or_ipc_object 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q06_006_02",
+          "fact_key": "operation_impl",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q06_006_pipe_def_01",
+            "codex_ev_Q06_006_pipe_alloc_02",
+            "codex_ev_Q06_006_pipe_rw_03",
+            "codex_ev_Q06_006_pipe_syscall_04"
+          ],
+          "notes": "operation_impl 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q06_006_03",
+          "fact_key": "scheduler_blocking",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q06_006_pipe_def_01",
+            "codex_ev_Q06_006_pipe_alloc_02",
+            "codex_ev_Q06_006_pipe_rw_03",
+            "codex_ev_Q06_006_pipe_syscall_04"
+          ],
+          "notes": "scheduler_blocking 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q06_006_04",
+          "fact_key": "race_deadlock_guard",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q06_006_pipe_def_01",
+            "codex_ev_Q06_006_pipe_alloc_02",
+            "codex_ev_Q06_006_pipe_rw_03",
+            "codex_ev_Q06_006_pipe_syscall_04"
+          ],
+          "notes": "race_deadlock_guard 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q06_006_05",
+          "fact_key": "semantic_boundary",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q06_006_pipe_def_01",
+            "codex_ev_Q06_006_pipe_alloc_02",
+            "codex_ev_Q06_006_pipe_rw_03",
+            "codex_ev_Q06_006_pipe_syscall_04"
+          ],
+          "notes": "semantic_boundary 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q06_006_06",
+          "fact_key": "negative_search_coverage",
+          "value": {
+            "searched_keywords": [
+              "spinlock",
+              "mutex",
+              "rwlock",
+              "semaphore",
+              "condvar",
+              "monitor",
+              "waitqueue",
+              "sleep",
+              "wakeup",
+              "atomic",
+              "deadlock",
+              "lock ordering",
+              "barrier",
+              "message passing",
+              "pipe",
+              "futex",
+              "msgget",
+              "semop",
+              "shmget"
+            ],
+            "searched_directories": [
+              "kernel",
+              "include",
+              "xv6-user",
+              "Makefile"
+            ],
+            "file_count": 101,
+            "match_count": 1702,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [],
+          "notes": "negative_search_coverage 见本题证据。"
+        }
+      ],
+      "value": "字节环形缓冲区 (ring buffer)",
+      "notes": "pipe 使用 nread/nwrite 对 PIPESIZE 取模在 pdata/data 中搬运字节。",
+      "used_evidence_ids": [
+        "codex_ev_Q06_006_pipe_def_01",
+        "codex_ev_Q06_006_pipe_alloc_02",
+        "codex_ev_Q06_006_pipe_rw_03",
+        "codex_ev_Q06_006_pipe_syscall_04"
+      ],
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q06_006_pipe_def_01",
+          "path": "repos/xv6-k210/include/fs/pipe.h",
+          "symbol_kind": "struct",
+          "symbol_name": "pipe",
+          "excerpt": "struct pipe contains spinlock, writer/reader wait_queue, nread/nwrite counters, readopen/writeopen, pdata and fixed data[PIPE_SIZE]; PIPESIZE(pi) shifts buffer size.",
+          "line_start": 13,
+          "line_end": 27,
+          "evidence_type": "definition",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q06_006_pipe_alloc_02",
+          "path": "repos/xv6-k210/kernel/fs/pipe.c",
+          "symbol_kind": "function",
+          "symbol_name": "pipealloc",
+          "excerpt": "pipealloc allocates two files and a pipe, initializes nread/nwrite/readopen/writeopen, initlock, wait_queue_init for write/read queues, and sets both FDs to FD_PIPE.",
+          "line_start": 40,
+          "line_end": 80,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q06_006_pipe_rw_03",
+          "path": "repos/xv6-k210/kernel/fs/pipe.c",
+          "symbol_kind": "function",
+          "symbol_name": "pipewrite/piperead",
+          "excerpt": "pipewritable sleeps on full pipe and wakes readers; pipereadable sleeps on empty pipe and wakes writers; pipewrite/piperead copy through circular pdata using nwrite/nread modulo PIPESIZE.",
+          "line_start": 166,
+          "line_end": 346,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q06_006_pipe_syscall_04",
+          "path": "repos/xv6-k210/kernel/syscall/sysfile.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_pipe",
+          "excerpt": "sys_pipe calls pipealloc(&rf,&wf) and copyout2 to return fd pair to user space.",
+          "line_start": 330,
+          "line_end": 343,
+          "evidence_type": "call_site",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_007",
+      "question_type": "single_choice",
+      "stem": "pipe 的阻塞语义更接近哪种？",
+      "fact_answers": [
+        {
+          "fact_id": "Q06_007_01",
+          "fact_key": "primitive_or_ipc_object",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q06_007_pipe_def_01",
+            "codex_ev_Q06_007_pipe_alloc_02",
+            "codex_ev_Q06_007_pipe_rw_03",
+            "codex_ev_Q06_007_pipe_syscall_04"
+          ],
+          "notes": "primitive_or_ipc_object 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q06_007_02",
+          "fact_key": "operation_impl",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q06_007_pipe_def_01",
+            "codex_ev_Q06_007_pipe_alloc_02",
+            "codex_ev_Q06_007_pipe_rw_03",
+            "codex_ev_Q06_007_pipe_syscall_04"
+          ],
+          "notes": "operation_impl 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q06_007_03",
+          "fact_key": "scheduler_blocking",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q06_007_pipe_def_01",
+            "codex_ev_Q06_007_pipe_alloc_02",
+            "codex_ev_Q06_007_pipe_rw_03",
+            "codex_ev_Q06_007_pipe_syscall_04"
+          ],
+          "notes": "scheduler_blocking 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q06_007_04",
+          "fact_key": "race_deadlock_guard",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q06_007_pipe_def_01",
+            "codex_ev_Q06_007_pipe_alloc_02",
+            "codex_ev_Q06_007_pipe_rw_03",
+            "codex_ev_Q06_007_pipe_syscall_04"
+          ],
+          "notes": "race_deadlock_guard 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q06_007_05",
+          "fact_key": "semantic_boundary",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q06_007_pipe_def_01",
+            "codex_ev_Q06_007_pipe_alloc_02",
+            "codex_ev_Q06_007_pipe_rw_03",
+            "codex_ev_Q06_007_pipe_syscall_04"
+          ],
+          "notes": "semantic_boundary 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q06_007_06",
+          "fact_key": "negative_search_coverage",
+          "value": {
+            "searched_keywords": [
+              "spinlock",
+              "mutex",
+              "rwlock",
+              "semaphore",
+              "condvar",
+              "monitor",
+              "waitqueue",
+              "sleep",
+              "wakeup",
+              "atomic",
+              "deadlock",
+              "lock ordering",
+              "barrier",
+              "message passing",
+              "pipe",
+              "futex",
+              "msgget",
+              "semop",
+              "shmget"
+            ],
+            "searched_directories": [
+              "kernel",
+              "include",
+              "xv6-user",
+              "Makefile"
+            ],
+            "file_count": 101,
+            "match_count": 1702,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [],
+          "notes": "negative_search_coverage 见本题证据。"
+        }
+      ],
+      "value": "阻塞：挂起当前线程/任务进入等待队列",
+      "notes": "读空/写满时通过 sleep(wait->chan,&pi->lock) 挂起，并由另一端 wakeup。",
+      "used_evidence_ids": [
+        "codex_ev_Q06_007_pipe_def_01",
+        "codex_ev_Q06_007_pipe_alloc_02",
+        "codex_ev_Q06_007_pipe_rw_03",
+        "codex_ev_Q06_007_pipe_syscall_04"
+      ],
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q06_007_pipe_def_01",
+          "path": "repos/xv6-k210/include/fs/pipe.h",
+          "symbol_kind": "struct",
+          "symbol_name": "pipe",
+          "excerpt": "struct pipe contains spinlock, writer/reader wait_queue, nread/nwrite counters, readopen/writeopen, pdata and fixed data[PIPE_SIZE]; PIPESIZE(pi) shifts buffer size.",
+          "line_start": 13,
+          "line_end": 27,
+          "evidence_type": "definition",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q06_007_pipe_alloc_02",
+          "path": "repos/xv6-k210/kernel/fs/pipe.c",
+          "symbol_kind": "function",
+          "symbol_name": "pipealloc",
+          "excerpt": "pipealloc allocates two files and a pipe, initializes nread/nwrite/readopen/writeopen, initlock, wait_queue_init for write/read queues, and sets both FDs to FD_PIPE.",
+          "line_start": 40,
+          "line_end": 80,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q06_007_pipe_rw_03",
+          "path": "repos/xv6-k210/kernel/fs/pipe.c",
+          "symbol_kind": "function",
+          "symbol_name": "pipewrite/piperead",
+          "excerpt": "pipewritable sleeps on full pipe and wakes readers; pipereadable sleeps on empty pipe and wakes writers; pipewrite/piperead copy through circular pdata using nwrite/nread modulo PIPESIZE.",
+          "line_start": 166,
+          "line_end": 346,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q06_007_pipe_syscall_04",
+          "path": "repos/xv6-k210/kernel/syscall/sysfile.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_pipe",
+          "excerpt": "sys_pipe calls pipealloc(&rf,&wf) and copyout2 to return fd pair to user space.",
+          "line_start": 330,
+          "line_end": 343,
+          "evidence_type": "call_site",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_008",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现消息队列/信号量/共享内存等 SysV IPC (Message Queue / Semaphore / Shared Memory, msg/sem/shm)？（必须三态；若仅实现其一需说明）",
+      "fact_answers": [
+        {
+          "fact_id": "Q06_008_01",
+          "fact_key": "syscall_entries",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q06_008_sync_neg_01"
+          ],
+          "notes": "syscall_entries 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q06_008_02",
+          "fact_key": "kernel_objects",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q06_008_sync_neg_01"
+          ],
+          "notes": "kernel_objects 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q06_008_03",
+          "fact_key": "operation_semantics",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q06_008_sync_neg_01"
+          ],
+          "notes": "operation_semantics 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q06_008_04",
+          "fact_key": "not_pipe_signal_futex",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q06_008_sync_neg_01"
+          ],
+          "notes": "not_pipe_signal_futex 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q06_008_05",
+          "fact_key": "negative_search_coverage",
+          "value": {
+            "searched_keywords": [
+              "spinlock",
+              "mutex",
+              "rwlock",
+              "semaphore",
+              "condvar",
+              "monitor",
+              "waitqueue",
+              "sleep",
+              "wakeup",
+              "atomic",
+              "deadlock",
+              "lock ordering",
+              "barrier",
+              "message passing",
+              "pipe",
+              "futex",
+              "msgget",
+              "semop",
+              "shmget"
+            ],
+            "searched_directories": [
+              "kernel",
+              "include",
+              "xv6-user",
+              "Makefile"
+            ],
+            "file_count": 101,
+            "match_count": 1702,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [
+            "codex_ev_Q06_008_sync_neg_01"
+          ],
+          "notes": "negative_search_coverage 见本题证据。"
+        }
+      ],
+      "value": "not_found",
+      "notes": "No SysV msg/sem/shm syscall entries or kernel IPC objects found; pipe and signal exist but are distinct mechanisms",
+      "used_evidence_ids": [
+        "codex_ev_Q06_008_sync_neg_01"
+      ],
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q06_008_sync_neg_01",
+          "path": "<negative_search>",
+          "symbol_kind": "search",
+          "symbol_name": "sync_neg",
+          "excerpt": "No SysV msg/sem/shm syscall entries or kernel IPC objects found; pipe and signal exist but are distinct mechanisms; searched_keywords=spinlock, mutex, rwlock, semaphore, condvar, monitor, waitqueue, sleep, wakeup, atomic, deadlock, lock ordering, barrier, message passing, pipe, futex, msgget, semop, shmget; searched_directories=kernel, include, xv6-user, Makefile; file_count=101; match_count=1702; coverage_sufficient=true",
+          "line_start": null,
+          "line_end": null,
+          "evidence_type": "negative_search",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "negative_search"
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_009",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 futex？（必须三态）",
+      "fact_answers": [
+        {
+          "fact_id": "Q06_009_01",
+          "fact_key": "syscall_entry",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q06_009_sync_neg_01"
+          ],
+          "notes": "syscall_entry 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q06_009_02",
+          "fact_key": "user_value_check",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q06_009_sync_neg_01"
+          ],
+          "notes": "user_value_check 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q06_009_03",
+          "fact_key": "wait_key_queue",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q06_009_sync_neg_01"
+          ],
+          "notes": "wait_key_queue 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q06_009_04",
+          "fact_key": "wake_path",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q06_009_sync_neg_01"
+          ],
+          "notes": "wake_path 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q06_009_05",
+          "fact_key": "edge_cases",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q06_009_sync_neg_01"
+          ],
+          "notes": "edge_cases 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q06_009_06",
+          "fact_key": "negative_search_coverage",
+          "value": {
+            "searched_keywords": [
+              "spinlock",
+              "mutex",
+              "rwlock",
+              "semaphore",
+              "condvar",
+              "monitor",
+              "waitqueue",
+              "sleep",
+              "wakeup",
+              "atomic",
+              "deadlock",
+              "lock ordering",
+              "barrier",
+              "message passing",
+              "pipe",
+              "futex",
+              "msgget",
+              "semop",
+              "shmget"
+            ],
+            "searched_directories": [
+              "kernel",
+              "include",
+              "xv6-user",
+              "Makefile"
+            ],
+            "file_count": 101,
+            "match_count": 1702,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [
+            "codex_ev_Q06_009_sync_neg_01"
+          ],
+          "notes": "negative_search_coverage 见本题证据。"
+        }
+      ],
+      "value": "not_found",
+      "notes": "No futex syscall, user-value wait key queue, FUTEX_WAIT/FUTEX_WAKE, or futex wake path found",
+      "used_evidence_ids": [
+        "codex_ev_Q06_009_sync_neg_01"
+      ],
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q06_009_sync_neg_01",
+          "path": "<negative_search>",
+          "symbol_kind": "search",
+          "symbol_name": "sync_neg",
+          "excerpt": "No futex syscall, user-value wait key queue, FUTEX_WAIT/FUTEX_WAKE, or futex wake path found; searched_keywords=spinlock, mutex, rwlock, semaphore, condvar, monitor, waitqueue, sleep, wakeup, atomic, deadlock, lock ordering, barrier, message passing, pipe, futex, msgget, semop, shmget; searched_directories=kernel, include, xv6-user, Makefile; file_count=101; match_count=1702; coverage_sufficient=true",
+          "line_start": null,
+          "line_end": null,
+          "evidence_type": "negative_search",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "negative_search"
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_010",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现信号机制（sigaction/kill/sigreturn/trampoline）？（必须三态）",
+      "fact_answers": [
+        {
+          "fact_id": "Q06_010_01",
+          "fact_key": "primitive_or_ipc_object",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q06_010_signal_sys_01",
+            "codex_ev_Q06_010_signal_syscall_02",
+            "codex_ev_Q06_010_signal_handle_03",
+            "codex_ev_Q06_010_signal_tramp_04"
+          ],
+          "notes": "primitive_or_ipc_object 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q06_010_02",
+          "fact_key": "operation_impl",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q06_010_signal_sys_01",
+            "codex_ev_Q06_010_signal_syscall_02",
+            "codex_ev_Q06_010_signal_handle_03",
+            "codex_ev_Q06_010_signal_tramp_04"
+          ],
+          "notes": "operation_impl 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q06_010_03",
+          "fact_key": "scheduler_blocking",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q06_010_signal_sys_01",
+            "codex_ev_Q06_010_signal_syscall_02",
+            "codex_ev_Q06_010_signal_handle_03",
+            "codex_ev_Q06_010_signal_tramp_04"
+          ],
+          "notes": "scheduler_blocking 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q06_010_04",
+          "fact_key": "race_deadlock_guard",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q06_010_signal_sys_01",
+            "codex_ev_Q06_010_signal_syscall_02",
+            "codex_ev_Q06_010_signal_handle_03",
+            "codex_ev_Q06_010_signal_tramp_04"
+          ],
+          "notes": "race_deadlock_guard 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q06_010_05",
+          "fact_key": "semantic_boundary",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q06_010_signal_sys_01",
+            "codex_ev_Q06_010_signal_syscall_02",
+            "codex_ev_Q06_010_signal_handle_03",
+            "codex_ev_Q06_010_signal_tramp_04"
+          ],
+          "notes": "semantic_boundary 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q06_010_06",
+          "fact_key": "negative_search_coverage",
+          "value": {
+            "searched_keywords": [
+              "spinlock",
+              "mutex",
+              "rwlock",
+              "semaphore",
+              "condvar",
+              "monitor",
+              "waitqueue",
+              "sleep",
+              "wakeup",
+              "atomic",
+              "deadlock",
+              "lock ordering",
+              "barrier",
+              "message passing",
+              "pipe",
+              "futex",
+              "msgget",
+              "semop",
+              "shmget"
+            ],
+            "searched_directories": [
+              "kernel",
+              "include",
+              "xv6-user",
+              "Makefile"
+            ],
+            "file_count": 101,
+            "match_count": 1702,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [],
+          "notes": "negative_search_coverage 见本题证据。"
+        }
+      ],
+      "value": "implemented",
+      "notes": "sigaction/kill/sigreturn/trampoline 和用户返回前 sighandle 均有实现证据。",
+      "used_evidence_ids": [
+        "codex_ev_Q06_010_signal_sys_01",
+        "codex_ev_Q06_010_signal_syscall_02",
+        "codex_ev_Q06_010_signal_handle_03",
+        "codex_ev_Q06_010_signal_tramp_04"
+      ],
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q06_010_signal_sys_01",
+          "path": "repos/xv6-k210/kernel/syscall/syscall.c",
+          "symbol_kind": "array",
+          "symbol_name": "syscalls",
+          "excerpt": "syscall table registers SYS_rt_sigaction -> sys_rt_sigaction; syscall() special-cases SYS_rt_sigreturn to call sigreturn without saving a return value.",
+          "line_start": 226,
+          "line_end": 347,
+          "evidence_type": "call_site",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q06_010_signal_syscall_02",
+          "path": "repos/xv6-k210/kernel/syscall/syssignal.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_rt_sigaction/sys_kill",
+          "excerpt": "sys_rt_sigaction copyin2/copyout2 handler fields and calls set_sigaction; sys_kill reads pid/sig and calls kill(pid,sig).",
+          "line_start": 17,
+          "line_end": 143,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q06_010_signal_handle_03",
+          "path": "repos/xv6-k210/kernel/sched/signal.c",
+          "symbol_kind": "function",
+          "symbol_name": "sighandle/sigreturn",
+          "excerpt": "sighandle allocates sig_frame and trapframe, saves old trapframe, sets epc to sig_handler trampoline and a0/a1 to signum/handler; sigreturn frees current trapframe and restores saved frame.",
+          "line_start": 177,
+          "line_end": 281,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q06_010_signal_tramp_04",
+          "path": "repos/xv6-k210/kernel/trap/sig_trampoline.S",
+          "symbol_kind": "function",
+          "symbol_name": "sig_handler/default_sigaction",
+          "excerpt": "sig_handler jalr a1 then issues SYS_rt_sigreturn ecall; default_sigaction exits with -1.",
+          "line_start": 9,
+          "line_end": 23,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_011",
+      "question_type": "short_answer",
+      "stem": "若实现 signal handler：用户态 handler 上下文如何构建？是否存在 sigreturn 恢复原 trap frame？（必须给证据）",
+      "fact_answers": [
+        {
+          "fact_id": "Q06_011_01",
+          "fact_key": "primitive_or_ipc_object",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q06_011_signal_sys_01",
+            "codex_ev_Q06_011_signal_syscall_02",
+            "codex_ev_Q06_011_signal_handle_03",
+            "codex_ev_Q06_011_signal_tramp_04"
+          ],
+          "notes": "primitive_or_ipc_object 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q06_011_02",
+          "fact_key": "operation_impl",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q06_011_signal_sys_01",
+            "codex_ev_Q06_011_signal_syscall_02",
+            "codex_ev_Q06_011_signal_handle_03",
+            "codex_ev_Q06_011_signal_tramp_04"
+          ],
+          "notes": "operation_impl 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q06_011_03",
+          "fact_key": "scheduler_blocking",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q06_011_signal_sys_01",
+            "codex_ev_Q06_011_signal_syscall_02",
+            "codex_ev_Q06_011_signal_handle_03",
+            "codex_ev_Q06_011_signal_tramp_04"
+          ],
+          "notes": "scheduler_blocking 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q06_011_04",
+          "fact_key": "race_deadlock_guard",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q06_011_signal_sys_01",
+            "codex_ev_Q06_011_signal_syscall_02",
+            "codex_ev_Q06_011_signal_handle_03",
+            "codex_ev_Q06_011_signal_tramp_04"
+          ],
+          "notes": "race_deadlock_guard 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q06_011_05",
+          "fact_key": "semantic_boundary",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q06_011_signal_sys_01",
+            "codex_ev_Q06_011_signal_syscall_02",
+            "codex_ev_Q06_011_signal_handle_03",
+            "codex_ev_Q06_011_signal_tramp_04"
+          ],
+          "notes": "semantic_boundary 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q06_011_06",
+          "fact_key": "negative_search_coverage",
+          "value": {
+            "searched_keywords": [
+              "spinlock",
+              "mutex",
+              "rwlock",
+              "semaphore",
+              "condvar",
+              "monitor",
+              "waitqueue",
+              "sleep",
+              "wakeup",
+              "atomic",
+              "deadlock",
+              "lock ordering",
+              "barrier",
+              "message passing",
+              "pipe",
+              "futex",
+              "msgget",
+              "semop",
+              "shmget"
+            ],
+            "searched_directories": [
+              "kernel",
+              "include",
+              "xv6-user",
+              "Makefile"
+            ],
+            "file_count": 101,
+            "match_count": 1702,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [],
+          "notes": "negative_search_coverage 见本题证据。"
+        }
+      ],
+      "value": {
+        "primitive_or_ipc_object": "有 sigaction 列表、sig_frame 链和 sig_trampoline。",
+        "operation_impl": "sighandle 保存原 p->trapframe 到 sig_frame，分配新 trapframe，把 epc 指向 sig_handler trampoline，a0=signum，a1=用户 handler 或 default_sigaction。",
+        "scheduler_blocking": "kill 若目标进程 SLEEPING，会把它从睡眠队列移到 PRIORITY_IRQ runnable。",
+        "race_deadlock_guard": "sigreturn 必须处在 sig_frame 中，否则 exit(-1)；恢复时释放当前 trapframe 并把 p->trapframe 还原为保存的 frame->tf。",
+        "semantic_boundary": "用户 handler 返回后 trampoline 发 SYS_rt_sigreturn ecall，由 syscall() 特判进入 sigreturn 恢复原 trapframe。",
+        "negative_search_coverage": {
+          "searched_keywords": [
+            "spinlock",
+            "mutex",
+            "rwlock",
+            "semaphore",
+            "condvar",
+            "monitor",
+            "waitqueue",
+            "sleep",
+            "wakeup",
+            "atomic",
+            "deadlock",
+            "lock ordering",
+            "barrier",
+            "message passing",
+            "pipe",
+            "futex",
+            "msgget",
+            "semop",
+            "shmget"
+          ],
+          "searched_directories": [
+            "kernel",
+            "include",
+            "xv6-user",
+            "Makefile"
+          ],
+          "file_count": 101,
+          "match_count": 1702,
+          "coverage_sufficient": true
+        }
+      },
+      "notes": "signal handler 上下文由内核改写 trapframe 加 trampoline 构建，sigreturn 恢复原 trapframe。",
+      "used_evidence_ids": [
+        "codex_ev_Q06_011_signal_sys_01",
+        "codex_ev_Q06_011_signal_syscall_02",
+        "codex_ev_Q06_011_signal_handle_03",
+        "codex_ev_Q06_011_signal_tramp_04"
+      ],
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q06_011_signal_sys_01",
+          "path": "repos/xv6-k210/kernel/syscall/syscall.c",
+          "symbol_kind": "array",
+          "symbol_name": "syscalls",
+          "excerpt": "syscall table registers SYS_rt_sigaction -> sys_rt_sigaction; syscall() special-cases SYS_rt_sigreturn to call sigreturn without saving a return value.",
+          "line_start": 226,
+          "line_end": 347,
+          "evidence_type": "call_site",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q06_011_signal_syscall_02",
+          "path": "repos/xv6-k210/kernel/syscall/syssignal.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_rt_sigaction/sys_kill",
+          "excerpt": "sys_rt_sigaction copyin2/copyout2 handler fields and calls set_sigaction; sys_kill reads pid/sig and calls kill(pid,sig).",
+          "line_start": 17,
+          "line_end": 143,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q06_011_signal_handle_03",
+          "path": "repos/xv6-k210/kernel/sched/signal.c",
+          "symbol_kind": "function",
+          "symbol_name": "sighandle/sigreturn",
+          "excerpt": "sighandle allocates sig_frame and trapframe, saves old trapframe, sets epc to sig_handler trampoline and a0/a1 to signum/handler; sigreturn frees current trapframe and restores saved frame.",
+          "line_start": 177,
+          "line_end": 281,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q06_011_signal_tramp_04",
+          "path": "repos/xv6-k210/kernel/trap/sig_trampoline.S",
+          "symbol_kind": "function",
+          "symbol_name": "sig_handler/default_sigaction",
+          "excerpt": "sig_handler jalr a1 then issues SYS_rt_sigreturn ecall; default_sigaction exits with -1.",
+          "line_start": 9,
+          "line_end": 23,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_012",
+      "question_type": "single_choice",
+      "stem": "RwLock（读写锁 Reader-Writer Lock）的实现形态更接近哪种？",
+      "fact_answers": [
+        {
+          "fact_id": "Q06_012_01",
+          "fact_key": "primitive_or_ipc_object",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q06_012_sync_neg_01"
+          ],
+          "notes": "primitive_or_ipc_object 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q06_012_02",
+          "fact_key": "operation_impl",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q06_012_sync_neg_01"
+          ],
+          "notes": "operation_impl 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q06_012_03",
+          "fact_key": "scheduler_blocking",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q06_012_sync_neg_01"
+          ],
+          "notes": "scheduler_blocking 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q06_012_04",
+          "fact_key": "race_deadlock_guard",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q06_012_sync_neg_01"
+          ],
+          "notes": "race_deadlock_guard 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q06_012_05",
+          "fact_key": "semantic_boundary",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q06_012_sync_neg_01"
+          ],
+          "notes": "semantic_boundary 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q06_012_06",
+          "fact_key": "negative_search_coverage",
+          "value": {
+            "searched_keywords": [
+              "spinlock",
+              "mutex",
+              "rwlock",
+              "semaphore",
+              "condvar",
+              "monitor",
+              "waitqueue",
+              "sleep",
+              "wakeup",
+              "atomic",
+              "deadlock",
+              "lock ordering",
+              "barrier",
+              "message passing",
+              "pipe",
+              "futex",
+              "msgget",
+              "semop",
+              "shmget"
+            ],
+            "searched_directories": [
+              "kernel",
+              "include",
+              "xv6-user",
+              "Makefile"
+            ],
+            "file_count": 101,
+            "match_count": 1702,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [
+            "codex_ev_Q06_012_sync_neg_01"
+          ],
+          "notes": "negative_search_coverage 见本题证据。"
+        }
+      ],
+      "value": "未发现/不支持",
+      "notes": "未发现读写锁实现。",
+      "used_evidence_ids": [
+        "codex_ev_Q06_012_sync_neg_01"
+      ],
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q06_012_sync_neg_01",
+          "path": "<negative_search>",
+          "symbol_kind": "search",
+          "symbol_name": "sync_neg",
+          "excerpt": "No rwlock/RwLock/read-write lock type with multi-reader/single-writer semantics found; searched_keywords=spinlock, mutex, rwlock, semaphore, condvar, monitor, waitqueue, sleep, wakeup, atomic, deadlock, lock ordering, barrier, message passing, pipe, futex, msgget, semop, shmget; searched_directories=kernel, include, xv6-user, Makefile; file_count=101; match_count=1702; coverage_sufficient=true",
+          "line_start": null,
+          "line_end": null,
+          "evidence_type": "negative_search",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "negative_search"
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_013",
+      "question_type": "single_choice",
+      "stem": "底层原子操作来源更接近哪种？",
+      "fact_answers": [
+        {
+          "fact_id": "Q06_013_01",
+          "fact_key": "primitive_or_ipc_object",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q06_013_spinlock_01",
+            "codex_ev_Q06_013_spinlock_02"
+          ],
+          "notes": "primitive_or_ipc_object 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q06_013_02",
+          "fact_key": "operation_impl",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q06_013_spinlock_01",
+            "codex_ev_Q06_013_spinlock_02"
+          ],
+          "notes": "operation_impl 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q06_013_03",
+          "fact_key": "scheduler_blocking",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q06_013_spinlock_01",
+            "codex_ev_Q06_013_spinlock_02"
+          ],
+          "notes": "scheduler_blocking 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q06_013_04",
+          "fact_key": "race_deadlock_guard",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q06_013_spinlock_01",
+            "codex_ev_Q06_013_spinlock_02"
+          ],
+          "notes": "race_deadlock_guard 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q06_013_05",
+          "fact_key": "semantic_boundary",
+          "value": "yes_weak",
+          "used_evidence_ids": [
+            "codex_ev_Q06_013_spinlock_01",
+            "codex_ev_Q06_013_spinlock_02"
+          ],
+          "notes": "semantic_boundary 仅有弱线索，不能单独支撑 implemented。"
+        },
+        {
+          "fact_id": "Q06_013_06",
+          "fact_key": "negative_search_coverage",
+          "value": {
+            "searched_keywords": [
+              "spinlock",
+              "mutex",
+              "rwlock",
+              "semaphore",
+              "condvar",
+              "monitor",
+              "waitqueue",
+              "sleep",
+              "wakeup",
+              "atomic",
+              "deadlock",
+              "lock ordering",
+              "barrier",
+              "message passing",
+              "pipe",
+              "futex",
+              "msgget",
+              "semop",
+              "shmget"
+            ],
+            "searched_directories": [
+              "kernel",
+              "include",
+              "xv6-user",
+              "Makefile"
+            ],
+            "file_count": 101,
+            "match_count": 1702,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [],
+          "notes": "negative_search_coverage 见本题证据。"
+        }
+      ],
+      "value": "未发现/不确定",
+      "notes": "源码使用 GCC __sync_lock_test_and_set/__sync_lock_release，并注释说明会生成 RISC-V amoswap；不是 Rust core::sync::atomic，也不是直接手写汇编，故按题目选项只能归为不确定。",
+      "used_evidence_ids": [
+        "codex_ev_Q06_013_spinlock_01",
+        "codex_ev_Q06_013_spinlock_02"
+      ],
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q06_013_spinlock_01",
+          "path": "repos/xv6-k210/include/sync/spinlock.h",
+          "symbol_kind": "struct",
+          "symbol_name": "spinlock",
+          "excerpt": "struct spinlock { uint locked; char *name; struct cpu *cpu; }; declares initlock/acquire/release/holding.",
+          "line_start": 7,
+          "line_end": 28,
+          "evidence_type": "definition",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q06_013_spinlock_02",
+          "path": "repos/xv6-k210/kernel/sync/spinlock.c",
+          "symbol_kind": "function",
+          "symbol_name": "acquire/release",
+          "excerpt": "acquire disables interrupts then loops on __sync_lock_test_and_set(&lk->locked,1); release fences and __sync_lock_release(&lk->locked), then pop_off().",
+          "line_start": 24,
+          "line_end": 70,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_014",
+      "question_type": "short_answer",
+      "stem": "死锁四必要条件（Coffman Conditions）在该内核中是否均成立？\n请逐条作答（互斥 Mutual Exclusion / 持有并等待 Hold-and-Wait / 不可剥夺 No Preemption / 循环等待 Circular Wait），并结合 SpinLock/Mutex 的实现给出证据或写「不适用」。",
+      "fact_answers": [
+        {
+          "fact_id": "Q06_014_01",
+          "fact_key": "mutual_exclusion_condition",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q06_014_spinlock_01",
+            "codex_ev_Q06_014_spinlock_02",
+            "codex_ev_Q06_014_sleeplock_01",
+            "codex_ev_Q06_014_sleeplock_02",
+            "codex_ev_Q06_014_waitqueue_01",
+            "codex_ev_Q06_014_sleep_wakeup_02",
+            "codex_ev_Q06_014_sync_neg_01"
+          ],
+          "notes": "mutual_exclusion_condition 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q06_014_02",
+          "fact_key": "hold_and_wait_condition",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q06_014_spinlock_01",
+            "codex_ev_Q06_014_spinlock_02",
+            "codex_ev_Q06_014_sleeplock_01",
+            "codex_ev_Q06_014_sleeplock_02",
+            "codex_ev_Q06_014_waitqueue_01",
+            "codex_ev_Q06_014_sleep_wakeup_02",
+            "codex_ev_Q06_014_sync_neg_01"
+          ],
+          "notes": "hold_and_wait_condition 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q06_014_03",
+          "fact_key": "no_preemption_condition",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q06_014_spinlock_01",
+            "codex_ev_Q06_014_spinlock_02",
+            "codex_ev_Q06_014_sleeplock_01",
+            "codex_ev_Q06_014_sleeplock_02",
+            "codex_ev_Q06_014_waitqueue_01",
+            "codex_ev_Q06_014_sleep_wakeup_02",
+            "codex_ev_Q06_014_sync_neg_01"
+          ],
+          "notes": "no_preemption_condition 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q06_014_04",
+          "fact_key": "circular_wait_or_ordering",
+          "value": "yes_weak",
+          "used_evidence_ids": [
+            "codex_ev_Q06_014_spinlock_01",
+            "codex_ev_Q06_014_spinlock_02",
+            "codex_ev_Q06_014_sleeplock_01",
+            "codex_ev_Q06_014_sleeplock_02",
+            "codex_ev_Q06_014_waitqueue_01",
+            "codex_ev_Q06_014_sleep_wakeup_02",
+            "codex_ev_Q06_014_sync_neg_01"
+          ],
+          "notes": "circular_wait_or_ordering 仅有弱线索，不能单独支撑 implemented。"
+        },
+        {
+          "fact_id": "Q06_014_05",
+          "fact_key": "deadlock_policy",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q06_014_spinlock_01",
+            "codex_ev_Q06_014_spinlock_02",
+            "codex_ev_Q06_014_sleeplock_01",
+            "codex_ev_Q06_014_sleeplock_02",
+            "codex_ev_Q06_014_waitqueue_01",
+            "codex_ev_Q06_014_sleep_wakeup_02",
+            "codex_ev_Q06_014_sync_neg_01"
+          ],
+          "notes": "deadlock_policy 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q06_014_06",
+          "fact_key": "negative_search_coverage",
+          "value": {
+            "searched_keywords": [
+              "spinlock",
+              "mutex",
+              "rwlock",
+              "semaphore",
+              "condvar",
+              "monitor",
+              "waitqueue",
+              "sleep",
+              "wakeup",
+              "atomic",
+              "deadlock",
+              "lock ordering",
+              "barrier",
+              "message passing",
+              "pipe",
+              "futex",
+              "msgget",
+              "semop",
+              "shmget"
+            ],
+            "searched_directories": [
+              "kernel",
+              "include",
+              "xv6-user",
+              "Makefile"
+            ],
+            "file_count": 101,
+            "match_count": 1702,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [
+            "codex_ev_Q06_014_sync_neg_01"
+          ],
+          "notes": "negative_search_coverage 见本题证据。"
+        }
+      ],
+      "value": {
+        "mutual_exclusion_condition": "成立：spinlock/sleeplock 都有 locked 状态和互斥进入。",
+        "hold_and_wait_condition": "可能成立：代码中存在嵌套锁/持锁 sleep 模式，例如 sleeplock 持内部 lk 检查后 sleep，pipe 持 pi->lock 检查条件。",
+        "no_preemption_condition": "成立：锁释放由持有者显式 release/releasesleep；未发现抢占式剥夺锁。",
+        "circular_wait_or_ordering": "循环等待风险未被全局消除；未发现锁顺序规范或 ABBA 检测。",
+        "deadlock_policy": "未发现预防/避免/检测恢复机制，策略更接近忽略。",
+        "negative_search_coverage": {
+          "searched_keywords": [
+            "spinlock",
+            "mutex",
+            "rwlock",
+            "semaphore",
+            "condvar",
+            "monitor",
+            "waitqueue",
+            "sleep",
+            "wakeup",
+            "atomic",
+            "deadlock",
+            "lock ordering",
+            "barrier",
+            "message passing",
+            "pipe",
+            "futex",
+            "msgget",
+            "semop",
+            "shmget"
+          ],
+          "searched_directories": [
+            "kernel",
+            "include",
+            "xv6-user",
+            "Makefile"
+          ],
+          "file_count": 101,
+          "match_count": 1702,
+          "coverage_sufficient": true
+        }
+      },
+      "notes": "Coffman 条件在锁语义上基本具备，循环等待未见系统性消除。",
+      "used_evidence_ids": [
+        "codex_ev_Q06_014_spinlock_01",
+        "codex_ev_Q06_014_spinlock_02",
+        "codex_ev_Q06_014_sleeplock_01",
+        "codex_ev_Q06_014_sleeplock_02",
+        "codex_ev_Q06_014_waitqueue_01",
+        "codex_ev_Q06_014_sleep_wakeup_02",
+        "codex_ev_Q06_014_sync_neg_01"
+      ],
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q06_014_spinlock_01",
+          "path": "repos/xv6-k210/include/sync/spinlock.h",
+          "symbol_kind": "struct",
+          "symbol_name": "spinlock",
+          "excerpt": "struct spinlock { uint locked; char *name; struct cpu *cpu; }; declares initlock/acquire/release/holding.",
+          "line_start": 7,
+          "line_end": 28,
+          "evidence_type": "definition",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q06_014_spinlock_02",
+          "path": "repos/xv6-k210/kernel/sync/spinlock.c",
+          "symbol_kind": "function",
+          "symbol_name": "acquire/release",
+          "excerpt": "acquire disables interrupts then loops on __sync_lock_test_and_set(&lk->locked,1); release fences and __sync_lock_release(&lk->locked), then pop_off().",
+          "line_start": 24,
+          "line_end": 70,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q06_014_sleeplock_01",
+          "path": "repos/xv6-k210/include/sync/sleeplock.h",
+          "symbol_kind": "struct",
+          "symbol_name": "sleeplock",
+          "excerpt": "struct sleeplock has locked, embedded spinlock lk, name, pid; declares acquiresleep/releasesleep/holdingsleep/trysleeplock.",
+          "line_start": 10,
+          "line_end": 23,
+          "evidence_type": "definition",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q06_014_sleeplock_02",
+          "path": "repos/xv6-k210/kernel/sync/sleeplock.c",
+          "symbol_kind": "function",
+          "symbol_name": "acquiresleep/releasesleep",
+          "excerpt": "acquiresleep holds lk and while locked calls sleep(lk,&lk->lk), then marks locked/pid; releasesleep clears locked/pid, calls wakeup(lk), releases lk.",
+          "line_start": 22,
+          "line_end": 40,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q06_014_waitqueue_01",
+          "path": "repos/xv6-k210/include/sync/waitqueue.h",
+          "symbol_kind": "struct",
+          "symbol_name": "wait_queue/wait_node",
+          "excerpt": "wait_queue is a spinlock plus doubly-linked list head; wait_node stores chan and list; helpers add/delete/next/is_first.",
+          "line_start": 17,
+          "line_end": 71,
+          "evidence_type": "definition",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q06_014_sleep_wakeup_02",
+          "path": "repos/xv6-k210/kernel/sched/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "sleep/wakeup",
+          "excerpt": "sleep enters proc critical section, releases caller lock, sets p->chan, removes runnable proc, inserts sleeping proc, calls sched, then reacquires lk; wakeup moves sleepers on chan runnable.",
+          "line_start": 392,
+          "line_end": 606,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q06_014_sync_neg_01",
+          "path": "<negative_search>",
+          "symbol_kind": "search",
+          "symbol_name": "sync_neg",
+          "excerpt": "No global lock ordering, deadlock avoidance, or deadlock recovery implementation found; searched_keywords=spinlock, mutex, rwlock, semaphore, condvar, monitor, waitqueue, sleep, wakeup, atomic, deadlock, lock ordering, barrier, message passing, pipe, futex, msgget, semop, shmget; searched_directories=kernel, include, xv6-user, Makefile; file_count=101; match_count=1702; coverage_sufficient=true",
+          "line_start": null,
+          "line_end": null,
+          "evidence_type": "negative_search",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "negative_search"
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_015",
+      "question_type": "single_choice",
+      "stem": "内核对死锁 (Deadlock) 的处理策略更接近哪种？",
+      "fact_answers": [
+        {
+          "fact_id": "Q06_015_01",
+          "fact_key": "mutual_exclusion_condition",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q06_015_sync_neg_01"
+          ],
+          "notes": "mutual_exclusion_condition 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q06_015_02",
+          "fact_key": "hold_and_wait_condition",
+          "value": "yes_weak",
+          "used_evidence_ids": [
+            "codex_ev_Q06_015_sync_neg_01"
+          ],
+          "notes": "hold_and_wait_condition 仅有弱线索，不能单独支撑 implemented。"
+        },
+        {
+          "fact_id": "Q06_015_03",
+          "fact_key": "no_preemption_condition",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q06_015_sync_neg_01"
+          ],
+          "notes": "no_preemption_condition 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q06_015_04",
+          "fact_key": "circular_wait_or_ordering",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q06_015_sync_neg_01"
+          ],
+          "notes": "circular_wait_or_ordering 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q06_015_05",
+          "fact_key": "deadlock_policy",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q06_015_sync_neg_01"
+          ],
+          "notes": "deadlock_policy 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q06_015_06",
+          "fact_key": "negative_search_coverage",
+          "value": {
+            "searched_keywords": [
+              "spinlock",
+              "mutex",
+              "rwlock",
+              "semaphore",
+              "condvar",
+              "monitor",
+              "waitqueue",
+              "sleep",
+              "wakeup",
+              "atomic",
+              "deadlock",
+              "lock ordering",
+              "barrier",
+              "message passing",
+              "pipe",
+              "futex",
+              "msgget",
+              "semop",
+              "shmget"
+            ],
+            "searched_directories": [
+              "kernel",
+              "include",
+              "xv6-user",
+              "Makefile"
+            ],
+            "file_count": 101,
+            "match_count": 1702,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [
+            "codex_ev_Q06_015_sync_neg_01"
+          ],
+          "notes": "negative_search_coverage 见本题证据。"
+        }
+      ],
+      "value": "忽略 (Ostrich Algorithm)：不处理，依赖外部重启",
+      "notes": "源码未发现死锁预防/避免/检测恢复，已有锁只提供互斥与阻塞。",
+      "used_evidence_ids": [
+        "codex_ev_Q06_015_sync_neg_01"
+      ],
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q06_015_sync_neg_01",
+          "path": "<negative_search>",
+          "symbol_kind": "search",
+          "symbol_name": "sync_neg",
+          "excerpt": "No lock-order prevention, Banker-style avoidance, or deadlock detection/recovery mechanism found; searched_keywords=spinlock, mutex, rwlock, semaphore, condvar, monitor, waitqueue, sleep, wakeup, atomic, deadlock, lock ordering, barrier, message passing, pipe, futex, msgget, semop, shmget; searched_directories=kernel, include, xv6-user, Makefile; file_count=101; match_count=1702; coverage_sufficient=true",
+          "line_start": null,
+          "line_end": null,
+          "evidence_type": "negative_search",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "negative_search"
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_016",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在全局锁顺序（Lock Ordering）规范或注释，以预防嵌套锁导致的循环等待死锁 (Circular Wait Deadlock)？（必须三态；若 implemented 需给出锁排序规则或 ABBA 锁检测代码证据）",
+      "fact_answers": [
+        {
+          "fact_id": "Q06_016_01",
+          "fact_key": "mutual_exclusion_condition",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q06_016_sync_neg_01"
+          ],
+          "notes": "mutual_exclusion_condition 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q06_016_02",
+          "fact_key": "hold_and_wait_condition",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q06_016_sync_neg_01"
+          ],
+          "notes": "hold_and_wait_condition 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q06_016_03",
+          "fact_key": "no_preemption_condition",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q06_016_sync_neg_01"
+          ],
+          "notes": "no_preemption_condition 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q06_016_04",
+          "fact_key": "circular_wait_or_ordering",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q06_016_sync_neg_01"
+          ],
+          "notes": "circular_wait_or_ordering 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q06_016_05",
+          "fact_key": "deadlock_policy",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q06_016_sync_neg_01"
+          ],
+          "notes": "deadlock_policy 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q06_016_06",
+          "fact_key": "negative_search_coverage",
+          "value": {
+            "searched_keywords": [
+              "spinlock",
+              "mutex",
+              "rwlock",
+              "semaphore",
+              "condvar",
+              "monitor",
+              "waitqueue",
+              "sleep",
+              "wakeup",
+              "atomic",
+              "deadlock",
+              "lock ordering",
+              "barrier",
+              "message passing",
+              "pipe",
+              "futex",
+              "msgget",
+              "semop",
+              "shmget"
+            ],
+            "searched_directories": [
+              "kernel",
+              "include",
+              "xv6-user",
+              "Makefile"
+            ],
+            "file_count": 101,
+            "match_count": 1702,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [
+            "codex_ev_Q06_016_sync_neg_01"
+          ],
+          "notes": "negative_search_coverage 见本题证据。"
+        }
+      ],
+      "value": "not_found",
+      "notes": "No global lock ordering rule, lock ranking annotation, or ABBA detector found",
+      "used_evidence_ids": [
+        "codex_ev_Q06_016_sync_neg_01"
+      ],
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q06_016_sync_neg_01",
+          "path": "<negative_search>",
+          "symbol_kind": "search",
+          "symbol_name": "sync_neg",
+          "excerpt": "No global lock ordering rule, lock ranking annotation, or ABBA detector found; searched_keywords=spinlock, mutex, rwlock, semaphore, condvar, monitor, waitqueue, sleep, wakeup, atomic, deadlock, lock ordering, barrier, message passing, pipe, futex, msgget, semop, shmget; searched_directories=kernel, include, xv6-user, Makefile; file_count=101; match_count=1702; coverage_sufficient=true",
+          "line_start": null,
+          "line_end": null,
+          "evidence_type": "negative_search",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "negative_search"
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_017",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现管程/条件变量 (Monitor / Condition Variable, Stallings Ch5)？（必须三态；搜索 Condvar / condition_variable / monitor / wait/notify/signal 等；若 implemented 需区分 Hoare 语义（等待者立即恢复）vs Mesa 语义（等待者重新竞争锁））",
+      "fact_answers": [
+        {
+          "fact_id": "Q06_017_01",
+          "fact_key": "primitive_or_ipc_object",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q06_017_sync_neg_01"
+          ],
+          "notes": "primitive_or_ipc_object 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q06_017_02",
+          "fact_key": "operation_impl",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q06_017_sync_neg_01"
+          ],
+          "notes": "operation_impl 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q06_017_03",
+          "fact_key": "scheduler_blocking",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q06_017_sync_neg_01"
+          ],
+          "notes": "scheduler_blocking 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q06_017_04",
+          "fact_key": "race_deadlock_guard",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q06_017_sync_neg_01"
+          ],
+          "notes": "race_deadlock_guard 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q06_017_05",
+          "fact_key": "semantic_boundary",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q06_017_sync_neg_01"
+          ],
+          "notes": "semantic_boundary 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q06_017_06",
+          "fact_key": "negative_search_coverage",
+          "value": {
+            "searched_keywords": [
+              "spinlock",
+              "mutex",
+              "rwlock",
+              "semaphore",
+              "condvar",
+              "monitor",
+              "waitqueue",
+              "sleep",
+              "wakeup",
+              "atomic",
+              "deadlock",
+              "lock ordering",
+              "barrier",
+              "message passing",
+              "pipe",
+              "futex",
+              "msgget",
+              "semop",
+              "shmget"
+            ],
+            "searched_directories": [
+              "kernel",
+              "include",
+              "xv6-user",
+              "Makefile"
+            ],
+            "file_count": 101,
+            "match_count": 1702,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [
+            "codex_ev_Q06_017_sync_neg_01"
+          ],
+          "notes": "negative_search_coverage 见本题证据。"
+        }
+      ],
+      "value": "not_found",
+      "notes": "No Condvar/condition_variable/monitor wait-notify object with Hoare or Mesa semantics found",
+      "used_evidence_ids": [
+        "codex_ev_Q06_017_sync_neg_01"
+      ],
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q06_017_sync_neg_01",
+          "path": "<negative_search>",
+          "symbol_kind": "search",
+          "symbol_name": "sync_neg",
+          "excerpt": "No Condvar/condition_variable/monitor wait-notify object with Hoare or Mesa semantics found; searched_keywords=spinlock, mutex, rwlock, semaphore, condvar, monitor, waitqueue, sleep, wakeup, atomic, deadlock, lock ordering, barrier, message passing, pipe, futex, msgget, semop, shmget; searched_directories=kernel, include, xv6-user, Makefile; file_count=101; match_count=1702; coverage_sufficient=true",
+          "line_start": null,
+          "line_end": null,
+          "evidence_type": "negative_search",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "negative_search"
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_018",
+      "question_type": "short_answer",
+      "stem": "经典同步问题验证 (Classic Synchronization Problems, Stallings Ch5)：\n以下三个经典问题在该内核中是否有对应实现或测试？\n- 生产者-消费者 (Producer-Consumer / Bounded Buffer)：___（implemented/not_found + 证据）\n- 读者-写者 (Readers-Writers)：___（实现了读者优先/写者优先/公平？ + 证据）\n- 哲学家就餐 (Dining Philosophers)：___（implemented/not_found）",
+      "fact_answers": [
+        {
+          "fact_id": "Q06_018_01",
+          "fact_key": "primitive_or_ipc_object",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q06_018_pipe_def_01",
+            "codex_ev_Q06_018_pipe_alloc_02",
+            "codex_ev_Q06_018_pipe_rw_03",
+            "codex_ev_Q06_018_pipe_syscall_04",
+            "codex_ev_Q06_018_sync_neg_01"
+          ],
+          "notes": "primitive_or_ipc_object 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q06_018_02",
+          "fact_key": "operation_impl",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q06_018_pipe_def_01",
+            "codex_ev_Q06_018_pipe_alloc_02",
+            "codex_ev_Q06_018_pipe_rw_03",
+            "codex_ev_Q06_018_pipe_syscall_04",
+            "codex_ev_Q06_018_sync_neg_01"
+          ],
+          "notes": "operation_impl 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q06_018_03",
+          "fact_key": "scheduler_blocking",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q06_018_pipe_def_01",
+            "codex_ev_Q06_018_pipe_alloc_02",
+            "codex_ev_Q06_018_pipe_rw_03",
+            "codex_ev_Q06_018_pipe_syscall_04",
+            "codex_ev_Q06_018_sync_neg_01"
+          ],
+          "notes": "scheduler_blocking 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q06_018_04",
+          "fact_key": "race_deadlock_guard",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q06_018_pipe_def_01",
+            "codex_ev_Q06_018_pipe_alloc_02",
+            "codex_ev_Q06_018_pipe_rw_03",
+            "codex_ev_Q06_018_pipe_syscall_04",
+            "codex_ev_Q06_018_sync_neg_01"
+          ],
+          "notes": "race_deadlock_guard 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q06_018_05",
+          "fact_key": "semantic_boundary",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q06_018_pipe_def_01",
+            "codex_ev_Q06_018_pipe_alloc_02",
+            "codex_ev_Q06_018_pipe_rw_03",
+            "codex_ev_Q06_018_pipe_syscall_04",
+            "codex_ev_Q06_018_sync_neg_01"
+          ],
+          "notes": "semantic_boundary 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q06_018_06",
+          "fact_key": "negative_search_coverage",
+          "value": {
+            "searched_keywords": [
+              "spinlock",
+              "mutex",
+              "rwlock",
+              "semaphore",
+              "condvar",
+              "monitor",
+              "waitqueue",
+              "sleep",
+              "wakeup",
+              "atomic",
+              "deadlock",
+              "lock ordering",
+              "barrier",
+              "message passing",
+              "pipe",
+              "futex",
+              "msgget",
+              "semop",
+              "shmget"
+            ],
+            "searched_directories": [
+              "kernel",
+              "include",
+              "xv6-user",
+              "Makefile"
+            ],
+            "file_count": 101,
+            "match_count": 1702,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [
+            "codex_ev_Q06_018_sync_neg_01"
+          ],
+          "notes": "negative_search_coverage 见本题证据。"
+        }
+      ],
+      "value": {
+        "primitive_or_ipc_object": "生产者-消费者：implemented（pipe 是有界字节缓冲和读写端阻塞唤醒路径）。",
+        "operation_impl": "读者-写者：not_found（未发现 RwLock 或读者优先/写者优先/公平测试）。",
+        "scheduler_blocking": "哲学家就餐：not_found。",
+        "race_deadlock_guard": "pipe 的生产者-消费者路径通过 wqueue/rqueue 和 pi->lock 防止并发读写竞争。",
+        "semantic_boundary": "pipe 可作为 bounded-buffer IPC；不等同于 Stallings 中专门的 readers-writers/dining philosophers 测试。",
+        "negative_search_coverage": {
+          "searched_keywords": [
+            "spinlock",
+            "mutex",
+            "rwlock",
+            "semaphore",
+            "condvar",
+            "monitor",
+            "waitqueue",
+            "sleep",
+            "wakeup",
+            "atomic",
+            "deadlock",
+            "lock ordering",
+            "barrier",
+            "message passing",
+            "pipe",
+            "futex",
+            "msgget",
+            "semop",
+            "shmget"
+          ],
+          "searched_directories": [
+            "kernel",
+            "include",
+            "xv6-user",
+            "Makefile"
+          ],
+          "file_count": 101,
+          "match_count": 1702,
+          "coverage_sufficient": true
+        }
+      },
+      "notes": "经典同步问题中只有 pipe 可对应生产者-消费者，其余未发现。",
+      "used_evidence_ids": [
+        "codex_ev_Q06_018_pipe_def_01",
+        "codex_ev_Q06_018_pipe_alloc_02",
+        "codex_ev_Q06_018_pipe_rw_03",
+        "codex_ev_Q06_018_pipe_syscall_04",
+        "codex_ev_Q06_018_sync_neg_01"
+      ],
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q06_018_pipe_def_01",
+          "path": "repos/xv6-k210/include/fs/pipe.h",
+          "symbol_kind": "struct",
+          "symbol_name": "pipe",
+          "excerpt": "struct pipe contains spinlock, writer/reader wait_queue, nread/nwrite counters, readopen/writeopen, pdata and fixed data[PIPE_SIZE]; PIPESIZE(pi) shifts buffer size.",
+          "line_start": 13,
+          "line_end": 27,
+          "evidence_type": "definition",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q06_018_pipe_alloc_02",
+          "path": "repos/xv6-k210/kernel/fs/pipe.c",
+          "symbol_kind": "function",
+          "symbol_name": "pipealloc",
+          "excerpt": "pipealloc allocates two files and a pipe, initializes nread/nwrite/readopen/writeopen, initlock, wait_queue_init for write/read queues, and sets both FDs to FD_PIPE.",
+          "line_start": 40,
+          "line_end": 80,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q06_018_pipe_rw_03",
+          "path": "repos/xv6-k210/kernel/fs/pipe.c",
+          "symbol_kind": "function",
+          "symbol_name": "pipewrite/piperead",
+          "excerpt": "pipewritable sleeps on full pipe and wakes readers; pipereadable sleeps on empty pipe and wakes writers; pipewrite/piperead copy through circular pdata using nwrite/nread modulo PIPESIZE.",
+          "line_start": 166,
+          "line_end": 346,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q06_018_pipe_syscall_04",
+          "path": "repos/xv6-k210/kernel/syscall/sysfile.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_pipe",
+          "excerpt": "sys_pipe calls pipealloc(&rf,&wf) and copyout2 to return fd pair to user space.",
+          "line_start": 330,
+          "line_end": 343,
+          "evidence_type": "call_site",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q06_018_sync_neg_01",
+          "path": "<negative_search>",
+          "symbol_kind": "search",
+          "symbol_name": "sync_neg",
+          "excerpt": "No readers-writers fairness test/implementation or dining philosophers test found; searched_keywords=spinlock, mutex, rwlock, semaphore, condvar, monitor, waitqueue, sleep, wakeup, atomic, deadlock, lock ordering, barrier, message passing, pipe, futex, msgget, semop, shmget; searched_directories=kernel, include, xv6-user, Makefile; file_count=101; match_count=1702; coverage_sufficient=true",
+          "line_start": null,
+          "line_end": null,
+          "evidence_type": "negative_search",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "negative_search"
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_019",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现消息传递 (Message Passing, Stallings Ch5) 作为 IPC 机制？（必须三态；区分直接消息传递 Direct / 间接通过邮箱 Mailbox / POSIX mq_open 等；与 SysV msgq 的区别是是否通过内核邮箱路由）",
+      "fact_answers": [
+        {
+          "fact_id": "Q06_019_01",
+          "fact_key": "syscall_entries",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q06_019_sync_neg_01"
+          ],
+          "notes": "syscall_entries 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q06_019_02",
+          "fact_key": "kernel_objects",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q06_019_sync_neg_01"
+          ],
+          "notes": "kernel_objects 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q06_019_03",
+          "fact_key": "operation_semantics",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q06_019_sync_neg_01"
+          ],
+          "notes": "operation_semantics 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q06_019_04",
+          "fact_key": "not_pipe_signal_futex",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q06_019_sync_neg_01"
+          ],
+          "notes": "not_pipe_signal_futex 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q06_019_05",
+          "fact_key": "negative_search_coverage",
+          "value": {
+            "searched_keywords": [
+              "spinlock",
+              "mutex",
+              "rwlock",
+              "semaphore",
+              "condvar",
+              "monitor",
+              "waitqueue",
+              "sleep",
+              "wakeup",
+              "atomic",
+              "deadlock",
+              "lock ordering",
+              "barrier",
+              "message passing",
+              "pipe",
+              "futex",
+              "msgget",
+              "semop",
+              "shmget"
+            ],
+            "searched_directories": [
+              "kernel",
+              "include",
+              "xv6-user",
+              "Makefile"
+            ],
+            "file_count": 101,
+            "match_count": 1702,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [
+            "codex_ev_Q06_019_sync_neg_01"
+          ],
+          "notes": "negative_search_coverage 见本题证据。"
+        }
+      ],
+      "value": "not_found",
+      "notes": "No direct message-passing, mailbox, POSIX mq_open, or kernel mailbox-routing IPC found; pipe/signal are separate IPC mechanisms",
+      "used_evidence_ids": [
+        "codex_ev_Q06_019_sync_neg_01"
+      ],
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q06_019_sync_neg_01",
+          "path": "<negative_search>",
+          "symbol_kind": "search",
+          "symbol_name": "sync_neg",
+          "excerpt": "No direct message-passing, mailbox, POSIX mq_open, or kernel mailbox-routing IPC found; pipe/signal are separate IPC mechanisms; searched_keywords=spinlock, mutex, rwlock, semaphore, condvar, monitor, waitqueue, sleep, wakeup, atomic, deadlock, lock ordering, barrier, message passing, pipe, futex, msgget, semop, shmget; searched_directories=kernel, include, xv6-user, Makefile; file_count=101; match_count=1702; coverage_sufficient=true",
+          "line_start": null,
+          "line_end": null,
+          "evidence_type": "negative_search",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "negative_search"
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_020",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现屏障同步 (Barrier Synchronization, Stallings Ch5)？（必须三态；搜索 barrier / sync_barrier / pthread_barrier 或等价；用于多线程/多核同步到同一检查点）",
+      "fact_answers": [
+        {
+          "fact_id": "Q06_020_01",
+          "fact_key": "primitive_or_ipc_object",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q06_020_sync_neg_01"
+          ],
+          "notes": "primitive_or_ipc_object 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q06_020_02",
+          "fact_key": "operation_impl",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q06_020_sync_neg_01"
+          ],
+          "notes": "operation_impl 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q06_020_03",
+          "fact_key": "scheduler_blocking",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q06_020_sync_neg_01"
+          ],
+          "notes": "scheduler_blocking 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q06_020_04",
+          "fact_key": "race_deadlock_guard",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q06_020_sync_neg_01"
+          ],
+          "notes": "race_deadlock_guard 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q06_020_05",
+          "fact_key": "semantic_boundary",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q06_020_sync_neg_01"
+          ],
+          "notes": "semantic_boundary 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q06_020_06",
+          "fact_key": "negative_search_coverage",
+          "value": {
+            "searched_keywords": [
+              "spinlock",
+              "mutex",
+              "rwlock",
+              "semaphore",
+              "condvar",
+              "monitor",
+              "waitqueue",
+              "sleep",
+              "wakeup",
+              "atomic",
+              "deadlock",
+              "lock ordering",
+              "barrier",
+              "message passing",
+              "pipe",
+              "futex",
+              "msgget",
+              "semop",
+              "shmget"
+            ],
+            "searched_directories": [
+              "kernel",
+              "include",
+              "xv6-user",
+              "Makefile"
+            ],
+            "file_count": 101,
+            "match_count": 1702,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [
+            "codex_ev_Q06_020_sync_neg_01"
+          ],
+          "notes": "negative_search_coverage 见本题证据。"
+        }
+      ],
+      "value": "not_found",
+      "notes": "No barrier/sync_barrier/pthread_barrier or equivalent multi-thread/multicore checkpoint barrier found",
+      "used_evidence_ids": [
+        "codex_ev_Q06_020_sync_neg_01"
+      ],
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q06_020_sync_neg_01",
+          "path": "<negative_search>",
+          "symbol_kind": "search",
+          "symbol_name": "sync_neg",
+          "excerpt": "No barrier/sync_barrier/pthread_barrier or equivalent multi-thread/multicore checkpoint barrier found; searched_keywords=spinlock, mutex, rwlock, semaphore, condvar, monitor, waitqueue, sleep, wakeup, atomic, deadlock, lock ordering, barrier, message passing, pipe, futex, msgget, semop, shmget; searched_directories=kernel, include, xv6-user, Makefile; file_count=101; match_count=1702; coverage_sufficient=true",
+          "line_start": null,
+          "line_end": null,
+          "evidence_type": "negative_search",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "negative_search"
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_021",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现计数信号量 (Counting Semaphore, Stallings Ch5) 及 P/V(wait/signal) 语义？（必须三态；与 Mutex/SpinLock 区分）",
+      "fact_answers": [
+        {
+          "fact_id": "Q06_021_01",
+          "fact_key": "semaphore_object",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q06_021_sync_neg_01"
+          ],
+          "notes": "semaphore_object 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q06_021_02",
+          "fact_key": "wait_down_semantics",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q06_021_sync_neg_01"
+          ],
+          "notes": "wait_down_semantics 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q06_021_03",
+          "fact_key": "signal_up_semantics",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q06_021_sync_neg_01"
+          ],
+          "notes": "signal_up_semantics 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q06_021_04",
+          "fact_key": "scheduler_integration",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q06_021_sync_neg_01"
+          ],
+          "notes": "scheduler_integration 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q06_021_05",
+          "fact_key": "user_visible_or_kernel_only",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q06_021_sync_neg_01"
+          ],
+          "notes": "user_visible_or_kernel_only 经覆盖搜索未发现实现证据。"
+        }
+      ],
+      "value": "not_found",
+      "notes": "No counting semaphore object with count/permits, wait/down/P blocking, and signal/up/V wake semantics found",
+      "used_evidence_ids": [
+        "codex_ev_Q06_021_sync_neg_01"
+      ],
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q06_021_sync_neg_01",
+          "path": "<negative_search>",
+          "symbol_kind": "search",
+          "symbol_name": "sync_neg",
+          "excerpt": "No counting semaphore object with count/permits, wait/down/P blocking, and signal/up/V wake semantics found; searched_keywords=spinlock, mutex, rwlock, semaphore, condvar, monitor, waitqueue, sleep, wakeup, atomic, deadlock, lock ordering, barrier, message passing, pipe, futex, msgget, semop, shmget; searched_directories=kernel, include, xv6-user, Makefile; file_count=101; match_count=1702; coverage_sufficient=true",
+          "line_start": null,
+          "line_end": null,
+          "evidence_type": "negative_search",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "negative_search"
+          ]
+        }
+      ]
+    }
+  ]
+}

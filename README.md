@@ -10,7 +10,7 @@
 
 ### 1. OS-Agent D：自动源码描述 (`os_agent_d_describe.py`) ✨ **增强版**
 
-对 OS 仓库进行 **阶段化**深度技术分析（`STAGES`：**02→09 技术章 → `10_history` → `01_overview` 置底**；另含 **00** 仓库准备、**0.5** RAG 预索引），现已升级为**阶段级 Plan-Execute (PE)** 架构，内置本地 RAG 语义搜索、LSP 调用图分析、智能重试；Execute 阶段受锁定 **`execution_steps`** 与执行契约约束。各阶段计划在 `_per_stage/*_plan.json` 落盘便于对照与复跑。
+对 OS 仓库进行 **阶段化**深度技术分析（`STAGES`：**02→09 技术章 → `10_history` → `01_overview` 置底**；另含 **00** 仓库准备、**0.5** RAG 预索引）。Describe 当前默认使用 **Multi-Agent 图模式**：程序化 Supervisor 负责调度、并行、锁、断点和发布，Task ReAct Agents 负责查证据并产出结构化草稿，Stage Assembler 与 Review Agent 负责逐题组装和证据支撑审查。
 
 | 阶段 | 内容 |
 |------|------|
@@ -27,16 +27,130 @@
 | 10 | 开发历史与里程碑（Git 语义化分析） |
 | 01 | 项目概览与技术栈（**最后执行**，依赖 02–10 各章） |
 
+**无工具 Baseline 对照（`baseline_test.py`）**
+
+- 对 **02–09 题单**各做一次「整仓源码 + 题单」的**单次** LLM 回答（不跑 Plan、不调工具、**不做** JSON 修复重试），再跑与主链路相同的 **Review**，结果落在 **`baseline_output/<repo名>/`**（仅 `_per_stage/*` 与 `review_score.json`，不生成合并 md）。
+- 环境变量与主程序一致：需 `.env` 中的 `REPO_URL` 等；可选 `BASELINE_MAX_USER_CHARS` 控制单轮用户消息总长度（默认 2,400,000 字符，过大时会截断平铺源码）。
+- 每阶段在终端输出 **Execute / Review 的 total_tokens 与累计**（与主链路 `response_metadata.token_usage` 一致），并落盘 **`baseline_output/<repo名>/token_usage.json`**；若某次为 0，多为 API 未返回用量。
+
 **核心分析机制（三级联动）：**
 
 1. 🔍 **RAG 语义搜索（首选）**：`rag_search_code` 对整个仓库代码建立本地向量索引（Jina Embedding），支持语义级模糊搜索（如"查找页表映射实现"），穿透复杂目录结构直接定位相关代码块，大幅减少无效的目录遍历。
 2. 🌳 **LSP 拓扑展开**：通过 `lsp_get_call_graph`（多层递归调用树，包含变量到引用的智能降级）、`lsp_get_definition`（跨文件跳转）、`lsp_get_references` 构建精确的 AST 调用拓扑图。
 3. 🛠️ **分层降级兜底**：当 LSP 失败时，系统**首选 Tree-sitter AST 解析**（C/C++/Rust/Go/Zig），再退到语言感知正则、通用 Grep；仅在汇编或前述路径都失败时才使用 ASM 词法兜底。系统具备“智能分层切换”：LSP -> Tree-sitter -> Language-aware Static -> Grep -> ASM(最终兜底)。
 
-**v4.0 新增：阶段级 Plan-Execute 闭环**
+**OS-Agent D Multi-Agent 图模式**
 
-1. 🧭 **Plan**：每章生成结构化 `PlanSpec`（`seed_paths`、`must_cover`、`entry_symbols` 等），并锁定 **`execution_steps`**（4～8 条短句）；Execute **须按该顺序**调工具与收束正文（见 `render_plan_context` + `STAGE_EXECUTION_CONTRACT`）。
-2. 🧠 **Execute**：ReAct Agent 做证据搜集与章节 Markdown；可抽取 `evidence_index` / `claim_map` 供内存侧逻辑参考；章节正文写入 `sections/*.md`，计划写入 `_per_stage/{stage_id}_plan.json`。
+直接运行 describe 即进入 Multi-Agent 图模式；`--multi-agent` 仍可传入，但只是兼容旧脚本的 no-op：
+
+```bash
+conda run -n os_agent python os_agent_d_describe.py --multi-agent
+```
+
+不带参数运行效果相同：
+
+```bash
+conda run -n os_agent python os_agent_d_describe.py
+```
+
+Multi-Agent 模式采用 **程序化 Supervisor + LLM ReAct Task Agents + 结构化证据黑板**：
+
+- **结构化题单本体**：`core/describe_stage_qa/02-09*.json` 是唯一题单真源，已直接写入 `feature_ids`、结构化事实、证据要求、负向搜索策略、三态规则和反例；运行时只读题单本体，不做自动补齐、生成或修补。
+- **Supervisor / Repo Profile / Task Builder / Evidence Verifier / Publisher**：程序节点，负责调度、状态、断点、证据校验、schema guard、图谱和产物写入。
+- **Stage Plan Agent**：基于结构化题单、`PlanSpec` 和 repo profile 生成 grouped `task_plan[]`；相近题可以合并到一个 task。
+- **Task Builder**：程序校验 Plan Agent 的任务，注入题单本体中的 evidence policy / structured facts，修正非法 `question_ids` 并去重；只在明显跨主题或命中高风险错分组（如缓存驱逐、UART 地址切换、空闲空间管理、网络/socket、安全权限）时拆分 task，并在 task metadata 写入 `plan_lint`。
+- **Task ReAct Agents**：每个 task 都是受限工具集的小 ReAct Agent，主动调用 RAG/LSP/read/build/git 工具查证据；最终输出 evidence candidates 和草稿，系统再生成 `EvidenceRecord`。
+- **Evidence Verifier**：校验 path、line、excerpt、证据类型和负向搜索覆盖，输出 `strength` 与 `supports_claim_types`；RAG/grep 默认只是 hint，不能单独支撑 `implemented`。
+- **Stage Assembler Agent**：不从零查源码，只消费 task 草稿与绑定证据，逐题统一格式、去重、修正过度表述；三态证据不足时保留原 `value`，但写入 blocker 级 guardrail 与 recommended_value。
+- **Review Agent**：默认无源码工具，只读审计题单、最终答案 JSON 与 evidence 摘要；重点检查回答 claim 是否被证据支撑，低分时生成 fix task，再交回 Task Agent 补证据。
+
+并行调度策略：
+
+- `02_boot_trap` 到 `09_debug_error` 以及 `10_history` 可并行执行。
+- `01_overview` 必须等待 02–10 全部完成后串行执行。
+- 用户只控制 stage 并发与 stage 内 task 并发。LLM 调用由这两个池自然限制；LSP 与 RAG 属于底层共享资源，代码内部固定串行保护。
+
+`.env` 中 OS-Agent D 只保留常用运行项：
+
+```env
+OS_AGENT_MAX_PARALLEL_STAGES=2
+OS_AGENT_MAX_PARALLEL_TASKS_PER_STAGE=3
+OS_AGENT_TASK_AGENT_BUDGET=30
+# OS_AGENT_FORCE_STAGES=
+OS_AGENT_TERMINAL_MODE=dashboard
+```
+
+`OS_AGENT_MAX_PARALLEL_STAGES` 控制 02-09 与 `10_history` 同时跑几个 stage；`01_overview` 始终等前面完成后串行执行。`OS_AGENT_MAX_PARALLEL_TASKS_PER_STAGE` 控制单个 stage 内同时跑几个 Task Agent。默认 `2 × 3`，也就是最多约 6 个 Task ReAct Agents 活跃。
+
+不再暴露单独的 LLM 并发变量，也不再读取旧的并发档位配置。Plan Agent 固定使用 LLM，Task Agent 固定使用 LLM ReAct；规则程序只做 schema 校验、证据审查、证据整理和安全兜底。
+
+`OS_AGENT_TASK_AGENT_BUDGET` 是单个 Task Agent 的唯一循环预算。它直接同时限制 ReAct 图递归次数和工具调用次数；超过后会产生 `tool_blocked` 或由 LangGraph 停止本 task，不再维护额外的内部派生阈值。LLM 抽风导致的固定动作循环属于内置熔断，不需要配置：系统会自动拦截 `AAA`、`ABABAB`、`ABCABCABC` 这类重复工具动作模式。
+
+断点与事件产物写入 `output/<repo>/_agent_state/`：
+
+```text
+_agent_state/
+├── run_state.json
+├── graph_state.json
+├── evidence_store.jsonl
+├── draft_answer_store.jsonl
+├── events.jsonl
+├── assembler/
+├── stages/
+├── tasks/
+├── reviews/
+└── locks/
+```
+
+Multi-Agent 终端输出支持 `dashboard` / `compact` / `verbose` / `silent`。默认 `dashboard` 会优先使用 `rich` 彩色表格和动态刷新；缺少 `rich` 时自动回退到无依赖 ANSI 仪表盘。Dashboard 会显示 active stages、active tasks/tools、LLM/tool/review 计数和最近事件。并行节点不会直接 `print()`，而是写入 `events.jsonl` 并由 renderer 统一显示，避免并发输出交错。
+
+完整排查日志会同时写入：
+
+```text
+output/<repo>/_agent_state/events.jsonl
+output/<repo>/_agent_state/debug_events.jsonl
+```
+
+其中 `debug_events.jsonl` 保留完整 `metadata`、工具参数、工具结果 excerpt、token usage 和 warning/error 信息，不受终端预览长度影响，方便复盘某个 task agent 的循环、卡顿或证据查找问题。
+
+**程序规则、字段覆写与打分来源**
+
+Describe 管线允许 LLM 作答，但以下位置会有程序性校验、兜底、覆写或打分；这些规则应被视为“报告生成管线的一部分”，不是参赛 OS 事实：
+
+| 位置 | 程序动作 | 可能影响的字段 | 追踪方式 |
+|------|----------|----------------|----------|
+| `core/describe_json_qa.py` | JSON-QA 默认值与题单契约 coerce：补齐 `fact_answers`，单/多选 A/B/C/D 转选项原文；仅当 `answer_contract.value_shape` 存在时才把 short/fill `value` 规整为固定字段对象 | `value`, `fact_answers` | answer 的 `_meta.programmatic_mutations[]`，以及 `answer_candidate_mutated` 事件 |
+| `core/describe_graph.py` | Evidence ref guard：只允许引用本题 Bound Evidence；未知或跨题 evidence id 会被丢弃；fallback_unusable 不自动绑定前几条证据 | `used_evidence_ids`, `evidence`, `fact_answers[*].used_evidence_ids`, `notes` | `_meta.programmatic_mutations[]`，`answer_evidence_refs_dropped` / `answer_evidence_refs_fallback` 事件 |
+| `core/describe_graph.py` | Tri-state schema guard：`tri_state_impl.value` 只能是 `implemented/stub/not_found/unknown`；缺少可支撑证据时保留原 `value`，只写风险标识和 recommended_value | `notes`, `_meta.guardrails.tri_state`, `_meta.audit` | `_meta.guardrails.tri_state`、`answer_guardrail_flagged` blocker 事件 |
+| `core/describe_graph.py` | Assembler fallback：解析失败、重试失败或证据不足时生成 `answer_status=fallback_unusable`，不猜单选/多选答案 | `answer_status`, `value`, `fact_answers`, `notes`, `_meta.fallback` | `_meta.fallback`、`_meta.programmatic_mutations[].phase=fallback_answer` |
+| `core/task_agents.py` / `core/evidence_verifier.py` | 从 `structured_fact_results` 合成 negative_search evidence 时，会标记 `synthetic=true`；synthetic negative_search 最高只作弱证据，不能单独支撑 `not_found` | `EvidenceRecord.metadata.negative_search`, `strength`, `supports_claim_types` | `negative_search_synthesized` 事件，`negative_search_synthetic=true` |
+| `core/task_builder.py` | Plan lint 只拆明显错分组或高风险跨主题组合 | `TaskSpec.question_ids`, `TaskSpec.metadata.plan_lint` | `metadata.plan_lint.split/reason/topic_tags_by_question` |
+| `core/describe_stage_review.py` | Review LLM 给逐题 `score_evidence` / `score_consistency`；程序按方案 A 重算全阶段 `confidence`，并写 `report_quality_score` 与 `_meta.quality` | `confidence`, `report_quality_score`, `_meta.quality` | `_per_stage/*_review.json` 与 `_agent_state/reviews/*_review.json` |
+| `core/describe_graph.py` | Review 低分或证据 finding 会触发 targeted fix task，重新补证据后再组装 | Task 列表、证据集合、草稿、answer `_meta.review_fix` | `review_fix_*` task metadata、`_meta.review_fix` 和事件日志 |
+
+凡是程序改过的 answer 字段，最终 JSON 中应带 `_meta.programmatic_mutations[]`，包含 `phase/source/reason/fields/diff`。三态证据不足不再改写 `value`，而是写 `_meta.guardrails.tri_state` 与 `_meta.audit[]`，便于区分 LLM 原答、程序标记和程序实际覆写。
+
+**高影响环境变量**
+
+`.env` 里建议至少显式记录这些会显著改变运行结果、成本或审计行为的变量：
+
+| 变量 | 默认值 | 影响 |
+|------|--------|------|
+| `OS_AGENT_MAX_PARALLEL_STAGES` | `2` | stage 并发数，影响速度、API 并发压力和日志交错 |
+| `OS_AGENT_MAX_PARALLEL_TASKS_PER_STAGE` | `3` | 单 stage 内 task agent 并发数 |
+| `OS_AGENT_TASK_AGENT_BUDGET` | `30` | 单 task ReAct 递归/工具预算，过低会欠查证据，过高会增加成本 |
+| `OS_AGENT_ANSWER_JSON_MAX_ATTEMPTS` | `3` | 单题 answer JSON 修复重试次数 |
+| `DESCRIBE_STAGE_REVIEW` | `0` | 是否启用 Review Agent 和 review_score |
+| `DESCRIBE_REVIEW_MAX_CHARS` | `50000` | 单次 review 输入预算；当前按题 review，若单题仍超预算会截断 |
+| `DESCRIBE_REVIEW_MAX_ATTEMPTS` | `3` | review JSON 解析/契约失败后的重试次数 |
+| `DESCRIBE_REVIEW_MODEL` | 空，沿用 `MODEL_NAME` | 单独指定 Review Agent 模型 |
+| `DESCRIBE_MAX_OUTPUT_TOKENS` | 模型默认 | Describe/JSON-QA 长输出上限 |
+| `OS_AGENT_TERMINAL_MODE` | `compact` | 终端渲染模式，不影响产物事实 |
+| `CODE_EMBEDDING_MODEL` | `jinaai/jina-embeddings-v2-base-code` | RAG 向量模型，影响语义搜索召回 |
+| `CODE_EMBEDDING_ENCODE_BATCH` | `8` | RAG 建索引批大小，影响显存/速度 |
+| `CODE_EMBEDDING_QUERY_PROMPT_NAME` | 空 | 查询向量 prompt 名，影响检索分布 |
+| `OS_AGENT_USE_HF_MIRROR` | `true` | 是否默认使用 HF 镜像 |
+| `OS_AGENT_HF_ENDPOINT` / `HF_ENDPOINT` | `https://hf-mirror.com` 或外部配置 | Hugging Face 下载源 |
 
 **v4.0 受限外部背景补充**
 
@@ -72,36 +186,11 @@
 
 ---
 
-### 2. OS-Agent D：自动报告评估 (`os_agent_d_evaluate.py`) ✨ **增强版**
+### 2. 本地工具安全与沙盒限制
 
-使用 Agent 将自动生成的报告与仓库内人类撰写的文档进行对比评估。
+为防止 Token 溢出与确保本地系统安全，工具仅能访问白名单目录（如 `repos/`、`output/`），具体额度与行为见下文「工具限制说明」。
 
-### 3. OS-Agent C：智能查重与比对 (`os_agent_c_coarse.py` / `os_agent_c_fine.py`)
-
-面向小型操作系统的分析比对，系统分为两阶段架构，快速在新旧作品间进行查重与创新点分析：
-
-- **粗筛模块 (`os_agent_c_coarse.py`)**：采用 **`pre-plan + deterministic pipeline`**，不引入完整 reviewer 闭环。先通过轻量 `coarse_preplan` 判断框架生态、关键 section 和粗筛锚点，再进入多维度加权余弦相似度检索。内置三项量化增强：
-  - **结构化精确特征（扩展版）**：LLM 会额外从 D 报告中提取更宽的 JSON 精确字段集，不再只覆盖少量校正项，而是同时覆盖框架/架构/内核类型、页表模式、物理页与堆分配器、任务模型、调度器、信号/Futex/IPC、VFS/主次文件系统、`mmap`/共享内存、socket 真实实现形态、`poll/select`、块设备/网卡/设备发现、`procfs/devfs/tmpfs`、安全权限模型，以及 `syscall_count_real`、`trapframe_bytes` 等数值字段。
-  - **精确字段加分规则（更新版）**：粗筛会先计算原始分 `raw_total = cosine_score + struct_score`，其中 `struct_score` 会按字段精确匹配叠加加分，覆盖内存管理、任务/IPC、文件系统、网络/驱动、安全与 SMP 等稳定事实字段，最高原始加分为 **+0.30**。最终再将总分**严格归一化到 `0~1`**（同时输出 `0~100%`），保证“完全相似 = `1.0` = `100%`”，避免查重场景中出现 `>1` 的误导。
-  - **框架感知权重**：自动识别两个项目是否基于同一框架（ArceOS/rCore/xv6 等），同框架时将框架贡献维度（D1/D2/D7）权重减半，自研核心维度（D3~D8）权重上调 ×1.4，防止因共享框架导致虚高相似度。
-  - **阶段缓存与断点续跑**：粗筛的指纹构建已支持分阶段落盘。`features`、`struct_features`、`embeddings` 会保存在 `output/<repo>/_coarse_stage/` 下，重跑时自动检查本地阶段缓存并跳过已完成阶段，避免因单次超时或中断整轮白跑。现在**最终 `fingerprint.json` 也依赖阶段缓存完整性**：只要某个阶段缓存缺失，即使 `fingerprint.json` 仍在，也会自动判定为需要重组最终指纹，而不是直接命中旧总缓存。
-
-- **精比模块 (`os_agent_c_fine.py`)**：**阶段级 Plan → Execute**（与 Describe 同为两阶段管线）。对粗筛出的 Top-K 候选逐阶段生成对比草稿，在源码级深度比对的基础上，增加“代码相似 vs 设计相似”区分。并保留两大量化相似度维度：
-  - **Token Jaccard 相似度**（`compare_function_tokens`）：对同名函数体 token 化后计算 Jaccard 指数，去除语言关键字后输出独有符号摘要，提供函数实现层面的客观数字证据。
-  - **Call Graph Jaccard 相似度**（`compare_call_graphs`）：对比两项目调用图的节点集合，输出节点 Jaccard = |交集| / |并集|，量化调用拓扑结构的相似程度。
-  - **综合评分锚定**：Agent 被强制要求对 5 个核心函数分别获取 Token Jaccard 与 CG Jaccard，以 `综合相似度 = Token Jaccard 均值 × 0.5 + CG Jaccard 均值 × 0.5` 为锚，结合 4 档评级区间（高度相似 / 改进版 / 受启发 / 独立）输出 0-100 最终评分，确保结论有量化依据可追溯。
-
-### 4. 本地工具安全与沙盒限制
-
-为防止 Token 溢出与确保本地系统安全，各底座工具有严格的使用边界：
-
-- **5 维度客观评分**: 覆盖度、准确性、技术深度、引用规范、亮点发现
-- **独立源码验真**: 冲突时永远以源码为准，利用工具确保证据链闭环
-- **重构脉络提取**: 完全自主翻阅并提取大型架构的历史合并节点
-- **创新亮点锚定**: 发现比人类原生文档更详细的地方，以及遗漏的关键缺陷
-- **沙盒安全边界**: 大模型仅能访问指定的仓库源内文件以及受限的外部沙盒输出目录
-
-### 5. 本地代码 RAG 语义搜索引擎
+### 3. 本地代码 RAG 语义搜索引擎
 
 OS-Agent 内置了一套专为操作系统内核代码优化的**本地 RAG（Retrieval-Augmented Generation）引擎**，在分析每个 OS 仓库前自动完成代码向量化，使 LLM Agent 可以用自然语言"查找功能实现"而非死记函数名。
 
@@ -217,12 +306,14 @@ python check_env.py
 `check_env.py` 特性：
 - **智能预检**：先运行 `pip --dry-run` 判断依赖是否已满足，已满足则跳过安装，秒速完成检查
 - **自动安装 LSP**：缺失 `clangd`、`gopls`、`rust-analyzer` 时自动安装
-- **多架构 Cross Compiler 检测**：自动扫描 RISC-V、ARM、LoongArch 交叉编译器
+- **多架构 Cross Compiler 检测**：自动扫描 RISC-V、ARM、LoongArch 交叉编译器，并识别常见别名/fallback（如 `riscv-none-elf-gcc`、`riscv64-unknown-elf-gcc`、`riscv64-linux-gnu-gcc`、`loongarch64-linux-gnu-gcc`、`aarch64-linux-gnu-gcc`）
 - **路径自动修复**：通过 `_resolve_lsp_binary` 探测 `~/go/bin/`、`~/.cargo/bin/`、WinGet 等非标准安装目录，无需手动配置 PATH
 
 ### 2. 安装 Language Servers（LSP 工具依赖）
 
 > LSP 工具（`lsp_get_definition`、`lsp_get_references`、`lsp_get_document_outline`）需要本地安装对应语言的 Language Server。未安装或超时时会**首选 Tree-sitter AST 解析**（C/C++/Rust/Go/Zig），再走语言感知正则、通用 Grep；仅在汇编或最终兜底场景才使用 ASM 正则。
+
+LSP 目标架构推断会优先读取仓库内显式标记 `.os_agent_lsp_target`，也会从 `rust-toolchain.toml`、`.cargo/config(.toml)`、`Cargo.toml`、`Makefile`、`CMakeLists.txt`、`build.zig`、`linker/*.ld(s)` 等构建配置中识别 target triple / 工具链前缀 / QEMU 与 linker `OUTPUT_ARCH` 线索。对 OS 内核场景，`riscv64-linux-gnu`、`loongarch64-linux-gnu`、`aarch64-linux-gnu` 这类 hosted 工具链会在非用户态上下文中映射为更适合 clangd 裸机解析的 target（如 `riscv64-unknown-elf`、`loongarch64-unknown-elf`、`aarch64-unknown-none-elf`）。手动调用 `lsp_set_target_arch(repo_path, target)` 后，会强制重启受 target 影响的 `rust-analyzer` 与 `clangd` 客户端，避免 Rust/C/C++ 混合仓库继续使用旧架构索引。
 
 ### 2.1 降级结果元数据
 
@@ -325,148 +416,12 @@ output/
     │   ├── repo_profile.json
     │   ├── 03_mem_mgmt_plan.json
     │   └── ...
-    ├── _coarse_stage/          # 粗筛阶段缓存（按项目）
-    │   ├── fingerprint_features.json
-    │   ├── fingerprint_struct_features.json
-    │   └── fingerprint_embeddings.json
-    ├── coarse_preplan.json     # 粗筛 pre-plan 结果
-    ├── fingerprint.json        # 粗筛最终指纹（features + struct_features + embeddings）
-    ├── coarse_screening.json   # 粗筛 Top-K 结果
-    ├── coarse_screening.md     # 粗筛可读报告
+    ├── features/               # 每阶段题单 JSON 中人工维护的 feature 摘要
+    ├── feature_graph.json      # Feature/Question/Evidence/File/Symbol/Claim 图谱
+    ├── feature_graph.cypher    # Neo4j 导入用 Cypher
+    ├── feature_graph.graphml   # 通用图工具导入格式
     ├── OS技术分析报告_<os-name>.md
     └── describe_error_report.json
-```
-
----
-
-## 📊 评估报告（os_agent_d_evaluate.py）✨ **增强版 v2.5**
-
-> **v2.0 更新**（2025-02-14）：新增智能重试、完整错误追溯、鲁棒性大幅提升！评估过程更稳定，失败可追溯。
-
-### 功能说明
-
-评估程序使用独立 Agent 对每个章节进行评估，自主探索仓库，查找人类撰写的文档（README、设计文档、PDF 等），与 Agent 生成的报告进行深度对比。**冲突时以源码为准**。
-
-**核心特点**：
-- 🔍 Agent 自主选择要读取的文档
-- 🔒 安全限制：只能访问仓库目录和 output 目录
-- 📊 5 维度评分体系（覆盖度、准确性、深度、引用、亮点）
-- ✨ 自动发现 Agent 报告的亮点和不足
-- 🔄 智能重试机制（指数退避、错误分类）
-- 📋 完整错误追溯（日志、报告、堆栈）
-- 🛡️ 高鲁棒性（输入验证、超时控制、优雅降级）
-
-### 使用方法
-
-```bash
-# 基本用法（使用 .env 中的 REPO_URL）
-python os_agent_d_evaluate.py
-
-# 指定仓库 URL
-python os_agent_d_evaluate.py --repo-url https://gitlab.educg.net/xxx/os-project.git
-
-# 指定仓库路径和输出目录
-python os_agent_d_evaluate.py --repo-path repos/my-os --output-dir output/my-os
-
-# 使用不同的 LLM 模型
-python os_agent_d_evaluate.py --model gpt-4o
-```
-
-### 命令行参数
-
-| 参数 | 说明 |
-|------|------|
-| `--repo-url` | OS 仓库 URL（覆盖 .env 中的 REPO_URL） |
-| `--repo-path` | 仓库本地路径（默认从 REPO_URL 解析） |
-| `--output-dir` | 生成报告目录（默认 output/<repo_name>） |
-| `--model` | LLM 模型名称（覆盖 .env 中的 EVAL_MODEL_NAME） |
-
-### 评估维度
-
-| 维度 | 权重 | 说明 |
-|------|------|------|
-| **coverage** | 25% | 内容覆盖度 - Agent 覆盖了人类文档多少关键技术点 |
-| **accuracy** | 35% | 准确性 - Agent 描述与人类文档/代码是否一致，捏造严重扣分 |
-| **depth** | 20% | 技术深度 - 是否深入到代码实现层面 |
-| **citations** | 10% | 证据引用 - 是否引用具体文件路径、代码片段 |
-| **highlights** | 10% | 亮点发现 - Agent 超越人类文档的源码级洞察 |
-
-### 输出文件（增强版）
-
-评估完成后，在 `evaluation/<repo_name>/` 目录下生成：
-
-```
-evaluation/
-└── <repo_name>/
-    ├── evaluation.log          # 📋 详细日志（DEBUG 级别，包含完整堆栈）
-    ├── error_report.json        # 🆕 错误报告（错误分类、统计、堆栈）
-    ├── summary.json            # 📊 汇总结果（包含成功率、统计信息）
-    ├── evaluation_report.md    # 📄 Markdown 报告（包含错误摘要）
-    └── sections/               # 📂 各章节评估结果
-        ├── 01_项目概览与技术栈.json
-        ├── 02_内存管理.json
-        └── ...
-```
-
-### 示例输出
-
-```
-============================================================
-🚀 OS-Agent D 评估开始（增强版）
-   仓库: my-os
-   repo_path: C:\...\repos\my-os
-   output_dir: C:\...\output\my-os
-   评估输出: C:\...\evaluation\my-os
-   模型: deepseek/deepseek-v3.2
-   章节总数: 11
-   日志文件: C:\...\evaluation\my-os\evaluation.log
-   重试配置: 最大3次, 退避2-60秒
-============================================================
-
-📌 评估章节: 01_项目概览与技术栈.md
-
-【步骤 1/500】🔧 调用工具:
-   find_human_docs(my-os/ "os kernel design")
-   ✅ find_human_docs: 找到 3 个文档
-
-【步骤 2/500】🔧 调用工具:
-   read_human_doc(README.md)
-   ✅ read_human_doc: 返回 150 行 (5000 字符)
-
-【步骤 3/500】🔧 调用工具:
-   verify_claim_in_source(repo_path, "使用 Buddy System", "buddy|BuddyAllocator")
-   ✅ verify_claim_in_source: ✓ 源码有匹配
-
-   ...
-
-   ✅ 01_项目概览与技术栈.md: 85.3 分 - 覆盖较好，准确性高...
-   📄 已保存: C:\...\evaluation\my-os\sections\01_项目概览与技术栈.json
-
-📌 评估章节: 02_内存管理.md
-   ❌ 网络错误: ConnectionError: Connection refused
-   🔄 正在重试 (1/3)...
-   ⏱️  等待 2 秒后重试（网络错误）...
-
-【步骤 15/500】🔧 调用工具:
-   find_human_docs(my-os/ "mm memory paging")
-   ✅ find_human_docs: 找到 2 个文档
-
-   ...
-
-   ✅ 02_内存管理.md: 78.1 分 - 深度分析到位，但缺少 Slab 分配器...
-
-============================================================
-✅ 评估任务完成
-   📊 统计:
-      - 总章节数: 11
-      - 成功: 12
-      - 失败: 1
-      - 跳过: 2
-   🎯 综合评分: 82.5 / 100
-   ⏱️  耗时: 256.3 秒 (4.3 分钟)
-   📋 日志: C:\...\evaluation\my-os\evaluation.log
-   ⚠️  错误数: 2 (详见错误报告)
-============================================================
 ```
 
 ---
@@ -475,26 +430,18 @@ evaluation/
 
 > 从最早期的基础描述模块，本作在各个子版本的演进中不断填补了 LLM 的认知短板，并建立起牢不可破的沙盒机制。
 
-#### 🆕 **v3.3 OS-Agent C 客观量化查重增强 & 并发安全修复**（2026-03-20）
-- **结构化精确特征提取**：粗筛阶段新增 LLM JSON 精确字段提取，并在后续版本中从最初 13 项少量校正字段扩展为覆盖更广的精确特征集（框架/架构/内核类型、页表模式、分配器、任务模型、IPC、VFS/FS、socket 形态、I/O 多路复用、驱动/设备发现、`procfs/devfs/tmpfs`、安全权限模型及关键数值字段），显著减少单靠嵌入向量造成的误判。
-- **框架感知权重调整**：同框架项目间自动降低框架贡献维度（D1/D2/D7）权重、上调自研核心维度（D3~D8）权重，防止共享框架导致的虚高相似度评分。
-- **精确字段加分升级**：`struct_score` 由原先少数字段的最高 **+0.15**，升级为覆盖多类稳定实现事实字段的最高 **+0.30**；同时粗筛最终分改为**严格归一化到 `0~1 / 0~100%`**，确保“完全相似 = 100%”语义稳定，更适合查重排序与阈值判断。
-- **Token Jaccard 工具**：新增 `compare_function_tokens`，对两仓库中同名函数体进行 token 化并计算 Jaccard 相似度，输出独有关键词摘要，提供代码实现层面的客观数字证据。
-- **Call Graph Jaccard 输出**：增强 `compare_call_graphs`，在输出末尾追加节点集合 Jaccard = |交集| / |并集|，量化调用拓扑结构相似度。
-- **c09_innovation 双维量化锚定**：强制 Agent 对 5 个核心函数分别获取 Token Jaccard 与 CG Jaccard，以加权均值确定最终 0-100 评分区间，结论有量化证据可追溯。
-- **`lsp_set_target_arch` 竞争修复**：补加 `async with _lsp_global_lock`，确保 LSP 重启操作等待所有飞行中请求完成后才执行，消除并发调用时的竞态窗口。
-- **`compare_function_tokens` 类型安全**：`syscall_count_real` 和 `trapframe_bytes` 的精确加分逻辑增加 `int()` 类型规范化，防止 LLM 以字符串输出数字时导致的 `TypeError`。
-
-#### 🆕 **v4.0 阶段级 Plan-Execute 与执行契约**（2026-03-27；后续迭代）
-- **阶段级 Plan-Execute**：`os_agent_d_describe.py` 与 `os_agent_c_fine.py` 使用 `StageState` / `PlanSpec`；Describe 在 Plan 中锁定 **`execution_steps`**，Execute 提示词注入 **`STAGE_EXECUTION_CONTRACT`**（证据路径、文风与粒度等）。
-- **动态上下文**：`repo_profile`、`evidence_cache`、`external_background` 等经 `render_plan_context` 注入 Execute。
-- **证据账本 (`evidence_index`)**：可从工具轨迹抽取，供 Execute 与内存侧逻辑参考；**不**写入 `_per_stage`。
-- **粗筛链路保持轻量**：`os_agent_c_coarse.py` 没有硬套完整 PE，而是新增 `coarse_preplan` 与 `validate_coarse_output()`，继续保持“预侦察 + 指纹构建 + 向量检索”的确定性流水线。
+#### 🆕 **v4.0 / v4.1 Describe Multi-Agent 图模式**（2026-03-27；后续迭代）
+- **Describe 默认 Multi-Agent**：`os_agent_d_describe.py` 直接进入 `core.describe_graph.MultiAgentRuntime`；旧串行 Describe Plan→Execute→Review 链路已移除，`--multi-agent` 仅作为兼容旧脚本的 no-op。
+- **结构化题单定稿**：02-09 题单 JSON 本体是可人工评审的结构化题单，运行时不自动扩展、补齐或修补；`tri_state_impl` 的 `implemented / stub / not_found / unknown` 判定边界、证据要求和反例都写在题单文件里。
+- **程序化图调度**：Supervisor 负责仓库准备、RAG 预索引、并行 stage/task 调度、锁、断点续传与发布；`Stage Plan Agent` 只生成 grouped task plan，`Task Builder` 会程序化校验并限流。
+- **结构化证据黑板**：Task ReAct Agents 产出候选证据与 `DraftAnswerRecord`，系统生成并校验 `EvidenceRecord`；Evidence Verifier 会区分 hint/weak/strong/invalid，并输出可支撑的 claim 类型。
+- **Feature Graph 输出**：最终发布 `feature_graph.json`、`feature_graph.cypher`、`feature_graph.graphml`，以 Feature/Question/Evidence/File/Symbol/Claim 节点展示 OS 机制 DAG 与证据追溯。
+- **旧 JSON-QA Repair 删除**：Describe 不再运行整章 JSON 修复循环，也不再写旧 repair 侧车。Review Agent 自身的 JSON 解析重试仍保留在 `core.describe_stage_review` 内。
+- **LSP target 与工具链推断增强**：`tools/compile_context.py` 现在从 Cargo/Make/CMake/Zig/linker script/QEMU 线索推断 target triple，并区分裸机内核与 hosted userland；`tools/lsp_ops.py` 优先使用裸机 RISC-V 工具链（`riscv-none-elf-gcc` / `riscv64-unknown-elf-gcc`），同时保留发行版常见 `riscv64-linux-gnu-gcc` fallback。`lsp_set_target_arch` 写入 `.os_agent_lsp_target` 后会重启 Rust 与 C/C++ LSP 客户端，避免混合语言仓库的 clangd 继续沿用旧 target。
+- **模型输出上限兼容**：`DESCRIBE_MAX_OUTPUT_TOKENS` 继续用于降低长 JSON-QA 截断风险；对 DeepSeek 兼容接口，`max_tokens` 会通过 `extra_body` 透传，避免 langchain-openai 将其改写成 DeepSeek 不接受的参数名。
 - **受限 `web_search`**：新增 `tools/web_search.py`，默认关闭，只允许用于“全国大学生操作系统比赛”背景、赛道定位、目标要求和技术概览；禁止作为源码实现证据或查重依据。
 - **细粒度并发保护而非降并发**：保留多 tool call / 多阶段并行能力，只对共享状态热点加最小粒度保护。当前已覆盖同仓库 LSP polyfill/目标架构切换、同项目 RAG 向量索引落盘、同仓库 clone，以及同目标文件写入/导出 PDF，避免把正常的只读检索也串行化。
 - **中断后不留“锁死”状态**：并发保护统一采用进程内锁，不落磁盘锁文件；`LSP` 的 `run_coroutine_threadsafe(...).result(timeout=...)` 在超时、异常或手动中断时会主动取消后台 future，避免同一进程里下一次运行被残留协程继续占锁。
-- **粗筛最终缓存语义收紧**：`fingerprint.json` 不再单独视为充分缓存命中条件；只有当 `features`、`struct_features`、`embeddings` 三个阶段缓存也完整且 schema 版本匹配时才会直接加载。只要任一阶段缓存缺失，即使最终指纹仍在，也会自动进入重组流程。
-
 #### 🆕 **v3.2 终局合成与抗幻觉架构重构**（2026-03-19）
 - **报告生成逆向思维法**：颠覆了流程式生成的刻板印象，将 `01_overview` 移至分析大循环的最后一环执行。Agent 现在会携带前置技术章与历史章（02–10）的全量上下文，以前所未有的上帝视角凝练出最终的项目概览与完成度评价，并通过首字母编排算法自动归位至报告首发位置。
 - **封杀数字虚构幻觉**：删除冗余旧阶段，并以硬性“防打分负向 Prompt”取代，有效抑制了大模型在评价完成度时随意虚构 `7.5/10` 一类不严谨的数字评分体系。
@@ -524,7 +471,7 @@ evaluation/
 - 纯 LLM 语义化历史推演，全面弃用传统统计 Python 图表。
 - 严格限定大模型的工具生命周期（Stage-Based Tool Provisioning），彻底切断环境外溢与污染，在特定领域精准限制探索边界。
 
-#### 🆕 **v2.7/v2.6 评估全链路监控防断连优化**（2026-03-01）
+#### 🆕 **v2.7/v2.6 全链路监控防断连优化**（2026-03-01）
 - 新增 **`ErrorTracker`** 与指数退避阻断：网络/API/超时自动断点重试。
 - 本地克隆增强（防 Windows NTFS 截断），并在 Conda 环境下深度解决底层 Rust 与 Clang 语言服务器安装检测与修复。
 
@@ -542,9 +489,6 @@ evaluation/
 ```
 OS-Agent/
 ├── os_agent_d_describe.py          # Agent D：OS 源码深度描述（10 个 LLM 阶段 + 仓库准备/RAG 预索引）
-├── os_agent_d_evaluate.py          # Agent D：报告自动评估
-├── os_agent_c_coarse.py            # Agent C：粗筛（pre-plan + 向量相似度检索）
-├── os_agent_c_fine.py              # Agent C：精比（阶段级 Plan→Execute）
 ├── check_env.py                    # 环境检查脚本（含依赖预检与 LSP 自动安装）
 ├── test_api.py                     # LLM API 连通性快速测试
 ├── force_download_jina.py          # Jina 嵌入模型强制下载脚本
@@ -554,24 +498,19 @@ OS-Agent/
 ├── .env                            # 环境变量配置（需自行创建）
 ├── .env.example                    # 环境变量配置模板
 ├── core/
-│   ├── agent_builder.py            # Agent 构建器（planner/executor/sub-agent）
+│   ├── agent_builder.py            # LLM、Review Prompt、Task ReAct Agent 构建器
 │   ├── code_rag.py                 # 代码 RAG 引擎（AST 解析 + 向量索引）
-│   ├── vectorizer.py               # 本地 Embedding 向量化（Jina 模型）+ 结构化精确特征提取
-│   ├── vector_store.py             # 向量数据库存取（含框架感知权重 + 精确字段加分）
 │   ├── utils.py                    # 公共工具函数（格式化、仓库名解析）
 │   ├── error_handling.py           # 错误处理模块（分类、重试、追踪）
 │   ├── per_types.py                # v4.0：StageState / PlanSpec 等核心数据结构
 │   ├── per_planner.py              # v4.0：plan 阶段、repo_profile、dynamic_context
-│   ├── per_executor.py             # v4.0：草稿与 evidence_index 抽取
 │   ├── per_llm_stages.py           # v4.0：LLM 规划 Agent（Plan JSON 解析与合并）
 │   └── hf_env.py                   # Hugging Face 默认镜像、嵌入模型加载
 ├── tools/
 │   ├── lsp_ops.py                  # LSP 封装（callHierarchy、定义、引用、大纲）
 │   ├── file_ops.py                 # 文件操作（read_code_segment、grep_in_repo）
 │   ├── git_ops.py                  # Git 操作（历史分析、作者贡献、Diff 透视）
-│   ├── compare_ops.py              # 项目比对工具（Agent C 精比辅助，含 Token/CG Jaccard）
 │   ├── describe_ops.py             # 描述模块专用工具
-│   ├── eval_ops.py                 # 评估专用工具（人类文档搜索、声明验证）
 │   └── web_search.py               # v4.0：受限外部背景搜索（默认关闭）
 ├── repos/                          # 克隆的 OS 仓库（运行时自动克隆，.gitignore 忽略）
 ├── output/                         # 描述模块输出（按项目名划分）
@@ -580,13 +519,6 @@ OS-Agent/
 │       ├── _per_stage/             # v4.0：侧车（repo_profile、各阶段 *_plan.json）
 │       ├── OS技术分析报告_<os-name>.md
 │       └── describe_error_report.json  # 错误报告（如有）
-└── evaluation/                     # 评估模块输出（按项目名划分）
-    └── <os-name>/
-        ├── evaluation.log          # 详细日志
-        ├── error_report.json       # 错误报告
-        ├── summary.json            # 汇总评分
-        ├── evaluation_report.md    # Markdown 评估报告
-        └── sections/               # 各章节评估 JSON
 ```
 
 
@@ -616,7 +548,7 @@ OS-Agent/
 - `repo_profile.json`：仓库级先验（框架猜测、架构、关键目录、语言混合）
 - `*_plan.json`：阶段 `PlanSpec`（含 **`execution_steps`**、`must_cover`、`seed_paths` 等）
 
-`evidence_index` 仅在内存中用于 Execute / 工具侧逻辑，**不**写入 `_per_stage`。`fine compare` 仅在 `vs_<候选>_per/` 下保留 `*_plan.json`。
+`evidence_index` 仅在内存中用于任务执行与证据整理，**不**写入 `_per_stage`。
 
 ### 支持的 CPU 架构
 
@@ -633,9 +565,8 @@ OS-Agent/
 
 | 工具 | 限制 | 说明 |
 |------|------|------|
-| `read_code_segment` | 最大 100,000 字符 | 只能访问 `repos/`、`output/`、`evaluation/` 目录 |
+| `read_code_segment` | 最大 100,000 字符 | 只能访问 `repos/`、`output/` 目录 |
 | `grep_in_repo` | 最多 20 条匹配 | 在源码中搜索关键词/正则，验证技术声明 |
-| `read_file` (评估) | 最大 50,000 字符 | 只能访问仓库和 output 目录 |
 | `list_repo_structure` | 默认 4 层深度 | 可通过 `max_depth` 调整 |
 | `lsp_get_definition` / `lsp_get_references` | 本地化跨文件追踪 | 不受文件切片截断影响，提供 AST 真实函数映射与依赖拓扑 |
 | `lsp_get_document_outline` | 文件大纲提取 | 快速获取文件中所有函数/结构体/枚举的名称与行号 |
@@ -647,13 +578,15 @@ OS-Agent/
 
 ### 并发与共享状态策略
 
-系统默认**不主动降低并发度**。只有在工具存在共享状态或共享输出路径时，才做细粒度保护：
+系统只让用户调 stage/task 两级并发。只有在工具存在共享状态或共享输出路径时，才做固定的底层保护：
 
-- **仓库级 LSP 配置锁**：保护 `compile_flags.txt`、`Cargo.toml`、`src/lib.rs`、`.os_agent_lsp_target` 的生成与切换，避免同仓库并行 polyfill 或切架构时互相覆盖。
+- **LSP tool 级固定串行**：`react_lsp` task 不再整段占用 LSP 锁；只有实际调用 `lsp_get_definition`、`lsp_get_references`、`lsp_get_document_outline`、`lsp_get_call_graph`、`lsp_set_target_arch` 时才进入 `lsp_tool_guard()`。LSP tool concurrency 固定为 `1`，因为底层共享 `_lsp_loop`、`_gateway`、`LSPClient`、`opened_uris`、`pending_requests`、polyfill 文件和 `.os_agent_lsp_target`；`lsp_set_target_arch` 还会重启语言服务器。
+- **仓库级 LSP 配置保护**：保护 `compile_flags.txt`、`Cargo.toml`、`src/lib.rs`、`.os_agent_lsp_target` 的生成与切换，避免同仓库并行 polyfill 或切架构时互相覆盖。
+- **RAG 查询与 embedding 固定串行**：`rag_search_code` 进入 `rag_tool_guard()`，RAG query / embedding concurrency 固定为 `1`，避免多个 Task Agent 同时打同一个本地 `SentenceTransformer.encode()`。
 - **项目级 RAG 索引锁**：保护 `output/<proj>/_vector_db/chunks.json` 与 `vectors.npy` 的构建和落盘，避免同项目被重复建索引或写坏索引文件。
 - **仓库级 clone 锁**：只串行同一个 `repos/<name>` 目录的克隆，其他仓库仍可并行。
 - **目标路径写锁**：`write_file()` 与 `convert_md_to_pdf()` 仅在写入同一路径时串行，避免覆盖。
-- **只读工具不受影响**：源码读取、grep/RAG 查询、评估文档读取、受限 `web_search` 等不因上述保护被整体串行化。
+- **普通只读工具不受影响**：源码读取、grep、受限 `web_search` 等不因上述保护被整体串行化。
 
 **截断提示**：所有工具在输出被截断时会明确告知 LLM，例如：
 ```
@@ -673,14 +606,19 @@ OS-Agent/
 - 单阶段失败不影响后续阶段执行
 - 运行结束时输出错误摘要，并生成 `output/<os-name>/describe_error_report.json`
 
-**v4.0** 可结合 `_per_stage/*_plan.json` 与 `repo_profile.json` 对照各章锁定步骤与 must_cover；章节正文以 `sections/*.md` 为准。
+**v4.1** 可结合 `_agent_state/`、`_per_stage/*_plan.json`、`evidence_store.jsonl`、`draft_answer_store.jsonl`、`features/*.json`、`feature_graph.json` 与 `repo_profile.json` 对照各章任务、证据、feature 和 review/fix 过程；章节正文以 `sections/*.md` 为准。
 
-**Describe 无工具 Review（可选）**：`DESCRIBE_STAGE_REVIEW=1` 时，仅对 **JSON-QA 且校验成功** 的阶段在落盘前送审：材料为 **`core/describe_stage_qa` 题单** + **`coerce_answers_payload_by_stage_qa` 覆写题面前的答案 JSON**（证据以答案 JSON 内 `evidence` 为准，**不含**工具回传摘录）。`01_overview`、`10_history` 不审。结果 `_per_stage/<stage_id>_review.json`：含逐题 **`question_reviews[]`**（`question_id`、`confidence`、`review` 文字）、全阶段 **`confidence`** 与 **`summary_zh`** 总评等；默认关闭。可选 `DESCRIBE_REVIEW_MODEL`。
+**Describe JSON-QA 生成**：02~09 题单阶段由 Task Agents 收集候选证据，系统生成并校验 `EvidenceRecord`，Stage Assembler 逐题生成 `_per_stage/<stage_id>_answers.json` 并渲染章节 Markdown。`tri_state_impl` 只能输出 `implemented / stub / not_found / unknown`；RAG/grep 不能单独支撑 `implemented`，负向搜索覆盖不足会降级为 `unknown` 或触发补证据 task。旧串行链路的整章 JSON repair 侧车已删除。
+
+**Describe 无工具 Review（可选）**：`DESCRIBE_STAGE_REVIEW=1` 时，仅对 **JSON-QA 且校验成功** 的阶段在落盘前送审：材料为 **`core/describe_stage_qa` 题单内 QA contract / feature context** + **`coerce_answers_payload_by_stage_qa` 覆写题面前的答案 JSON**（证据以答案 JSON 内 `evidence` 为准）。`01_overview`、`10_history` 不审。结果 `_per_stage/<stage_id>_review.json`：细粒度规则见系统提示**详细分档（0.95+ 为优秀，<0.80 为证据单薄，<0.50 为严重问题）**；后处理会写入 **`report_quality_score`（0~1，完全由 LLM 逐题置信度与维度分合成，摒弃纯代码统计）**、**`_meta.quality`**，并按**方案 A** 重算全阶段 **`confidence`（与各题 `confidence` 一致）**；另含逐题 `question_reviews[]`、`summary_zh` 等。默认可选 `DESCRIBE_REVIEW_MODEL`。合并总报告时，会在 **`output/<os-name>/review_score.json`** 汇总 **02~09 题库各章**（8 个 `stage_id`）的 0~100 分与 **总分校验（有分章的算术平均）**，并在最终报告文首写引用行；若各章无可用 review 则写“未统计”类占位。
+
+审阅侧车若 **JSON 解析或结构不合规**（如缺题、乱序），会按 **`DESCRIBE_REVIEW_MAX_ATTEMPTS`**（默认 `3`，最大 `8`）对同一审阅模型追加「修复重发」轮次；仍失败则写入 `*_review_error.json`。
 
 若某章质量不符预期，优先检查 `output/<os-name>/_per_stage/` 下对应 `*_plan.json` 与 `os_agent_d_describe.py` 中该阶段 `prompt` / 执行契约。
 
 并发保护相关的运行时保证：
 - 当前锁都是**进程内锁**，不会在磁盘上遗留 `.lock` 一类文件，因此程序被终止后，下次启动不会因为旧锁残留而无法运行。
+- `react_lsp` 的 LSP 并发保护是**工具级**而不是 task 级：LLM 思考、RAG、grep、read 代码不会占用 LSP 槽位，只有具体 LSP 工具调用会进入固定串行队列。
 - 对 `LSP` 后台协程，若出现超时、异常或手动中断，系统会主动取消对应 future，避免“本次虽然停了，但后台还在继续跑并占着仓库级锁”的情况。
 - 共享状态保护只影响**同一仓库 / 同一项目 / 同一路径**的竞争写入；不会把其他仓库、其他输出路径、或只读查询一起拖成串行。
 
@@ -697,43 +635,6 @@ OS-Agent/
 - 替代源码证据
 
 如果不配置 `ENABLE_WEB_SEARCH=true` 和 provider 密钥，系统会自动保持关闭。
-
-### Q: 如何评估已有的报告？
-
-使用 `os_agent_d_evaluate.py` 直接评估：
-
-```bash
-# 使用 .env 中的 REPO_URL
-python os_agent_d_evaluate.py
-
-# 或指定仓库 URL
-python os_agent_d_evaluate.py --repo-url https://gitlab.educg.net/xxx/os-project.git
-```
-
-### Q: 评估失败怎么办？
-
-**v2.0 增强版**提供了完整的错误追溯：
-
-1. **查看日志**：`evaluation/<repo_name>/evaluation.log`
-   - 包含详细的错误信息和堆栈跟踪
-
-2. **查看错误报告**：`evaluation/<repo_name>/error_report.json`
-   - 错误分类统计
-   - 每个错误的完整上下文
-
-3. **常见问题**：
-   - **网络错误**：检查网络连接，程序会自动重试 3 次
-   - **API 错误**：检查 API 密钥和配额，增加退避时间
-   - **超时错误**：在 `.env` 中增加 `EVAL_REQUEST_TIMEOUT=600`
-   - **解析错误**：程序会自动追问 Agent 重新生成 JSON
-
-4. **配置重试**：
-   ```bash
-   # 在 .env 中配置（未来版本支持）
-   EVAL_MAX_RETRIES=5
-   EVAL_INITIAL_BACKOFF=3
-   EVAL_MAX_BACKOFF=120
-   ```
 
 ### Q: 如何获取更详细的调试信息？
 

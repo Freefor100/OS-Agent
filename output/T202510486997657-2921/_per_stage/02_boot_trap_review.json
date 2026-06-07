@@ -1,0 +1,188 @@
+{
+  "schema_version": "describe_review_v1",
+  "stage_id": "02_boot_trap",
+  "stage_title": "启动/架构与 Trap/系统调用",
+  "confidence": 0.98,
+  "question_reviews": [
+    {
+      "question_id": "Q02_001",
+      "confidence": 1.0,
+      "review": "题面要求提供入口文件路径及符号证据。答案明确给出了 RISC-V 和 LoongArch 的 linker.ld 及 entry.S 路径与符号，证据摘录包含 ENTRY 设置与标签定义，完全符合题面约束。"
+    },
+    {
+      "question_id": "Q02_002",
+      "confidence": 1.0,
+      "review": "题面为单选。答案选择了与选项 A 文本一致的描述，证据中的注释明确提到了 open-sbi 到 entry.S 的交接流程，支撑结论。"
+    },
+    {
+      "question_id": "Q02_003",
+      "confidence": 1.0,
+      "review": "题面要求三态判断特权级切换。答案判定为 implemented，证据展示了 CRMD 寄存器设置及 sstatus 位操作，能够证实模式切换逻辑存在。"
+    },
+    {
+      "question_id": "Q02_004",
+      "confidence": 1.0,
+      "review": "题面要求列出关键寄存器/位并给证据。答案列举了 mstatus/sstatus/satp 等及 LoongArch 对应寄存器，证据摘录显示了相关 CSR 的写入操作，符合题面。"
+    },
+    {
+      "question_id": "Q02_005",
+      "confidence": 1.0,
+      "review": "题面要求三态判断 MMU 启用。答案判定为 implemented，证据展示了 VirtualMemoryManager::init 中设置 satp/pgdl 及 tlbinit 调用，支撑结论。"
+    },
+    {
+      "question_id": "Q02_006",
+      "confidence": 1.0,
+      "review": "题面要求列出 3-6 个跳转链节点。答案提供了从 entry 到 main 再到 scheduler 的完整链条，证据摘录显示了函数调用关系，符合题面要求。"
+    },
+    {
+      "question_id": "Q02_007",
+      "confidence": 1.0,
+      "review": "题面要求 fill_in 格式（项目：状态 [路径]）。答案按格式列出了 BSS、串口、DTB、页表的状态与路径，证据支持各项状态的判定。"
+    },
+    {
+      "question_id": "Q02_008",
+      "confidence": 1.0,
+      "review": "题面要求三态判断 FPU 启用。答案判定为 stub，证据指出 enable_fpu 函数存在但在启动链中未被调用，逻辑自洽且符合题面。"
+    },
+    {
+      "question_id": "Q02_009",
+      "confidence": 1.0,
+      "review": "题面要求三态判断 trap 向量设置。答案判定为 implemented，证据展示了 inithart 中写入 stvec/eentry 的操作，支撑结论。"
+    },
+    {
+      "question_id": "Q02_010",
+      "confidence": 1.0,
+      "review": "题面要求说明构建系统如何选择架构。答案引用了 Makefile 中 ARCH 变量及条件编译标志，证据摘录清晰，符合题面。"
+    },
+    {
+      "question_id": "Q02_011",
+      "confidence": 1.0,
+      "review": "题面要求三态判断固件链。答案判定为 implemented，证据包含启动流程注释及 sbi.hh 头文件存在，支撑 RISC-V 固件链结论。"
+    },
+    {
+      "question_id": "Q02_012",
+      "confidence": 1.0,
+      "review": "题面要求三态判断 MMU 前后 UART 地址切换。答案判定为 implemented，证据展示了 kvmmap 映射 UART 及初始化逻辑，符合题面。"
+    },
+    {
+      "question_id": "Q02_013",
+      "confidence": 1.0,
+      "review": "题面要求三态判断返回用户态路径。答案判定为 implemented，证据展示了 usertrapret、userret 及 sret 指令，支撑结论。"
+    },
+    {
+      "question_id": "Q02_014",
+      "confidence": 1.0,
+      "review": "题面要求说明多平台支持。答案指出支持双架构但无特定板型差异，证据引用 Makefile 及入口文件，符合题面搜索要求。"
+    },
+    {
+      "question_id": "Q02_015",
+      "confidence": 1.0,
+      "review": "题面要求指出 trap 向量入口。答案给出了 kernelvec/uservec 标签及文件路径，证据摘录了汇编标签定义，符合题面。"
+    },
+    {
+      "question_id": "Q02_016",
+      "confidence": 1.0,
+      "review": "题面为单选。答案选择了与选项 C 文本一致的描述，证据展示了 TRAPFRAME 映射到用户空间的代码，支撑结论。"
+    },
+    {
+      "question_id": "Q02_017",
+      "confidence": 1.0,
+      "review": "题面要求 TrapFrame 定义及大小。答案给出了结构体路径、字段数及字节数，证据摘录了结构体定义，符合题面。"
+    },
+    {
+      "question_id": "Q02_018",
+      "confidence": 1.0,
+      "review": "题面要求三态判断 syscall 分发表。答案判定为 implemented，证据展示了 BIND_SYSCALL 宏及函数指针数组，支撑结论。"
+    },
+    {
+      "question_id": "Q02_019",
+      "confidence": 1.0,
+      "review": "题面要求三态判断 syscall 号边界检查。答案判定为 implemented，证据指出未绑定 syscall 会进入默认处理函数并 panic，符合边界检查逻辑。"
+    },
+    {
+      "question_id": "Q02_020",
+      "confidence": 1.0,
+      "review": "题面要求追踪具体 syscall 链路。答案追踪了 sys_write 从 ecall 到返回的节点，证据摘录了关键函数调用，符合题面。"
+    },
+    {
+      "question_id": "Q02_021",
+      "confidence": 1.0,
+      "review": "题面要求列出 5-10 个 syscall 状态。答案列出了 fork/exec/mmap 等 10 个 syscall 的三态及证据，符合题面数量要求。"
+    },
+    {
+      "question_id": "Q02_022",
+      "confidence": 1.0,
+      "review": "题面要求三态判断用户指针检查。答案判定为 implemented，证据展示了 copy_in/copy_out 函数及其在 syscall 中的调用，支撑结论。"
+    },
+    {
+      "question_id": "Q02_023",
+      "confidence": 1.0,
+      "review": "题面要求三态判断时钟抢占。答案判定为 implemented，证据展示了 timeslice 计数及 yield 调用，支撑结论。"
+    },
+    {
+      "question_id": "Q02_024",
+      "confidence": 1.0,
+      "review": "题面要求三态判断信号处理链路。答案判定为 implemented，证据展示了 handle_signal 及 sig_trampoline，支撑结论。"
+    },
+    {
+      "question_id": "Q02_025",
+      "confidence": 1.0,
+      "review": "题面要求说明缺页与内存特性联动。答案描述了 cause 检测及 mmap_handler 调用，证据摘录了相关代码，符合题面。"
+    },
+    {
+      "question_id": "Q02_026",
+      "confidence": 1.0,
+      "review": "题面要求多核一致性检查。答案指出单核不适用并引用 QEMU 参数，证据支持单核配置结论，符合题面。"
+    },
+    {
+      "question_id": "Q02_027",
+      "confidence": 1.0,
+      "review": "题面要求 fill_in 格式统计 syscall 覆盖。答案按格式提供了分发表路径、数量估计及统计方法，符合题面允许区间估计的要求。"
+    },
+    {
+      "question_id": "Q02_028",
+      "confidence": 1.0,
+      "review": "题面要求 README 与代码对照。答案指出 README 描述 vague 且代码存在 stub，证据引用了 README 及 syscall 实现，符合题面。"
+    },
+    {
+      "question_id": "Q02_029",
+      "confidence": 1.0,
+      "review": "题面要求搜索特定命名模式。答案结论为未见该模式（除默认函数外），证据展示了搜索结果，符合题面。"
+    },
+    {
+      "question_id": "Q02_030",
+      "confidence": 1.0,
+      "review": "题面要求三态判断外部中断分发。答案判定为 implemented，证据展示了 devintr 及中断控制器 claim 操作，支撑结论。"
+    },
+    {
+      "question_id": "Q02_031",
+      "confidence": 1.0,
+      "review": "题面要求三态判断 SIGSEGV 发送。答案判定为 implemented，证据展示了 page fault 处理中调用 add_signal(SIGSEGV)，支撑结论。"
+    },
+    {
+      "question_id": "Q02_032",
+      "confidence": 1.0,
+      "review": "题面要求说明信号发送粒度。答案列出了 kill/tkill/tgkill 三种粒度及对应函数，证据摘录了实现代码，符合题面。"
+    },
+    {
+      "question_id": "Q02_033",
+      "confidence": 1.0,
+      "review": "题面为单选。答案选择了与选项 A 文本一致的描述，证据展示了通过 scause/estat 区分中断与异常的代码，支撑结论。"
+    },
+    {
+      "question_id": "Q02_034",
+      "confidence": 1.0,
+      "review": "题面要求三态判断中断嵌套。答案判定为 implemented，证据包含注释说明及 handler 内开中断代码，支撑结论。"
+    }
+  ],
+  "dimensions": {
+    "evidence_supports_answers": 1.0,
+    "question_answer_consistency": 1.0,
+    "requirements_fit": 1.0
+  },
+  "findings": [],
+  "summary_zh": "所有 34 道题目均已完成作答。答案格式符合 JSON-QA 契约，题面要求（如三态、单选、证据路径）均被严格遵循。证据摘录与结论（value）逻辑一致，未发现题面与作答不符、证据缺失或契约违反情况。全阶段置信度高。",
+  "_meta": {
+    "review_model": "qwen3.5-plus"
+  }
+}

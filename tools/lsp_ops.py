@@ -2,6 +2,7 @@
 LSP Operations Tool (Dynamic Multiplexing Gateway)
 """
 import os
+import hashlib
 
 def _abspath(p: str) -> str:
     res = os.path.abspath(p)
@@ -20,8 +21,82 @@ from typing import Dict, Any, Optional, List, Tuple
 
 from langchain.tools import tool
 
+from tools.compile_context import build_compile_flag_lines, detect_target_arch
+
 logger = logging.getLogger("lsp_ops")
 logger.setLevel(logging.INFO)
+
+# --- 仓库外缓存：cargo fetch 标记等（不写入被克隆的 repos/）---
+def _agent_repo_root() -> str:
+    return os.path.dirname(os.path.dirname(_abspath(__file__)))
+
+
+def _lsp_sidecar_dir(repo_path: str) -> str:
+    abs_r = _abspath(repo_path)
+    h = hashlib.sha256(abs_r.encode("utf-8")).hexdigest()[:12]
+    tail = abs_r.rstrip("/\\")
+    base = os.path.basename(tail) or "repo"
+    d = os.path.join(_agent_repo_root(), "output", "_lsp_sidecar", f"{base}_{h}")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+# 由本模块写入、应在 LSP 会话结束时从仓库根删除的 compile_flags.txt
+_repos_agent_wrote_compile_flags: set[str] = set()
+# 本进程内 clangd / rust-analyzer 每仓库引用计数
+_clangd_ref_by_repo: Dict[str, int] = {}
+_rust_analyzer_ref_by_repo: Dict[str, int] = {}
+
+OS_AGENT_CARGO_VIRTUAL_HEADER = (
+    "# os-agent: generated virtual workspace manifest for rust-analyzer only\n"
+)
+OS_AGENT_CARGO_PACKAGE_HEADER = (
+    "# os-agent: generated package stub for rust-analyzer only\n"
+)
+OS_AGENT_DUMMY_LIB_MARKER = "// os-agent-generated-dummy-lib-rs\n"
+# compile_flags.txt 首行：clangd 多数版本会忽略以 # 开头的行；用于「上次残留 / 新跑开始前」自动识别并删除
+OS_AGENT_COMPILE_FLAGS_HEADER = (
+    "# os-agent: managed-compile-flags v1 (auto-remove on next run; not a compiler flag)\n"
+)
+
+
+def _compile_flags_file_is_os_agent_managed(path: str) -> bool:
+    try:
+        with open(path, "r", encoding="utf-8", errors="ignore") as f:
+            line = f.readline()
+        s = line.strip()
+        return s.startswith("# os-agent:") and "managed-compile-flags" in s
+    except OSError:
+        return False
+
+
+def cleanup_os_agent_repo_ephemeral(repo_path: str) -> None:
+    """
+    在 describe 开跑、或 LSP 首次连接前调用：删除仓库根由 OS-Agent 留下且带签名的临时文件。
+    若当前进程仍有该仓库的 clangd/rust-analyzer 会话，则不会删除正在使用的 compile_flags /
+    不会删除仍可能被 RA 使用的根 Cargo 占位（由引用计数门控）。
+    """
+    abs_r = _abspath(repo_path)
+    # 旧版写在克隆目录内的 cargo fetch 标记（现改为 output/_lsp_sidecar/）
+    legacy_fetch = os.path.join(abs_r, ".lsp_cargo_fetched")
+    try:
+        if os.path.isfile(legacy_fetch):
+            os.remove(legacy_fetch)
+    except OSError as e:
+        logger.debug("remove legacy .lsp_cargo_fetched: %s", e)
+
+    cf = os.path.join(abs_r, "compile_flags.txt")
+    if _clangd_ref_by_repo.get(abs_r, 0) == 0 and os.path.isfile(cf):
+        if abs_r in _repos_agent_wrote_compile_flags or _compile_flags_file_is_os_agent_managed(cf):
+            try:
+                os.remove(cf)
+            except OSError as e:
+                logger.debug("cleanup compile_flags.txt: %s", e)
+            _repos_agent_wrote_compile_flags.discard(abs_r)
+
+    if _rust_analyzer_ref_by_repo.get(abs_r, 0) == 0:
+        _remove_managed_rust_root_artifacts(abs_r)
+
 
 # --- 阶段 1：编译配置的深度扫描 (Pre-flight Workspace Scan) ---
 def _pre_flight_workspace_scan(repo_path: str) -> Dict[str, bool]:
@@ -47,7 +122,7 @@ async def _ensure_cargo_fetched(repo_path: str):
     import subprocess
     import shutil
     
-    marker = os.path.join(repo_path, ".lsp_cargo_fetched")
+    marker = os.path.join(_lsp_sidecar_dir(repo_path), ".lsp_cargo_fetched")
     if os.path.exists(marker):
         return  # already fetched
     
@@ -94,50 +169,70 @@ async def _ensure_cargo_fetched(repo_path: str):
             pass
 
 # --- 阶段 2：编译上下文的动态生成 (Dynamic Context Polyfill) ---
-def _detect_target_arch(repo_path: str) -> Optional[str]:
-    """尝试从仓库结构中推测目标架构 (riscv64, loongarch64 etc)"""
-    # 0. 极高优先级：检查 LLM 手动设置的本地标记文件
-    override_marker = os.path.join(repo_path, ".os_agent_lsp_target")
-    if os.path.exists(override_marker):
-        try:
-            with open(override_marker, 'r', encoding='utf-8') as f:
-                target = f.read().strip()
-                if target:
-                    logger.info(f"Using LLM-driven target override from {override_marker}: {target}")
-                    return target
-        except Exception:
-            pass
-
-    # 1. 优先使用环境变量强制覆盖
-    target = os.environ.get("LSP_TARGET")
-    if target:
-        return target
-    
-    # 2. 检查常见的目录名
-    arch_dir = os.path.join(repo_path, "os", "src", "arch")
-    if os.path.exists(arch_dir):
-        subdirs = [d for d in os.listdir(arch_dir) if os.path.isdir(os.path.join(arch_dir, d))]
-        # 优先级探测：如果同时存在，目前保持现有顺序，但增加 la64 识别
-        if "riscv64" in subdirs: return "riscv64gc-unknown-none-elf"
-        if "loongarch64" in subdirs or "la64" in subdirs: return "loongarch64-unknown-none-elf"
-        if "x86_64" in subdirs: return "x86_64-unknown-none-elf"
-        if "aarch64" in subdirs: return "aarch64-unknown-none-elf"
-    
-    # 3. 语义搜索 (启发式)
+def _remove_managed_compile_flags(abs_repo: str) -> None:
+    """删除本进程登记的、或带 os-agent 首行签名的 compile_flags.txt。"""
+    path = os.path.join(abs_repo, "compile_flags.txt")
+    if abs_repo not in _repos_agent_wrote_compile_flags and not (
+        os.path.isfile(path) and _compile_flags_file_is_os_agent_managed(path)
+    ):
+        return
     try:
-        # 只看核心模块
-        for root, dirs, files in os.walk(os.path.join(repo_path, "os", "src")):
-            if "target" in dirs: dirs.remove("target")
-            for f in files:
-                if f.endswith(".rs"):
-                    with open(os.path.join(root, f), 'r', encoding='utf-8', errors='ignore') as f_in:
-                        content = f_in.read(2048) # 只看开头
-                        if 'target_arch = "riscv64"' in content: return "riscv64gc-unknown-none-elf"
-                        if 'target_arch = "loongarch64"' in content: return "loongarch64-unknown-none-elf"
-    except:
-        pass
-        
-    return None
+        if os.path.isfile(path):
+            os.remove(path)
+    except OSError as e:
+        logger.debug("remove compile_flags.txt: %s", e)
+    _repos_agent_wrote_compile_flags.discard(abs_repo)
+
+
+def _remove_managed_rust_root_artifacts(abs_repo: str) -> None:
+    cargo = os.path.join(abs_repo, "Cargo.toml")
+    try:
+        if os.path.isfile(cargo):
+            with open(cargo, "r", encoding="utf-8", errors="ignore") as f:
+                head = f.read(200)
+            if head.startswith(OS_AGENT_CARGO_VIRTUAL_HEADER) or head.startswith(
+                OS_AGENT_CARGO_PACKAGE_HEADER
+            ):
+                os.remove(cargo)
+    except OSError as e:
+        logger.debug("remove managed Cargo.toml: %s", e)
+
+    dummy = os.path.join(abs_repo, "src", "lib.rs")
+    try:
+        if os.path.isfile(dummy):
+            with open(dummy, "r", encoding="utf-8", errors="ignore") as f:
+                body = f.read(400)
+            if OS_AGENT_DUMMY_LIB_MARKER in body:
+                os.remove(dummy)
+                # 若 src 空则尝试删除目录（仅当是我们可能创建的空壳）
+                src_dir = os.path.join(abs_repo, "src")
+                try:
+                    if os.path.isdir(src_dir) and not os.listdir(src_dir):
+                        os.rmdir(src_dir)
+                except OSError:
+                    pass
+    except OSError as e:
+        logger.debug("remove dummy src/lib.rs: %s", e)
+
+
+def _release_lsp_repo_slot(binary_basename: str, abs_repo: str) -> None:
+    """LSP 子进程退出后：递减引用并在最后一档时清理写入仓库根的临时文件。"""
+    name = (binary_basename or "").lower()
+    if "clangd" in name:
+        n = _clangd_ref_by_repo.get(abs_repo, 0) - 1
+        if n <= 0:
+            _clangd_ref_by_repo.pop(abs_repo, None)
+            _remove_managed_compile_flags(abs_repo)
+        else:
+            _clangd_ref_by_repo[abs_repo] = n
+    elif "rust-analyzer" in name:
+        n = _rust_analyzer_ref_by_repo.get(abs_repo, 0) - 1
+        if n <= 0:
+            _rust_analyzer_ref_by_repo.pop(abs_repo, None)
+            _remove_managed_rust_root_artifacts(abs_repo)
+        else:
+            _rust_analyzer_ref_by_repo[abs_repo] = n
+
 
 async def _polyfill_context(repo_path: str, scan_results: Dict[str, bool], lang: str):
     async with _get_polyfill_lock(repo_path):
@@ -149,44 +244,17 @@ async def _polyfill_context(repo_path: str, scan_results: Dict[str, bool], lang:
 
         if lang in ["c", "cpp"] and not has_c_config:
             compile_flags_path = os.path.join(repo_path, "compile_flags.txt")
-            # 总是重新生成，以防克隆后文件变动
-            include_dirs = {_abspath(repo_path)}
-            for root, dirs, files in os.walk(repo_path):
-                # 跳过无关目录，防止生成的 flags 过载
-                dirs[:] = [d for d in dirs if d not in {".git", ".github", "target", "vendor", "node_modules", "build", "dist"}]
-                if any(f.endswith('.h') or f.endswith('.hpp') for f in files):
-                    include_dirs.add(_abspath(root))
-                    # Also add the parent directory to handle includes like "proc/thread.h"
-                    include_dirs.add(os.path.dirname(_abspath(root)))
-                # If the directory is named 'include', proactively add it even if it directly contains no headers
-                if os.path.basename(os.path.normpath(root)) == "include":
-                    include_dirs.add(_abspath(root))
-            if include_dirs:
-                try:
-                    with open(compile_flags_path, 'w', encoding='utf-8') as f:
-                        # 声明这大概率是一个 C 语言或 C++ 内核项目
-                        f.write("-xc\n")
-
-                        # 裸机/内核环境标志：
-                        # -ffreestanding: 告知 clangd 不假设标准 C 运行时存在（无 main 入口、无 libc）
-                        # -fno-builtin:   禁止将 exit/exec/memcpy 等识别为编译器内建函数，
-                        #                 避免与内核自定义同名函数冲突导致 prepareCallHierarchy 失败
-                        f.write("-ffreestanding\n")
-                        f.write("-fno-builtin\n")
-
-                        # 注入交叉编译目标架构，防止 clangd 在 x86 主机上解析异构汇编报错
-                        target_arch = _detect_target_arch(repo_path)
-                        if target_arch:
-                            base_arch = target_arch.split('-')[0].replace('gc', '')
-                            f.write(f"--target={base_arch}\n")
-
-                        # 将根目录和所有包含头文件的目录加入搜索路径
-                        for d in include_dirs:
-                            # 对于 Windows 上的 clangd，路径中的反斜杠可能需要转义或统一替换为正斜杠
-                            sanitized_path = d.replace('\\', '/')
-                            f.write(f"-I{sanitized_path}\n")
-                except Exception as e:
-                    logger.error(f"Failed to generate compile_flags.txt: {e}")
+            # 仅在 clangd 会话需要时写入仓库根；子进程全部退出后由 _release_lsp_repo_slot 删除
+            try:
+                flag_lines = build_compile_flag_lines(repo_path)
+                if flag_lines:
+                    with open(compile_flags_path, "w", encoding="utf-8") as f:
+                        f.write(OS_AGENT_COMPILE_FLAGS_HEADER)
+                        for line in flag_lines:
+                            f.write(line + "\n")
+                    _repos_agent_wrote_compile_flags.add(_abspath(repo_path))
+            except Exception as e:
+                logger.error(f"Failed to generate compile_flags.txt: {e}")
 
         # Rust (rust-analyzer) 补全逻辑
         if lang == "rust":
@@ -210,16 +278,18 @@ async def _polyfill_context(repo_path: str, scan_results: Dict[str, bool], lang:
                                 members.append(rel_path)
 
                         try:
-                            with open(cargo_toml_path, 'w', encoding='utf-8') as f:
+                            with open(cargo_toml_path, "w", encoding="utf-8") as f:
                                 if members:
-                                    # 这种情况下生成 "Virtual Manifest"，即只有 [workspace] 而没有 [package]
-                                    # 这样 cargo metadata 就不会报错要求根目录必须有 src/lib.rs 了
-                                    f.write('[workspace]\nmembers = [\n')
+                                    f.write(OS_AGENT_CARGO_VIRTUAL_HEADER)
+                                    f.write("[workspace]\nmembers = [\n")
                                     for m in members:
                                         f.write(f'    "{m}",\n')
-                                    f.write(']\n')
+                                    f.write("]\n")
                                 else:
-                                    f.write('[package]\nname = "os_kernel_dummy"\nversion = "0.1.0"\nedition = "2021"\n')
+                                    f.write(OS_AGENT_CARGO_PACKAGE_HEADER)
+                                    f.write(
+                                        '[package]\nname = "os_kernel_dummy"\nversion = "0.1.0"\nedition = "2021"\n'
+                                    )
                         except Exception as e:
                             logger.error(f"Failed to generate Cargo.toml: {e}")
 
@@ -236,8 +306,13 @@ async def _polyfill_context(repo_path: str, scan_results: Dict[str, bool], lang:
                             if not has_target:
                                 os.makedirs(src_dir, exist_ok=True)
                                 try:
-                                    with open(os.path.join(src_dir, "lib.rs"), 'w', encoding='utf-8') as f:
-                                        f.write("// Dummy lib created by os-agent to satisfy rust-analyzer workspace loader\n")
+                                    with open(
+                                        os.path.join(src_dir, "lib.rs"), "w", encoding="utf-8"
+                                    ) as f:
+                                        f.write(OS_AGENT_DUMMY_LIB_MARKER)
+                                        f.write(
+                                            "// Dummy lib created by os-agent to satisfy rust-analyzer workspace loader\n"
+                                        )
                                 except Exception as e:
                                     logger.error(f"Failed to generate dummy src/lib.rs: {e}")
 
@@ -288,11 +363,11 @@ class LSPClient:
                     extra_paths.append(os.path.dirname(p))
             
             # --- 交叉编译器注入 (Multi-Arch Context) ---
-            target_arch = _detect_target_arch(self.cwd)
+            target_arch = detect_target_arch(self.cwd)
             # 定义架构到编译器的映射
             arch_to_cc = {
-                "riscv64": "riscv64-linux-musl-cc",
-                "riscv32": "riscv64-linux-musl-cc",
+                "riscv64": "riscv-none-elf-gcc",
+                "riscv32": "riscv-none-elf-gcc",
                 "aarch64": "arm-none-eabi-gcc",
                 "arm": "arm-none-eabi-gcc",
                 "loongarch64": "loongarch64-unknown-elf-gcc",
@@ -428,7 +503,7 @@ class LSPClient:
                         "buildScripts": {
                             "enable": not getattr(self, "build_scripts_disabled", False)
                         },
-                        "target": _detect_target_arch(self.cwd),
+                        "target": detect_target_arch(self.cwd),
                     },
                     "checkOnSave": False
                 } if "rust-analyzer" in self.cmd[0] else {}
@@ -562,18 +637,18 @@ def _resolve_lsp_binary(base_name: str, cwd: Optional[str] = None) -> str:
     
     # 别名映射：允许一个工具对应多个可能的名称（比如在不同系统或分发版下）
     aliases = {
-        # Arch/Debian 常见为 riscv64-linux-gnu-gcc（pacman/apt），而非 musl-cc / bare-metal 名
+        # OS 比赛内核优先裸机工具链；Linux 发行版常只有 riscv64-linux-gnu-gcc，作为可用 fallback。
         "riscv64-linux-musl-cc": [
-            "riscv64-linux-musl-cc",
-            "riscv64-linux-gnu-gcc",
             "riscv-none-elf-gcc",
             "riscv64-unknown-elf-gcc",
+            "riscv64-linux-musl-cc",
+            "riscv64-linux-gnu-gcc",
         ],
         "riscv64-linux-musl-ld": [
-            "riscv64-linux-musl-ld",
-            "riscv64-linux-gnu-ld",
             "riscv-none-elf-ld",
             "riscv64-unknown-elf-ld",
+            "riscv64-linux-musl-ld",
+            "riscv64-linux-gnu-ld",
         ],
         "arm-none-eabi-gcc": [
             "arm-none-eabi-gcc",
@@ -590,7 +665,18 @@ def _resolve_lsp_binary(base_name: str, cwd: Optional[str] = None) -> str:
         ],
         "loongarch64-unknown-elf-gcc": ["loongarch64-unknown-elf-gcc", "loongarch64-linux-gnu-gcc", "loongarch64-unknown-linux-gnu-gcc"],
         # xpack RISC-V 工具链别名（Windows 安装的实际可执行文件名）
-        "riscv-none-elf-gcc": ["riscv-none-elf-gcc", "riscv64-unknown-elf-gcc", "riscv64-linux-musl-cc"],
+        "riscv-none-elf-gcc": [
+            "riscv-none-elf-gcc",
+            "riscv64-unknown-elf-gcc",
+            "riscv64-linux-musl-cc",
+            "riscv64-linux-gnu-gcc",
+        ],
+        "riscv-none-elf-ld": [
+            "riscv-none-elf-ld",
+            "riscv64-unknown-elf-ld",
+            "riscv64-linux-musl-ld",
+            "riscv64-linux-gnu-ld",
+        ],
     }
     
     search_names = aliases.get(base_name, [base_name])
@@ -685,6 +771,27 @@ def _resolve_lsp_binary(base_name: str, cwd: Optional[str] = None) -> str:
     logger.debug(f"Failed to resolve any candidates for {base_name}: {search_names}")
     return base_name
 
+async def _shutdown_client_and_release(client: "LSPClient") -> None:
+    """停止 LSP 子进程并递减引用计数，必要时清理写入仓库根的临时文件。"""
+    abs_repo = _abspath(client.cwd)
+    bn = os.path.basename(client.cmd[0]) if client.cmd else ""
+    try:
+        await client.stop()
+    except Exception:
+        pass
+    _release_lsp_repo_slot(bn, abs_repo)
+
+
+def _cleanup_clangd_polyfill_if_zero_ref(abs_repo: str) -> None:
+    if _clangd_ref_by_repo.get(abs_repo, 0) == 0:
+        _remove_managed_compile_flags(abs_repo)
+
+
+def _cleanup_rust_polyfill_if_zero_ref(abs_repo: str) -> None:
+    if _rust_analyzer_ref_by_repo.get(abs_repo, 0) == 0:
+        _remove_managed_rust_root_artifacts(abs_repo)
+
+
 class MultiplexingLSPGateway:
     def __init__(self):
         self.clients: Dict[str, LSPClient] = {}
@@ -695,18 +802,18 @@ class MultiplexingLSPGateway:
         key = f"{abs_repo}_{lang}"
         
         async with self.lock:
-            # Check cache — evict dead clients
+            # Check cache — evict dead clients（先 release 引用，再清残留）
             if key in self.clients:
                 existing = self.clients[key]
                 if existing.is_alive:
                     return existing
                 else:
                     logger.warning(f"Evicting dead LSP client for {lang}, will restart.")
-                    try:
-                        await existing.stop()
-                    except Exception:
-                        pass
+                    await _shutdown_client_and_release(existing)
                     del self.clients[key]
+
+            # 无缓存命中或已驱逐死进程后：在无活跃 clangd/RA 时删掉上次遗留的带签名文件
+            cleanup_os_agent_repo_ephemeral(abs_repo)
 
             scan_res = _pre_flight_workspace_scan(abs_repo)
             await _polyfill_context(abs_repo, scan_res, lang)
@@ -757,6 +864,7 @@ class MultiplexingLSPGateway:
                     # Check if it crashed immediately or build script failed (e.g. panicking build.rs)
                     if (not client.is_alive or getattr(client, "build_script_failed", False)) and lang == "rust":
                         logger.warning(f"LSP {cmd[0]} died or build script failed. Retrying with build scripts disabled.")
+                        # 尚未计入 self.clients / 引用计数，仅结束子进程，避免误触发 _release
                         try:
                             await client.stop()
                         except Exception:
@@ -767,13 +875,27 @@ class MultiplexingLSPGateway:
                         
                 if not client.is_alive:
                     logger.error(f"Failed to start LSP {cmd[0]}: Process died after startup.")
+                    if lang in ("c", "cpp"):
+                        _cleanup_clangd_polyfill_if_zero_ref(abs_repo)
+                    elif lang == "rust":
+                        _cleanup_rust_polyfill_if_zero_ref(abs_repo)
                     return None
-                    
+
                 self.clients[key] = client
+                if lang in ("c", "cpp"):
+                    _clangd_ref_by_repo[abs_repo] = _clangd_ref_by_repo.get(abs_repo, 0) + 1
+                elif lang == "rust":
+                    _rust_analyzer_ref_by_repo[abs_repo] = (
+                        _rust_analyzer_ref_by_repo.get(abs_repo, 0) + 1
+                    )
                 logger.info(f"LSP {cmd[0]} started successfully for {abs_repo}")
                 return client
             except Exception as e:
                 logger.error(f"Failed to start LSP {cmd[0]}: {e}")
+                if lang in ("c", "cpp"):
+                    _cleanup_clangd_polyfill_if_zero_ref(abs_repo)
+                elif lang == "rust":
+                    _cleanup_rust_polyfill_if_zero_ref(abs_repo)
                 return None
 
     async def force_restart_client(self, repo_path: str, lang: str):
@@ -789,15 +911,12 @@ class MultiplexingLSPGateway:
                 if key in self.clients:
                     logger.info(f"Force restarting LSP client for {lang} in {abs_repo}...")
                     client = self.clients.pop(key)
-                    try:
-                        await client.stop()
-                    except Exception:
-                        pass
+                    await _shutdown_client_and_release(client)
 
     async def stop_all(self):
         async with self.lock:
-            for client in self.clients.values():
-                await client.stop()
+            for client in list(self.clients.values()):
+                await _shutdown_client_and_release(client)
             self.clients.clear()
 
 # 在单独的后台线程中启动持久的事件循环，维护持久化的 LSP 子进程生命周期
@@ -2283,7 +2402,7 @@ def lsp_get_call_graph(repo_path: str, file_path: str, symbol: str,
     适用场景：
     - 分析内核关键路径（如 fork、handle_page_fault、syscall_handler）的完整调用链
     - 验证某个函数是否被正确调用，以及调用层次是否合理
-    - 为 OS-Agent C 的细粒度比对提供 Call Graph 快照
+    - 为结构化源码报告提供 Call Graph 快照
 
     注意：需要 Language Server 支持 callHierarchy 协议。
     clangd (v12+) 和 rust-analyzer 均支持。
@@ -2326,7 +2445,7 @@ def lsp_get_call_graph(repo_path: str, file_path: str, symbol: str,
 
 
 async def _async_lsp_set_target_arch(repo_path: str, target: str) -> str:
-    """内部异步实现：保存架构标记并强制重启 rust-analyzer。"""
+    """内部异步实现：保存架构标记并强制重启受 target 影响的 LSP。"""
     repo_path = _abspath(repo_path)
     marker = os.path.join(repo_path, ".os_agent_lsp_target")
 
@@ -2339,7 +2458,9 @@ async def _async_lsp_set_target_arch(repo_path: str, target: str) -> str:
             # 必须避免在这里先拿 _lsp_global_lock 再去调用 force_restart_client，
             # 否则会与 get_client 的锁顺序相反，形成潜在死锁。
             await _gateway.force_restart_client(repo_path, "rust")
-        return f"Successfully set LSP target to '{target}' and restarted rust-analyzer for {repo_path}."
+            await _gateway.force_restart_client(repo_path, "c")
+            await _gateway.force_restart_client(repo_path, "cpp")
+        return f"Successfully set LSP target to '{target}' and restarted LSP clients for {repo_path}."
     except Exception as e:
         return f"Error setting target arch: {e}"
 
@@ -2353,7 +2474,8 @@ def lsp_set_target_arch(repo_path: str, target: str) -> str:
     2. 你在源码中读到了明确的架构要求（如 target_arch = "..."），但 LSP 却返回了空结果或大量错误。
     3. 代码块由于 #[cfg] 显式被 LSP 灰化。
 
-    调用后，系统会保存设置并【强制重启】LSP 服务端，以确保所有语义分析能够基于正确的架构进行重算。
+    调用后，系统会保存设置并【强制重启】rust-analyzer / clangd 服务端，
+    以确保所有语义分析能够基于正确的架构进行重算。
 
     常见 Target Triples:
     - riscv64gc-unknown-none-elf (RISC-V 64)

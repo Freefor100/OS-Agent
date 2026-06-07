@@ -1,0 +1,34 @@
+{
+  "task_id": "task_08_network_overview",
+  "stage_id": "08_network",
+  "question_id": "Q08_001",
+  "question_ids": [
+    "Q08_001",
+    "Q08_002"
+  ],
+  "status": "done",
+  "evidence_ids": [
+    "ev_task_08_network_overview_e7271f15",
+    "ev_task_08_network_overview_10911eca",
+    "ev_task_08_network_overview_9616161e",
+    "ev_task_08_network_overview_fd90e5d4",
+    "ev_task_08_network_overview_b3469835",
+    "ev_task_08_network_overview_61e5e300",
+    "ev_task_08_network_overview_1e8a03ee",
+    "ev_task_08_network_overview_3f3cfaf6"
+  ],
+  "draft_answer_ids": [
+    "draft_task_08_network_overview_Q08_001_2b299a82",
+    "draft_task_08_network_overview_Q08_002_362833dc"
+  ],
+  "findings": [],
+  "confidence": "high",
+  "errors": [],
+  "token_usage": {},
+  "metadata": {
+    "evidence_count": 8,
+    "mode": "react",
+    "summary": "xv6-k210 没有网络子系统实现。syscall table 无 socket/bind/connect/sendto/recvfrom 等系统调用号或实现；无协议栈模块或第三方依赖（smoltcp/lwip 等均不存在）；无 Ethernet/ARP/IP/ICMP/UDP/TCP 协议层实现；无 netdev/loopback/driver 队列抽象；无网卡驱动初始化或中断收包。仅有的痕迹是 stat.h 中 S_IFSOCK 常量定义和 errno.h 中 socket 相关错误码，属于 POSIX 兼容头文件定义，无实际功能。",
+    "raw_output_excerpt": "Good. Now I have all the evidence. Let me produce the final JSON.\n\n```json\n{\n  \"status\": \"done\",\n  \"summary\": \"xv6-k210 没有网络子系统实现。syscall table 无 socket/bind/connect/sendto/recvfrom 等系统调用号或实现；无协议栈模块或第三方依赖（smoltcp/lwip 等均不存在）；无 Ethernet/ARP/IP/ICMP/UDP/TCP 协议层实现；无 netdev/loopback/driver 队列抽象；无网卡驱动初始化或中断收包。仅有的痕迹是 stat.h 中 S_IFSOCK 常量定义和 errno.h 中 socket 相关错误码，属于 POSIX 兼容头文件定义，无实际功能。\",\n  \"claim\": \"xv6-k210 未实现任何网络子系统（协议栈或 socket 层）。\",\n  \"structured_fact_results\": [\n    {\n      \"fact_id\": \"Q08_001_01\",\n      \"status_or_value\": \"no_after_negative_search\",\n      \"evidence_candidate_indexes\": [0, 1, 2, 3],\n      \"notes\": \"syscall table (sysnum.h) 无 socket/bind/connect/sendto/recvfrom 系统调用号；syscall.c 无对应 sys_* 实现；user.h 无 socket 相关函数声明。仅 errno.h 有 ENOTSOCK/EPROTOTYPE/ESOCKTNOSUPPORT 错误码定义，stat.h 有 S_IFSOCK 常量，均为 POSIX 兼容头文件定义，无实际功能。\"\n    },\n    {\n      \"fact_id\": \"Q08_001_02\",\n      \"status_or_value\": \"no_after_negative_search\",\n      \"evidence_candidate_indexes\": [0, 4, 5],\n      \"notes\": \"未发现任何协议栈模块或第三方依赖。Cargo.toml 不存在（项目为 C 语言 Makefile 构建）；Makefile 中无网络相关源文件；grep 搜索 smoltcp/lwip/netdev 均无匹配。\"\n    },\n    {\n      \"fact_id\": \"Q08_001_03\",\n      \"status_or_value\": \"no_after_negative_search\",\n      \"evidence_candidate_indexes\": [0, 4, 5],\n      \"notes\": \"未实现 Ethernet/ARP/IP/ICMP/UDP/TCP 中任何一层。无相关结构体、函数、头文件或实现文件。\"\n    },\n    {\n      \"fact_id\": \"Q08_001_04\",\n      \"status_or_value\": \"no_after_negative_search\",\n      \"evidence_candidate_indexes\": [0, 4, 5],\n      \"notes\": \"无 netdev/loopback/driver 队列抽象。send/recv 仅通过文件系统 pipe 和常规文件描述符实现，未接入任何网络设备队列。\"\n    },\n    {\n      \"fact_id\": \"Q08_001_05\",\n      \"status_or_value\": \"no_after_negative_search\",\n      \"evidence_candidate_indexes\": [0, 4, 5, 6],\n      \"notes\": \"无网卡驱动初始化、中断/轮询收包或 DMA/descriptor 网络功能。virtio 驱动仅实现块设备（virtio_blk），virtio.h 中 VIRTIO_MMIO_DEVICE_ID 注释提到 device type 1 是 net 但未实现；DMA 驱动仅用于 SD 卡/SPI 通信。\"\n    },\n    {\n      \"fact_id\": \"Q08_001_06\",\n      \"status_or_value\": {\n        \"searched_keywords\": [\"socket\", \"bind\", \""
+  }
+}

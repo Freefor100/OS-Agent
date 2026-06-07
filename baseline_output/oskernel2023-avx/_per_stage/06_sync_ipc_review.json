@@ -1,0 +1,142 @@
+{
+  "schema_version": "describe_review_v1",
+  "stage_id": "06_sync_ipc",
+  "stage_title": "同步互斥与进程间通信",
+  "confidence": 0.97,
+  "question_reviews": [
+    {
+      "question_id": "Q06_001",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "答案列举了 SpinLock/Semaphore/SleepLock 并提供了 struct 定义证据，WaitQueue 通过 sleep/wakeup 函数证据支撑，符合 short_answer 要求，证据详实。"
+    },
+    {
+      "question_id": "Q06_002",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "选择 B（阻塞锁），证据 acquiresleep 中调用 sleep 函数直接证明阻塞行为，与选项一致，证据有效。"
+    },
+    {
+      "question_id": "Q06_003",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态值 implemented，证据提供 sleep/wakeup 函数源码片段，直接证明等待队列机制存在，符合题面。"
+    },
+    {
+      "question_id": "Q06_004",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "按 fill_in 格式填写了入口、锁、机制等，证据引用 sleep/wakeup/releasesleep 代码片段支撑锁顺序与唤醒逻辑，内容完整。"
+    },
+    {
+      "question_id": "Q06_005",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态值 implemented，证据列出 pipe.c 及关键函数，直接证明管道实现，符合题面约束。"
+    },
+    {
+      "question_id": "Q06_006",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "选择 A（环形缓冲区），证据展示 data 数组及取模运算，直接支撑环形缓冲结论，选项匹配。"
+    },
+    {
+      "question_id": "Q06_007",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "选择 A（阻塞），证据显示 pipewrite/read 中调用 sleep，证明阻塞语义，与选项一致。"
+    },
+    {
+      "question_id": "Q06_008",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态值 not_found（针对 SysV），证据区分了 POSIX 信号量与 SysV 系统调用缺失，逻辑清晰，证据支撑结论。"
+    },
+    {
+      "question_id": "Q06_009",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态值 implemented，证据提供 futex.c 及 syscall，直接证明 futex 实现，符合题面。"
+    },
+    {
+      "question_id": "Q06_010",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态值 implemented，证据覆盖 signal.c/syssig.c/Trampoline，完整支撑信号机制实现结论。"
+    },
+    {
+      "question_id": "Q06_011",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "详细描述了上下文保存与 sigreturn 恢复，证据引用 sighandle/rt_sigreturn 代码，直接支撑 value 中的技术细节。"
+    },
+    {
+      "question_id": "Q06_012",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "选择 C（未发现），证据为搜索负结果，符合 tri-state/single_choice 逻辑，证据支撑 not_found 结论。"
+    },
+    {
+      "question_id": "Q06_013",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "选择 D（未发现/不确定），证据显示 GCC builtin 而非 Rust 或显式汇编，合理支撑为何不选 A/B，符合题面。"
+    },
+    {
+      "question_id": "Q06_014",
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "逐条回答了四条件，前三个条件证据充分，循环等待条件证据为隐式（无锁序），略欠直接代码支撑，但结论合理。"
+    },
+    {
+      "question_id": "Q06_015",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "选择 D（忽略），证据引用文档及代码搜索负结果，支撑无死锁处理机制的结论，选项匹配。"
+    },
+    {
+      "question_id": "Q06_016",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态值 not_found，证据为搜索负结果，直接支撑无全局锁序规范的结论，符合题面。"
+    },
+    {
+      "question_id": "Q06_017",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态值 implemented，证据展示 wakeup 与锁释放顺序，并正确推断为 Mesa 语义，证据与结论一致。"
+    },
+    {
+      "question_id": "Q06_018",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "分别回答了三个经典问题，Pipe 作为生产者 - 消费者证据充分，其余搜索负结果支撑 not_found，格式符合。"
+    },
+    {
+      "question_id": "Q06_019",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态值 not_found，证据搜索 msgget/send 等负结果，支撑无消息传递 IPC 结论，符合题面。"
+    },
+    {
+      "question_id": "Q06_020",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态值 not_found，证据搜索 barrier 负结果，支撑无屏障同步结论，符合题面。"
+    }
+  ],
+  "findings": [],
+  "summary_zh": "本报告整体质量较高，所有 20 题均按题面要求作答，题型（single_choice/tri_state/short_answer 等）遵守良好。证据链完整，绝大多数题目提供了具体的文件路径、函数名及代码摘录（excerpt）直接支撑 value 中的结论。仅 Q06_014 关于循环等待条件的证据略偏隐式（基于无锁序规范的推断），其余题目证据均直接有效。全阶段置信度按各题均分计算，无低分截断。",
+  "report_quality_score": 0.97,
+  "_meta": {
+    "quality": {
+      "mean_question_confidence": 0.9725
+    },
+    "review_model": "qwen3.5-plus",
+    "baseline": true,
+    "run_at": "2026-04-24T16:04:02",
+    "baseline_execute_tokens": 725465,
+    "baseline_review_tokens": 14013,
+    "baseline_stage_total_tokens": 739478
+  }
+}

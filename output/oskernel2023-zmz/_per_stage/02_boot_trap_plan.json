@@ -1,0 +1,104 @@
+{
+  "stage_id": "02_boot_trap",
+  "evidence_targets": [
+    "启动入口 (_entry/_start)",
+    "模式切换 (S-mode 初始化)",
+    "页表/MMU (kvminit/kvminithart)",
+    "trap 向量 (stvec 设置)",
+    "trap 入口 (usertrap/kerneltrap)",
+    "syscall 分发 (syscall() 函数)",
+    "TrapFrame 结构定义",
+    "用户指针校验 (fetchaddr/fetchstr/copyin2)",
+    "QEMU/k210 平台差异",
+    "页故障处理 (handle_page_fault)",
+    "启动入口",
+    "模式切换",
+    "页表/MMU",
+    "trap 向量",
+    "trap 入口",
+    "syscall 分发"
+  ],
+  "seed_paths": [
+    "kernel/entry.S",
+    "kernel/entry_qemu.S",
+    "kernel/entry_k210.S",
+    "kernel/main.c",
+    "kernel/trap/trap.c",
+    "kernel/trap/trampoline.S",
+    "kernel/trap/kernelvec.S",
+    "kernel/syscall/syscall.c",
+    "kernel/mm/vm.c",
+    "include/trap.h",
+    "include/memlayout.h",
+    "linker/linker64.ld",
+    "arch",
+    "boot"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "_entry",
+    "_start",
+    "main",
+    "trapinithart",
+    "usertrap",
+    "kerneltrap",
+    "usertrapret",
+    "syscall",
+    "handle_page_fault",
+    "kvminit",
+    "start",
+    "rust_main"
+  ],
+  "repo_hotspots": [
+    "Cargo.toml",
+    "Makefile",
+    "debug",
+    "debug/kendryte_openocd",
+    "debug/openocd_cfg",
+    "doc",
+    "doc/img",
+    "include",
+    "include/fs",
+    "include/hal"
+  ],
+  "preferred_tools": [
+    "lsp_get_call_graph",
+    "lsp_get_definition",
+    "lsp_get_references",
+    "read_code_segment",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "使用 lsp_get_call_graph 分析 main() 函数的 outgoing 调用链 (max_depth=2)，追踪启动流程",
+    "使用 lsp_get_definition 定位 kvminit 和 kvminithart 的定义，分析页表初始化",
+    "使用 lsp_get_definition 定位 trapinithart 的定义，确认 stvec 设置逻辑",
+    "使用 lsp_get_call_graph 分析 usertrap 的 incoming 调用图，确认 trap 入口来源",
+    "使用 lsp_get_definition 定位 syscall 函数，分析系统调用分发机制",
+    "使用 read_code_segment 读取 kernel/syscall/sysproc.c 前 50 行，查看 fork/exec 等关键 syscall 实现",
+    "使用 lsp_get_definition 定位 handle_page_fault 函数，分析页故障处理流程",
+    "使用 grep_in_repo 搜索 'PTE_U|PTE_V|PTE_W' 验证页表权限位使用",
+    "使用 read_code_segment 读取 kernel/mm/vm.c 中 copyin2/copyout2 实现 (约 773-850 行)",
+    "使用 lsp_get_references 查询 TrapFrame 结构体的引用位置，确认 trapframe 使用场景",
+    "使用 grep_in_repo 搜索 'TRAPFRAME|TRAMPOLINE' 验证用户/内核切换地址布局",
+    "使用 read_code_segment 读取 kernel/sched/proc.c 前 80 行，查看 proc 结构和 userinit",
+    "使用 lsp_get_call_graph 分析 usertrapret 的 outgoing 调用链 (max_depth=2)，确认返回用户空间流程",
+    "使用 grep_in_repo 搜索 'SSTATUS_SPP|SSTATUS_SPIE' 验证模式切换标志位操作",
+    "使用 read_code_segment 读取 include/hal/riscv.h 中 w_stvec/r_stvec 等 CSR 操作宏",
+    "使用 lsp_get_definition 定位 userinit 函数，分析第一个用户进程创建流程"
+  ]
+}

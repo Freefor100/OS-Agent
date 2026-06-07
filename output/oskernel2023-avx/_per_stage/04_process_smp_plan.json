@@ -1,0 +1,115 @@
+{
+  "stage_id": "04_process_smp",
+  "evidence_targets": [
+    "任务模型 (struct proc + struct thread 双层级)",
+    "调度器 (scheduler/sched/yield)",
+    "上下文切换 (swtch.S + context 结构)",
+    "信号/Futex (sys_futex, tkill, signal)",
+    "多核启动 (main.c hartid 分支)",
+    "CPU 本地状态 (struct cpu, mycpu, cpuid)",
+    "IPI (sbi_send_ipi)",
+    "并发保护 (spinlock, noff/intena)",
+    "任务模型",
+    "调度器",
+    "上下文切换",
+    "信号/Futex",
+    "多核启动",
+    "CPU 本地状态",
+    "IPI",
+    "并发保护"
+  ],
+  "seed_paths": [
+    "kernel/proc.c",
+    "kernel/thread.c",
+    "kernel/swtch.S",
+    "kernel/main.c",
+    "kernel/include/proc.h",
+    "kernel/include/thread.h",
+    "kernel/include/context.h",
+    "kernel/include/spinlock.h",
+    "kernel/futex.c",
+    "kernel/signal.c",
+    "kernel/include/sbi.h",
+    "kernel/trap.c",
+    "task",
+    "proc"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "scheduler",
+    "sched",
+    "swtch",
+    "yield",
+    "mycpu",
+    "cpuid",
+    "cpuinit",
+    "procinit",
+    "threadInit",
+    "sys_futex",
+    "schedule",
+    "sys_fork"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "doc",
+    "doc/pic",
+    "kernel",
+    "kernel/include",
+    "kernel/lwip",
+    "linker",
+    "tools",
+    "xv6-user"
+  ],
+  "preferred_tools": [
+    "lsp_get_call_graph",
+    "lsp_get_definition",
+    "lsp_get_references",
+    "read_code_segment",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "使用 lsp_get_definition 定位 scheduler 函数的完整实现 (proc.c:669)",
+    "使用 read_code_segment 读取 scheduler 核心循环 (proc.c:669-760)，分析 RUNNABLE 进程选择逻辑",
+    "使用 lsp_get_call_graph 分析 sched 的入向调用 (yield/sleep/exit)，验证调度触发点",
+    "使用 read_code_segment 读取 swtch.S 完整代码，确认上下文切换保存/恢复的寄存器列表",
+    "使用 lsp_get_definition 定位 struct cpu 和 struct proc 的定义 (proc.h)",
+    "使用 read_code_segment 读取 proc.h:44-100，分析 cpu/proc/thread 结构体字段",
+    "使用 lsp_get_call_graph 分析 mycpu 的调用链，确认 CPU 本地状态访问模式",
+    "使用 read_code_segment 读取 main.c:39-90，分析多核启动流程 (hartid 分支)",
+    "使用 grep_in_repo 搜索 started 变量的所有引用，确认从核同步机制",
+    "使用 read_code_segment 读取 futex.c 完整内容，分析 futexWait/futexWake 实现",
+    "使用 grep_in_repo 搜索 sys_futex 的定义和调用，确认系统调用入口",
+    "使用 read_code_segment 读取 signal.c 和 syssig.c，分析信号处理机制",
+    "使用 lsp_get_references 查找 tkill/tgkill 的所有调用点",
+    "使用 read_code_segment 读取 spinlock.c:40-100，分析 acquire/release 和 noff 机制",
+    "使用 grep_in_repo 搜索 intr_on/intr_get，确认中断使能/检查点",
+    "使用 read_code_segment 读取 proc.c:762-781 (sched 函数)，分析切换前检查条件",
+    "使用 lsp_get_definition 定位 yield 函数，分析其如何调用 sched",
+    "使用 read_code_segment 读取 proc.c:784-792 (yield 函数)",
+    "使用 grep_in_repo 搜索 THREAD_NUM 和 threads 数组，分析线程池规模",
+    "使用 read_code_segment 读取 thread.c:13-26 (threadInit 初始化逻辑)",
+    "使用 lsp_get_call_graph 分析 fork 的调用链，确认进程创建路径",
+    "使用 read_code_segment 读取 proc.c:443-520 (fork 实现)",
+    "使用 grep_in_repo 搜索 CLONE_THREAD 标志，分析线程创建与进程创建的区别",
+    "使用 read_code_segment 读取 proc.c:1073-1120 (thread_clone/clone 实现)",
+    "使用 lsp_get_references 查找 sleep 和 wakeup 的所有调用点",
+    "使用 read_code_segment 读取 proc.c:818-865 (sleep/wakeup 实现)",
+    "使用 grep_in_repo 搜索 sbi_send_ipi 的调用位置，确认 IPI 使用场景",
+    "使用 read_code_segment 读取 trap.c:51-80 (usertrap)，分析中断/异常处理中的调度调用"
+  ]
+}

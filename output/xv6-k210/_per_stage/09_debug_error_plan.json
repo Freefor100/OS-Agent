@@ -1,58 +1,24 @@
 {
   "stage_id": "09_debug_error",
-  "goal": "分析 xv6-k210 的调试机制与错误处理：日志系统、panic 处理、栈回溯、交互式 shell、GDB stub、错误码体系、trace 机制。",
-  "must_cover": [
-    "[Q09_001] 日志系统：printf 宏实现，无级别控制（仅 DEBUG 宏开关）",
-    "[Q09_002] panic 处理：panic_handler（RustSBI）+ __panic（内核），存在崩溃路径",
-    "[Q09_003] panic 诊断：输出文件/行号、调用 backtrace()、停机循环（intr_off + for(;;)）",
-    "[Q09_004] 栈回溯：基于 FramePointer 的 backtrace() 实现（非 dwarf），打印 ra 地址",
-    "[Q09_005] 交互式 shell：xv6-user/sh.c 存在，支持 export/cd/exec 等命令",
-    "[Q09_006] GDB stub：未发现 handle_gdb_packet 或数据包解析循环",
-    "[Q09_007] 错误码：errno.h 定义 POSIX 风格错误码（EPERM/ENOENT 等），无 Result/Error enum",
-    "[Q09_008] trace 机制：sys_trace 系统调用 + strace 用户工具，无 ftrace/perf/tracepoints",
-    "[Q09_001] 是否存在日志系统（log/printk/println 宏）与日志级别控制？（必须三态）",
-    "[Q09_002] 是否存在 panic/崩溃处理路径（panic_handler/oom/abort 等）？（必须三态）",
-    "[Q09_003] panic 路径会输出哪些诊断？（寄存器 dump/栈回溯/停机；必须引用实现证据）",
-    "[Q09_004] 是否实现栈回溯 (backtrace/unwind/stack_trace)？（必须三态；仅打印 ra 不算）",
-    "[Q09_005] 是否存在交互式内核 monitor/shell？（必须三态；若 implemented 列出 3-10 个命令入口证据）",
-    "[Q09_006] 是否实现 GDB stub（需数据包解析循环，如 handle_gdb_packet）？（必须三态）",
-    "[Q09_007] 错误码/错误类型体系是什么？（errno/Result/Error enum；给类型定义与传播点证据）",
-    "[Q09_008] 是否存在 trace/perf/ftrace 等跟踪机制或 tracepoints？（必须三态）",
-    "若存在 monitor/shell：**命令实现文件**列表；若无：明确「未发现」。",
-    "日志系统：print/log 宏如何实现？日志级别设计？",
-    "Panic 处理：panic! 触发后的流程（栈回溯、寄存器 dump、停机）。**须一句话结论**：是否包含寄存器 dump、是否调用回溯辅助函数，并附 `路径:行号`。",
-    "**栈回溯 (Backtrace)**：是否支持 `dwarf` 解析或基于 FramePointer 的回溯？**必须** `grep_in_repo` 搜索 `backtrace|unwind|stack_trace|StackTrace`，在正文**摘录关键命中行或明确写零命中**。**注意**：不要被 panic 时仅打印若干寄存器/`ra` 误导为完整回溯；`doc/*.md` 不得单独作为「已实现回溯」的证据，须 C/Rust 源码 `路径:行号`。",
-    "异常处理：未处理异常的默认行为。",
-    "调试接口："
-  ],
   "evidence_targets": [
-    "panic 实现路径（include/printf.h:12-16, kernel/printf.c:115-133）",
-    "backtrace 实现（kernel/printf.c:135-145）",
-    "日志宏（include/utils/debug.h）",
-    "shell 命令入口（xv6-user/sh.c）",
-    "错误码定义（include/errno.h）",
-    "trace 系统调用（kernel/syscall/sysproc.c:255-265, xv6-user/strace.c）",
-    "GDB stub 缺失证据（grep 零命中）",
     "panic/debug",
     "日志系统",
     "回溯",
     "错误处理"
   ],
   "seed_paths": [
-    "include/printf.h",
-    "kernel/printf.c",
-    "include/utils/debug.h",
-    "include/errno.h",
-    "xv6-user/sh.c",
-    "xv6-user/strace.c",
-    "kernel/syscall/sysproc.c",
-    "bootloader/SBI/rustsbi-k210/src/main.rs",
     "debug",
     "log",
     "panic",
     "assert",
     "backtrace",
-    "include/fs"
+    "include/fs",
+    "include/mm",
+    "include/sync",
+    "kernel/fs",
+    "kernel/mm",
+    "kernel/sync",
+    "kernel/trap"
   ],
   "framework_guess": [
     "xv6"
@@ -61,21 +27,14 @@
     "riscv64"
   ],
   "entry_symbols": [
-    "panic",
-    "__panic",
-    "backtrace",
-    "printf",
-    "sys_trace",
-    "trace",
-    "parsecmd",
-    "main",
     "panic_handler",
+    "backtrace",
     "log",
     "assert",
-    "_start"
+    "_start",
+    "start"
   ],
   "repo_hotspots": [
-    "Cargo.toml",
     "Makefile",
     "bootloader",
     "bootloader/SBI",
@@ -84,12 +43,14 @@
     "debug/openocd_cfg",
     "doc",
     "doc/img",
-    "include"
+    "include",
+    "include/fs"
   ],
   "preferred_tools": [
-    "read_code_segment",
-    "grep_in_repo",
-    "lsp_get_call_graph"
+    "rag_search_code",
+    "lsp_get_call_graph",
+    "lsp_get_definition",
+    "read_code_segment"
   ],
   "avoid_tools": [
     "blind_read_large_files",
@@ -102,13 +63,240 @@
     "max_memory_items": 8
   },
   "execution_steps": [
-    "1. 确认 panic 路径：读取 kernel/printf.c 的 __panic 函数，验证是否调用 backtrace() 并停机",
-    "2. 验证 backtrace 实现：读取 kernel/printf.c:135-145，确认基于 FramePointer 的回溯逻辑（非 dwarf）",
-    "3. 检查日志系统：读取 include/utils/debug.h，确认 DEBUG 宏控制 __debug_assert/__debug_msg，无运行时级别",
-    "4. 分析 shell：读取 xv6-user/sh.c 前 200 行，列出 3-5 个命令入口（如 export/cd/parsecmd）",
-    "5. 验证 GDB stub 缺失：确认 grep 'handle_gdb_packet|gdb_stub' 零命中，记录结论",
-    "6. 整理错误码：读取 include/errno.h，记录错误码体系为 POSIX errno 风格，无 Rust Result/Error",
-    "7. 分析 trace 机制：读取 kernel/syscall/sysproc.c:255-265 和 xv6-user/strace.c，确认 sys_trace 实现",
-    "8. 汇总证据：将各文件路径:行号整理为 Q09_001~Q09_008 的作答依据"
+    "对照 seed_paths、entry_symbols，用 rag_search_code / list_repo_structure / LSP 锁定与本阶段相关的关键文件与符号。",
+    "对核心入口使用 lsp_get_document_outline → lsp_get_call_graph（单入口、浅深度）→ 必要时 read_code_segment 精读。",
+    "按题单逐项输出结论，每条附反引号源码路径；无实现则显式写「未发现/桩函数」等，勿臆测。"
+  ],
+  "task_plan": [
+    {
+      "task_id": "task_09_logging",
+      "question_ids": [
+        "Q09_001"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证日志系统（log/printk/println 宏）与日志级别控制的实现状态，完成 fact Q09_001_01~Q09_001_06：找到 debug_entry 定义、specialized_mechanism 实现体、runtime_integration 调用点、output_or_storage 实现、external_or_userland_boundary 分类，并执行 negative_search_coverage。",
+      "group_reason": "Q09_001 单独构成一个完整的三态判断题，需要独立查证日志系统的入口、级别、过滤、输出、集成等全部事实，不宜与其他题合并。",
+      "query": "搜索并读取 kernel/debug/include 等目录下与 log/printk/println 相关的宏定义、函数实现、调用点；确认是否有日志级别控制（如 LOG_LEVEL、printk 级别过滤）；检查是否接入 trap/syscall/sched/mm/fs 等主路径；若未找到，按 negative_search_policy 覆盖关键词和目录。",
+      "seed_paths": [
+        "kernel",
+        "debug",
+        "console",
+        "trap",
+        "syscall",
+        "include",
+        "Makefile"
+      ],
+      "entry_symbols": [
+        "printk",
+        "println",
+        "log",
+        "panic_handler"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ]
+    },
+    {
+      "task_id": "task_09_panic",
+      "question_ids": [
+        "Q09_002",
+        "Q09_003"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证 panic/崩溃处理路径（panic_handler/oom/abort）的实现状态，并详细列出 panic 路径输出的诊断信息（寄存器 dump/栈回溯/停机等），完成 fact Q09_002_01~Q09_002_06 和 Q09_003_01~Q09_003_06。",
+      "group_reason": "Q09_002 和 Q09_003 共享同一实现链路：panic 处理函数及其输出内容。查证 panic_handler 实现体时自然能获取其输出的诊断信息。",
+      "query": "搜索并读取 kernel/trap/kernel/debug 等目录下 panic_handler/panic/abort 等函数的定义和实现体；确认是否调用 backtrace、dump_regs、halt/shutdown；记录输出的具体内容（寄存器、栈帧、停机指令等）；若未找到，执行负向搜索。",
+      "seed_paths": [
+        "kernel",
+        "debug",
+        "trap",
+        "include"
+      ],
+      "entry_symbols": [
+        "panic_handler",
+        "panic",
+        "abort",
+        "halt",
+        "shutdown"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ]
+    },
+    {
+      "task_id": "task_09_backtrace",
+      "question_ids": [
+        "Q09_004"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证栈回溯（backtrace/unwind/stack_trace）是否实现，完成 fact Q09_004_01~Q09_004_06：找到 backtrace 函数定义、实现体（遍历栈帧）、调用点（panic 或 monitor 中调用）、输出方式。",
+      "group_reason": "Q09_004 是独立的栈回溯机制查证，与日志/panic 共享部分 seed_paths 但实现体独立，需单独查证。",
+      "query": "搜索并读取 kernel/debug/include 等目录下 backtrace/unwind/stack_trace 相关函数定义和实现体；确认是否遍历栈帧（读取 fp/sp/ra），而不仅仅是打印 ra；检查是否在 panic 或 monitor 中被调用；若未找到，执行负向搜索。",
+      "seed_paths": [
+        "kernel",
+        "debug",
+        "trap",
+        "include"
+      ],
+      "entry_symbols": [
+        "backtrace",
+        "unwind",
+        "stack_trace",
+        "walk_stack"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ]
+    },
+    {
+      "task_id": "task_09_monitor",
+      "question_ids": [
+        "Q09_005"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证内核驻留的交互式调试监视器（kernel debug monitor）是否实现，完成 fact Q09_005_01~Q09_005_06：找到内核态命令解析循环、命令分发表、至少 3 个命令处理函数（如 help/backtrace/mem/regs 等），并给出命令名和分发入口证据。",
+      "group_reason": "Q09_005 是独立的 kernel debug monitor 查证，需要专门搜索命令解析循环和命令表，与其他题证据链不同。",
+      "query": "搜索并读取 kernel/debug/console 等目录下 monitor/debug_console 相关代码；查找命令解析循环（如 while(1) 读取输入、strcmp 分发）、命令表（struct command 数组）、命令处理函数（如 cmd_help/cmd_backtrace/cmd_mem）；确认运行在内核态而非用户态 shell；若未找到，执行负向搜索。",
+      "seed_paths": [
+        "kernel",
+        "debug",
+        "console",
+        "trap",
+        "include"
+      ],
+      "entry_symbols": [
+        "monitor",
+        "debug_console",
+        "cmd_help",
+        "cmd_backtrace",
+        "cmd_mem"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ]
+    },
+    {
+      "task_id": "task_09_gdbstub",
+      "question_ids": [
+        "Q09_006"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证 GDB stub 是否实现，完成 fact Q09_006_01~Q09_006_06：找到 GDB/RSP 数据包解析循环（如 handle_gdb_packet）、checksum 校验、命令处理（$g/$m/$c/$s/$Z 等）、trap 入口集成。",
+      "group_reason": "Q09_006 是独立的 GDB stub 查证，需要专门搜索 RSP 协议解析代码，与其他题证据链不同。",
+      "query": "搜索并读取 kernel/debug/gdb 等目录下 gdbstub/handle_gdb_packet 相关代码；查找 RSP 数据包接收循环、$ 和 # 解析、checksum 校验与 ACK 回复、命令分发（读寄存器 g、读内存 m、继续 c、单步 s、断点 Z 等）；确认 trap/breakpoint 异常入口是否调用 stub；若未找到，执行负向搜索。",
+      "seed_paths": [
+        "kernel",
+        "debug",
+        "gdb",
+        "console",
+        "driver",
+        "trap",
+        "include"
+      ],
+      "entry_symbols": [
+        "gdbstub",
+        "handle_gdb_packet",
+        "gdb_putchar",
+        "gdb_getchar",
+        "gdb_regs",
+        "gdb_mem"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ]
+    },
+    {
+      "task_id": "task_09_error_code",
+      "question_ids": [
+        "Q09_007"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证错误码/错误类型体系（errno/Result/Error enum），完成 fact Q09_007_01~Q09_007_06：找到错误码定义（如 include/errno.h 或 Error enum）、错误传播点（syscall 返回、函数返回值）、使用示例。",
+      "group_reason": "Q09_007 是独立的错误码体系查证，需要搜索 errno 定义和传播路径，与其他题证据链不同。",
+      "query": "搜索并读取 include/kernel 等目录下 errno.h/Error/Result 相关类型定义；查找错误码枚举值（如 EINVAL/ENOMEM/EFAULT 等）；确认 syscall 返回路径是否使用这些错误码；查找函数返回值类型为 Result/Error 的传播点；若未找到，执行负向搜索。",
+      "seed_paths": [
+        "kernel",
+        "include",
+        "syscall",
+        "fs",
+        "mm"
+      ],
+      "entry_symbols": [
+        "errno",
+        "Error",
+        "Result",
+        "EINVAL",
+        "ENOMEM",
+        "EFAULT"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ]
+    },
+    {
+      "task_id": "task_09_trace",
+      "question_ids": [
+        "Q09_008"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证 trace/perf/ftrace 等跟踪机制或 tracepoints 是否实现，完成 fact Q09_008_01~Q09_008_06：找到 trace event/tracepoint 类型或宏定义、事件存储（ring buffer/list）、关键路径插桩点、启停/过滤/读取接口。",
+      "group_reason": "Q09_008 是独立的跟踪机制查证，需要搜索 tracepoint 宏和 ring buffer 实现，与其他题证据链不同。",
+      "query": "搜索并读取 kernel/debug/trace 等目录下 trace/tracepoint/ftrace/perf 相关代码；查找 trace event 结构体定义、tracepoint 宏（如 TRACE_EVENT/DEFINE_TRACE）、事件写入 ring buffer 的实现；确认是否在 syscall/sched/trap/mm/fs 等路径插桩；查找启停/过滤/读取 trace 的接口（如 sysfs/procfs）；若未找到，执行负向搜索。",
+      "seed_paths": [
+        "kernel",
+        "debug",
+        "trace",
+        "sched",
+        "syscall",
+        "trap",
+        "include"
+      ],
+      "entry_symbols": [
+        "trace",
+        "tracepoint",
+        "ftrace",
+        "perf",
+        "ring_buffer",
+        "TRACE_EVENT"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ]
+    }
   ]
 }

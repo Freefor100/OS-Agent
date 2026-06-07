@@ -1,8 +1,7 @@
 """
 错误处理模块
 
-从 os_agent_d_evaluate.py 中提取的错误分类、重试策略和错误追踪机制，
-供 describe 和 evaluate 两个模块共享使用。
+错误分类、重试策略与错误追踪（Describe / RAG 等链路共用）。
 """
 import json
 import logging

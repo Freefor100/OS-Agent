@@ -1,0 +1,106 @@
+{
+  "schema_version": "describe_review_v1",
+  "stage_id": "07_security",
+  "stage_title": "安全机制与权限模型",
+  "confidence": 0.96,
+  "question_reviews": [
+    {
+      "question_id": "Q07_001",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "答案值完全匹配选项 A 文本。证据引用了 trap.c 中的模式检查及页表权限位，直接支撑用户态/内核态隔离的结论，证据充分。"
+    },
+    {
+      "question_id": "Q07_002",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态值合法。证据展示了 proc 结构体定义及初始化代码，直接证明凭证字段存在，符合 implemented 判定标准。"
+    },
+    {
+      "question_id": "Q07_003",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态值合法。证据指出 syscall 路径缺乏权限检查且 UID/GID 硬编码，有效支撑 stub 状态结论，逻辑自洽。"
+    },
+    {
+      "question_id": "Q07_004",
+      "score_evidence": 0.9,
+      "score_consistency": 0.85,
+      "review": "证据支持无检查链的结论。但题干要求列举 2-5 个节点，答案因功能缺失未列节点，虽逻辑合理但格式上未完全满足列举要求，故一致性略扣。"
+    },
+    {
+      "question_id": "Q07_005",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态值合法。证据引用 copyin/copyout 中的地址验证逻辑（walkaddr），直接证明用户指针验证机制存在，证据有力。"
+    },
+    {
+      "question_id": "Q07_006",
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "三态值合法。证据主要为关键字搜索结果，虽能支撑 not_found 结论，但相比代码逻辑证据稍弱，故证据分略低。"
+    },
+    {
+      "question_id": "Q07_007",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "三态值合法。证据引用 Makefile 中显式禁用栈保护的编译标志，为决定性证据，支撑度极高。"
+    },
+    {
+      "question_id": "Q07_008",
+      "score_evidence": 0.8,
+      "score_consistency": 1.0,
+      "review": "三态值合法。证据主要为通用关键字搜索及初始化函数检查，缺乏具体配置项代码佐证，证据充分性一般。"
+    },
+    {
+      "question_id": "Q07_009",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "答案明确架构为 riscv64 并提供工具链、头文件及初始化代码证据。对安全初始化缺失的说明也有代码支撑，符合逐架构作答要求。"
+    },
+    {
+      "question_id": "Q07_010",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "三态值合法。证据通过文件后缀及编译器配置证明项目非 Rust，直接支撑 not_found 结论，无歧义。"
+    },
+    {
+      "question_id": "Q07_011",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态值合法。证据展示用户页表映射了 trampoline 页面且搜索无 KPTI 关键字，有效支撑无页表隔离的结论。"
+    },
+    {
+      "question_id": "Q07_012",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "答案明确标注「字段存在但无检查链」，符合题干特殊指令。证据展示字段定义及硬编码行为，支撑结论准确。"
+    },
+    {
+      "question_id": "Q07_013",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "答案值完全匹配选项 D 文本。证据展示缺乏细粒度权限验证及硬编码权限位，支撑访问控制模型缺失的结论。"
+    },
+    {
+      "question_id": "Q07_014",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态值合法。证据展示页表权限位同时包含读写执行（无 W^X）及编译选项，有效支撑无完整性策略的结论。"
+    }
+  ],
+  "findings": [],
+  "summary_zh": "本报告整体质量较高，题面相符度好，三态及单选题选项均严格遵循契约。证据支撑方面，多数题目提供了具体的代码片段或编译配置作为依据，尤其是编译选项（如栈保护）证据确凿。部分题目（如 Q07_008）主要依赖关键字搜索，证据力度稍弱于直接代码逻辑。全阶段置信度按各题均值方案 A 汇总计算。",
+  "report_quality_score": 0.96,
+  "_meta": {
+    "quality": {
+      "mean_question_confidence": 0.9625
+    },
+    "review_model": "qwen3.5-plus",
+    "baseline": true,
+    "run_at": "2026-04-24T16:08:16",
+    "baseline_execute_tokens": 718203,
+    "baseline_review_tokens": 12215,
+    "baseline_stage_total_tokens": 730418
+  }
+}

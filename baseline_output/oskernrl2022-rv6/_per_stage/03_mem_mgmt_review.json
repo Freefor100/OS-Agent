@@ -1,0 +1,226 @@
+{
+  "schema_version": "describe_review_v1",
+  "stage_id": "03_mem_mgmt",
+  "stage_title": "内存管理（物理/虚拟/分配器）",
+  "confidence": 0.97,
+  "question_reviews": [
+    {
+      "question_id": "Q03_001",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "证据引用 Makefile 与 pm.c 准确支撑 C/Makefile 风格结论，题面相符。"
+    },
+    {
+      "question_id": "Q03_002",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "三态结论 implemented 有 kpminit/allocpage/freepage 完整代码证据支撑。"
+    },
+    {
+      "question_id": "Q03_003",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "空闲链表结论与 struct run 及 freerange 证据完全一致。"
+    },
+    {
+      "question_id": "Q03_004",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "核心数据结构描述准确，证据直接给出 struct 定义。"
+    },
+    {
+      "question_id": "Q03_005",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "全局锁结论有 acquire(&kmem.lock) 证据支撑，持锁范围描述清晰。"
+    },
+    {
+      "question_id": "Q03_006",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "页表三态 implemented 有 walk/mappages/vmunmap 完整证据链。"
+    },
+    {
+      "question_id": "Q03_007",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "API 列举与证据函数名一致，模块定位准确。"
+    },
+    {
+      "question_id": "Q03_008",
+      "score_evidence": 0.9,
+      "score_consistency": 0.95,
+      "review": "结论称 proc->lock 保护，但证据 excerpt 主要为注释推断，显式持锁代码未直接展示。"
+    },
+    {
+      "question_id": "Q03_009",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "共享页表结论有 kvmcreate 复制内核页表证据支撑，符合 xv6 特征。"
+    },
+    {
+      "question_id": "Q03_010",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "stub 结论准确，证据显示 usertrap 未处理缺页 scause，handle_page_fault 仅声明。"
+    },
+    {
+      "question_id": "Q03_011",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "诚实标注链路未闭合，证据覆盖各节点函数但承认实现不完整。"
+    },
+    {
+      "question_id": "Q03_012",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "not_found 结论有搜索证据支撑，覆盖 fork/proc/trap 关键路径。"
+    },
+    {
+      "question_id": "Q03_013",
+      "score_evidence": 0.9,
+      "score_consistency": 0.95,
+      "review": "stub 结论合理，证据显示 alloc 参数存在但调用多为立即分配。"
+    },
+    {
+      "question_id": "Q03_014",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "not_found 结论有全局搜索证据支撑，无 swap 关键字。"
+    },
+    {
+      "question_id": "Q03_015",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "implemented 结论有 do_mmap 及标志位处理代码证据。"
+    },
+    {
+      "question_id": "Q03_016",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "stub 结论区分了块缓存与页缓存，证据准确。"
+    },
+    {
+      "question_id": "Q03_017",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "stub 结论指出仅 munmap 时写回，无后台机制，证据支持。"
+    },
+    {
+      "question_id": "Q03_018",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "not_found 结论有 SBI 接口定义但无调用证据，逻辑自洽。"
+    },
+    {
+      "question_id": "Q03_019",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "TLB 刷新指令证据确凿，汇编封装清晰。"
+    },
+    {
+      "question_id": "Q03_020",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "用户指针检查机制有 copyin/walkaddr 及 PTE_U 检查证据。"
+    },
+    {
+      "question_id": "Q03_021",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "未实现置换结论与 Q03_014 一致，证据支持无 swap。"
+    },
+    {
+      "question_id": "Q03_022",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "not_found 结论有搜索关键字证据，覆盖工作集相关术语。"
+    },
+    {
+      "question_id": "Q03_023",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "填空数据均有宏定义证据支撑，精确到字节/位。"
+    },
+    {
+      "question_id": "Q03_024",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "硬件保护结论有 PTE 权限位及 walkaddr 检查证据。"
+    },
+    {
+      "question_id": "Q03_025",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "VMA 链表结构证据充分，包含类型枚举与进程结构引用。"
+    },
+    {
+      "question_id": "Q03_026",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "纯分页结论符合 RISC-V 架构特征，证据无分段代码。"
+    },
+    {
+      "question_id": "Q03_027",
+      "score_evidence": 0.75,
+      "score_consistency": 0.85,
+      "review": "结论选按需调页 (A)，但证据显示 exec 时预分配 (alloc=1)，证据更支持预分配策略 (D)，存在逻辑矛盾。"
+    },
+    {
+      "question_id": "Q03_028",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "放置策略描述具体，有函数与宏定义证据支撑各区域起始地址。"
+    },
+    {
+      "question_id": "Q03_029",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "not_found 结论有搜索证据，覆盖 OOM/负载控制关键字。"
+    },
+    {
+      "question_id": "Q03_030",
+      "score_evidence": 0.9,
+      "score_consistency": 0.95,
+      "review": "Mermaid 链路清晰，但标注为候选链路，证据支持节点存在但承认未完全闭合。"
+    },
+    {
+      "question_id": "Q03_031",
+      "score_evidence": 0.9,
+      "score_consistency": 0.95,
+      "review": "外部碎片结论基于空闲链表分配器推断，逻辑合理但属间接证据。"
+    },
+    {
+      "question_id": "Q03_032",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "运行时绑定结论有 w_satp 及 trampoline 切换证据。"
+    },
+    {
+      "question_id": "Q03_033",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "未实现置换结论与 Q03_021 一致，证据支持。"
+    },
+    {
+      "question_id": "Q03_034",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "not_found 结论有搜索证据，指出仅同步写回无后台策略。"
+    }
+  ],
+  "findings": [],
+  "summary_zh": "本报告整体质量较高，绝大多数题目证据详实、题面相符。物理分配器、页表操作、TLB 刷新等基础机制证据链完整。主要瑕疵在于 Q03_027（取页策略），结论声称“按需调页”但证据显示 exec 时“预分配”，存在策略描述与代码证据的逻辑张力；Q03_008/Q03_011/Q03_030 对未完全实现功能的描述诚实且证据支撑到位。全阶段置信度按各题均值方案 A 汇总计算。",
+  "report_quality_score": 0.97,
+  "_meta": {
+    "quality": {
+      "mean_question_confidence": 0.9669
+    },
+    "review_model": "qwen3.5-plus",
+    "baseline": true,
+    "run_at": "2026-04-24T09:12:05",
+    "baseline_execute_tokens": 196676,
+    "baseline_review_tokens": 22667,
+    "baseline_stage_total_tokens": 219343
+  }
+}

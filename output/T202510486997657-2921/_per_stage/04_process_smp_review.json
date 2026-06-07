@@ -1,0 +1,223 @@
+{
+  "schema_version": "describe_review_v1",
+  "stage_id": "04_process_smp",
+  "stage_title": "进程/线程/调度与多核",
+  "confidence": 0.98,
+  "question_reviews": [
+    {
+      "question_id": "Q04_001",
+      "confidence": 1.0,
+      "review": "题面格式要求完全落实（类型/路径/字段/区分），证据 excerpt 直接展示 Pcb 类定义及关键字段，value 与 evidence 一致。"
+    },
+    {
+      "question_id": "Q04_002",
+      "confidence": 1.0,
+      "review": "状态枚举与流转点均给出代码路径，evidence 包含 enum 定义与状态变更函数 excerpt，支撑 value 描述。"
+    },
+    {
+      "question_id": "Q04_003",
+      "confidence": 1.0,
+      "review": "tri_state 结论为 implemented，evidence 列出汇编文件与调用点，直接支撑上下文切换实现存在性。"
+    },
+    {
+      "question_id": "Q04_004",
+      "confidence": 1.0,
+      "review": "寄存器集合列举清晰，evidence 引用汇编指令与 Context 结构体定义，与 value 中寄存器列表一致。"
+    },
+    {
+      "question_id": "Q04_005",
+      "confidence": 1.0,
+      "review": "算法名称与代码证据格式符合题面，evidence 展示优先级比较逻辑与字段定义，支撑 Priority 结论。"
+    },
+    {
+      "question_id": "Q04_006",
+      "confidence": 1.0,
+      "review": "列出 3 个核心入口函数，evidence 包含 start_schedule 实现 excerpt，支撑调度器入口描述。"
+    },
+    {
+      "question_id": "Q04_007",
+      "confidence": 1.0,
+      "review": "tri_state 结论为 implemented，evidence 展示 fork/clone 函数定义，支撑创建执行实体实现。"
+    },
+    {
+      "question_id": "Q04_008",
+      "confidence": 1.0,
+      "review": "地址空间与文件表复制逻辑描述详细，evidence 引用 fork 函数中相关分支代码，支撑 value 结论。"
+    },
+    {
+      "question_id": "Q04_009",
+      "confidence": 1.0,
+      "review": "tri_state 结论为 implemented，evidence 展示 execve 函数定义，支撑 ELF 装载实现。"
+    },
+    {
+      "question_id": "Q04_010",
+      "confidence": 1.0,
+      "review": "tri_state 结论为 implemented，evidence 展示 wait4 及 syscall 处理函数，支撑等待回收实现。"
+    },
+    {
+      "question_id": "Q04_011",
+      "confidence": 1.0,
+      "review": "单选择项与题面 choices 匹配，evidence 引用 sleep 调用展示阻塞机制，支撑 Choice A 结论。"
+    },
+    {
+      "question_id": "Q04_012",
+      "confidence": 1.0,
+      "review": "PID 分配方式描述清晰，evidence 展示 alloc_pid 函数中锁保护与自增逻辑，支撑 value 结论。"
+    },
+    {
+      "question_id": "Q04_013",
+      "confidence": 1.0,
+      "review": "父子树存储方式描述准确，evidence 展示 _parent 字段与 reparent 逻辑，支撑 value 结论。"
+    },
+    {
+      "question_id": "Q04_014",
+      "confidence": 1.0,
+      "review": "tri_state 结论为 implemented，evidence 列出 signal.cc 与 futex.cc 文件，支撑信号与 futex 实现。"
+    },
+    {
+      "question_id": "Q04_015",
+      "confidence": 1.0,
+      "review": "题面允许写不适用，value 说明单核不适用，evidence 引用 NUMCPU=1 宏定义，支撑结论。"
+    },
+    {
+      "question_id": "Q04_016",
+      "confidence": 1.0,
+      "review": "回收调用链描述完整，evidence 展示 exit_proc 中资源释放与状态变更，支撑 value 结论。"
+    },
+    {
+      "question_id": "Q04_017",
+      "confidence": 1.0,
+      "review": "tri_state 结论为 implemented，evidence 展示 pgid/sid 字段与 syscall 实现，支撑进程组/会话实现。"
+    },
+    {
+      "question_id": "Q04_018",
+      "confidence": 1.0,
+      "review": "tri_state 结论为 implemented，evidence 展示资源限制枚举与字段及 syscall，支撑 rlimit 实现。"
+    },
+    {
+      "question_id": "Q04_019",
+      "confidence": 1.0,
+      "review": "单选择项与题面 choices 匹配，evidence 展示统一 Pcb 结构，支撑 Choice B 结论。"
+    },
+    {
+      "question_id": "Q04_020",
+      "confidence": 1.0,
+      "review": "tri_state 结论为 not_found，evidence 说明 swtch 仅切换 Context 无页表指令，支撑 value 结论。"
+    },
+    {
+      "question_id": "Q04_021",
+      "confidence": 1.0,
+      "review": "单选择项与题面 choices 匹配，evidence 说明仅内核级 Pcb 无用户态线程库，支撑 Choice D 结论。"
+    },
+    {
+      "question_id": "Q04_022",
+      "confidence": 1.0,
+      "review": "tri_state 结论为 not_found，evidence 说明搜索无 TLS 相关字段，支撑 value 结论。"
+    },
+    {
+      "question_id": "Q04_023",
+      "confidence": 1.0,
+      "review": "多选择项符合题面，value 说明未发现统计，evidence 展示 scheduler 无相关指标代码，支撑结论。"
+    },
+    {
+      "question_id": "Q04_024",
+      "confidence": 1.0,
+      "review": "tri_state 结论为 not_found，evidence 说明搜索 aging 无命中，支撑 value 结论。"
+    },
+    {
+      "question_id": "Q04_025",
+      "confidence": 1.0,
+      "review": "tri_state 结论为 not_found，evidence 说明搜索 fair_share 无命中，支撑 value 结论。"
+    },
+    {
+      "question_id": "Q04_026",
+      "confidence": 1.0,
+      "review": "单选择项与题面 choices 匹配，evidence 展示 yield 与时钟中断处理，支撑 Choice A 结论。"
+    },
+    {
+      "question_id": "Q04_027",
+      "confidence": 1.0,
+      "review": "tri_state 结论为 not_found，evidence 说明搜索 SJF 无命中，支撑 value 结论。"
+    },
+    {
+      "question_id": "Q04_028",
+      "confidence": 1.0,
+      "review": "单选择项与题面 choices 匹配，evidence 引用 NUMCPU=1，支撑 Choice C 结论。"
+    },
+    {
+      "question_id": "Q04_029",
+      "confidence": 1.0,
+      "review": "tri_state 结论为 not_found，evidence 说明搜索 AP 启动代码无命中，支撑 value 结论。"
+    },
+    {
+      "question_id": "Q04_030",
+      "confidence": 1.0,
+      "review": "tri_state 结论为 not_found，evidence 说明仅定义宏无实际调用，支撑 value 结论。"
+    },
+    {
+      "question_id": "Q04_031",
+      "confidence": 1.0,
+      "review": "题面允许写不适用，value 说明单核未实现，evidence 引用 NUMCPU=1，支撑结论。"
+    },
+    {
+      "question_id": "Q04_032",
+      "confidence": 1.0,
+      "review": "tri_state 结论为 implemented，evidence 展示 Cpu 类与全局数组，支撑 per-CPU 变量存在。"
+    },
+    {
+      "question_id": "Q04_033",
+      "confidence": 1.0,
+      "review": "per-CPU 实现方式描述清晰，evidence 展示 tp 寄存器与 get_cpu 逻辑，支撑 value 结论。"
+    },
+    {
+      "question_id": "Q04_034",
+      "confidence": 1.0,
+      "review": "tri_state 结论为 not_found，evidence 说明搜索负载均衡无命中，支撑 value 结论。"
+    },
+    {
+      "question_id": "Q04_035",
+      "confidence": 1.0,
+      "review": "tri_state 结论为 not_found，evidence 说明搜索 TLB shootdown 无命中，支撑 value 结论。"
+    },
+    {
+      "question_id": "Q04_036",
+      "confidence": 1.0,
+      "review": "四项交叉一致性均作答，evidence 引用 NUMCPU 与 spinlock 实现，支撑 value 中单核适用性说明。"
+    },
+    {
+      "question_id": "Q04_037",
+      "confidence": 1.0,
+      "review": "单选择项与题面 choices 匹配，evidence 展示 acquire 中关中断调用，支撑 Choice A 结论。"
+    },
+    {
+      "question_id": "Q04_038",
+      "confidence": 1.0,
+      "review": "NCPU 与链接脚本对应关系描述准确，evidence 展示链接脚本搜索无对应符号，支撑 value 结论。"
+    },
+    {
+      "question_id": "Q04_039",
+      "confidence": 1.0,
+      "review": "tri_state 结论为 not_found，evidence 展示使用 SpinLock 而非原子变量，支撑 value 结论。"
+    },
+    {
+      "question_id": "Q04_040",
+      "confidence": 1.0,
+      "review": "tri_state 结论为 not_found，evidence 说明搜索实时调度关键字无命中，支撑 value 结论。"
+    },
+    {
+      "question_id": "Q04_041",
+      "confidence": 1.0,
+      "review": "tri_state 结论为 not_found，evidence 说明搜索 NUMA 关键字无命中，支撑 value 结论。"
+    }
+  ],
+  "dimensions": {
+    "evidence_supports_answers": 1.0,
+    "question_answer_consistency": 1.0,
+    "requirements_fit": 1.0
+  },
+  "findings": [],
+  "summary_zh": "全阶段 41 题均完成作答。题面格式要求（如 short_answer 字段、tri_state 三态、choice 选项）均被严格遵守。所有 value 结论均有对应的 evidence 代码片段或搜索记录支撑，未发现证据与结论矛盾、缺证据或引用错误。JSON 契约符合规范，无格式违规。",
+  "_meta": {
+    "review_model": "qwen3.5-plus"
+  }
+}

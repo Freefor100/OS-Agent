@@ -1,0 +1,119 @@
+{
+  "stage_id": "01_overview",
+  "goal": "完成项目概览与技术栈章节：整理双架构(RISC-V/LoongArch)启动链、各核心模块技术选型、关键数据结构、外部依赖(EASTL/lwext4/onpstack)、构建产物与评测信号。",
+  "must_cover": [
+    "双架构启动流程(entry.S→main.cc)与初始化顺序",
+    "内存管理：伙伴系统+Buddy、Slab分配器、虚拟内存管理器",
+    "进程管理：proc_manager(174KB)、scheduler、信号/管道/Futex",
+    "文件系统：VFS层+lwext4(81KB ext4.cc)+FAT32+buffer cache",
+    "系统调用：syscall_handler(488KB)分发机制与TrapFrame",
+    "设备驱动：virtio_disk/uart/PCI/virtio_net",
+    "网络协议栈：onpstack自研栈+virtio_net驱动",
+    "同步原语：spinlock/sleeplock/semaphore/futex",
+    "构建产物：kernel-la/kernel-qemu、sdcard.img、initcode",
+    "技术栈：C++23+EASTL、GCC交叉编译链、QEMU 9.2.1",
+    "02 启动/架构与 Trap/系统调用 → 启动链、模式切换、MMU/FPU、Trap 向量、系统调用分发、TrapFrame、用户指针校验等",
+    "03 内存管理 → 物理/虚拟内存、页表、分配器、CoW/Lazy/Swap 等高级特性",
+    "04 进程/线程/调度与多核 → 任务模型、调度算法、上下文切换、信号/Futex、多核启动、IPI、每 CPU 数据等",
+    "05 文件系统与设备 I/O → VFS、具体 FS、fd/mmap、驱动框架、块/网设备等",
+    "06 同步与 IPC → 锁、管道、IPC、Futex 等",
+    "07 安全机制 → 权限、Capability、隔离等",
+    "08 网络协议栈 → socket、协议栈实现形态等",
+    "09 调试与错误处理 → panic、日志、回溯等",
+    "10 演进与历史 → 模块演进、重大提交方向（技术层面归纳即可）",
+    "## 快速总览",
+    "## 评测与交付适配",
+    "**Delivery**：`Makefile`/`build.rs`/CI 中是否出现固定产物名（如 `kernel-rv`、`kernel-la`、`disk.img`）、`make all` 等；列路径，不写仓外断言。"
+  ],
+  "evidence_targets": [
+    "语言与框架来源(C++23/EASTL/Xv6衍生)",
+    "支持架构(RISC-V/LoongArch双架构)",
+    "入口函数(riscv: main(hartid,dtb_addr), loongarch: main())",
+    "关键目录(kernel/boot,mem,proc,fs,sys,trap,net,devs)",
+    "README构建命令(make all/riscv/loongarch/run/debug)",
+    "评测产物信号(kernel-la/kernel-qemu/sdcard-rv-onsite.img)",
+    "语言与框架来源",
+    "支持架构",
+    "入口函数",
+    "关键目录",
+    "README 构建与运行命令",
+    "评测/交付产物信号(kernel-rv等)"
+  ],
+  "seed_paths": [
+    "README.md",
+    "Makefile",
+    "kernel/boot/riscv/main.cc",
+    "kernel/boot/loongarch/main.cc",
+    "kernel/sys/syscall_handler.hh",
+    "kernel/mem/virtual_memory_manager.cc",
+    "kernel/proc/proc_manager.cc",
+    "kernel/fs/lwext4/ext4.cc",
+    "kernel/net/onpstack",
+    "thirdparty/EASTL",
+    "docs",
+    "Cargo.toml",
+    "build.rs",
+    ".cargo"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64",
+    "loongarch64"
+  ],
+  "entry_symbols": [
+    "main",
+    "_start",
+    "k_syscall_handler",
+    "k_pm",
+    "k_vmm",
+    "k_pmm",
+    "k_scheduler",
+    "trap_mgr",
+    "virtio_disk_init",
+    "init_fs_table",
+    "kernel_main",
+    "rust_main"
+  ],
+  "repo_hotspots": [
+    "Makefile",
+    "busybox",
+    "busybox/loongarch",
+    "busybox/riscv",
+    "docs",
+    "kernel",
+    "kernel/boot",
+    "kernel/devs",
+    "kernel/fs",
+    "kernel/hal"
+  ],
+  "preferred_tools": [
+    "lsp_get_document_outline",
+    "lsp_get_definition",
+    "lsp_get_references",
+    "lsp_get_call_graph",
+    "read_code_segment",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 12000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 18,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "使用lsp_get_document_outline鸟瞰kernel/boot/riscv/main.cc和kernel/boot/loongarch/main.cc，确认双架构入口与初始化顺序差异",
+    "使用lsp_get_definition定位k_syscall_handler、k_pm、k_vmm等核心全局对象的定义与初始化位置",
+    "使用lsp_get_call_graph(max_depth=2)分析main→user_init→start_schedule的调用链，确认调度器启动时机",
+    "使用grep_in_repo搜索kernel-la、kernel-qemu、sdcard.img等构建产物名，确认Makefile中的输出目标",
+    "使用read_code_segment小段读取kernel/sys/syscall_handler.hh(1-80行)确认系统调用表规模与分发机制",
+    "使用read_code_segment小段读取kernel/mem/virtual_memory_manager.hh和kernel/proc/proc_manager.hh的关键结构定义",
+    "使用lsp_get_references追踪trap_mgr.init和syscall_handler.invoke_syscaller的调用点，确认Trap→Syscall路径",
+    "对照must_cover逐项整理：启动链、内存分配器、进程模型、VFS层、系统调用表、网络栈来源、构建产物"
+  ]
+}

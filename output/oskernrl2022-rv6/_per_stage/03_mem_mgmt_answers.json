@@ -8,25 +8,19 @@
       "question_id": "Q03_001",
       "question_type": "single_choice",
       "stem": "该 OS 的内存管理实现语言/形态更接近哪类？（只选最贴近的一项）",
-      "value": "B. C/Makefile 风格内核（xv6 类）",
+      "value": "未发现内存管理实现（仅接口/文档）",
       "evidence": [
         {
-          "path": "src/pm.c",
-          "symbol_kind": "file",
-          "symbol_name": "pm.c",
-          "excerpt": "C 语言实现，类 xv6 风格的物理页分配器"
+          "path": "repos/oskernrl2022-rv6/src/include/vma.h",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '内存管理（物理/虚拟/分配器） / Q03_001: 该 OS 的内存管理实现语言/形态更接近哪类？（只选最贴近的一项）\n关键词: ' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4582 | 文件: repos\\oskernrl2022-rv6\\src\\include\\vma.h:33-33 | 类型: struct_specifier | 符号名: \n```\nstruct proc\n```\n\n[2] 相似度: 0.4582 | 文件: repos\\oskernrl2022-rv6\\src\\include\\vma.h:34-34 | 类型: struct_specifier | 符号名: \n```\nstruct proc\n```\n\n[3] 相似度: 0.4582 | 文件: repos\\oskernrl2022-rv6\\src\\include\\vma.h:36-36 | 类型: struct_specifier | 符号名: \n```\nstruct proc\n```\n\n[4] 相似度: 0.4582 | 文件: repos\\oskernrl2022-rv"
         },
         {
-          "path": "src/vm.c",
-          "symbol_kind": "file",
-          "symbol_name": "vm.c",
-          "excerpt": "C 语言实现页表操作 walk/mappages/vmunmap"
-        },
-        {
-          "path": "Makefile",
-          "symbol_kind": "file",
-          "symbol_name": "Makefile",
-          "excerpt": "使用 Makefile 构建系统"
+          "path": "repos/oskernrl2022-rv6/src/include/vma.h",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '内存管理（物理/虚拟/分配器） / Q03_001: 该 OS 的内存管理实现语言/形态更接近哪类？（只选最贴近的一项）\n关键词: ' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4582 | 文件: repos\\oskernrl2022-rv6\\src\\include\\vma.h:33-33 | 类型: struct_specifier | 符号名: \n```\nstruct proc\n```\n\n[2] 相似度: 0.4582 | 文件: repos\\oskernrl2022-rv6\\src\\include\\vma.h:34-34 | 类型: struct_specifier | 符号名: \n```\nstruct proc\n```\n\n[3] 相似度: 0.4582 | 文件: repos\\oskernrl2022-rv6\\src\\include\\vma.h:36-36 | 类型: struct_specifier | 符号名: \n```\nstruct proc\n```\n\n[4] 相似度: 0.4582 | 文件: repos\\oskernrl2022-rv"
         }
       ]
     },
@@ -34,25 +28,19 @@
       "question_id": "Q03_002",
       "question_type": "tri_state_impl",
       "stem": "是否存在“物理页帧分配器 (Physical Frame Allocator)”的真实实现？（必须三态）",
-      "value": "implemented",
+      "value": "not_found",
       "evidence": [
         {
-          "path": "src/pm.c",
-          "symbol_kind": "function",
-          "symbol_name": "allocpage",
-          "excerpt": "void *allocpage(void) - 分配 4096 字节物理页"
+          "path": "repos/oskernrl2022-rv6/src/vma.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '内存管理（物理/虚拟/分配器） / Q03_002: 是否存在“物理页帧分配器 (Physical Frame Allocator)”的真实实现？（必须三态）\n关键词: Physical, Frame, Allocator, 物理页' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4520 | 文件: repos\\oskernrl2022-rv6\\src\\vma.c:240-281 | 类型: function_definition | 符号名: \n```\nstruct vma *alloc_addr_heap_vma(struct proc *p, uint64 addr, int perm)\n{\n  struct vma *vma = type_locate_vma(p->vma, HEAP);\n  struct vma *lvma = type_locate_vma(p->vma, LOAD);\n  addr = PGROUNDUP(addr);\n  if(vma == NULL)\n  {\n    uint64 start = lvma->end;\n "
         },
         {
-          "path": "src/pm.c",
-          "symbol_kind": "function",
-          "symbol_name": "freepage",
-          "excerpt": "void freepage(void *pa) - 释放物理页"
-        },
-        {
-          "path": "src/pm.c",
-          "symbol_kind": "function",
-          "symbol_name": "kpminit",
-          "excerpt": "void kpminit() - 初始化分配器"
+          "path": "repos/oskernrl2022-rv6/src/vma.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '内存管理（物理/虚拟/分配器） / Q03_002: 是否存在“物理页帧分配器 (Physical Frame Allocator)”的真实实现？（必须三态）\n关键词: Physical, Frame, Allocator, 物理页' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4520 | 文件: repos\\oskernrl2022-rv6\\src\\vma.c:240-281 | 类型: function_definition | 符号名: \n```\nstruct vma *alloc_addr_heap_vma(struct proc *p, uint64 addr, int perm)\n{\n  struct vma *vma = type_locate_vma(p->vma, HEAP);\n  struct vma *lvma = type_locate_vma(p->vma, LOAD);\n  addr = PGROUNDUP(addr);\n  if(vma == NULL)\n  {\n    uint64 start = lvma->end;\n "
         }
       ]
     },
@@ -60,19 +48,13 @@
       "question_id": "Q03_003",
       "question_type": "single_choice",
       "stem": "物理内存分配算法更接近哪种？",
-      "value": "D. 空闲链表 run list（xv6 风格）",
+      "value": "未发现",
       "evidence": [
         {
-          "path": "src/pm.c",
-          "symbol_kind": "struct",
-          "symbol_name": "run",
-          "excerpt": "struct run { struct run *next; }; 单链表结构"
-        },
-        {
-          "path": "src/pm.c",
-          "symbol_kind": "struct",
-          "symbol_name": "kmem",
-          "excerpt": "static struct { struct spinlock lock; struct run *freelist; uint64 npage; } kmem;"
+          "path": "repos/oskernrl2022-rv6/src/pm.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '内存管理（物理/虚拟/分配器） / Q03_003: 物理内存分配算法更接近哪种？\n关键词: ' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5683 | 文件: repos\\oskernrl2022-rv6\\src\\pm.c:79-99 | 类型: function_definition | 符号名: \n```\nvoid *\nallocpage(void)\n{\n\tstruct run *r;\n\n\tacquire(&kmem.lock);\n\tr = kmem.freelist;\n\tif (r) {\n\t\tkmem.freelist = r->next;\n\t\tkmem.npage--;\n\t}\n\trelease(&kmem.lock);\n\n\t#ifdef DEBUG \n\tif (r)\n\t\tmemset((char*)r, 5, PGSIZE); // fill with junk\n\t#endif \n\n\tallocs++;\n\treturn (void*)r;\n}\n```\n\n[2] 相似度: 0.5675 | 文件: repos\\oskernrl2022-rv6\\s"
         }
       ]
     },
@@ -80,19 +62,25 @@
       "question_id": "Q03_004",
       "question_type": "short_answer",
       "stem": "物理页帧分配器的核心数据结构是什么？（例如 bitmap 数组、buddy free list、slab cache 表、`struct run` 单链表等；必须引用结构体/字段证据）",
-      "value": "struct run 单链表 + 全局 kmem 结构体。核心结构：struct run { struct run *next; } 作为空闲链表节点；static struct { struct spinlock lock; struct run *freelist; uint64 npage; } kmem 管理全局空闲链表和页计数",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
       "evidence": [
         {
-          "path": "src/pm.c",
-          "symbol_kind": "struct",
-          "symbol_name": "run",
-          "excerpt": "struct run { struct run *next; };"
+          "path": "repos/oskernrl2022-rv6/src/kmalloc.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '内存管理（物理/虚拟/分配器） / Q03_004: 物理页帧分配器的核心数据结构是什么？（例如 bitmap 数组、buddy free list、slab cache 表、`struct run` 单链表等；必须引用结构体/字段证据）\n关键词: bitmap, buddy, free, list, slab, cache, struct, run' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5775 | 文件: repos\\oskernrl2022-rv6\\src\\kmalloc.c:39-47 | 类型: struct_specifier | 符号名: \n```\nstruct kmem_allocator {\n\tstruct spinlock lock;\t\t// the lock to protect this allocator \n\tuint obj_size;\t\t\t\t// the obj size that allocator allocates \n\tuint16 npages;\n\tuint16 nobjs;\n\tstruct kmem_node"
         },
         {
-          "path": "src/pm.c",
-          "symbol_kind": "struct",
-          "symbol_name": "kmem",
-          "excerpt": "static struct { struct spinlock lock; struct run *freelist; uint64 npage; } kmem;"
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
         }
       ]
     },
@@ -100,25 +88,25 @@
       "question_id": "Q03_005",
       "question_type": "short_answer",
       "stem": "物理分配器的并发控制锁粒度是什么？（全局大锁 / per-CPU / 分桶 / 无锁+关中断 / 其他；必须给锁对象类型与持锁范围证据）",
-      "value": "全局自旋锁 (global spinlock)。使用 struct spinlock kmem.lock 保护整个空闲链表，持锁范围覆盖 allocpage 和 freepage 的整个临界区",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
       "evidence": [
         {
-          "path": "src/pm.c",
-          "symbol_kind": "function",
-          "symbol_name": "allocpage",
-          "excerpt": "acquire(&kmem.lock); r = kmem.freelist; ... release(&kmem.lock);"
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "definition",
+          "symbol_name": "lsp_get_definition",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
         },
         {
-          "path": "src/pm.c",
-          "symbol_kind": "function",
-          "symbol_name": "freepage",
-          "excerpt": "acquire(&kmem.lock); r->next = kmem.freelist; kmem.freelist = r; ... release(&kmem.lock);"
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "definition",
+          "symbol_name": "lsp_get_definition",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
         },
         {
-          "path": "src/include/spinlock.h",
-          "symbol_kind": "struct",
-          "symbol_name": "spinlock",
-          "excerpt": "struct spinlock { uint locked; char *name; struct cpu *cpu; };"
+          "path": "repos/oskernrl2022-rv6/src/pm.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '内存管理（物理/虚拟/分配器） / Q03_005: 物理分配器的并发控制锁粒度是什么？（全局大锁 / per-CPU / 分桶 / 无锁+关中断 / 其他；必须给锁对象类型与持锁范围证据）\n关键词: per, CPU, 锁' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5415 | 文件: repos\\oskernrl2022-rv6\\src\\pm.c:31-35 | 类型: struct_specifier | 符号名: \n```\nstruct {\n\tstruct spinlock lock;\n\tstruct run *freelist;\n\tuint64 npage;\n}\n```\n\n[2] 相似度: 0.5367 | 文件: repos\\oskernrl2022-rv6\\src\\spinlock.c:79-85 | 类型: function_definition | 符号名: holding\n```\nint\nholding(struct spinlock *lk)\n{\n  int r;\n  r = (lk->locked && lk->cpu == m"
         }
       ]
     },
@@ -126,25 +114,25 @@
       "question_id": "Q03_006",
       "question_type": "tri_state_impl",
       "stem": "是否存在“页表 (page table) 结构体 + walk/map/unmap”的真实实现？（必须三态）",
-      "value": "implemented",
+      "value": "not_found",
       "evidence": [
         {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "walk",
-          "excerpt": "pte_t *walk(pagetable_t pagetable, uint64 va, int alloc) - 三级页表遍历"
+          "path": "repos/oskernrl2022-rv6/src/proc.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '内存管理（物理/虚拟/分配器） / Q03_006: 是否存在“页表 (page table) 结构体 + walk/map/unmap”的真实实现？（必须三态）\n关键词: page, table, walk, map, unmap, 页表' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5498 | 文件: repos\\oskernrl2022-rv6\\src\\proc.c:297-365 | 类型: function_definition | 符号名: proc_pagetable\n```\npagetable_t\nproc_pagetable(struct proc *p, struct proc *pp, int thread_create)\n{\n  pagetable_t pagetable;\n\n  // An empty page table.\n  pagetable = kvmcreate();\n  if(pagetable == 0)\n    return NULL;\n\n  p->pagetable = pagetable;\n  //print"
         },
         {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "mappages",
-          "excerpt": "int mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)"
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "definition",
+          "symbol_name": "lsp_get_definition",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
         },
         {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "vmunmap",
-          "excerpt": "void vmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)"
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "definition",
+          "symbol_name": "lsp_get_definition",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
         }
       ]
     },
@@ -152,25 +140,25 @@
       "question_id": "Q03_007",
       "question_type": "short_answer",
       "stem": "页表操作 API（walk/map/unmap 或等价）对应的函数名/模块是什么？列出 1-3 个关键入口并给证据。",
-      "value": "核心 API：walk() 遍历页表返回 PTE 指针；mappages() 建立虚拟地址到物理地址的映射；vmunmap() 解除映射并可选释放物理页。辅助 API：uvmalloc() 分配用户内存并建立映射；uvmdealloc() 释放用户内存",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
       "evidence": [
         {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "walk",
-          "excerpt": "pte_t *walk(pagetable_t pagetable, uint64 va, int alloc)"
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
         },
         {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "mappages",
-          "excerpt": "int mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)"
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
         },
         {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "vmunmap",
-          "excerpt": "void vmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)"
+          "path": "repos/oskernrl2022-rv6/src/pm.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '内存管理（物理/虚拟/分配器） / Q03_007: 页表操作 API（walk/map/unmap 或等价）对应的函数名/模块是什么？列出 1-3 个关键入口并给证据。\n关键词: API, walk, map, unmap, 页表' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6061 | 文件: repos\\oskernrl2022-rv6\\src\\pm.c:79-99 | 类型: function_definition | 符号名: \n```\nvoid *\nallocpage(void)\n{\n\tstruct run *r;\n\n\tacquire(&kmem.lock);\n\tr = kmem.freelist;\n\tif (r) {\n\t\tkmem.freelist = r->next;\n\t\tkmem.npage--;\n\t}\n\trelease(&kmem.lock);\n\n\t#ifdef DEBUG \n\tif (r)\n\t\tmemset((char*)r, 5, PGSIZE); // fill with junk\n\t#endif \n\n\tallocs++;\n\tr"
         }
       ]
     },
@@ -178,19 +166,25 @@
       "question_id": "Q03_008",
       "question_type": "short_answer",
       "stem": "页表修改路径的并发控制是什么？（锁粒度、是否需要关中断、是否使用每进程地址空间锁等；必须引用锁/临界区证据）",
-      "value": "页表修改路径本身无专用锁，依赖物理页分配时的 kmem.lock 全局锁保护。mappages/walk 在分配新页表页时调用 allocpage() 持有 kmem.lock。无 per-CPU 锁或地址空间锁，无显式关中断保护",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
       "evidence": [
         {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "walk",
-          "excerpt": "if(!alloc || (pagetable = (pde_t*)allocpage()) == NULL) return NULL; - 调用 allocpage 间接持有 kmem.lock"
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
         },
         {
-          "path": "src/pm.c",
-          "symbol_kind": "function",
-          "symbol_name": "allocpage",
-          "excerpt": "acquire(&kmem.lock); ... release(&kmem.lock);"
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/ramdisk.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '内存管理（物理/虚拟/分配器） / Q03_008: 页表修改路径的并发控制是什么？（锁粒度、是否需要关中断、是否使用每进程地址空间锁等；必须引用锁/临界区证据）\n关键词: 页表, 锁' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5355 | 文件: repos\\oskernrl2022-rv6\\src\\ramdisk.c:13-13 | 类型: struct_specifier | 符号名: \n```\nstruct spinlock\n```\n\n[2] 相似度: 0.5291 | 文件: repos\\oskernrl2022-rv6\\src\\pm.c:31-35 | 类型: struct_specifier | 符号名: \n```\nstruct {\n\tstruct spinlock lock;\n\tstruct run *freelist;\n\tuint64 npage;\n}\n```\n\n[3] 相似度: 0.5240 | 文件: repos\\oskernrl2022-rv6\\src\\vma.c:329-332 | 类型: function_definitio"
         }
       ]
     },
@@ -198,19 +192,13 @@
       "question_id": "Q03_009",
       "question_type": "single_choice",
       "stem": "内核与用户地址空间关系更接近哪种？",
-      "value": "B. 共享同一页表（内核映射常驻，高半核等）",
+      "value": "未发现/待核实",
       "evidence": [
         {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "kvmcreate",
-          "excerpt": "pagetable_t kvmcreate() { ... memmove(pagetable, kernel_pagetable, PGSIZE); ... } - 用户页表复制内核页表"
-        },
-        {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "kvminit",
-          "excerpt": "内核页表映射 KERNBASE 到 PHYSTOP，用户进程共享这些映射"
+          "path": "repos/oskernrl2022-rv6/src/vma.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '内存管理（物理/虚拟/分配器） / Q03_009: 内核与用户地址空间关系更接近哪种？\n关键词: ' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5505 | 文件: repos\\oskernrl2022-rv6\\src\\vma.c:329-332 | 类型: function_definition | 符号名: \n```\nstruct vma *alloc_load_vma(struct proc *p, uint64 addr, uint64 sz, int perm)\n{\n  return alloc_vma(p, LOAD, addr, sz, perm, 1, NULL);\n}\n```\n\n[2] 相似度: 0.5497 | 文件: repos\\oskernrl2022-rv6\\src\\vma.c:240-281 | 类型: function_definition | 符号名: \n```\nstruct vma *alloc_addr_heap_vma(struct proc *p, uint64 addr, int perm)\n{\n  struc"
         }
       ]
     },
@@ -221,22 +209,16 @@
       "value": "not_found",
       "evidence": [
         {
-          "path": "src/trap.c",
-          "symbol_kind": "macro",
-          "symbol_name": "EXCP_LOAD_PAGE",
-          "excerpt": "#define EXCP_LOAD_PAGE 0xd // 13 - 定义但未在 usertrap 中处理"
+          "path": "repos/oskernrl2022-rv6/src/vma.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '内存管理（物理/虚拟/分配器） / Q03_010: 是否存在缺页异常 (Page Fault) 处理逻辑并与内存分配/映射联动？（必须三态）\n关键词: Page, Fault' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4836 | 文件: repos\\oskernrl2022-rv6\\src\\vma.c:16-63 | 类型: function_definition | 符号名: \n```\nstruct vma *vma_list_init(struct proc *p)\n{\n  if(p == NULL)\n  {\n    __debug_warn(\"[vma_list_init] proc is NULL\\n\");\n    return NULL;\n  }\n  // alloc head\n  struct vma *vma = (struct vma*)kmalloc(sizeof(struct vma));\n  if(vma == NULL)\n  {\n    __debug_warn(\"[vma_list_init] vma kmalloc fa"
         },
         {
-          "path": "src/trap.c",
-          "symbol_kind": "function",
-          "symbol_name": "usertrap",
-          "excerpt": "usertrap 中仅处理 EXCP_ENV_CALL 和 devintr，EXCP_LOAD_PAGE/EXCP_STORE_PAGE 分支被注释掉"
-        },
-        {
-          "path": "src/include/vm.h",
-          "symbol_kind": "function",
-          "symbol_name": "handle_page_fault",
-          "excerpt": "int handle_page_fault(int kind, uint stval); - 仅声明，未发现实现"
+          "path": "repos/oskernrl2022-rv6/src/vma.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '内存管理（物理/虚拟/分配器） / Q03_010: 是否存在缺页异常 (Page Fault) 处理逻辑并与内存分配/映射联动？（必须三态）\n关键词: Page, Fault' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4836 | 文件: repos\\oskernrl2022-rv6\\src\\vma.c:16-63 | 类型: function_definition | 符号名: \n```\nstruct vma *vma_list_init(struct proc *p)\n{\n  if(p == NULL)\n  {\n    __debug_warn(\"[vma_list_init] proc is NULL\\n\");\n    return NULL;\n  }\n  // alloc head\n  struct vma *vma = (struct vma*)kmalloc(sizeof(struct vma));\n  if(vma == NULL)\n  {\n    __debug_warn(\"[vma_list_init] vma kmalloc fa"
         }
       ]
     },
@@ -244,19 +226,25 @@
       "question_id": "Q03_011",
       "question_type": "short_answer",
       "stem": "追踪一条缺页链路：trap/异常入口 → 缺页处理函数（handle_page_fault 或等价）→ 分配页帧 → 建立映射。用 3-5 个关键节点描述并给每节点证据。",
-      "value": "缺页链路未实现。trap.c:usertrap 中 EXCP_LOAD_PAGE/EXCP_STORE_PAGE 处理分支被注释掉，handle_page_fault 仅在 vm.h 中声明但无实现。候选链路（未闭合）：usertrap [trap.c:94] → handle_excp [trap.c:未实现] → handle_page_fault [vm.h:42 仅声明] → allocpage [pm.c:79]",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
       "evidence": [
         {
-          "path": "src/trap.c",
-          "symbol_kind": "function",
-          "symbol_name": "usertrap",
-          "excerpt": "/* else if(handle_excp(cause) == 0) { } */ - 缺页处理被注释"
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
         },
         {
-          "path": "src/include/vm.h",
-          "symbol_kind": "function",
-          "symbol_name": "handle_page_fault",
-          "excerpt": "int handle_page_fault(int kind, uint stval); - 仅声明"
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/trap.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '内存管理（物理/虚拟/分配器） / Q03_011: 追踪一条缺页链路：trap/异常入口 → 缺页处理函数（handle_page_fault 或等价）→ 分配页帧 → 建立映射。用 3-5 个关键节点描述并给每节点证据。\n关键词: trap, handle_page_fault' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5464 | 文件: repos\\oskernrl2022-rv6\\src\\trap.c:176-209 | 类型: function_definition | 符号名: kerneltrap\n```\nvoid \nkerneltrap() {\n  int which_dev = 0;\n  uint64 sepc = r_sepc();\n  uint64 sstatus = r_sstatus();\n  uint64 scause = r_scause();\n\n  // printf(\"kerneltrap scause:%p\\n\",scause);\n  if((sstatus & SSTATUS_SPP) == 0)\n    pan"
         }
       ]
     },
@@ -267,16 +255,16 @@
       "value": "not_found",
       "evidence": [
         {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "uvmcopy",
-          "excerpt": "uvmcopy 实现深拷贝或浅拷贝，但未发现 PTE 写保护位设置或 CoW 标志"
+          "path": "repos/oskernrl2022-rv6/src/copy.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '内存管理（物理/虚拟/分配器） / Q03_012: 是否实现写时复制 (Copy-on-Write, CoW)？（必须三态；若 implemented 需说明触发点在 fault 中还是 fork 中）\n关键词: Copy, Write, CoW, implemented, fault, fork' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4885 | 文件: repos\\oskernrl2022-rv6\\src\\copy.c:177-187 | 类型: function_definition | 符号名: either_copyout\n```\nint\neither_copyout(int user_dst, uint64 dst, void *src, uint64 len)\n{\n  struct proc *p = myproc();\n  if(user_dst){\n    return copyout(p->pagetable, dst, src, len);\n  } else {\n    memmove((char *)dst, src, l"
         },
         {
-          "path": "src/trap.c",
-          "symbol_kind": "function",
-          "symbol_name": "usertrap",
-          "excerpt": "缺页处理未实现，无法触发 CoW"
+          "path": "repos/oskernrl2022-rv6/src/copy.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '内存管理（物理/虚拟/分配器） / Q03_012: 是否实现写时复制 (Copy-on-Write, CoW)？（必须三态；若 implemented 需说明触发点在 fault 中还是 fork 中）\n关键词: Copy, Write, CoW, implemented, fault, fork' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4885 | 文件: repos\\oskernrl2022-rv6\\src\\copy.c:177-187 | 类型: function_definition | 符号名: either_copyout\n```\nint\neither_copyout(int user_dst, uint64 dst, void *src, uint64 len)\n{\n  struct proc *p = myproc();\n  if(user_dst){\n    return copyout(p->pagetable, dst, src, len);\n  } else {\n    memmove((char *)dst, src, l"
         }
       ]
     },
@@ -284,19 +272,19 @@
       "question_id": "Q03_013",
       "question_type": "tri_state_impl",
       "stem": "是否实现惰性分配 (Lazy Allocation)？（必须三态；若 implemented 需说明是在 brk/mmap 还是 fault 中分配）",
-      "value": "stub",
+      "value": "not_found",
       "evidence": [
         {
-          "path": "src/vma.c",
-          "symbol_kind": "function",
-          "symbol_name": "alloc_vma",
-          "excerpt": "alloc_vma 中 alloc==1 时立即调用 uvmalloc 分配物理页，非惰性"
+          "path": "repos/oskernrl2022-rv6/src/vma.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '内存管理（物理/虚拟/分配器） / Q03_013: 是否实现惰性分配 (Lazy Allocation)？（必须三态；若 implemented 需说明是在 brk/mmap 还是 fault 中分配）\n关键词: Lazy, Allocation, implemented, brk, mmap, fault' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5645 | 文件: repos\\oskernrl2022-rv6\\src\\vma.c:329-332 | 类型: function_definition | 符号名: \n```\nstruct vma *alloc_load_vma(struct proc *p, uint64 addr, uint64 sz, int perm)\n{\n  return alloc_vma(p, LOAD, addr, sz, perm, 1, NULL);\n}\n```\n\n[2] 相似度: 0.5433 | 文件: repos\\oskernrl2022-rv6\\src\\vma.c:197-218 | 类型: functio"
         },
         {
-          "path": "src/vma.c",
-          "symbol_kind": "function",
-          "symbol_name": "alloc_mmap_vma",
-          "excerpt": "alloc_mmap_vma 调用 alloc_vma(p, MMAP, addr, sz, perm, 1, NULL) - 立即分配"
+          "path": "repos/oskernrl2022-rv6/src/vma.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '内存管理（物理/虚拟/分配器） / Q03_013: 是否实现惰性分配 (Lazy Allocation)？（必须三态；若 implemented 需说明是在 brk/mmap 还是 fault 中分配）\n关键词: Lazy, Allocation, implemented, brk, mmap, fault' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5645 | 文件: repos\\oskernrl2022-rv6\\src\\vma.c:329-332 | 类型: function_definition | 符号名: \n```\nstruct vma *alloc_load_vma(struct proc *p, uint64 addr, uint64 sz, int perm)\n{\n  return alloc_vma(p, LOAD, addr, sz, perm, 1, NULL);\n}\n```\n\n[2] 相似度: 0.5433 | 文件: repos\\oskernrl2022-rv6\\src\\vma.c:197-218 | 类型: functio"
         }
       ]
     },
@@ -307,10 +295,16 @@
       "value": "not_found",
       "evidence": [
         {
-          "path": "src/include/sysinfo.h",
-          "symbol_kind": "struct",
-          "symbol_name": "sysinfo",
-          "excerpt": "unsigned long totalswap; unsigned long freeswap; - 仅结构体定义，无实现"
+          "path": "repos/oskernrl2022-rv6/src/exec.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '内存管理（物理/虚拟/分配器） / Q03_014: 是否实现 swap（swap_in/swap_out 或等价页面置换）？（必须三态）\n关键词: swap, swap_in, swap_out' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6045 | 文件: repos\\oskernrl2022-rv6\\src\\exec.c:114-122 | 类型: function_definition | 符号名: swap\n```\nvoid swap(void* a,void* b,int len){\n  char c;\n  char *sa = a,*sb = b;\n  for(int i = 0;i<len;i++){\n    c = sa[i];\n    sa[i] = sb[i];\n    sb[i] = c;\n  }\n}\n```\n\n[2] 相似度: 0.4696 | 文件: repos\\oskernrl2022-rv6\\src\\mmap.c:156-222 | 类型: function_definition | 符号名: do_munmap\n```"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/exec.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '内存管理（物理/虚拟/分配器） / Q03_014: 是否实现 swap（swap_in/swap_out 或等价页面置换）？（必须三态）\n关键词: swap, swap_in, swap_out' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6045 | 文件: repos\\oskernrl2022-rv6\\src\\exec.c:114-122 | 类型: function_definition | 符号名: swap\n```\nvoid swap(void* a,void* b,int len){\n  char c;\n  char *sa = a,*sb = b;\n  for(int i = 0;i<len;i++){\n    c = sa[i];\n    sa[i] = sb[i];\n    sb[i] = c;\n  }\n}\n```\n\n[2] 相似度: 0.4696 | 文件: repos\\oskernrl2022-rv6\\src\\mmap.c:156-222 | 类型: function_definition | 符号名: do_munmap\n```"
         }
       ]
     },
@@ -318,25 +312,19 @@
       "question_id": "Q03_015",
       "question_type": "tri_state_impl",
       "stem": "是否实现 mmap（文件映射/匿名映射）且处理标志位（MAP_FIXED/MAP_ANON/MAP_SHARED 等）？（必须三态；stub 需说明形态如 ENOSYS/return 0）",
-      "value": "implemented",
+      "value": "not_found",
       "evidence": [
         {
-          "path": "src/mmap.c",
-          "symbol_kind": "function",
-          "symbol_name": "do_mmap",
-          "excerpt": "处理 MAP_ANONYMOUS、MAP_FIXED、MAP_SHARED、MAP_PRIVATE 标志位"
+          "path": "repos/oskernrl2022-rv6/src/sysfile.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '内存管理（物理/虚拟/分配器） / Q03_015: 是否实现 mmap（文件映射/匿名映射）且处理标志位（MAP_FIXED/MAP_ANON/MAP_SHARED 等）？（必须三态；stub 需说明形态如 ENOSYS/return 0）\n关键词: mmap, MAP_FIXED, MAP_ANON, MAP_SHARED, stub, ENOSYS, return' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.7180 | 文件: repos\\oskernrl2022-rv6\\src\\sysfile.c:894-921 | 类型: function_definition | 符号名: sys_mmap\n```\nuint64\nsys_mmap(void)\n{\n  uint64 start;\n  uint64 len;\n  int prot;\n  int flags;\n  int fd;\n  int off;\n  if(argaddr(0, &start) < 0)\n    return -1;\n  if(argaddr(1, &len) < 0)\n  "
         },
         {
-          "path": "src/mmap.c",
-          "symbol_kind": "function",
-          "symbol_name": "do_munmap",
-          "excerpt": "实现 munmap 并处理脏页回写（PTE_D 位检查）"
-        },
-        {
-          "path": "src/sysfile.c",
-          "symbol_kind": "function",
-          "symbol_name": "sys_mmap",
-          "excerpt": "系统调用入口 sys_mmap 调用 do_mmap"
+          "path": "repos/oskernrl2022-rv6/src/sysfile.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '内存管理（物理/虚拟/分配器） / Q03_015: 是否实现 mmap（文件映射/匿名映射）且处理标志位（MAP_FIXED/MAP_ANON/MAP_SHARED 等）？（必须三态；stub 需说明形态如 ENOSYS/return 0）\n关键词: mmap, MAP_FIXED, MAP_ANON, MAP_SHARED, stub, ENOSYS, return' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.7180 | 文件: repos\\oskernrl2022-rv6\\src\\sysfile.c:894-921 | 类型: function_definition | 符号名: sys_mmap\n```\nuint64\nsys_mmap(void)\n{\n  uint64 start;\n  uint64 len;\n  int prot;\n  int flags;\n  int fd;\n  int off;\n  if(argaddr(0, &start) < 0)\n    return -1;\n  if(argaddr(1, &len) < 0)\n  "
         }
       ]
     },
@@ -347,10 +335,16 @@
       "value": "not_found",
       "evidence": [
         {
-          "path": "src/bio.c",
-          "symbol_kind": "file",
-          "symbol_name": "bio.c",
-          "excerpt": "块 I/O 缓冲，但非页缓存机制"
+          "path": "repos/oskernrl2022-rv6/src/pm.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '内存管理（物理/虚拟/分配器） / Q03_016: 是否存在 Page Cache（页缓存/文件页缓存）管理？（必须三态）\n关键词: Page, Cache' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5301 | 文件: repos\\oskernrl2022-rv6\\src\\pm.c:101-110 | 类型: function_definition | 符号名: checkmemlist\n```\nvoid\ncheckmemlist(void* pa){\n\tstruct run* r = kmem.freelist;\n\twhile(r){\n\t  if(pa == r){\n\t    __debug_warn(\"[freepage]free %p twice\\n\",pa);\n\t  }\n\t  r= r->next;\n\t}\n}\n```\n\n[2] 相似度: 0.4929 | 文件: repos\\oskernrl2022-rv6\\src\\pm.c:79-99 | 类型: function_definition | 符号名: \n```\nvoid *\nallocpa"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/pm.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '内存管理（物理/虚拟/分配器） / Q03_016: 是否存在 Page Cache（页缓存/文件页缓存）管理？（必须三态）\n关键词: Page, Cache' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5301 | 文件: repos\\oskernrl2022-rv6\\src\\pm.c:101-110 | 类型: function_definition | 符号名: checkmemlist\n```\nvoid\ncheckmemlist(void* pa){\n\tstruct run* r = kmem.freelist;\n\twhile(r){\n\t  if(pa == r){\n\t    __debug_warn(\"[freepage]free %p twice\\n\",pa);\n\t  }\n\t  r= r->next;\n\t}\n}\n```\n\n[2] 相似度: 0.4929 | 文件: repos\\oskernrl2022-rv6\\src\\pm.c:79-99 | 类型: function_definition | 符号名: \n```\nvoid *\nallocpa"
         }
       ]
     },
@@ -358,13 +352,19 @@
       "question_id": "Q03_017",
       "question_type": "tri_state_impl",
       "stem": "是否存在脏页回写 (dirty page writeback) 机制？（必须三态；若 implemented 需指出同步/异步与触发条件）",
-      "value": "implemented",
+      "value": "not_found",
       "evidence": [
         {
-          "path": "src/mmap.c",
-          "symbol_kind": "function",
-          "symbol_name": "do_munmap",
-          "excerpt": "if(*pte & PTE_D){ pa = PTE2PA(*pte); filewrite(f, va, size); } - munmap 时同步回写脏页"
+          "path": "repos/oskernrl2022-rv6/src/ramdisk.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '内存管理（物理/虚拟/分配器） / Q03_017: 是否存在脏页回写 (dirty page writeback) 机制？（必须三态；若 implemented 需指出同步/异步与触发条件）\n关键词: dirty, page, writeback, implemented' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5213 | 文件: repos\\oskernrl2022-rv6\\src\\ramdisk.c:31-47 | 类型: function_definition | 符号名: ramdisk_rw\n```\nvoid \nramdisk_rw(struct buf *b, int write)\n{\n  acquire(&ramdisklock);\n  uint sectorno = b->sectorno;\n\n  char *addr = ramdisk + sectorno * BSIZE;\n  if (write)\n  {\n    memmove((void*)addr, b->data, BSIZE);\n  }\n  else\n  {\n   "
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/ramdisk.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '内存管理（物理/虚拟/分配器） / Q03_017: 是否存在脏页回写 (dirty page writeback) 机制？（必须三态；若 implemented 需指出同步/异步与触发条件）\n关键词: dirty, page, writeback, implemented' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5213 | 文件: repos\\oskernrl2022-rv6\\src\\ramdisk.c:31-47 | 类型: function_definition | 符号名: ramdisk_rw\n```\nvoid \nramdisk_rw(struct buf *b, int write)\n{\n  acquire(&ramdisklock);\n  uint sectorno = b->sectorno;\n\n  char *addr = ramdisk + sectorno * BSIZE;\n  if (write)\n  {\n    memmove((void*)addr, b->data, BSIZE);\n  }\n  else\n  {\n   "
         }
       ]
     },
@@ -375,16 +375,22 @@
       "value": "not_found",
       "evidence": [
         {
-          "path": "src/include/sbi.h",
-          "symbol_kind": "macro",
-          "symbol_name": "SBI_REMOTE_SFENCE_VMA",
-          "excerpt": "#define SBI_REMOTE_SFENCE_VMA 6 - 仅定义，未发现调用"
+          "path": "repos/oskernrl2022-rv6/src/proc.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '内存管理（物理/虚拟/分配器） / Q03_018: 是否存在 TLB 射击 (TLB Shootdown / Remote TLB Flush)机制以支持多核页表一致性？（必须三态；若 implemented 需指向 IPI/跨核调用证据）\n关键词: TLB, Shootdown, Remote, Flush, implemented, IPI, 页表' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5324 | 文件: repos\\oskernrl2022-rv6\\src\\proc.c:297-365 | 类型: function_definition | 符号名: proc_pagetable\n```\npagetable_t\nproc_pagetable(struct proc *p, struct proc *pp, int thread_create)\n{\n  pagetable_t pagetable;\n\n  // An empty page table.\n  pagetable = kvmcreate();\n  if(pagetable == "
         },
         {
-          "path": "src/include/sbi.h",
-          "symbol_kind": "macro",
-          "symbol_name": "SBI_REMOTE_SFENCE_VMA_ASID",
-          "excerpt": "#define SBI_REMOTE_SFENCE_VMA_ASID 7 - 仅定义，未发现调用"
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
         }
       ]
     },
@@ -392,19 +398,13 @@
       "question_id": "Q03_019",
       "question_type": "short_answer",
       "stem": "TLB 刷新指令/函数点是什么？（RISC-V sfence.vma / AArch64 tlbi / x86 invlpg 等，或仓库中等价的 TLB 刷新封装；必须给证据）",
-      "value": "RISC-V sfence.vma 指令。封装函数：sfence_vma() 定义在 riscv.h:329，使用 asm volatile(\"sfence.vma\") 实现。调用点：vm.c:57 kvminithart 中调用 sfence_vma()",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
       "evidence": [
         {
-          "path": "src/include/riscv.h",
-          "symbol_kind": "function",
-          "symbol_name": "sfence_vma",
-          "excerpt": "static inline void sfence_vma() { asm volatile(\"sfence.vma\"); }"
-        },
-        {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "kvminithart",
-          "excerpt": "w_satp(MAKE_SATP(kernel_pagetable)); sfence_vma();"
+          "path": "repos/oskernrl2022-rv6/src/include/riscv.h",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '内存管理（物理/虚拟/分配器） / Q03_019: TLB 刷新指令/函数点是什么？（RISC-V sfence.vma / AArch64 tlbi / x86 invlpg 等，或仓库中等价的 TLB 刷新封装；必须给证据）\n关键词: TLB, RISC, sfence, vma, AArch64, tlbi, x86, invlpg' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6461 | 文件: repos\\oskernrl2022-rv6\\src\\include\\riscv.h:328-334 | 类型: function_definition | 符号名: sfence_vma\n```\nstatic inline void\nsfence_vma()\n{\n  // the zero, zero means flush all TLB entries.\n  // asm volatile(\"sfence.vma zero, zero\");\n  asm volatile(\"sfence.vma\");\n}\n```\n\n[2] 相似度: 0.6353 "
         }
       ]
     },
@@ -412,25 +412,25 @@
       "question_id": "Q03_020",
       "question_type": "short_answer",
       "stem": "用户指针安全检查机制是什么？（access_ok/verify_area/UserInPtr 等；列出入口点与校验逻辑证据）",
-      "value": "walkaddr() 函数进行用户指针检查。检查逻辑：1) va >= MAXVA 返回 NULL；2) walk(pagetable, va, 0) 检查 PTE 存在；3) (*pte & PTE_V) == 0 检查有效位；4) (*pte & PTE_U) == 0 检查用户可访问位。copyin/copyout 调用 walkaddr 进行校验",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
       "evidence": [
         {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "walkaddr",
-          "excerpt": "if(va >= MAXVA) return NULL; pte = walk(...); if((*pte & PTE_V) == 0) return NULL; if((*pte & PTE_U) == 0) return NULL;"
+          "path": "repos/oskernrl2022-rv6/src/pm.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '内存管理（物理/虚拟/分配器） / Q03_020: 用户指针安全检查机制是什么？（access_ok/verify_area/UserInPtr 等；列出入口点与校验逻辑证据）\n关键词: access_ok, verify_area, UserInPtr' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4665 | 文件: repos\\oskernrl2022-rv6\\src\\pm.c:101-110 | 类型: function_definition | 符号名: checkmemlist\n```\nvoid\ncheckmemlist(void* pa){\n\tstruct run* r = kmem.freelist;\n\twhile(r){\n\t  if(pa == r){\n\t    __debug_warn(\"[freepage]free %p twice\\n\",pa);\n\t  }\n\t  r= r->next;\n\t}\n}\n```\n\n[2] 相似度: 0.4625 | 文件: repos\\oskernrl2022-rv6\\src\\uarg.c:6-14 | "
         },
         {
-          "path": "src/copy.c",
-          "symbol_kind": "function",
-          "symbol_name": "copyin",
-          "excerpt": "pa0 = walkaddr(pagetable, va0); if(pa0 == NULL) return -1;"
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
         },
         {
-          "path": "src/copy.c",
-          "symbol_kind": "function",
-          "symbol_name": "copyout",
-          "excerpt": "pa0 = walkaddr(pagetable, va0); if(pa0 == NULL) return -1;"
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
         }
       ]
     },
@@ -438,13 +438,19 @@
       "question_id": "Q03_021",
       "question_type": "single_choice",
       "stem": "若实现了页面置换 (Page Replacement)，使用的算法最接近哪种？（Stallings Ch8：OPT 理想算法 / LRU 最近最少使用 / Clock 近似 LRU / FIFO / 未实现）",
-      "value": "F. 未实现页面置换（无 swap）",
+      "value": "未实现页面置换（无 swap）",
       "evidence": [
         {
-          "path": "src",
-          "symbol_kind": "file",
-          "symbol_name": "全局搜索",
-          "excerpt": "未发现 swap_in/swap_out 或页面置换算法实现"
+          "path": "repos/oskernrl2022-rv6/src/pm.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '内存管理（物理/虚拟/分配器） / Q03_021: 若实现了页面置换 (Page Replacement)，使用的算法最接近哪种？（Stallings Ch8：OPT 理想算法 / LRU 最近最少使用 / Clock 近似 LRU / FIFO / 未实现）\n关键词: Page, Replacement, Stallings, Ch8, OPT, LRU, Clock, FIFO' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6280 | 文件: repos\\oskernrl2022-rv6\\src\\pm.c:79-99 | 类型: function_definition | 符号名: \n```\nvoid *\nallocpage(void)\n{\n\tstruct run *r;\n\n\tacquire(&kmem.lock);\n\tr = kmem.freelist;\n\tif (r) {\n\t\tkmem.freelist = r->next;\n\t\tkmem.npage--;\n\t}\n\trelease(&kmem.lock);\n\n\t#ifdef DEBUG \n\tif"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/pm.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '内存管理（物理/虚拟/分配器） / Q03_021: 若实现了页面置换 (Page Replacement)，使用的算法最接近哪种？（Stallings Ch8：OPT 理想算法 / LRU 最近最少使用 / Clock 近似 LRU / FIFO / 未实现）\n关键词: Page, Replacement, Stallings, Ch8, OPT, LRU, Clock, FIFO' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6280 | 文件: repos\\oskernrl2022-rv6\\src\\pm.c:79-99 | 类型: function_definition | 符号名: \n```\nvoid *\nallocpage(void)\n{\n\tstruct run *r;\n\n\tacquire(&kmem.lock);\n\tr = kmem.freelist;\n\tif (r) {\n\t\tkmem.freelist = r->next;\n\t\tkmem.npage--;\n\t}\n\trelease(&kmem.lock);\n\n\t#ifdef DEBUG \n\tif"
         }
       ]
     },
@@ -455,10 +461,16 @@
       "value": "not_found",
       "evidence": [
         {
-          "path": "src",
-          "symbol_kind": "file",
-          "symbol_name": "全局搜索",
-          "excerpt": "搜索关键字：working_set|thrash|resident_set|kswapd|oom - 未找到匹配"
+          "path": "repos/oskernrl2022-rv6/src/pm.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '内存管理（物理/虚拟/分配器） / Q03_022: 是否存在工作集模型 (Working Set Model, WSM) 或抖动检测/防止 (Thrashing Prevention) 机制？（必须三态；Stallings Ch8 核心概念；若 not_found 需列出已搜关键字 working_set|thrash|resident_set）\n关键词: Working, Set, Model, WSM, Thrashing, Prevention, Stallings, Ch8' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.3987 | 文件: repos\\oskernrl2022-rv6\\src\\pm.c:40-49 | 类型: function_definition | 符号名: kpminit\n```\nvoid\nkpminit()\n{\n\tinitlock(&kmem.lock, \"kmem\");\n\tkmem.freelist = 0;\n\tkmem.npage = 0;\n\tallocs = frees = 0;\n\tfreerange(kernel"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/pm.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '内存管理（物理/虚拟/分配器） / Q03_022: 是否存在工作集模型 (Working Set Model, WSM) 或抖动检测/防止 (Thrashing Prevention) 机制？（必须三态；Stallings Ch8 核心概念；若 not_found 需列出已搜关键字 working_set|thrash|resident_set）\n关键词: Working, Set, Model, WSM, Thrashing, Prevention, Stallings, Ch8' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.3987 | 文件: repos\\oskernrl2022-rv6\\src\\pm.c:40-49 | 类型: function_definition | 符号名: kpminit\n```\nvoid\nkpminit()\n{\n\tinitlock(&kmem.lock, \"kmem\");\n\tkmem.freelist = 0;\n\tkmem.npage = 0;\n\tallocs = frees = 0;\n\tfreerange(kernel"
         }
       ]
     },
@@ -466,31 +478,25 @@
       "question_id": "Q03_023",
       "question_type": "fill_in",
       "stem": "物理内存总量（Physical Memory Size）：____ KB/MB；页大小（Page Size）：____ bytes；最大进程虚拟地址空间（Virtual Address Space）：____ bits。（必须从代码常量/链接脚本/配置中给出证据；无法确定则写 unknown 并说明已搜路径）",
-      "value": "物理内存总量：128 MB；页大小：4096 bytes；最大进程虚拟地址空间：39 bits（Sv39）",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
       "evidence": [
         {
-          "path": "src/include/memlayout.h",
-          "symbol_kind": "macro",
-          "symbol_name": "PHYSTOP",
-          "excerpt": "#define PHYSTOP (0x80000000ULL + (unsigned long long)(1ULL * 128 * 1024 * 1024)) // 128MB"
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
         },
         {
-          "path": "src/include/riscv.h",
-          "symbol_kind": "macro",
-          "symbol_name": "PGSIZE",
-          "excerpt": "#define PGSIZE 4096 // bytes per page"
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
         },
         {
-          "path": "src/include/riscv.h",
-          "symbol_kind": "macro",
-          "symbol_name": "MAXVA",
-          "excerpt": "#define MAXVA (1L << (9 + 9 + 9 + 12 - 1)) // 256 GB, Sv39 39-bit virtual address"
-        },
-        {
-          "path": "src/include/riscv.h",
-          "symbol_kind": "macro",
-          "symbol_name": "SATP_SV39",
-          "excerpt": "#define SATP_SV39 (8L << 60) // use riscv's sv39 page table scheme"
+          "path": "repos/oskernrl2022-rv6/src/vma.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '内存管理（物理/虚拟/分配器） / Q03_023: 物理内存总量（Physical Memory Size）：____ KB/MB；页大小（Page Size）：____ bytes；最大进程虚拟地址空间（Virtual Address Space）：____ bits。（必须从代码常量/链接脚本/配置中给出证据；无法确定则写 unknown 并说明已搜路径）\n关键词: Physical, Memory, Size, ____, Page, bytes, Virtual, Address' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5573 | 文件: repos\\oskernrl2022-rv6\\src\\vma.c:329-332 | 类型: function_definition | 符号名: \n```\nstruct vma *alloc_load_vma(struct proc *p, uint64 addr, uint64 sz, int perm)\n{\n  return alloc_vma(p, LOAD, addr, sz, perm, 1"
         }
       ]
     },
@@ -498,25 +504,19 @@
       "question_id": "Q03_024",
       "question_type": "single_choice",
       "stem": "内存保护机制 (Memory Protection) 的实现形式更接近哪种？（Stallings Ch7.1）",
-      "value": "C. 硬件页表 + 软件指针检查双重保护",
+      "value": "未发现",
       "evidence": [
         {
-          "path": "src/include/riscv.h",
-          "symbol_kind": "macro",
-          "symbol_name": "PTE_U",
-          "excerpt": "#define PTE_U (1L << 4) // 1 -> user can access - 硬件页表权限位"
+          "path": "repos/oskernrl2022-rv6/src/vma.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '内存管理（物理/虚拟/分配器） / Q03_024: 内存保护机制 (Memory Protection) 的实现形式更接近哪种？（Stallings Ch7.1）\n关键词: Memory, Protection, Stallings, Ch7' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5617 | 文件: repos\\oskernrl2022-rv6\\src\\vma.c:329-332 | 类型: function_definition | 符号名: \n```\nstruct vma *alloc_load_vma(struct proc *p, uint64 addr, uint64 sz, int perm)\n{\n  return alloc_vma(p, LOAD, addr, sz, perm, 1, NULL);\n}\n```\n\n[2] 相似度: 0.5420 | 文件: repos\\oskernrl2022-rv6\\src\\vma.c:197-218 | 类型: function_definition | 符号名: \n```\nstruct v"
         },
         {
-          "path": "src/copy.c",
-          "symbol_kind": "function",
-          "symbol_name": "copyin",
-          "excerpt": "walkaddr 检查 PTE_U 位，软件校验用户指针"
-        },
-        {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "walkaddr",
-          "excerpt": "if((*pte & PTE_U) == 0) return NULL; - 软件检查用户可访问性"
+          "path": "repos/oskernrl2022-rv6/src/vma.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '内存管理（物理/虚拟/分配器） / Q03_024: 内存保护机制 (Memory Protection) 的实现形式更接近哪种？（Stallings Ch7.1）\n关键词: Memory, Protection, Stallings, Ch7' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5617 | 文件: repos\\oskernrl2022-rv6\\src\\vma.c:329-332 | 类型: function_definition | 符号名: \n```\nstruct vma *alloc_load_vma(struct proc *p, uint64 addr, uint64 sz, int perm)\n{\n  return alloc_vma(p, LOAD, addr, sz, perm, 1, NULL);\n}\n```\n\n[2] 相似度: 0.5420 | 文件: repos\\oskernrl2022-rv6\\src\\vma.c:197-218 | 类型: function_definition | 符号名: \n```\nstruct v"
         }
       ]
     },
@@ -524,25 +524,25 @@
       "question_id": "Q03_025",
       "question_type": "short_answer",
       "stem": "逻辑内存组织 (Logical Memory Organization, Stallings Ch7.1)：进程地址空间中 text/data/heap/stack/mmap 各区域（或等价区间）是否由统一的映射管理结构（VMA/区间表/链表/BTreeMap 等）维护？（如存在请给结构体证据；不存在则写未发现等价结构）",
-      "value": "是，使用 VMA（Virtual Memory Area）双向链表统一管理。结构体 struct vma 定义在 vma.h:15，包含 type（LOAD/HEAP/STACK/MMAP/TRAP 等）、addr、sz、end、perm、fd、f_off 字段。进程 struct proc 包含 vma 头指针",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
       "evidence": [
         {
-          "path": "src/include/vma.h",
-          "symbol_kind": "struct",
-          "symbol_name": "vma",
-          "excerpt": "struct vma { enum segtype type; int perm; uint64 addr; uint64 sz; uint64 end; int flags; int fd; uint64 f_off; struct vma *prev; struct vma *next; };"
+          "path": "repos/oskernrl2022-rv6/src/vma.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '内存管理（物理/虚拟/分配器） / Q03_025: 逻辑内存组织 (Logical Memory Organization, Stallings Ch7.1)：进程地址空间中 text/data/heap/stack/mmap 各区域（或等价区间）是否由统一的映射管理结构（VMA/区间表/链表/BTreeMap 等）维护？（如存在请给结构体证据；不存在则写未发现等价结构）\n关键词: Logical, Memory, Organization, Stallings, Ch7, text, data, heap' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5760 | 文件: repos\\oskernrl2022-rv6\\src\\vma.c:197-218 | 类型: function_definition | 符号名: \n```\nstruct vma* alloc_mmap_vma(struct proc *p, int flags, uint64 addr, uint64 sz, int perm, int fd ,uint64 f_off)\n{\n  "
         },
         {
-          "path": "src/include/proc.h",
-          "symbol_kind": "struct",
-          "symbol_name": "proc",
-          "excerpt": "struct proc { ... struct vma *vma; ... };"
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
         },
         {
-          "path": "src/vma.c",
-          "symbol_kind": "function",
-          "symbol_name": "vma_list_init",
-          "excerpt": "初始化 LOAD/HEAP/STACK/MMAP/TRAP 各区域 VMA"
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
         }
       ]
     },
@@ -550,13 +550,19 @@
       "question_id": "Q03_026",
       "question_type": "single_choice",
       "stem": "是否存在显式的硬件分段机制 (Hardware Segmentation, Stallings Ch7.4)？",
-      "value": "C. 纯分页无分段（RISC-V/AArch64 常见）",
+      "value": "未发现",
       "evidence": [
         {
-          "path": "src/include/riscv.h",
-          "symbol_kind": "macro",
-          "symbol_name": "SATP_SV39",
-          "excerpt": "RISC-V Sv39 纯分页机制，无硬件分段"
+          "path": "repos/oskernrl2022-rv6/src/vm.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '内存管理（物理/虚拟/分配器） / Q03_026: 是否存在显式的硬件分段机制 (Hardware Segmentation, Stallings Ch7.4)？\n关键词: Hardware, Segmentation, Stallings, Ch7' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5300 | 文件: repos\\oskernrl2022-rv6\\src\\vm.c:52-59 | 类型: function_definition | 符号名: kvminithart\n```\nvoid\nkvminithart()\n{\n  w_satp(MAKE_SATP(kernel_pagetable));\n  // reg_info();\n  sfence_vma();\n  __debug_info(\"kvminithart\\n\");\n}\n```\n\n[2] 相似度: 0.5128 | 文件: repos\\oskernrl2022-rv6\\src\\disk.c:36-43 | 类型: function_definition | 符号名: vdisk_wri"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/vm.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '内存管理（物理/虚拟/分配器） / Q03_026: 是否存在显式的硬件分段机制 (Hardware Segmentation, Stallings Ch7.4)？\n关键词: Hardware, Segmentation, Stallings, Ch7' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5300 | 文件: repos\\oskernrl2022-rv6\\src\\vm.c:52-59 | 类型: function_definition | 符号名: kvminithart\n```\nvoid\nkvminithart()\n{\n  w_satp(MAKE_SATP(kernel_pagetable));\n  // reg_info();\n  sfence_vma();\n  __debug_info(\"kvminithart\\n\");\n}\n```\n\n[2] 相似度: 0.5128 | 文件: repos\\oskernrl2022-rv6\\src\\disk.c:36-43 | 类型: function_definition | 符号名: vdisk_wri"
         }
       ]
     },
@@ -564,19 +570,13 @@
       "question_id": "Q03_027",
       "question_type": "single_choice",
       "stem": "取页策略 (Fetch Policy, Stallings Ch8.2) 更接近哪种？",
-      "value": "D. 预分配 (Pre-allocation)：进程创建时立即分配全部物理页",
+      "value": "未发现/不适用",
       "evidence": [
         {
-          "path": "src/vma.c",
-          "symbol_kind": "function",
-          "symbol_name": "alloc_vma",
-          "excerpt": "alloc==1 时立即调用 uvmalloc 分配物理页并建立映射"
-        },
-        {
-          "path": "src/vma.c",
-          "symbol_kind": "function",
-          "symbol_name": "alloc_mmap_vma",
-          "excerpt": "调用 alloc_vma(p, MMAP, addr, sz, perm, 1, NULL) - 立即分配"
+          "path": "repos/oskernrl2022-rv6/src/pm.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '内存管理（物理/虚拟/分配器） / Q03_027: 取页策略 (Fetch Policy, Stallings Ch8.2) 更接近哪种？\n关键词: Fetch, Policy, Stallings, Ch8' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5362 | 文件: repos\\oskernrl2022-rv6\\src\\pm.c:79-99 | 类型: function_definition | 符号名: \n```\nvoid *\nallocpage(void)\n{\n\tstruct run *r;\n\n\tacquire(&kmem.lock);\n\tr = kmem.freelist;\n\tif (r) {\n\t\tkmem.freelist = r->next;\n\t\tkmem.npage--;\n\t}\n\trelease(&kmem.lock);\n\n\t#ifdef DEBUG \n\tif (r)\n\t\tmemset((char*)r, 5, PGSIZE); // fill with junk\n\t#endif \n\n\tallocs++;\n\treturn (void"
         }
       ]
     },
@@ -584,25 +584,19 @@
       "question_id": "Q03_028",
       "question_type": "short_answer",
       "stem": "放置策略 (Placement Policy, Stallings Ch8.2)：新的匿名映射或堆区域增长时，系统如何选择虚拟地址区间？（固定起始地址 / mmap_base 向下生长 / 首次适配 / 最佳适配 等；必须给实现证据或写未发现等价策略）",
-      "value": "VMA 双向链表首次适配（first-fit）。alloc_vma 遍历链表查找空闲区间：while(nvma != vma_head) { if(end <= nvma->addr) break; ... }。MMAP 区域从 USER_MMAP_START 向下生长（alloc_mmap_vma 中 addr = PGROUNDDOWN(mvma->addr - sz)）",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
       "evidence": [
         {
-          "path": "src/vma.c",
-          "symbol_kind": "function",
-          "symbol_name": "alloc_vma",
-          "excerpt": "遍历 VMA 链表查找空闲区间：while(nvma != vma_head) { if(end <= nvma->addr) break; }"
+          "path": "repos/oskernrl2022-rv6/src/vma.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '内存管理（物理/虚拟/分配器） / Q03_028: 放置策略 (Placement Policy, Stallings Ch8.2)：新的匿名映射或堆区域增长时，系统如何选择虚拟地址区间？（固定起始地址 / mmap_base 向下生长 / 首次适配 / 最佳适配 等；必须给实现证据或写未发现等价策略）\n关键词: Placement, Policy, Stallings, Ch8, mmap_base' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6292 | 文件: repos\\oskernrl2022-rv6\\src\\vma.c:329-332 | 类型: function_definition | 符号名: \n```\nstruct vma *alloc_load_vma(struct proc *p, uint64 addr, uint64 sz, int perm)\n{\n  return alloc_vma(p, LOAD, addr, sz, perm, 1, NULL);\n}\n```\n\n[2] 相似度: 0.6265 | 文件: repos\\"
         },
         {
-          "path": "src/vma.c",
-          "symbol_kind": "function",
-          "symbol_name": "alloc_mmap_vma",
-          "excerpt": "addr = PGROUNDDOWN(mvma->addr - sz); - MMAP 向下生长"
-        },
-        {
-          "path": "src/include/memlayout.h",
-          "symbol_kind": "macro",
-          "symbol_name": "USER_MMAP_START",
-          "excerpt": "#define USER_MMAP_START (USER_STACK_BOTTOM - 0x10000000)"
+          "path": "repos/oskernrl2022-rv6/src/vma.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '内存管理（物理/虚拟/分配器） / Q03_028: 放置策略 (Placement Policy, Stallings Ch8.2)：新的匿名映射或堆区域增长时，系统如何选择虚拟地址区间？（固定起始地址 / mmap_base 向下生长 / 首次适配 / 最佳适配 等；必须给实现证据或写未发现等价策略）\n关键词: Placement, Policy, Stallings, Ch8, mmap_base' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6292 | 文件: repos\\oskernrl2022-rv6\\src\\vma.c:329-332 | 类型: function_definition | 符号名: \n```\nstruct vma *alloc_load_vma(struct proc *p, uint64 addr, uint64 sz, int perm)\n{\n  return alloc_vma(p, LOAD, addr, sz, perm, 1, NULL);\n}\n```\n\n[2] 相似度: 0.6265 | 文件: repos\\"
         }
       ]
     },
@@ -613,10 +607,16 @@
       "value": "not_found",
       "evidence": [
         {
-          "path": "src",
-          "symbol_kind": "file",
-          "symbol_name": "全局搜索",
-          "excerpt": "搜索关键字：working_set|thrash|resident_set|kswapd|oom|load_control - 未找到匹配"
+          "path": "repos/oskernrl2022-rv6/src/pm.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '内存管理（物理/虚拟/分配器） / Q03_029: 是否存在驻留集管理/内存负载控制 (Resident Set Management / Load Control, Stallings Ch8.2)？（包括工作集动态调整、内存回收守护线程、OOM killer、驻留页数限制等；若 not_found 需列出已搜关键字）\n关键词: Resident, Set, Management, Load, Control, Stallings, Ch8, OOM' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4697 | 文件: repos\\oskernrl2022-rv6\\src\\pm.c:40-49 | 类型: function_definition | 符号名: kpminit\n```\nvoid\nkpminit()\n{\n\tinitlock(&kmem.lock, \"kmem\");\n\tkmem.freelist = 0;\n\tkmem.npage = 0;\n\tallocs = frees = 0;\n\tfreerange(kernel_end, (void*)PH"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/pm.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '内存管理（物理/虚拟/分配器） / Q03_029: 是否存在驻留集管理/内存负载控制 (Resident Set Management / Load Control, Stallings Ch8.2)？（包括工作集动态调整、内存回收守护线程、OOM killer、驻留页数限制等；若 not_found 需列出已搜关键字）\n关键词: Resident, Set, Management, Load, Control, Stallings, Ch8, OOM' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4697 | 文件: repos\\oskernrl2022-rv6\\src\\pm.c:40-49 | 类型: function_definition | 符号名: kpminit\n```\nvoid\nkpminit()\n{\n\tinitlock(&kmem.lock, \"kmem\");\n\tkmem.freelist = 0;\n\tkmem.npage = 0;\n\tallocs = frees = 0;\n\tfreerange(kernel_end, (void*)PH"
         }
       ]
     },
@@ -624,49 +624,25 @@
       "question_id": "Q03_030",
       "question_type": "short_answer",
       "stem": "内存主链路（必须给出，尽量以 Mermaid graph TD 表达）：从确认的最强内存入口（缺页处理入口/mmap 入口/brk 入口/等价入口）出发，追踪到页表操作核心点或物理页分配核心点，写出 3-6 个关键节点。节点格式：FuncName [path:line]。若链路未被源码证据完全闭合，标注候选主链路而非确认的主链路。只画一条主链，不要并列展开多条支线。",
-      "value": "graph TD\n    sys_mmap[sys_mmap [src/sysfile.c:894]] --> do_mmap[do_mmap [src/mmap.c:30]]\n    do_mmap --> alloc_mmap_vma[alloc_mmap_vma [src/vma.c:195]]\n    alloc_mmap_vma --> alloc_vma[alloc_vma [src/vma.c:64]]\n    alloc_vma --> uvmalloc[uvmalloc [src/vm.c:224]]\n    uvmalloc --> mappages[mappages [src/vm.c:85]]\n    mappages --> walk[walk [src/vm.c:140]]\n    walk --> allocpage[allocpage [src/pm.c:79]]",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
       "evidence": [
         {
-          "path": "src/sysfile.c",
-          "symbol_kind": "function",
-          "symbol_name": "sys_mmap",
-          "excerpt": "系统调用入口"
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
         },
         {
-          "path": "src/mmap.c",
-          "symbol_kind": "function",
-          "symbol_name": "do_mmap",
-          "excerpt": "mmap 核心实现"
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
         },
         {
-          "path": "src/vma.c",
-          "symbol_kind": "function",
-          "symbol_name": "alloc_mmap_vma",
-          "excerpt": "分配 MMAP VMA"
-        },
-        {
-          "path": "src/vma.c",
-          "symbol_kind": "function",
-          "symbol_name": "alloc_vma",
-          "excerpt": "通用 VMA 分配"
-        },
-        {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "uvmalloc",
-          "excerpt": "用户内存分配"
-        },
-        {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "mappages",
-          "excerpt": "页表映射"
-        },
-        {
-          "path": "src/pm.c",
-          "symbol_kind": "function",
-          "symbol_name": "allocpage",
-          "excerpt": "物理页分配"
+          "path": "repos/oskernrl2022-rv6/src/pm.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '内存管理（物理/虚拟/分配器） / Q03_030: 内存主链路（必须给出，尽量以 Mermaid graph TD 表达）：从确认的最强内存入口（缺页处理入口/mmap 入口/brk 入口/等价入口）出发，追踪到页表操作核心点或物理页分配核心点，写出 3-6 个关键节点。节点格式：FuncName [path:line]。若链路未被源码证据完全闭合，标注候选主链路而非确认的主链路。只画一条主链，不要并列展开多条支线。\n关键词: Mermaid, graph, mmap, brk, FuncName, path, line, 页表' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5339 | 文件: repos\\oskernrl2022-rv6\\src\\pm.c:79-99 | 类型: function_definition | 符号名: \n```\nvoid *\nallocpage(void)\n{\n\tstruct run *r;\n\n\tacquire(&kmem.lock);\n\tr = kmem.freelist;\n\tif (r) {\n\t\tkmem.freel"
         }
       ]
     },
@@ -674,19 +650,13 @@
       "question_id": "Q03_031",
       "question_type": "single_choice",
       "stem": "该系统更容易出现哪种内存碎片 (Memory Fragmentation, Stallings Ch7.2)？",
-      "value": "B. 外部碎片 (External Fragmentation)：空闲块分散无法满足大连续请求",
+      "value": "未发现相关机制",
       "evidence": [
         {
-          "path": "src/pm.c",
-          "symbol_kind": "function",
-          "symbol_name": "allocpage",
-          "excerpt": "简单空闲链表分配器，无碎片整理机制"
-        },
-        {
-          "path": "src/pm.c",
-          "symbol_kind": "function",
-          "symbol_name": "freepage",
-          "excerpt": "释放页插入链表头部，可能导致碎片化"
+          "path": "repos/oskernrl2022-rv6/src/vma.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '内存管理（物理/虚拟/分配器） / Q03_031: 该系统更容易出现哪种内存碎片 (Memory Fragmentation, Stallings Ch7.2)？\n关键词: Memory, Fragmentation, Stallings, Ch7' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5646 | 文件: repos\\oskernrl2022-rv6\\src\\vma.c:329-332 | 类型: function_definition | 符号名: \n```\nstruct vma *alloc_load_vma(struct proc *p, uint64 addr, uint64 sz, int perm)\n{\n  return alloc_vma(p, LOAD, addr, sz, perm, 1, NULL);\n}\n```\n\n[2] 相似度: 0.5543 | 文件: repos\\oskernrl2022-rv6\\src\\vma.c:240-281 | 类型: function_definition | 符号名: \n```\nstruc"
         }
       ]
     },
@@ -694,19 +664,13 @@
       "question_id": "Q03_032",
       "question_type": "single_choice",
       "stem": "地址重定位 (Address Relocation, Stallings Ch7.1) 的绑定时机更接近哪种？",
-      "value": "C. 运行时动态绑定 (Run-time / Dynamic Relocation)：通过 MMU 基址 + 界限或页表在每次访问时转换",
+      "value": "未发现/不适用",
       "evidence": [
         {
-          "path": "src/include/riscv.h",
-          "symbol_kind": "macro",
-          "symbol_name": "SATP_SV39",
-          "excerpt": "RISC-V Sv39 页表机制，运行时通过 satp 寄存器切换页表"
-        },
-        {
-          "path": "src/vm.c",
-          "symbol_kind": "function",
-          "symbol_name": "kvminithart",
-          "excerpt": "w_satp(MAKE_SATP(kernel_pagetable)); sfence_vma(); - 运行时切换页表"
+          "path": "repos/oskernrl2022-rv6/src/vma.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '内存管理（物理/虚拟/分配器） / Q03_032: 地址重定位 (Address Relocation, Stallings Ch7.1) 的绑定时机更接近哪种？\n关键词: Address, Relocation, Stallings, Ch7' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5284 | 文件: repos\\oskernrl2022-rv6\\src\\vma.c:183-195 | 类型: function_definition | 符号名: \n```\nstruct vma *addr_locate_vma(struct vma*head, uint64 addr)\n{\n  struct vma *vma = head->next;\n  while(vma != head)\n  {\n    if(vma->addr <= addr && addr < vma->end)\n    {\n      return vma;\n    }\n    vma = vma->next;\n  }\n  return NULL;\n}\n```\n\n[2] 相似度: "
         }
       ]
     },
@@ -714,13 +678,13 @@
       "question_id": "Q03_033",
       "question_type": "single_choice",
       "stem": "页面置换的作用域策略 (Replacement Scope, Stallings Ch8.2) 更接近哪种？",
-      "value": "C. 未实现置换（无 swap）",
+      "value": "未发现",
       "evidence": [
         {
-          "path": "src",
-          "symbol_kind": "file",
-          "symbol_name": "全局搜索",
-          "excerpt": "未发现 swap 或页面置换实现"
+          "path": "repos/oskernrl2022-rv6/src/pm.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '内存管理（物理/虚拟/分配器） / Q03_033: 页面置换的作用域策略 (Replacement Scope, Stallings Ch8.2) 更接近哪种？\n关键词: Replacement, Scope, Stallings, Ch8' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5323 | 文件: repos\\oskernrl2022-rv6\\src\\pm.c:79-99 | 类型: function_definition | 符号名: \n```\nvoid *\nallocpage(void)\n{\n\tstruct run *r;\n\n\tacquire(&kmem.lock);\n\tr = kmem.freelist;\n\tif (r) {\n\t\tkmem.freelist = r->next;\n\t\tkmem.npage--;\n\t}\n\trelease(&kmem.lock);\n\n\t#ifdef DEBUG \n\tif (r)\n\t\tmemset((char*)r, 5, PGSIZE); // fill with junk\n\t#endif \n\n\tallocs+"
         }
       ]
     },
@@ -731,16 +695,16 @@
       "value": "not_found",
       "evidence": [
         {
-          "path": "src",
-          "symbol_kind": "file",
-          "symbol_name": "全局搜索",
-          "excerpt": "搜索关键字：background_writeback|writeback|cleaner|flush_dirty|kswapd - 仅找到 VIRTIO_BLK_F_CONFIG_WCE 定义，无后台写回实现"
+          "path": "repos/oskernrl2022-rv6/src/pm.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '内存管理（物理/虚拟/分配器） / Q03_034: 是否存在清理策略 (Cleaning Policy, Stallings Ch8.2)？（即脏页预先后台写回，而非仅在置换时才写回；搜索 background writeback / kswapd / cleaner_thread 或等价；必须三态；若 not_found 需列出已搜关键字）\n关键词: Cleaning, Policy, Stallings, Ch8, background, writeback, kswapd, cleaner_thread' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4357 | 文件: repos\\oskernrl2022-rv6\\src\\pm.c:101-110 | 类型: function_definition | 符号名: checkmemlist\n```\nvoid\ncheckmemlist(void* pa){\n\tstruct run* r = kmem.freelist;\n\twhile(r){\n\t  if(pa == r){\n\t    __debug_w"
         },
         {
-          "path": "src/mmap.c",
-          "symbol_kind": "function",
-          "symbol_name": "do_munmap",
-          "excerpt": "仅在 munmap 时同步回写脏页，无后台清理线程"
+          "path": "repos/oskernrl2022-rv6/src/pm.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '内存管理（物理/虚拟/分配器） / Q03_034: 是否存在清理策略 (Cleaning Policy, Stallings Ch8.2)？（即脏页预先后台写回，而非仅在置换时才写回；搜索 background writeback / kswapd / cleaner_thread 或等价；必须三态；若 not_found 需列出已搜关键字）\n关键词: Cleaning, Policy, Stallings, Ch8, background, writeback, kswapd, cleaner_thread' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4357 | 文件: repos\\oskernrl2022-rv6\\src\\pm.c:101-110 | 类型: function_definition | 符号名: checkmemlist\n```\nvoid\ncheckmemlist(void* pa){\n\tstruct run* r = kmem.freelist;\n\twhile(r){\n\t  if(pa == r){\n\t    __debug_w"
         }
       ]
     }

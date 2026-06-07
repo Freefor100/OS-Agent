@@ -1,0 +1,57 @@
+{
+  "task_id": "task_04_smp_ap_ipi_percpu",
+  "stage_id": "04_process_smp",
+  "question_id": "Q04_028",
+  "question_ids": [
+    "Q04_028",
+    "Q04_029",
+    "Q04_030",
+    "Q04_031",
+    "Q04_032",
+    "Q04_033",
+    "Q04_034",
+    "Q04_035",
+    "Q04_038",
+    "Q04_039",
+    "Q04_041"
+  ],
+  "status": "done",
+  "evidence_ids": [
+    "ev_task_04_smp_ap_ipi_percpu_08a29c01",
+    "ev_task_04_smp_ap_ipi_percpu_ee5f99d3",
+    "ev_task_04_smp_ap_ipi_percpu_2a26f53e",
+    "ev_task_04_smp_ap_ipi_percpu_10a75d4b",
+    "ev_task_04_smp_ap_ipi_percpu_927344a4",
+    "ev_task_04_smp_ap_ipi_percpu_2e482b37",
+    "ev_task_04_smp_ap_ipi_percpu_4ba212a9",
+    "ev_task_04_smp_ap_ipi_percpu_972d49ec",
+    "ev_task_04_smp_ap_ipi_percpu_c11e62a9",
+    "ev_task_04_smp_ap_ipi_percpu_f78b3473",
+    "ev_task_04_smp_ap_ipi_percpu_4dac740f",
+    "ev_task_04_smp_ap_ipi_percpu_a51dede2",
+    "ev_task_04_smp_ap_ipi_percpu_cb8b0e75"
+  ],
+  "draft_answer_ids": [
+    "draft_task_04_smp_ap_ipi_percpu_Q04_028_259388d1",
+    "draft_task_04_smp_ap_ipi_percpu_Q04_029_f8550b47",
+    "draft_task_04_smp_ap_ipi_percpu_Q04_030_4cad8a5a",
+    "draft_task_04_smp_ap_ipi_percpu_Q04_031_832cc868",
+    "draft_task_04_smp_ap_ipi_percpu_Q04_032_55ebc9fb",
+    "draft_task_04_smp_ap_ipi_percpu_Q04_033_e612e73e",
+    "draft_task_04_smp_ap_ipi_percpu_Q04_034_836ca576",
+    "draft_task_04_smp_ap_ipi_percpu_Q04_035_8cc9278e",
+    "draft_task_04_smp_ap_ipi_percpu_Q04_038_f1efacbd",
+    "draft_task_04_smp_ap_ipi_percpu_Q04_039_07af8241",
+    "draft_task_04_smp_ap_ipi_percpu_Q04_041_62d20543"
+  ],
+  "findings": [],
+  "confidence": "high",
+  "errors": [],
+  "token_usage": {},
+  "metadata": {
+    "evidence_count": 13,
+    "mode": "react",
+    "summary": "查证了 xv6-k210 的 SMP 相关实现：NCPU=2，BSP(hart0)通过 SBI IPI 唤醒 AP(hart1)，per-CPU 通过 tp 寄存器存 hartid + cpus[] 数组，IPI 使用 SBI 扩展，调度器使用全局单队列无负载均衡/亲和性，TLB shootdown 仅本地 sfence_vma 无远程，PID 分配用普通 int+spinlock 非 AtomicUsize，无 NUMA 支持。",
+    "raw_output_excerpt": "Now I have all the evidence. Let me produce the final JSON output.\n\n```json\n{\n  \"status\": \"done\",\n  \"summary\": \"查证了 xv6-k210 的 SMP 相关实现：NCPU=2，BSP(hart0)通过 SBI IPI 唤醒 AP(hart1)，per-CPU 通过 tp 寄存器存 hartid + cpus[] 数组，IPI 使用 SBI 扩展，调度器使用全局单队列无负载均衡/亲和性，TLB shootdown 仅本地 sfence_vma 无远程，PID 分配用普通 int+spinlock 非 AtomicUsize，无 NUMA 支持。\",\n  \"claim\": \"xv6-k210 实现了基本的双核 SMP（NCPU=2），包括 AP 启动链（BSP 发 IPI 唤醒 AP）、per-CPU 数据（tp 寄存器 + cpus[] 数组）、IPI 发送与处理（SBI IPI 扩展）。但缺少：per-CPU 专用结构体（仅有 struct cpu）、调度负载均衡/迁移/亲和性、远程 TLB shootdown、AtomicUsize PID 分配、NUMA 支持。\",\n  \"structured_fact_results\": [\n    {\n      \"fact_id\": \"Q04_028_01\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [0],\n      \"notes\": \"NCPU=2 定义在 include/param.h:5，有完整定义和实际使用\"\n    },\n    {\n      \"fact_id\": \"Q04_028_02\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [1, 2, 3],\n      \"notes\": \"AP 启动链在 kernel/main.c 中实现：BSP(hart0)初始化后通过 sbi_send_ipi 唤醒其他 hart，hart1 等待 started 标志后执行初始化\"\n    },\n    {\n      \"fact_id\": \"Q04_028_03\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [4, 5, 6],\n      \"notes\": \"per-CPU 通过 tp 寄存器存 hartid（cpuid()读取），cpus[NCPU]数组索引访问。无 PerCpu/cpu_local 专用结构体\"\n    },\n    {\n      \"fact_id\": \"Q04_028_04\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [7, 8, 9],\n      \"notes\": \"IPI 使用 SBI IPI 扩展（sbi_send_ipi），handler 在 trap.c handle_intr() 中处理 INTR_SOFTWARE\"\n    },\n    {\n      \"fact_id\": \"Q04_028_05\",\n      \"status_or_value\": \"yes_weak\",\n      \"evidence_candidate_indexes\": [10, 11],\n      \"notes\": \"调度器使用全局单队列（proc_runnable[3]），无 per-CPU 队列、无负载均衡、无迁移、无亲和性。TLB shootdown 仅本地 sfence_vma()，无远程 shootdown\"\n    },\n    {\n      \"fact_id\": \"Q04_028_06\",\n      \"status_or_value\": \"no_after_negative_search\",\n      \"evidence_candidate_indexes\": [12],\n      \"notes\": \"已按 negative_search_policy 覆盖关键词和目录，未发现 PerCpu/cpu_local 结构体、load_balance/affinity 实现、远程 TLB shootdown、AtomicUsize、NUMA\"\n    },\n    {\n      \"fact_id\": \"Q0"
+  }
+}

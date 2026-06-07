@@ -1,0 +1,185 @@
+{
+  "raw": "{\n  \"task_plan\": [\n    {\n      \"task_id\": \"task_08_net_subsystem_existence\",\n      \"question_ids\": [\"Q08_001\", \"Q08_002\"],\n      \"task_type\": \"react_code\",\n      \"agent_type\": \"react_code\",\n      \"task_goal\": \"确认是否存在网络子系统（协议栈或socket层），并判断协议栈来源（第三方库如lwip/smoltcp或自研）\",\n      \"group_reason\": \"两题均需先定位网络子系统整体存在性及来源，共享同一发现路径\",\n      \"query\": \"查找网络协议栈实现，搜索lwip、smoltcp、tcp、udp、socket等关键词，确认是否存在及来源\",\n      \"seed_paths\": [\"net\", \"tcp\", \"udp\", \"socket\", \"lwip\", \"smoltcp\", \"src\"],\n      \"entry_symbols\": [\"main\"],\n      \"expected_evidence_types\": [\"definition\", \"implementation_body\", \"build_config\"]\n    },\n    {\n      \"task_id\": \"task_08_socket_syscall_interface\",\n      \"question_ids\": [\"Q08_003\"],\n      \"task_type\": \"react_code\",\n      \"agent_type\": \"react_code\",\n      \"task_goal\": \"查证是否实现socket系统调用接口（socket/bind/connect/sendto/recvfrom等），找到定义与实现体\",\n      \"group_reason\": \"独立题，需专门追踪socket相关系统调用入口\",\n      \"query\": \"搜索socket、bind、connect、sendto、recvfrom系统调用实现，确认是否存在\",\n      \"seed_paths\": [\"syscall\", \"src\", \"socket\"],\n      \"entry_symbols\": [\"sys_socket\", \"sys_bind\", \"sys_connect\", \"sys_sendto\", \"sys_recvfrom\"],\n      \"expected_evidence_types\": [\"definition\", \"implementation_body\", \"call_site\"]\n    },\n    {\n      \"task_id\": \"task_08_send_path_trace\",\n      \"question_ids\": [\"Q08_004\"],\n      \"task_type\": \"react_code\",\n      \"agent_type\": \"react_code\",\n      \"task_goal\": \"追踪sys_sendto发送路径：syscall层→协议栈→网卡驱动，列出3-6个关键节点并给出证据\",\n      \"group_reason\": \"独立题，需完整追踪发送链路，涉及多个层次\",\n      \"query\": \"从sys_sendto开始追踪发送路径，经过协议栈到网卡驱动，找出关键函数调用链\",\n      \"seed_paths\": [\"syscall\", \"net\", \"tcp\", \"udp\", \"src\"],\n      \"entry_symbols\": [\"sys_sendto\", \"sys_write\", \"tcp_output\", \"udp_send\", \"netif\"],\n      \"expected_evidence_types\": [\"definition\", \"implementation_body\", \"call_site\", \"usage_flow\"]\n    },\n    {\n      \"task_id\": \"task_08_nic_driver_interrupt\",\n      \"question_ids\": [\"Q08_005\"],\n      \"task_type\": \"react_code\",\n      \"agent_type\": \"react_code\",\n      \"task_goal\": \"查证是否实现网卡驱动（virtio-net/e1000等）与收包中断路径，找到驱动代码和中断处理\",\n      \"group_reason\": \"独立题，需定位网卡驱动实现及中断处理逻辑\",\n      \"query\": \"搜索virtio-net、e1000、网卡驱动、中断处理、接收路径相关代码\",\n      \"seed_paths\": [\"src\", \"net\", \"driver\"],\n      \"entry_symbols\": [\"virtio_net\", \"e1000\", \"interrupt_handler\", \"recv\", \"netif_rx\"],\n      \"expected_evidence_types\": [\"definition\", \"implementation_body\", \"call_site\"]\n    },\n    {\n      \"task_id\": \"task_08_protocol_support\",\n      \"question_ids\": [\"Q08_006\"],\n      \"task_type\": \"react_code\",\n      \"agent_type\": \"react_code\",\n      \"task_goal\": \"确认协议支持情况：Ethernet/ARP/IPv4/IPv6/ICMP/UDP/TCP/DHCP/DNS，找到各协议实现证据\",\n      \"group_reason\": \"独立题，需逐一检查各协议实现，共享协议栈代码区域\",\n      \"query\": \"搜索Ethernet、ARP、IPv4、IPv6、ICMP、UDP、TCP、DHCP、DNS协议实现代码\",\n      \"seed_paths\": [\"net\", \"tcp\", \"udp\", \"lwip\", \"smoltcp\", \"src\"],\n      \"entry_symbols\": [\"eth\", \"arp\", \"ip\", \"icmp\", \"udp\", \"tcp\", \"dhcp\", \"dns\"],\n      \"expected_evidence_types\": [\"definition\", \"implementation_body\"]\n    },\n    {\n      \"task_id\": \"task_08_zero_copy_dma\",\n      \"question_ids\": [\"Q08_007\"],\n      \"task_type\": \"react_code\",\n      \"agent_type\": \"react_code\",\n      \"task_goal\": \"查证是否存在零拷贝/共享缓冲/DMA描述符路径，找到相关实现代码（非仅名词引用）\",\n      \"group_reason\": \"独立题，需专门搜索零拷贝、DMA、共享缓冲相关实现\",\n      \"query\": \"搜索zero-copy、DMA descriptor、shared buffer、零拷贝、描述符环等实现代码\",\n      \"seed_paths\": [\"net\", \"src\", \"driver\"],\n      \"entry_symbols\": [\"dma\", \"zero_copy\", \"descriptor\", \"buffer_pool\", \"mbuf\"],\n      \"expected_evidence_types\": [\"definition\", \"implementation_body\", \"usage_flow\"]\n    }\n  ]\n}",
+  "parsed": {
+    "task_plan": [
+      {
+        "task_id": "task_08_net_subsystem_existence",
+        "question_ids": [
+          "Q08_001",
+          "Q08_002"
+        ],
+        "task_type": "react_code",
+        "agent_type": "react_code",
+        "task_goal": "确认是否存在网络子系统（协议栈或socket层），并判断协议栈来源（第三方库如lwip/smoltcp或自研）",
+        "group_reason": "两题均需先定位网络子系统整体存在性及来源，共享同一发现路径",
+        "query": "查找网络协议栈实现，搜索lwip、smoltcp、tcp、udp、socket等关键词，确认是否存在及来源",
+        "seed_paths": [
+          "net",
+          "tcp",
+          "udp",
+          "socket",
+          "lwip",
+          "smoltcp",
+          "src"
+        ],
+        "entry_symbols": [
+          "main"
+        ],
+        "expected_evidence_types": [
+          "definition",
+          "implementation_body",
+          "build_config"
+        ]
+      },
+      {
+        "task_id": "task_08_socket_syscall_interface",
+        "question_ids": [
+          "Q08_003"
+        ],
+        "task_type": "react_code",
+        "agent_type": "react_code",
+        "task_goal": "查证是否实现socket系统调用接口（socket/bind/connect/sendto/recvfrom等），找到定义与实现体",
+        "group_reason": "独立题，需专门追踪socket相关系统调用入口",
+        "query": "搜索socket、bind、connect、sendto、recvfrom系统调用实现，确认是否存在",
+        "seed_paths": [
+          "syscall",
+          "src",
+          "socket"
+        ],
+        "entry_symbols": [
+          "sys_socket",
+          "sys_bind",
+          "sys_connect",
+          "sys_sendto",
+          "sys_recvfrom"
+        ],
+        "expected_evidence_types": [
+          "definition",
+          "implementation_body",
+          "call_site"
+        ]
+      },
+      {
+        "task_id": "task_08_send_path_trace",
+        "question_ids": [
+          "Q08_004"
+        ],
+        "task_type": "react_code",
+        "agent_type": "react_code",
+        "task_goal": "追踪sys_sendto发送路径：syscall层→协议栈→网卡驱动，列出3-6个关键节点并给出证据",
+        "group_reason": "独立题，需完整追踪发送链路，涉及多个层次",
+        "query": "从sys_sendto开始追踪发送路径，经过协议栈到网卡驱动，找出关键函数调用链",
+        "seed_paths": [
+          "syscall",
+          "net",
+          "tcp",
+          "udp",
+          "src"
+        ],
+        "entry_symbols": [
+          "sys_sendto",
+          "sys_write",
+          "tcp_output",
+          "udp_send",
+          "netif"
+        ],
+        "expected_evidence_types": [
+          "definition",
+          "implementation_body",
+          "call_site",
+          "usage_flow"
+        ]
+      },
+      {
+        "task_id": "task_08_nic_driver_interrupt",
+        "question_ids": [
+          "Q08_005"
+        ],
+        "task_type": "react_code",
+        "agent_type": "react_code",
+        "task_goal": "查证是否实现网卡驱动（virtio-net/e1000等）与收包中断路径，找到驱动代码和中断处理",
+        "group_reason": "独立题，需定位网卡驱动实现及中断处理逻辑",
+        "query": "搜索virtio-net、e1000、网卡驱动、中断处理、接收路径相关代码",
+        "seed_paths": [
+          "src",
+          "net",
+          "driver"
+        ],
+        "entry_symbols": [
+          "virtio_net",
+          "e1000",
+          "interrupt_handler",
+          "recv",
+          "netif_rx"
+        ],
+        "expected_evidence_types": [
+          "definition",
+          "implementation_body",
+          "call_site"
+        ]
+      },
+      {
+        "task_id": "task_08_protocol_support",
+        "question_ids": [
+          "Q08_006"
+        ],
+        "task_type": "react_code",
+        "agent_type": "react_code",
+        "task_goal": "确认协议支持情况：Ethernet/ARP/IPv4/IPv6/ICMP/UDP/TCP/DHCP/DNS，找到各协议实现证据",
+        "group_reason": "独立题，需逐一检查各协议实现，共享协议栈代码区域",
+        "query": "搜索Ethernet、ARP、IPv4、IPv6、ICMP、UDP、TCP、DHCP、DNS协议实现代码",
+        "seed_paths": [
+          "net",
+          "tcp",
+          "udp",
+          "lwip",
+          "smoltcp",
+          "src"
+        ],
+        "entry_symbols": [
+          "eth",
+          "arp",
+          "ip",
+          "icmp",
+          "udp",
+          "tcp",
+          "dhcp",
+          "dns"
+        ],
+        "expected_evidence_types": [
+          "definition",
+          "implementation_body"
+        ]
+      },
+      {
+        "task_id": "task_08_zero_copy_dma",
+        "question_ids": [
+          "Q08_007"
+        ],
+        "task_type": "react_code",
+        "agent_type": "react_code",
+        "task_goal": "查证是否存在零拷贝/共享缓冲/DMA描述符路径，找到相关实现代码（非仅名词引用）",
+        "group_reason": "独立题，需专门搜索零拷贝、DMA、共享缓冲相关实现",
+        "query": "搜索zero-copy、DMA descriptor、shared buffer、零拷贝、描述符环等实现代码",
+        "seed_paths": [
+          "net",
+          "src",
+          "driver"
+        ],
+        "entry_symbols": [
+          "dma",
+          "zero_copy",
+          "descriptor",
+          "buffer_pool",
+          "mbuf"
+        ],
+        "expected_evidence_types": [
+          "definition",
+          "implementation_body",
+          "usage_flow"
+        ]
+      }
+    ]
+  },
+  "task_plan_count": 6
+}

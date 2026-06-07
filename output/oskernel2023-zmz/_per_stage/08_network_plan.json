@@ -1,0 +1,100 @@
+{
+  "stage_id": "08_network",
+  "evidence_targets": [
+    "poll/select 实现 (ppoll/pselect)",
+    "文件描述符与 file 结构体中的 poll 回调机制",
+    "pipe 作为 IPC 机制的 poll 支持",
+    "socket API 缺失状态确认",
+    "网络协议栈缺失状态确认",
+    "virtio 网络设备驱动状态",
+    "inet_pton/inet_ntop 测试桩",
+    "协议栈",
+    "socket API",
+    "poll/epoll",
+    "驱动接入"
+  ],
+  "seed_paths": [
+    "kernel/fs/poll.c",
+    "kernel/fs/pipe.c",
+    "kernel/fs/file.c",
+    "kernel/syscall/sysfile.c",
+    "include/fs/poll.h",
+    "include/fs/file.h",
+    "include/fs/pipe.h",
+    "include/sysnum.h",
+    "kernel/syscall/syscall.c",
+    "include/hal/virtio.h",
+    "xv6-user/run_test.c",
+    "xv6-user/user.h",
+    "net",
+    "tcp"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "pselect",
+    "ppoll",
+    "file_poll",
+    "pipepoll",
+    "poll_init",
+    "poll_end",
+    "sys_pselect",
+    "sys_ppoll",
+    "pipealloc",
+    "fd2file",
+    "sys_socket",
+    "tcp"
+  ],
+  "repo_hotspots": [
+    "Cargo.toml",
+    "Makefile",
+    "debug",
+    "debug/kendryte_openocd",
+    "debug/openocd_cfg",
+    "doc",
+    "doc/img",
+    "include",
+    "include/fs",
+    "include/hal"
+  ],
+  "preferred_tools": [
+    "lsp_get_call_graph",
+    "lsp_get_definition",
+    "lsp_get_references",
+    "read_code_segment",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "使用 lsp_get_document_outline 分析 kernel/fs/poll.c 文件结构，确认 pselect/ppoll 实现位置",
+    "使用 lsp_get_call_graph 追踪 pselect 函数的 incoming 调用链 (depth=2)，确认 syscall 入口",
+    "使用 lsp_get_definition 定位 sys_pselect 和 sys_ppoll 的精确定义位置",
+    "使用 read_code_segment 读取 sys_pselect 实现 (kernel/syscall/sysfile.c:760-820)",
+    "使用 read_code_segment 读取 sys_ppoll 实现 (kernel/syscall/sysfile.c:821-850)",
+    "使用 lsp_get_references 查询 file_poll 符号的全局引用，确认 poll 回调机制",
+    "使用 read_code_segment 读取 pipepoll 实现 (kernel/fs/pipe.c 末尾部分)",
+    "使用 grep_in_repo 搜索 FD_PIPE/FD_INODE/FD_DEVICE 枚举，确认 file 类型体系",
+    "使用 read_code_segment 读取 include/fs/file.h 完整内容，确认 struct file 定义",
+    "使用 lsp_get_call_graph 追踪 pipealloc 的 outgoing 调用链 (depth=2)，确认 pipe 创建流程",
+    "使用 grep_in_repo 搜索 struct file 中 poll 函数指针的赋值位置",
+    "使用 read_code_segment 读取 kernel/fs/file.c 中 file_poll 相关实现",
+    "使用 grep_in_repo 确认 virtio_disk.c 中是否有网络设备相关代码",
+    "使用 read_code_segment 读取 xv6-user/run_test.c 中 inet_pton 测试条目上下文",
+    "使用 grep_in_repo 搜索 S_IFSOCK 宏定义及使用位置",
+    "使用 read_code_segment 读取 include/fs/stat.h 中 S_IFSOCK 定义",
+    "汇总证据：确认 socket API 未实现、协议栈缺失、poll 框架已就绪"
+  ]
+}

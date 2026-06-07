@@ -1,13 +1,13 @@
 """
 公共工具函数模块
 
-从 os_agent_d_describe.py 和 os_agent_d_evaluate.py 中提取的共享函数，
-合并为超集版本，兼容两者的工具名称映射。
+由 os_agent_d_describe.py 等入口使用的共享函数（含工具名映射与终端摘要格式化）。
 """
 import ast
 import os
 import json
 import re
+from typing import Any
 
 
 def _stringify_tool_arg(v):
@@ -148,21 +148,7 @@ def parse_env_repo_list(var_name: str, dotenv_path: str = ".env") -> list:
 
 
 def format_tool_call_summary(tool_name: str, tool_args: dict) -> str:
-    """格式化工具调用为简洁摘要（合并 describe + evaluate 两个版本的超集）"""
-
-    # OS-Agent C：调用图对比（避免只显示第一个参数）
-    if tool_name == "compare_call_graphs":
-        repo_a = tool_args.get("repo_a", "?")
-        repo_b = tool_args.get("repo_b", "?")
-        entry = tool_args.get("entry_function", tool_args.get("function_name", "?"))
-        return f"repo_a={repo_a}, repo_b={repo_b}, entry_function={entry}"
-
-    # OS-Agent C：函数 Token 相似度（避免只显示第一个参数）
-    if tool_name == "compare_function_tokens":
-        repo_a = tool_args.get("repo_a", "?")
-        repo_b = tool_args.get("repo_b", "?")
-        fn = tool_args.get("function_name", tool_args.get("entry_function", "?"))
-        return f"repo_a={repo_a}, repo_b={repo_b}, function_name={fn}"
+    """格式化工具调用为简洁摘要"""
 
     # 文件读取类工具
     if tool_name in ("read_code_segment", "read_file", "read_human_doc"):
@@ -207,8 +193,8 @@ def format_tool_call_summary(tool_name: str, tool_args: dict) -> str:
         suffix = f" in {dirname}/" if dirname else ""
         return f'"{pattern}"{suffix}' + (f" ({', '.join(extra)})" if extra else "")
 
-    # 技术栈分析 / 核心模块发现
-    elif tool_name in ("analyze_tech_stack", "find_os_core_modules"):
+    # 核心模块发现
+    elif tool_name == "find_os_core_modules":
         path = tool_args.get("repo_path", tool_args.get("path", "?"))
         dirname = os.path.basename(str(path).rstrip("/\\")) if path else "?"
         return f"{dirname}/"
@@ -261,7 +247,7 @@ def format_tool_call_summary(tool_name: str, tool_args: dict) -> str:
 
 
 def format_tool_result_summary(tool_name: str, content: str) -> str:
-    """格式化工具返回结果为简洁摘要（合并 describe + evaluate 两个版本的超集）"""
+    """格式化工具返回结果为简洁摘要"""
     content_len = len(content)
     line_count = len(content.split("\n")) if content else 0
 
@@ -286,11 +272,50 @@ def format_tool_result_summary(tool_name: str, content: str) -> str:
         return f"返回 {lines} 行关联信息"
     elif tool_name == "lsp_set_target_arch":
         return f"成功切换架构并重启 LSP" if "Successfully" in content else f"切换失败: {content[:30]}..."
-    elif tool_name == "analyze_tech_stack":
-        if "代码文件统计" in content or "Rust" in content:
-            return "返回技术栈与文件统计"
-        return f"返回 {content_len} 字符"
     elif tool_name in ("get_dev_history_by_module", "analyze_git_history_detailed", "analyze_git_history", "get_git_history_summary", "trace_file_evolution", "analyze_authors_contribution", "get_commit_diff_summary"):
         return f"返回开发历史分析 ({line_count} 行, {content_len} 字符)"
     else:
         return f"返回 {content_len} 字符 ({line_count} 行)"
+
+
+def llm_message_total_tokens(msg: Any) -> int:
+    """从 LangChain Chat 返回的 AIMessage 等取 total_tokens，与 `os_agent_d_describe.print_step` 一致。
+
+    若提供方未在 response_metadata 中返回用量，则返回 0（与终端「未携带 token_usage」行为一致）。"""
+    metadata = getattr(msg, "response_metadata", None) or {}
+    if not isinstance(metadata, dict):
+        return 0
+    usage = metadata.get("token_usage") or {}
+    if not isinstance(usage, dict):
+        return 0
+    t = usage.get("total_tokens")
+    try:
+        return int(t) if t is not None else 0
+    except (TypeError, ValueError):
+        return 0
+
+
+def safe_llm_invoke(llm, messages, max_retries: int = 5, initial_delay: float = 2.0, backoff_factor: float = 2.0) -> Any:
+    """安全的 llm.invoke 包装器，可在异常（如 AttributeError、超时）时以指数退避策略自动重试。"""
+    import time
+    import logging
+    logger = logging.getLogger("OS-Agent.SafeLLM")
+
+    last_exc = None
+    delay = initial_delay
+    for attempt in range(1, max_retries + 1):
+        try:
+            msg = llm.invoke(messages)
+            if msg is not None:
+                return msg
+            raise ValueError("llm.invoke 返回了 None")
+        except Exception as e:
+            last_exc = e
+            logger.warning(
+                f"llm.invoke 在第 {attempt}/{max_retries} 次尝试时失败，错误: {type(e).__name__}: {e}。"
+                f"将在 {delay:.1f} 秒后重试..."
+            )
+            time.sleep(delay)
+            delay *= backoff_factor
+    raise last_exc
+

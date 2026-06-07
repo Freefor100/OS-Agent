@@ -1,0 +1,402 @@
+{
+  "schema_version": "v1",
+  "stage_id": "06_sync_ipc",
+  "stage_title": "同步互斥与进程间通信",
+  "terminology_profile": "stallings_en_zh",
+  "answers": [
+    {
+      "question_id": "Q06_001",
+      "question_type": "short_answer",
+      "stem": "该内核提供了哪些同步原语？（SpinLock/Mutex/RwLock/Semaphore/Condvar/WaitQueue 等；列出类型定义证据）",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "definition",
+          "symbol_name": "lsp_get_definition",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "definition",
+          "symbol_name": "lsp_get_definition",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/proc.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '同步互斥与进程间通信 / Q06_001: 该内核提供了哪些同步原语？（SpinLock/Mutex/RwLock/Semaphore/Condvar/WaitQueue 等；列出类型定义证据）\n关键词: SpinLock, Mutex, RwLock, Semaphore, Condvar, WaitQueue' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5839 | 文件: repos\\oskernrl2022-rv6\\src\\proc.c:37-37 | 类型: struct_specifier | 符号名: \n```\nstruct spinlock\n```\n\n[2] 相似度: 0.5839 | 文件: repos\\oskernrl2022-rv6\\src\\proc.c:30-30 | 类型: struct_specifier | 符号名: \n```\nstruct spinlock\n```\n\n[3] 相似度: 0.5818 | 文件: repos\\oskernrl2022-rv6\\src\\include\\spinlock.h:7-13 | 类型: "
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_002",
+      "question_type": "single_choice",
+      "stem": "Mutex 更接近哪种实现？",
+      "value": "未发现/待核实",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/file.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '同步互斥与进程间通信 / Q06_002: Mutex 更接近哪种实现？\n关键词: Mutex' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4602 | 文件: repos\\oskernrl2022-rv6\\src\\file.c:132-146 | 类型: function_definition | 符号名: fileiolock\n```\nvoid fileiolock(struct file* f){\n  switch (f->type) {\n    case FD_PIPE:\n        acquire(&f->pipe->lock);\n        break;\n    case FD_DEVICE:\n        acquire(&(devsw + f->major)->lk);\n        break;\n    case FD_ENTRY:\n        elock(f->ep);\n        break;\n    case FD_NONE:\n    \treturn;\n  }\n}\n```\n\n[2] 相似度: 0.4570 | "
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/file.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '同步互斥与进程间通信 / Q06_002: Mutex 更接近哪种实现？\n关键词: Mutex' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4602 | 文件: repos\\oskernrl2022-rv6\\src\\file.c:132-146 | 类型: function_definition | 符号名: fileiolock\n```\nvoid fileiolock(struct file* f){\n  switch (f->type) {\n    case FD_PIPE:\n        acquire(&f->pipe->lock);\n        break;\n    case FD_DEVICE:\n        acquire(&(devsw + f->major)->lk);\n        break;\n    case FD_ENTRY:\n        elock(f->ep);\n        break;\n    case FD_NONE:\n    \treturn;\n  }\n}\n```\n\n[2] 相似度: 0.4570 | "
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_003",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在等待队列 (Wait Queue, WaitQueue) 与 sleep/wakeup（或等价阻塞/唤醒）实现？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/proc.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '同步互斥与进程间通信 / Q06_003: 是否存在等待队列 (Wait Queue, WaitQueue) 与 sleep/wakeup（或等价阻塞/唤醒）实现？（必须三态）\n关键词: Wait, Queue, WaitQueue, sleep, wakeup' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6525 | 文件: repos\\oskernrl2022-rv6\\src\\proc.c:580-592 | 类型: function_definition | 符号名: wakeup\n```\nvoid\nwakeup(void *chan)\n{\n   queue* q = findwaitq(chan);\n   if(q){\n     struct proc* p;\n     while((p = waitq_pop(q))!=NULL){\n       p->state = RUNNABLE;\n       readyq_push(p);\n     }\n     delwaitq(q);\n   }\n}\n```\n\n[2] 相似度: 0.5590 | 文"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/proc.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '同步互斥与进程间通信 / Q06_003: 是否存在等待队列 (Wait Queue, WaitQueue) 与 sleep/wakeup（或等价阻塞/唤醒）实现？（必须三态）\n关键词: Wait, Queue, WaitQueue, sleep, wakeup' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6525 | 文件: repos\\oskernrl2022-rv6\\src\\proc.c:580-592 | 类型: function_definition | 符号名: wakeup\n```\nvoid\nwakeup(void *chan)\n{\n   queue* q = findwaitq(chan);\n   if(q){\n     struct proc* p;\n     while((p = waitq_pop(q))!=NULL){\n       p->state = RUNNABLE;\n       readyq_push(p);\n     }\n     delwaitq(q);\n   }\n}\n```\n\n[2] 相似度: 0.5590 | 文"
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_004",
+      "question_type": "fill_in",
+      "stem": "sleep / wakeup 不变量 (Sleep-Wakeup Invariant) 分析，按格式填写：\n- sleep 入口函数: ___（路径）\n- 入睡前持有的锁: ___（无则写 none）\n- 防丢 wakeup (Lost Wakeup Prevention) 机制: ___（如：持队列锁检查条件 / 无防护）\n- wakeup 函数: ___（路径）\n- 唤醒与锁释放顺序: ___（先唤醒后释放 / 先释放后唤醒 / 其他）",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/sd/test.c",
+          "symbol_kind": "call_graph",
+          "symbol_name": "lsp_get_call_graph",
+          "excerpt": "Error: 文件未找到 repos/oskernrl2022-rv6/sd/test.c"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/proc.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '同步互斥与进程间通信 / Q06_004: sleep / wakeup 不变量 (Sleep-Wakeup Invariant) 分析，按格式填写：\n- sleep 入口函数: ___（路径）\n- 入睡前持有的锁: ___（无则写 none）\n- 防丢 wakeup (Lost Wakeup Prevention) 机制: ___（如：持队列锁检查条件 / 无防护）\n- wakeup 函数: ___（路径）\n- 唤醒与锁释放顺序: ___（先唤醒后释放 / 先释放后唤醒 / 其他）\n关键词: sleep, wakeup, Invariant, ___, none, Lost, Prevention, 锁' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6976 | 文件: repos\\oskernrl2022-rv6\\src\\proc.c:542-576 | 类型: function_definition | 符号名: sleep\n```\nvoid\nsleep(void *chan, struct spinlock *lk)\n{\n  struct proc"
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_005",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现管道 (Pipe)？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/include/pipe.h",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '同步互斥与进程间通信 / Q06_005: 是否实现管道 (Pipe)？（必须三态）\n关键词: Pipe' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5877 | 文件: repos\\oskernrl2022-rv6\\src\\include\\pipe.h:10-17 | 类型: struct_specifier | 符号名: \n```\nstruct pipe {\n  struct spinlock lock;\n  char data[PIPESIZE];\n  uint nread;     // number of bytes read\n  uint nwrite;    // number of bytes written\n  int readopen;   // read fd is still open\n  int writeopen;  // write fd is still open\n}\n```\n\n[2] 相似度: 0.5837 | 文件: repos\\oskernrl2022-rv6\\src\\pipe.c:69-93 | 类型: funct"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/include/pipe.h",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '同步互斥与进程间通信 / Q06_005: 是否实现管道 (Pipe)？（必须三态）\n关键词: Pipe' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5877 | 文件: repos\\oskernrl2022-rv6\\src\\include\\pipe.h:10-17 | 类型: struct_specifier | 符号名: \n```\nstruct pipe {\n  struct spinlock lock;\n  char data[PIPESIZE];\n  uint nread;     // number of bytes read\n  uint nwrite;    // number of bytes written\n  int readopen;   // read fd is still open\n  int writeopen;  // write fd is still open\n}\n```\n\n[2] 相似度: 0.5837 | 文件: repos\\oskernrl2022-rv6\\src\\pipe.c:69-93 | 类型: funct"
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_006",
+      "question_type": "single_choice",
+      "stem": "pipe 缓冲形态更接近哪种？",
+      "value": "未发现",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/pipe.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '同步互斥与进程间通信 / Q06_006: pipe 缓冲形态更接近哪种？\n关键词: pipe' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6686 | 文件: repos\\oskernrl2022-rv6\\src\\pipe.c:69-93 | 类型: function_definition | 符号名: pipewrite\n```\nint\npipewrite(struct pipe *pi, int user, uint64 addr, int n)\n{\n  int i;\n  char ch;\n  struct proc *pr = myproc();\n  \n  printf(\"[pipe]nread %d nwrite %d n %p\\n\", pi->nread, pi->nwrite, n);\n  for(i = 0; i < n; i++){\n    while(pi->nwrite == pi->nread + PIPESIZE){  //DOC: pipewrite-full\n      if(pi->readopen == 0 || pr-"
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_007",
+      "question_type": "single_choice",
+      "stem": "pipe 的阻塞语义更接近哪种？",
+      "value": "未发现/不支持",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/pipe.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '同步互斥与进程间通信 / Q06_007: pipe 的阻塞语义更接近哪种？\n关键词: pipe' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6458 | 文件: repos\\oskernrl2022-rv6\\src\\pipe.c:69-93 | 类型: function_definition | 符号名: pipewrite\n```\nint\npipewrite(struct pipe *pi, int user, uint64 addr, int n)\n{\n  int i;\n  char ch;\n  struct proc *pr = myproc();\n  \n  printf(\"[pipe]nread %d nwrite %d n %p\\n\", pi->nread, pi->nwrite, n);\n  for(i = 0; i < n; i++){\n    while(pi->nwrite == pi->nread + PIPESIZE){  //DOC: pipewrite-full\n      if(pi->readopen == 0 || pr"
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_008",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现消息队列/信号量/共享内存等 SysV IPC (Message Queue / Semaphore / Shared Memory, msg/sem/shm)？（必须三态；若仅实现其一需说明）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/proc.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '同步互斥与进程间通信 / Q06_008: 是否实现消息队列/信号量/共享内存等 SysV IPC (Message Queue / Semaphore / Shared Memory, msg/sem/shm)？（必须三态；若仅实现其一需说明）\n关键词: SysV, IPC, Message, Queue, Semaphore, Shared, Memory, msg' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4157 | 文件: repos\\oskernrl2022-rv6\\src\\proc.c:99-102 | 类型: function_definition | 符号名: readyq_push\n```\nvoid\nreadyq_push(struct proc* p){\n  queue_push(&readyq,p);\n}\n```\n\n[2] 相似度: 0.3992 | 文件: repos\\oskernrl2022-rv6\\src\\include\\queue.h:36-41 | 类型: function_definition | 符号名: queu"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/proc.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '同步互斥与进程间通信 / Q06_008: 是否实现消息队列/信号量/共享内存等 SysV IPC (Message Queue / Semaphore / Shared Memory, msg/sem/shm)？（必须三态；若仅实现其一需说明）\n关键词: SysV, IPC, Message, Queue, Semaphore, Shared, Memory, msg' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4157 | 文件: repos\\oskernrl2022-rv6\\src\\proc.c:99-102 | 类型: function_definition | 符号名: readyq_push\n```\nvoid\nreadyq_push(struct proc* p){\n  queue_push(&readyq,p);\n}\n```\n\n[2] 相似度: 0.3992 | 文件: repos\\oskernrl2022-rv6\\src\\include\\queue.h:36-41 | 类型: function_definition | 符号名: queu"
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_009",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 futex？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/include/proc.h",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '同步互斥与进程间通信 / Q06_009: 是否实现 futex？（必须三态）\n关键词: futex' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5140 | 文件: repos\\oskernrl2022-rv6\\src\\include\\proc.h:120-124 | 类型: struct_specifier | 符号名: \n```\nstruct robust_list_head {\n  struct robust_list list;\n  long futex_offset;\n  struct robust_list *list_op_pending;\n}\n```\n\n[2] 相似度: 0.4979 | 文件: repos\\oskernrl2022-rv6\\src\\proc.c:37-37 | 类型: struct_specifier | 符号名: \n```\nstruct spinlock\n```\n\n[3] 相似度: 0.4979 | 文件: repos\\oskernrl2022-rv6\\src\\proc.c:30-30 | 类型: struct_sp"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/include/proc.h",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '同步互斥与进程间通信 / Q06_009: 是否实现 futex？（必须三态）\n关键词: futex' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5140 | 文件: repos\\oskernrl2022-rv6\\src\\include\\proc.h:120-124 | 类型: struct_specifier | 符号名: \n```\nstruct robust_list_head {\n  struct robust_list list;\n  long futex_offset;\n  struct robust_list *list_op_pending;\n}\n```\n\n[2] 相似度: 0.4979 | 文件: repos\\oskernrl2022-rv6\\src\\proc.c:37-37 | 类型: struct_specifier | 符号名: \n```\nstruct spinlock\n```\n\n[3] 相似度: 0.4979 | 文件: repos\\oskernrl2022-rv6\\src\\proc.c:30-30 | 类型: struct_sp"
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_010",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现信号机制（sigaction/kill/sigreturn/trampoline）？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/signal.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '同步互斥与进程间通信 / Q06_010: 是否实现信号机制（sigaction/kill/sigreturn/trampoline）？（必须三态）\n关键词: sigaction, kill, sigreturn, trampoline' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5581 | 文件: repos\\oskernrl2022-rv6\\src\\signal.c:46-83 | 类型: function_definition | 符号名: set_sigaction\n```\nint set_sigaction(\n\tint signum, \n\tstruct sigaction const *act, \n\tstruct sigaction *oldact \n) {\n\tstruct proc *p = myproc();\n\n\tksigaction_t *tmp = __search_sig(p, signum);\n\t// printf(\"pid %d search %d find %p\\n\", p->pid, signum, tmp);\n\n\tif ("
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/signal.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '同步互斥与进程间通信 / Q06_010: 是否实现信号机制（sigaction/kill/sigreturn/trampoline）？（必须三态）\n关键词: sigaction, kill, sigreturn, trampoline' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5581 | 文件: repos\\oskernrl2022-rv6\\src\\signal.c:46-83 | 类型: function_definition | 符号名: set_sigaction\n```\nint set_sigaction(\n\tint signum, \n\tstruct sigaction const *act, \n\tstruct sigaction *oldact \n) {\n\tstruct proc *p = myproc();\n\n\tksigaction_t *tmp = __search_sig(p, signum);\n\t// printf(\"pid %d search %d find %p\\n\", p->pid, signum, tmp);\n\n\tif ("
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_011",
+      "question_type": "short_answer",
+      "stem": "若实现 signal handler：用户态 handler 上下文如何构建？是否存在 sigreturn 恢复原 trap frame？（必须给证据）",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
+      "evidence": [
+        {
+          "path": "LINKER=linker/kernel.ld",
+          "symbol_kind": "build_config",
+          "symbol_name": "parse_build_config",
+          "excerpt": "## Build Config Summary\n- Makefile markers=[qemu-system, -machine, riscv, ENTRY, disk.img]\n  excerpt: K=src U=usrinit SBI=sbi/fw_jump.elf LINKER=linker/kernel.ld  FS?=FAT MAC?=SIFIVE_U  ifeq ($(MAC),SIFIVE_U) DISK:=$K/link_null.o endif  ifeq ($(MAC),QEMU) DISK:=$K/link_disk.o endif  OBJS += \\ \t$K/entry.o \\ \t$K/bio.o \\ \t$(DISK) \\ \t$K/ramdisk.o \\ \t$K/spi.o \\ \t$K/sd.o \\ \t$K/diskio.o \\ \t$K/disk.o \\ \t$K/\n- linker/kernel.ld markers=[riscv, ENTRY]\n  excerpt: OUTPUT_ARCH(riscv) ENTRY(_entry)  BASE_ADDRE"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/signal.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '同步互斥与进程间通信 / Q06_011: 若实现 signal handler：用户态 handler 上下文如何构建？是否存在 sigreturn 恢复原 trap frame？（必须给证据）\n关键词: signal, handler, sigreturn, trap, frame' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.7268 | 文件: repos\\oskernrl2022-rv6\\src\\signal.c:124-202 | 类型: function_definition | 符号名: sighandle\n```\nvoid sighandle(void) {\n\tstruct proc *p = myproc();\n\n\tint signum = 0;\n\tif (p->killed) {\n\t\tsignum = p->killed;\n\n\t\tconst int len = sizeof(unsigned long) * 8;\n\t\tint i = (unsigned long)(p->killed) / len;\n\t\tint bit = (unsi"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/signal.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '同步互斥与进程间通信 / Q06_011: 若实现 signal handler：用户态 handler 上下文如何构建？是否存在 sigreturn 恢复原 trap frame？（必须给证据）\n关键词: signal, handler, sigreturn, trap, frame' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.7268 | 文件: repos\\oskernrl2022-rv6\\src\\signal.c:124-202 | 类型: function_definition | 符号名: sighandle\n```\nvoid sighandle(void) {\n\tstruct proc *p = myproc();\n\n\tint signum = 0;\n\tif (p->killed) {\n\t\tsignum = p->killed;\n\n\t\tconst int len = sizeof(unsigned long) * 8;\n\t\tint i = (unsigned long)(p->killed) / len;\n\t\tint bit = (unsi"
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_012",
+      "question_type": "single_choice",
+      "stem": "RwLock（读写锁 Reader-Writer Lock）的实现形态更接近哪种？",
+      "value": "未发现/不支持",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/spinlock.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '同步互斥与进程间通信 / Q06_012: RwLock（读写锁 Reader-Writer Lock）的实现形态更接近哪种？\n关键词: RwLock, Reader, Writer, Lock, 锁' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5525 | 文件: repos\\oskernrl2022-rv6\\src\\spinlock.c:24-46 | 类型: function_definition | 符号名: acquire\n```\nvoid\nacquire(struct spinlock *lk)\n{\n  push_off(); // disable interrupts to avoid deadlock.\n  if(holding(lk))\n    panic(\"acquire\");\n\n  // On RISC-V, sync_lock_test_and_set turns into an atomic swap:\n  //   a5 = 1\n  //   s1 = &lk->locked\n  //   amoswap.w.aq a5, a"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/spinlock.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '同步互斥与进程间通信 / Q06_012: RwLock（读写锁 Reader-Writer Lock）的实现形态更接近哪种？\n关键词: RwLock, Reader, Writer, Lock, 锁' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5525 | 文件: repos\\oskernrl2022-rv6\\src\\spinlock.c:24-46 | 类型: function_definition | 符号名: acquire\n```\nvoid\nacquire(struct spinlock *lk)\n{\n  push_off(); // disable interrupts to avoid deadlock.\n  if(holding(lk))\n    panic(\"acquire\");\n\n  // On RISC-V, sync_lock_test_and_set turns into an atomic swap:\n  //   a5 = 1\n  //   s1 = &lk->locked\n  //   amoswap.w.aq a5, a"
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_013",
+      "question_type": "single_choice",
+      "stem": "底层原子操作来源更接近哪种？",
+      "value": "未发现/不确定",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/include/proc.h",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '同步互斥与进程间通信 / Q06_013: 底层原子操作来源更接近哪种？\n关键词: ' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4232 | 文件: repos\\oskernrl2022-rv6\\src\\include\\proc.h:128-167 | 类型: struct_specifier | 符号名: \n```\nstruct proc {\n  int magic;\n  struct spinlock lock;\n  // p->lock must be held when using these:\n  enum procstate state;        // Process state\n  struct proc *parent;         // Parent process\n  void *chan;                  // If non-zero, sleeping on chan\n  // the signal that will be handled...\n  int killed;              "
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_014",
+      "question_type": "short_answer",
+      "stem": "死锁四必要条件（Coffman Conditions）在该内核中是否均成立？\n请逐条作答（互斥 Mutual Exclusion / 持有并等待 Hold-and-Wait / 不可剥夺 No Preemption / 循环等待 Circular Wait），并结合 SpinLock/Mutex 的实现给出证据或写「不适用」。",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/sifive/barrier.h",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '同步互斥与进程间通信 / Q06_014: 死锁四必要条件（Coffman Conditions）在该内核中是否均成立？\n请逐条作答（互斥 Mutual Exclusion / 持有并等待 Hold-and-Wait / 不可剥夺 No Preemption / 循环等待 Circular Wait），并结合 SpinLock/Mutex 的实现给出证据或写「不适用」。\n关键词: Coffman, Conditions, Mutual, Exclusion, Hold, Wait, Preemption, Circular' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5568 | 文件: repos\\oskernrl2022-rv6\\src\\sifive\\barrier.h:20-47 | 类型: function_definition | 符号名: Barrier_Wait\n```\nstatic inline void Barrier_Wait(Barrier *bar, int numProcs) // re-write for C/C++11 at"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/sifive/barrier.h",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '同步互斥与进程间通信 / Q06_014: 死锁四必要条件（Coffman Conditions）在该内核中是否均成立？\n请逐条作答（互斥 Mutual Exclusion / 持有并等待 Hold-and-Wait / 不可剥夺 No Preemption / 循环等待 Circular Wait），并结合 SpinLock/Mutex 的实现给出证据或写「不适用」。\n关键词: Coffman, Conditions, Mutual, Exclusion, Hold, Wait, Preemption, Circular' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5568 | 文件: repos\\oskernrl2022-rv6\\src\\sifive\\barrier.h:20-47 | 类型: function_definition | 符号名: Barrier_Wait\n```\nstatic inline void Barrier_Wait(Barrier *bar, int numProcs) // re-write for C/C++11 at"
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_015",
+      "question_type": "single_choice",
+      "stem": "内核对死锁 (Deadlock) 的处理策略更接近哪种？",
+      "value": "未发现相关机制",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/bio.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '同步互斥与进程间通信 / Q06_015: 内核对死锁 (Deadlock) 的处理策略更接近哪种？\n关键词: Deadlock, 锁' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.5764 | 文件: repos\\oskernrl2022-rv6\\src\\bio.c:128-149 | 类型: function_definition | 符号名: brelse\n```\nvoid\nbrelse(struct buf *b)\n{\n  \n  if(!holdingsleep(&b->lock))\n    panic(\"brelse\");\n    \n  releasesleep(&b->lock);//?????????\n  acquire(&bcache.lock);\n  b->refcnt--;\n  if (b->refcnt == 0) {\n    // no one is waiting for it.\n    b->next->prev = b->prev;\n    b->prev->next = b->next;\n    b->next = bcac"
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_016",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在全局锁顺序（Lock Ordering）规范或注释，以预防嵌套锁导致的循环等待死锁 (Circular Wait Deadlock)？（必须三态；若 implemented 需给出锁排序规则或 ABBA 锁检测代码证据）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/spinlock.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '同步互斥与进程间通信 / Q06_016: 是否存在全局锁顺序（Lock Ordering）规范或注释，以预防嵌套锁导致的循环等待死锁 (Circular Wait Deadlock)？（必须三态；若 implemented 需给出锁排序规则或 ABBA 锁检测代码证据）\n关键词: Lock, Ordering, Circular, Wait, Deadlock, implemented, ABBA, 锁' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6116 | 文件: repos\\oskernrl2022-rv6\\src\\spinlock.c:24-46 | 类型: function_definition | 符号名: acquire\n```\nvoid\nacquire(struct spinlock *lk)\n{\n  push_off(); // disable interrupts to avoid deadlock.\n  if(holding(lk))\n    panic(\"acquire\");\n\n  // On RISC-V, sync_lock"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/spinlock.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '同步互斥与进程间通信 / Q06_016: 是否存在全局锁顺序（Lock Ordering）规范或注释，以预防嵌套锁导致的循环等待死锁 (Circular Wait Deadlock)？（必须三态；若 implemented 需给出锁排序规则或 ABBA 锁检测代码证据）\n关键词: Lock, Ordering, Circular, Wait, Deadlock, implemented, ABBA, 锁' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6116 | 文件: repos\\oskernrl2022-rv6\\src\\spinlock.c:24-46 | 类型: function_definition | 符号名: acquire\n```\nvoid\nacquire(struct spinlock *lk)\n{\n  push_off(); // disable interrupts to avoid deadlock.\n  if(holding(lk))\n    panic(\"acquire\");\n\n  // On RISC-V, sync_lock"
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_017",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现管程/条件变量 (Monitor / Condition Variable, Stallings Ch5)？（必须三态；搜索 Condvar / condition_variable / monitor / wait/notify/signal 等；若 implemented 需区分 Hoare 语义（等待者立即恢复）vs Mesa 语义（等待者重新竞争锁））",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/sifive/barrier.h",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '同步互斥与进程间通信 / Q06_017: 是否实现管程/条件变量 (Monitor / Condition Variable, Stallings Ch5)？（必须三态；搜索 Condvar / condition_variable / monitor / wait/notify/signal 等；若 implemented 需区分 Hoare 语义（等待者立即恢复）vs Mesa 语义（等待者重新竞争锁））\n关键词: Monitor, Condition, Variable, Stallings, Ch5, Condvar, condition_variable, wait' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4683 | 文件: repos\\oskernrl2022-rv6\\src\\sifive\\barrier.h:20-47 | 类型: function_definition | 符号名: Barrier_Wait\n```\nstatic inline void Barrier_Wait(Barrier *bar, int numProcs"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/sifive/barrier.h",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '同步互斥与进程间通信 / Q06_017: 是否实现管程/条件变量 (Monitor / Condition Variable, Stallings Ch5)？（必须三态；搜索 Condvar / condition_variable / monitor / wait/notify/signal 等；若 implemented 需区分 Hoare 语义（等待者立即恢复）vs Mesa 语义（等待者重新竞争锁））\n关键词: Monitor, Condition, Variable, Stallings, Ch5, Condvar, condition_variable, wait' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4683 | 文件: repos\\oskernrl2022-rv6\\src\\sifive\\barrier.h:20-47 | 类型: function_definition | 符号名: Barrier_Wait\n```\nstatic inline void Barrier_Wait(Barrier *bar, int numProcs"
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_018",
+      "question_type": "short_answer",
+      "stem": "经典同步问题验证 (Classic Synchronization Problems, Stallings Ch5)：\n以下三个经典问题在该内核中是否有对应实现或测试？\n- 生产者-消费者 (Producer-Consumer / Bounded Buffer)：___（implemented/not_found + 证据）\n- 读者-写者 (Readers-Writers)：___（实现了读者优先/写者优先/公平？ + 证据）\n- 哲学家就餐 (Dining Philosophers)：___（implemented/not_found）",
+      "value": "待核实：当前 Multi-Agent 证据不足，需结合 evidence 继续确认。",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/sifive/barrier.h",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '同步互斥与进程间通信 / Q06_018: 经典同步问题验证 (Classic Synchronization Problems, Stallings Ch5)：\n以下三个经典问题在该内核中是否有对应实现或测试？\n- 生产者-消费者 (Producer-Consumer / Bounded Buffer)：___（implemented/not_found + 证据）\n- 读者-写者 (Readers-Writers)：___（实现了读者优先/写者优先/公平？ + 证据）\n- 哲学家就餐 (Dining Philosophers)：___（implemented/not_found）\n关键词: Classic, Synchronization, Problems, Stallings, Ch5, Producer, Consumer, Bounded' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4910 | 文件: repos\\oskernrl2022-rv6\\src\\sifive\\barrier.h:13-17 | 类型: struct_specifi"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/sifive/barrier.h",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '同步互斥与进程间通信 / Q06_018: 经典同步问题验证 (Classic Synchronization Problems, Stallings Ch5)：\n以下三个经典问题在该内核中是否有对应实现或测试？\n- 生产者-消费者 (Producer-Consumer / Bounded Buffer)：___（implemented/not_found + 证据）\n- 读者-写者 (Readers-Writers)：___（实现了读者优先/写者优先/公平？ + 证据）\n- 哲学家就餐 (Dining Philosophers)：___（implemented/not_found）\n关键词: Classic, Synchronization, Problems, Stallings, Ch5, Producer, Consumer, Bounded' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4910 | 文件: repos\\oskernrl2022-rv6\\src\\sifive\\barrier.h:13-17 | 类型: struct_specifi"
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_019",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现消息传递 (Message Passing, Stallings Ch5) 作为 IPC 机制？（必须三态；区分直接消息传递 Direct / 间接通过邮箱 Mailbox / POSIX mq_open 等；与 SysV msgq 的区别是是否通过内核邮箱路由）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/proc.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '同步互斥与进程间通信 / Q06_019: 是否实现消息传递 (Message Passing, Stallings Ch5) 作为 IPC 机制？（必须三态；区分直接消息传递 Direct / 间接通过邮箱 Mailbox / POSIX mq_open 等；与 SysV msgq 的区别是是否通过内核邮箱路由）\n关键词: Message, Passing, Stallings, Ch5, IPC, Direct, Mailbox, POSIX' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4205 | 文件: repos\\oskernrl2022-rv6\\src\\proc.c:99-102 | 类型: function_definition | 符号名: readyq_push\n```\nvoid\nreadyq_push(struct proc* p){\n  queue_push(&readyq,p);\n}\n```\n\n[2] 相似度: 0.4057 | 文件: repos\\oskernrl2022-rv6\\src\\include\\queue.h:36-4"
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/proc.c",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '同步互斥与进程间通信 / Q06_019: 是否实现消息传递 (Message Passing, Stallings Ch5) 作为 IPC 机制？（必须三态；区分直接消息传递 Direct / 间接通过邮箱 Mailbox / POSIX mq_open 等；与 SysV msgq 的区别是是否通过内核邮箱路由）\n关键词: Message, Passing, Stallings, Ch5, IPC, Direct, Mailbox, POSIX' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.4205 | 文件: repos\\oskernrl2022-rv6\\src\\proc.c:99-102 | 类型: function_definition | 符号名: readyq_push\n```\nvoid\nreadyq_push(struct proc* p){\n  queue_push(&readyq,p);\n}\n```\n\n[2] 相似度: 0.4057 | 文件: repos\\oskernrl2022-rv6\\src\\include\\queue.h:36-4"
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_020",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现屏障同步 (Barrier Synchronization, Stallings Ch5)？（必须三态；搜索 barrier / sync_barrier / pthread_barrier 或等价；用于多线程/多核同步到同一检查点）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "repos/oskernrl2022-rv6/src/sifive/barrier.h",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '同步互斥与进程间通信 / Q06_020: 是否实现屏障同步 (Barrier Synchronization, Stallings Ch5)？（必须三态；搜索 barrier / sync_barrier / pthread_barrier 或等价；用于多线程/多核同步到同一检查点）\n关键词: Barrier, Synchronization, Stallings, Ch5, sync_barrier, pthread_barrier' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6442 | 文件: repos\\oskernrl2022-rv6\\src\\sifive\\barrier.h:20-47 | 类型: function_definition | 符号名: Barrier_Wait\n```\nstatic inline void Barrier_Wait(Barrier *bar, int numProcs) // re-write for C/C++11 atomics\n{\n  int gen, arrived;\n\n  if (numProcs "
+        },
+        {
+          "path": "repos/oskernrl2022-rv6/src/sifive/barrier.h",
+          "symbol_kind": "semantic_search",
+          "symbol_name": "rag_search_code",
+          "excerpt": "RAG 语义搜索 '同步互斥与进程间通信 / Q06_020: 是否实现屏障同步 (Barrier Synchronization, Stallings Ch5)？（必须三态；搜索 barrier / sync_barrier / pthread_barrier 或等价；用于多线程/多核同步到同一检查点）\n关键词: Barrier, Synchronization, Stallings, Ch5, sync_barrier, pthread_barrier' 找到的 Top 5 代码块:\n\n[1] 相似度: 0.6442 | 文件: repos\\oskernrl2022-rv6\\src\\sifive\\barrier.h:20-47 | 类型: function_definition | 符号名: Barrier_Wait\n```\nstatic inline void Barrier_Wait(Barrier *bar, int numProcs) // re-write for C/C++11 atomics\n{\n  int gen, arrived;\n\n  if (numProcs "
+        }
+      ]
+    }
+  ]
+}

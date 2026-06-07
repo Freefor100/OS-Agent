@@ -1,0 +1,41 @@
+{
+  "task_id": "task_03_vm_policies",
+  "stage_id": "03_mem_mgmt",
+  "question_id": "Q03_027",
+  "question_ids": [
+    "Q03_027",
+    "Q03_028",
+    "Q03_029",
+    "Q03_031",
+    "Q03_032",
+    "Q03_033"
+  ],
+  "status": "done",
+  "evidence_ids": [
+    "ev_task_03_vm_policies_789d1b9b",
+    "ev_task_03_vm_policies_f4ab850d",
+    "ev_task_03_vm_policies_9252fa1a",
+    "ev_task_03_vm_policies_82857a97",
+    "ev_task_03_vm_policies_d77b484c",
+    "ev_task_03_vm_policies_3958a384",
+    "ev_task_03_vm_policies_293dec82"
+  ],
+  "draft_answer_ids": [
+    "draft_task_03_vm_policies_Q03_027_d2ee46c9",
+    "draft_task_03_vm_policies_Q03_028_16915101",
+    "draft_task_03_vm_policies_Q03_029_0c37b3ba",
+    "draft_task_03_vm_policies_Q03_031_6e37ba53",
+    "draft_task_03_vm_policies_Q03_032_a9073f23",
+    "draft_task_03_vm_policies_Q03_033_577fc25b"
+  ],
+  "findings": [],
+  "confidence": "high",
+  "errors": [],
+  "token_usage": {},
+  "metadata": {
+    "evidence_count": 7,
+    "mode": "react",
+    "summary": "查证 xv6-k210 虚拟内存策略：实现了 demand paging（lazy allocation + COW），无 prepaging；placement 使用固定 VUMMAP 基地址 + 顺序段分配，物理页使用 first-fit 风格 freelist；无 page replacement 算法（FAT 缓存有 LRU 但非 VM）；无 resident set/working set/thrashing/load control/OOM/kswapd；cleaning 为同步写回（exit/munmap 时）；无碎片管理；无地址重定位；无全局/局部置换作用域。",
+    "raw_output_excerpt": "Now I have all the information needed. Let me produce the final structured JSON output.\n\n```json\n{\n  \"status\": \"done\",\n  \"summary\": \"查证 xv6-k210 虚拟内存策略：实现了 demand paging（lazy allocation + COW），无 prepaging；placement 使用固定 VUMMAP 基地址 + 顺序段分配，物理页使用 first-fit 风格 freelist；无 page replacement 算法（FAT 缓存有 LRU 但非 VM）；无 resident set/working set/thrashing/load control/OOM/kswapd；cleaning 为同步写回（exit/munmap 时）；无碎片管理；无地址重定位；无全局/局部置换作用域。\",\n  \"claim\": \"xv6-k210 实现了 demand paging（lazy allocation + COW page fault handler），但无 prepaging、无 page replacement 算法、无 resident set/working set 管理、无负载控制、无后台 cleaning 守护进程、无碎片管理、无地址重定位、无置换作用域概念。\",\n  \"structured_fact_results\": [\n    {\n      \"fact_id\": \"Q03_027_01\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [0, 1, 2],\n      \"notes\": \"demand paging 通过 lazy allocation 实现：handle_page_fault_lazy() 在缺页时分配物理页；COW 通过 handle_store_page_fault_cow() 实现。无 prepaging 机制。\"\n    },\n    {\n      \"fact_id\": \"Q03_027_02\",\n      \"status_or_value\": \"yes_weak\",\n      \"evidence_candidate_indexes\": [3, 4],\n      \"notes\": \"虚拟地址放置策略：mmap 使用固定 VUMMAP (0x70000000) 基地址，段按顺序排列；物理页分配使用 freelist first-fit 风格（__mul_alloc_no_lock 遍历第一个 npage >= n 的块）。无 first fit/best fit 命名算法。\"\n    },\n    {\n      \"fact_id\": \"Q03_027_03\",\n      \"status_or_value\": \"no_after_negative_search\",\n      \"evidence_candidate_indexes\": [5],\n      \"notes\": \"无 page replacement 算法。FAT 缓存有 LRU 计数器（fat.c 中 lrucnt），但这是文件缓存策略，非 VM 置换。无 LRU/Clock/FIFO 用于 VM。\"\n    },\n    {\n      \"fact_id\": \"Q03_027_04\",\n      \"status_or_value\": \"no_after_negative_search\",\n      \"evidence_candidate_indexes\": [5],\n      \"notes\": \"无 resident set 管理、无 working set 跟踪、无 thrashing 检测、无 OOM killer、无 kswapd、无 load control。\"\n    },\n    {\n      \"fact_id\": \"Q03_027_05\",\n      \"status_or_value\": \"yes_weak\",\n      \"evidence_candidate_indexes\": [6],\n      \"notes\": \"cleaning 策略为同步写回：mmapdel() 中 __file_mmapdel() 在进程退出或 munmap 时同步写回脏页；无后台 writeback 守护进程。\"\n    },\n    {\n      \"fact_id\": \"Q03_027_06\",\n      \"status_or_value\": "
+  }
+}

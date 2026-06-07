@@ -1,0 +1,91 @@
+{
+  "stage_id": "09_debug_error",
+  "evidence_targets": [
+    "panic/debug",
+    "日志系统",
+    "回溯",
+    "错误处理",
+    "trapframe dump"
+  ],
+  "seed_paths": [
+    "kernel/printf.c",
+    "include/printf.h",
+    "include/utils/debug.h",
+    "kernel/trap/trap.c",
+    "include/trap.h",
+    "kernel/sync/spinlock.c",
+    "kernel/mm/vm.c",
+    "kernel/mm/mmap.c",
+    "debug",
+    "log",
+    "panic",
+    "assert",
+    "backtrace",
+    "include/fs"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "__panic",
+    "panic",
+    "backtrace",
+    "trapframedump",
+    "__debug_assert",
+    "__assert",
+    "handle_excp",
+    "handle_page_fault",
+    "panic_handler",
+    "log",
+    "assert",
+    "_start"
+  ],
+  "repo_hotspots": [
+    "Cargo.toml",
+    "Makefile",
+    "debug",
+    "debug/kendryte_openocd",
+    "debug/openocd_cfg",
+    "doc",
+    "doc/img",
+    "include",
+    "include/fs",
+    "include/hal"
+  ],
+  "preferred_tools": [
+    "read_code_segment",
+    "lsp_get_definition",
+    "lsp_get_references",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "读取 include/printf.h 完整内容，确认 panic 宏定义和 backtrace 声明",
+    "读取 include/utils/debug.h 完整内容，分析 __debug_assert 和 __assert 宏的实现差异",
+    "读取 kernel/printf.c 中 __panic 和 backtrace 函数的完整实现（行 115-150）",
+    "使用 lsp_get_references 查询 __panic 的所有调用点，统计关键错误路径",
+    "读取 kernel/trap/trap.c 中 trapframedump 函数实现（行 428-462）",
+    "使用 grep_in_repo 搜索 trapframedump 的调用位置，确认何时触发寄存器转储",
+    "读取 kernel/trap/trap.c 中 handle_excp 函数，分析异常分发逻辑",
+    "使用 lsp_get_call_graph 分析 backtrace 的入向调用图（已完成，需在报告中整理）",
+    "读取 kernel/sync/spinlock.c 中 acquire 函数，确认 panic 在锁错误时的使用",
+    "使用 grep_in_repo 搜索 'assert' 在 kernel/ 目录的使用场景，抽样 3-5 处",
+    "读取 kernel/mm/vm.c 中 handle_page_fault 函数开头部分，确认错误返回路径",
+    "检查 kernel/main.c 中是否使用 __debug_assert 进行初始化校验",
+    "确认 panic 后是否关闭中断（intr_off）并进入死循环",
+    "整理 backtrace 实现原理：基于帧指针 fp 遍历调用栈",
+    "汇总 panic/assert/backtrace/trapframedump 的证据路径和行号"
+  ]
+}

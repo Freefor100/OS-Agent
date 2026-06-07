@@ -1,0 +1,35 @@
+{
+  "task_id": "task_10_history_discovery",
+  "stage_id": "10_history",
+  "question_id": "",
+  "question_ids": [],
+  "status": "done",
+  "evidence_ids": [
+    "ev_task_10_history_discovery_4e534bd0",
+    "ev_task_10_history_discovery_21ae0f19",
+    "ev_task_10_history_discovery_19110440",
+    "ev_task_10_history_discovery_92e1b3a6",
+    "ev_task_10_history_discovery_e0ec8750",
+    "ev_task_10_history_discovery_77908619",
+    "ev_task_10_history_discovery_796ddd2a",
+    "ev_task_10_history_discovery_ba8728a9",
+    "ev_task_10_history_discovery_740b37d9",
+    "ev_task_10_history_discovery_9c056d9d",
+    "ev_task_10_history_discovery_93d2d036",
+    "ev_task_10_history_discovery_f1ae6292",
+    "ev_task_10_history_discovery_a6628c08"
+  ],
+  "draft_answer_ids": [
+    "draft_task_10_history_discovery_Q10_001_29c81c50"
+  ],
+  "findings": [],
+  "confidence": "medium",
+  "errors": [],
+  "token_usage": {},
+  "metadata": {
+    "evidence_count": 13,
+    "mode": "react",
+    "summary": "查找到 xv6-k210 项目的开发历史与里程碑相关核心模块和入口，包括 README 进度列表、移植报告、总言文档、Makefile、入口文件等",
+    "raw_output_excerpt": "Now I have all the information needed. Let me compile the final structured JSON output.\n\n```json\n{\n  \"status\": \"done\",\n  \"summary\": \"查找到 xv6-k210 项目的开发历史与里程碑相关核心模块和入口，包括 README 进度列表、移植报告、总言文档、Makefile、入口文件等\",\n  \"claim\": \"xv6-k210 是基于 MIT xv6-riscv 移植到 K210 开发板的操作系统项目，由 HUST-OS 团队开发，主要贡献者包括车春池、刘一鸣、陆思彤、李永康等。项目始于 2020 年 10 月，经历了多核启动、内存管理、中断处理、SD 卡驱动、文件系统、进程管理等多个里程碑阶段，最终支持 FAT32 文件系统、COW/Lazy Allocation 等特性，并可在 QEMU 上仿真运行。\",\n  \"structured_fact_results\": [\n    {\n      \"fact_id\": \"Q10_001_F01\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [0, 1, 2],\n      \"notes\": \"README.md 和 README_cn.md 明确列出了项目进度（Progress）共 12 项已完成功能，包括多核启动、内存分配、页表、时钟中断、S 态外部中断、SD 卡驱动、进程管理、文件系统、用户程序、稳定键盘输入等\"\n    },\n    {\n      \"fact_id\": \"Q10_001_F02\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [3, 4],\n      \"notes\": \"doc/总言.md 明确列出了开发过程中的重大里程碑：支持 k210 平台的时钟/外部中断、SD 卡驱动、FAT32 文件系统、S 态键盘输入与 DMA 中断、VFS、动态内存分配器、COW/Lazy Allocation、新内存映射策略、重写调度器、busybox 支持、PsicaSBI 等\"\n    },\n    {\n      \"fact_id\": \"Q10_001_F03\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [5, 6],\n      \"notes\": \"doc/report_2020_12_26.md 和 doc/xv6-k210-report-车春池.md 两份移植报告详细记录了 2020 年 12 月 26 日之前的移植工作，包括多核启动、内存分配、虚拟内存管理、中断处理、S 态外部中断、用户多进程、SD 卡驱动、文件系统、软硬件协同调试、中文文档等\"\n    },\n    {\n      \"fact_id\": \"Q10_001_F04\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [7, 8],\n      \"notes\": \"kernel/entry_k210.S 和 linker/k210.ld 定义了 K210 平台的内核入口点 _start，入口地址为 0x80020000；kernel/entry.S 和 kernel/entry_qemu.S 定义了 QEMU 平台的入口点 _entry\"\n    },\n    {\n      \"fact_id\": \"Q10_001_F05\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [9],\n      \"notes\": \"kernel/main.c 中的 main() 函数是内核 C 语言入口，负责初始化各子系统：cpuinit、consoleinit、kpminit、kvminit、kmallocinit、trapinithart、procinit、plicinit、disk_init、binit、userinit 等，最后调用 scheduler()\"\n    },\n    {\n      \"fact_id\": \"Q10_001_F06\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_c"
+  }
+}

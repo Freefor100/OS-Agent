@@ -1,0 +1,33 @@
+{
+  "task_id": "task_07_seccomp_sandbox",
+  "stage_id": "07_security",
+  "question_id": "Q07_006",
+  "question_ids": [
+    "Q07_006"
+  ],
+  "status": "done",
+  "evidence_ids": [
+    "ev_task_07_seccomp_sandbox_db90241f",
+    "ev_task_07_seccomp_sandbox_5b66e878",
+    "ev_task_07_seccomp_sandbox_0df175c6",
+    "ev_task_07_seccomp_sandbox_83f6d6e6",
+    "ev_task_07_seccomp_sandbox_035a968f",
+    "ev_task_07_seccomp_sandbox_b9622075",
+    "ev_task_07_seccomp_sandbox_44e00eea",
+    "ev_task_07_seccomp_sandbox_28cd8378",
+    "ev_task_07_seccomp_sandbox_071df324"
+  ],
+  "draft_answer_ids": [
+    "draft_task_07_seccomp_sandbox_Q07_006_3a611a69"
+  ],
+  "findings": [],
+  "confidence": "medium",
+  "errors": [],
+  "token_usage": {},
+  "metadata": {
+    "evidence_count": 9,
+    "mode": "react",
+    "summary": "在 xv6-k210 仓库中未发现 seccomp、prctl、sandbox 等系统调用过滤/沙箱机制的实现。sys_getuid 返回 0（始终 root），faccessat 仅做基础权限检查但注释写明 'assume user as root'，无安全目录、无审计/安全启动/签名/PMP/SMEP/SMAP/KPTI/W^X 等机制。仅有 RISC-V 硬件级 PUM/SUM 位切换（protect_usr_mem/permit_usr_mem）用于用户内存保护，非软件沙箱。",
+    "raw_output_excerpt": "Now I have all the evidence. Let me produce the final JSON output.\n\n```json\n{\n  \"status\": \"done\",\n  \"summary\": \"在 xv6-k210 仓库中未发现 seccomp、prctl、sandbox 等系统调用过滤/沙箱机制的实现。sys_getuid 返回 0（始终 root），faccessat 仅做基础权限检查但注释写明 'assume user as root'，无安全目录、无审计/安全启动/签名/PMP/SMEP/SMAP/KPTI/W^X 等机制。仅有 RISC-V 硬件级 PUM/SUM 位切换（protect_usr_mem/permit_usr_mem）用于用户内存保护，非软件沙箱。\",\n  \"claim\": \"xv6-k210 未实现 seccomp/prctl/sandbox 等系统调用过滤或沙箱机制。\",\n  \"structured_fact_results\": [\n    {\n      \"fact_id\": \"Q07_006_01\",\n      \"status_or_value\": \"no_after_negative_search\",\n      \"evidence_candidate_indexes\": [0, 1, 2, 3, 4, 5, 6, 7, 8],\n      \"notes\": \"security_state: 未发现任何 seccomp/prctl/sandbox 相关定义、结构体或状态管理。sys_getuid 返回 0（始终 root），无真实凭证系统。faccessat 注释写明 'assume user as root'。\"\n    },\n    {\n      \"fact_id\": \"Q07_006_02\",\n      \"status_or_value\": \"no_after_negative_search\",\n      \"evidence_candidate_indexes\": [0, 1, 2, 3, 4, 5, 6, 7, 8],\n      \"notes\": \"enforcement_callsite: 未发现任何 seccomp/prctl/sandbox 的执行调用点。syscall 表中无 SYS_seccomp/SYS_prctl 条目。exec/open/write 等路径未调用任何系统调用过滤检查。\"\n    },\n    {\n      \"fact_id\": \"Q07_006_03\",\n      \"status_or_value\": \"no_after_negative_search\",\n      \"evidence_candidate_indexes\": [0, 1, 2, 3, 4, 5, 6, 7, 8],\n      \"notes\": \"deny_or_fault_path: 未发现任何 seccomp/sandbox 相关的拒绝路径或错误返回。仅有 faccessat 的基础权限检查（owner bits），非沙箱机制。\"\n    },\n    {\n      \"fact_id\": \"Q07_006_04\",\n      \"status_or_value\": \"no_after_negative_search\",\n      \"evidence_candidate_indexes\": [0, 1, 2, 3, 4, 5, 6, 7, 8],\n      \"notes\": \"policy_scope: 未发现任何 seccomp/sandbox 策略对象、规则定义或执行点。无安全策略框架。\"\n    },\n    {\n      \"fact_id\": \"Q07_006_05\",\n      \"status_or_value\": \"no_after_negative_search\",\n      \"evidence_candidate_indexes\": [0, 1, 2, 3, 4, 5, 6, 7, 8],\n      \"notes\": \"stub_detection: 未发现任何 seccomp/prctl/sandbox 的声明、空实现、ENOSYS 返回或 todo 占位。sysnum.h 中无对应系统调用号。\"\n    },\n    {\n      \"fact_id\": \"Q07_006_06\",\n      \"status_or_value\": {\n        \"searched_keywords\": [\"seccomp\", \"prctl\", \"sandbox\", \"audit\", \"secure boot\", \""
+  }
+}

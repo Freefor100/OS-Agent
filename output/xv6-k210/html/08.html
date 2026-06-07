@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>第08章 网络子系统与协议栈 - xv6-k210</title>
+<style>
+
+:root {
+    --bg: #f8f9fa;
+    --card-bg: #ffffff;
+    --text: #2c3e50;
+    --text-muted: #6c757d;
+    --border: #dee2e6;
+    --code-bg: #f1f3f5;
+    --link: #2980b9;
+    --accent: #3498db;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans SC", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    padding: 0;
+}
+.container { max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem; }
+h1 { font-size: 1.8rem; margin-bottom: 0.5rem; }
+h2 { font-size: 1.5rem; margin: 2rem 0 0.8rem; padding-bottom: 0.4rem; border-bottom: 2px solid var(--border); }
+h3 { font-size: 1.25rem; margin: 1.5rem 0 0.6rem; color: var(--text); }
+h4 { font-size: 1.1rem; margin: 1.2rem 0 0.4rem; }
+p { margin: 0.6rem 0; }
+ul, ol { margin: 0.6rem 0 0.6rem 1.5rem; }
+li { margin: 0.3rem 0; }
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+code {
+    background: var(--code-bg);
+    padding: 0.15em 0.4em;
+    border-radius: 3px;
+    font-size: 0.88em;
+    font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+}
+pre {
+    background: #1e1e2e;
+    color: #cdd6f4;
+    padding: 1rem 1.2rem;
+    border-radius: 8px;
+    overflow-x: auto;
+    margin: 1rem 0;
+    font-size: 0.85rem;
+    line-height: 1.5;
+}
+pre code { background: none; padding: 0; color: inherit; }
+blockquote {
+    border-left: 4px solid var(--accent);
+    padding: 0.5rem 1rem;
+    margin: 1rem 0;
+    background: #eef6fc;
+    border-radius: 0 6px 6px 0;
+}
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+    font-size: 0.9rem;
+    overflow-x: auto;
+    display: block;
+}
+thead { background: #f1f3f5; }
+th, td {
+    padding: 0.6rem 0.8rem;
+    border: 1px solid var(--border);
+    text-align: left;
+    vertical-align: top;
+}
+tr:nth-child(even) { background: #f8f9fa; }
+tr:hover { background: #e9ecef; }
+.evidence-link {
+    display: inline-block;
+    background: #fff3cd;
+    color: #856404;
+    padding: 0.1em 0.5em;
+    border-radius: 12px;
+    font-size: 0.78em;
+    font-family: monospace;
+    cursor: pointer;
+    border: 1px solid #ffc107;
+    transition: all 0.2s;
+}
+.evidence-link:hover {
+    background: #ffc107;
+    color: #1a1a1a;
+    text-decoration: none;
+    transform: scale(1.05);
+}
+.evidence-anchor {
+    display: inline-block;
+    background: #d4edda;
+    color: #155724;
+    padding: 0.1em 0.5em;
+    border-radius: 12px;
+    font-size: 0.78em;
+    font-family: monospace;
+    border: 1px solid #28a745;
+    scroll-margin-top: 80px;
+}
+.evidence-anchor:target {
+    background: #ffc107;
+    color: #1a1a1a;
+    box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.4);
+    animation: pulse 0.6s ease-out;
+}
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}
+hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+
+/* --- PLACEHOLDER_NAV --- */
+
+
+.top-nav {
+    position: sticky;
+    top: 0;
+    background: rgba(255,255,255,0.95);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border);
+    padding: 0.7rem 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    z-index: 100;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+.top-nav a {
+    padding: 0.3rem 0.8rem;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    transition: background 0.2s;
+}
+.top-nav a:hover { background: #e9ecef; text-decoration: none; }
+.top-nav .spacer { flex: 1; }
+.nav-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 1rem;
+    margin: 2rem 0;
+}
+.nav-card {
+    display: block;
+    padding: 1.2rem 1rem;
+    border-radius: 12px;
+    color: #fff;
+    font-weight: 600;
+    font-size: 1rem;
+    text-align: center;
+    transition: transform 0.2s, box-shadow 0.2s;
+    text-decoration: none;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+}
+.nav-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.18);
+    text-decoration: none;
+}
+.nav-card .chapter-num {
+    display: block;
+    font-size: 0.75rem;
+    opacity: 0.85;
+    margin-bottom: 0.3rem;
+}
+.header-info {
+    background: var(--card-bg);
+    border-radius: 12px;
+    padding: 1.5rem 2rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    border: 1px solid var(--border);
+}
+.header-info h1 { color: var(--accent); }
+.header-info .meta-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 0.5rem 2rem;
+    margin-top: 1rem;
+}
+.header-info .meta-item { font-size: 0.92rem; }
+.header-info .meta-label { color: var(--text-muted); font-weight: 500; }
+.chapter-badge {
+    display: inline-block;
+    padding: 0.3rem 1rem;
+    border-radius: 20px;
+    color: #fff;
+    font-weight: 600;
+    font-size: 0.85rem;
+    margin-bottom: 1rem;
+}
+
+.chapter-accent { color: #5b2c6f; }
+
+.question-block {
+    margin: 1.5rem 0;
+    padding: 1.2rem 1.5rem;
+    background: var(--card-bg);
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+.question-block h3 {
+    margin: 0 0 0.8rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid var(--border);
+}
+.fact-table {
+    width: 100%;
+    font-size: 0.88rem;
+    display: table;
+}
+.fact-table th { background: #f1f3f5; font-weight: 600; }
+.fact-table td, .fact-table th { padding: 0.5rem 0.7rem; }
+.conclusion-label {
+    margin: 0.8rem 0 0.3rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+.answer-value {
+    margin: 0.4rem 0;
+    padding: 0.4rem 0;
+}
+.answer-notes {
+    margin-top: 0.5rem;
+    padding: 0.6rem 1rem;
+    background: #f8f9fa;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    line-height: 1.6;
+}
+.fact-details {
+    margin-top: 0.8rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+}
+.fact-details summary {
+    padding: 0.5rem 1rem;
+    background: #f1f3f5;
+    cursor: pointer;
+    font-size: 0.88rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    user-select: none;
+    list-style: none;
+}
+.fact-details summary::-webkit-details-marker { display: none; }
+.fact-details summary::before {
+    content: "▶ ";
+    font-size: 0.75em;
+    transition: transform 0.2s;
+    display: inline-block;
+}
+.fact-details[open] summary::before { content: "▼ "; }
+.fact-details summary:hover { background: #e9ecef; color: var(--text); }
+.fact-details .fact-table { margin: 0; border-radius: 0; }
+.fact-details .fact-table th,
+.fact-details .fact-table td { border-left: none; border-right: none; }
+.fact-details .fact-table tr:last-child td { border-bottom: none; }
+
+</style>
+</head>
+<body>
+
+<nav class="top-nav">
+<a href="../index.html">← 首页</a>
+<a href="07.html">← 安全机制与权限模</a>
+<span class="spacer"></span>
+<strong class="chapter-accent">第 08 章</strong>
+<span class="spacer"></span>
+<a href="09.html">调试机制与错误处 →</a>
+</nav>
+<div class="container">
+<span class="chapter-badge" style="background:#5b2c6f">第 08 章</span>
+<h1>网络子系统与协议栈</h1>
+<hr>
+<section class="question-block" id="q08_001">
+<h3>Q08_001 是否存在网络子系统实现（协议栈或 socket 层）？（必须三态）</h3>
+<div class="answer-value"><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#f8d7da;color:#721c24;font-size:0.85em;font-weight:500">❌ 未发现</span> <span style="color:var(--text-muted);margin-left:0.5em">未发现</span></div>
+<div class="answer-notes">所有 6 个 structured_facts 均为 no_after_negative_search，负向搜索覆盖充分（19 关键词、8 目录、207 文件），无 socket API、协议栈、协议层、send/recv 数据路径或网卡驱动实现。仅有的 errno.h 错误码和 stat.h S_IFSOCK 常量属于 POSIX 兼容头文件定义，无实际网络功能，不能支撑 implemented 或 stub。因此最终三态值为 not_found。</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>socket_api</strong></td><td>“网络子系统实现”的内核定义、入口、对象或配置开关在哪里？</td><td><span>no_after_negative_search</span></td><td>syscall table (sysnum.h, syscall.c) 和用户头文件 (user.h) 均无 socket/bind/connect/sendto/recvfrom 相关系统调用号或声明；grep 仅在 errno.h 和 stat.h 中匹配到 POSIX 常量，无实际实现。 <a href="#ev_task_08_network_overview_61e5e300" class="evidence-link">ev_task_08_network_overview_61e5e300</a> <a href="#ev_task_08_network_overview_e7271f15" class="evidence-link">ev_task_08_network_overview_e7271f15</a> <a href="#ev_task_08_network_overview_10911eca" class="evidence-link">ev_task_08_network_overview_10911eca</a> <a href="#ev_task_08_network_overview_9616161e" class="evidence-link">ev_task_08_network_overview_9616161e</a></td></tr>
+<tr><td><strong>protocol_stack</strong></td><td>是否存在执行“网络子系统实现”语义的真实实现体，而不是声明、空函数或固定返回？</td><td><span>no_after_negative_search</span></td><td>grep 搜索 smoltcp/lwip/netdev/virtio-net/e1000/loopback 等协议栈关键词在 207 个文件中返回 0 匹配；无协议栈模块或第三方依赖。 <a href="#ev_task_08_network_overview_b3469835" class="evidence-link">ev_task_08_network_overview_b3469835</a> <a href="#ev_task_08_network_overview_61e5e300" class="evidence-link">ev_task_08_network_overview_61e5e300</a></td></tr>
+<tr><td><strong>socket_state</strong></td><td>该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？</td><td><span>no_after_negative_search</span></td><td>grep 搜索 Ethernet/ARP/IP/ICMP/UDP/TCP 等协议层关键词，仅在 errno.h/stat.h 中匹配到 POSIX 常量，无任何协议层实现。 <a href="#ev_task_08_network_overview_61e5e300" class="evidence-link">ev_task_08_network_overview_61e5e300</a> <a href="#ev_task_08_network_overview_3f3cfaf6" class="evidence-link">ev_task_08_network_overview_3f3cfaf6</a></td></tr>
+<tr><td><strong>send_recv_flow</strong></td><td>执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？</td><td><span>no_after_negative_search</span></td><td>无 send/recv 系统调用实现，无 netdev/loopback/driver 队列接入。 <a href="#ev_task_08_network_overview_61e5e300" class="evidence-link">ev_task_08_network_overview_61e5e300</a> <a href="#ev_task_08_network_overview_3f3cfaf6" class="evidence-link">ev_task_08_network_overview_3f3cfaf6</a></td></tr>
+<tr><td><strong>net_device_driver</strong></td><td>是否排除与“网络子系统实现”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？</td><td><span>no_after_negative_search</span></td><td>grep 搜索 netdev/virtio-net/e1000 等网卡驱动关键词返回 0 匹配；virtio_disk.c 是磁盘驱动，非网卡驱动。 <a href="#ev_task_08_network_overview_b3469835" class="evidence-link">ev_task_08_network_overview_b3469835</a> <a href="#ev_task_08_network_overview_3f3cfaf6" class="evidence-link">ev_task_08_network_overview_3f3cfaf6</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>若未确认“网络子系统实现”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span>{"searched_keywords": ["socket", "bind", "connect", "sendto", "recvfrom", "Ethernet", "ARP", "IP", "ICMP", "UDP", "TCP", "smoltcp", "lwip", "netdev", "virtio-net", "e1000", "loopback", "nic", "eth"], "searched_directories": ["kernel", "include", "xv6-user", "bootloader", "sbi", "linker", "tools", "doc"], "file_count": 207, "match_count": 0, "coverage_sufficient": true}</span></td><td>负向搜索覆盖 19 个关键词、8 个目录、207 个文件，匹配数 0（排除 errno.h/stat.h 中的 POSIX 常量），覆盖充分。 <a href="#ev_task_08_network_overview_3f3cfaf6" class="evidence-link">ev_task_08_network_overview_3f3cfaf6</a> <a href="#ev_task_08_network_overview_b3469835" class="evidence-link">ev_task_08_network_overview_b3469835</a> <a href="#ev_task_08_network_overview_61e5e300" class="evidence-link">ev_task_08_network_overview_61e5e300</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_08_network_overview_1e8a03ee" class="evidence-anchor">ev_task_08_network_overview_1e8a03ee</span> 
+<span id="ev_task_08_network_overview_b3469835" class="evidence-anchor">ev_task_08_network_overview_b3469835</span> 
+<span id="ev_task_08_network_overview_61e5e300" class="evidence-anchor">ev_task_08_network_overview_61e5e300</span> 
+<span id="ev_task_08_network_overview_3f3cfaf6" class="evidence-anchor">ev_task_08_network_overview_3f3cfaf6</span> 
+<span id="ev_task_08_network_overview_e7271f15" class="evidence-anchor">ev_task_08_network_overview_e7271f15</span> 
+<span id="ev_task_08_network_overview_10911eca" class="evidence-anchor">ev_task_08_network_overview_10911eca</span> 
+<span id="ev_task_08_network_overview_9616161e" class="evidence-anchor">ev_task_08_network_overview_9616161e</span> 
+<span id="ev_task_08_network_overview_fd90e5d4" class="evidence-anchor">ev_task_08_network_overview_fd90e5d4</span> 
+</section>
+<section class="question-block" id="q08_002">
+<h3>Q08_002 协议栈来源更接近哪种？</h3>
+<div class="answer-value"><p>未发现</p></div>
+<div class="answer-notes">所有6个structured_facts均为no_after_negative_search，负向搜索覆盖充分（19个关键词、8个目录、207个文件、0个有效匹配），因此最终选择'未发现'。</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>socket_api</strong></td><td>题目“协议栈来源更接近哪种？”的候选选项有哪些，是否只从题单 choices 中选择？</td><td><span>no_after_negative_search</span></td><td>负向搜索在207个文件中未发现socket/bind/connect/sendto/recvfrom等用户接口的实现；syscall table和user.h中均无socket相关条目；仅errno.h定义了ENOTSOCK等错误码常量，属于POSIX常量定义而非实现。 <a href="#ev_task_08_network_overview_61e5e300" class="evidence-link">ev_task_08_network_overview_61e5e300</a> <a href="#ev_task_08_network_overview_3f3cfaf6" class="evidence-link">ev_task_08_network_overview_3f3cfaf6</a> <a href="#ev_task_08_network_overview_e7271f15" class="evidence-link">ev_task_08_network_overview_e7271f15</a> <a href="#ev_task_08_network_overview_10911eca" class="evidence-link">ev_task_08_network_overview_10911eca</a> <a href="#ev_task_08_network_overview_9616161e" class="evidence-link">ev_task_08_network_overview_9616161e</a></td></tr>
+<tr><td><strong>protocol_stack</strong></td><td>被选中的形态是否有源码、配置、调用链或数据结构证据直接支撑？</td><td><span>no_after_negative_search</span></td><td>负向搜索在207个文件中未发现smoltcp/lwip等第三方协议栈依赖，也未发现Ethernet/ARP/IP/ICMP/UDP/TCP等协议栈模块的实现。 <a href="#ev_task_08_network_overview_b3469835" class="evidence-link">ev_task_08_network_overview_b3469835</a> <a href="#ev_task_08_network_overview_3f3cfaf6" class="evidence-link">ev_task_08_network_overview_3f3cfaf6</a></td></tr>
+<tr><td><strong>socket_state</strong></td><td>未选选项是否被源码证据、缺失证据或概念边界排除？</td><td><span>no_after_negative_search</span></td><td>负向搜索未发现Ethernet/ARP/IP/ICMP/UDP/TCP中任何协议层的实现代码。 <a href="#ev_task_08_network_overview_61e5e300" class="evidence-link">ev_task_08_network_overview_61e5e300</a> <a href="#ev_task_08_network_overview_3f3cfaf6" class="evidence-link">ev_task_08_network_overview_3f3cfaf6</a></td></tr>
+<tr><td><strong>send_recv_flow</strong></td><td>若多个选项同时成立或证据不足，是否按题意选择“其他/混合/unknown”并说明原因？</td><td><span>no_after_negative_search</span></td><td>负向搜索未发现send/recv接入netdev/loopback/driver队列的任何实现。 <a href="#ev_task_08_network_overview_61e5e300" class="evidence-link">ev_task_08_network_overview_61e5e300</a> <a href="#ev_task_08_network_overview_3f3cfaf6" class="evidence-link">ev_task_08_network_overview_3f3cfaf6</a></td></tr>
+<tr><td><strong>net_device_driver</strong></td><td>若未确认“协议栈来源更接近哪种？”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span>no_after_negative_search</span></td><td>负向搜索未发现virtio-net/e1000/loopback等网卡驱动初始化、中断/轮询收包或DMA/descriptor的实现；仅存在virtio_disk驱动，与网络无关。 <a href="#ev_task_08_network_overview_b3469835" class="evidence-link">ev_task_08_network_overview_b3469835</a> <a href="#ev_task_08_network_overview_3f3cfaf6" class="evidence-link">ev_task_08_network_overview_3f3cfaf6</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>-</td><td><span>{"searched_keywords": ["socket", "bind", "connect", "sendto", "recvfrom", "Ethernet", "ARP", "IP", "ICMP", "UDP", "TCP", "smoltcp", "lwip", "netdev", "virtio-net", "e1000", "loopback", "nic", "eth"], "searched_directories": ["kernel", "include", "xv6-user", "bootloader", "sbi", "linker", "tools", "doc"], "file_count": 207, "match_count": 0, "coverage_sufficient": true}</span></td><td>负向搜索覆盖了19个关键词和8个目录，共207个文件，匹配数为0（排除errno.h/stat.h中的POSIX常量），覆盖充分。 <a href="#ev_task_08_network_overview_3f3cfaf6" class="evidence-link">ev_task_08_network_overview_3f3cfaf6</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_08_network_overview_b3469835" class="evidence-anchor">ev_task_08_network_overview_b3469835</span> 
+<span id="ev_task_08_network_overview_61e5e300" class="evidence-anchor">ev_task_08_network_overview_61e5e300</span> 
+<span id="ev_task_08_network_overview_3f3cfaf6" class="evidence-anchor">ev_task_08_network_overview_3f3cfaf6</span> 
+<span id="ev_task_08_network_overview_e7271f15" class="evidence-anchor">ev_task_08_network_overview_e7271f15</span> 
+<span id="ev_task_08_network_overview_10911eca" class="evidence-anchor">ev_task_08_network_overview_10911eca</span> 
+<span id="ev_task_08_network_overview_9616161e" class="evidence-anchor">ev_task_08_network_overview_9616161e</span> 
+</section>
+<section class="question-block" id="q08_003">
+<h3>Q08_003 是否实现 socket 系统调用接口（socket/bind/connect/sendto/recvfrom 等）？（必须三态）</h3>
+<div class="answer-value"><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#f8d7da;color:#721c24;font-size:0.85em;font-weight:500">❌ 未发现</span> <span style="color:var(--text-muted);margin-left:0.5em">未发现</span></div>
+<div class="answer-notes">所有 structured_facts 均为 no_after_negative_search，负向搜索覆盖充分（15+ keywords, 8+ directories, 207 files），可判定 not_found。errno.h 和 stat.h 中的 socket 相关常量仅为 POSIX 兼容性定义，不构成实现。</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>socket_api</strong></td><td>“socket 系统调用接口”的内核定义、入口、对象或配置开关在哪里？</td><td><span>no_after_negative_search</span></td><td>syscall table 无 socket 相关系统调用；sysnum.h 无 socket 系统调用号；user.h 无 socket API 声明；extern 声明中无 sys_socket/sys_bind/sys_connect/sys_sendto/sys_recvfrom <a href="#ev_task_08_socket_syscall_39944fbf" class="evidence-link">ev_task_08_socket_syscall_39944fbf</a> <a href="#ev_task_08_socket_syscall_3d13f69d" class="evidence-link">ev_task_08_socket_syscall_3d13f69d</a> <a href="#ev_task_08_socket_syscall_1d18431f" class="evidence-link">ev_task_08_socket_syscall_1d18431f</a> <a href="#ev_task_08_socket_syscall_6ab4eedc" class="evidence-link">ev_task_08_socket_syscall_6ab4eedc</a></td></tr>
+<tr><td><strong>protocol_stack</strong></td><td>是否存在执行“socket 系统调用接口”语义的真实实现体，而不是声明、空函数或固定返回？</td><td><span>no_after_negative_search</span></td><td>Makefile 无网络相关源文件；find_os_core_modules 未识别出网络模块；grep 协议关键词返回无关内容（mip 寄存器、SPI 传输、SBI IPI 等），无网络协议实现 <a href="#ev_task_08_socket_syscall_99e7ecae" class="evidence-link">ev_task_08_socket_syscall_99e7ecae</a> <a href="#ev_task_08_socket_syscall_32e9a92f" class="evidence-link">ev_task_08_socket_syscall_32e9a92f</a> <a href="#ev_task_08_socket_syscall_f77c2894" class="evidence-link">ev_task_08_socket_syscall_f77c2894</a></td></tr>
+<tr><td><strong>socket_state</strong></td><td>该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？</td><td><span>no_after_negative_search</span></td><td>grep 'Ethernet|ARP|IP|ICMP|UDP|TCP' 返回 1365 匹配，但均为无关内容，未实现任何协议层 <a href="#ev_task_08_socket_syscall_f77c2894" class="evidence-link">ev_task_08_socket_syscall_f77c2894</a></td></tr>
+<tr><td><strong>send_recv_flow</strong></td><td>执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？</td><td><span>no_after_negative_search</span></td><td>grep 'netdev|loopback' 无匹配；SYS_read(63)/SYS_write(64) 为通用文件读写系统调用，非网络 socket 操作 <a href="#ev_task_08_socket_syscall_3cebbf4c" class="evidence-link">ev_task_08_socket_syscall_3cebbf4c</a></td></tr>
+<tr><td><strong>net_device_driver</strong></td><td>是否排除与“socket 系统调用接口”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？</td><td><span>no_after_negative_search</span></td><td>Makefile 中无网卡驱动源文件；find_os_core_modules 未识别出网络模块；DMAC 仅用于 SD 卡；virtio 仅用于块设备 <a href="#ev_task_08_socket_syscall_99e7ecae" class="evidence-link">ev_task_08_socket_syscall_99e7ecae</a> <a href="#ev_task_08_socket_syscall_32e9a92f" class="evidence-link">ev_task_08_socket_syscall_32e9a92f</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>若未确认“socket 系统调用接口”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span>{"searched_keywords": ["socket", "bind", "connect", "sendto", "recvfrom", "Ethernet", "ARP", "IP", "ICMP", "UDP", "TCP", "smoltcp", "lwip", "netdev", "virtio-net", "e1000"], "searched_directories": ["kernel", "include", "xv6-user", "bootloader", "sbi", "tools", "linker", "doc"], "file_count": 207, "match_count": 0, "coverage_sufficient": true}</span></td><td>负向搜索覆盖充分：15+ keywords, 8+ directories, 207 files, 0 matches <a href="#ev_task_08_socket_syscall_39944fbf" class="evidence-link">ev_task_08_socket_syscall_39944fbf</a> <a href="#ev_task_08_socket_syscall_3d13f69d" class="evidence-link">ev_task_08_socket_syscall_3d13f69d</a> <a href="#ev_task_08_socket_syscall_1d18431f" class="evidence-link">ev_task_08_socket_syscall_1d18431f</a> <a href="#ev_task_08_socket_syscall_6ab4eedc" class="evidence-link">ev_task_08_socket_syscall_6ab4eedc</a> <a href="#ev_task_08_socket_syscall_99e7ecae" class="evidence-link">ev_task_08_socket_syscall_99e7ecae</a> <a href="#ev_task_08_socket_syscall_32e9a92f" class="evidence-link">ev_task_08_socket_syscall_32e9a92f</a> <a href="#ev_task_08_socket_syscall_f77c2894" class="evidence-link">ev_task_08_socket_syscall_f77c2894</a> <a href="#ev_task_08_socket_syscall_3cebbf4c" class="evidence-link">ev_task_08_socket_syscall_3cebbf4c</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_08_socket_syscall_39944fbf" class="evidence-anchor">ev_task_08_socket_syscall_39944fbf</span> 
+<span id="ev_task_08_socket_syscall_3d13f69d" class="evidence-anchor">ev_task_08_socket_syscall_3d13f69d</span> 
+<span id="ev_task_08_socket_syscall_1d18431f" class="evidence-anchor">ev_task_08_socket_syscall_1d18431f</span> 
+<span id="ev_task_08_socket_syscall_6ab4eedc" class="evidence-anchor">ev_task_08_socket_syscall_6ab4eedc</span> 
+<span id="ev_task_08_socket_syscall_99e7ecae" class="evidence-anchor">ev_task_08_socket_syscall_99e7ecae</span> 
+<span id="ev_task_08_socket_syscall_32e9a92f" class="evidence-anchor">ev_task_08_socket_syscall_32e9a92f</span> 
+<span id="ev_task_08_socket_syscall_f77c2894" class="evidence-anchor">ev_task_08_socket_syscall_f77c2894</span> 
+<span id="ev_task_08_socket_syscall_3cebbf4c" class="evidence-anchor">ev_task_08_socket_syscall_3cebbf4c</span> 
+</section>
+<section class="question-block" id="q08_004">
+<h3>Q08_004 选择一个发送路径（优先 sys_sendto），追踪：syscall → 协议栈 → 网卡驱动。列 3-6 个关键节点并给证据。</h3>
+<div class="answer-value"><pre><code>{
+  "socket_api": "no_after_negative_search",
+  "protocol_stack": "no_after_negative_search",
+  "socket_state": "no_after_negative_search",
+  "send_recv_flow": "no_after_negative_search",
+  "net_device_driver": "no_after_negative_search",
+  "negative_search_coverage": {
+    "searched_keywords": [
+      "socket",
+      "bind",
+      "connect",
+      "sendto",
+      "recvfrom",
+      "Ethernet",
+      "ARP",
+      "IP",
+      "ICMP",
+      "UDP",
+      "TCP",
+      "smoltcp",
+      "lwip",
+      "netdev",
+      "virtio-net",
+      "e1000"
+    ],
+    "searched_directories": [
+      "kernel",
+      "net",
+      "network",
+      "driver",
+      "hal",
+      "syscall",
+      "include",
+      "Cargo.toml",
+      "Makefile"
+    ],
+    "file_count": 207,
+    "match_count": 0,
+    "coverage_sufficient": true
+  }
+}</code></pre></div>
+<div class="answer-notes">xv6-k210 未实现网络子系统。syscall table 和用户头文件中无 socket/sendto/recvfrom 等接口；无协议栈模块或第三方依赖（无 smoltcp/lwip）；未实现 Ethernet/ARP/IP/ICMP/UDP/TCP 任何一层；无 netdev/loopback/driver 队列；无网卡驱动。仅有的网络相关代码是 errno.h 中的 POSIX 错误码常量（ENOTSOCK 等），这些只是兼容性常量，不能构成网络实现。所有 6 个 structured_facts 均通过负向搜索确认为未实现，覆盖充分。</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>socket_api</strong></td><td>本题只回答“选择一个发送路径（优先 sys_sendto），追踪：syscall → 协议栈 → 网卡驱动。列 3-6 个关键节点并给证据。”，是否明确输出对象、范围、数量或状态字段？</td><td><span>no_after_negative_search</span></td><td>syscall table (syscall.c) 和用户头文件 (user.h) 中均无 socket/sendto/recvfrom 等接口；sysnum.h 中无对应系统调用号；负向搜索覆盖 207 个文件，0 匹配。 <a href="#ev_task_08_send_path_trace_f973d696" class="evidence-link">ev_task_08_send_path_trace_f973d696</a> <a href="#ev_task_08_send_path_trace_509092fb" class="evidence-link">ev_task_08_send_path_trace_509092fb</a> <a href="#ev_task_08_send_path_trace_d9f21143" class="evidence-link">ev_task_08_send_path_trace_d9f21143</a> <a href="#ev_task_08_send_path_trace_72268933" class="evidence-link">ev_task_08_send_path_trace_72268933</a></td></tr>
+<tr><td><strong>protocol_stack</strong></td><td>支撑答案的主要源码/配置/文档锚点在哪里（路径、符号、结构体或常量）？</td><td><span>no_after_negative_search</span></td><td>grep 搜索 smoltcp/lwip/libnet/pnet 等协议栈依赖，207 个文件中 0 匹配。 <a href="#ev_task_08_send_path_trace_a6e3d9b0" class="evidence-link">ev_task_08_send_path_trace_a6e3d9b0</a> <a href="#ev_task_08_send_path_trace_72268933" class="evidence-link">ev_task_08_send_path_trace_72268933</a></td></tr>
+<tr><td><strong>socket_state</strong></td><td>答案中的每个关键结论是否有实现体、调用链、状态变化或配置分支证据？</td><td><span>no_after_negative_search</span></td><td>负向搜索覆盖 Ethernet/ARP/IP/ICMP/UDP/TCP 等关键词，207 个文件中 0 匹配。 <a href="#ev_task_08_send_path_trace_72268933" class="evidence-link">ev_task_08_send_path_trace_72268933</a></td></tr>
+<tr><td><strong>send_recv_flow</strong></td><td>是否排除题干未要求的相邻模块、同名概念、用户态封装、README 口号或测试桩？</td><td><span>no_after_negative_search</span></td><td>负向搜索覆盖 netdev/loopback/driver 队列相关关键词，207 个文件中 0 匹配。 <a href="#ev_task_08_send_path_trace_72268933" class="evidence-link">ev_task_08_send_path_trace_72268933</a></td></tr>
+<tr><td><strong>net_device_driver</strong></td><td>多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？</td><td><span>no_after_negative_search</span></td><td>grep 搜索 netdev/loopback/virtio-net/e1000 等网卡驱动关键词，142 个 .c/.h 文件中 0 匹配。 <a href="#ev_task_08_send_path_trace_5d434efd" class="evidence-link">ev_task_08_send_path_trace_5d434efd</a> <a href="#ev_task_08_send_path_trace_72268933" class="evidence-link">ev_task_08_send_path_trace_72268933</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>若未确认“选择一个发送路径（优先 sys_sendto），追踪：syscall → 协议栈 → 网卡驱动。列 3-6 个关键节点并给证据。”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span>{"searched_keywords": ["socket", "bind", "connect", "sendto", "recvfrom", "Ethernet", "ARP", "IP", "ICMP", "UDP", "TCP", "smoltcp", "lwip", "netdev", "virtio-net", "e1000"], "searched_directories": ["kernel", "net", "network", "driver", "hal", "syscall", "include", "Cargo.toml", "Makefile"], "file_count": 207, "match_count": 0, "coverage_sufficient": true}</span></td><td>负向搜索覆盖全部 16 个关键词和 9 个种子目录/文件，搜索 207 个文件，0 相关匹配，覆盖充分。 <a href="#ev_task_08_send_path_trace_72268933" class="evidence-link">ev_task_08_send_path_trace_72268933</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_08_send_path_trace_a2e4944c" class="evidence-anchor">ev_task_08_send_path_trace_a2e4944c</span> 
+<span id="ev_task_08_send_path_trace_72268933" class="evidence-anchor">ev_task_08_send_path_trace_72268933</span> 
+<span id="ev_task_08_send_path_trace_f973d696" class="evidence-anchor">ev_task_08_send_path_trace_f973d696</span> 
+<span id="ev_task_08_send_path_trace_509092fb" class="evidence-anchor">ev_task_08_send_path_trace_509092fb</span> 
+<span id="ev_task_08_send_path_trace_d9f21143" class="evidence-anchor">ev_task_08_send_path_trace_d9f21143</span> 
+<span id="ev_task_08_send_path_trace_a6e3d9b0" class="evidence-anchor">ev_task_08_send_path_trace_a6e3d9b0</span> 
+<span id="ev_task_08_send_path_trace_5d434efd" class="evidence-anchor">ev_task_08_send_path_trace_5d434efd</span> 
+</section>
+<section class="question-block" id="q08_005">
+<h3>Q08_005 是否实现网卡驱动（virtio-net/e1000 等）与收包中断路径？（必须三态）</h3>
+<div class="answer-value"><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#f8d7da;color:#721c24;font-size:0.85em;font-weight:500">❌ 未发现</span> <span style="color:var(--text-muted);margin-left:0.5em">未发现</span></div>
+<div class="answer-notes">所有 6 个 structured_facts 均指向 no_after_negative_search，负向搜索覆盖充分（coverage_sufficient=true）。xv6-k210 未实现任何网络功能：无 socket API、无协议栈、无网卡驱动、无网络中断路径。virtio 驱动仅用于块设备，PLIC 中断仅处理 UART 和 DISK。因此最终三态结论为 not_found。</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>socket_api</strong></td><td>“网卡驱动”的内核定义、入口、对象或配置开关在哪里？</td><td><span>no_after_negative_search</span></td><td>sysnum.h 无网络 syscall 号，syscall.c 无网络处理函数，user.h 无网络 API 声明，负向搜索未发现 socket/sendto/recvfrom 等用户接口。 <a href="#ev_task_08_net_driver_000158bf" class="evidence-link">ev_task_08_net_driver_000158bf</a> <a href="#ev_task_08_net_driver_4e2d6830" class="evidence-link">ev_task_08_net_driver_4e2d6830</a> <a href="#ev_task_08_net_driver_62e38853" class="evidence-link">ev_task_08_net_driver_62e38853</a> <a href="#ev_task_08_net_driver_d9231e10" class="evidence-link">ev_task_08_net_driver_d9231e10</a></td></tr>
+<tr><td><strong>protocol_stack</strong></td><td>是否存在执行“网卡驱动”语义的真实实现体，而不是声明、空函数或固定返回？</td><td><span>no_after_negative_search</span></td><td>Makefile 无网络源文件，kernel/ 和 include/ 无 net/ 子目录，负向搜索未发现协议栈模块或第三方依赖。 <a href="#ev_task_08_net_driver_a73f68d2" class="evidence-link">ev_task_08_net_driver_a73f68d2</a> <a href="#ev_task_08_net_driver_5aefcfc8" class="evidence-link">ev_task_08_net_driver_5aefcfc8</a> <a href="#ev_task_08_net_driver_0c743860" class="evidence-link">ev_task_08_net_driver_0c743860</a> <a href="#ev_task_08_net_driver_d9231e10" class="evidence-link">ev_task_08_net_driver_d9231e10</a></td></tr>
+<tr><td><strong>socket_state</strong></td><td>该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？</td><td><span>no_after_negative_search</span></td><td>负向搜索未发现 Ethernet/ARP/IP/ICMP/UDP/TCP 任何协议层实现。 <a href="#ev_task_08_net_driver_d9231e10" class="evidence-link">ev_task_08_net_driver_d9231e10</a></td></tr>
+<tr><td><strong>send_recv_flow</strong></td><td>执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？</td><td><span>no_after_negative_search</span></td><td>负向搜索未发现 netdev/loopback/driver 队列相关代码。 <a href="#ev_task_08_net_driver_d9231e10" class="evidence-link">ev_task_08_net_driver_d9231e10</a></td></tr>
+<tr><td><strong>net_device_driver</strong></td><td>是否排除与“网卡驱动”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？</td><td><span>no_after_negative_search</span></td><td>virtio.h 仅声明 virtio_disk_* 函数，无 virtio_net_*；trap.c 中断处理仅处理 UART_IRQ 和 DISK_IRQ，无网络中断；负向搜索未发现网卡驱动初始化、中断/轮询收包或 DMA/descriptor。 <a href="#ev_task_08_net_driver_879ee5a5" class="evidence-link">ev_task_08_net_driver_879ee5a5</a> <a href="#ev_task_08_net_driver_5087383f" class="evidence-link">ev_task_08_net_driver_5087383f</a> <a href="#ev_task_08_net_driver_d9231e10" class="evidence-link">ev_task_08_net_driver_d9231e10</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>若未确认“网卡驱动”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span>{"searched_keywords": ["socket", "bind", "connect", "sendto", "recvfrom", "Ethernet", "ARP", "IP", "ICMP", "UDP", "TCP", "smoltcp", "lwip", "netdev", "virtio-net", "e1000", "virtio_net", "loopback", "net_device", "NET_IRQ"], "searched_directories": ["kernel", "include", "xv6-user", "sbi", "bootloader", "Makefile"], "file_count": 207, "match_count": 0, "coverage_sufficient": true}</span></td><td>负向搜索覆盖了所有指定关键词和目录，未发现任何网络相关实现，覆盖充分。 <a href="#ev_task_08_net_driver_d9231e10" class="evidence-link">ev_task_08_net_driver_d9231e10</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_08_net_driver_a73f68d2" class="evidence-anchor">ev_task_08_net_driver_a73f68d2</span> 
+<span id="ev_task_08_net_driver_5aefcfc8" class="evidence-anchor">ev_task_08_net_driver_5aefcfc8</span> 
+<span id="ev_task_08_net_driver_0c743860" class="evidence-anchor">ev_task_08_net_driver_0c743860</span> 
+<span id="ev_task_08_net_driver_d9231e10" class="evidence-anchor">ev_task_08_net_driver_d9231e10</span> 
+<span id="ev_task_08_net_driver_000158bf" class="evidence-anchor">ev_task_08_net_driver_000158bf</span> 
+<span id="ev_task_08_net_driver_4e2d6830" class="evidence-anchor">ev_task_08_net_driver_4e2d6830</span> 
+<span id="ev_task_08_net_driver_62e38853" class="evidence-anchor">ev_task_08_net_driver_62e38853</span> 
+<span id="ev_task_08_net_driver_655003fb" class="evidence-anchor">ev_task_08_net_driver_655003fb</span> 
+<span id="ev_task_08_net_driver_879ee5a5" class="evidence-anchor">ev_task_08_net_driver_879ee5a5</span> 
+<span id="ev_task_08_net_driver_5087383f" class="evidence-anchor">ev_task_08_net_driver_5087383f</span> 
+</section>
+<section class="question-block" id="q08_006">
+<h3>Q08_006 协议支持情况（多选；未发现则留空并在 notes 写 not_found）：</h3>
+<div class="answer-value"><pre><code>[]</code></pre></div>
+<div class="answer-notes">所有 structured_facts 均为 no_after_negative_search，负向搜索覆盖充分，未发现任何协议支持，故 value 留空数组。</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>socket_api</strong></td><td>逐项读取题单 choices，列出本题允许多选的全部候选项。</td><td><span>no_after_negative_search</span></td><td>sysnum.h 无网络 syscall 号，syscall.c 无网络处理函数，user.h 无 socket 包装函数 <a href="#ev_task_08_protocol_support_5a6e982e" class="evidence-link">ev_task_08_protocol_support_5a6e982e</a> <a href="#ev_task_08_protocol_support_32e36d88" class="evidence-link">ev_task_08_protocol_support_32e36d88</a> <a href="#ev_task_08_protocol_support_349276c8" class="evidence-link">ev_task_08_protocol_support_349276c8</a></td></tr>
+<tr><td><strong>protocol_stack</strong></td><td>每个被选中的选项是否都有独立源码/配置/调用点证据？</td><td><span>no_after_negative_search</span></td><td>Makefile 中无 net/、network/ 或网络驱动文件，无第三方网络依赖 <a href="#ev_task_08_protocol_support_27d29bd0" class="evidence-link">ev_task_08_protocol_support_27d29bd0</a></td></tr>
+<tr><td><strong>socket_state</strong></td><td>未选选项是否经过关键词和目录搜索，而不是默认遗漏？</td><td><span>no_after_negative_search</span></td><td>无任何 Ethernet/ARP/IP/ICMP/UDP/TCP 实现 <a href="#ev_task_08_protocol_support_5a6e982e" class="evidence-link">ev_task_08_protocol_support_5a6e982e</a> <a href="#ev_task_08_protocol_support_32e36d88" class="evidence-link">ev_task_08_protocol_support_32e36d88</a> <a href="#ev_task_08_protocol_support_27d29bd0" class="evidence-link">ev_task_08_protocol_support_27d29bd0</a></td></tr>
+<tr><td><strong>send_recv_flow</strong></td><td>是否避免把相似选项、相邻模块或文档声称混作已选功能？</td><td><span>no_after_negative_search</span></td><td>无 netdev/loopback/driver 队列相关代码 <a href="#ev_task_08_protocol_support_32e36d88" class="evidence-link">ev_task_08_protocol_support_32e36d88</a> <a href="#ev_task_08_protocol_support_27d29bd0" class="evidence-link">ev_task_08_protocol_support_27d29bd0</a></td></tr>
+<tr><td><strong>net_device_driver</strong></td><td>若未确认“协议支持情况（多选；未发现则留空并在 notes 写 not_found）：”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span>no_after_negative_search</span></td><td>trap.c 中断处理仅 UART 和 DISK，PLIC 无网络设备 IRQ，Makefile 无网络驱动 <a href="#ev_task_08_protocol_support_771389d3" class="evidence-link">ev_task_08_protocol_support_771389d3</a> <a href="#ev_task_08_protocol_support_bdab2177" class="evidence-link">ev_task_08_protocol_support_bdab2177</a> <a href="#ev_task_08_protocol_support_27d29bd0" class="evidence-link">ev_task_08_protocol_support_27d29bd0</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>-</td><td><span>{"searched_keywords": ["socket", "bind", "connect", "sendto", "recvfrom", "Ethernet", "ARP", "IP", "ICMP", "UDP", "TCP", "smoltcp", "lwip", "netdev", "virtio-net", "e1000"], "searched_directories": ["kernel", "net", "network", "driver", "hal", "syscall", "include", "Cargo.toml", "Makefile", "sbi", "bootloader"], "file_count": 207, "match_count": 0, "coverage_sufficient": true}</span></td><td>全面搜索覆盖所有指定关键词和目录，匹配数为 0 <a href="#ev_task_08_protocol_support_5a6e982e" class="evidence-link">ev_task_08_protocol_support_5a6e982e</a> <a href="#ev_task_08_protocol_support_32e36d88" class="evidence-link">ev_task_08_protocol_support_32e36d88</a> <a href="#ev_task_08_protocol_support_349276c8" class="evidence-link">ev_task_08_protocol_support_349276c8</a> <a href="#ev_task_08_protocol_support_7d9148e5" class="evidence-link">ev_task_08_protocol_support_7d9148e5</a> <a href="#ev_task_08_protocol_support_da547fea" class="evidence-link">ev_task_08_protocol_support_da547fea</a> <a href="#ev_task_08_protocol_support_771389d3" class="evidence-link">ev_task_08_protocol_support_771389d3</a> <a href="#ev_task_08_protocol_support_bdab2177" class="evidence-link">ev_task_08_protocol_support_bdab2177</a> <a href="#ev_task_08_protocol_support_27d29bd0" class="evidence-link">ev_task_08_protocol_support_27d29bd0</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_08_protocol_support_5a6e982e" class="evidence-anchor">ev_task_08_protocol_support_5a6e982e</span> 
+<span id="ev_task_08_protocol_support_32e36d88" class="evidence-anchor">ev_task_08_protocol_support_32e36d88</span> 
+<span id="ev_task_08_protocol_support_349276c8" class="evidence-anchor">ev_task_08_protocol_support_349276c8</span> 
+<span id="ev_task_08_protocol_support_7d9148e5" class="evidence-anchor">ev_task_08_protocol_support_7d9148e5</span> 
+<span id="ev_task_08_protocol_support_da547fea" class="evidence-anchor">ev_task_08_protocol_support_da547fea</span> 
+<span id="ev_task_08_protocol_support_771389d3" class="evidence-anchor">ev_task_08_protocol_support_771389d3</span> 
+<span id="ev_task_08_protocol_support_bdab2177" class="evidence-anchor">ev_task_08_protocol_support_bdab2177</span> 
+<span id="ev_task_08_protocol_support_27d29bd0" class="evidence-anchor">ev_task_08_protocol_support_27d29bd0</span> 
+</section>
+<section class="question-block" id="q08_007">
+<h3>Q08_007 是否存在零拷贝/共享缓冲/DMA 描述符等路径（zero-copy）？（必须三态；仅有名词不算 implemented）</h3>
+<div class="answer-value"><span style="display:inline-block;padding:0.15em 0.6em;border-radius:12px;background:#f8d7da;color:#721c24;font-size:0.85em;font-weight:500">❌ 未发现</span> <span style="color:var(--text-muted);margin-left:0.5em">未发现</span></div>
+<div class="answer-notes">所有 6 个 structured_facts 均判定为 no_after_negative_search，且 negative_search_coverage 覆盖充分。xv6-k210 未实现任何网络功能，DMA 仅用于 SD 卡块设备路径，不属于网络包路径。因此最终三态值为 not_found。</div>
+<details class="fact-details">
+<summary>子事实明细（6 项）</summary>
+<table class="fact-table">
+<thead><tr><th>子问题</th><th>考核项</th><th>结论</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><strong>socket_api</strong></td><td>本题只回答“网络数据路径中是否存在用户可见 zero-copy、内核共享缓冲、或网卡 DMA descriptor？请分别给状态与证据；普通 DMA descriptor 不自动等于 zero-copy。”，是否明确输出对象、范围、数量或状态字段？</td><td><span>no_after_negative_search</span></td><td>sysnum.h 无 socket 相关 syscall 号；syscall.c 无 socket 相关实现。 <a href="#ev_task_08_zero_copy_ea6592e4" class="evidence-link">ev_task_08_zero_copy_ea6592e4</a> <a href="#ev_task_08_zero_copy_0fe6598f" class="evidence-link">ev_task_08_zero_copy_0fe6598f</a></td></tr>
+<tr><td><strong>protocol_stack</strong></td><td>支撑答案的主要源码/配置/文档锚点在哪里（路径、符号、结构体或常量）？</td><td><span>no_after_negative_search</span></td><td>Makefile 无网络源文件；kernel 目录无 net/network 子目录；无 smoltcp/lwIP 依赖。 <a href="#ev_task_08_zero_copy_a7172cf8" class="evidence-link">ev_task_08_zero_copy_a7172cf8</a> <a href="#ev_task_08_zero_copy_f154ad5c" class="evidence-link">ev_task_08_zero_copy_f154ad5c</a></td></tr>
+<tr><td><strong>protocol_coverage</strong></td><td>答案中的每个关键结论是否有实现体、调用链、状态变化或配置分支证据？</td><td><span>no_after_negative_search</span></td><td>grep ETH|ARP|IP|ICMP|UDP|TCP 在 kernel/*.c 中匹配结果均为非网络含义。 <a href="#ev_task_08_zero_copy_5926cb32" class="evidence-link">ev_task_08_zero_copy_5926cb32</a></td></tr>
+<tr><td><strong>driver_flow</strong></td><td>是否排除题干未要求的相邻模块、同名概念、用户态封装、README 口号或测试桩？</td><td><span>no_after_negative_search</span></td><td>无 netdev/loopback/virtio-net/e1000 等网络设备驱动；virtio.h 仅定义设备类型常量，无网络驱动实现。 <a href="#ev_task_08_zero_copy_f154ad5c" class="evidence-link">ev_task_08_zero_copy_f154ad5c</a> <a href="#ev_task_08_zero_copy_e44dd9a5" class="evidence-link">ev_task_08_zero_copy_e44dd9a5</a></td></tr>
+<tr><td><strong>buffer_dma_zero_copy</strong></td><td>多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？</td><td><span>no_after_negative_search</span></td><td>无网络包专用零拷贝/DMA/共享缓冲；DMA 仅用于 SD 卡块设备路径。 <a href="#ev_task_08_zero_copy_f154ad5c" class="evidence-link">ev_task_08_zero_copy_f154ad5c</a> <a href="#ev_task_08_zero_copy_5926cb32" class="evidence-link">ev_task_08_zero_copy_5926cb32</a></td></tr>
+<tr><td><strong>negative_search_coverage</strong></td><td>若未确认“用户可见 zero-copy、内核共享缓冲、或网卡 DMA descriptor”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。</td><td><span>{"searched_keywords": ["socket", "bind", "connect", "sendto", "recvfrom", "Ethernet", "ARP", "IP", "ICMP", "UDP", "TCP", "smoltcp", "lwip", "netdev", "virtio-net", "e1000", "zero-copy", "DMA", "sk_buff", "mbuf", "packet_buffer", "dma_descriptor", "loopback", "network_device"], "searched_directories": ["kernel", "include", "xv6-user", "bootloader", "doc", "tools", "linker", "sbi", "Makefile"], "file_count": 207, "match_count": 0, "coverage_sufficient": true}</span></td><td>负向搜索覆盖充分，关键词和目录均满足 minimum_keyword_coverage 0.7 和 minimum_directory_coverage 0.6。 <a href="#ev_task_08_zero_copy_ea6592e4" class="evidence-link">ev_task_08_zero_copy_ea6592e4</a> <a href="#ev_task_08_zero_copy_0fe6598f" class="evidence-link">ev_task_08_zero_copy_0fe6598f</a> <a href="#ev_task_08_zero_copy_a7172cf8" class="evidence-link">ev_task_08_zero_copy_a7172cf8</a> <a href="#ev_task_08_zero_copy_f154ad5c" class="evidence-link">ev_task_08_zero_copy_f154ad5c</a> <a href="#ev_task_08_zero_copy_5926cb32" class="evidence-link">ev_task_08_zero_copy_5926cb32</a></td></tr>
+</tbody></table>
+</details>
+<span id="ev_task_08_zero_copy_ea6592e4" class="evidence-anchor">ev_task_08_zero_copy_ea6592e4</span> 
+<span id="ev_task_08_zero_copy_0fe6598f" class="evidence-anchor">ev_task_08_zero_copy_0fe6598f</span> 
+<span id="ev_task_08_zero_copy_a7172cf8" class="evidence-anchor">ev_task_08_zero_copy_a7172cf8</span> 
+<span id="ev_task_08_zero_copy_f154ad5c" class="evidence-anchor">ev_task_08_zero_copy_f154ad5c</span> 
+<span id="ev_task_08_zero_copy_5926cb32" class="evidence-anchor">ev_task_08_zero_copy_5926cb32</span> 
+<span id="ev_task_08_zero_copy_e44dd9a5" class="evidence-anchor">ev_task_08_zero_copy_e44dd9a5</span> 
+</section>
+<div style="margin-top:3rem;display:flex;justify-content:space-between;flex-wrap:wrap;gap:1rem">
+<a href="07.html" style="padding:0.6rem 1.2rem;background:#e67e22;color:#fff;border-radius:8px;text-decoration:none">← 安全机制与权限模型</a>
+<a href="../index.html" style="padding:0.6rem 1.2rem;background:#6c757d;color:#fff;border-radius:8px;text-decoration:none">首页</a>
+<a href="09.html" style="padding:0.6rem 1.2rem;background:#34495e;color:#fff;border-radius:8px;text-decoration:none">调试机制与错误处理 →</a>
+</div>
+</div></body></html>

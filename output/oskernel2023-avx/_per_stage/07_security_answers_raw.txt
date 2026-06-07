@@ -1,0 +1,338 @@
+```json
+{
+  "schema_version": "v1",
+  "stage_id": "07_security",
+  "stage_title": "安全机制与权限模型",
+  "terminology_profile": "stallings_en_zh",
+  "answers": [
+    {
+      "question_id": "Q07_001",
+      "question_type": "single_choice",
+      "stem": "特权级隔离形态更接近哪种？",
+      "value": "有用户态/内核态隔离（user mode/kernel mode）",
+      "evidence": [
+        {
+          "path": "kernel/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "usertrap",
+          "excerpt": "usertrap() 中检查 SSTATUS_SPP 位确认来自用户模式：if ((r_sstatus() & SSTATUS_SPP) != 0) panic(\"usertrap: not from user mode\"); [Source: kernel/trap.c:55]"
+        },
+        {
+          "path": "kernel/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "usertrapret",
+          "excerpt": "usertrapret() 清除 SPP 位进入用户态：x &= ~SSTATUS_SPP; w_sstatus(x); [Source: kernel/trap.c:144-145]"
+        },
+        {
+          "path": "kernel/include/riscv.h",
+          "symbol_kind": "macro",
+          "symbol_name": "SSTATUS_SPP",
+          "excerpt": "#define SSTATUS_SPP (1L << 8)  // Previous mode, 1=Supervisor, 0=User [Source: kernel/include/riscv.h:47]"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_002",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在凭证/权限数据结构（UID/GID/Credential/Capability/ACL 等）？",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/include/proc.h",
+          "symbol_kind": "struct",
+          "symbol_name": "proc",
+          "excerpt": "struct proc { int uid; int gid; ... } [Source: kernel/include/proc.h:67-68]"
+        },
+        {
+          "path": "kernel/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "allocproc",
+          "excerpt": "allocproc() 初始化 uid/gid 为 0：p->uid = 0; p->gid = 0; [Source: kernel/proc.c:235-236]"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_003",
+      "question_type": "tri_state_impl",
+      "stem": "是否能证实在 syscall 路径上真实执行了权限检查（open/exec/write 等）？",
+      "value": "stub",
+      "evidence": [
+        {
+          "path": "kernel/sysfile.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_faccessat",
+          "excerpt": "sys_faccessat 仅检查 mode == F_OK 或 emode & mode，未使用 proc->uid/gid：if (mode == F_OK) return 0; if ((emode & mode) != mode) return -1; [Source: kernel/sysfile.c:1038-1042]"
+        },
+        {
+          "path": "kernel/fat32.c",
+          "symbol_kind": "function",
+          "symbol_name": "ekstat",
+          "excerpt": "ekstat() 硬编码 st_uid/st_gid 为 0：st->st_uid = 0; st->st_gid = 0; [Source: kernel/fat32.c:824-825]"
+        },
+        {
+          "path": "kernel/sysproc.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_setuid",
+          "excerpt": "sys_setuid 无 root 权限检查，直接赋值：myproc()->uid = uid; return 0; [Source: kernel/sysproc.c:386-390]"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_004",
+      "question_type": "short_answer",
+      "stem": "若存在权限检查：入口点与核心检查函数链路是什么？",
+      "value": "权限检查链路（仅 faccessat）：\n1. sys_faccessat (kernel/sysfile.c:1018) - 系统调用入口\n2. 检查 mode == F_OK 返回 0 (kernel/sysfile.c:1038)\n3. 检查 (emode & mode) != mode 返回 -1 (kernel/sysfile.c:1041)\n4. emode 硬编码为 R_OK|W_OK|X_OK (kernel/sysfile.c:1020)\n\n注意：该链路未使用 proc->uid/gid 字段，仅检查传入的 mode 参数。open/exec/write 等系统调用无权限检查。",
+      "evidence": [
+        {
+          "path": "kernel/sysfile.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_faccessat",
+          "excerpt": "int dirfd, mode, flags, emode = R_OK | W_OK | X_OK; ... if (mode == F_OK) return 0; if ((emode & mode) != mode) return -1; [Source: kernel/sysfile.c:1020-1042]"
+        },
+        {
+          "path": "kernel/include/file.h",
+          "symbol_kind": "macro",
+          "symbol_name": "R_OK",
+          "excerpt": "#define R_OK 4, #define W_OK 2, #define X_OK 1, #define F_OK 0 [Source: kernel/include/file.h:60-63]"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_005",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现用户指针验证（access_ok/verify_area/UserInPtr/copyin/copyout 等）？",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/vm.c",
+          "symbol_kind": "function",
+          "symbol_name": "copyin",
+          "excerpt": "copyin() 通过 walkaddr() 验证用户地址：pa0 = walkaddr(pagetable, va0); if (pa0 == NULL) return -1; [Source: kernel/vm.c:483-488]"
+        },
+        {
+          "path": "kernel/vm.c",
+          "symbol_kind": "function",
+          "symbol_name": "copyout",
+          "excerpt": "copyout() 同样使用 walkaddr() 验证：pa0 = walkaddr(pagetable, va0); if (pa0 == NULL) return -1; [Source: kernel/vm.c:456-462]"
+        },
+        {
+          "path": "kernel/syscall.c",
+          "symbol_kind": "function",
+          "symbol_name": "fetchaddr",
+          "excerpt": "fetchaddr() 使用 copyin() 验证并复制用户指针：if (copyin(p->pagetable, (char *)ip, addr, sizeof(*ip)) != 0) return -1; [Source: kernel/syscall.c:17-27]"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_006",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 seccomp/prctl/sandbox 等系统调用过滤/沙箱？",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/sysproc.c",
+          "symbol_kind": "search",
+          "symbol_name": "grep_seccomp_prctl",
+          "excerpt": "在 kernel/ 目录下搜索 'seccomp|prctl|sandbox' 关键词，0 命中。sysnum.h 系统调用表中无相关定义。[Source: kernel/sysproc.c 全文件扫描]"
+        },
+        {
+          "path": "kernel/include/sysnum.h",
+          "symbol_kind": "scan",
+          "symbol_name": "syscall_table_scan",
+          "excerpt": "检查 sysnum.h 中所有 SYS_* 定义（共 117 行），未发现 seccomp/prctl/sandbox 相关系统调用号。[Source: kernel/include/sysnum.h:1-117]"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_007",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在栈保护/溢出防护（stack canary/guard page）或等价机制？",
+      "value": "stub",
+      "evidence": [
+        {
+          "path": "kernel/vm.c",
+          "symbol_kind": "function",
+          "symbol_name": "uvmclear",
+          "excerpt": "uvmclear() 用于用户栈保护页：void uvmclear(pagetable_t pagetable, uint64 va) { pte = walk(pagetable, va, 0); *pte &= ~PTE_U; } [Source: kernel/vm.c:417-424]"
+        },
+        {
+          "path": "kernel/include/memlayout.h",
+          "symbol_kind": "doc",
+          "symbol_name": "guard_page_comment",
+          "excerpt": "注释提及 guard page：// each surrounded by invalid guard pages. [Source: kernel/include/memlayout.h:92]"
+        },
+        {
+          "path": "kernel/net.mk",
+          "symbol_kind": "search",
+          "symbol_name": "stack_protector",
+          "excerpt": "发现 -fno-stack-protector 编译选项，表明未启用 stack canary。[Source: kernel/net.mk:19]"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_008",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在审计/安全启动（audit/secure boot/signature）相关逻辑？",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/",
+          "symbol_kind": "search",
+          "symbol_name": "grep_audit_secure_boot",
+          "excerpt": "在 kernel/ 目录搜索 'audit|secure_boot|signature' 关键词，仅发现 lwip 网络栈中的 checksum 验证（如 ip4.c:568 'verify checksum'），无安全启动或审计日志机制。[Source: kernel/ 全目录扫描]"
+        },
+        {
+          "path": "kernel/entry_qemu.S",
+          "symbol_kind": "scan",
+          "symbol_name": "boot_entry_scan",
+          "excerpt": "检查启动入口 entry_qemu.S，仅简单跳转到 main()，无安全启动验证逻辑。[Source: kernel/entry_qemu.S:1-19]"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_009",
+      "question_type": "short_answer",
+      "stem": "本项目支持哪些架构（riscv64/aarch64/x86_64/loongarch64 等）？每种架构的安全相关初始化（特权级配置、PMP/MPU/SMEP 等）是否有代码证据？",
+      "value": "仅支持 RISC-V 64 架构。\n\nRISC-V 64 安全相关初始化：\n1. 特权级配置：通过 SSTATUS_SPP 位控制用户/内核模式切换（kernel/trap.c:144-145）\n2. 中断使能：trapinithart() 设置 SSTATUS_SIE 和 SIE_*（kernel/trap.c:35-37）\n3. 页表隔离：每个进程有独立用户页表（kernel/proc.c:256-260）\n\n未发现 PMP（Physical Memory Protection）配置代码。搜索 'PMP|PMA|SMEP|SMAP' 关键词 0 命中。",
+      "evidence": [
+        {
+          "path": "kernel/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "usertrapret",
+          "excerpt": "usertrapret() 设置 SPP=0 进入用户态：x &= ~SSTATUS_SPP; w_sstatus(x); [Source: kernel/trap.c:144]"
+        },
+        {
+          "path": "kernel/",
+          "symbol_kind": "search",
+          "symbol_name": "grep_pmp",
+          "excerpt": "搜索 'PMP|PMA|SMEP|SMAP|KPTI|TTBR' 关键词，0 命中，表明无 PMP 或等价硬件保护机制配置。[Source: kernel/ 全目录扫描]"
+        },
+        {
+          "path": "kernel/entry_qemu.S",
+          "symbol_kind": "file",
+          "symbol_name": "entry_qemu.S",
+          "excerpt": "RISC-V 64 启动入口，无架构检测或多架构支持代码。[Source: kernel/entry_qemu.S:1-19]"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_010",
+      "question_type": "tri_state_impl",
+      "stem": "若项目使用 Rust，是否存在 RAII/所有权/生命周期相关的内核安全机制（如不可 unsafe 直接访问用户内存、锁的 RAII 自动释放等）？",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/",
+          "symbol_kind": "scan",
+          "symbol_name": "language_check",
+          "excerpt": "项目使用 C 语言编写（.c/.h 文件），非 Rust。检查 kernel/*.c 和 kernel/include/*.h 均为 C 语法，无 Rust 特征（如 impl、trait、fn、let mut 等）。[Source: kernel/ 全目录文件扩展名检查]"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_011",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现了内核/用户页表隔离 (Kernel/User Page Table Isolation, KPTI 或等价机制)？",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "allocproc",
+          "excerpt": "每个进程有独立页表 p->pagetable 和内核页表 p->kpagetable，但这是标准 xv6 设计，非 KPTI。KPTI 特指 x86 上为缓解 Meltdown 的 CR3 切换优化。[Source: kernel/proc.c:256-260]"
+        },
+        {
+          "path": "kernel/",
+          "symbol_kind": "search",
+          "symbol_name": "grep_kpti",
+          "excerpt": "搜索 'KPTI|TTBR|CR3' 关键词，0 命中。RISC-V 使用 satp 寄存器而非 CR3/TTBR，无 KPTI 等价机制。[Source: kernel/ 全目录扫描]"
+        },
+        {
+          "path": "kernel/vm.c",
+          "symbol_kind": "function",
+          "symbol_name": "kvminithart",
+          "excerpt": "kvminithart() 设置内核页表：w_satp(MAKE_SATP(kernel_pagetable)); 无用户/内核页表动态切换逻辑。[Source: kernel/vm.c:69-73]"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_012",
+      "question_type": "short_answer",
+      "stem": "UID/GID 字段是否在 syscall 路径上真实执行权限检查？",
+      "value": "字段存在但无检查链 🔸\n\n证据：\n1. struct proc 有 uid/gid 字段（kernel/include/proc.h:67-68）\n2. allocproc() 初始化为 0（kernel/proc.c:235-236）\n3. sys_getuid/sys_setuid 可读写（kernel/sysproc.c:378-390）\n4. 但 sys_faccessat 未使用 uid/gid 检查（kernel/sysfile.c:1018-1048）\n5. open/exec/write 等系统调用无权限检查逻辑\n6. FAT32 的 ekstat() 硬编码 st_uid/st_gid 为 0（kernel/fat32.c:824-825）\n\n搜索 'check_perm|inode_permission' 关键词 0 命中，无通用权限检查函数。",
+      "evidence": [
+        {
+          "path": "kernel/include/proc.h",
+          "symbol_kind": "struct",
+          "symbol_name": "proc",
+          "excerpt": "struct proc { int uid; int gid; ... } [Source: kernel/include/proc.h:67-68]"
+        },
+        {
+          "path": "kernel/sysfile.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_faccessat",
+          "excerpt": "sys_faccessat 未使用 myproc()->uid/gid，仅检查 mode 参数。[Source: kernel/sysfile.c:1018-1048]"
+        },
+        {
+          "path": "kernel/",
+          "symbol_kind": "search",
+          "symbol_name": "grep_check_perm",
+          "excerpt": "搜索 'check_perm|inode_permission' 关键词，0 命中，无通用权限检查函数。[Source: kernel/ 全目录扫描]"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_013",
+      "question_type": "single_choice",
+      "stem": "访问控制模型 (Access Control Model, Stallings Ch15) 更接近哪种？",
+      "value": "仅有特权级隔离（ring0/ring3），无细粒度访问控制",
+      "evidence": [
+        {
+          "path": "kernel/sysfile.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_faccessat",
+          "excerpt": "sys_faccessat 仅检查 mode 参数，未使用 uid/gid 进行 DAC 检查。[Source: kernel/sysfile.c:1038-1042]"
+        },
+        {
+          "path": "kernel/fat32.c",
+          "symbol_kind": "function",
+          "symbol_name": "ekstat",
+          "excerpt": "ekstat() 硬编码 st_uid/st_gid=0，所有文件所有者为 root，无 DAC 基础。[Source: kernel/fat32.c:824-825]"
+        },
+        {
+          "path": "kernel/",
+          "symbol_kind": "search",
+          "symbol_name": "grep_chmod_chown",
+          "excerpt": "搜索 'chmod|chown|capability' 关键词，仅发现 lwip 网络栈中的无关匹配，无文件系统权限修改系统调用。[Source: kernel/ 全目录扫描]"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_014",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现完整性策略 (Integrity Policy, Stallings Ch15)？",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/",
+          "symbol_kind": "search",
+          "symbol_name": "grep_integrity",
+          "excerpt": "搜索 'W^X|XOM|code_sign|text_protect|Biba' 关键词，0 命中。无 W^X（Write XOR Execute）内存保护、代码签名或 Biba 完整性模型实现。[Source: kernel/ 全目录扫描]"
+        },
+        {
+          "path": "kernel/vm.c",
+          "symbol_kind": "scan",
+          "symbol_name": "pte_flags_scan",
+          "excerpt": "检查页表权限标志 PTE_R/PTE_W/PTE_X/PTE_U，发现 mmap() 和 exec() 可同时设置 PTE_W 和 PTE_X，无 W^X 强制检查。[Source: kernel/mmap.c:18-25]"
+        },
+        {
+          "path": "kernel/entry_qemu.S",
+          "symbol_kind": "scan",
+          "symbol_name": "boot_scan",
+          "excerpt": "启动代码无签名验证或完整性检查逻辑。[Source: kernel/entry_qemu.S:1-19]"
+        }
+      ]
+    }
+  ]
+}
+```

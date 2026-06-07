@@ -1,0 +1,41 @@
+{
+  "task_id": "task_01_overview_build_platform",
+  "stage_id": "01_overview",
+  "question_id": "",
+  "question_ids": [],
+  "status": "done",
+  "evidence_ids": [
+    "ev_task_01_overview_build_platform_c5177370",
+    "ev_task_01_overview_build_platform_508c5d1f",
+    "ev_task_01_overview_build_platform_3020e87c",
+    "ev_task_01_overview_build_platform_1213ec37",
+    "ev_task_01_overview_build_platform_9bcc2e2f",
+    "ev_task_01_overview_build_platform_c0cfe48e",
+    "ev_task_01_overview_build_platform_b3f74b1a",
+    "ev_task_01_overview_build_platform_5f126715",
+    "ev_task_01_overview_build_platform_0ceb97d0",
+    "ev_task_01_overview_build_platform_0b306e99",
+    "ev_task_01_overview_build_platform_12e5d7dd",
+    "ev_task_01_overview_build_platform_70696b29",
+    "ev_task_01_overview_build_platform_ba2d43c9",
+    "ev_task_01_overview_build_platform_76218876",
+    "ev_task_01_overview_build_platform_44a6df85",
+    "ev_task_01_overview_build_platform_38492c64",
+    "ev_task_01_overview_build_platform_eeb86a8c",
+    "ev_task_01_overview_build_platform_e7f35fbd",
+    "ev_task_01_overview_build_platform_63a361af"
+  ],
+  "draft_answer_ids": [
+    "draft_task_01_overview_build_platform_OV_001_fc94dd2e"
+  ],
+  "findings": [],
+  "confidence": "high",
+  "errors": [],
+  "token_usage": {},
+  "metadata": {
+    "evidence_count": 19,
+    "mode": "react",
+    "summary": "xv6-k210 是基于 MIT xv6-riscv 移植到 Kendryte K210 (RISC-V 双核64位) 开发板的宏内核操作系统，同时支持 QEMU 模拟。使用 RISC-V 64 位 GCC 交叉编译链 (riscv64-unknown-elf-)，Makefile 构建系统，支持 k210 和 qemu 双平台。内核入口为 _entry (linker64.ld) 或 _start (k210.ld)，主函数为 main()。SBI 使用 Rust 实现的 PsicaSBI (原 RustSBI)。文件系统为 FAT32。",
+    "raw_output_excerpt": "Now I have all the information needed. Let me compile the final structured JSON.\n\n```json\n{\n  \"status\": \"done\",\n  \"summary\": \"xv6-k210 是基于 MIT xv6-riscv 移植到 Kendryte K210 (RISC-V 双核64位) 开发板的宏内核操作系统，同时支持 QEMU 模拟。使用 RISC-V 64 位 GCC 交叉编译链 (riscv64-unknown-elf-)，Makefile 构建系统，支持 k210 和 qemu 双平台。内核入口为 _entry (linker64.ld) 或 _start (k210.ld)，主函数为 main()。SBI 使用 Rust 实现的 PsicaSBI (原 RustSBI)。文件系统为 FAT32。\",\n  \"claim\": \"xv6-k210 是一个基于 MIT xv6-riscv 的 RISC-V 64 位宏内核操作系统，支持 K210 开发板和 QEMU 模拟器，使用 riscv64-unknown-elf- 工具链和 Makefile 构建，SBI 为 PsicaSBI (Rust 实现)，内核入口为 _entry (linker64.ld) 或 _start (k210.ld)，主函数为 main()。\",\n  \"structured_fact_results\": [\n    {\n      \"fact_id\": \"OV_001_F01\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [0, 1, 2],\n      \"notes\": \"README.md 和 README_cn.md 明确说明项目基于 MIT xv6-riscv，移植到 K210 开发板。doc/总言.md 也确认了这一点。\"\n    },\n    {\n      \"fact_id\": \"OV_001_F02\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [3, 4, 5],\n      \"notes\": \"Makefile 明确使用 riscv64-unknown-elf- 工具链 (gcc, gas, ld, objcopy, objdump)，CFLAGS 包含 -march=rv64imafdc -mcmodel=medany。\"\n    },\n    {\n      \"fact_id\": \"OV_001_F03\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [3, 6, 7, 8],\n      \"notes\": \"Makefile 支持 platform=k210 (默认) 和 platform=qemu 两种目标。linker/k210.ld 和 linker/qemu.ld 分别对应不同平台。entry_k210.S 和 entry_qemu.S 分别对应不同平台入口。\"\n    },\n    {\n      \"fact_id\": \"OV_001_F04\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [9, 10, 11],\n      \"notes\": \"linker/linker64.ld 使用 ENTRY(_entry)，linker/k210.ld 使用 ENTRY(_start)。entry.S 定义 _entry 符号，entry_k210.S 定义 _start 符号。main.c 中的 main() 函数是 C 入口。\"\n    },\n    {\n      \"fact_id\": \"OV_001_F05\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [12, 13],\n      \"notes\": \"Makefile 中 SBI := ./sbi/sbi-k210 或 ./sbi/sbi-qemu，编译命令为 cd ./sbi/psicasbi && cargo build --no-default-features --features=$(platform)。sbi.h 定义了 SBI 调用接口 "
+  }
+}

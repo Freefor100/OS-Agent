@@ -1,0 +1,34 @@
+{
+  "task_id": "task_04_pid_proctree",
+  "stage_id": "04_process_smp",
+  "question_id": "Q04_012",
+  "question_ids": [
+    "Q04_012",
+    "Q04_013"
+  ],
+  "status": "done",
+  "evidence_ids": [
+    "ev_task_04_pid_proctree_4fe0e9ad",
+    "ev_task_04_pid_proctree_f4585ffd",
+    "ev_task_04_pid_proctree_b7786c84",
+    "ev_task_04_pid_proctree_6736f2a5",
+    "ev_task_04_pid_proctree_0c39589f",
+    "ev_task_04_pid_proctree_4cf4dd77",
+    "ev_task_04_pid_proctree_0c18922c",
+    "ev_task_04_pid_proctree_eb277de5"
+  ],
+  "draft_answer_ids": [
+    "draft_task_04_pid_proctree_Q04_012_4e1ae0ea",
+    "draft_task_04_pid_proctree_Q04_013_3544c6e3"
+  ],
+  "findings": [],
+  "confidence": "high",
+  "errors": [],
+  "token_usage": {},
+  "metadata": {
+    "evidence_count": 8,
+    "mode": "react",
+    "summary": "查证了PID分配器实现（自增计数器，无bitmap/空闲栈/回收）和父子进程树存储方式（parent+child+sibling_next+sibling_pprev链表结构）",
+    "raw_output_excerpt": "Now I have all the evidence. Let me produce the final structured JSON output.\n\n```json\n{\n  \"status\": \"done\",\n  \"summary\": \"查证了PID分配器实现（自增计数器，无bitmap/空闲栈/回收）和父子进程树存储方式（parent+child+sibling_next+sibling_pprev链表结构）\",\n  \"claim\": \"xv6-k210的PID分配采用全局自增计数器`__pid`（初始值1），每次allocproc()执行`p->pid = __pid++`，无bitmap/空闲栈复用/回收机制；进程树采用parent指针+child首子+sibling_next/sibling_pprev双向兄弟链表存储，非children Vec。\",\n  \"structured_fact_results\": [\n    {\n      \"fact_id\": \"Q04_012_01\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [0, 1, 2],\n      \"notes\": \"PID分配器实体：全局int __pid（初始1），allocproc()中p->pid = __pid++，无bitmap/空闲栈/回收。freeproc()仅从hash移除，不回收PID。\"\n    },\n    {\n      \"fact_id\": \"Q04_012_02\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [0, 1, 3, 4],\n      \"notes\": \"syscall入口：sys_fork()调用clone(0, NULL)，sys_clone()调用clone(flag, stack)，clone()内部调用allocproc()分配PID。\"\n    },\n    {\n      \"fact_id\": \"Q04_012_03\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [0, 1, 2],\n      \"notes\": \"状态资源更新：allocproc()分配PID（自增），freeproc()从hash移除但不回收PID号，PID只增不减。\"\n    },\n    {\n      \"fact_id\": \"Q04_012_04\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [0, 5, 6],\n      \"notes\": \"关系映射：PID通过pid_hash哈希表（HASH_SIZE=17）映射proc指针，hash_insert/hash_remove/hash_search操作。\"\n    },\n    {\n      \"fact_id\": \"Q04_012_05\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [0, 2],\n      \"notes\": \"清理：freeproc()调用hash_remove_no_lock(p)从哈希表移除，然后kfree(p)释放proc结构体，但PID号不回收。\"\n    },\n    {\n      \"fact_id\": \"Q04_012_06\",\n      \"status_or_value\": {\n        \"searched_keywords\": [\"alloc_pid\", \"next_pid\", \"pid\", \"bitmap\", \"free_pid\", \"pid_stack\", \"pid_reuse\", \"recycle\"],\n        \"searched_directories\": [\"kernel/sched\", \"include/sched\", \"kernel/proc\", \"kernel/syscall\"],\n        \"file_count\": 4,\n        \"match_count\": 0,\n        \"coverage_sufficient\": true\n      },\n      \"evidence_candidate_indexes\": [7],\n      "
+  }
+}

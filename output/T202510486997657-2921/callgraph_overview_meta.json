@@ -1,0 +1,481 @@
+{
+  "cache_version": 5,
+  "input_fingerprint": "1aed22d8a0b27de15f7b988f414032febd4051eb2984fb46",
+  "k_param": 30,
+  "lsp_max_depth": 4,
+  "fn_count": 5593,
+  "edge_count": 3729,
+  "top_k": [
+    "to_le32",
+    "static_cast",
+    "to_le16",
+    "ext4_assert",
+    "os_thread_mutex_lock",
+    "os_thread_mutex_unlock",
+    "mutex",
+    "syscall",
+    "ext4_get32",
+    "ext4_sb_get_block_size",
+    "ext4_block_set",
+    "printf",
+    "ext4_get_mount",
+    "os_critical_init",
+    "os_enter_critical",
+    "os_exit_critical",
+    "ext4_sb_feature_ro_com",
+    "va_start",
+    "get_absolute_path",
+    "ext4_dbg",
+    "ext4_bcache_free",
+    "onps_input_get",
+    "crc32",
+    "min",
+    "ext4_trans_set_block_dirty",
+    "ext4_free",
+    "ext4_inode_get_mode",
+    "ext4_fs_put_inode_ref",
+    "ext4_crc32c",
+    "vprintf"
+  ],
+  "classified": {
+    "to_le32": {
+      "domain": "fs_storage",
+      "layer": "kernel",
+      "kind": "call_only",
+      "file": "",
+      "line": 0,
+      "ref_files": [
+        "kernel\\fs\\lwext4\\ext4_dir.cc",
+        "kernel\\fs\\lwext4\\ext4_dir_idx.cc",
+        "kernel\\fs\\lwext4\\ext4_extent.cc",
+        "kernel\\fs\\lwext4\\ext4_fs.cc",
+        "kernel\\fs\\lwext4\\ext4_inode.cc"
+      ],
+      "in_degree": 92,
+      "out_degree": 0,
+      "pagerank": 0.009274202802290916,
+      "method": "llm"
+    },
+    "static_cast": {
+      "domain": "sync_ipc",
+      "layer": "kernel",
+      "kind": "call_only",
+      "file": "",
+      "line": 0,
+      "ref_files": [
+        "kernel\\net\\onpstack\\port\\os_adapter.cc"
+      ],
+      "in_degree": 8,
+      "out_degree": 0,
+      "pagerank": 0.00672203278011401,
+      "method": "llm"
+    },
+    "to_le16": {
+      "domain": "fs_storage",
+      "layer": "kernel",
+      "kind": "call_only",
+      "file": "",
+      "line": 0,
+      "ref_files": [
+        "kernel\\fs\\lwext4\\ext4_balloc.cc",
+        "kernel\\fs\\lwext4\\ext4_dir.cc",
+        "kernel\\fs\\lwext4\\ext4_dir_idx.cc",
+        "kernel\\fs\\lwext4\\ext4_extent.cc",
+        "kernel\\fs\\lwext4\\ext4_fs.cc"
+      ],
+      "in_degree": 66,
+      "out_degree": 0,
+      "pagerank": 0.006709603187781926,
+      "method": "llm"
+    },
+    "ext4_assert": {
+      "domain": "fs_storage",
+      "layer": "kernel",
+      "kind": "call_only",
+      "file": "",
+      "line": 0,
+      "ref_files": [
+        "kernel\\fs\\lwext4\\ext4.cc",
+        "kernel\\fs\\lwext4\\ext4_balloc.cc",
+        "kernel\\fs\\lwext4\\ext4_bcache.cc",
+        "kernel\\fs\\lwext4\\ext4_blockdev.cc",
+        "kernel\\fs\\lwext4\\ext4_dir.cc"
+      ],
+      "in_degree": 48,
+      "out_degree": 0,
+      "pagerank": 0.00616972737822488,
+      "method": "llm"
+    },
+    "os_thread_mutex_lock": {
+      "domain": "sync_ipc",
+      "layer": "kernel",
+      "kind": "function",
+      "file": "kernel\\net\\onpstack\\port\\os_adapter.cc",
+      "line": 236,
+      "ref_files": [],
+      "in_degree": 90,
+      "out_degree": 4,
+      "pagerank": 0.005101276905284708,
+      "method": "llm"
+    },
+    "os_thread_mutex_unlock": {
+      "domain": "sync_ipc",
+      "layer": "kernel",
+      "kind": "function",
+      "file": "kernel\\net\\onpstack\\port\\os_adapter.cc",
+      "line": 250,
+      "ref_files": [],
+      "in_degree": 90,
+      "out_degree": 4,
+      "pagerank": 0.005101276905284708,
+      "method": "llm"
+    },
+    "mutex": {
+      "domain": "sync_ipc",
+      "layer": "kernel",
+      "kind": "call_only",
+      "file": "",
+      "line": 0,
+      "ref_files": [
+        "kernel\\net\\onpstack\\port\\os_adapter.cc"
+      ],
+      "in_degree": 3,
+      "out_degree": 0,
+      "pagerank": 0.004913542882619744,
+      "method": "llm"
+    },
+    "syscall": {
+      "domain": "user_programs",
+      "layer": "userspace",
+      "kind": "call_only",
+      "file": "",
+      "line": 0,
+      "ref_files": [
+        "user\\syscall_lib\\syscall.cc",
+        "kernel\\net\\onpstack\\bsd\\socket.cc",
+        "kernel\\fs\\fat32\\fat32.cc"
+      ],
+      "in_degree": 35,
+      "out_degree": 0,
+      "pagerank": 0.0047206642116620805,
+      "method": "llm"
+    },
+    "ext4_get32": {
+      "domain": "fs_storage",
+      "layer": "kernel",
+      "kind": "call_only",
+      "file": "",
+      "line": 0,
+      "ref_files": [
+        "kernel\\fs\\lwext4\\ext4.cc",
+        "kernel\\fs\\lwext4\\ext4_balloc.cc",
+        "kernel\\fs\\lwext4\\ext4_fs.cc",
+        "kernel\\fs\\lwext4\\ext4_ialloc.cc",
+        "kernel\\fs\\lwext4\\ext4_inode.cc"
+      ],
+      "in_degree": 32,
+      "out_degree": 0,
+      "pagerank": 0.0028519555527858546,
+      "method": "llm"
+    },
+    "ext4_sb_get_block_size": {
+      "domain": "fs_storage",
+      "layer": "kernel",
+      "kind": "call_only",
+      "file": "",
+      "line": 0,
+      "ref_files": [
+        "kernel\\fs\\lwext4\\ext4.cc",
+        "kernel\\fs\\lwext4\\ext4_balloc.cc",
+        "kernel\\fs\\lwext4\\ext4_dir.cc",
+        "kernel\\fs\\lwext4\\ext4_dir_idx.cc",
+        "kernel\\fs\\lwext4\\ext4_extent.cc"
+      ],
+      "in_degree": 55,
+      "out_degree": 0,
+      "pagerank": 0.0021172776558644867,
+      "method": "llm"
+    },
+    "ext4_block_set": {
+      "domain": "fs_storage",
+      "layer": "kernel",
+      "kind": "function",
+      "file": "kernel\\fs\\lwext4\\ext4_blockdev.cc",
+      "line": 246,
+      "ref_files": [],
+      "in_degree": 51,
+      "out_degree": 3,
+      "pagerank": 0.0020974432286509706,
+      "method": "llm"
+    },
+    "printf": {
+      "domain": "runtime_common",
+      "layer": "userspace",
+      "kind": "function",
+      "file": "user\\syscall_lib\\printf.cc",
+      "line": 106,
+      "ref_files": [],
+      "in_degree": 53,
+      "out_degree": 5,
+      "pagerank": 0.0019240110847244416,
+      "method": "llm"
+    },
+    "ext4_get_mount": {
+      "domain": "fs_storage",
+      "layer": "kernel",
+      "kind": "function",
+      "file": "kernel\\fs\\lwext4\\ext4.cc",
+      "line": 477,
+      "ref_files": [],
+      "in_degree": 48,
+      "out_degree": 2,
+      "pagerank": 0.0019076527115173976,
+      "method": "llm"
+    },
+    "os_critical_init": {
+      "domain": "sync_ipc",
+      "layer": "kernel",
+      "kind": "call_only",
+      "file": "",
+      "line": 0,
+      "ref_files": [
+        "kernel\\net\\onpstack\\onps_input.cc",
+        "kernel\\net\\onpstack\\onps_utils.cc",
+        "kernel\\net\\onpstack\\ethernet\\arp.cc",
+        "kernel\\net\\onpstack\\ethernet\\ethernet.cc",
+        "kernel\\net\\onpstack\\ip\\icmp.cc"
+      ],
+      "in_degree": 37,
+      "out_degree": 0,
+      "pagerank": 0.0018282072945953,
+      "method": "llm"
+    },
+    "os_enter_critical": {
+      "domain": "sync_ipc",
+      "layer": "kernel",
+      "kind": "call_only",
+      "file": "",
+      "line": 0,
+      "ref_files": [
+        "kernel\\net\\onpstack\\onps_input.cc",
+        "kernel\\net\\onpstack\\onps_utils.cc",
+        "kernel\\net\\onpstack\\ethernet\\arp.cc",
+        "kernel\\net\\onpstack\\ethernet\\ethernet.cc",
+        "kernel\\net\\onpstack\\ip\\icmp.cc"
+      ],
+      "in_degree": 37,
+      "out_degree": 0,
+      "pagerank": 0.0018282072945953,
+      "method": "llm"
+    },
+    "os_exit_critical": {
+      "domain": "sync_ipc",
+      "layer": "kernel",
+      "kind": "call_only",
+      "file": "",
+      "line": 0,
+      "ref_files": [
+        "kernel\\net\\onpstack\\onps_input.cc",
+        "kernel\\net\\onpstack\\onps_utils.cc",
+        "kernel\\net\\onpstack\\ethernet\\arp.cc",
+        "kernel\\net\\onpstack\\ethernet\\ethernet.cc",
+        "kernel\\net\\onpstack\\ip\\icmp.cc"
+      ],
+      "in_degree": 37,
+      "out_degree": 0,
+      "pagerank": 0.0018282072945953,
+      "method": "llm"
+    },
+    "ext4_sb_feature_ro_com": {
+      "domain": "fs_storage",
+      "layer": "kernel",
+      "kind": "call_only",
+      "file": "",
+      "line": 0,
+      "ref_files": [
+        "kernel\\fs\\lwext4\\ext4_balloc.cc",
+        "kernel\\fs\\lwext4\\ext4_dir.cc",
+        "kernel\\fs\\lwext4\\ext4_dir_idx.cc",
+        "kernel\\fs\\lwext4\\ext4_extent.cc",
+        "kernel\\fs\\lwext4\\ext4_fs.cc"
+      ],
+      "in_degree": 32,
+      "out_degree": 0,
+      "pagerank": 0.0014939193653880217,
+      "method": "llm"
+    },
+    "va_start": {
+      "domain": "runtime_common",
+      "layer": "kernel",
+      "kind": "call_only",
+      "file": "",
+      "line": 0,
+      "ref_files": [
+        "kernel\\libs\\klib.cc",
+        "user\\syscall_lib\\printf.cc"
+      ],
+      "in_degree": 4,
+      "out_degree": 0,
+      "pagerank": 0.0013723563875535168,
+      "method": "llm"
+    },
+    "get_absolute_path": {
+      "domain": "fs_storage",
+      "layer": "kernel",
+      "kind": "function",
+      "file": "kernel\\fs\\vfs\\ops.cc",
+      "line": 39,
+      "ref_files": [],
+      "in_degree": 28,
+      "out_degree": 5,
+      "pagerank": 0.0013625134128530743,
+      "method": "llm"
+    },
+    "ext4_dbg": {
+      "domain": "fs_storage",
+      "layer": "kernel",
+      "kind": "call_only",
+      "file": "",
+      "line": 0,
+      "ref_files": [
+        "kernel\\fs\\lwext4\\ext4_balloc.cc",
+        "kernel\\fs\\lwext4\\ext4_bcache.cc",
+        "kernel\\fs\\lwext4\\ext4_dir.cc",
+        "kernel\\fs\\lwext4\\ext4_dir_idx.cc",
+        "kernel\\fs\\lwext4\\ext4_extent.cc"
+      ],
+      "in_degree": 33,
+      "out_degree": 0,
+      "pagerank": 0.001346641060038112,
+      "method": "llm"
+    },
+    "ext4_bcache_free": {
+      "domain": "fs_storage",
+      "layer": "kernel",
+      "kind": "function",
+      "file": "kernel\\fs\\lwext4\\ext4_bcache.cc",
+      "line": 242,
+      "ref_files": [],
+      "in_degree": 4,
+      "out_degree": 27,
+      "pagerank": 0.0012354206043384585,
+      "method": "llm"
+    },
+    "onps_input_get": {
+      "domain": "sync_ipc",
+      "layer": "kernel",
+      "kind": "function",
+      "file": "kernel\\net\\onpstack\\onps_input.cc",
+      "line": 587,
+      "ref_files": [],
+      "in_degree": 25,
+      "out_degree": 0,
+      "pagerank": 0.0012327401060987426,
+      "method": "llm"
+    },
+    "crc32": {
+      "domain": "fs_storage",
+      "layer": "kernel",
+      "kind": "function",
+      "file": "kernel\\fs\\lwext4\\ext4_crc32.cc",
+      "line": 129,
+      "ref_files": [],
+      "in_degree": 3,
+      "out_degree": 0,
+      "pagerank": 0.0012116339747957005,
+      "method": "llm"
+    },
+    "min": {
+      "domain": "runtime_common",
+      "layer": "kernel",
+      "kind": "macro",
+      "file": "kernel\\fs\\vfs\\vfs_ext4_ext.cc",
+      "line": 28,
+      "ref_files": [],
+      "in_degree": 3,
+      "out_degree": 1,
+      "pagerank": 0.0011988705835317176,
+      "method": "llm"
+    },
+    "ext4_trans_set_block_dirty": {
+      "domain": "fs_storage",
+      "layer": "kernel",
+      "kind": "function",
+      "file": "kernel\\fs\\lwext4\\ext4_trans.cc",
+      "line": 47,
+      "ref_files": [],
+      "in_degree": 79,
+      "out_degree": 2,
+      "pagerank": 0.0011939275558882285,
+      "method": "llm"
+    },
+    "ext4_free": {
+      "domain": "fs_storage",
+      "layer": "kernel",
+      "kind": "call_only",
+      "file": "",
+      "line": 0,
+      "ref_files": [
+        "kernel\\fs\\lwext4\\ext4.cc",
+        "kernel\\fs\\lwext4\\ext4_bcache.cc",
+        "kernel\\fs\\lwext4\\ext4_dir_idx.cc",
+        "kernel\\fs\\lwext4\\ext4_extent.cc",
+        "kernel\\fs\\lwext4\\ext4_journal.cc"
+      ],
+      "in_degree": 17,
+      "out_degree": 0,
+      "pagerank": 0.0010897176361685085,
+      "method": "llm"
+    },
+    "ext4_inode_get_mode": {
+      "domain": "fs_storage",
+      "layer": "kernel",
+      "kind": "function",
+      "file": "kernel\\fs\\lwext4\\ext4_inode.cc",
+      "line": 67,
+      "ref_files": [],
+      "in_degree": 68,
+      "out_degree": 2,
+      "pagerank": 0.0010796947922919408,
+      "method": "llm"
+    },
+    "ext4_fs_put_inode_ref": {
+      "domain": "fs_storage",
+      "layer": "kernel",
+      "kind": "function",
+      "file": "kernel\\fs\\lwext4\\ext4_fs.cc",
+      "line": 790,
+      "ref_files": [],
+      "in_degree": 78,
+      "out_degree": 27,
+      "pagerank": 0.0010726222869325388,
+      "method": "llm"
+    },
+    "ext4_crc32c": {
+      "domain": "fs_storage",
+      "layer": "kernel",
+      "kind": "function",
+      "file": "kernel\\fs\\lwext4\\ext4_crc32.cc",
+      "line": 140,
+      "ref_files": [],
+      "in_degree": 49,
+      "out_degree": 1,
+      "pagerank": 0.0010682521306767127,
+      "method": "llm"
+    },
+    "vprintf": {
+      "domain": "runtime_common",
+      "layer": "userspace",
+      "kind": "function",
+      "file": "user\\syscall_lib\\printf.cc",
+      "line": 51,
+      "ref_files": [],
+      "in_degree": 2,
+      "out_degree": 4,
+      "pagerank": 0.0010329987680734575,
+      "method": "llm"
+    }
+  },
+  "semantic_pruned_nodes": 556,
+  "semantic_message": "语义解析 136/136 个文件"
+}

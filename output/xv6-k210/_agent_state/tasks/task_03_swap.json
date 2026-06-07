@@ -1,0 +1,35 @@
+{
+  "task_id": "task_03_swap",
+  "stage_id": "03_mem_mgmt",
+  "question_id": "Q03_014",
+  "question_ids": [
+    "Q03_014",
+    "Q03_021",
+    "Q03_022",
+    "Q03_034"
+  ],
+  "status": "done",
+  "evidence_ids": [
+    "ev_task_03_swap_95f5abd7",
+    "ev_task_03_swap_b9c1f73d",
+    "ev_task_03_swap_5995c620",
+    "ev_task_03_swap_fd2e1594",
+    "ev_task_03_swap_ddb1f567"
+  ],
+  "draft_answer_ids": [
+    "draft_task_03_swap_Q03_014_cf53bef3",
+    "draft_task_03_swap_Q03_021_2a741390",
+    "draft_task_03_swap_Q03_022_2fa415e0",
+    "draft_task_03_swap_Q03_034_733df64b"
+  ],
+  "findings": [],
+  "confidence": "medium",
+  "errors": [],
+  "token_usage": {},
+  "metadata": {
+    "evidence_count": 5,
+    "mode": "react",
+    "summary": "在 xv6-k210 中搜索 swap、页面置换、工作集模型和清理策略。发现：1) __page_file_swap 函数存在但被完全注释掉（死代码）；2) sysinfo.h 有 totalswap/freeswap 字段但无实现；3) 无 swap_in/swap_out/pageout/reclaim 等页面置换机制；4) 无工作集模型或抖动检测；5) 无 kswapd/background writeback 清理策略。block cache 有 LRU 和异步写回，但属于磁盘缓冲层，不等价于 swap/page replacement。",
+    "raw_output_excerpt": "Now I have all the information needed. Let me produce the final JSON output.\n\n```json\n{\n  \"status\": \"done\",\n  \"summary\": \"在 xv6-k210 中搜索 swap、页面置换、工作集模型和清理策略。发现：1) __page_file_swap 函数存在但被完全注释掉（死代码）；2) sysinfo.h 有 totalswap/freeswap 字段但无实现；3) 无 swap_in/swap_out/pageout/reclaim 等页面置换机制；4) 无工作集模型或抖动检测；5) 无 kswapd/background writeback 清理策略。block cache 有 LRU 和异步写回，但属于磁盘缓冲层，不等价于 swap/page replacement。\",\n  \"claim\": \"xv6-k210 未实现 swap 机制、页面置换算法、工作集模型或清理策略。__page_file_swap 被注释掉，sysinfo 中的 swap 字段仅为占位。\",\n  \"structured_fact_results\": [\n    {\n      \"fact_id\": \"Q03_014_01\",\n      \"status_or_value\": \"no_after_negative_search\",\n      \"evidence_candidate_indexes\": [0, 1, 2, 3, 4],\n      \"notes\": \"搜索了 swap, swap_in, swap_out, pageout, reclaim, evict, replacement, LRU, Clock, FIFO, swapfile 等关键词。__page_file_swap 被完全注释（死代码）。sysinfo.h 有 totalswap/freeswap 字段但仅为结构体定义，无对应实现。无 swap area/swapfile/backing store 管理代码。\"\n    },\n    {\n      \"fact_id\": \"Q03_014_02\",\n      \"status_or_value\": \"no_after_negative_search\",\n      \"evidence_candidate_indexes\": [0, 1, 2, 3, 4],\n      \"notes\": \"无可换出页元数据或驻留/非驻留状态。mmap_page 结构有 pa/valid/ref 字段但用于文件映射缓存，非 swap 换出页元数据。无 present/absent 或 resident/nonresident 标志位。\"\n    },\n    {\n      \"fact_id\": \"Q03_014_03\",\n      \"status_or_value\": \"no_after_negative_search\",\n      \"evidence_candidate_indexes\": [0, 1, 2, 3, 4],\n      \"notes\": \"无 swap_out/pageout/reclaim 将页写到后备存储。__page_file_swap（已注释）曾尝试将 mmap 页写回文件，但未启用。无其他将用户页写到磁盘的路径。\"\n    },\n    {\n      \"fact_id\": \"Q03_014_04\",\n      \"status_or_value\": \"no_after_negative_search\",\n      \"evidence_candidate_indexes\": [0, 1, 2, 3, 4],\n      \"notes\": \"page fault 处理路径（handle_page_fault）仅处理 COW、lazy alloc、ELF load、mmap file/anon 四种情况，无 swap_in 恢复路径。\"\n    },\n    {\n      \"fact_id\": \"Q03_014_05\",\n      \"status_or_value\": \"no_after_negative_search\",\n      \"evidence_candidate_indexes\": [0, 1, 2, 3, 4],\n      \"notes\": \"无页面置换算法选择 victim。block cache 有 LRU（bio.c 的 lru_head 链表），FAT cache 有 LRU（lrucnt 计数器），dentry cache 有 LRU（move-to-front），"
+  }
+}

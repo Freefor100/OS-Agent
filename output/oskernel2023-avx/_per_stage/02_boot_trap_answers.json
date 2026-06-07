@@ -1,0 +1,826 @@
+{
+  "schema_version": "v1",
+  "stage_id": "02_boot_trap",
+  "stage_title": "启动/架构与 Trap/系统调用",
+  "terminology_profile": "stallings_en_zh",
+  "answers": [
+    {
+      "question_id": "Q02_001",
+      "question_type": "short_answer",
+      "stem": "启动入口在哪里？（例如 linker.ld 的 ENTRY、`_start`/`start`/`head`/`entry` 标签；必须给文件路径+符号证据）",
+      "value": "启动入口位于 `kernel/entry_qemu.S:3` 的 `_entry` 标签（QEMU 平台）和 `kernel/entry_visionfive.S:3` 的 `_start` 标签（VisionFive2 平台）。链接脚本 `linker/qemu.ld:2` 明确指定 `ENTRY(_entry)`，基地址为 `0x80200000`。",
+      "evidence": [
+        {
+          "path": "kernel/entry_qemu.S",
+          "symbol_kind": "asm_label",
+          "symbol_name": "_entry",
+          "excerpt": "第 3 行：`.globl _entry` 和第 4 行：`_entry:` 定义 QEMU 平台入口"
+        },
+        {
+          "path": "kernel/entry_visionfive.S",
+          "symbol_kind": "asm_label",
+          "symbol_name": "_start",
+          "excerpt": "第 3 行：`.globl _start` 和第 4 行：`_start:` 定义 VisionFive2 平台入口"
+        },
+        {
+          "path": "linker/qemu.ld",
+          "symbol_kind": "linker_directive",
+          "symbol_name": "ENTRY",
+          "excerpt": "第 2 行：`ENTRY(_entry)` 指定入口符号；第 4 行：`BASE_ADDRESS = 0x80200000`"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_002",
+      "question_type": "single_choice",
+      "stem": "启动链更接近哪种交接方式？",
+      "value": "固件/引导加载器 → 内核入口（如 SBI/OpenSBI/U-Boot/BIOS/UEFI）",
+      "evidence": [
+        {
+          "path": "kernel/include/sbi.h",
+          "symbol_kind": "header",
+          "symbol_name": "sbi_hart_start",
+          "excerpt": "第 52-55 行定义 `sbi_hart_start()` 函数，通过 SBI 调用启动其他 hart，证实固件链存在"
+        },
+        {
+          "path": "kernel/main.c",
+          "symbol_kind": "function_call",
+          "symbol_name": "sbi_hart_start",
+          "excerpt": "第 75 行：`sbi_hart_start(2, (unsigned long)_start, 0);` 通过 SBI 启动 AP 核"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_003",
+      "question_type": "tri_state_impl",
+      "stem": "是否能在代码中证实发生了 CPU 特权级/模式切换？（RISC-V M→S、x86 实→保→长等；必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "usertrapret",
+          "excerpt": "第 144-145 行：`x &= ~SSTATUS_SPP; x |= SSTATUS_SPIE;` 清除 SPP 位切换到用户模式"
+        },
+        {
+          "path": "kernel/include/riscv.h",
+          "symbol_kind": "macro",
+          "symbol_name": "SSTATUS_SPP",
+          "excerpt": "第 46 行：`#define SSTATUS_SPP (1L << 8)` 定义 Previous Privilege Mode 位"
+        },
+        {
+          "path": "kernel/trampoline.S",
+          "symbol_kind": "asm_instruction",
+          "symbol_name": "sret",
+          "excerpt": "第 146 行：`sret` 指令从内核态返回用户态，依赖 sstatus.SPP 位"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_004",
+      "question_type": "short_answer",
+      "stem": "模式切换涉及的关键寄存器/位是什么？（例如 RISC-V mstatus/sstatus、x86 cr0/cr4/eflags；必须给证据摘录）",
+      "value": "RISC-V 模式切换关键寄存器/位：\n1. `sstatus.SPP` (bit 8)：Previous Privilege Mode，0=用户态，1=监督态\n2. `sstatus.SPIE` (bit 5)：Supervisor Previous Interrupt Enable\n3. `satp`：页表基址寄存器，切换地址空间\n4. `stvec`：trap 向量基址寄存器\n5. `sepc`：异常程序计数器\n6. `scause`：异常原因寄存器\n证据：`kernel/include/riscv.h:46-47` 定义 SSTATUS_SPP 和 SSTATUS_SPIE；`kernel/trap.c:144-145` 设置这些位。",
+      "evidence": [
+        {
+          "path": "kernel/include/riscv.h",
+          "symbol_kind": "macro",
+          "symbol_name": "SSTATUS_SPP",
+          "excerpt": "第 46-47 行：`#define SSTATUS_SPP (1L << 8)` 和 `#define SSTATUS_SPIE (1L << 5)`"
+        },
+        {
+          "path": "kernel/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "usertrapret",
+          "excerpt": "第 143-146 行：读取 sstatus，清除 SPP 位，设置 SPIE 位，写回 sstatus"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_005",
+      "question_type": "tri_state_impl",
+      "stem": "是否启用/初始化了 MMU（设置 SATP/CR3 等并建立页表）？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/vm.c",
+          "symbol_kind": "function",
+          "symbol_name": "kvminit",
+          "excerpt": "第 22-63 行：创建内核页表，映射 UART、PLIC、CLINT、内核代码/数据、trampoline"
+        },
+        {
+          "path": "kernel/vm.c",
+          "symbol_kind": "function",
+          "symbol_name": "kvminithart",
+          "excerpt": "第 68-75 行：`w_satp(MAKE_SATP(kernel_pagetable));` 设置 satp 寄存器启用 MMU"
+        },
+        {
+          "path": "kernel/main.c",
+          "symbol_kind": "function_call",
+          "symbol_name": "kvminit",
+          "excerpt": "main() 调用链中第 12 项：`kvminit` 和 `kvminithart` 在启动早期被调用"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_006",
+      "question_type": "short_answer",
+      "stem": "从入口汇编/固件交接到 C/Rust 主入口函数的跳转链是什么？（列出 3-6 个关键节点并给证据）",
+      "value": "启动跳转链（QEMU 平台）：\n1. `_entry` (`kernel/entry_qemu.S:4`)：汇编入口，计算栈地址\n2. `main` (`kernel/main.c:39`)：C 语言主入口\n3. `trapinithart` (`kernel/trap.c:36`)：设置 trap 向量 stvec\n4. `kvminithart` (`kernel/vm.c:68`)：启用 MMU\n5. `scheduler` (`kernel/proc.c:669`)：启动第一个进程\n\nVisionFive2 平台类似，但入口为 `_start` (`kernel/entry_visionfive.S:4`)。",
+      "evidence": [
+        {
+          "path": "kernel/entry_qemu.S",
+          "symbol_kind": "asm_function",
+          "symbol_name": "_entry",
+          "excerpt": "第 3-9 行：设置栈指针后 `call main`"
+        },
+        {
+          "path": "kernel/main.c",
+          "symbol_kind": "function",
+          "symbol_name": "main",
+          "excerpt": "第 39 行：`main()` 函数，调用 trapinithart、kvminithart、scheduler 等"
+        },
+        {
+          "path": "kernel/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "trapinithart",
+          "excerpt": "第 36-45 行：`w_stvec((uint64)kernelvec);` 设置内核 trap 向量"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_007",
+      "question_type": "fill_in",
+      "stem": "早期初始化 (Early Initialization) 各项状态（每项必须 implemented / stub / not_found + 证据路径，格式：`项目: 状态 [路径]`）：\n- BSS 清零 (BSS Clearing): ___\n- 早期串口输出 (Early Serial/UART Output): ___\n- 设备树解析 (Device Tree Blob parsing, DTB): ___\n- 页表初始化时机 (Page Table Init): ___（在 MMU 启用前/后？）",
+      "value": "BSS 清零 (BSS Clearing): implemented [linker/qemu.ld:48-51] - 链接脚本定义 .bss 段和 sbss_clear/ebss_clear 符号\n早期串口输出 (Early Serial/UART Output): implemented [kernel/console.c:51] - sbi_console_putchar 通过 SBI 实现早期输出\n设备树解析 (Device Tree Blob parsing, DTB): not_found [kernel/main.c] - 未发现 DTB 解析代码，平台配置通过条件编译区分\n页表初始化时机 (Page Table Init): implemented [kernel/main.c:50-51] - 在 MMU 启用前调用 kvminit() 建立初始页表，然后 kvminithart() 启用",
+      "evidence": [
+        {
+          "path": "linker/qemu.ld",
+          "symbol_kind": "linker_script",
+          "symbol_name": ".bss",
+          "excerpt": "第 48-51 行：`.bss : { *(.bss.stack) sbss_clear = .; *(.sbss .bss .bss.*) ebss_clear = .; }`"
+        },
+        {
+          "path": "kernel/console.c",
+          "symbol_kind": "function",
+          "symbol_name": "consoleputc",
+          "excerpt": "第 51 行：`sbi_console_putchar(c);` 通过 SBI 实现早期串口输出"
+        },
+        {
+          "path": "kernel/vm.c",
+          "symbol_kind": "function",
+          "symbol_name": "kvminit",
+          "excerpt": "第 22-63 行：在 MMU 启用前建立内核页表映射"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_008",
+      "question_type": "tri_state_impl",
+      "stem": "是否初始化/启用了 FPU（如 sstatus.fs / cpacr_el1 / cr4）？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/include/riscv.h",
+          "symbol_kind": "search",
+          "symbol_name": "fpu_init_scan",
+          "excerpt": "搜索 sstatus.fs、FS 位、fpu、fp_init 等关键词，未发现 FPU 初始化代码"
+        },
+        {
+          "path": "kernel/main.c",
+          "symbol_kind": "scan",
+          "symbol_name": "main_init_chain",
+          "excerpt": "main() 初始化链中未发现 FPU 相关初始化调用"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_009",
+      "question_type": "tri_state_impl",
+      "stem": "是否设置 trap/中断向量（如 stvec/idt 等）并能指出设置点？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "trapinithart",
+          "excerpt": "第 36-45 行：`w_stvec((uint64)kernelvec);` 设置内核 trap 向量；`w_sie(r_sie() | SIE_SEIE | SIE_SSIE | SIE_STIE);` 启用中断"
+        },
+        {
+          "path": "kernel/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "usertrapret",
+          "excerpt": "第 130 行：`w_stvec(TRAMPOLINE + (uservec - trampoline));` 设置用户态 trap 向量到 trampoline"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_010",
+      "question_type": "short_answer",
+      "stem": "构建系统如何选择目标平台/架构与入口文件？（Cargo features/Kconfig/Makefile 条件；必须引用配置证据）",
+      "value": "通过 Makefile 条件编译和链接脚本区分平台：\n1. QEMU 平台：使用 `kernel/entry_qemu.S` 和 `linker/qemu.ld`\n2. VisionFive2 平台：使用 `kernel/entry_visionfive.S` 和 `linker/visionfive.ld`\n3. 条件编译宏：`#ifdef QEMU` 和 `#ifdef visionfive` 在源码中区分平台特定代码\n证据：`kernel/vm.c:32,46` 使用 `#ifdef visionfive` 和 `#ifdef QEMU` 区分 UART 和 VIRTIO 映射；`kernel/console.c:31,41,48` 等平台特定代码。",
+      "evidence": [
+        {
+          "path": "kernel/vm.c",
+          "symbol_kind": "preprocessor",
+          "symbol_name": "ifdef_QEMU",
+          "excerpt": "第 32 行：`#ifdef visionfive` 映射 UART_V；第 35 行：`#ifdef QEMU` 映射 VIRTIO0"
+        },
+        {
+          "path": "Makefile",
+          "symbol_kind": "makefile",
+          "symbol_name": "build_config",
+          "excerpt": "Makefile 中通过条件编译选择不同平台的入口文件和链接脚本"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_011",
+      "question_type": "tri_state_impl",
+      "stem": "对 RISC-V 平台：是否能证实 SBI/OpenSBI/U-Boot 固件链（固件将控制权移交内核）？（必须三态；搜索 sbi|opensbi|u-boot；非 RISC-V 平台写 not_found 并说明架构）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/include/sbi.h",
+          "symbol_kind": "header",
+          "symbol_name": "SBI_CALL",
+          "excerpt": "第 26-39 行：定义 SBI 调用宏，通过 ecall 指令与固件通信"
+        },
+        {
+          "path": "kernel/main.c",
+          "symbol_kind": "function_call",
+          "symbol_name": "sbi_hart_start",
+          "excerpt": "第 75 行：`sbi_hart_start(2, (unsigned long)_start, 0);` 通过 SBI 启动 AP 核"
+        },
+        {
+          "path": "kernel/timer.c",
+          "symbol_kind": "function_call",
+          "symbol_name": "sbi_set_timer",
+          "excerpt": "第 39 行：`sbi_set_timer(r_time() + INTERVAL);` 通过 SBI 设置定时器"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_012",
+      "question_type": "tri_state_impl",
+      "stem": "MMU 启用前后是否存在串口/UART 地址切换逻辑（物理地址→虚拟地址）？（必须三态；搜索 phys_to_virt|virt_to_phys 及 UART 基址常量）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/include/memlayout.h",
+          "symbol_kind": "macro",
+          "symbol_name": "UART_V",
+          "excerpt": "第 44 行：`#define UART_V (UART + VIRT_OFFSET)` 定义 UART 虚拟地址，VIRT_OFFSET=0x3F00000000L"
+        },
+        {
+          "path": "kernel/vm.c",
+          "symbol_kind": "function",
+          "symbol_name": "kvminithart",
+          "excerpt": "第 73 行：`uart8250_change_base_addr(UART_V);` 在 MMU 启用后切换 UART 基址为虚拟地址"
+        },
+        {
+          "path": "kernel/include/memlayout.h",
+          "symbol_kind": "macro",
+          "symbol_name": "VIRT_OFFSET",
+          "excerpt": "第 34 行：`#define VIRT_OFFSET 0x3F00000000L` 定义虚拟地址偏移"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_013",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在从内核返回用户态的路径（usertrapret/trap_return/trampoline/eret 等）并设置 stvec/VBAR/IDT？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "usertrapret",
+          "excerpt": "第 121-162 行：完整实现返回用户态路径，设置 stvec 到 trampoline，恢复用户寄存器"
+        },
+        {
+          "path": "kernel/trampoline.S",
+          "symbol_kind": "asm_function",
+          "symbol_name": "userret",
+          "excerpt": "第 88-146 行：恢复用户寄存器，执行 `sret` 返回用户态"
+        },
+        {
+          "path": "kernel/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "usertrapret",
+          "excerpt": "第 130 行：`w_stvec(TRAMPOLINE + (uservec - trampoline));` 设置用户态 trap 向量"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_014",
+      "question_type": "short_answer",
+      "stem": "是否支持多平台启动（StarFive VisionFive2/LoongArch/多板型）？（搜索 visionfive|jh7110|loongarch；有则描述差异入口与互斥关系；无则写未发现）",
+      "value": "支持双平台启动：QEMU 和 StarFive VisionFive2。\n1. QEMU 平台：入口 `kernel/entry_qemu.S:_entry`，链接脚本 `linker/qemu.ld`\n2. VisionFive2 平台：入口 `kernel/entry_visionfive.S:_start`，链接脚本 `linker/visionfive.ld`\n3. 差异：entry_visionfive.S 有额外的注释代码（注释掉的 mhartid 读取）；vm.c 中 UART 和 SD 控制器映射地址不同。\n4. 互斥关系：通过 `#ifdef QEMU` 和 `#ifdef visionfive` 条件编译区分，未见 LoongArch 支持。",
+      "evidence": [
+        {
+          "path": "kernel/entry_qemu.S",
+          "symbol_kind": "asm_file",
+          "symbol_name": "_entry",
+          "excerpt": "QEMU 平台入口文件，19 行"
+        },
+        {
+          "path": "kernel/entry_visionfive.S",
+          "symbol_kind": "asm_file",
+          "symbol_name": "_start",
+          "excerpt": "VisionFive2 平台入口文件，29 行"
+        },
+        {
+          "path": "kernel/vm.c",
+          "symbol_kind": "preprocessor",
+          "symbol_name": "platform_conditional",
+          "excerpt": "第 32、46 行使用 `#ifdef visionfive` 区分平台特定映射"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_015",
+      "question_type": "short_answer",
+      "stem": "trap/异常向量入口在哪里？（trap_handler/trap_vector/__alltraps 等；必须给证据）",
+      "value": "Trap 向量入口：\n1. 内核态：`kernel/kernelvec.S:kernelvec` - 通过 `w_stvec((uint64)kernelvec)` 设置\n2. 用户态：`kernel/trampoline.S:uservec` - 通过 `w_stvec(TRAMPOLINE + (uservec - trampoline))` 设置\n证据：`kernel/trap.c:37` 设置内核向量；`kernel/trap.c:130` 设置用户向量；`kernel/trampoline.S:16` 定义 uservec 标签。",
+      "evidence": [
+        {
+          "path": "kernel/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "trapinithart",
+          "excerpt": "第 37 行：`w_stvec((uint64)kernelvec);` 设置内核 trap 向量"
+        },
+        {
+          "path": "kernel/trampoline.S",
+          "symbol_kind": "asm_label",
+          "symbol_name": "uservec",
+          "excerpt": "第 16 行：`uservec:` 定义用户态 trap 入口"
+        },
+        {
+          "path": "kernel/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "usertrapret",
+          "excerpt": "第 130 行：`w_stvec(TRAMPOLINE + (uservec - trampoline));` 设置用户态向量"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_016",
+      "question_type": "single_choice",
+      "stem": "trap 上下文 (TrapFrame/TrapContext) 更可能存放在哪里？",
+      "value": "用户地址空间预留页（trampoline/trap_context page）",
+      "evidence": [
+        {
+          "path": "kernel/include/trap.h",
+          "symbol_kind": "struct",
+          "symbol_name": "trapframe",
+          "excerpt": "第 17-60 行定义 struct trapframe，注释说明\"sits in a page by itself just under the trampoline page in the user page table\""
+        },
+        {
+          "path": "kernel/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "allocproc",
+          "excerpt": "第 239-243 行：`p->trapframe = (struct trapframe *)kalloc();` 为每个进程分配独立页"
+        },
+        {
+          "path": "kernel/trampoline.S",
+          "symbol_kind": "asm_comment",
+          "symbol_name": "sscratch_usage",
+          "excerpt": "第 24-25 行注释：\"sscratch points to where the process's p->trapframe is mapped into user space, at TRAPFRAME\""
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_017",
+      "question_type": "short_answer",
+      "stem": "TrapFrame/寄存器保存结构体定义在哪里？寄存器数量与字节数是多少？（必须引用结构体定义证据）",
+      "value": "定义位置：`kernel/include/trap.h:17-60` 的 `struct trapframe`。\n寄存器数量：33 个字段（5 个内核元数据 + 28 个通用寄存器）。\n字节数：288 字节（5*8 + 28*8 = 40 + 224 = 264 字节，但实际结构体包含 33 个 uint64 字段 = 264 字节）。\n具体字段：kernel_satp(8)、kernel_sp(8)、kernel_trap(8)、epc(8)、kernel_hartid(8)、ra-t6(28 个寄存器*8=224)，总计 264 字节。",
+      "evidence": [
+        {
+          "path": "kernel/include/trap.h",
+          "symbol_kind": "struct",
+          "symbol_name": "trapframe",
+          "excerpt": "第 17-60 行：定义 33 个 uint64 字段，从 kernel_satp(偏移 0) 到 t6(偏移 280)"
+        },
+        {
+          "path": "kernel/trampoline.S",
+          "symbol_kind": "asm_code",
+          "symbol_name": "uservec_save",
+          "excerpt": "第 33-67 行：保存 28 个通用寄存器到 trapframe，每个 sd 指令偏移 8 字节"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_018",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在系统调用分发表（syscall table / match 分发）？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/syscall.c",
+          "symbol_kind": "array",
+          "symbol_name": "syscalls",
+          "excerpt": "第 204-317 行：定义 `static uint64 (*syscalls[])(void)` 分发表，包含约 110 个 syscall 函数指针"
+        },
+        {
+          "path": "kernel/syscall.c",
+          "symbol_kind": "function",
+          "symbol_name": "syscall",
+          "excerpt": "第 432-458 行：通过 `syscalls[num]()` 间接调用具体 syscall 实现"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_019",
+      "question_type": "tri_state_impl",
+      "stem": "系统调用号是否做边界检查？（越界默认分支/返回错误/panic；必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/syscall.c",
+          "symbol_kind": "function",
+          "symbol_name": "syscall",
+          "excerpt": "第 437 行：`if (num > 0 && num < NELEM(syscalls) && syscalls[num])` 进行边界检查"
+        },
+        {
+          "path": "kernel/syscall.c",
+          "symbol_kind": "function",
+          "symbol_name": "syscall",
+          "excerpt": "第 455-457 行：越界时打印错误信息并返回 -1：`p->trapframe->a0 = -1;`"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_020",
+      "question_type": "short_answer",
+      "stem": "选择一个具体 syscall（优先 sys_write），追踪：用户指令 → trap → 分发 → 实现体。列出 3-6 个关键节点并给证据。",
+      "value": "sys_write 调用链：\n1. 用户态：`ecall` 指令，a7=SYS_write(64)，a0=fd，a1=buf，a2=count\n2. Trap 入口：`kernel/trampoline.S:uservec` 保存上下文，跳转到 `usertrap`\n3. Trap 分发：`kernel/trap.c:76` 检测到 scause=8（ecall），调用 `syscall()`\n4. Syscall 分发：`kernel/syscall.c:437` 检查 num=64，调用 `syscalls[64]() = sys_write()`\n5. 实现体：`kernel/sysfile.c:180-191` 解析参数，调用 `filewrite(f, p, n)`\n6. 返回：设置 `p->trapframe->a0` 为返回值，`usertrapret()` 恢复上下文返回用户态。",
+      "evidence": [
+        {
+          "path": "kernel/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "usertrap",
+          "excerpt": "第 67-76 行：检测到 scause==8（系统调用），调用 `syscall()`"
+        },
+        {
+          "path": "kernel/syscall.c",
+          "symbol_kind": "function",
+          "symbol_name": "syscall",
+          "excerpt": "第 437-440 行：`p->trapframe->a0 = syscalls[num]();` 调用分发表"
+        },
+        {
+          "path": "kernel/sysfile.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_write",
+          "excerpt": "第 180-191 行：`argfd(0, 0, &f)` 获取文件描述符，调用 `filewrite(f, p, n)`"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_021",
+      "question_type": "short_answer",
+      "stem": "列出 5-10 个“高价值 syscall”（fork/exec/mmap/open/write 等）的实现三态（implemented/stub/not_found），并为每个至少给一条证据。",
+      "value": "高价值 syscall 实现状态：\n1. sys_fork: implemented [kernel/sysproc.c:268] - 调用 fork()\n2. sys_exec: implemented [kernel/sysfile.c:455] - 调用 exec()\n3. sys_open: implemented [kernel/sysfile.c:455-462] - 调用 open()\n4. sys_write: implemented [kernel/sysfile.c:180-191] - 调用 filewrite()\n5. sys_mmap: implemented [kernel/sysproc.c:135 声明，kernel/mmap.c 实现]\n6. sys_clone: implemented [kernel/sysproc.c:20-52] - 调用 thread_clone() 或 clone()\n7. sys_exit: implemented [kernel/sysproc.c] - 调用 exit()\n8. sys_wait: implemented [kernel/sysproc.c:271-275] - 调用 wait()\n9. sys_read: implemented [kernel/sysfile.c] - 调用 fileread()\n10. sys_brk: implemented [kernel/sysproc.c:283-300] - 调用 growproc()",
+      "evidence": [
+        {
+          "path": "kernel/sysproc.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_fork",
+          "excerpt": "第 268 行：`uint64 sys_fork(void) { return fork(); }`"
+        },
+        {
+          "path": "kernel/sysfile.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_write",
+          "excerpt": "第 180-191 行：完整实现 write 逻辑，调用 filewrite()"
+        },
+        {
+          "path": "kernel/syscall.c",
+          "symbol_kind": "array",
+          "symbol_name": "syscalls",
+          "excerpt": "第 205-317 行：分发表中所有 syscall 都有对应函数指针"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_022",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在用户指针访问安全检查（copyin/copyout/access_ok/UserInPtr 等）？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/syscall.c",
+          "symbol_kind": "function",
+          "symbol_name": "fetchaddr",
+          "excerpt": "第 17-30 行：使用 `copyin(p->pagetable, (char *)ip, addr, sizeof(*ip))` 检查并复制用户数据"
+        },
+        {
+          "path": "kernel/syscall.c",
+          "symbol_kind": "function",
+          "symbol_name": "fetchstr",
+          "excerpt": "第 33-41 行：使用 `copyinstr(p->pagetable, buf, addr, max)` 安全复制字符串"
+        },
+        {
+          "path": "kernel/file.c",
+          "symbol_kind": "function_call",
+          "symbol_name": "either_copyout",
+          "excerpt": "多处使用 `either_copyout()` 和 `either_copyin()` 进行用户内存访问"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_023",
+      "question_type": "tri_state_impl",
+      "stem": "时钟中断是否触发抢占调度（timer tick 中调用 yield/schedule/resched）？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "usertrap",
+          "excerpt": "第 113-116 行：`if (which_dev == 2) { p->utime++; yield(); }` 时钟中断触发 yield"
+        },
+        {
+          "path": "kernel/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "kerneltrap",
+          "excerpt": "第 188-191 行：`if (which_dev == 2 && myproc() != 0 && myproc()->state == RUNNING) { yield(); }`"
+        },
+        {
+          "path": "kernel/timer.c",
+          "symbol_kind": "function",
+          "symbol_name": "timer_tick",
+          "excerpt": "第 42 行：`timer_tick()` 被 devintr() 调用，触发调度"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_024",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在信号处理链路（trap 返回前处理 pending signal、sigreturn/trampoline）？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "usertrap",
+          "excerpt": "第 103-106 行：`if (p->killed) { sighandle(); }` 在返回前处理信号"
+        },
+        {
+          "path": "kernel/signal.c",
+          "symbol_kind": "function",
+          "symbol_name": "sighandle",
+          "excerpt": "第 57-78 行：设置信号处理函数入口，修改 trapframe->epc 和 ra 到 SIGTRAMPOLINE"
+        },
+        {
+          "path": "kernel/syssig.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_rt_sigreturn",
+          "excerpt": "第 93 行：`sys_rt_sigreturn()` 调用 `rt_sigreturn()` 恢复信号上下文"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_025",
+      "question_type": "short_answer",
+      "stem": "缺页异常与内存特性（CoW/lazy）是否在 trap 中联动？（若存在，说明入口点与调用到内存模块的证据）",
+      "value": "存在缺页异常处理，但仅支持栈空间的动态增长（类似 lazy allocation），未发现 CoW 实现。\n入口点：`kernel/trap.c:79-83` 检测到 scause=13/15（load/store page fault），调用 `handle_stack_page_fault()`。\n实现：`kernel/vma.c:288-322` 检查 fault 地址是否在栈 VMA 范围内，如果是则调用 `uvmalloc1()` 分配新页，扩展栈空间。\n未发现 CoW 相关代码（搜索 cow 关键词无命中）。",
+      "evidence": [
+        {
+          "path": "kernel/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "usertrap",
+          "excerpt": "第 79-83 行：检测到 page fault，调用 `handle_stack_page_fault(myproc(), r_stval())`"
+        },
+        {
+          "path": "kernel/vma.c",
+          "symbol_kind": "function",
+          "symbol_name": "handle_stack_page_fault",
+          "excerpt": "第 288-322 行：检查 VMA 类型是否为 STACK，调用 uvmalloc1() 分配新页"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_026",
+      "question_type": "short_answer",
+      "stem": "与 09 多核交叉一致性：per-CPU trap 栈/时钟初始化顺序与 AP 上线是否一致？（互指证据或写单核不适用）",
+      "value": "多核支持已实现：\n1. AP 启动：`kernel/main.c:75` 通过 `sbi_hart_start(2, (unsigned long)_start, 0)` 启动 hart 2\n2. Per-CPU trap 初始化：每个 hart 启动后调用 `trapinithart()` 设置自己的 stvec\n3. Per-CPU 时钟：`kernel/timer.c:39` 每个 hart 调用 `sbi_set_timer()` 设置独立定时器\n4. Per-CPU 数据：`kernel/proc.c:20` 定义 `struct cpu cpus[NCPU]` 存储每 CPU 状态\n一致性：AP 启动流程与 BSP 一致，都经过 entry_xxx.S → main() → trapinithart() → scheduler()。",
+      "evidence": [
+        {
+          "path": "kernel/main.c",
+          "symbol_kind": "function_call",
+          "symbol_name": "sbi_hart_start",
+          "excerpt": "第 75 行：`sbi_hart_start(2, (unsigned long)_start, 0);` 启动 AP 核"
+        },
+        {
+          "path": "kernel/proc.c",
+          "symbol_kind": "global_var",
+          "symbol_name": "cpus",
+          "excerpt": "第 20 行：`struct cpu cpus[NCPU];` 定义 per-CPU 数据结构"
+        },
+        {
+          "path": "kernel/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "trapinithart",
+          "excerpt": "第 36-45 行：每 hart 调用，设置独立 stvec 和 sie"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_027",
+      "question_type": "fill_in",
+      "stem": "Syscall 实现全量统计 (Syscall Coverage Analysis)，请按格式填写：\n- 分发表路径: ___\n- 完整实现 ✅ (implemented): ___ 个\n- 桩/ENOSYS/return 0 🔸 (stub): ___ 个，代表性例子: ___\n- 未注册 ❌ (not_found): ___ 个\n- 统计依据（grep 或 outline 方式）: ___\n（若无法精确计数，给出区间估计并说明理由）",
+      "value": "分发表路径：kernel/syscall.c:204-317 (syscalls[] 数组)\n完整实现 ✅ (implemented): 约 95 个（根据 syscalls[] 数组中非空且对应.c 文件有实际逻辑的函数）\n桩/ENOSYS/return 0 🔸 (stub): 约 15 个，代表性例子：sys_chroot() [kernel/sysproc.c:426] 直接返回 0；sys_exit_group() [kernel/sysproc.c:424] 直接返回 0；sys_sched_setscheduler() [kernel/sysproc.c:214-216] 仅返回 0\n未注册 ❌ (not_found): 0 个（所有 SYS_* 宏在 sysnum.h 中定义，都在 syscalls[] 中有对应项）\n统计依据：基于 kernel/syscall.c 的 syscalls[] 数组（第 204-317 行）和 sysnames[] 数组（第 319-429 行），共约 110 个 syscall；抽样检查 sysfile.c、sysproc.c、syssig.c、thread.c 等实现文件确认实现深度。",
+      "evidence": [
+        {
+          "path": "kernel/syscall.c",
+          "symbol_kind": "array",
+          "symbol_name": "syscalls",
+          "excerpt": "第 204-317 行：定义约 110 个 syscall 函数指针的分发表"
+        },
+        {
+          "path": "kernel/sysproc.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_chroot",
+          "excerpt": "第 426 行：`uint64 sys_chroot(void) { return 0; }` 桩函数"
+        },
+        {
+          "path": "kernel/sysproc.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_exit_group",
+          "excerpt": "第 424 行：`uint64 sys_exit_group(void) { return 0; }` 桩函数"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_028",
+      "question_type": "short_answer",
+      "stem": "README 与 syscall 声称对照：README 中声称兼容/实现了哪些 syscall 或标准？与代码分发表实际是否一致？（无 README 则写「无 README，仅以代码为准」）",
+      "value": "README.md 仅 23 行，内容为依赖说明和构建/运行命令，未声称具体 syscall 兼容性。README 文件（2.1KB）内容类似，主要是许可证和构建说明。因此「无 README 声称，仅以代码为准」。代码中 syscalls[] 分发表包含约 110 个 syscall，覆盖 POSIX/Linux 常用 syscall（fork、exec、open、read、write、mmap、clone、signal 等）。",
+      "evidence": [
+        {
+          "path": "README.md",
+          "symbol_kind": "doc",
+          "symbol_name": "readme_content",
+          "excerpt": "仅 23 行，包含依赖、文档目录、QEMU 运行命令、gdb 调试命令，无 syscall 声称"
+        },
+        {
+          "path": "kernel/syscall.c",
+          "symbol_kind": "array",
+          "symbol_name": "syscalls",
+          "excerpt": "第 204-317 行：实际实现约 110 个 syscall"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_029",
+      "question_type": "short_answer",
+      "stem": "`_impl` 命名模式搜索结论：grep `_impl\\b|sys_[a-z0-9_]*_impl`，结果是命中了哪些函数（列出），还是「未见该命名模式」？（必须给搜索结论）",
+      "value": "搜索结论：命中 64 个结果，但全部位于 `kernel/lwip/` 目录下（LwIP 网络协议栈），与 syscall 无关。\n具体命中：\n1. `lwip_getsockopt_impl` (kernel/lwip/api/sockets.c:401)\n2. `lwip_setsockopt_impl` (kernel/lwip/api/sockets.c:403)\n3. ppp 日志宏：`ppp_dbglog_impl`、`ppp_info_impl` 等 (kernel/lwip/include/netif/ppp/ppp_impl.h:619-624)\n内核 syscall 实现未使用 `_impl` 后缀命名模式，直接采用 `sys_xxx` 命名。",
+      "evidence": [
+        {
+          "path": "kernel/lwip/api/sockets.c",
+          "symbol_kind": "function",
+          "symbol_name": "lwip_getsockopt_impl",
+          "excerpt": "第 401 行：`static int lwip_getsockopt_impl(...)` LwIP 内部实现"
+        },
+        {
+          "path": "kernel/lwip/include/netif/ppp/ppp_impl.h",
+          "symbol_kind": "macro",
+          "symbol_name": "ppp_dbglog_impl",
+          "excerpt": "第 619 行：`void ppp_dbglog_impl(const char *fmt, ...);` PPP 日志宏"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_030",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在外部中断（PLIC/APIC 等）的分发处理逻辑？（必须三态；与时钟中断分开作答）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "devintr",
+          "excerpt": "第 204-238 行：检测 scause 最高位为 1（外部中断），通过 `plic_claim()` 获取中断号，分发到 UART、DISK 等处理函数"
+        },
+        {
+          "path": "kernel/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "devintr",
+          "excerpt": "第 209-222 行：`if (UART_IRQ == irq) { consoleintr(c); } else if (DISK_IRQ == irq) { disk_intr(); }`"
+        },
+        {
+          "path": "kernel/plic.c",
+          "symbol_kind": "function",
+          "symbol_name": "plic_claim",
+          "excerpt": "PLIC 中断控制器驱动，获取中断号"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_031",
+      "question_type": "tri_state_impl",
+      "stem": "非法内存访问时是否向进程发送 SIGSEGV 信号？（必须三态；搜索 SIGSEGV|sig_segv）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/include/signal.h",
+          "symbol_kind": "macro",
+          "symbol_name": "SIGSEGV",
+          "excerpt": "第 16 行定义 `#define SIGSEGV 11`，但仅在头文件中定义，未在 trap 处理中使用"
+        },
+        {
+          "path": "kernel/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "usertrap",
+          "excerpt": "第 91-100 行：未识别的异常设置 `p->killed = SIGTERM` 而非 SIGSEGV"
+        },
+        {
+          "path": "kernel/vma.c",
+          "symbol_kind": "function",
+          "symbol_name": "handle_stack_page_fault",
+          "excerpt": "第 288-322 行：栈缺页时分配新页，未触发 SIGSEGV；非栈缺页返回 -1 但未发送信号"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_032",
+      "question_type": "short_answer",
+      "stem": "信号发送支持哪些粒度？（搜索 sys_kill/sys_tkill/sys_tgkill；分别是进程级/线程级/进程组级；列出已实现的与其证据）",
+      "value": "信号发送支持三种粒度：\n1. 进程级：`sys_kill` [kernel/sysproc.c:339-359] - 向进程发送信号，但实现有缺陷（第 354 行错误地使用 `pid = myproc()->pid` 而非目标 pid）\n2. 线程级：`sys_tkill` [kernel/thread.c:69-77] - 向特定线程发送信号，但实现为桩（第 76 行仅返回 0）\n3. 进程组级：`sys_tgkill` [kernel/syssig.c:101-110] - 向线程组发送信号，调用 `tgkill(tid, pid, sig)`\n已完整实现：sys_kill（尽管有 bug）、sys_tgkill；桩实现：sys_tkill。",
+      "evidence": [
+        {
+          "path": "kernel/sysproc.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_kill",
+          "excerpt": "第 339-359 行：实现进程级信号发送，但第 354 行有 bug"
+        },
+        {
+          "path": "kernel/thread.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_tkill",
+          "excerpt": "第 69-77 行：`uint64 sys_tkill() { ... return 0; }` 桩函数"
+        },
+        {
+          "path": "kernel/syssig.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_tgkill",
+          "excerpt": "第 101-110 行：调用 `tgkill(tid, pid, sig)` 实现线程组信号发送"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_033",
+      "question_type": "single_choice",
+      "stem": "中断 (Interrupt)、异常 (Exception/Fault/Trap) 的区分机制更接近哪种？（Stallings Ch5；即 trap handler 如何区分「外部中断」与「同步异常」）",
+      "value": "通过 scause/mcause/VBAR 中断原因寄存器区分（硬件编码原因号）",
+      "evidence": [
+        {
+          "path": "kernel/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "usertrap",
+          "excerpt": "第 67 行：`if (r_scause() == 8)` 判断系统调用；第 79 行：`r_scause() == 13 || r_scause() == 15` 判断缺页异常"
+        },
+        {
+          "path": "kernel/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "devintr",
+          "excerpt": "第 207 行：`if ((0x8000000000000000L & scause) && 9 == (scause & 0xff))` 判断外部中断（最高位为 1）"
+        },
+        {
+          "path": "kernel/include/riscv.h",
+          "symbol_kind": "function",
+          "symbol_name": "r_scause",
+          "excerpt": "第 223 行：`r_scause()` 读取 scause 寄存器，硬件编码异常/中断类型"
+        }
+      ]
+    },
+    {
+      "question_id": "Q02_034",
+      "question_type": "tri_state_impl",
+      "stem": "是否支持中断嵌套 (Nested Interrupt / Interrupt Nesting, Stallings Ch5)？（必须三态；搜索 enable_irq_in_handler / nested_irq / 中断处理时是否重开中断；若 not_found 需说明是否关中断运行整个 handler）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "kerneltrap",
+          "excerpt": "第 173 行：`if (intr_get() != 0) panic(\"kerneltrap: interrupts enabled\");` 要求中断必须关闭"
+        },
+        {
+          "path": "kernel/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "usertrap",
+          "excerpt": "第 76 行：`intr_on();` 在系统调用处理前开启中断，但这不是中断嵌套，而是允许系统调用处理时被中断"
+        },
+        {
+          "path": "kernel/intr.c",
+          "symbol_kind": "search",
+          "symbol_name": "nested_irq_scan",
+          "excerpt": "搜索 enable_irq_in_handler、nested_irq 等关键词，未发现中断嵌套支持代码；intr_on()/intr_off() 仅用于匹配 push_off()/pop_off()"
+        }
+      ]
+    }
+  ]
+}

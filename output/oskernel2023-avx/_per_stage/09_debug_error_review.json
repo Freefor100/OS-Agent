@@ -1,0 +1,73 @@
+{
+  "schema_version": "describe_review_v1",
+  "stage_id": "09_debug_error",
+  "stage_title": "调试机制与错误处理",
+  "confidence": 0.95,
+  "question_reviews": [
+    {
+      "question_id": "Q09_001",
+      "confidence": 0.95,
+      "review": "题面要求三态及日志级别控制，答案选 implemented。证据列出 printf/serious_print/debug_print 函数及 DEBUG 宏控制，syslogbuffer 及系统调用定义。摘录非空且直接支撑日志系统与级别控制结论，符合题面约束。"
+    },
+    {
+      "question_id": "Q09_002",
+      "confidence": 0.95,
+      "review": "题面要求 panic/崩溃处理路径，答案选 implemented。证据包含 panic 函数定义、usertrap/kerneltrap 调用点及广泛调用搜索。摘录清晰展示错误输出至停机流程，支撑充分。"
+    },
+    {
+      "question_id": "Q09_003",
+      "confidence": 0.95,
+      "review": "题面要求简述 panic 诊断内容并引证据，答案列出错误串/回溯/寄存器/停机。证据摘录对应 panic/backtrace/trapframedump/kerneltrap 代码段，路径与行号与 value 描述一致，支撑充分。"
+    },
+    {
+      "question_id": "Q09_004",
+      "confidence": 0.95,
+      "review": "题面要求栈回溯实现（非仅打印 ra），答案选 implemented。证据展示 backtrace 函数基于帧指针遍历逻辑及 r_fp 读取，摘录直接证明实现深度，符合题面硬约束。"
+    },
+    {
+      "question_id": "Q09_005",
+      "confidence": 0.95,
+      "review": "题面明确排除用户态 shell 并要求内核监视器，答案选 not_found。证据说明内核目录搜索无命中，并明确区分用户态 sh.c 不符合定义，负面结论有证据支撑，未跑题。"
+    },
+    {
+      "question_id": "Q09_006",
+      "confidence": 0.95,
+      "review": "题面要求 GDB stub，答案选 not_found。证据展示关键字搜索零命中，并检查 trap/uart 无协议解析逻辑。摘录支撑负面结论，符合三态题要求。"
+    },
+    {
+      "question_id": "Q09_007",
+      "confidence": 0.95,
+      "review": "题面要求错误码体系及传播点，答案描述 errno 风格。证据给出 ErrorCode 枚举、errno 宏定义、syscall 返回及 exit 调用。摘录覆盖定义与使用，信息量达 short_answer 要求。"
+    },
+    {
+      "question_id": "Q09_008",
+      "confidence": 0.95,
+      "review": "题面要求 trace/perf 机制，答案选 not_found。证据展示搜索零命中，并区分 debug_print 非 tracepoint。摘录支撑负面结论，无契约违例。"
+    }
+  ],
+  "dimensions": {
+    "evidence_supports_answers": 0.95,
+    "question_answer_consistency": 0.95,
+    "requirements_fit": 0.95
+  },
+  "findings": [],
+  "summary_zh": "本题单 8 道小题均完成度较高，三态题结论与证据摘录对应紧密，short_answer 题引用了具体路径与代码逻辑。所有证据 excerpt 均非空且能直接支撑 value 结论，无题面约束违例。全阶段分按各题均值计算。",
+  "report_quality_score": 0.97,
+  "_meta": {
+    "quality": {
+      "excerpt_coverage": 1.0,
+      "evidence_richness": 1.0,
+      "total_evidence_items": 29,
+      "nonempty_excerpt_items": 29,
+      "mean_question_confidence": 0.95,
+      "mean_dimensions": 0.95,
+      "weights": {
+        "w_mean": 0.45,
+        "w_excerpt": 0.25,
+        "w_rich": 0.2,
+        "w_dim": 0.1
+      }
+    },
+    "review_model": "qwen3.5-plus"
+  }
+}

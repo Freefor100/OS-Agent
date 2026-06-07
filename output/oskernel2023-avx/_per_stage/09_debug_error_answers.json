@@ -1,0 +1,246 @@
+{
+  "schema_version": "v1",
+  "stage_id": "09_debug_error",
+  "stage_title": "调试机制与错误处理",
+  "terminology_profile": "stallings_en_zh",
+  "answers": [
+    {
+      "question_id": "Q09_001",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在日志系统（log/printk/println 宏）与日志级别控制？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/printf.c:127",
+          "symbol_kind": "function",
+          "symbol_name": "serious_print",
+          "excerpt": "serious_print 函数实现，受 #ifndef EXAM 条件编译控制，支持 %d/%x/%p/%s 格式，用于关键错误输出"
+        },
+        {
+          "path": "kernel/printf.c:72",
+          "symbol_kind": "function",
+          "symbol_name": "debug_print",
+          "excerpt": "debug_print 函数实现，受 #ifdef DEBUG 条件编译控制，用于调试日志输出"
+        },
+        {
+          "path": "kernel/printf.c:184",
+          "symbol_kind": "function",
+          "symbol_name": "printf",
+          "excerpt": "printf 通用日志输出函数，支持 %d/%x/%p/%s 格式，带自旋锁保护避免并发 interleaving"
+        },
+        {
+          "path": "kernel/sysfile.c:26",
+          "symbol_kind": "global_var",
+          "symbol_name": "syslogbuffer",
+          "excerpt": "char syslogbuffer[1024] 全局日志缓冲 + initlogbuffer() 初始化 + sys_syslog 系统调用读取日志"
+        },
+        {
+          "path": "kernel/include/sysinfo.h:24-25",
+          "symbol_kind": "macro",
+          "symbol_name": "SYSLOG_ACTION_*",
+          "excerpt": "定义 SYSLOG_ACTION_READ_ALL (3) 和 SYSLOG_ACTION_SIZE_BUFFER (10) 日志系统调用命令"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_002",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 panic/崩溃处理路径（panic_handler/oom/abort 等）？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/printf.c:266",
+          "symbol_kind": "function",
+          "symbol_name": "panic",
+          "excerpt": "panic 函数实现：输出错误信息 → 调用 backtrace() → 设置 panicked=1 → 无限循环停机"
+        },
+        {
+          "path": "kernel/trap.c:51",
+          "symbol_kind": "function",
+          "symbol_name": "usertrap",
+          "excerpt": "用户态异常处理入口，对未处理异常调用 serious_print 和 trapframedump 后设置 p->killed=SIGTERM"
+        },
+        {
+          "path": "kernel/trap.c:164",
+          "symbol_kind": "function",
+          "symbol_name": "kerneltrap",
+          "excerpt": "内核态异常处理入口，对未处理中断调用 serious_print 输出诊断信息后调用 panic"
+        },
+        {
+          "path": "kernel/bio.c:90",
+          "symbol_kind": "search",
+          "symbol_name": "panic_call_sites",
+          "excerpt": "panic 被广泛调用：bio.c:90(bget 无缓冲)、bio.c:109(bwrite)、fat32.c:95(非 FAT32 卷) 等 119 处"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_003",
+      "question_type": "short_answer",
+      "stem": "panic 路径会输出哪些诊断？（寄存器 dump/栈回溯/停机；必须引用实现证据）",
+      "value": "panic 路径输出：1) 错误字符串 (serious_print 输出 s)；2) 调用 backtrace() 输出栈回溯 (kernel/printf.c:280-289)；3) 内核态 panic 额外输出 scause/sepc/stval/hartid/pid/name (kernel/trap.c:176-180)；4) 用户态未处理异常输出 scause/sepc/ir 并调用 trapframedump 输出全部寄存器 (kernel/trap.c:94-99, kernel/trap.c:241-274)；5) 设置 panicked=1 后进入无限循环停机 (kernel/printf.c:275-277)。",
+      "evidence": [
+        {
+          "path": "kernel/printf.c:266-277",
+          "symbol_kind": "function",
+          "symbol_name": "panic",
+          "excerpt": "void panic(char *s) { serious_print(s); backtrace(); panicked=1; for(;;); }"
+        },
+        {
+          "path": "kernel/printf.c:280-289",
+          "symbol_kind": "function",
+          "symbol_name": "backtrace",
+          "excerpt": "backtrace 基于帧指针遍历：while(fp<bottom) { ra=*(fp-1); serious_print(ra-4); fp=*(fp-2); }"
+        },
+        {
+          "path": "kernel/trap.c:241-274",
+          "symbol_kind": "function",
+          "symbol_name": "trapframedump",
+          "excerpt": "trapframedump 输出 trapframe 中全部寄存器：a0-a7/t0-t6/s0-s11/ra/sp/gp/tp/epc"
+        },
+        {
+          "path": "kernel/trap.c:176-180",
+          "symbol_kind": "function",
+          "symbol_name": "kerneltrap",
+          "excerpt": "serious_print(\"\\nscause %p\\n\", scause); serious_print(\"sepc=%p stval=%p hart=%d\\n\"); panic(\"kerneltrap\");"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_004",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现栈回溯 (backtrace/unwind/stack_trace)？（必须三态；仅打印 ra 不算）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/printf.c:280-289",
+          "symbol_kind": "function",
+          "symbol_name": "backtrace",
+          "excerpt": "完整栈回溯实现：基于帧指针 (r_fp()) 遍历，循环读取 *(fp-1) 获取返回地址，*(fp-2) 获取上一帧指针，输出 ra-4 作为调用点"
+        },
+        {
+          "path": "kernel/printf.c:275",
+          "symbol_kind": "function_call",
+          "symbol_name": "panic_call_backtrace",
+          "excerpt": "panic 函数中明确调用 backtrace() 输出调用栈"
+        },
+        {
+          "path": "kernel/include/riscv.h:320",
+          "symbol_kind": "inline_asm",
+          "symbol_name": "r_fp",
+          "excerpt": "r_fp() 内联汇编读取 s0/fp 寄存器作为当前帧指针基址"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_005",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 **内核驻留的交互式监视器（kernel monitor）**？（对齐 Stallings《操作系统：精髓与设计原理》语境：**在内核态上下文**接受命令、用于探查/操控系统的监视器；**不包括**仅在用户态运行的常规 shell，如 `xv6-user/sh.c`、`user/` 下用户程序等——除非题面另有定义。必须三态；若 `implemented`：须给出 3–10 个 **用户可键入的 monitor 命令名** 及对应 **内核内** 解析/分发入口的 `路径:行号` 证据；仅以用户态 shell 充当内核 monitor 视为 **未切题** 应判 `stub` 或 `not_found` 并说明理由。）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/",
+          "symbol_kind": "scan",
+          "symbol_name": "kernel_monitor_scan",
+          "excerpt": "在 kernel/ 目录下搜索 monitor|cmdloop|command_loop 关键字，仅命中 lwip 中 SNTP 相关宏 (kernel/lwip/include/lwip/apps/sntp.h:62)，无内核监视器实现"
+        },
+        {
+          "path": "xv6-user/sh.c",
+          "symbol_kind": "file",
+          "symbol_name": "user_shell",
+          "excerpt": "xv6-user/sh.c 为用户态 shell 实现，非内核态监视器；不符合 Stallings 定义的内核 monitor"
+        },
+        {
+          "path": "kernel/main.c:48-52",
+          "symbol_kind": "function",
+          "symbol_name": "main",
+          "excerpt": "内核入口 main() 仅调用 cpuinit/consoleinit/printfinit/print_logo，无 monitor 初始化或命令循环"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_006",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 GDB stub（需数据包解析循环，如 handle_gdb_packet）？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/",
+          "symbol_kind": "search",
+          "symbol_name": "gdbstub_scan",
+          "excerpt": "全局搜索 gdbstub|gdb_stub|handle_gdb_packet 关键字，0 命中 (已搜索 416 个文件)"
+        },
+        {
+          "path": "kernel/trap.c:51-100",
+          "symbol_kind": "function",
+          "symbol_name": "usertrap",
+          "excerpt": "usertrap 处理系统调用/缺页/设备中断，无 GDB 断点/单步调试处理逻辑"
+        },
+        {
+          "path": "kernel/uart.c",
+          "symbol_kind": "scan",
+          "symbol_name": "uart_gdb_scan",
+          "excerpt": "uart.c 实现串口输入输出 (uartputc/uartgetc/uartintr)，无 GDB 远程协议解析 (如 $<cmd>#<checksum> 格式)"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_007",
+      "question_type": "short_answer",
+      "stem": "错误码/错误类型体系是什么？（errno/Result/Error enum；给类型定义与传播点证据）",
+      "value": "errno 风格错误码体系：1) kernel/include/error.h:4-12 定义 enum ErrorCode { UNKNOWN_ERROR=1, BAD_PROCESS, INVALID_PARAM, NO_FREE_MEMORY, NO_FREE_PROCESS, NOT_ELF_FILE, INVALID_PROCESS_STATUS, INVALID_PERM }；2) kernel/include/error.h:14-121 定义标准 POSIX errno 宏 (EPERM=1, ENOENT=2, ESRCH=3, EINTR=4, EIO=5, ENOMEM=12, EACCES=13, EINVAL=22 等共 121 个)；3) 系统调用通过 return -1 或 return -E* 传播错误 (如 kernel/sysfile.c:1286 sys_syslog 返回 -1)；4) 内核函数通过 return 错误码或直接调用 panic 处理致命错误。",
+      "evidence": [
+        {
+          "path": "kernel/include/error.h:4-12",
+          "symbol_kind": "enum",
+          "symbol_name": "ErrorCode",
+          "excerpt": "enum ErrorCode { UNKNOWN_ERROR=1, BAD_PROCESS, INVALID_PARAM, NO_FREE_MEMORY, NO_FREE_PROCESS, NOT_ELF_FILE, INVALID_PROCESS_STATUS, INVALID_PERM }"
+        },
+        {
+          "path": "kernel/include/error.h:14-60",
+          "symbol_kind": "macro",
+          "symbol_name": "errno_macros",
+          "excerpt": "#define EPERM 1, #define ENOENT 2, #define ENOMEM 12, #define EACCES 13, #define EINVAL 22 等标准 errno 宏"
+        },
+        {
+          "path": "kernel/sysfile.c:1286",
+          "symbol_kind": "function",
+          "symbol_name": "sys_syslog",
+          "excerpt": "if (argint(0,&type)<0 || argaddr(1,&bufp)<0 || argint(2,&len)<0) return -1; 错误返回 -1"
+        },
+        {
+          "path": "kernel/proc.c:545",
+          "symbol_kind": "function",
+          "symbol_name": "exit",
+          "excerpt": "exit(-1) 用于进程异常终止，传递错误状态给用户态"
+        }
+      ]
+    },
+    {
+      "question_id": "Q09_008",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 trace/perf/ftrace 等跟踪机制或 tracepoints？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/",
+          "symbol_kind": "search",
+          "symbol_name": "tracepoint_scan",
+          "excerpt": "全局搜索 tracepoint|ftrace|perf_event|trace_ 关键字，0 命中 (已搜索 416 个文件)"
+        },
+        {
+          "path": "kernel/printf.c:72-125",
+          "symbol_kind": "function",
+          "symbol_name": "debug_print",
+          "excerpt": "debug_print 为条件编译的调试日志宏 (#ifdef DEBUG)，非 tracepoint 机制，无动态启用/禁用或事件过滤功能"
+        },
+        {
+          "path": "kernel/trap.c:51-100",
+          "symbol_kind": "function",
+          "symbol_name": "usertrap",
+          "excerpt": "usertrap 处理异常但无性能计数/事件采样逻辑，无 perf_event_open 或类似系统调用"
+        }
+      ]
+    }
+  ]
+}

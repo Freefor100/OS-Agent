@@ -1,0 +1,105 @@
+{
+  "stage_id": "01_overview",
+  "evidence_targets": [
+    "语言与框架来源: C/Rust混合，基于xv6-riscv移植到K210",
+    "支持架构: riscv64 (K210板载+QEMU模拟器)",
+    "入口函数: _entry (linker64.ld), _start (k210.ld), rust_main (SBI)",
+    "关键目录: kernel/, xv6-user/, sbi/psicasbi/, include/, linker/",
+    "README构建与运行命令: make build/run, make fs, make run platform=qemu",
+    "评测/交付产物: kernel.bin, k210.bin, fs.img, sbi-k210/sbi-qemu",
+    "语言与框架来源",
+    "支持架构",
+    "入口函数",
+    "关键目录",
+    "README 构建与运行命令",
+    "评测/交付产物信号(kernel-rv等)"
+  ],
+  "seed_paths": [
+    "README.md",
+    "Makefile",
+    "Cargo.toml",
+    "kernel/main.c",
+    "kernel/entry.S",
+    "kernel/entry_k210.S",
+    "sbi/psicasbi/src/main.rs",
+    "sbi/psicasbi/Cargo.toml",
+    "linker/linker64.ld",
+    "linker/k210.ld",
+    "include/hal/riscv.h",
+    "kernel/trap/trap.c",
+    "docs",
+    "build.rs"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "_entry",
+    "_start",
+    "main",
+    "rust_main",
+    "ekernel",
+    "trap_init",
+    "cpuinit",
+    "scheduler",
+    "userinit",
+    "kernel_main",
+    "start"
+  ],
+  "repo_hotspots": [
+    "Cargo.toml",
+    "Makefile",
+    "debug",
+    "debug/kendryte_openocd",
+    "debug/openocd_cfg",
+    "doc",
+    "doc/img",
+    "include",
+    "include/fs",
+    "include/hal"
+  ],
+  "preferred_tools": [
+    "lsp_get_definition",
+    "lsp_get_call_graph",
+    "lsp_get_document_outline",
+    "read_code_segment",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 12000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 18,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "使用lsp_get_document_outline查看kernel/main.c的函数结构，确认main()的调用上下文",
+    "使用lsp_get_definition定位_entry.S中的_entry符号，验证链接脚本ENTRY匹配",
+    "使用lsp_get_call_graph分析main()的outgoing调用链（depth=2），识别初始化序列",
+    "使用lsp_get_definition查找sbi/psicasbi/src/main.rs中的rust_main，确认SBI引导流程",
+    "使用grep_in_repo搜索'ekernel'符号，定位SBI跳转到内核的入口点",
+    "使用read_code_segment小段读取kernel/trap/trap.c前100行，了解中断初始化",
+    "使用lsp_get_definition定位trap_init函数，确认其在main.c中的调用位置",
+    "使用grep_in_repo搜索'scheduler'，确认进程调度器入口",
+    "使用lsp_get_call_graph分析scheduler()的incoming调用，确认唯一调用者为main()",
+    "使用read_code_segment读取linker/linker64.ld的BASE_ADDRESS和SECTIONS关键段",
+    "使用grep_in_repo搜索'QEMU'宏定义，确认平台条件编译的分布",
+    "使用read_code_segment小段读取Makefile中run目标和fs目标的关键命令",
+    "使用lsp_get_definition定位cpuinit和procinit，确认CPU和进程子系统初始化顺序",
+    "使用read_code_segment读取kernel/entry.S和entry_k210.S的差异（栈初始化方式）",
+    "使用grep_in_repo搜索'userinit'，确认第一个用户进程的创建位置",
+    "使用lsp_get_references查找main符号的全局引用，确认是否被多处调用",
+    "使用read_code_segment读取sbi/psicasbi/src/trap/mod.rs（如存在）了解SBI陷阱处理",
+    "使用grep_in_repo搜索'SBI_SUCCESS'或'sbi_send_ipi'，确认多核唤醒机制",
+    "使用read_code_segment小段读取kernel/sched/proc.c的procinit函数实现",
+    "使用lsp_get_document_outline查看kernel/exec.c的结构，为后续阶段做准备",
+    "整理入口调用链：_entry/_start → main → scheduler，以及SBI侧：_entry → rust_main → enter_supervisor",
+    "确认双平台差异：K210使用entry_k210.S和k210.ld，QEMU使用entry.S和linker64.ld"
+  ]
+}

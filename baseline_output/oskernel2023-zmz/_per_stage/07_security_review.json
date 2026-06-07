@@ -1,0 +1,106 @@
+{
+  "schema_version": "describe_review_v1",
+  "stage_id": "07_security",
+  "stage_title": "安全机制与权限模型",
+  "confidence": 0.96,
+  "question_reviews": [
+    {
+      "question_id": "Q07_001",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "答案选择与题面选项完全一致。证据引用了 trap 处理、汇编切换及状态寄存器宏定义，能直接支撑用户态/内核态隔离的结论，证据链完整。"
+    },
+    {
+      "question_id": "Q07_002",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "三态结论合法。证据提供了结构体定义及 ELF 宏，有效证明了凭证数据结构的存在性；虽系统调用返回硬编码值，但不影响数据结构存在的判定。"
+    },
+    {
+      "question_id": "Q07_003",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态结论合法。证据明确指出 syscall 路径中缺乏基于凭证的检查逻辑，且辅以 getuid 返回 0 的实证，充分支撑「stub」判定。"
+    },
+    {
+      "question_id": "Q07_004",
+      "score_evidence": 0.85,
+      "score_consistency": 0.95,
+      "review": "短回答符合题面要求（列出了 4 个节点）。证据主要描述缺失情况，虽未展示检查代码（因不存在），但引用了相关函数路径，基本支撑结论。"
+    },
+    {
+      "question_id": "Q07_005",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "三态结论合法。证据引用了 copyin/copyout 及 segment 检查逻辑，能有效证明用户指针验证机制的实现，证据充分。"
+    },
+    {
+      "question_id": "Q07_006",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "三态结论合法。证据通过关键字搜索未命中的方式证明功能缺失，符合「not_found」的证据要求。"
+    },
+    {
+      "question_id": "Q07_007",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态结论合法。证据引用了编译配置显式禁用栈保护及内存分配无 guard page 的代码，强支撑「stub」结论。"
+    },
+    {
+      "question_id": "Q07_008",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "三态结论合法。证据通过多目录关键字搜索未命中证明缺失，符合审计规范。"
+    },
+    {
+      "question_id": "Q07_009",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "短回答完整。明确说明仅支持 riscv64 并逐条给出架构配置及 PMP 初始化证据，符合逐架构作答的题面约束。"
+    },
+    {
+      "question_id": "Q07_010",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "三态结论合法。证据区分了内核 C 语言与 SBI Rust 代码，并指出 Rust 部分无 RAII 安全封装，逻辑清晰支撑结论。"
+    },
+    {
+      "question_id": "Q07_011",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态结论合法。证据分析了页表映射细节（trampoline 双向映射）及关键字搜索，有力证明了缺乏 KPTI 隔离。"
+    },
+    {
+      "question_id": "Q07_012",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "短回答符合题面。结论与 Q07_003 一致，证据引用了具体 syscall 实现片段证明无检查链，支撑充分。"
+    },
+    {
+      "question_id": "Q07_013",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "单选答案在选项范围内。证据通过否定细粒度访问控制的存在来支撑选项 D，逻辑自洽。"
+    },
+    {
+      "question_id": "Q07_014",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态结论合法。证据引用了页表权限位可任意组合的代码及签名验证缺失的搜索结果，充分支撑「not_found」。"
+    }
+  ],
+  "findings": [],
+  "summary_zh": "本报告整体质量较高，题面相符度好，所有题目均严格遵守了题型约束（单选/三态/简答）。证据支撑度方面，多数题目提供了具体的代码片段或搜索记录来支撑结论，尤其是负面结论（如 not_found/stub）均有相应的代码缺失证据或配置证据。Q07_004 证据略显描述性但可接受。全阶段置信度按各题均值方案计算，无严重契约违例。",
+  "report_quality_score": 0.96,
+  "_meta": {
+    "quality": {
+      "mean_question_confidence": 0.9571
+    },
+    "review_model": "qwen3.5-plus",
+    "baseline": true,
+    "run_at": "2026-04-24T08:14:41",
+    "baseline_execute_tokens": 0,
+    "baseline_review_tokens": 11770,
+    "baseline_stage_total_tokens": 11770
+  }
+}

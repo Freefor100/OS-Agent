@@ -1,0 +1,2839 @@
+{
+  "schema_version": "v1",
+  "stage_id": "07_security",
+  "stage_title": "安全机制与权限模型",
+  "terminology_profile": "stallings_en_zh",
+  "answers": [
+    {
+      "question_id": "Q07_001",
+      "question_type": "single_choice",
+      "stem": "特权级隔离形态更接近哪种？",
+      "fact_answers": [
+        {
+          "fact_id": "Q07_001_01",
+          "fact_key": "security_state",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q07_001_privilege_01",
+            "codex_ev_Q07_001_usercopy_02",
+            "codex_ev_Q07_001_uid_stub_03",
+            "codex_ev_Q07_001_access_weak_04"
+          ],
+          "notes": "security_state 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q07_001_02",
+          "fact_key": "enforcement_callsite",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q07_001_privilege_01",
+            "codex_ev_Q07_001_usercopy_02",
+            "codex_ev_Q07_001_uid_stub_03",
+            "codex_ev_Q07_001_access_weak_04"
+          ],
+          "notes": "enforcement_callsite 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q07_001_03",
+          "fact_key": "deny_or_fault_path",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q07_001_privilege_01",
+            "codex_ev_Q07_001_usercopy_02",
+            "codex_ev_Q07_001_uid_stub_03",
+            "codex_ev_Q07_001_access_weak_04"
+          ],
+          "notes": "deny_or_fault_path 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q07_001_04",
+          "fact_key": "policy_scope",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q07_001_privilege_01",
+            "codex_ev_Q07_001_usercopy_02",
+            "codex_ev_Q07_001_uid_stub_03",
+            "codex_ev_Q07_001_access_weak_04"
+          ],
+          "notes": "policy_scope 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q07_001_05",
+          "fact_key": "stub_detection",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q07_001_privilege_01",
+            "codex_ev_Q07_001_usercopy_02",
+            "codex_ev_Q07_001_uid_stub_03",
+            "codex_ev_Q07_001_access_weak_04"
+          ],
+          "notes": "stub_detection 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q07_001_06",
+          "fact_key": "negative_search_coverage",
+          "value": {
+            "searched_keywords": [
+              "uid",
+              "gid",
+              "cred",
+              "permission",
+              "access control",
+              "ACL",
+              "capability",
+              "mode",
+              "EACCES",
+              "EPERM",
+              "seccomp",
+              "sandbox",
+              "audit",
+              "secure boot",
+              "signature",
+              "PMP",
+              "SMEP",
+              "SMAP",
+              "KPTI",
+              "W^X",
+              "canary",
+              "guard"
+            ],
+            "searched_directories": [
+              "kernel",
+              "include",
+              "xv6-user",
+              "Makefile",
+              "linker",
+              "doc"
+            ],
+            "file_count": 123,
+            "match_count": 509,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [],
+          "notes": "negative_search_coverage 见本题证据。"
+        }
+      ],
+      "value": "有用户态/内核态隔离（user mode/kernel mode）",
+      "notes": "trap 路径明确区分 usertrap/kerneltrap，返回用户态前清 SPP 并切换用户页表。",
+      "used_evidence_ids": [
+        "codex_ev_Q07_001_privilege_01",
+        "codex_ev_Q07_001_usercopy_02",
+        "codex_ev_Q07_001_uid_stub_03",
+        "codex_ev_Q07_001_access_weak_04"
+      ],
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q07_001_privilege_01",
+          "path": "repos/xv6-k210/kernel/trap/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "usertrap/usertrapret/kerneltrap",
+          "excerpt": "usertrap asserts SSTATUS_SPP is 0 (from user), usertrapret clears SSTATUS_SPP for user mode and switches through trampoline with the process pagetable; kerneltrap asserts SSTATUS_SPP is set.",
+          "line_start": 77,
+          "line_end": 209,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q07_001_usercopy_02",
+          "path": "repos/xv6-k210/kernel/mm/vm.c",
+          "symbol_kind": "function",
+          "symbol_name": "walkaddr/copyin2/copyout2",
+          "excerpt": "walkaddr rejects va>=MAXUVA and PTEs lacking PTE_V or PTE_U; copyout2/copyin2 first verify the address range belongs to a user segment, then safememmove with SUM/PUM toggling.",
+          "line_start": 236,
+          "line_end": 848,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q07_001_uid_stub_03",
+          "path": "repos/xv6-k210/kernel/syscall/sysproc.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_getuid",
+          "excerpt": "sys_getuid returns constant 0; syscall table maps getuid/geteuid/getgid/getegid to this same function.",
+          "line_start": 267,
+          "line_end": 270,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "stub",
+            "implementation_body"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q07_001_access_weak_04",
+          "path": "repos/xv6-k210/kernel/syscall/sysfile.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_faccessat/sys_openat",
+          "excerpt": "sys_faccessat says assume user as root and checks owner mode bits; sys_openat enforces file type constraints such as directory write/O_DIRECTORY, but does not check current uid/gid credentials.",
+          "line_start": 198,
+          "line_end": 822,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_002",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在凭证/权限数据结构（UID/GID/Credential/Capability/ACL 等）？（必须三态）",
+      "fact_answers": [
+        {
+          "fact_id": "Q07_002_01",
+          "fact_key": "security_state",
+          "value": "yes_weak",
+          "used_evidence_ids": [
+            "codex_ev_Q07_002_privilege_01",
+            "codex_ev_Q07_002_usercopy_02",
+            "codex_ev_Q07_002_uid_stub_03",
+            "codex_ev_Q07_002_access_weak_04",
+            "codex_ev_Q07_002_sec_neg_01"
+          ],
+          "notes": "security_state 仅有弱线索，不能单独支撑 implemented。"
+        },
+        {
+          "fact_id": "Q07_002_02",
+          "fact_key": "enforcement_callsite",
+          "value": "stub_or_declaration_only",
+          "used_evidence_ids": [
+            "codex_ev_Q07_002_privilege_01",
+            "codex_ev_Q07_002_usercopy_02",
+            "codex_ev_Q07_002_uid_stub_03",
+            "codex_ev_Q07_002_access_weak_04",
+            "codex_ev_Q07_002_sec_neg_01"
+          ],
+          "notes": "enforcement_callsite 只有字段、固定返回或弱接口，未闭合强制语义。"
+        },
+        {
+          "fact_id": "Q07_002_03",
+          "fact_key": "deny_or_fault_path",
+          "value": "stub_or_declaration_only",
+          "used_evidence_ids": [
+            "codex_ev_Q07_002_privilege_01",
+            "codex_ev_Q07_002_usercopy_02",
+            "codex_ev_Q07_002_uid_stub_03",
+            "codex_ev_Q07_002_access_weak_04",
+            "codex_ev_Q07_002_sec_neg_01"
+          ],
+          "notes": "deny_or_fault_path 只有字段、固定返回或弱接口，未闭合强制语义。"
+        },
+        {
+          "fact_id": "Q07_002_04",
+          "fact_key": "policy_scope",
+          "value": "stub_or_declaration_only",
+          "used_evidence_ids": [
+            "codex_ev_Q07_002_privilege_01",
+            "codex_ev_Q07_002_usercopy_02",
+            "codex_ev_Q07_002_uid_stub_03",
+            "codex_ev_Q07_002_access_weak_04",
+            "codex_ev_Q07_002_sec_neg_01"
+          ],
+          "notes": "policy_scope 只有字段、固定返回或弱接口，未闭合强制语义。"
+        },
+        {
+          "fact_id": "Q07_002_05",
+          "fact_key": "stub_detection",
+          "value": "stub_or_declaration_only",
+          "used_evidence_ids": [
+            "codex_ev_Q07_002_privilege_01",
+            "codex_ev_Q07_002_usercopy_02",
+            "codex_ev_Q07_002_uid_stub_03",
+            "codex_ev_Q07_002_access_weak_04",
+            "codex_ev_Q07_002_sec_neg_01"
+          ],
+          "notes": "stub_detection 只有字段、固定返回或弱接口，未闭合强制语义。"
+        },
+        {
+          "fact_id": "Q07_002_06",
+          "fact_key": "negative_search_coverage",
+          "value": {
+            "searched_keywords": [
+              "uid",
+              "gid",
+              "cred",
+              "permission",
+              "access control",
+              "ACL",
+              "capability",
+              "mode",
+              "EACCES",
+              "EPERM",
+              "seccomp",
+              "sandbox",
+              "audit",
+              "secure boot",
+              "signature",
+              "PMP",
+              "SMEP",
+              "SMAP",
+              "KPTI",
+              "W^X",
+              "canary",
+              "guard"
+            ],
+            "searched_directories": [
+              "kernel",
+              "include",
+              "xv6-user",
+              "Makefile",
+              "linker",
+              "doc"
+            ],
+            "file_count": 123,
+            "match_count": 509,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [
+            "codex_ev_Q07_002_sec_neg_01"
+          ],
+          "notes": "negative_search_coverage 见本题证据。"
+        }
+      ],
+      "value": "stub",
+      "notes": "存在 uid/gid 字段和 getuid syscall 号，但 getuid 固定返回 0，未发现进程凭证或 capability/ACL 对象。",
+      "used_evidence_ids": [
+        "codex_ev_Q07_002_privilege_01",
+        "codex_ev_Q07_002_usercopy_02",
+        "codex_ev_Q07_002_uid_stub_03",
+        "codex_ev_Q07_002_access_weak_04",
+        "codex_ev_Q07_002_sec_neg_01"
+      ],
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q07_002_privilege_01",
+          "path": "repos/xv6-k210/kernel/trap/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "usertrap/usertrapret/kerneltrap",
+          "excerpt": "usertrap asserts SSTATUS_SPP is 0 (from user), usertrapret clears SSTATUS_SPP for user mode and switches through trampoline with the process pagetable; kerneltrap asserts SSTATUS_SPP is set.",
+          "line_start": 77,
+          "line_end": 209,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q07_002_usercopy_02",
+          "path": "repos/xv6-k210/kernel/mm/vm.c",
+          "symbol_kind": "function",
+          "symbol_name": "walkaddr/copyin2/copyout2",
+          "excerpt": "walkaddr rejects va>=MAXUVA and PTEs lacking PTE_V or PTE_U; copyout2/copyin2 first verify the address range belongs to a user segment, then safememmove with SUM/PUM toggling.",
+          "line_start": 236,
+          "line_end": 848,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q07_002_uid_stub_03",
+          "path": "repos/xv6-k210/kernel/syscall/sysproc.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_getuid",
+          "excerpt": "sys_getuid returns constant 0; syscall table maps getuid/geteuid/getgid/getegid to this same function.",
+          "line_start": 267,
+          "line_end": 270,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "stub",
+            "implementation_body"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q07_002_access_weak_04",
+          "path": "repos/xv6-k210/kernel/syscall/sysfile.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_faccessat/sys_openat",
+          "excerpt": "sys_faccessat says assume user as root and checks owner mode bits; sys_openat enforces file type constraints such as directory write/O_DIRECTORY, but does not check current uid/gid credentials.",
+          "line_start": 198,
+          "line_end": 822,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q07_002_sec_neg_01",
+          "path": "<negative_search>",
+          "symbol_kind": "search",
+          "symbol_name": "sec_neg",
+          "excerpt": "No per-process cred/uid/gid/capability/ACL object found; only stat uid/gid fields and fixed getuid=0 exist; searched_keywords=uid, gid, cred, permission, access control, ACL, capability, mode, EACCES, EPERM, seccomp, sandbox, audit, secure boot, signature, PMP, SMEP, SMAP, KPTI, W^X, canary, guard; searched_directories=kernel, include, xv6-user, Makefile, linker, doc; file_count=123; match_count=509; coverage_sufficient=true",
+          "line_start": null,
+          "line_end": null,
+          "evidence_type": "negative_search",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "negative_search"
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_003",
+      "question_type": "tri_state_impl",
+      "stem": "是否能证实在 syscall 路径上真实执行了权限检查（open/exec/write 等）？（必须三态；仅有字段不算 implemented）",
+      "fact_answers": [
+        {
+          "fact_id": "Q07_003_01",
+          "fact_key": "security_state",
+          "value": "stub_or_declaration_only",
+          "used_evidence_ids": [
+            "codex_ev_Q07_003_privilege_01",
+            "codex_ev_Q07_003_usercopy_02",
+            "codex_ev_Q07_003_uid_stub_03",
+            "codex_ev_Q07_003_access_weak_04"
+          ],
+          "notes": "security_state 只有字段、固定返回或弱接口，未闭合强制语义。"
+        },
+        {
+          "fact_id": "Q07_003_02",
+          "fact_key": "enforcement_callsite",
+          "value": "yes_weak",
+          "used_evidence_ids": [
+            "codex_ev_Q07_003_privilege_01",
+            "codex_ev_Q07_003_usercopy_02",
+            "codex_ev_Q07_003_uid_stub_03",
+            "codex_ev_Q07_003_access_weak_04"
+          ],
+          "notes": "enforcement_callsite 仅有弱线索，不能单独支撑 implemented。"
+        },
+        {
+          "fact_id": "Q07_003_03",
+          "fact_key": "deny_or_fault_path",
+          "value": "yes_weak",
+          "used_evidence_ids": [
+            "codex_ev_Q07_003_privilege_01",
+            "codex_ev_Q07_003_usercopy_02",
+            "codex_ev_Q07_003_uid_stub_03",
+            "codex_ev_Q07_003_access_weak_04"
+          ],
+          "notes": "deny_or_fault_path 仅有弱线索，不能单独支撑 implemented。"
+        },
+        {
+          "fact_id": "Q07_003_04",
+          "fact_key": "policy_scope",
+          "value": "stub_or_declaration_only",
+          "used_evidence_ids": [
+            "codex_ev_Q07_003_privilege_01",
+            "codex_ev_Q07_003_usercopy_02",
+            "codex_ev_Q07_003_uid_stub_03",
+            "codex_ev_Q07_003_access_weak_04"
+          ],
+          "notes": "policy_scope 只有字段、固定返回或弱接口，未闭合强制语义。"
+        },
+        {
+          "fact_id": "Q07_003_05",
+          "fact_key": "stub_detection",
+          "value": "stub_or_declaration_only",
+          "used_evidence_ids": [
+            "codex_ev_Q07_003_privilege_01",
+            "codex_ev_Q07_003_usercopy_02",
+            "codex_ev_Q07_003_uid_stub_03",
+            "codex_ev_Q07_003_access_weak_04"
+          ],
+          "notes": "stub_detection 只有字段、固定返回或弱接口，未闭合强制语义。"
+        },
+        {
+          "fact_id": "Q07_003_06",
+          "fact_key": "negative_search_coverage",
+          "value": {
+            "searched_keywords": [
+              "uid",
+              "gid",
+              "cred",
+              "permission",
+              "access control",
+              "ACL",
+              "capability",
+              "mode",
+              "EACCES",
+              "EPERM",
+              "seccomp",
+              "sandbox",
+              "audit",
+              "secure boot",
+              "signature",
+              "PMP",
+              "SMEP",
+              "SMAP",
+              "KPTI",
+              "W^X",
+              "canary",
+              "guard"
+            ],
+            "searched_directories": [
+              "kernel",
+              "include",
+              "xv6-user",
+              "Makefile",
+              "linker",
+              "doc"
+            ],
+            "file_count": 123,
+            "match_count": 509,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [],
+          "notes": "negative_search_coverage 见本题证据。"
+        }
+      ],
+      "value": "stub",
+      "notes": "sys_faccessat 有基于 owner mode bits 的弱检查但注释假定 root；open/exec/write 未发现基于当前凭证的强制权限链。",
+      "used_evidence_ids": [
+        "codex_ev_Q07_003_privilege_01",
+        "codex_ev_Q07_003_usercopy_02",
+        "codex_ev_Q07_003_uid_stub_03",
+        "codex_ev_Q07_003_access_weak_04"
+      ],
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q07_003_privilege_01",
+          "path": "repos/xv6-k210/kernel/trap/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "usertrap/usertrapret/kerneltrap",
+          "excerpt": "usertrap asserts SSTATUS_SPP is 0 (from user), usertrapret clears SSTATUS_SPP for user mode and switches through trampoline with the process pagetable; kerneltrap asserts SSTATUS_SPP is set.",
+          "line_start": 77,
+          "line_end": 209,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q07_003_usercopy_02",
+          "path": "repos/xv6-k210/kernel/mm/vm.c",
+          "symbol_kind": "function",
+          "symbol_name": "walkaddr/copyin2/copyout2",
+          "excerpt": "walkaddr rejects va>=MAXUVA and PTEs lacking PTE_V or PTE_U; copyout2/copyin2 first verify the address range belongs to a user segment, then safememmove with SUM/PUM toggling.",
+          "line_start": 236,
+          "line_end": 848,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q07_003_uid_stub_03",
+          "path": "repos/xv6-k210/kernel/syscall/sysproc.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_getuid",
+          "excerpt": "sys_getuid returns constant 0; syscall table maps getuid/geteuid/getgid/getegid to this same function.",
+          "line_start": 267,
+          "line_end": 270,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "stub",
+            "implementation_body"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q07_003_access_weak_04",
+          "path": "repos/xv6-k210/kernel/syscall/sysfile.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_faccessat/sys_openat",
+          "excerpt": "sys_faccessat says assume user as root and checks owner mode bits; sys_openat enforces file type constraints such as directory write/O_DIRECTORY, but does not check current uid/gid credentials.",
+          "line_start": 198,
+          "line_end": 822,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_004",
+      "question_type": "short_answer",
+      "stem": "若存在权限检查：入口点与核心检查函数链路是什么？（列 2-5 个节点并给证据）",
+      "fact_answers": [
+        {
+          "fact_id": "Q07_004_01",
+          "fact_key": "security_state",
+          "value": "stub_or_declaration_only",
+          "used_evidence_ids": [
+            "codex_ev_Q07_004_privilege_01",
+            "codex_ev_Q07_004_usercopy_02",
+            "codex_ev_Q07_004_uid_stub_03",
+            "codex_ev_Q07_004_access_weak_04"
+          ],
+          "notes": "security_state 只有字段、固定返回或弱接口，未闭合强制语义。"
+        },
+        {
+          "fact_id": "Q07_004_02",
+          "fact_key": "enforcement_callsite",
+          "value": "stub_or_declaration_only",
+          "used_evidence_ids": [
+            "codex_ev_Q07_004_privilege_01",
+            "codex_ev_Q07_004_usercopy_02",
+            "codex_ev_Q07_004_uid_stub_03",
+            "codex_ev_Q07_004_access_weak_04"
+          ],
+          "notes": "enforcement_callsite 只有字段、固定返回或弱接口，未闭合强制语义。"
+        },
+        {
+          "fact_id": "Q07_004_03",
+          "fact_key": "deny_or_fault_path",
+          "value": "stub_or_declaration_only",
+          "used_evidence_ids": [
+            "codex_ev_Q07_004_privilege_01",
+            "codex_ev_Q07_004_usercopy_02",
+            "codex_ev_Q07_004_uid_stub_03",
+            "codex_ev_Q07_004_access_weak_04"
+          ],
+          "notes": "deny_or_fault_path 只有字段、固定返回或弱接口，未闭合强制语义。"
+        },
+        {
+          "fact_id": "Q07_004_04",
+          "fact_key": "policy_scope",
+          "value": "stub_or_declaration_only",
+          "used_evidence_ids": [
+            "codex_ev_Q07_004_privilege_01",
+            "codex_ev_Q07_004_usercopy_02",
+            "codex_ev_Q07_004_uid_stub_03",
+            "codex_ev_Q07_004_access_weak_04"
+          ],
+          "notes": "policy_scope 只有字段、固定返回或弱接口，未闭合强制语义。"
+        },
+        {
+          "fact_id": "Q07_004_05",
+          "fact_key": "stub_detection",
+          "value": "stub_or_declaration_only",
+          "used_evidence_ids": [
+            "codex_ev_Q07_004_privilege_01",
+            "codex_ev_Q07_004_usercopy_02",
+            "codex_ev_Q07_004_uid_stub_03",
+            "codex_ev_Q07_004_access_weak_04"
+          ],
+          "notes": "stub_detection 只有字段、固定返回或弱接口，未闭合强制语义。"
+        },
+        {
+          "fact_id": "Q07_004_06",
+          "fact_key": "negative_search_coverage",
+          "value": {
+            "searched_keywords": [
+              "uid",
+              "gid",
+              "cred",
+              "permission",
+              "access control",
+              "ACL",
+              "capability",
+              "mode",
+              "EACCES",
+              "EPERM",
+              "seccomp",
+              "sandbox",
+              "audit",
+              "secure boot",
+              "signature",
+              "PMP",
+              "SMEP",
+              "SMAP",
+              "KPTI",
+              "W^X",
+              "canary",
+              "guard"
+            ],
+            "searched_directories": [
+              "kernel",
+              "include",
+              "xv6-user",
+              "Makefile",
+              "linker",
+              "doc"
+            ],
+            "file_count": 123,
+            "match_count": 509,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [],
+          "notes": "negative_search_coverage 见本题证据。"
+        }
+      ],
+      "value": {
+        "security_state": "未发现真实凭证模型；getuid/geteuid/getgid/getegid 均映射到固定返回 0。",
+        "enforcement_callsite": "弱链路仅有 sys_faccessat -> nameifrom -> ip->mode owner bits 检查；sys_openat 只做文件类型/O_DIRECTORY/O_TRUNC 处理。",
+        "deny_or_fault_path": "faccessat 模式不匹配返回 -1；sys_openat 对目录写返回 -EISDIR、O_DIRECTORY 不匹配返回 -ENOTDIR。",
+        "policy_scope": "不是 open/exec/write 的通用权限强制链。",
+        "stub_detection": "字段/常量/固定 root 返回存在，但无 cred 对象和跨 syscall 强制执行。",
+        "negative_search_coverage": {
+          "searched_keywords": [
+            "uid",
+            "gid",
+            "cred",
+            "permission",
+            "access control",
+            "ACL",
+            "capability",
+            "mode",
+            "EACCES",
+            "EPERM",
+            "seccomp",
+            "sandbox",
+            "audit",
+            "secure boot",
+            "signature",
+            "PMP",
+            "SMEP",
+            "SMAP",
+            "KPTI",
+            "W^X",
+            "canary",
+            "guard"
+          ],
+          "searched_directories": [
+            "kernel",
+            "include",
+            "xv6-user",
+            "Makefile",
+            "linker",
+            "doc"
+          ],
+          "file_count": 123,
+          "match_count": 509,
+          "coverage_sufficient": true
+        }
+      },
+      "notes": "可列出的只是弱检查/类型检查链，不是完整权限检查链。",
+      "used_evidence_ids": [
+        "codex_ev_Q07_004_privilege_01",
+        "codex_ev_Q07_004_usercopy_02",
+        "codex_ev_Q07_004_uid_stub_03",
+        "codex_ev_Q07_004_access_weak_04"
+      ],
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q07_004_privilege_01",
+          "path": "repos/xv6-k210/kernel/trap/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "usertrap/usertrapret/kerneltrap",
+          "excerpt": "usertrap asserts SSTATUS_SPP is 0 (from user), usertrapret clears SSTATUS_SPP for user mode and switches through trampoline with the process pagetable; kerneltrap asserts SSTATUS_SPP is set.",
+          "line_start": 77,
+          "line_end": 209,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q07_004_usercopy_02",
+          "path": "repos/xv6-k210/kernel/mm/vm.c",
+          "symbol_kind": "function",
+          "symbol_name": "walkaddr/copyin2/copyout2",
+          "excerpt": "walkaddr rejects va>=MAXUVA and PTEs lacking PTE_V or PTE_U; copyout2/copyin2 first verify the address range belongs to a user segment, then safememmove with SUM/PUM toggling.",
+          "line_start": 236,
+          "line_end": 848,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q07_004_uid_stub_03",
+          "path": "repos/xv6-k210/kernel/syscall/sysproc.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_getuid",
+          "excerpt": "sys_getuid returns constant 0; syscall table maps getuid/geteuid/getgid/getegid to this same function.",
+          "line_start": 267,
+          "line_end": 270,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "stub",
+            "implementation_body"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q07_004_access_weak_04",
+          "path": "repos/xv6-k210/kernel/syscall/sysfile.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_faccessat/sys_openat",
+          "excerpt": "sys_faccessat says assume user as root and checks owner mode bits; sys_openat enforces file type constraints such as directory write/O_DIRECTORY, but does not check current uid/gid credentials.",
+          "line_start": 198,
+          "line_end": 822,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_005",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现用户指针验证（access_ok/verify_area/UserInPtr/copyin/copyout 等）？（必须三态）",
+      "fact_answers": [
+        {
+          "fact_id": "Q07_005_01",
+          "fact_key": "security_state",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q07_005_privilege_01",
+            "codex_ev_Q07_005_usercopy_02",
+            "codex_ev_Q07_005_uid_stub_03",
+            "codex_ev_Q07_005_access_weak_04"
+          ],
+          "notes": "security_state 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q07_005_02",
+          "fact_key": "enforcement_callsite",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q07_005_privilege_01",
+            "codex_ev_Q07_005_usercopy_02",
+            "codex_ev_Q07_005_uid_stub_03",
+            "codex_ev_Q07_005_access_weak_04"
+          ],
+          "notes": "enforcement_callsite 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q07_005_03",
+          "fact_key": "deny_or_fault_path",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q07_005_privilege_01",
+            "codex_ev_Q07_005_usercopy_02",
+            "codex_ev_Q07_005_uid_stub_03",
+            "codex_ev_Q07_005_access_weak_04"
+          ],
+          "notes": "deny_or_fault_path 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q07_005_04",
+          "fact_key": "policy_scope",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q07_005_privilege_01",
+            "codex_ev_Q07_005_usercopy_02",
+            "codex_ev_Q07_005_uid_stub_03",
+            "codex_ev_Q07_005_access_weak_04"
+          ],
+          "notes": "policy_scope 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q07_005_05",
+          "fact_key": "stub_detection",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q07_005_privilege_01",
+            "codex_ev_Q07_005_usercopy_02",
+            "codex_ev_Q07_005_uid_stub_03",
+            "codex_ev_Q07_005_access_weak_04"
+          ],
+          "notes": "stub_detection 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q07_005_06",
+          "fact_key": "negative_search_coverage",
+          "value": {
+            "searched_keywords": [
+              "uid",
+              "gid",
+              "cred",
+              "permission",
+              "access control",
+              "ACL",
+              "capability",
+              "mode",
+              "EACCES",
+              "EPERM",
+              "seccomp",
+              "sandbox",
+              "audit",
+              "secure boot",
+              "signature",
+              "PMP",
+              "SMEP",
+              "SMAP",
+              "KPTI",
+              "W^X",
+              "canary",
+              "guard"
+            ],
+            "searched_directories": [
+              "kernel",
+              "include",
+              "xv6-user",
+              "Makefile",
+              "linker",
+              "doc"
+            ],
+            "file_count": 123,
+            "match_count": 509,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [],
+          "notes": "negative_search_coverage 见本题证据。"
+        }
+      ],
+      "value": "implemented",
+      "notes": "copyin2/copyout2 验证用户段范围，walkaddr 检查 MAXUVA/PTE_V/PTE_U，safememmove 处理用户访问保护。",
+      "used_evidence_ids": [
+        "codex_ev_Q07_005_privilege_01",
+        "codex_ev_Q07_005_usercopy_02",
+        "codex_ev_Q07_005_uid_stub_03",
+        "codex_ev_Q07_005_access_weak_04"
+      ],
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q07_005_privilege_01",
+          "path": "repos/xv6-k210/kernel/trap/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "usertrap/usertrapret/kerneltrap",
+          "excerpt": "usertrap asserts SSTATUS_SPP is 0 (from user), usertrapret clears SSTATUS_SPP for user mode and switches through trampoline with the process pagetable; kerneltrap asserts SSTATUS_SPP is set.",
+          "line_start": 77,
+          "line_end": 209,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q07_005_usercopy_02",
+          "path": "repos/xv6-k210/kernel/mm/vm.c",
+          "symbol_kind": "function",
+          "symbol_name": "walkaddr/copyin2/copyout2",
+          "excerpt": "walkaddr rejects va>=MAXUVA and PTEs lacking PTE_V or PTE_U; copyout2/copyin2 first verify the address range belongs to a user segment, then safememmove with SUM/PUM toggling.",
+          "line_start": 236,
+          "line_end": 848,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q07_005_uid_stub_03",
+          "path": "repos/xv6-k210/kernel/syscall/sysproc.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_getuid",
+          "excerpt": "sys_getuid returns constant 0; syscall table maps getuid/geteuid/getgid/getegid to this same function.",
+          "line_start": 267,
+          "line_end": 270,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "stub",
+            "implementation_body"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q07_005_access_weak_04",
+          "path": "repos/xv6-k210/kernel/syscall/sysfile.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_faccessat/sys_openat",
+          "excerpt": "sys_faccessat says assume user as root and checks owner mode bits; sys_openat enforces file type constraints such as directory write/O_DIRECTORY, but does not check current uid/gid credentials.",
+          "line_start": 198,
+          "line_end": 822,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_006",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 seccomp/prctl/sandbox 等系统调用过滤/沙箱？（必须三态；stub 需说明形态：ENOSYS/return 0）",
+      "fact_answers": [
+        {
+          "fact_id": "Q07_006_01",
+          "fact_key": "security_state",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q07_006_sec_neg_01"
+          ],
+          "notes": "security_state 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q07_006_02",
+          "fact_key": "enforcement_callsite",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q07_006_sec_neg_01"
+          ],
+          "notes": "enforcement_callsite 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q07_006_03",
+          "fact_key": "deny_or_fault_path",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q07_006_sec_neg_01"
+          ],
+          "notes": "deny_or_fault_path 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q07_006_04",
+          "fact_key": "policy_scope",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q07_006_sec_neg_01"
+          ],
+          "notes": "policy_scope 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q07_006_05",
+          "fact_key": "stub_detection",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q07_006_sec_neg_01"
+          ],
+          "notes": "stub_detection 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q07_006_06",
+          "fact_key": "negative_search_coverage",
+          "value": {
+            "searched_keywords": [
+              "uid",
+              "gid",
+              "cred",
+              "permission",
+              "access control",
+              "ACL",
+              "capability",
+              "mode",
+              "EACCES",
+              "EPERM",
+              "seccomp",
+              "sandbox",
+              "audit",
+              "secure boot",
+              "signature",
+              "PMP",
+              "SMEP",
+              "SMAP",
+              "KPTI",
+              "W^X",
+              "canary",
+              "guard"
+            ],
+            "searched_directories": [
+              "kernel",
+              "include",
+              "xv6-user",
+              "Makefile",
+              "linker",
+              "doc"
+            ],
+            "file_count": 123,
+            "match_count": 509,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [
+            "codex_ev_Q07_006_sec_neg_01"
+          ],
+          "notes": "negative_search_coverage 见本题证据。"
+        }
+      ],
+      "value": "not_found",
+      "notes": "No seccomp/prctl/sandbox syscall filtering policy object or enforcement point found",
+      "used_evidence_ids": [
+        "codex_ev_Q07_006_sec_neg_01"
+      ],
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q07_006_sec_neg_01",
+          "path": "<negative_search>",
+          "symbol_kind": "search",
+          "symbol_name": "sec_neg",
+          "excerpt": "No seccomp/prctl/sandbox syscall filtering policy object or enforcement point found; searched_keywords=uid, gid, cred, permission, access control, ACL, capability, mode, EACCES, EPERM, seccomp, sandbox, audit, secure boot, signature, PMP, SMEP, SMAP, KPTI, W^X, canary, guard; searched_directories=kernel, include, xv6-user, Makefile, linker, doc; file_count=123; match_count=509; coverage_sufficient=true",
+          "line_start": null,
+          "line_end": null,
+          "evidence_type": "negative_search",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "negative_search"
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_007",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在栈保护/溢出防护（stack canary/guard page）或等价机制？（必须三态）",
+      "fact_answers": [
+        {
+          "fact_id": "Q07_007_01",
+          "fact_key": "security_state",
+          "value": "stub_or_declaration_only",
+          "used_evidence_ids": [
+            "codex_ev_Q07_007_wx_01",
+            "codex_ev_Q07_007_canary_disabled_02",
+            "codex_ev_Q07_007_sec_neg_01"
+          ],
+          "notes": "security_state 只有字段、固定返回或弱接口，未闭合强制语义。"
+        },
+        {
+          "fact_id": "Q07_007_02",
+          "fact_key": "enforcement_callsite",
+          "value": "stub_or_declaration_only",
+          "used_evidence_ids": [
+            "codex_ev_Q07_007_wx_01",
+            "codex_ev_Q07_007_canary_disabled_02",
+            "codex_ev_Q07_007_sec_neg_01"
+          ],
+          "notes": "enforcement_callsite 只有字段、固定返回或弱接口，未闭合强制语义。"
+        },
+        {
+          "fact_id": "Q07_007_03",
+          "fact_key": "deny_or_fault_path",
+          "value": "stub_or_declaration_only",
+          "used_evidence_ids": [
+            "codex_ev_Q07_007_wx_01",
+            "codex_ev_Q07_007_canary_disabled_02",
+            "codex_ev_Q07_007_sec_neg_01"
+          ],
+          "notes": "deny_or_fault_path 只有字段、固定返回或弱接口，未闭合强制语义。"
+        },
+        {
+          "fact_id": "Q07_007_04",
+          "fact_key": "policy_scope",
+          "value": "stub_or_declaration_only",
+          "used_evidence_ids": [
+            "codex_ev_Q07_007_wx_01",
+            "codex_ev_Q07_007_canary_disabled_02",
+            "codex_ev_Q07_007_sec_neg_01"
+          ],
+          "notes": "policy_scope 只有字段、固定返回或弱接口，未闭合强制语义。"
+        },
+        {
+          "fact_id": "Q07_007_05",
+          "fact_key": "stub_detection",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q07_007_wx_01",
+            "codex_ev_Q07_007_canary_disabled_02",
+            "codex_ev_Q07_007_sec_neg_01"
+          ],
+          "notes": "stub_detection 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q07_007_06",
+          "fact_key": "negative_search_coverage",
+          "value": {
+            "searched_keywords": [
+              "uid",
+              "gid",
+              "cred",
+              "permission",
+              "access control",
+              "ACL",
+              "capability",
+              "mode",
+              "EACCES",
+              "EPERM",
+              "seccomp",
+              "sandbox",
+              "audit",
+              "secure boot",
+              "signature",
+              "PMP",
+              "SMEP",
+              "SMAP",
+              "KPTI",
+              "W^X",
+              "canary",
+              "guard"
+            ],
+            "searched_directories": [
+              "kernel",
+              "include",
+              "xv6-user",
+              "Makefile",
+              "linker",
+              "doc"
+            ],
+            "file_count": 123,
+            "match_count": 509,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [
+            "codex_ev_Q07_007_sec_neg_01"
+          ],
+          "notes": "negative_search_coverage 见本题证据。"
+        }
+      ],
+      "value": "stub",
+      "notes": "栈 canary 明确禁用；guard page 只有注释/未启用 helper，不能判完整实现。",
+      "used_evidence_ids": [
+        "codex_ev_Q07_007_wx_01",
+        "codex_ev_Q07_007_canary_disabled_02",
+        "codex_ev_Q07_007_sec_neg_01"
+      ],
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q07_007_wx_01",
+          "path": "repos/xv6-k210/kernel/mm/vm.c",
+          "symbol_kind": "function",
+          "symbol_name": "kvminit/uvmprotect",
+          "excerpt": "kvminit maps kernel text with PTE_R|PTE_X and later maps data with PTE_R|PTE_W; uvmprotect rewrites PTE_X/PTE_W/PTE_R bits for user mappings.",
+          "line_start": 106,
+          "line_end": 651,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q07_007_canary_disabled_02",
+          "path": "repos/xv6-k210/Makefile",
+          "symbol_kind": "build_flag",
+          "symbol_name": "CFLAGS",
+          "excerpt": "CFLAGS adds -fno-stack-protector when supported, so compiler stack canaries are explicitly disabled.",
+          "line_start": 24,
+          "line_end": 30,
+          "evidence_type": "configuration",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "negative_search",
+            "stub"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q07_007_sec_neg_01",
+          "path": "<negative_search>",
+          "symbol_kind": "search",
+          "symbol_name": "sec_neg",
+          "excerpt": "No active stack canary implementation; uvmclear guard-page helper is commented out, and Makefile disables stack protector; searched_keywords=uid, gid, cred, permission, access control, ACL, capability, mode, EACCES, EPERM, seccomp, sandbox, audit, secure boot, signature, PMP, SMEP, SMAP, KPTI, W^X, canary, guard; searched_directories=kernel, include, xv6-user, Makefile, linker, doc; file_count=123; match_count=509; coverage_sufficient=true",
+          "line_start": null,
+          "line_end": null,
+          "evidence_type": "negative_search",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "negative_search"
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_008",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在审计/安全启动（audit/secure boot/signature）相关逻辑？（必须三态）",
+      "fact_answers": [
+        {
+          "fact_id": "Q07_008_01",
+          "fact_key": "security_state",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q07_008_sec_neg_01"
+          ],
+          "notes": "security_state 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q07_008_02",
+          "fact_key": "enforcement_callsite",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q07_008_sec_neg_01"
+          ],
+          "notes": "enforcement_callsite 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q07_008_03",
+          "fact_key": "deny_or_fault_path",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q07_008_sec_neg_01"
+          ],
+          "notes": "deny_or_fault_path 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q07_008_04",
+          "fact_key": "policy_scope",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q07_008_sec_neg_01"
+          ],
+          "notes": "policy_scope 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q07_008_05",
+          "fact_key": "stub_detection",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q07_008_sec_neg_01"
+          ],
+          "notes": "stub_detection 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q07_008_06",
+          "fact_key": "negative_search_coverage",
+          "value": {
+            "searched_keywords": [
+              "uid",
+              "gid",
+              "cred",
+              "permission",
+              "access control",
+              "ACL",
+              "capability",
+              "mode",
+              "EACCES",
+              "EPERM",
+              "seccomp",
+              "sandbox",
+              "audit",
+              "secure boot",
+              "signature",
+              "PMP",
+              "SMEP",
+              "SMAP",
+              "KPTI",
+              "W^X",
+              "canary",
+              "guard"
+            ],
+            "searched_directories": [
+              "kernel",
+              "include",
+              "xv6-user",
+              "Makefile",
+              "linker",
+              "doc"
+            ],
+            "file_count": 123,
+            "match_count": 509,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [
+            "codex_ev_Q07_008_sec_neg_01"
+          ],
+          "notes": "negative_search_coverage 见本题证据。"
+        }
+      ],
+      "value": "not_found",
+      "notes": "No audit event subsystem, secure boot verification, or image/module signature checking found",
+      "used_evidence_ids": [
+        "codex_ev_Q07_008_sec_neg_01"
+      ],
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q07_008_sec_neg_01",
+          "path": "<negative_search>",
+          "symbol_kind": "search",
+          "symbol_name": "sec_neg",
+          "excerpt": "No audit event subsystem, secure boot verification, or image/module signature checking found; searched_keywords=uid, gid, cred, permission, access control, ACL, capability, mode, EACCES, EPERM, seccomp, sandbox, audit, secure boot, signature, PMP, SMEP, SMAP, KPTI, W^X, canary, guard; searched_directories=kernel, include, xv6-user, Makefile, linker, doc; file_count=123; match_count=509; coverage_sufficient=true",
+          "line_start": null,
+          "line_end": null,
+          "evidence_type": "negative_search",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "negative_search"
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_009",
+      "question_type": "short_answer",
+      "stem": "本项目支持哪些架构（riscv64/aarch64/x86_64/loongarch64 等）？每种架构的安全相关初始化（特权级配置、PMP/MPU/SMEP 等）是否有代码证据？（必须逐架构作答，无证据写「未发现」）",
+      "fact_answers": [
+        {
+          "fact_id": "Q07_009_ARCH_01",
+          "fact_key": "riscv64",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q07_009_privilege_01",
+            "codex_ev_Q07_009_usercopy_02",
+            "codex_ev_Q07_009_uid_stub_03",
+            "codex_ev_Q07_009_access_weak_04",
+            "codex_ev_Q07_009_sec_neg_01"
+          ],
+          "notes": "riscv64 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q07_009_ARCH_02",
+          "fact_key": "aarch64",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q07_009_privilege_01",
+            "codex_ev_Q07_009_usercopy_02",
+            "codex_ev_Q07_009_uid_stub_03",
+            "codex_ev_Q07_009_access_weak_04",
+            "codex_ev_Q07_009_sec_neg_01"
+          ],
+          "notes": "aarch64 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q07_009_ARCH_03",
+          "fact_key": "x86_64",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q07_009_privilege_01",
+            "codex_ev_Q07_009_usercopy_02",
+            "codex_ev_Q07_009_uid_stub_03",
+            "codex_ev_Q07_009_access_weak_04",
+            "codex_ev_Q07_009_sec_neg_01"
+          ],
+          "notes": "x86_64 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q07_009_ARCH_04",
+          "fact_key": "loongarch64",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q07_009_privilege_01",
+            "codex_ev_Q07_009_usercopy_02",
+            "codex_ev_Q07_009_uid_stub_03",
+            "codex_ev_Q07_009_access_weak_04",
+            "codex_ev_Q07_009_sec_neg_01"
+          ],
+          "notes": "loongarch64 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q07_009_NEG",
+          "fact_key": "negative_search_coverage",
+          "value": {
+            "searched_keywords": [
+              "uid",
+              "gid",
+              "cred",
+              "permission",
+              "access control",
+              "ACL",
+              "capability",
+              "mode",
+              "EACCES",
+              "EPERM",
+              "seccomp",
+              "sandbox",
+              "audit",
+              "secure boot",
+              "signature",
+              "PMP",
+              "SMEP",
+              "SMAP",
+              "KPTI",
+              "W^X",
+              "canary",
+              "guard"
+            ],
+            "searched_directories": [
+              "kernel",
+              "include",
+              "xv6-user",
+              "Makefile",
+              "linker",
+              "doc"
+            ],
+            "file_count": 123,
+            "match_count": 509,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [
+            "codex_ev_Q07_009_sec_neg_01"
+          ],
+          "notes": "negative_search_coverage 见本题证据。"
+        }
+      ],
+      "value": {
+        "riscv64": "implemented：RISC-V S-mode/U-mode trap path、SSTATUS_SPP、PTE_U/SUM 用户内存保护有代码证据。",
+        "aarch64": "未发现。",
+        "x86_64": "未发现。",
+        "loongarch64": "未发现。",
+        "negative_search_coverage": {
+          "searched_keywords": [
+            "uid",
+            "gid",
+            "cred",
+            "permission",
+            "access control",
+            "ACL",
+            "capability",
+            "mode",
+            "EACCES",
+            "EPERM",
+            "seccomp",
+            "sandbox",
+            "audit",
+            "secure boot",
+            "signature",
+            "PMP",
+            "SMEP",
+            "SMAP",
+            "KPTI",
+            "W^X",
+            "canary",
+            "guard"
+          ],
+          "searched_directories": [
+            "kernel",
+            "include",
+            "xv6-user",
+            "Makefile",
+            "linker",
+            "doc"
+          ],
+          "file_count": 123,
+          "match_count": 509,
+          "coverage_sufficient": true
+        }
+      },
+      "notes": "项目内核安全相关架构证据只覆盖 riscv64。",
+      "used_evidence_ids": [
+        "codex_ev_Q07_009_privilege_01",
+        "codex_ev_Q07_009_usercopy_02",
+        "codex_ev_Q07_009_uid_stub_03",
+        "codex_ev_Q07_009_access_weak_04",
+        "codex_ev_Q07_009_sec_neg_01"
+      ],
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q07_009_privilege_01",
+          "path": "repos/xv6-k210/kernel/trap/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "usertrap/usertrapret/kerneltrap",
+          "excerpt": "usertrap asserts SSTATUS_SPP is 0 (from user), usertrapret clears SSTATUS_SPP for user mode and switches through trampoline with the process pagetable; kerneltrap asserts SSTATUS_SPP is set.",
+          "line_start": 77,
+          "line_end": 209,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q07_009_usercopy_02",
+          "path": "repos/xv6-k210/kernel/mm/vm.c",
+          "symbol_kind": "function",
+          "symbol_name": "walkaddr/copyin2/copyout2",
+          "excerpt": "walkaddr rejects va>=MAXUVA and PTEs lacking PTE_V or PTE_U; copyout2/copyin2 first verify the address range belongs to a user segment, then safememmove with SUM/PUM toggling.",
+          "line_start": 236,
+          "line_end": 848,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q07_009_uid_stub_03",
+          "path": "repos/xv6-k210/kernel/syscall/sysproc.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_getuid",
+          "excerpt": "sys_getuid returns constant 0; syscall table maps getuid/geteuid/getgid/getegid to this same function.",
+          "line_start": 267,
+          "line_end": 270,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "stub",
+            "implementation_body"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q07_009_access_weak_04",
+          "path": "repos/xv6-k210/kernel/syscall/sysfile.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_faccessat/sys_openat",
+          "excerpt": "sys_faccessat says assume user as root and checks owner mode bits; sys_openat enforces file type constraints such as directory write/O_DIRECTORY, but does not check current uid/gid credentials.",
+          "line_start": 198,
+          "line_end": 822,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q07_009_sec_neg_01",
+          "path": "<negative_search>",
+          "symbol_kind": "search",
+          "symbol_name": "sec_neg",
+          "excerpt": "Search found RISC-V specific code and no aarch64/x86_64/loongarch64 architecture implementation; searched_keywords=uid, gid, cred, permission, access control, ACL, capability, mode, EACCES, EPERM, seccomp, sandbox, audit, secure boot, signature, PMP, SMEP, SMAP, KPTI, W^X, canary, guard; searched_directories=kernel, include, xv6-user, Makefile, linker, doc; file_count=123; match_count=509; coverage_sufficient=true",
+          "line_start": null,
+          "line_end": null,
+          "evidence_type": "negative_search",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "negative_search"
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_010",
+      "question_type": "tri_state_impl",
+      "stem": "若项目使用 Rust，是否存在 RAII/所有权/生命周期相关的内核安全机制（如不可 unsafe 直接访问用户内存、锁的 RAII 自动释放等）？（必须三态；给具体模式证据）",
+      "fact_answers": [
+        {
+          "fact_id": "Q07_010_01",
+          "fact_key": "security_state",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q07_010_sec_neg_01"
+          ],
+          "notes": "security_state 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q07_010_02",
+          "fact_key": "enforcement_callsite",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q07_010_sec_neg_01"
+          ],
+          "notes": "enforcement_callsite 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q07_010_03",
+          "fact_key": "deny_or_fault_path",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q07_010_sec_neg_01"
+          ],
+          "notes": "deny_or_fault_path 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q07_010_04",
+          "fact_key": "policy_scope",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q07_010_sec_neg_01"
+          ],
+          "notes": "policy_scope 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q07_010_05",
+          "fact_key": "stub_detection",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q07_010_sec_neg_01"
+          ],
+          "notes": "stub_detection 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q07_010_06",
+          "fact_key": "negative_search_coverage",
+          "value": {
+            "searched_keywords": [
+              "uid",
+              "gid",
+              "cred",
+              "permission",
+              "access control",
+              "ACL",
+              "capability",
+              "mode",
+              "EACCES",
+              "EPERM",
+              "seccomp",
+              "sandbox",
+              "audit",
+              "secure boot",
+              "signature",
+              "PMP",
+              "SMEP",
+              "SMAP",
+              "KPTI",
+              "W^X",
+              "canary",
+              "guard"
+            ],
+            "searched_directories": [
+              "kernel",
+              "include",
+              "xv6-user",
+              "Makefile",
+              "linker",
+              "doc"
+            ],
+            "file_count": 123,
+            "match_count": 509,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [
+            "codex_ev_Q07_010_sec_neg_01"
+          ],
+          "notes": "negative_search_coverage 见本题证据。"
+        }
+      ],
+      "value": "not_found",
+      "notes": "Kernel is C; Rust appears in SBI bootloader only, and no kernel RAII/ownership/lifetime safety mechanism found",
+      "used_evidence_ids": [
+        "codex_ev_Q07_010_sec_neg_01"
+      ],
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q07_010_sec_neg_01",
+          "path": "<negative_search>",
+          "symbol_kind": "search",
+          "symbol_name": "sec_neg",
+          "excerpt": "Kernel is C; Rust appears in SBI bootloader only, and no kernel RAII/ownership/lifetime safety mechanism found; searched_keywords=uid, gid, cred, permission, access control, ACL, capability, mode, EACCES, EPERM, seccomp, sandbox, audit, secure boot, signature, PMP, SMEP, SMAP, KPTI, W^X, canary, guard; searched_directories=kernel, include, xv6-user, Makefile, linker, doc; file_count=123; match_count=509; coverage_sufficient=true",
+          "line_start": null,
+          "line_end": null,
+          "evidence_type": "negative_search",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "negative_search"
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_011",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现了内核/用户页表隔离 (Kernel/User Page Table Isolation, KPTI 或等价机制)？\n（x86: CR3 KPTI / SMEP / SMAP；RISC-V: PMP / S-mode 分离；AArch64: TTBR0/TTBR1 隔离；\n必须三态；无则写未发现并列出已搜关键字）",
+      "fact_answers": [
+        {
+          "fact_id": "Q07_011_01",
+          "fact_key": "security_state",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q07_011_privilege_01",
+            "codex_ev_Q07_011_usercopy_02",
+            "codex_ev_Q07_011_uid_stub_03",
+            "codex_ev_Q07_011_access_weak_04",
+            "codex_ev_Q07_011_wx_01",
+            "codex_ev_Q07_011_canary_disabled_02"
+          ],
+          "notes": "security_state 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q07_011_02",
+          "fact_key": "enforcement_callsite",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q07_011_privilege_01",
+            "codex_ev_Q07_011_usercopy_02",
+            "codex_ev_Q07_011_uid_stub_03",
+            "codex_ev_Q07_011_access_weak_04",
+            "codex_ev_Q07_011_wx_01",
+            "codex_ev_Q07_011_canary_disabled_02"
+          ],
+          "notes": "enforcement_callsite 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q07_011_03",
+          "fact_key": "deny_or_fault_path",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q07_011_privilege_01",
+            "codex_ev_Q07_011_usercopy_02",
+            "codex_ev_Q07_011_uid_stub_03",
+            "codex_ev_Q07_011_access_weak_04",
+            "codex_ev_Q07_011_wx_01",
+            "codex_ev_Q07_011_canary_disabled_02"
+          ],
+          "notes": "deny_or_fault_path 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q07_011_04",
+          "fact_key": "policy_scope",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q07_011_privilege_01",
+            "codex_ev_Q07_011_usercopy_02",
+            "codex_ev_Q07_011_uid_stub_03",
+            "codex_ev_Q07_011_access_weak_04",
+            "codex_ev_Q07_011_wx_01",
+            "codex_ev_Q07_011_canary_disabled_02"
+          ],
+          "notes": "policy_scope 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q07_011_05",
+          "fact_key": "stub_detection",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q07_011_privilege_01",
+            "codex_ev_Q07_011_usercopy_02",
+            "codex_ev_Q07_011_uid_stub_03",
+            "codex_ev_Q07_011_access_weak_04",
+            "codex_ev_Q07_011_wx_01",
+            "codex_ev_Q07_011_canary_disabled_02"
+          ],
+          "notes": "stub_detection 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q07_011_06",
+          "fact_key": "negative_search_coverage",
+          "value": {
+            "searched_keywords": [
+              "uid",
+              "gid",
+              "cred",
+              "permission",
+              "access control",
+              "ACL",
+              "capability",
+              "mode",
+              "EACCES",
+              "EPERM",
+              "seccomp",
+              "sandbox",
+              "audit",
+              "secure boot",
+              "signature",
+              "PMP",
+              "SMEP",
+              "SMAP",
+              "KPTI",
+              "W^X",
+              "canary",
+              "guard"
+            ],
+            "searched_directories": [
+              "kernel",
+              "include",
+              "xv6-user",
+              "Makefile",
+              "linker",
+              "doc"
+            ],
+            "file_count": 123,
+            "match_count": 509,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [],
+          "notes": "negative_search_coverage 见本题证据。"
+        }
+      ],
+      "value": "implemented",
+      "notes": "没有 x86 KPTI/SMEP/SMAP 名称，但 RISC-V 路径有用户/内核特权级、用户页表切换、PTE_U 与 SUM/PUM 用户内存保护。",
+      "used_evidence_ids": [
+        "codex_ev_Q07_011_privilege_01",
+        "codex_ev_Q07_011_usercopy_02",
+        "codex_ev_Q07_011_uid_stub_03",
+        "codex_ev_Q07_011_access_weak_04",
+        "codex_ev_Q07_011_wx_01",
+        "codex_ev_Q07_011_canary_disabled_02"
+      ],
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q07_011_privilege_01",
+          "path": "repos/xv6-k210/kernel/trap/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "usertrap/usertrapret/kerneltrap",
+          "excerpt": "usertrap asserts SSTATUS_SPP is 0 (from user), usertrapret clears SSTATUS_SPP for user mode and switches through trampoline with the process pagetable; kerneltrap asserts SSTATUS_SPP is set.",
+          "line_start": 77,
+          "line_end": 209,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q07_011_usercopy_02",
+          "path": "repos/xv6-k210/kernel/mm/vm.c",
+          "symbol_kind": "function",
+          "symbol_name": "walkaddr/copyin2/copyout2",
+          "excerpt": "walkaddr rejects va>=MAXUVA and PTEs lacking PTE_V or PTE_U; copyout2/copyin2 first verify the address range belongs to a user segment, then safememmove with SUM/PUM toggling.",
+          "line_start": 236,
+          "line_end": 848,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q07_011_uid_stub_03",
+          "path": "repos/xv6-k210/kernel/syscall/sysproc.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_getuid",
+          "excerpt": "sys_getuid returns constant 0; syscall table maps getuid/geteuid/getgid/getegid to this same function.",
+          "line_start": 267,
+          "line_end": 270,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "stub",
+            "implementation_body"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q07_011_access_weak_04",
+          "path": "repos/xv6-k210/kernel/syscall/sysfile.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_faccessat/sys_openat",
+          "excerpt": "sys_faccessat says assume user as root and checks owner mode bits; sys_openat enforces file type constraints such as directory write/O_DIRECTORY, but does not check current uid/gid credentials.",
+          "line_start": 198,
+          "line_end": 822,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q07_011_wx_01",
+          "path": "repos/xv6-k210/kernel/mm/vm.c",
+          "symbol_kind": "function",
+          "symbol_name": "kvminit/uvmprotect",
+          "excerpt": "kvminit maps kernel text with PTE_R|PTE_X and later maps data with PTE_R|PTE_W; uvmprotect rewrites PTE_X/PTE_W/PTE_R bits for user mappings.",
+          "line_start": 106,
+          "line_end": 651,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q07_011_canary_disabled_02",
+          "path": "repos/xv6-k210/Makefile",
+          "symbol_kind": "build_flag",
+          "symbol_name": "CFLAGS",
+          "excerpt": "CFLAGS adds -fno-stack-protector when supported, so compiler stack canaries are explicitly disabled.",
+          "line_start": 24,
+          "line_end": 30,
+          "evidence_type": "configuration",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "negative_search",
+            "stub"
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_012",
+      "question_type": "short_answer",
+      "stem": "UID/GID 字段是否在 syscall 路径上真实执行权限检查？（搜索 check_perm/inode_permission；若只有字段无检查链须标注「仅有定义但未强制执行 🔸」；给检查链证据或写「字段存在但无检查链」）",
+      "fact_answers": [
+        {
+          "fact_id": "Q07_012_01",
+          "fact_key": "security_state",
+          "value": "stub_or_declaration_only",
+          "used_evidence_ids": [
+            "codex_ev_Q07_012_privilege_01",
+            "codex_ev_Q07_012_usercopy_02",
+            "codex_ev_Q07_012_uid_stub_03",
+            "codex_ev_Q07_012_access_weak_04"
+          ],
+          "notes": "security_state 只有字段、固定返回或弱接口，未闭合强制语义。"
+        },
+        {
+          "fact_id": "Q07_012_02",
+          "fact_key": "enforcement_callsite",
+          "value": "stub_or_declaration_only",
+          "used_evidence_ids": [
+            "codex_ev_Q07_012_privilege_01",
+            "codex_ev_Q07_012_usercopy_02",
+            "codex_ev_Q07_012_uid_stub_03",
+            "codex_ev_Q07_012_access_weak_04"
+          ],
+          "notes": "enforcement_callsite 只有字段、固定返回或弱接口，未闭合强制语义。"
+        },
+        {
+          "fact_id": "Q07_012_03",
+          "fact_key": "deny_or_fault_path",
+          "value": "stub_or_declaration_only",
+          "used_evidence_ids": [
+            "codex_ev_Q07_012_privilege_01",
+            "codex_ev_Q07_012_usercopy_02",
+            "codex_ev_Q07_012_uid_stub_03",
+            "codex_ev_Q07_012_access_weak_04"
+          ],
+          "notes": "deny_or_fault_path 只有字段、固定返回或弱接口，未闭合强制语义。"
+        },
+        {
+          "fact_id": "Q07_012_04",
+          "fact_key": "policy_scope",
+          "value": "stub_or_declaration_only",
+          "used_evidence_ids": [
+            "codex_ev_Q07_012_privilege_01",
+            "codex_ev_Q07_012_usercopy_02",
+            "codex_ev_Q07_012_uid_stub_03",
+            "codex_ev_Q07_012_access_weak_04"
+          ],
+          "notes": "policy_scope 只有字段、固定返回或弱接口，未闭合强制语义。"
+        },
+        {
+          "fact_id": "Q07_012_05",
+          "fact_key": "stub_detection",
+          "value": "stub_or_declaration_only",
+          "used_evidence_ids": [
+            "codex_ev_Q07_012_privilege_01",
+            "codex_ev_Q07_012_usercopy_02",
+            "codex_ev_Q07_012_uid_stub_03",
+            "codex_ev_Q07_012_access_weak_04"
+          ],
+          "notes": "stub_detection 只有字段、固定返回或弱接口，未闭合强制语义。"
+        },
+        {
+          "fact_id": "Q07_012_06",
+          "fact_key": "negative_search_coverage",
+          "value": {
+            "searched_keywords": [
+              "uid",
+              "gid",
+              "cred",
+              "permission",
+              "access control",
+              "ACL",
+              "capability",
+              "mode",
+              "EACCES",
+              "EPERM",
+              "seccomp",
+              "sandbox",
+              "audit",
+              "secure boot",
+              "signature",
+              "PMP",
+              "SMEP",
+              "SMAP",
+              "KPTI",
+              "W^X",
+              "canary",
+              "guard"
+            ],
+            "searched_directories": [
+              "kernel",
+              "include",
+              "xv6-user",
+              "Makefile",
+              "linker",
+              "doc"
+            ],
+            "file_count": 123,
+            "match_count": 509,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [],
+          "notes": "negative_search_coverage 见本题证据。"
+        }
+      ],
+      "value": {
+        "security_state": "字段存在但无检查链：kstat 有 uid/gid，sys_getuid 固定返回 0。",
+        "enforcement_callsite": "未发现 check_perm/inode_permission 或 open/write/exec 使用当前 uid/gid 的链路。",
+        "deny_or_fault_path": "faccessat 只按 owner 位弱检查，且注释 assume user as root。",
+        "policy_scope": "不是 DAC/MAC/RBAC 的系统性执行。",
+        "stub_detection": "仅有定义但未强制执行。",
+        "negative_search_coverage": {
+          "searched_keywords": [
+            "uid",
+            "gid",
+            "cred",
+            "permission",
+            "access control",
+            "ACL",
+            "capability",
+            "mode",
+            "EACCES",
+            "EPERM",
+            "seccomp",
+            "sandbox",
+            "audit",
+            "secure boot",
+            "signature",
+            "PMP",
+            "SMEP",
+            "SMAP",
+            "KPTI",
+            "W^X",
+            "canary",
+            "guard"
+          ],
+          "searched_directories": [
+            "kernel",
+            "include",
+            "xv6-user",
+            "Makefile",
+            "linker",
+            "doc"
+          ],
+          "file_count": 123,
+          "match_count": 509,
+          "coverage_sufficient": true
+        }
+      },
+      "notes": "UID/GID 字段没有进入真实权限强制路径。",
+      "used_evidence_ids": [
+        "codex_ev_Q07_012_privilege_01",
+        "codex_ev_Q07_012_usercopy_02",
+        "codex_ev_Q07_012_uid_stub_03",
+        "codex_ev_Q07_012_access_weak_04"
+      ],
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q07_012_privilege_01",
+          "path": "repos/xv6-k210/kernel/trap/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "usertrap/usertrapret/kerneltrap",
+          "excerpt": "usertrap asserts SSTATUS_SPP is 0 (from user), usertrapret clears SSTATUS_SPP for user mode and switches through trampoline with the process pagetable; kerneltrap asserts SSTATUS_SPP is set.",
+          "line_start": 77,
+          "line_end": 209,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q07_012_usercopy_02",
+          "path": "repos/xv6-k210/kernel/mm/vm.c",
+          "symbol_kind": "function",
+          "symbol_name": "walkaddr/copyin2/copyout2",
+          "excerpt": "walkaddr rejects va>=MAXUVA and PTEs lacking PTE_V or PTE_U; copyout2/copyin2 first verify the address range belongs to a user segment, then safememmove with SUM/PUM toggling.",
+          "line_start": 236,
+          "line_end": 848,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q07_012_uid_stub_03",
+          "path": "repos/xv6-k210/kernel/syscall/sysproc.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_getuid",
+          "excerpt": "sys_getuid returns constant 0; syscall table maps getuid/geteuid/getgid/getegid to this same function.",
+          "line_start": 267,
+          "line_end": 270,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "stub",
+            "implementation_body"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q07_012_access_weak_04",
+          "path": "repos/xv6-k210/kernel/syscall/sysfile.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_faccessat/sys_openat",
+          "excerpt": "sys_faccessat says assume user as root and checks owner mode bits; sys_openat enforces file type constraints such as directory write/O_DIRECTORY, but does not check current uid/gid credentials.",
+          "line_start": 198,
+          "line_end": 822,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_013",
+      "question_type": "single_choice",
+      "stem": "访问控制模型 (Access Control Model, Stallings Ch15) 更接近哪种？",
+      "fact_answers": [
+        {
+          "fact_id": "Q07_013_01",
+          "fact_key": "subject_identity_model",
+          "value": "stub_or_declaration_only",
+          "used_evidence_ids": [
+            "codex_ev_Q07_013_privilege_01",
+            "codex_ev_Q07_013_usercopy_02",
+            "codex_ev_Q07_013_uid_stub_03",
+            "codex_ev_Q07_013_access_weak_04"
+          ],
+          "notes": "subject_identity_model 只有字段、固定返回或弱接口，未闭合强制语义。"
+        },
+        {
+          "fact_id": "Q07_013_02",
+          "fact_key": "object_permission_model",
+          "value": "yes_weak",
+          "used_evidence_ids": [
+            "codex_ev_Q07_013_privilege_01",
+            "codex_ev_Q07_013_usercopy_02",
+            "codex_ev_Q07_013_uid_stub_03",
+            "codex_ev_Q07_013_access_weak_04"
+          ],
+          "notes": "object_permission_model 仅有弱线索，不能单独支撑 implemented。"
+        },
+        {
+          "fact_id": "Q07_013_03",
+          "fact_key": "enforcement_path",
+          "value": "stub_or_declaration_only",
+          "used_evidence_ids": [
+            "codex_ev_Q07_013_privilege_01",
+            "codex_ev_Q07_013_usercopy_02",
+            "codex_ev_Q07_013_uid_stub_03",
+            "codex_ev_Q07_013_access_weak_04"
+          ],
+          "notes": "enforcement_path 只有字段、固定返回或弱接口，未闭合强制语义。"
+        },
+        {
+          "fact_id": "Q07_013_04",
+          "fact_key": "model_classification",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q07_013_privilege_01",
+            "codex_ev_Q07_013_usercopy_02",
+            "codex_ev_Q07_013_uid_stub_03",
+            "codex_ev_Q07_013_access_weak_04"
+          ],
+          "notes": "model_classification 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q07_013_05",
+          "fact_key": "negative_search_coverage",
+          "value": {
+            "searched_keywords": [
+              "uid",
+              "gid",
+              "cred",
+              "permission",
+              "access control",
+              "ACL",
+              "capability",
+              "mode",
+              "EACCES",
+              "EPERM",
+              "seccomp",
+              "sandbox",
+              "audit",
+              "secure boot",
+              "signature",
+              "PMP",
+              "SMEP",
+              "SMAP",
+              "KPTI",
+              "W^X",
+              "canary",
+              "guard"
+            ],
+            "searched_directories": [
+              "kernel",
+              "include",
+              "xv6-user",
+              "Makefile",
+              "linker",
+              "doc"
+            ],
+            "file_count": 123,
+            "match_count": 509,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [],
+          "notes": "negative_search_coverage 见本题证据。"
+        }
+      ],
+      "value": "仅有特权级隔离（ring0/ring3），无细粒度访问控制",
+      "notes": "有 U/S 特权级隔离；细粒度访问控制只有弱/桩式 owner mode 检查。",
+      "used_evidence_ids": [
+        "codex_ev_Q07_013_privilege_01",
+        "codex_ev_Q07_013_usercopy_02",
+        "codex_ev_Q07_013_uid_stub_03",
+        "codex_ev_Q07_013_access_weak_04"
+      ],
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q07_013_privilege_01",
+          "path": "repos/xv6-k210/kernel/trap/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "usertrap/usertrapret/kerneltrap",
+          "excerpt": "usertrap asserts SSTATUS_SPP is 0 (from user), usertrapret clears SSTATUS_SPP for user mode and switches through trampoline with the process pagetable; kerneltrap asserts SSTATUS_SPP is set.",
+          "line_start": 77,
+          "line_end": 209,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q07_013_usercopy_02",
+          "path": "repos/xv6-k210/kernel/mm/vm.c",
+          "symbol_kind": "function",
+          "symbol_name": "walkaddr/copyin2/copyout2",
+          "excerpt": "walkaddr rejects va>=MAXUVA and PTEs lacking PTE_V or PTE_U; copyout2/copyin2 first verify the address range belongs to a user segment, then safememmove with SUM/PUM toggling.",
+          "line_start": 236,
+          "line_end": 848,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q07_013_uid_stub_03",
+          "path": "repos/xv6-k210/kernel/syscall/sysproc.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_getuid",
+          "excerpt": "sys_getuid returns constant 0; syscall table maps getuid/geteuid/getgid/getegid to this same function.",
+          "line_start": 267,
+          "line_end": 270,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "stub",
+            "implementation_body"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q07_013_access_weak_04",
+          "path": "repos/xv6-k210/kernel/syscall/sysfile.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_faccessat/sys_openat",
+          "excerpt": "sys_faccessat says assume user as root and checks owner mode bits; sys_openat enforces file type constraints such as directory write/O_DIRECTORY, but does not check current uid/gid credentials.",
+          "line_start": 198,
+          "line_end": 822,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_014",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现完整性策略 (Integrity Policy, Stallings Ch15)？（如 Biba 模型、只读内核段、代码签名验证、W^X 内存保护等；必须三态）",
+      "fact_answers": [
+        {
+          "fact_id": "Q07_014_01",
+          "fact_key": "security_state",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q07_014_wx_01",
+            "codex_ev_Q07_014_canary_disabled_02",
+            "codex_ev_Q07_014_sec_neg_01"
+          ],
+          "notes": "security_state 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q07_014_02",
+          "fact_key": "enforcement_callsite",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q07_014_wx_01",
+            "codex_ev_Q07_014_canary_disabled_02",
+            "codex_ev_Q07_014_sec_neg_01"
+          ],
+          "notes": "enforcement_callsite 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q07_014_03",
+          "fact_key": "deny_or_fault_path",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q07_014_wx_01",
+            "codex_ev_Q07_014_canary_disabled_02",
+            "codex_ev_Q07_014_sec_neg_01"
+          ],
+          "notes": "deny_or_fault_path 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q07_014_04",
+          "fact_key": "policy_scope",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q07_014_wx_01",
+            "codex_ev_Q07_014_canary_disabled_02",
+            "codex_ev_Q07_014_sec_neg_01"
+          ],
+          "notes": "policy_scope 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q07_014_05",
+          "fact_key": "stub_detection",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q07_014_wx_01",
+            "codex_ev_Q07_014_canary_disabled_02",
+            "codex_ev_Q07_014_sec_neg_01"
+          ],
+          "notes": "stub_detection 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q07_014_06",
+          "fact_key": "negative_search_coverage",
+          "value": {
+            "searched_keywords": [
+              "uid",
+              "gid",
+              "cred",
+              "permission",
+              "access control",
+              "ACL",
+              "capability",
+              "mode",
+              "EACCES",
+              "EPERM",
+              "seccomp",
+              "sandbox",
+              "audit",
+              "secure boot",
+              "signature",
+              "PMP",
+              "SMEP",
+              "SMAP",
+              "KPTI",
+              "W^X",
+              "canary",
+              "guard"
+            ],
+            "searched_directories": [
+              "kernel",
+              "include",
+              "xv6-user",
+              "Makefile",
+              "linker",
+              "doc"
+            ],
+            "file_count": 123,
+            "match_count": 509,
+            "coverage_sufficient": true
+          },
+          "used_evidence_ids": [
+            "codex_ev_Q07_014_sec_neg_01"
+          ],
+          "notes": "negative_search_coverage 见本题证据。"
+        }
+      ],
+      "value": "implemented",
+      "notes": "可证实的完整性措施限于内核文本 RX/数据 RW 和用户 mprotect 页权限；未发现 Biba/签名。",
+      "used_evidence_ids": [
+        "codex_ev_Q07_014_wx_01",
+        "codex_ev_Q07_014_canary_disabled_02",
+        "codex_ev_Q07_014_sec_neg_01"
+      ],
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q07_014_wx_01",
+          "path": "repos/xv6-k210/kernel/mm/vm.c",
+          "symbol_kind": "function",
+          "symbol_name": "kvminit/uvmprotect",
+          "excerpt": "kvminit maps kernel text with PTE_R|PTE_X and later maps data with PTE_R|PTE_W; uvmprotect rewrites PTE_X/PTE_W/PTE_R bits for user mappings.",
+          "line_start": 106,
+          "line_end": 651,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q07_014_canary_disabled_02",
+          "path": "repos/xv6-k210/Makefile",
+          "symbol_kind": "build_flag",
+          "symbol_name": "CFLAGS",
+          "excerpt": "CFLAGS adds -fno-stack-protector when supported, so compiler stack canaries are explicitly disabled.",
+          "line_start": 24,
+          "line_end": 30,
+          "evidence_type": "configuration",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "negative_search",
+            "stub"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q07_014_sec_neg_01",
+          "path": "<negative_search>",
+          "symbol_kind": "search",
+          "symbol_name": "sec_neg",
+          "excerpt": "No Biba/signature policy found; integrity evidence is limited to page permission/W^X style mapping; searched_keywords=uid, gid, cred, permission, access control, ACL, capability, mode, EACCES, EPERM, seccomp, sandbox, audit, secure boot, signature, PMP, SMEP, SMAP, KPTI, W^X, canary, guard; searched_directories=kernel, include, xv6-user, Makefile, linker, doc; file_count=123; match_count=509; coverage_sufficient=true",
+          "line_start": null,
+          "line_end": null,
+          "evidence_type": "negative_search",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "negative_search"
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_015",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现缓冲区溢出防护 (Buffer Overflow Defenses, Stallings Ch15)？（必须三态；区分 stack canary / guard page / NX-W^X / ASLR / bounds check）",
+      "fact_answers": [
+        {
+          "fact_id": "Q07_015_01",
+          "fact_key": "stack_canary",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q07_015_wx_01",
+            "codex_ev_Q07_015_canary_disabled_02",
+            "codex_ev_Q07_015_privilege_01",
+            "codex_ev_Q07_015_usercopy_02",
+            "codex_ev_Q07_015_uid_stub_03",
+            "codex_ev_Q07_015_access_weak_04"
+          ],
+          "notes": "stack_canary 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q07_015_02",
+          "fact_key": "guard_page",
+          "value": "stub_or_declaration_only",
+          "used_evidence_ids": [
+            "codex_ev_Q07_015_wx_01",
+            "codex_ev_Q07_015_canary_disabled_02",
+            "codex_ev_Q07_015_privilege_01",
+            "codex_ev_Q07_015_usercopy_02",
+            "codex_ev_Q07_015_uid_stub_03",
+            "codex_ev_Q07_015_access_weak_04"
+          ],
+          "notes": "guard_page 只有字段、固定返回或弱接口，未闭合强制语义。"
+        },
+        {
+          "fact_id": "Q07_015_03",
+          "fact_key": "nx_wx_policy",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q07_015_wx_01",
+            "codex_ev_Q07_015_canary_disabled_02",
+            "codex_ev_Q07_015_privilege_01",
+            "codex_ev_Q07_015_usercopy_02",
+            "codex_ev_Q07_015_uid_stub_03",
+            "codex_ev_Q07_015_access_weak_04"
+          ],
+          "notes": "nx_wx_policy 有源码定义/实现/调用证据。"
+        },
+        {
+          "fact_id": "Q07_015_04",
+          "fact_key": "aslr_randomization",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q07_015_wx_01",
+            "codex_ev_Q07_015_canary_disabled_02",
+            "codex_ev_Q07_015_privilege_01",
+            "codex_ev_Q07_015_usercopy_02",
+            "codex_ev_Q07_015_uid_stub_03",
+            "codex_ev_Q07_015_access_weak_04"
+          ],
+          "notes": "aslr_randomization 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q07_015_05",
+          "fact_key": "bounds_or_safe_copy",
+          "value": "yes_strong",
+          "used_evidence_ids": [
+            "codex_ev_Q07_015_wx_01",
+            "codex_ev_Q07_015_canary_disabled_02",
+            "codex_ev_Q07_015_privilege_01",
+            "codex_ev_Q07_015_usercopy_02",
+            "codex_ev_Q07_015_uid_stub_03",
+            "codex_ev_Q07_015_access_weak_04"
+          ],
+          "notes": "bounds_or_safe_copy 有源码定义/实现/调用证据。"
+        }
+      ],
+      "value": "implemented",
+      "notes": "没有 stack canary/ASLR，guard page 证据不足；但有 PTE_X/PTE_W/PTE_R 权限控制和 copyin/copyout 边界检查，可作为部分缓冲区/内存访问防护。",
+      "used_evidence_ids": [
+        "codex_ev_Q07_015_wx_01",
+        "codex_ev_Q07_015_canary_disabled_02",
+        "codex_ev_Q07_015_privilege_01",
+        "codex_ev_Q07_015_usercopy_02",
+        "codex_ev_Q07_015_uid_stub_03",
+        "codex_ev_Q07_015_access_weak_04"
+      ],
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q07_015_wx_01",
+          "path": "repos/xv6-k210/kernel/mm/vm.c",
+          "symbol_kind": "function",
+          "symbol_name": "kvminit/uvmprotect",
+          "excerpt": "kvminit maps kernel text with PTE_R|PTE_X and later maps data with PTE_R|PTE_W; uvmprotect rewrites PTE_X/PTE_W/PTE_R bits for user mappings.",
+          "line_start": 106,
+          "line_end": 651,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q07_015_canary_disabled_02",
+          "path": "repos/xv6-k210/Makefile",
+          "symbol_kind": "build_flag",
+          "symbol_name": "CFLAGS",
+          "excerpt": "CFLAGS adds -fno-stack-protector when supported, so compiler stack canaries are explicitly disabled.",
+          "line_start": 24,
+          "line_end": 30,
+          "evidence_type": "configuration",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "negative_search",
+            "stub"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q07_015_privilege_01",
+          "path": "repos/xv6-k210/kernel/trap/trap.c",
+          "symbol_kind": "function",
+          "symbol_name": "usertrap/usertrapret/kerneltrap",
+          "excerpt": "usertrap asserts SSTATUS_SPP is 0 (from user), usertrapret clears SSTATUS_SPP for user mode and switches through trampoline with the process pagetable; kerneltrap asserts SSTATUS_SPP is set.",
+          "line_start": 77,
+          "line_end": 209,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q07_015_usercopy_02",
+          "path": "repos/xv6-k210/kernel/mm/vm.c",
+          "symbol_kind": "function",
+          "symbol_name": "walkaddr/copyin2/copyout2",
+          "excerpt": "walkaddr rejects va>=MAXUVA and PTEs lacking PTE_V or PTE_U; copyout2/copyin2 first verify the address range belongs to a user segment, then safememmove with SUM/PUM toggling.",
+          "line_start": 236,
+          "line_end": 848,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q07_015_uid_stub_03",
+          "path": "repos/xv6-k210/kernel/syscall/sysproc.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_getuid",
+          "excerpt": "sys_getuid returns constant 0; syscall table maps getuid/geteuid/getgid/getegid to this same function.",
+          "line_start": 267,
+          "line_end": 270,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "stub",
+            "implementation_body"
+          ]
+        },
+        {
+          "evidence_id": "codex_ev_Q07_015_access_weak_04",
+          "path": "repos/xv6-k210/kernel/syscall/sysfile.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_faccessat/sys_openat",
+          "excerpt": "sys_faccessat says assume user as root and checks owner mode bits; sys_openat enforces file type constraints such as directory write/O_DIRECTORY, but does not check current uid/gid credentials.",
+          "line_start": 198,
+          "line_end": 822,
+          "evidence_type": "implementation_body",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "definition",
+            "implementation_body",
+            "usage_flow"
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_016",
+      "question_type": "short_answer",
+      "stem": "系统硬化与安全维护 (OS Hardening / Security Maintenance, Stallings Ch15) 在代码或构建中有哪些可证实措施？按“服务裁剪、权限最小化、审计日志、备份/恢复、补丁/版本策略”逐项回答。",
+      "fact_answers": [
+        {
+          "fact_id": "Q07_016_01",
+          "fact_key": "service_minimization",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q07_016_sec_neg_01"
+          ],
+          "notes": "service_minimization 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q07_016_02",
+          "fact_key": "least_privilege_defaults",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q07_016_sec_neg_01"
+          ],
+          "notes": "least_privilege_defaults 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q07_016_03",
+          "fact_key": "security_audit_logging",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q07_016_sec_neg_01"
+          ],
+          "notes": "security_audit_logging 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q07_016_04",
+          "fact_key": "backup_or_recovery_policy",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q07_016_sec_neg_01"
+          ],
+          "notes": "backup_or_recovery_policy 经覆盖搜索未发现实现证据。"
+        },
+        {
+          "fact_id": "Q07_016_05",
+          "fact_key": "patch_or_signature_policy",
+          "value": "no_after_negative_search",
+          "used_evidence_ids": [
+            "codex_ev_Q07_016_sec_neg_01"
+          ],
+          "notes": "patch_or_signature_policy 经覆盖搜索未发现实现证据。"
+        }
+      ],
+      "value": {
+        "service_minimization": "未发现。",
+        "least_privilege_defaults": "未发现；getuid 固定 root/0，未见最小权限主体。",
+        "security_audit_logging": "未发现；普通 debug/printf 不构成权限拒绝/身份变更审计。",
+        "backup_or_recovery_policy": "未发现备份/恢复策略；sync/fs 写回不等同安全维护备份。",
+        "patch_or_signature_policy": "未发现补丁版本策略、镜像签名或 secure boot。"
+      },
+      "notes": "系统硬化/维护五项均未发现可证实实现。",
+      "used_evidence_ids": [
+        "codex_ev_Q07_016_sec_neg_01"
+      ],
+      "evidence": [
+        {
+          "evidence_id": "codex_ev_Q07_016_sec_neg_01",
+          "path": "<negative_search>",
+          "symbol_kind": "search",
+          "symbol_name": "sec_neg",
+          "excerpt": "No hardening policy for service minimization, least privilege, security audit, backup/recovery, patching, secure boot, or signatures found; searched_keywords=uid, gid, cred, permission, access control, ACL, capability, mode, EACCES, EPERM, seccomp, sandbox, audit, secure boot, signature, PMP, SMEP, SMAP, KPTI, W^X, canary, guard; searched_directories=kernel, include, xv6-user, Makefile, linker, doc; file_count=123; match_count=509; coverage_sufficient=true",
+          "line_start": null,
+          "line_end": null,
+          "evidence_type": "negative_search",
+          "strength": "strong",
+          "validity": "valid",
+          "supports_claim_types": [
+            "negative_search"
+          ]
+        }
+      ]
+    }
+  ]
+}

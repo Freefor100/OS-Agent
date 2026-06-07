@@ -1,59 +1,23 @@
 {
   "stage_id": "03_mem_mgmt",
-  "goal": "分析 xv6-k210 内存管理模块：物理页分配器、页表机制、缺页处理、COW/Lazy 实现、mmap 及 TLB 刷新等核心功能",
-  "must_cover": [
-    "[Q03_001] 内存管理形态：C 语言实现的分页式内存管理（类 xv6/RISC-V Sv39）",
-    "[Q03_002] 物理页帧分配器：已实现（pm.c 中的 allocpage/freepage）",
-    "[Q03_003] 分配算法：空闲链表（free list）+ 单页/多页分桶",
-    "[Q03_004] 核心数据结构：struct run{next, npage} + struct pm_allocator{lock, freelist, npage}",
-    "[Q03_005] 并发控制：双锁分桶（single/multiple 独立 spinlock），持锁范围覆盖 alloc/free 全程",
-    "[Q03_006] 页表实现：已实现（walk/map/unmappages/mappages）",
-    "[Q03_007] 页表 API：walk()、mappages()、unmappages()、uvmalloc()",
-    "[Q03_008] 页表并发：依赖进程地址空间隔离 + 关中断（trap 路径），无显式每进程页表锁",
-    "[Q03_009] 地址空间：内核/用户共享高地址 trampoline，用户空间 0~MAXUVA，内核 KERNBASE~PHYSTOP",
-    "[Q03_010] 缺页异常：已实现（handle_page_fault 联动 alloc/map）",
-    "[Q03_011] 缺页链路：usertrap→handle_excp→handle_page_fault→{lazy/loadelf/mmap/COW}→uvmalloc/allocpage→mappages→sfence_vma",
-    "[Q03_012] COW：已实现（fork 时标记 PTE_COW，store fault 触发 copy）",
-    "[Q03_013] Lazy Allocation：已实现（HEAP/STACK 段 fault 时分配）",
-    "[Q03_014] Swap：未实现（仅 mmap file 有 page_file_swap 占位）",
-    "[Q03_015] mmap：已实现（do_mmap/do_munmap，支持 MAP_ANON/MAP_SHARED）",
-    "[Q03_016] Page Cache：未发现独立页缓存管理结构",
-    "[Q03_001] 该 OS 的内存管理实现语言/形态更接近哪类？（只选最贴近的一项）",
-    "[Q03_002] 是否存在“物理页帧分配器 (Physical Frame Allocator)”的真实实现？（必须三态）",
-    "[Q03_003] 物理内存分配算法更接近哪种？",
-    "[Q03_004] 物理页帧分配器的核心数据结构是什么？（例如 bitmap 数组、buddy free list、slab cache 表、`struct run` 单链表等；必须引用结构体/字段证据）",
-    "[Q03_005] 物理分配器的并发控制锁粒度是什么？（全局大锁 / per-CPU / 分桶 / 无锁+关中断 / 其他；必须给锁对象类型与持锁范围证据）",
-    "[Q03_006] 是否存在“页表 (page table) 结构体 + walk/map/unmap”的真实实现？（必须三态）"
-  ],
   "evidence_targets": [
-    "物理页分配器 pm.c: struct run 链表 + single/multiple 分桶锁",
-    "页表操作 vm.c: walk/mappages/unmappages/uvmalloc",
-    "缺页处理 vm.c: handle_page_fault 分支到 lazy/loadelf/mmap/COW",
-    "COW 机制 vm.c: PTE_COW 标记 + handle_store_page_fault_cow",
-    "mmap 实现 mmap.c: do_mmap + handle_page_fault_mmap",
-    "TLB 刷新 riscv.h: sfence_vma 宏",
-    "用户检查 vm.c: copyin/copyout/walkaddr",
-    "段管理 usrmm.h: struct seg 链表",
     "物理页分配",
     "页表映射",
     "页故障处理",
     "堆分配器"
   ],
   "seed_paths": [
-    "kernel/mm/pm.c",
-    "kernel/mm/vm.c",
-    "kernel/mm/mmap.c",
-    "kernel/mm/kmalloc.c",
-    "kernel/trap/trap.c",
-    "include/mm/vm.h",
-    "include/mm/usrmm.h",
-    "include/memlayout.h",
-    "include/hal/riscv.h",
     "mm",
     "memory",
     "vm",
     "kernel/mm",
-    "os/src/mm"
+    "os/src/mm",
+    "include/fs",
+    "include/mm",
+    "include/sync",
+    "kernel/fs",
+    "kernel/sync",
+    "kernel/trap"
   ],
   "framework_guess": [
     "xv6"
@@ -63,20 +27,14 @@
   ],
   "entry_symbols": [
     "handle_page_fault",
-    "allocpage",
-    "freepage",
-    "walk",
-    "mappages",
-    "uvmalloc",
-    "sfence_vma",
-    "handle_store_page_fault_cow",
-    "do_mmap",
-    "copyin",
     "alloc_frame",
-    "map_page"
+    "map_page",
+    "PageTable",
+    "FrameAllocator",
+    "_start",
+    "start"
   ],
   "repo_hotspots": [
-    "Cargo.toml",
     "Makefile",
     "bootloader",
     "bootloader/SBI",
@@ -85,13 +43,14 @@
     "debug/openocd_cfg",
     "doc",
     "doc/img",
-    "include"
+    "include",
+    "include/fs"
   ],
   "preferred_tools": [
-    "read_code_segment",
+    "rag_search_code",
+    "lsp_get_call_graph",
     "lsp_get_definition",
-    "lsp_get_references",
-    "grep_in_repo"
+    "read_code_segment"
   ],
   "avoid_tools": [
     "blind_read_large_files",
@@ -104,13 +63,582 @@
     "max_memory_items": 8
   },
   "execution_steps": [
-    "1. 精读 kernel/mm/pm.c 前 100 行，确认 struct run 和 pm_allocator 定义及 single/multiple 分桶锁初始化逻辑",
-    "2. 读取 kernel/mm/vm.c 的 walk() 和 mappages() 实现（约 211-330 行），取证页表遍历和映射流程",
-    "3. 读取 handle_page_fault() 完整实现（1039-1105 行）及四个子处理函数，绘制缺页分发决策树",
-    "4. 读取 handle_store_page_fault_cow()（975-1000 行）和 uvmcopy() 中 COW 标记逻辑，确认 fork 时 PTE_COW 设置点",
-    "5. 读取 kernel/mm/mmap.c 的 do_mmap() 和 handle_page_fault_mmap()，确认 mmap 系统调用到缺页映射的链路",
-    "6. 搜索并读取 copyin/copyout/walkaddr 实现，总结用户指针校验机制",
-    "7. 汇总 memlayout.h 和 riscv.h 中的内存常量（PGSIZE/PHYSTOP/MAXVA），计算物理内存总量和虚拟地址空间位数",
-    "8. 整合证据，按 must_cover 30 题逐一作答，绘制 Mermaid 主链路图（usertrap→handle_excp→handle_page_fault→uvmalloc→mappages→sfence_vma）"
+    "对照 seed_paths、entry_symbols，用 rag_search_code / list_repo_structure / LSP 锁定与本阶段相关的关键文件与符号。",
+    "对核心入口使用 lsp_get_document_outline → lsp_get_call_graph（单入口、浅深度）→ 必要时 read_code_segment 精读。",
+    "按题单逐项输出结论，每条附反引号源码路径；无实现则显式写「未发现/桩函数」等，勿臆测。"
+  ],
+  "task_plan": [
+    {
+      "task_id": "task_03_mem_overview",
+      "question_ids": [
+        "Q03_001"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证内存管理实现语言/形态，收集 memory_constants、allocator_state、map_unmap_api、protection_relocation、call_path 等事实，判断属于 Rust no_std、C/Makefile 风格、混合或未发现。",
+      "group_reason": "Q03_001 是全局分类题，需要覆盖所有内存管理核心事实才能判断。",
+      "query": "在 kernel/mm、include/mm、kernel、include 等目录中搜索物理页帧/页大小/地址空间常量、分配器状态结构、页表 walk/map/unmap API、保护位/重定位机制，并追踪调用路径。使用 rag_search_code、lsp_get_definition、read_code_segment 获取强证据。",
+      "seed_paths": [
+        "kernel/mm",
+        "include/mm",
+        "kernel",
+        "include",
+        "arch"
+      ],
+      "entry_symbols": [
+        "PGSIZE",
+        "PAGE_SIZE",
+        "MAXVA",
+        "kalloc",
+        "kfree",
+        "walk",
+        "mappages",
+        "uvmunmap",
+        "PTE_R",
+        "PTE_W",
+        "PTE_X",
+        "PTE_U",
+        "satp"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ]
+    },
+    {
+      "task_id": "task_03_frame_allocator",
+      "question_ids": [
+        "Q03_002",
+        "Q03_003",
+        "Q03_004",
+        "Q03_005"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证物理页帧分配器是否存在、分配算法类型、核心数据结构、并发控制锁粒度。填充 Q03_002_01~Q03_002_06、Q03_003_01~Q03_003_06、Q03_004_01~Q03_004_06、Q03_005_01~Q03_005_06 等事实。",
+      "group_reason": "四题均围绕物理页帧分配器，共享同一实现链路（kalloc/kfree 及其底层结构）。",
+      "query": "在 kernel/mm、include/mm 中搜索 kalloc、kfree、buddy、bitmap、freelist、slab、run、kmem、lock 等符号，读取分配器结构体定义、实现体、调用点，确定算法类型、核心数据结构（如 struct run、buddy free list、bitmap 数组）和锁对象（如 struct spinlock kmem.lock）。",
+      "seed_paths": [
+        "kernel/mm",
+        "include/mm",
+        "kernel"
+      ],
+      "entry_symbols": [
+        "kalloc",
+        "kfree",
+        "kmem",
+        "buddy",
+        "bitmap",
+        "freelist",
+        "slab",
+        "run",
+        "lock"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow"
+      ]
+    },
+    {
+      "task_id": "task_03_page_table",
+      "question_ids": [
+        "Q03_006",
+        "Q03_007",
+        "Q03_008"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证页表结构体+walk/map/unmap 实现、API 函数名、并发控制。填充 Q03_006_01~Q03_006_06、Q03_007_01~Q03_007_06、Q03_008_01~Q03_008_06 等事实。",
+      "group_reason": "三题均围绕页表操作，共享 walk/map/unmap 实现链路和锁机制。",
+      "query": "在 kernel/mm、include/mm、kernel/vm.c 等文件中搜索 pagetable_t、walk、mappages、uvmunmap、uvmcreate 等符号，读取结构体定义、函数实现体、调用点，并查找页表修改路径中的锁（如 proc.lock、kmem.lock）或关中断操作。",
+      "seed_paths": [
+        "kernel/mm",
+        "include/mm",
+        "kernel"
+      ],
+      "entry_symbols": [
+        "pagetable_t",
+        "walk",
+        "mappages",
+        "uvmunmap",
+        "uvmcreate",
+        "PTE",
+        "satp"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow"
+      ]
+    },
+    {
+      "task_id": "task_03_address_space",
+      "question_ids": [
+        "Q03_009"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证内核与用户地址空间关系，判断是独立页表、共享页表还是仅内核态。填充 Q03_009_01~Q03_009_06 事实。",
+      "group_reason": "Q03_009 独立成题，需要查证页表切换/共享机制。",
+      "query": "在 kernel、include、arch 目录中搜索 satp 切换、CR3 切换、用户页表创建/加载、内核映射常驻等代码，读取进程切换时页表基址寄存器的赋值逻辑。",
+      "seed_paths": [
+        "kernel",
+        "include",
+        "arch"
+      ],
+      "entry_symbols": [
+        "satp",
+        "w_satp",
+        "kvminithart",
+        "uvmswitch",
+        "proc_pagetable"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow"
+      ]
+    },
+    {
+      "task_id": "task_03_page_fault",
+      "question_ids": [
+        "Q03_010",
+        "Q03_011"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证缺页异常处理逻辑及完整链路。填充 Q03_010_01~Q03_010_06、Q03_011_01~Q03_011_06 事实。",
+      "group_reason": "两题均围绕缺页异常，共享 trap→handle_page_fault→alloc→map 链路。",
+      "query": "在 kernel/trap.c、kernel/vm.c、kernel/memlayout.h 中搜索 handle_page_fault、usertrap、scause、STORE_PAGE_FAULT、LOAD_PAGE_FAULT 等符号，读取异常入口、缺页处理函数、页帧分配和映射建立代码。",
+      "seed_paths": [
+        "kernel/trap",
+        "kernel/mm",
+        "kernel/vm.c",
+        "include"
+      ],
+      "entry_symbols": [
+        "handle_page_fault",
+        "usertrap",
+        "scause",
+        "kalloc",
+        "mappages",
+        "uvmalloc"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow"
+      ]
+    },
+    {
+      "task_id": "task_03_cow_lazy",
+      "question_ids": [
+        "Q03_012",
+        "Q03_013"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证写时复制 (CoW) 和惰性分配 (Lazy Allocation) 实现。填充 Q03_012_01~Q03_012_06、Q03_013_01~Q03_013_06 事实。",
+      "group_reason": "两题均涉及缺页时的特殊分配策略，共享 fault 处理路径。",
+      "query": "在 kernel/vm.c、kernel/trap.c、kernel/proc.c 中搜索 cow、lazy、fork、uvmcopy、sbrk、alloc 等符号，读取 fork 时页表复制、缺页时 CoW 处理、sbrk 懒分配等代码。",
+      "seed_paths": [
+        "kernel/vm.c",
+        "kernel/trap.c",
+        "kernel/proc.c",
+        "include"
+      ],
+      "entry_symbols": [
+        "uvmcopy",
+        "cow",
+        "lazy",
+        "sbrk",
+        "alloc",
+        "fork"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow"
+      ]
+    },
+    {
+      "task_id": "task_03_swap",
+      "question_ids": [
+        "Q03_014",
+        "Q03_021",
+        "Q03_022",
+        "Q03_034"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证 swap、页面置换算法、工作集模型、清理策略。填充 Q03_014_01~Q03_014_06、Q03_021_01~Q03_021_06、Q03_022_01~Q03_022_06、Q03_034_01~Q03_034_06 事实。",
+      "group_reason": "四题均围绕 swap/页面置换/工作集/清理策略，共享后备存储、换入换出路径和 victim 选择逻辑。",
+      "query": "在 kernel/mm、kernel/vm.c、kernel/fs、include 中搜索 swap、swap_in、swap_out、pageout、reclaim、evict、LRU、Clock、FIFO、swapfile、working_set、thrash、resident、kswapd、writeback 等符号，读取相关结构体和实现。",
+      "seed_paths": [
+        "kernel/mm",
+        "kernel/vm.c",
+        "kernel/fs",
+        "include"
+      ],
+      "entry_symbols": [
+        "swap",
+        "swap_in",
+        "swap_out",
+        "pageout",
+        "reclaim",
+        "evict",
+        "LRU",
+        "Clock",
+        "FIFO",
+        "swapfile",
+        "working_set",
+        "thrash",
+        "resident",
+        "kswapd",
+        "writeback"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ]
+    },
+    {
+      "task_id": "task_03_mmap",
+      "question_ids": [
+        "Q03_015"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证 mmap 实现，包括 syscall 入口、参数解析、VMA 管理、fault 路径、清理。填充 Q03_015_01~Q03_015_06 事实。",
+      "group_reason": "Q03_015 独立成题，需要完整 mmap 链路证据。",
+      "query": "在 kernel/syscall.c、kernel/sysfile.c、kernel/vm.c、kernel/proc.c、include 中搜索 mmap、munmap、MAP_FIXED、MAP_ANON、MAP_SHARED、VMA、vma 等符号，读取 sys_mmap 实现、VMA 结构体定义、fault 时根据 VMA 分配页的代码。",
+      "seed_paths": [
+        "kernel/syscall.c",
+        "kernel/sysfile.c",
+        "kernel/vm.c",
+        "kernel/proc.c",
+        "include"
+      ],
+      "entry_symbols": [
+        "mmap",
+        "munmap",
+        "MAP_FIXED",
+        "MAP_ANON",
+        "MAP_SHARED",
+        "VMA",
+        "vma"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow"
+      ]
+    },
+    {
+      "task_id": "task_03_page_cache",
+      "question_ids": [
+        "Q03_016",
+        "Q03_017"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证 Page Cache 和脏页回写机制。填充 Q03_016_01~Q03_016_07、Q03_017_01~Q03_017_06 事实。",
+      "group_reason": "两题均围绕文件页缓存，共享 page_cache/address_space 结构和 writeback 路径。",
+      "query": "在 kernel/fs、kernel/mm、include 中搜索 page_cache、address_space、inode、pgoff、buffer cache、block cache、dirty、writeback 等符号，读取缓存结构体定义、key 粒度、dirty 标记和回写函数。",
+      "seed_paths": [
+        "kernel/fs",
+        "kernel/mm",
+        "include"
+      ],
+      "entry_symbols": [
+        "page_cache",
+        "address_space",
+        "inode",
+        "pgoff",
+        "buffer cache",
+        "block cache",
+        "dirty",
+        "writeback"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ]
+    },
+    {
+      "task_id": "task_03_tlb",
+      "question_ids": [
+        "Q03_018",
+        "Q03_019"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证 TLB 射击机制和本地 TLB 刷新指令/函数。填充 Q03_018_01~Q03_018_06、Q03_019_01~Q03_019_06 事实。",
+      "group_reason": "两题均围绕 TLB 刷新，共享本地 flush 和远程 shootdown 路径。",
+      "query": "在 kernel、arch、include 中搜索 sfence.vma、sfence、tlbi、invlpg、flush_tlb、shootdown、IPI、remote、hart、cpu、asid、satp 等符号，读取本地 flush 封装函数、页表修改后调用 flush 的代码、IPI 发送和远程 handler。",
+      "seed_paths": [
+        "kernel",
+        "arch",
+        "include"
+      ],
+      "entry_symbols": [
+        "sfence.vma",
+        "sfence",
+        "tlbi",
+        "invlpg",
+        "flush_tlb",
+        "shootdown",
+        "IPI",
+        "remote",
+        "hart",
+        "cpu",
+        "asid",
+        "satp"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ]
+    },
+    {
+      "task_id": "task_03_user_ptr_check",
+      "question_ids": [
+        "Q03_020"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证用户指针安全检查机制。填充 Q03_020_01~Q03_020_06 事实。",
+      "group_reason": "Q03_020 独立成题，需要查证 access_ok/verify_area/copyin/copyout 等实现。",
+      "query": "在 kernel、include 中搜索 access_ok、verify_area、copyin、copyout、UserInPtr 等符号，读取校验逻辑和调用点。",
+      "seed_paths": [
+        "kernel",
+        "include"
+      ],
+      "entry_symbols": [
+        "access_ok",
+        "verify_area",
+        "copyin",
+        "copyout",
+        "UserInPtr"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow"
+      ]
+    },
+    {
+      "task_id": "task_03_mem_constants",
+      "question_ids": [
+        "Q03_023"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证物理内存总量、页大小、虚拟地址空间位数。填充 Q03_023_01~Q03_023_06 事实。",
+      "group_reason": "Q03_023 独立成题，需要从代码常量/链接脚本/配置中提取数值。",
+      "query": "在 kernel、include、linker 脚本中搜索 PHYSTOP、PGSIZE、MAXVA、VA_BITS、MEMORY_SIZE 等常量定义，读取链接脚本中的内存布局。",
+      "seed_paths": [
+        "kernel",
+        "include",
+        "linker"
+      ],
+      "entry_symbols": [
+        "PHYSTOP",
+        "PGSIZE",
+        "MAXVA",
+        "VA_BITS",
+        "MEMORY_SIZE"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body"
+      ]
+    },
+    {
+      "task_id": "task_03_mem_protection",
+      "question_ids": [
+        "Q03_024"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证内存保护机制形式。填充 Q03_024_01~Q03_024_06 事实。",
+      "group_reason": "Q03_024 独立成题，需要查证页表权限位和软件指针检查。",
+      "query": "在 kernel/mm、include、kernel/trap.c 中搜索 PTE_R、PTE_W、PTE_X、PTE_U、copyin、copyout、access_ok 等符号，读取页表权限位定义和用户指针检查代码。",
+      "seed_paths": [
+        "kernel/mm",
+        "include",
+        "kernel/trap.c"
+      ],
+      "entry_symbols": [
+        "PTE_R",
+        "PTE_W",
+        "PTE_X",
+        "PTE_U",
+        "copyin",
+        "copyout",
+        "access_ok"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow"
+      ]
+    },
+    {
+      "task_id": "task_03_logical_org",
+      "question_ids": [
+        "Q03_025"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证进程地址空间逻辑组织（VMA/区间表）。填充 Q03_025_01~Q03_025_06 事实。",
+      "group_reason": "Q03_025 独立成题，需要查证 VMA 结构体。",
+      "query": "在 kernel/proc.c、kernel/vm.c、include 中搜索 VMA、vma、vm_area、mmap_area、text、data、heap、stack 等符号，读取地址空间管理结构体定义。",
+      "seed_paths": [
+        "kernel/proc.c",
+        "kernel/vm.c",
+        "include"
+      ],
+      "entry_symbols": [
+        "VMA",
+        "vma",
+        "vm_area",
+        "mmap_area"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body"
+      ]
+    },
+    {
+      "task_id": "task_03_segmentation",
+      "question_ids": [
+        "Q03_026"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证是否存在硬件分段机制。填充 Q03_026_01~Q03_026_06 事实。",
+      "group_reason": "Q03_026 独立成题，需要查证 GDT/LDT 或等价段描述符。",
+      "query": "在 kernel、arch、include 中搜索 GDT、LDT、segment、segmentation、cs、ds、es、ss 等符号，读取段描述符定义和加载代码。",
+      "seed_paths": [
+        "kernel",
+        "arch",
+        "include"
+      ],
+      "entry_symbols": [
+        "GDT",
+        "LDT",
+        "segment",
+        "segmentation",
+        "cs",
+        "ds",
+        "es",
+        "ss"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "negative_search"
+      ]
+    },
+    {
+      "task_id": "task_03_vm_policies",
+      "question_ids": [
+        "Q03_027",
+        "Q03_028",
+        "Q03_029",
+        "Q03_031",
+        "Q03_032",
+        "Q03_033"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "查证取页策略、放置策略、驻留集管理、碎片类型、地址重定位、置换作用域。填充 Q03_027_01~Q03_027_06、Q03_028_01~Q03_028_06、Q03_029_01~Q03_029_06、Q03_031_01~Q03_031_06、Q03_032_01~Q03_032_06、Q03_033_01~Q03_033_06 事实。",
+      "group_reason": "六题均涉及 Stallings Ch8 虚拟内存策略，共享 VM 实现上下文。",
+      "query": "在 kernel/vm.c、kernel/proc.c、kernel/trap.c、include 中搜索 demand paging、lazy allocation、prepaging、mmap_base、first fit、best fit、working set、thrash、resident、OOM、kswapd、load control、internal fragmentation、external fragmentation、relocation、compile-time、load-time、run-time、global replacement、local replacement 等关键词，读取相关实现。",
+      "seed_paths": [
+        "kernel/vm.c",
+        "kernel/proc.c",
+        "kernel/trap.c",
+        "include"
+      ],
+      "entry_symbols": [
+        "demand",
+        "lazy",
+        "prepaging",
+        "mmap_base",
+        "first fit",
+        "best fit",
+        "working_set",
+        "thrash",
+        "resident",
+        "OOM",
+        "kswapd",
+        "load control",
+        "fragmentation",
+        "relocation",
+        "global",
+        "local"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ]
+    },
+    {
+      "task_id": "task_03_main_chain",
+      "question_ids": [
+        "Q03_030"
+      ],
+      "task_type": "react_code",
+      "agent_type": "react_code",
+      "task_goal": "绘制内存主链路 Mermaid 图，从最强入口到页表/物理页分配核心点。填充 Q03_030_01~Q03_030_06 事实。",
+      "group_reason": "Q03_030 独立成题，需要综合之前所有证据绘制链路。",
+      "query": "基于前序任务收集的证据，确定最强内存入口（如缺页处理、mmap、brk），追踪到页表操作（walk/mappages）或物理页分配（kalloc），列出 3-6 个关键节点，格式为 FuncName [path:line]。",
+      "seed_paths": [
+        "kernel/trap.c",
+        "kernel/vm.c",
+        "kernel/proc.c",
+        "kernel/sysfile.c"
+      ],
+      "entry_symbols": [
+        "handle_page_fault",
+        "mmap",
+        "sbrk",
+        "walk",
+        "mappages",
+        "kalloc"
+      ],
+      "expected_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow"
+      ]
+    }
   ]
 }

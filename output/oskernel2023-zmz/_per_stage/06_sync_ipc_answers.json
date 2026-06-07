@@ -1,0 +1,438 @@
+{
+  "schema_version": "v1",
+  "stage_id": "06_sync_ipc",
+  "stage_title": "同步互斥与进程间通信",
+  "terminology_profile": "stallings_en_zh",
+  "answers": [
+    {
+      "question_id": "Q06_001",
+      "question_type": "short_answer",
+      "stem": "该内核提供了哪些同步原语？（SpinLock/Mutex/RwLock/Semaphore/Condvar/WaitQueue 等；列出类型定义证据）",
+      "value": "已实现 SpinLock（自旋锁）、SleepLock（睡眠锁）、WaitQueue（等待队列）。证据：`include/sync/spinlock.h:7-13` 定义 `struct spinlock`（含 `locked`、`name`、`cpu` 字段）；`include/sync/sleeplock.h:9-16` 定义 `struct sleeplock`（含 `locked`、`lk`、`name`、`pid` 字段）；`include/sync/waitqueue.h:16-24` 定义 `struct wait_queue`（含 `lock`、`head`）和 `struct wait_node`（含 `chan`、`list`）。未发现 RwLock、Semaphore、Condvar 实现。",
+      "evidence": [
+        {
+          "path": "include/sync/spinlock.h",
+          "symbol_kind": "struct",
+          "symbol_name": "spinlock",
+          "excerpt": "struct spinlock { uint locked; char *name; struct cpu *cpu; };"
+        },
+        {
+          "path": "include/sync/sleeplock.h",
+          "symbol_kind": "struct",
+          "symbol_name": "sleeplock",
+          "excerpt": "struct sleeplock { uint locked; struct spinlock lk; char *name; int pid; };"
+        },
+        {
+          "path": "include/sync/waitqueue.h",
+          "symbol_kind": "struct",
+          "symbol_name": "wait_queue",
+          "excerpt": "struct wait_queue { struct spinlock lock; struct d_list head; };"
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_002",
+      "question_type": "single_choice",
+      "stem": "Mutex 更接近哪种实现？",
+      "value": "阻塞锁（Blocking Mutex，进入等待队列并挂起）",
+      "evidence": [
+        {
+          "path": "kernel/sync/sleeplock.c",
+          "symbol_kind": "function",
+          "symbol_name": "acquiresleep",
+          "excerpt": "void acquiresleep(struct sleeplock *lk) { acquire(&lk->lk); while (lk->locked) { sleep(lk, &lk->lk); } lk->locked = 1; ... }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_003",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在等待队列 (Wait Queue, WaitQueue) 与 sleep/wakeup（或等价阻塞/唤醒）实现？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "include/sync/waitqueue.h",
+          "symbol_kind": "struct",
+          "symbol_name": "wait_queue",
+          "excerpt": "struct wait_queue { struct spinlock lock; struct d_list head; }; 提供 wait_queue_add/del/is_first 等操作"
+        },
+        {
+          "path": "kernel/sched/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "sleep",
+          "excerpt": "void sleep(void *chan, struct spinlock *lk) { ... p->chan = chan; __remove(p); __insert_sleep(p); sched(); ... }"
+        },
+        {
+          "path": "kernel/sched/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "wakeup",
+          "excerpt": "void wakeup(void *chan) { __enter_proc_cs __wakeup_no_lock(chan); __leave_proc_cs }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_004",
+      "question_type": "fill_in",
+      "stem": "sleep / wakeup 不变量 (Sleep-Wakeup Invariant) 分析，按格式填写：\n- sleep 入口函数: ___（路径）\n- 入睡前持有的锁: ___（无则写 none）\n- 防丢 wakeup (Lost Wakeup Prevention) 机制: ___（如：持队列锁检查条件 / 无防护）\n- wakeup 函数: ___（路径）\n- 唤醒与锁释放顺序: ___（先唤醒后释放 / 先释放后唤醒 / 其他）",
+      "value": "sleep 入口函数: kernel/sched/proc.c:569 (sleep)\n入睡前持有的锁: 必须持有 proc_lock 或传入的 lk（若 lk 非 proc_lock 则释放 lk 后持 proc_lock 进入 sleep）\n防丢 wakeup (Lost Wakeup Prevention) 机制: 持 proc_lock 检查条件并进入睡眠，wakeup 也持 proc_lock 遍历睡眠队列，确保原子性\nwakeup 函数: kernel/sched/proc.c:386 (wakeup)\n唤醒与锁释放顺序: 先唤醒（__wakeup_no_lock 将进程移入 runnable 队列）后释放 proc_lock",
+      "evidence": [
+        {
+          "path": "kernel/sched/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "sleep",
+          "excerpt": "void sleep(void *chan, struct spinlock *lk) { ... if (&proc_lock != lk) { __enter_proc_cs release(lk); } ... sched(); __leave_proc_cs acquire(lk); }"
+        },
+        {
+          "path": "kernel/sched/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "wakeup",
+          "excerpt": "void wakeup(void *chan) { __enter_proc_cs __wakeup_no_lock(chan); __leave_proc_cs }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_005",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现管道 (Pipe)？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/fs/pipe.c",
+          "symbol_kind": "function",
+          "symbol_name": "pipealloc",
+          "excerpt": "int pipealloc(struct file **pf0, struct file **pf1) { ... pi = kmalloc(sizeof(struct pipe)); ... initlock(&pi->lock, \"pipe\"); wait_queue_init(&pi->wqueue, \"pipewritequeue\"); ... }"
+        },
+        {
+          "path": "kernel/fs/pipe.c",
+          "symbol_kind": "function",
+          "symbol_name": "piperead",
+          "excerpt": "int piperead(struct pipe *pi, uint64 addr, int n) { ... pipelock(pi, &wait, PIPE_READER); ... pipereadable(pi); ... pipeunlock(pi, &wait, PIPE_READER); }"
+        },
+        {
+          "path": "kernel/syscall/sysfile.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_pipe",
+          "excerpt": "uint64 sys_pipe(void) { ... if(pipealloc(&rf, &wf) < 0) return -ENOMEM; ... }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_006",
+      "question_type": "single_choice",
+      "stem": "pipe 缓冲形态更接近哪种？",
+      "value": "字节环形缓冲区 (ring buffer)",
+      "evidence": [
+        {
+          "path": "include/fs/pipe.h",
+          "symbol_kind": "struct",
+          "symbol_name": "pipe",
+          "excerpt": "struct pipe { ... char data[PIPESIZE]; }; #define PIPESIZE 1024"
+        },
+        {
+          "path": "kernel/fs/pipe.c",
+          "symbol_kind": "function",
+          "symbol_name": "pipewrite",
+          "excerpt": "char *paddr = pi->data + pi->nwrite % PIPESIZE; // 使用模运算实现环形缓冲"
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_007",
+      "question_type": "single_choice",
+      "stem": "pipe 的阻塞语义更接近哪种？",
+      "value": "阻塞：挂起当前线程/任务进入等待队列",
+      "evidence": [
+        {
+          "path": "kernel/fs/pipe.c",
+          "symbol_kind": "function",
+          "symbol_name": "pipelock",
+          "excerpt": "static void pipelock(struct pipe *pi, struct wait_node *wait, int who) { ... while (!wait_queue_is_first(q, wait)) { sleep(wait->chan, &q->lock); } }"
+        },
+        {
+          "path": "kernel/fs/pipe.c",
+          "symbol_kind": "function",
+          "symbol_name": "pipewritable",
+          "excerpt": "while ((m = pi->nwrite - pi->nread) == PIPESIZE) { ... sleep(wait->chan, &pi->lock); }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_008",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现消息队列/信号量/共享内存等 SysV IPC (Message Queue / Semaphore / Shared Memory, msg/sem/shm)？（必须三态；若仅实现其一需说明）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/syscall/syscall.c",
+          "symbol_kind": "search",
+          "symbol_name": "grep_sys_msgget_semget_shmget",
+          "excerpt": "在 syscall.c 系统调用表中检索 sys_msgget/sys_semget/sys_shmget，0 命中；在 sysfile.c、sysmem.c、sysproc.c 中检索亦无结果"
+        },
+        {
+          "path": "include/sysnum.h",
+          "symbol_kind": "search",
+          "symbol_name": "grep_sysnum_ipc",
+          "excerpt": "检索 SYS_msgget/SYS_semget/SYS_shmget 等系统调用号，未发现定义"
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_009",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 futex？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/syscall/syscall.c",
+          "symbol_kind": "search",
+          "symbol_name": "grep_futex",
+          "excerpt": "在 syscall.c 系统调用表及全仓库检索 futex 关键词，0 命中"
+        },
+        {
+          "path": "include/sysnum.h",
+          "symbol_kind": "search",
+          "symbol_name": "grep_sysnum_futex",
+          "excerpt": "检索 SYS_futex 系统调用号，未发现定义"
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_010",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现信号机制（sigaction/kill/sigreturn/trampoline）？（必须三态）",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/syscall/syssignal.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_rt_sigaction",
+          "excerpt": "uint64 sys_rt_sigaction(void) { ... set_sigaction(signum, &act, &oldact, size/8); ... }"
+        },
+        {
+          "path": "kernel/syscall/syssignal.c",
+          "symbol_kind": "function",
+          "symbol_name": "sys_kill",
+          "excerpt": "uint64 sys_kill(void) { argint(0, &pid); argint(1, &sig); return kill(pid, sig); }"
+        },
+        {
+          "path": "kernel/sched/signal.c",
+          "symbol_kind": "function",
+          "symbol_name": "sigreturn",
+          "excerpt": "void sigreturn(void) { ... p->trapframe = frame->tf; p->sig_frame = frame->next; kfree(frame); }"
+        },
+        {
+          "path": "kernel/trap/sig_trampoline.S",
+          "symbol_kind": "asm_label",
+          "symbol_name": "sig_trampoline",
+          "excerpt": ".globl sig_trampoline; sig_handler: jalr a1; li a7, SYS_rt_sigreturn; ecall"
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_011",
+      "question_type": "short_answer",
+      "stem": "若实现 signal handler：用户态 handler 上下文如何构建？是否存在 sigreturn 恢复原 trap frame？（必须给证据）",
+      "value": "用户态 handler 上下文构建：在 kernel/sched/signal.c:177-264 的 sighandle() 中，分配 sig_frame 保存原 trapframe（`frame->tf = p->trapframe`），新建 trapframe 设置 epc 为 sig_trampoline 中的 sig_handler 地址（`tf->epc = (uint64)(SIG_TRAMPOLINE + ((uint64)sig_handler - (uint64)sig_trampoline))`），a0 传递 signum，a1 传递 handler 地址。sigreturn 恢复：kernel/sched/signal.c:267-280 的 sigreturn() 从 sig_frame 链表中取出原 trapframe 恢复（`p->trapframe = frame->tf`），释放 sig_frame。证据：`kernel/sched/signal.c:237-254` 构建上下文，`kernel/sched/signal.c:267-280` 恢复，`kernel/trap/sig_trampoline.S:8-13` 提供 trampoline 代码。",
+      "evidence": [
+        {
+          "path": "kernel/sched/signal.c",
+          "symbol_kind": "function",
+          "symbol_name": "sighandle",
+          "excerpt": "frame->tf = p->trapframe; tf->epc = (uint64)(SIG_TRAMPOLINE + ((uint64)sig_handler - (uint64)sig_trampoline)); tf->a0 = signum; tf->a1 = (uint64)(sigact->sigact.__sigaction_handler.sa_handler);"
+        },
+        {
+          "path": "kernel/sched/signal.c",
+          "symbol_kind": "function",
+          "symbol_name": "sigreturn",
+          "excerpt": "struct sig_frame *frame = p->sig_frame; ... p->trapframe = frame->tf; p->sig_frame = frame->next; kfree(frame);"
+        },
+        {
+          "path": "kernel/trap/sig_trampoline.S",
+          "symbol_kind": "asm_label",
+          "symbol_name": "sig_handler",
+          "excerpt": "sig_handler: jalr a1; li a7, SYS_rt_sigreturn; ecall"
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_012",
+      "question_type": "single_choice",
+      "stem": "RwLock（读写锁 Reader-Writer Lock）的实现形态更接近哪种？",
+      "value": "未发现/不支持",
+      "evidence": [
+        {
+          "path": "include/sync/",
+          "symbol_kind": "search",
+          "symbol_name": "grep_rwlock",
+          "excerpt": "在 include/sync/ 及全仓库检索 RwLock/rwlock/read_write_lock，仅在 xv6-user/run_test.c 发现测试用例引用，内核源码中无实现"
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_013",
+      "question_type": "single_choice",
+      "stem": "底层原子操作来源更接近哪种？",
+      "value": "自定义汇编（ldxr/stxr、lock xchg 等）",
+      "evidence": [
+        {
+          "path": "kernel/sync/spinlock.c",
+          "symbol_kind": "function",
+          "symbol_name": "acquire",
+          "excerpt": "while(__sync_lock_test_and_set(&lk->locked, 1) != 0) ; // 注释说明：On RISC-V, sync_lock_test_and_set turns into an atomic swap: amoswap.w.aq"
+        },
+        {
+          "path": "kernel/sync/spinlock.c",
+          "symbol_kind": "function",
+          "symbol_name": "release",
+          "excerpt": "__sync_lock_release(&lk->locked); // On RISC-V, sync_lock_release turns into an atomic swap: amoswap.w zero, zero, (s1)"
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_014",
+      "question_type": "short_answer",
+      "stem": "死锁四必要条件（Coffman Conditions）在该内核中是否均成立？\n请逐条作答（互斥 Mutual Exclusion / 持有并等待 Hold-and-Wait / 不可剥夺 No Preemption / 循环等待 Circular Wait），并结合 SpinLock/Mutex 的实现给出证据或写「不适用」。",
+      "value": "1. 互斥 (Mutual Exclusion)：成立。SpinLock 通过原子操作 `__sync_lock_test_and_set` 确保同一时刻仅一个 CPU 持有锁（`kernel/sync/spinlock.c:34`）。SleepLock 在 spinlock 基础上增加睡眠机制，同样保证互斥（`kernel/sync/sleeplock.c:22-28`）。\n2. 持有并等待 (Hold-and-Wait)：成立。sleep() 实现中，进程持有 proc_lock 进入睡眠（`kernel/sched/proc.c:577-580`），pipelock 中进程持有队列锁调用 sleep（`kernel/fs/pipe.c:90-97`）。\n3. 不可剥夺 (No Preemption)：成立。锁只能由持有者主动释放（release/releasesleep），内核无强制剥夺锁的机制。\n4. 循环等待 (Circular Wait)：可能成立。内核未实现全局锁顺序规范（见 Q06_016），存在嵌套锁场景（如 pipe 操作中同时持有 pi->lock 和 wq->lock），理论上可能形成 ABBA 死锁。",
+      "evidence": [
+        {
+          "path": "kernel/sync/spinlock.c",
+          "symbol_kind": "function",
+          "symbol_name": "acquire",
+          "excerpt": "while(__sync_lock_test_and_set(&lk->locked, 1) != 0) ; // 原子操作保证互斥"
+        },
+        {
+          "path": "kernel/sched/proc.c",
+          "symbol_kind": "function",
+          "symbol_name": "sleep",
+          "excerpt": "if (&proc_lock != lk) { __enter_proc_cs release(lk); } ... sched(); // 持锁进入睡眠"
+        },
+        {
+          "path": "kernel/fs/pipe.c",
+          "symbol_kind": "function",
+          "symbol_name": "pipelock",
+          "excerpt": "acquire(&q->lock); wait_queue_add(q, wait); while (!wait_queue_is_first(q, wait)) { sleep(wait->chan, &q->lock); }"
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_015",
+      "question_type": "single_choice",
+      "stem": "内核对死锁 (Deadlock) 的处理策略更接近哪种？",
+      "value": "忽略 (Ostrich Algorithm)：不处理，依赖外部重启",
+      "evidence": [
+        {
+          "path": "kernel/sync/spinlock.c",
+          "symbol_kind": "search",
+          "symbol_name": "deadlock_detection",
+          "excerpt": "检索 deadlock detection/prevention/avoidance 等关键词，0 命中；内核无死锁检测、避免或恢复机制"
+        },
+        {
+          "path": "kernel/sched/proc.c",
+          "symbol_kind": "search",
+          "symbol_name": "lock_ordering",
+          "excerpt": "检索 lock ordering/ABBA 等关键词，0 命中；无锁顺序规范注释或代码"
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_016",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在全局锁顺序（Lock Ordering）规范或注释，以预防嵌套锁导致的循环等待死锁 (Circular Wait Deadlock)？（必须三态；若 implemented 需给出锁排序规则或 ABBA 锁检测代码证据）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/sync/",
+          "symbol_kind": "search",
+          "symbol_name": "grep_lock_ordering",
+          "excerpt": "在 kernel/sync/ 及全仓库检索 'lock ordering'、'lock order'、'ABBA'、'deadlock.*order' 等关键词，0 命中"
+        },
+        {
+          "path": "kernel/fs/pipe.c",
+          "symbol_kind": "scan",
+          "symbol_name": "nested_lock_analysis",
+          "excerpt": "pipe.c 中存在嵌套锁（pi->lock 和 wq->lock/rq->lock），但无注释说明锁获取顺序规范"
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_017",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现管程/条件变量 (Monitor / Condition Variable, Stallings Ch5)？（必须三态；搜索 Condvar / condition_variable / monitor / wait/notify/signal 等；若 implemented 需区分 Hoare 语义（等待者立即恢复）vs Mesa 语义（等待者重新竞争锁））",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "include/sync/",
+          "symbol_kind": "search",
+          "symbol_name": "grep_condvar",
+          "excerpt": "检索 Condvar/condition_variable/monitor/pthread_cond，仅在 xv6-user/run_test.c 发现测试用例引用，内核源码中无实现"
+        },
+        {
+          "path": "kernel/sync/",
+          "symbol_kind": "scan",
+          "symbol_name": "sync_module_scan",
+          "excerpt": "kernel/sync/ 仅包含 spinlock.c 和 sleeplock.c，无条件变量实现"
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_018",
+      "question_type": "short_answer",
+      "stem": "经典同步问题验证 (Classic Synchronization Problems, Stallings Ch5)：\n以下三个经典问题在该内核中是否有对应实现或测试？\n- 生产者-消费者 (Producer-Consumer / Bounded Buffer)：___（implemented/not_found + 证据）\n- 读者-写者 (Readers-Writers)：___（实现了读者优先/写者优先/公平？ + 证据）\n- 哲学家就餐 (Dining Philosophers)：___（implemented/not_found）",
+      "value": "生产者 - 消费者 (Producer-Consumer / Bounded Buffer)：not_found（管道 pipe 实现了有界缓冲区的生产者 - 消费者模式，但无专门的测试或示例代码；`kernel/fs/pipe.c` 使用 PIPESIZE=1024 的环形缓冲，pipewrite 为生产者，piperead 为消费者）\n读者 - 写者 (Readers-Writers)：not_found（未实现读写锁，无读者 - 写者问题的专门实现或测试；xv6-user/run_test.c 中有 pthread_rwlock 测试但内核无对应实现）\n哲学家就餐 (Dining Philosophers)：not_found（全仓库检索 dining/philosopher 关键词，0 命中）",
+      "evidence": [
+        {
+          "path": "kernel/fs/pipe.c",
+          "symbol_kind": "struct",
+          "symbol_name": "pipe",
+          "excerpt": "struct pipe { char data[PIPESIZE]; uint nread, nwrite; ... }; // 有界缓冲区，但未作为经典问题示例"
+        },
+        {
+          "path": "xv6-user/run_test.c",
+          "symbol_kind": "search",
+          "symbol_name": "pthread_test",
+          "excerpt": "run_test.c 中有 pthread_rwlock/pthread_cond 测试用例，但内核未实现对应原语"
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_019",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现消息传递 (Message Passing, Stallings Ch5) 作为 IPC 机制？（必须三态；区分直接消息传递 Direct / 间接通过邮箱 Mailbox / POSIX mq_open 等；与 SysV msgq 的区别是是否通过内核邮箱路由）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/syscall/",
+          "symbol_kind": "search",
+          "symbol_name": "grep_message_passing",
+          "excerpt": "检索 message.*pass/mailbox/mq_open 等关键词，0 命中；内核无消息队列或邮箱机制"
+        },
+        {
+          "path": "include/sysnum.h",
+          "symbol_kind": "search",
+          "symbol_name": "sysnum_ipc_scan",
+          "excerpt": "系统调用号定义中无消息传递相关调用（如 msgget、msgsnd、msgrcv、mq_open 等）"
+        }
+      ]
+    },
+    {
+      "question_id": "Q06_020",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现屏障同步 (Barrier Synchronization, Stallings Ch5)？（必须三态；搜索 barrier / sync_barrier / pthread_barrier 或等价；用于多线程/多核同步到同一检查点）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/",
+          "symbol_kind": "search",
+          "symbol_name": "grep_barrier",
+          "excerpt": "检索 barrier/sync_barrier/pthread_barrier 等关键词，0 命中；内核无屏障同步实现"
+        },
+        {
+          "path": "include/sync/",
+          "symbol_kind": "scan",
+          "symbol_name": "sync_header_scan",
+          "excerpt": "include/sync/ 头文件中无 barrier 相关定义"
+        }
+      ]
+    }
+  ]
+}

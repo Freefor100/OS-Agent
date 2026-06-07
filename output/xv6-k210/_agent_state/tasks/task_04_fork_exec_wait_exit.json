@@ -1,0 +1,54 @@
+{
+  "task_id": "task_04_fork_exec_wait_exit",
+  "stage_id": "04_process_smp",
+  "question_id": "Q04_007",
+  "question_ids": [
+    "Q04_007",
+    "Q04_008",
+    "Q04_009",
+    "Q04_010",
+    "Q04_011",
+    "Q04_016"
+  ],
+  "status": "done",
+  "evidence_ids": [
+    "ev_task_04_fork_exec_wait_exit_366de412",
+    "ev_task_04_fork_exec_wait_exit_2b72a414",
+    "ev_task_04_fork_exec_wait_exit_c09d8494",
+    "ev_task_04_fork_exec_wait_exit_1ea967db",
+    "ev_task_04_fork_exec_wait_exit_c9db34ef",
+    "ev_task_04_fork_exec_wait_exit_fa5c269e",
+    "ev_task_04_fork_exec_wait_exit_ad9d6536",
+    "ev_task_04_fork_exec_wait_exit_ae03123a",
+    "ev_task_04_fork_exec_wait_exit_21bdc29b",
+    "ev_task_04_fork_exec_wait_exit_4faa4dd3",
+    "ev_task_04_fork_exec_wait_exit_67536f66",
+    "ev_task_04_fork_exec_wait_exit_2c27fd50",
+    "ev_task_04_fork_exec_wait_exit_467bacfe",
+    "ev_task_04_fork_exec_wait_exit_4749ed5f",
+    "ev_task_04_fork_exec_wait_exit_03363e28",
+    "ev_task_04_fork_exec_wait_exit_87131b33",
+    "ev_task_04_fork_exec_wait_exit_55557f50",
+    "ev_task_04_fork_exec_wait_exit_40ce8a8b",
+    "ev_task_04_fork_exec_wait_exit_3fab50fe",
+    "ev_task_04_fork_exec_wait_exit_f1a12ed2"
+  ],
+  "draft_answer_ids": [
+    "draft_task_04_fork_exec_wait_exit_Q04_007_dda9ca1d",
+    "draft_task_04_fork_exec_wait_exit_Q04_008_bd9f3d3d",
+    "draft_task_04_fork_exec_wait_exit_Q04_009_ef68c933",
+    "draft_task_04_fork_exec_wait_exit_Q04_010_ed247361",
+    "draft_task_04_fork_exec_wait_exit_Q04_011_b7ff6c86",
+    "draft_task_04_fork_exec_wait_exit_Q04_016_ad43e1c2"
+  ],
+  "findings": [],
+  "confidence": "high",
+  "errors": [],
+  "token_usage": {},
+  "metadata": {
+    "evidence_count": 20,
+    "mode": "react",
+    "summary": "查证了 xv6-k210 的 fork/clone、exec、wait/waitpid、exit 实现。clone() 创建进程并复制地址空间(copysegs/uvmcopy)和文件表(copyfdtable)；execve() 装载 ELF 并重建地址空间；wait4() 通过 sleep/wakeup 机制阻塞等待 ZOMBIE 子进程；exit() 释放地址空间、关闭文件、通知父进程。所有 syscall 入口均已注册。",
+    "raw_output_excerpt": "Now I have all the evidence. Let me compile the final JSON output.\n\n{\n  \"status\": \"done\",\n  \"summary\": \"查证了 xv6-k210 的 fork/clone、exec、wait/waitpid、exit 实现。clone() 创建进程并复制地址空间(copysegs/uvmcopy)和文件表(copyfdtable)；execve() 装载 ELF 并重建地址空间；wait4() 通过 sleep/wakeup 机制阻塞等待 ZOMBIE 子进程；exit() 释放地址空间、关闭文件、通知父进程。所有 syscall 入口均已注册。\",\n  \"claim\": \"xv6-k210 完整实现了 fork/clone（创建进程、复制地址空间和文件表）、exec（ELF 装载、重建地址空间）、wait/waitpid（通过 sleep/wakeup 阻塞等待 ZOMBIE 子进程）、exit（释放地址空间、关闭文件、通知父进程、变为 ZOMBIE）。\",\n  \"structured_fact_results\": [\n    {\n      \"fact_id\": \"Q04_007_01\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [0, 1],\n      \"notes\": \"proc 结构体定义在 include/sched/proc.h，包含 pid、state、parent/child/sibling 指针、pagetable、trapframe、fds、cwd、elf 等完整 PCB 字段。enum procstate 定义了 RUNNABLE/RUNNING/SLEEPING/ZOMBIE 状态。\"\n    },\n    {\n      \"fact_id\": \"Q04_007_02\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [2, 3, 4],\n      \"notes\": \"sys_fork() 在 kernel/syscall/sysproc.c 中调用 clone(0, NULL)；sys_clone() 调用 clone(flag, stack)。clone() 实现在 kernel/sched/proc.c，完整创建新进程。syscall 表已注册 SYS_fork→sys_fork、SYS_clone→sys_clone。\"\n    },\n    {\n      \"fact_id\": \"Q04_007_03\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [5, 6, 7],\n      \"notes\": \"clone() 调用 copysegs() 复制地址空间（通过 uvmcopy 逐页复制），调用 copyfdtable() 复制文件描述符表（filedup 每个文件），复制 trapframe、信号处理、cwd、elf 等资源。新进程状态设为 RUNNABLE 并加入调度队列。\"\n    },\n    {\n      \"fact_id\": \"Q04_007_04\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [1, 8],\n      \"notes\": \"proc 结构体包含 parent、child、sibling_next、sibling_pprev 字段。clone() 中设置 np->parent = p，并将 np 插入 p 的子进程链表。exit() 中重新托管子进程给 initproc。\"\n    },\n    {\n      \"fact_id\": \"Q04_007_05\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [9, 10],\n      \"notes\": \"exit() 释放地址空间(delsegs+uvmfree)、关闭文件(dropfdtable+iput)、设置 ZOMBIE 状态、唤醒父进程。wait4() 遍历子进程链表查找 ZOMBIE 子进程，通过 sleep(p, &p->lk) 阻塞等待，找到后调用 freeproc() 释放。\"\n"
+  }
+}

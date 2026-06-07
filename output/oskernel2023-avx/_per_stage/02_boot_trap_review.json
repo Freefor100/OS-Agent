@@ -1,0 +1,208 @@
+{
+  "schema_version": "describe_review_v1",
+  "stage_id": "02_boot_trap",
+  "stage_title": "启动/架构与 Trap/系统调用",
+  "confidence": 0.75,
+  "question_reviews": [
+    {
+      "question_id": "Q02_001",
+      "confidence": 1.0,
+      "review": "题面要求文件路径 + 符号证据。Value 明确给出路径与符号，Evidence 中 3 条摘录均直接展示了对应代码行与指令，证据充分且无歧义。"
+    },
+    {
+      "question_id": "Q02_002",
+      "confidence": 0.95,
+      "review": "单选题选择 A，Evidence 展示 SBI 调用代码，直接支撑固件链交接结论，题答一致。"
+    },
+    {
+      "question_id": "Q02_003",
+      "confidence": 0.95,
+      "review": "三态题选 implemented，Evidence 展示 sstatus 位操作与 sret 指令，直接证实特权级切换逻辑，证据充分。"
+    },
+    {
+      "question_id": "Q02_004",
+      "confidence": 0.95,
+      "review": "Value 列出关键寄存器，Evidence 提供宏定义与设置代码摘录，支撑到位，符合题面证据要求。"
+    },
+    {
+      "question_id": "Q02_005",
+      "confidence": 0.95,
+      "review": "三态题选 implemented，Evidence 展示页表创建与 satp 设置函数，直接支撑 MMU 启用结论。"
+    },
+    {
+      "question_id": "Q02_006",
+      "confidence": 0.9,
+      "review": "Value 列出 5 个节点，Evidence 提供 3 条摘录。其中 kvminithart 与 scheduler 节点主要依赖 main.c 摘录中的文字描述而非独立代码行支撑，证据覆盖度略低于完美标准。"
+    },
+    {
+      "question_id": "Q02_007",
+      "confidence": 0.95,
+      "review": "Fill-in 格式正确，各项状态均有对应路径，Evidence 覆盖 BSS、UART、页表关键项，DTB 未找到亦有说明，符合题面。"
+    },
+    {
+      "question_id": "Q02_008",
+      "confidence": 0.9,
+      "review": "三态题选 not_found，Evidence 为搜索结论描述。虽无代码实证（因未找到），但符合否定结论的证据呈现方式。"
+    },
+    {
+      "question_id": "Q02_009",
+      "confidence": 0.95,
+      "review": "三态题选 implemented，Evidence 展示 stvec 设置代码，直接支撑向量表初始化结论。"
+    },
+    {
+      "question_id": "Q02_010",
+      "confidence": 0.85,
+      "review": "题面要求引用配置证据。Value 提及 Makefile，但 Evidence 中 Makefile 摘录为总结性文字而非具体配置代码片段（如 ifeq/CONFIG），证据力度稍弱。"
+    },
+    {
+      "question_id": "Q02_011",
+      "confidence": 0.95,
+      "review": "三态题选 implemented，Evidence 展示 SBI 宏定义与调用，直接支撑固件链结论。"
+    },
+    {
+      "question_id": "Q02_012",
+      "confidence": 0.95,
+      "review": "三态题选 implemented，Evidence 展示虚拟地址宏与基址切换函数，支撑地址切换逻辑。"
+    },
+    {
+      "question_id": "Q02_013",
+      "confidence": 0.95,
+      "review": "三态题选 implemented，Evidence 展示返回路径代码与 sret 指令，支撑充分。"
+    },
+    {
+      "question_id": "Q02_014",
+      "confidence": 0.95,
+      "review": "Value 描述双平台支持，Evidence 提供对应入口文件与条件编译证据，符合搜索验证要求。"
+    },
+    {
+      "question_id": "Q02_015",
+      "confidence": 0.95,
+      "review": "Value 指出向量入口标签，Evidence 提供设置代码与标签定义，证据直接对应。"
+    },
+    {
+      "question_id": "Q02_016",
+      "confidence": 0.95,
+      "review": "单选题选 C，Evidence 中注释明确说明 trapframe 位于用户页表独立页，直接支撑选项。"
+    },
+    {
+      "question_id": "Q02_017",
+      "confidence": 0.9,
+      "review": "Value 中字节数描述存在内部矛盾（先写 288 后计算为 264），虽 Evidence 支撑结构体定义，但报告文本准确性有瑕疵。"
+    },
+    {
+      "question_id": "Q02_018",
+      "confidence": 0.95,
+      "review": "三态题选 implemented，Evidence 展示分发表数组定义，支撑充分。"
+    },
+    {
+      "question_id": "Q02_019",
+      "confidence": 0.95,
+      "review": "三态题选 implemented，Evidence 展示边界检查代码逻辑，支撑充分。"
+    },
+    {
+      "question_id": "Q02_020",
+      "confidence": 0.95,
+      "review": "Value 列出 6 个节点，Evidence 提供 3 条关键代码摘录覆盖 Trap、分发、实现核心环节，支撑链路的完整性。"
+    },
+    {
+      "question_id": "Q02_021",
+      "confidence": 0.65,
+      "review": "题面要求列出 5-10 个 syscall 并为每个至少给一条证据。Value 列出 10 个，但 Evidence 数组仅含 3 条摘录，超过半数列出的 syscall 缺乏独立证据支撑，违反题面证据密度要求。"
+    },
+    {
+      "question_id": "Q02_022",
+      "confidence": 0.95,
+      "review": "三态题选 implemented，Evidence 展示 copyin/copyinstr 等安全检查函数，支撑充分。"
+    },
+    {
+      "question_id": "Q02_023",
+      "confidence": 0.95,
+      "review": "三态题选 implemented，Evidence 展示时钟中断中调用 yield 的代码，支撑抢占逻辑。"
+    },
+    {
+      "question_id": "Q02_024",
+      "confidence": 0.95,
+      "review": "三态题选 implemented，Evidence 展示信号处理函数与返回路径，支撑信号链路存在。"
+    },
+    {
+      "question_id": "Q02_025",
+      "confidence": 0.9,
+      "review": "Value 说明缺页处理逻辑，Evidence 提供入口与处理函数。CoW 未找到为否定结论，证据形式可接受。"
+    },
+    {
+      "question_id": "Q02_026",
+      "confidence": 0.95,
+      "review": "Value 描述多核初始化一致性，Evidence 提供 AP 启动与 per-CPU 数据定义，支撑交叉验证。"
+    },
+    {
+      "question_id": "Q02_027",
+      "confidence": 0.9,
+      "review": "Fill-in 格式完整，统计数字为估算值，Evidence 支撑分发表路径与桩函数示例，符合统计类题目特征。"
+    },
+    {
+      "question_id": "Q02_028",
+      "confidence": 0.95,
+      "review": "Value 说明 README 无声称，Evidence 提供 README 内容摘要，符合对照验证要求。"
+    },
+    {
+      "question_id": "Q02_029",
+      "confidence": 0.95,
+      "review": "Value 给出搜索结论，Evidence 提供具体命中函数示例，支撑搜索报告。"
+    },
+    {
+      "question_id": "Q02_030",
+      "confidence": 0.95,
+      "review": "三态题选 implemented，Evidence 展示外部中断分发逻辑与 PLIC 驱动，支撑充分。"
+    },
+    {
+      "question_id": "Q02_031",
+      "confidence": 0.95,
+      "review": "三态题选 not_found，Evidence 展示实际使用的信号类型（SIGTERM）及缺页处理逻辑，支撑未使用 SIGSEGV 的结论。"
+    },
+    {
+      "question_id": "Q02_032",
+      "confidence": 0.95,
+      "review": "Value 列出三种粒度，Evidence 提供对应三个 syscall 的实现摘录，一一对应，证据充分。"
+    },
+    {
+      "question_id": "Q02_033",
+      "confidence": 0.95,
+      "review": "单选题选 A，Evidence 展示 scause 读取与判断逻辑，直接支撑硬件原因号区分机制。"
+    },
+    {
+      "question_id": "Q02_034",
+      "confidence": 0.95,
+      "review": "三态题选 not_found，Evidence 展示中断关闭检查与搜索结果，支撑无嵌套结论。"
+    }
+  ],
+  "dimensions": {
+    "evidence_supports_answers": 0.85,
+    "question_answer_consistency": 0.95,
+    "requirements_fit": 0.9
+  },
+  "findings": [
+    {
+      "severity": "warn",
+      "message": "Q02_021 题干明确要求为列出的每个 syscall 提供证据，但答案 JSON 的 `evidence` 数组仅包含 3 条摘录，无法支撑 Value 中列出的 10 个 syscall 的逐一验证，证据密度严重不足。"
+    }
+  ],
+  "summary_zh": "本报告整体题面响应度高，大部分题目证据充分且逻辑自洽。主要问题集中在 Q02_021（Syscall 统计），列出的 10 个 syscall 中超过半数缺乏独立证据摘录，违反题面「为每个至少给一条证据」的约束，导致本题置信度降至 0.65 并触发全阶段置信度截断（0.75）。此外，Q02_010 构建系统证据为描述性文字而非代码片段，Q02_017 数值计算文本存在内部矛盾。除上述问题外，其余题目证据与结论对齐良好，JSON 契约符合。全阶段置信度按方案 A 计算后受最低分题截断。",
+  "report_quality_score": 0.96,
+  "_meta": {
+    "quality": {
+      "excerpt_coverage": 1.0,
+      "evidence_richness": 1.0,
+      "total_evidence_items": 91,
+      "nonempty_excerpt_items": 91,
+      "mean_question_confidence": 0.9324,
+      "mean_dimensions": 0.9,
+      "weights": {
+        "w_mean": 0.45,
+        "w_excerpt": 0.25,
+        "w_rich": 0.2,
+        "w_dim": 0.1
+      }
+    },
+    "review_model": "qwen3.5-plus"
+  }
+}

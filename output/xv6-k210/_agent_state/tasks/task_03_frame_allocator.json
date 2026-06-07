@@ -1,0 +1,45 @@
+{
+  "task_id": "task_03_frame_allocator",
+  "stage_id": "03_mem_mgmt",
+  "question_id": "Q03_002",
+  "question_ids": [
+    "Q03_002",
+    "Q03_003",
+    "Q03_004",
+    "Q03_005"
+  ],
+  "status": "done",
+  "evidence_ids": [
+    "ev_task_03_frame_allocator_d1908b85",
+    "ev_task_03_frame_allocator_94887d06",
+    "ev_task_03_frame_allocator_6d2929f4",
+    "ev_task_03_frame_allocator_6f05198b",
+    "ev_task_03_frame_allocator_22f08873",
+    "ev_task_03_frame_allocator_5c5852df",
+    "ev_task_03_frame_allocator_bee3b7d4",
+    "ev_task_03_frame_allocator_6a585cfd",
+    "ev_task_03_frame_allocator_60c8c805",
+    "ev_task_03_frame_allocator_ee9a45fc",
+    "ev_task_03_frame_allocator_a740d7c1",
+    "ev_task_03_frame_allocator_e6b0f683",
+    "ev_task_03_frame_allocator_858767d8",
+    "ev_task_03_frame_allocator_69c66f4a",
+    "ev_task_03_frame_allocator_4ddfb8cf"
+  ],
+  "draft_answer_ids": [
+    "draft_task_03_frame_allocator_Q03_002_f58ebf7e",
+    "draft_task_03_frame_allocator_Q03_003_06fc38ca",
+    "draft_task_03_frame_allocator_Q03_004_664c619b",
+    "draft_task_03_frame_allocator_Q03_005_77ab83de"
+  ],
+  "findings": [],
+  "confidence": "high",
+  "errors": [],
+  "token_usage": {},
+  "metadata": {
+    "evidence_count": 15,
+    "mode": "react",
+    "summary": "查证了 xv6-k210 的物理页帧分配器。kernel/mm/pm.c 实现了基于 freelist 的物理页帧分配器（kpminit/allocpage/freepage），使用 struct run 作为空闲链表节点，struct pm_allocator 包含 spinlock 锁和 freelist。kernel/mm/kmalloc.c 实现了 slab 风格的小对象分配器（kmalloc/kfree），构建在 pm 之上。页表操作（walk/mappages/unmappages）真实修改 PTE。MMU 通过 satp CSR 在运行时启用分页。PTE 保护位（PTE_R/W/X/U）实现用户/内核隔离。",
+    "raw_output_excerpt": "Now I have all the evidence. Let me produce the final JSON output.\n\n```json\n{\n  \"status\": \"done\",\n  \"summary\": \"查证了 xv6-k210 的物理页帧分配器。kernel/mm/pm.c 实现了基于 freelist 的物理页帧分配器（kpminit/allocpage/freepage），使用 struct run 作为空闲链表节点，struct pm_allocator 包含 spinlock 锁和 freelist。kernel/mm/kmalloc.c 实现了 slab 风格的小对象分配器（kmalloc/kfree），构建在 pm 之上。页表操作（walk/mappages/unmappages）真实修改 PTE。MMU 通过 satp CSR 在运行时启用分页。PTE 保护位（PTE_R/W/X/U）实现用户/内核隔离。\",\n  \"claim\": \"xv6-k210 存在完整的物理页帧分配器（freelist 算法），核心数据结构为 struct run（空闲链表节点）和 struct pm_allocator（含 spinlock 锁），并发控制粒度为每个分配器一个 spinlock。\",\n  \"structured_fact_results\": [\n    {\n      \"fact_id\": \"Q03_002_01\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [0, 1, 2],\n      \"notes\": \"memory_constants: PGSIZE=4096 (riscv.h:378), PHYSTOP=0x80600000 (memlayout.h:102), KERNBASE=0x80020000 (memlayout.h:99), PGROUNDUP/PGROUNDDOWN (riscv.h:381-382) 均有强定义。\"\n    },\n    {\n      \"fact_id\": \"Q03_002_02\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [3, 4, 5, 6],\n      \"notes\": \"allocator_state: pm.c 使用 freelist 算法，struct run {next, npage} 作为空闲链表节点，struct pm_allocator {lock, freelist, npage} 管理空闲页。kmalloc.c 使用 slab 风格的小对象分配器（kmem_allocator/kmem_node）。\"\n    },\n    {\n      \"fact_id\": \"Q03_002_03\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [7, 8, 9],\n      \"notes\": \"map_unmap_api: vm.c 中 walk() 真实遍历/创建页表项，mappages() 真实写入 PTE（*pte = PA2PTE(pa) | perm | PTE_V），unmappages() 真实清除 PTE（*pte = 0）并释放物理页。\"\n    },\n    {\n      \"fact_id\": \"Q03_002_04\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [10, 11, 12],\n      \"notes\": \"protection_relocation: kvminithart() 通过 w_satp() 写入 SATP_SV39 启用分页（运行时 MMU 重定位）。PTE 标志位 PTE_R/W/X/U 实现保护位隔离。permit_usr_mem()/protect_usr_mem() 控制 SSTATUS_PUM/SUM 位。handle_page_fault() 检查访问权限。\"\n    },\n    {\n      \"fact_id\": \"Q03_002_05\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [13, 14],\n      \"notes\": \"cal"
+  }
+}

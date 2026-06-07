@@ -1,0 +1,112 @@
+{
+  "stage_id": "04_process_smp",
+  "evidence_targets": [
+    "任务模型 (struct proc/context)",
+    "调度器 (scheduler/sched/yield)",
+    "上下文切换 (swtch.S)",
+    "多核启动 (hartid/main IPI 唤醒)",
+    "CPU 本地状态 (struct cpu/mycpu)",
+    "并发保护 (spinlock acquire/release)",
+    "进程创建 (clone/fork)",
+    "信号机制 (sig_pending/sighandle)",
+    "任务模型",
+    "调度器",
+    "上下文切换",
+    "信号/Futex",
+    "多核启动",
+    "CPU 本地状态",
+    "IPI",
+    "并发保护"
+  ],
+  "seed_paths": [
+    "kernel/sched/proc.c",
+    "include/sched/proc.h",
+    "kernel/sched/swtch.S",
+    "kernel/main.c",
+    "kernel/sync/spinlock.c",
+    "include/sync/spinlock.h",
+    "kernel/sched/signal.c",
+    "include/sched/signal.h",
+    "kernel/syscall/sysproc.c",
+    "include/hal/riscv.h",
+    "task",
+    "proc",
+    "process",
+    "sched"
+  ],
+  "framework_guess": [
+    "xv6"
+  ],
+  "arch_guess": [
+    "riscv64"
+  ],
+  "entry_symbols": [
+    "scheduler",
+    "sched",
+    "swtch",
+    "clone",
+    "yield",
+    "mycpu",
+    "cpuinit",
+    "acquire",
+    "release",
+    "sighandle",
+    "schedule",
+    "sys_fork"
+  ],
+  "repo_hotspots": [
+    "Cargo.toml",
+    "Makefile",
+    "debug",
+    "debug/kendryte_openocd",
+    "debug/openocd_cfg",
+    "doc",
+    "doc/img",
+    "include",
+    "include/fs",
+    "include/hal"
+  ],
+  "preferred_tools": [
+    "lsp_get_definition",
+    "lsp_get_references",
+    "lsp_get_call_graph",
+    "read_code_segment",
+    "grep_in_repo"
+  ],
+  "avoid_tools": [
+    "blind_read_large_files",
+    "full_repo_scan_with_read_code_segment"
+  ],
+  "context_budget": {
+    "max_prev_section_chars": 6000,
+    "max_seed_paths": 8,
+    "max_evidence_items": 12,
+    "max_memory_items": 8
+  },
+  "execution_steps": [
+    "使用 lsp_get_definition 定位 scheduler 函数的完整定义",
+    "使用 lsp_get_definition 定位 swtch 汇编实现 (kernel/sched/swtch.S)",
+    "使用 read_code_segment 读取 swtch.S 完整内容 (约 41 行)",
+    "使用 lsp_get_call_graph 分析 scheduler 的入向调用 (已确认 main 调用)",
+    "使用 lsp_get_definition 定位 clone 函数，分析进程创建流程",
+    "使用 read_code_segment 读取 clone 函数关键段 (行 289-370)",
+    "使用 lsp_get_definition 定位 struct proc 和 struct cpu 的定义",
+    "使用 grep_in_repo 搜索 NCPU 常量定义，确认支持的核心数",
+    "使用 read_code_segment 读取 main.c 中多核启动逻辑 (行 41-105)",
+    "使用 lsp_get_definition 定位 acquire 和 release 函数",
+    "使用 read_code_segment 读取 spinlock.c 完整实现",
+    "使用 lsp_get_references 查找 proc_lock 的所有引用点",
+    "使用 lsp_get_definition 定位 sighandle 函数",
+    "使用 read_code_segment 读取 signal.c 中 sighandle 实现 (行 177-261)",
+    "使用 grep_in_repo 搜索 sys_fork 和 sys_clone 的系统调用实现",
+    "使用 read_code_segment 读取 sysproc.c 中 fork/clone 相关系统调用",
+    "使用 lsp_get_call_graph 分析 sched 函数的入向调用 (exit/sleep/yield)",
+    "使用 grep_in_repo 搜索 context 结构体字段，确认保存的寄存器",
+    "使用 read_code_segment 读取 include/sched/proc.h 中 context 和 proc 定义",
+    "使用 lsp_get_definition 定位 mycpu 和 cpuid 函数实现",
+    "使用 grep_in_repo 搜索 trap 中是否有 proc_tick 调用",
+    "使用 read_code_segment 读取 proc_tick 函数 (行 740-774)",
+    "使用 lsp_get_references 查找 scheduler 的所有引用",
+    "使用 grep_in_repo 搜索 yield 函数的调用点"
+  ]
+}

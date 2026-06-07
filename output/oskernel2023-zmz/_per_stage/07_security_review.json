@@ -1,0 +1,101 @@
+{
+  "schema_version": "describe_review_v1",
+  "stage_id": "07_security",
+  "stage_title": "安全机制与权限模型",
+  "confidence": 0.98,
+  "question_reviews": [
+    {
+      "question_id": "Q07_001",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "答案值完全匹配选项 A 文本。证据摘录直接展示了 SSTATUS 寄存器位操作及用户/内核态切换逻辑，支撑充分。"
+    },
+    {
+      "question_id": "Q07_002",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态值 'stub' 符合题面约束。证据清晰区分了 struct proc 无凭证字段与 struct kstat 有字段但仅用于统计的事实，支撑 'stub' 结论。"
+    },
+    {
+      "question_id": "Q07_003",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "三态值 'stub' 准确。证据引用了代码注释 'consider the permission' 及 'assume user as root'，直接证明权限检查未真实执行。"
+    },
+    {
+      "question_id": "Q07_004",
+      "score_evidence": 0.95,
+      "score_consistency": 0.95,
+      "review": "列出了 3 个节点，符合 2-5 个要求。证据摘录与描述链路一致。值中包含行号引用但证据摘录未显式包含行号，轻微格式不一致。"
+    },
+    {
+      "question_id": "Q07_005",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "三态值 'implemented' 有强证据支撑。fetchaddr/copyin2 的调用链及 walkaddr 验证逻辑摘录清晰，证明用户指针验证存在。"
+    },
+    {
+      "question_id": "Q07_006",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "三态值 'not_found' 符合题面。证据基于关键词搜索（grep）结果为 0 命中，虽为间接证据但足以支撑 'not_found' 结论。"
+    },
+    {
+      "question_id": "Q07_007",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "三态值 'stub' 准确。证据指出宏被注释掉及函数被标记为 'abandoned'，直接证明栈保护机制未实际启用。"
+    },
+    {
+      "question_id": "Q07_008",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "三态值 'not_found' 符合题面。证据基于关键词搜索及 PMP 初始化配置（允许所有访问），支撑无安全启动/审计逻辑的结论。"
+    },
+    {
+      "question_id": "Q07_009",
+      "score_evidence": 1.0,
+      "score_consistency": 0.95,
+      "review": "逐架构作答符合要求（仅 RISC-V）。证据提供了寄存器定义及 PMP 初始化代码。值中包含行号引用但证据摘录未显式包含，轻微不一致。"
+    },
+    {
+      "question_id": "Q07_010",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "三态值 'not_found' 合理。证据说明内核主体为 C 语言，仅 SBI 为 Rust，因此内核层无 Rust 安全机制，逻辑自洽。"
+    },
+    {
+      "question_id": "Q07_011",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "三态值 'not_found' 符合题面。证据结合关键词搜索及 struct proc 单页表设计、usertrapret 直接切换行为，支撑无 KPTI 结论。"
+    },
+    {
+      "question_id": "Q07_012",
+      "score_evidence": 1.0,
+      "score_consistency": 0.95,
+      "review": "值明确标注 '字段存在但无检查链'，符合题面特殊要求。证据链完整（kstat 定义、faccessat 假设 root、getuid 硬编码）。值中行号引用与证据摘录格式轻微不一致。"
+    },
+    {
+      "question_id": "Q07_013",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "答案值完全匹配选项 D 文本。证据引用了无 uid 字段及假设 root 的代码片段，支撑无细粒度访问控制的结论。"
+    },
+    {
+      "question_id": "Q07_014",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "三态值 'not_found' 符合题面。证据通过 exec.c 中同时设置 R|W|X 标志的代码，直接证明无 W^X 保护，支撑有力。"
+    }
+  ],
+  "findings": [],
+  "summary_zh": "本报告整体质量较高，题面相符度好，三态及单选题选项均严格遵循约束。证据支撑度普遍较强，代码逻辑类题目（如权限检查、指针验证）摘录详实；搜索类题目（如 seccomp、audit）虽为间接证据但结论可信。部分简答题值中包含行号引用而证据摘录未显式对应，存在轻微格式不一致，但不影响实质评审。全阶段分按各题均值方案汇总。",
+  "report_quality_score": 0.98,
+  "_meta": {
+    "quality": {
+      "mean_question_confidence": 0.9768
+    },
+    "review_model": "qwen3.5-plus"
+  }
+}

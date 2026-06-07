@@ -1,0 +1,188 @@
+{
+  "schema_version": "describe_review_v1",
+  "stage_id": "03_mem_mgmt",
+  "stage_title": "内存管理（物理/虚拟/分配器）",
+  "confidence": 0.98,
+  "question_reviews": [
+    {
+      "question_id": "Q03_001",
+      "confidence": 0.95,
+      "review": "题面要求选择语言/形态。Value 选 B（C/Makefile），Evidence 指出是 C++ 实现但风格类似 xv6。虽语言细节（C++ vs C）有微小差异，但构建风格与非 Rust 形态一致，证据支撑结论。"
+    },
+    {
+      "question_id": "Q03_002",
+      "confidence": 1.0,
+      "review": "题面询问物理页帧分配器实现。Value 为 implemented，Evidence 列出 BuddySystem::Alloc 及 PMM 封装函数，证据充分支撑结论。"
+    },
+    {
+      "question_id": "Q03_003",
+      "confidence": 1.0,
+      "review": "题面询问分配算法。Value 选 A（伙伴系统），Evidence 引用 NodeState 枚举及二叉树结构实现，证据与结论一致。"
+    },
+    {
+      "question_id": "Q03_004",
+      "confidence": 1.0,
+      "review": "题面要求核心数据结构。Value 描述 tree 数组与 NodeState，Evidence 引用头文件成员定义及初始化代码，证据支撑具体结构描述。"
+    },
+    {
+      "question_id": "Q03_005",
+      "confidence": 1.0,
+      "review": "题面询问锁粒度。Value 指出全局 SpinLock 且说明持锁范围，Evidence 引用锁定义与初始化，证据支撑锁对象存在及类型。"
+    },
+    {
+      "question_id": "Q03_006",
+      "confidence": 1.0,
+      "review": "题面询问页表结构及操作。Value 为 implemented，Evidence 列出 PageTable 类及 walk/map/unmap 对应函数，证据充分。"
+    },
+    {
+      "question_id": "Q03_007",
+      "confidence": 1.0,
+      "review": "题面要求 API 函数名。Value 列出 walk/map_pages/vmunmap，Evidence 引用对应源文件及函数签名，证据与结论一致。"
+    },
+    {
+      "question_id": "Q03_008",
+      "confidence": 1.0,
+      "review": "题面询问页表并发控制。Value 指出 _virt_mem_lock 存在但依赖调用者持锁，Evidence 引用锁定义，证据支撑锁对象存在。"
+    },
+    {
+      "question_id": "Q03_009",
+      "confidence": 1.0,
+      "review": "题面询问内核/用户地址空间关系。Value 选 B（共享/常驻），Evidence 引用 KERNBASE 映射及 trampoline 处理，证据支撑高半核/常驻映射模式。"
+    },
+    {
+      "question_id": "Q03_010",
+      "confidence": 1.0,
+      "review": "题面询问缺页处理联动。Value 为 implemented，Evidence 引用 trap 入口及 allocate_vma_page，证据支撑缺页链路存在。"
+    },
+    {
+      "question_id": "Q03_011",
+      "confidence": 1.0,
+      "review": "题面要求追踪缺页链路。Value 列出 5 个关键节点，Evidence 引用对应函数调用关系，证据支撑链路描述。"
+    },
+    {
+      "question_id": "Q03_012",
+      "confidence": 1.0,
+      "review": "题面询问 CoW。Value 为 not_found，Evidence 说明搜索关键词 0 命中且 fork 为直接复制，证据支撑结论。"
+    },
+    {
+      "question_id": "Q03_013",
+      "confidence": 1.0,
+      "review": "题面询问惰性分配。Value 为 implemented，Evidence 说明 mmap 仅建 VMA，缺页时分配，证据支撑惰性机制。"
+    },
+    {
+      "question_id": "Q03_014",
+      "confidence": 1.0,
+      "review": "题面询问 swap。Value 为 not_found，Evidence 说明搜索 swap 关键词仅命中字节序转换，证据支撑无 swap 实现。"
+    },
+    {
+      "question_id": "Q03_015",
+      "confidence": 1.0,
+      "review": "题面询问 mmap 及标志位。Value 为 implemented，Evidence 引用 sys_mmap 及标志位定义，证据支撑完整实现。"
+    },
+    {
+      "question_id": "Q03_016",
+      "confidence": 1.0,
+      "review": "题面询问 Page Cache。Value 为 not_found，Evidence 说明搜索 page_cache 关键词无结果，证据支撑结论。"
+    },
+    {
+      "question_id": "Q03_017",
+      "confidence": 1.0,
+      "review": "题面询问脏页回写。Value 为 implemented，Evidence 引用 VMA 释放时写回逻辑，证据支撑存在回写机制（虽为同步）。"
+    },
+    {
+      "question_id": "Q03_018",
+      "confidence": 1.0,
+      "review": "题面询问 TLB Shootdown。Value 为 not_found，Evidence 说明搜索远程刷新关键词 0 命中，证据支撑结论。"
+    },
+    {
+      "question_id": "Q03_019",
+      "confidence": 1.0,
+      "review": "题面要求 TLB 刷新指令。Value 列出 sfence.vma/invtlb，Evidence 引用内联汇编封装，证据支撑指令点。"
+    },
+    {
+      "question_id": "Q03_020",
+      "confidence": 1.0,
+      "review": "题面询问用户指针检查。Value 描述 copy_in/out 结合页表与 VMA 检查，Evidence 引用相关函数逻辑，证据支撑机制。"
+    },
+    {
+      "question_id": "Q03_021",
+      "confidence": 1.0,
+      "review": "题面询问置换算法。Value 选 F（未实现），Evidence 说明无 swap 故无置换，与 Q03_014 一致，证据支撑。"
+    },
+    {
+      "question_id": "Q03_022",
+      "confidence": 1.0,
+      "review": "题面询问工作集/抖动。Value 为 not_found，Evidence 说明搜索相关关键词 0 命中，证据支撑结论。"
+    },
+    {
+      "question_id": "Q03_023",
+      "confidence": 1.0,
+      "review": "题面要求填空内存参数。Value 给出具体数值，Evidence 引用 PHYSTOP/PGSIZE/MAXVA 宏定义，证据支撑数值来源。"
+    },
+    {
+      "question_id": "Q03_024",
+      "confidence": 1.0,
+      "review": "题面询问内存保护形式。Value 选 C（硬件 + 软件），Evidence 引用 PTE 权限位及 copy_in 软件检查，证据支撑双重保护。"
+    },
+    {
+      "question_id": "Q03_025",
+      "confidence": 1.0,
+      "review": "题面询问逻辑内存组织结构。Value 指出 VMA 数组，Evidence 引用 struct VMA 定义，证据支撑结构存在。"
+    },
+    {
+      "question_id": "Q03_026",
+      "confidence": 1.0,
+      "review": "题面询问硬件分段。Value 选 C（纯分页），Evidence 引用 RISC-V 页表宏及无段描述符，证据支撑结论。"
+    },
+    {
+      "question_id": "Q03_027",
+      "confidence": 1.0,
+      "review": "题面询问取页策略。Value 选 B（惰性分配），Evidence 引用 mmap 建 VMA 及缺页分配逻辑，与 Q03_013 一致。"
+    },
+    {
+      "question_id": "Q03_028",
+      "confidence": 1.0,
+      "review": "题面询问放置策略。Value 指出未发现显式策略，Evidence 引用 grow_heap 及 mmap 地址选择逻辑，证据支撑描述。"
+    },
+    {
+      "question_id": "Q03_029",
+      "confidence": 1.0,
+      "review": "题面询问驻留集/负载控制。Value 为 not_found，Evidence 说明搜索 oom/reclaim 关键词 0 命中，证据支撑结论。"
+    },
+    {
+      "question_id": "Q03_030",
+      "confidence": 1.0,
+      "review": "题面要求内存主链路 Mermaid。Value 提供图表，Evidence 引用链路中各函数节点，证据支撑链路节点真实性。"
+    },
+    {
+      "question_id": "Q03_031",
+      "confidence": 1.0,
+      "review": "题面询问碎片类型。Value 选 D（无明显碎片），Evidence 引用 Buddy 合并及 Slab 机制，证据支撑缓解机制存在。"
+    },
+    {
+      "question_id": "Q03_032",
+      "confidence": 1.0,
+      "review": "题面询问地址重定位时机。Value 选 C（运行时），Evidence 引用 MMU 页表转换及 satp 设置，证据支撑动态绑定。"
+    },
+    {
+      "question_id": "Q03_033",
+      "confidence": 1.0,
+      "review": "题面询问置换作用域。Value 选 C（未实现），Evidence 说明无 swap 机制，与 Q03_014/021 一致。"
+    },
+    {
+      "question_id": "Q03_034",
+      "confidence": 1.0,
+      "review": "题面询问清理策略。Value 为 stub，Evidence 说明仅 VMA 释放时同步写回，无后台线程，证据支撑 stub 状态。"
+    }
+  ],
+  "dimensions": {
+    "evidence_supports_answers": 1.0,
+    "question_answer_consistency": 0.98,
+    "requirements_fit": 1.0
+  },
+  "findings": [],
+  "summary_zh": "全阶段 34 题均已作答。题面与答案一致性高，Evidence 均能支撑对应 Value 结论。Q03_001 中 Evidence 提及 C++ 而 Value 选 C 风格，属语言细节微小差异但不影响形态分类结论。JSON 契约符合，字段齐全，枚举合法。无证据缺失或矛盾项。",
+  "_meta": {
+    "review_model": "qwen3.5-plus"
+  }
+}

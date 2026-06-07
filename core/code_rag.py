@@ -158,6 +158,8 @@ class ASTParser:
         return chunks
 
 class CodeRAGEngine:
+    # 按模型 ID 进程内共享一份 SentenceTransformer，避免每次工具调用 new CodeRAGEngine 都占满一份显存。
+    _shared_embedding_models: Dict[str, Any] = {}
     _model_lock = threading.Lock()
     _project_locks_guard = threading.Lock()
     _project_locks = {}
@@ -183,31 +185,36 @@ class CodeRAGEngine:
     def _load_model(self):
         if self.model is not None:
             return
-            
-        with CodeRAGEngine._model_lock:
-            if self.model is not None:
-                return
-                
-            if SentenceTransformer is not None:
-                # 强制使用针对代码优化的 Jina 模型，禁止回退到其他模型
-                model_name = os.environ.get("CODE_EMBEDDING_MODEL", "jinaai/jina-embeddings-v2-base-code")
-                try:
-                    import torch
-                    from core.hf_env import load_sentence_transformer_for_embedding
+        if SentenceTransformer is None:
+            return
 
-                    device = "cuda" if torch.cuda.is_available() else "cpu"
-                    logger.info(f"正在加载代码嵌入模型: {model_name} (Device: {device})...")
-                    model_kwargs = {"dtype": torch.float32, "low_cpu_mem_usage": False}
-                    self.model = load_sentence_transformer_for_embedding(
-                        model_name,
-                        trust_remote_code=True,
-                        device=device,
-                        model_kwargs=model_kwargs,
-                    )
-                except Exception as e:
-                    msg = f"❌ 无法加载核心代码模型 {model_name}: {e}。请检查网络环境、HF_ENDPOINT 镜像或模型缓存。"
-                    logger.error(msg)
-                    raise RuntimeError(msg)
+        model_name = os.environ.get("CODE_EMBEDDING_MODEL", "jinaai/jina-embeddings-v2-base-code")
+
+        with CodeRAGEngine._model_lock:
+            cached = CodeRAGEngine._shared_embedding_models.get(model_name)
+            if cached is not None:
+                self.model = cached
+                return
+
+            try:
+                import torch
+                from core.hf_env import load_sentence_transformer_for_embedding
+
+                device = "cuda" if torch.cuda.is_available() else "cpu"
+                logger.info(f"正在加载代码嵌入模型: {model_name} (Device: {device}, 进程内共享) ...")
+                model_kwargs = {"dtype": torch.float32, "low_cpu_mem_usage": False}
+                loaded = load_sentence_transformer_for_embedding(
+                    model_name,
+                    trust_remote_code=True,
+                    device=device,
+                    model_kwargs=model_kwargs,
+                )
+                CodeRAGEngine._shared_embedding_models[model_name] = loaded
+                self.model = loaded
+            except Exception as e:
+                msg = f"❌ 无法加载核心代码模型 {model_name}: {e}。请检查网络环境、HF_ENDPOINT 镜像或模型缓存。"
+                logger.error(msg)
+                raise RuntimeError(msg)
 
     def build_index(self, repo_path: str, force: bool = False):
         lock = CodeRAGEngine._get_project_lock(os.path.abspath(self.db_dir))
@@ -240,7 +247,15 @@ class CodeRAGEngine:
             if self.model:
                 logger.info("正在生成代码向量...")
                 texts = [f"Name: {c.name}\nPath: {c.file_path}\nType: {c.node_type}\nCode:\n{c.code[:2000]}" for c in self.chunks]
-                self.vectors = self.model.encode(texts, normalize_embeddings=True)
+                # 长文本 + 默认大批量 encode 易在消费级显卡上 OOM；可通过环境变量收紧 batch
+                bs = int(os.environ.get("CODE_EMBEDDING_ENCODE_BATCH", "8"))
+                bs = max(1, bs)
+                self.vectors = self.model.encode(
+                    texts,
+                    normalize_embeddings=True,
+                    batch_size=bs,
+                    show_progress_bar=False,
+                )
                 self.vectors = np.array(self.vectors, dtype=np.float32)
                 self.save()
                 logger.info("代码向量生成完毕并保存。")
@@ -267,7 +282,13 @@ class CodeRAGEngine:
             
         if self.vectors is not None:
             self._load_model()
-            q_vec = self.model.encode([query], normalize_embeddings=True)[0]
+            # 部分开源 embedding（如 Qwen3-Embedding）建议 query 侧使用 prompts["query"]；
+            # 文档/代码块侧仍使用默认 encode。通过环境变量开启，不写死模型名。
+            q_prompt = os.environ.get("CODE_EMBEDDING_QUERY_PROMPT_NAME", "").strip()
+            q_kw: Dict[str, Any] = {"normalize_embeddings": True}
+            if q_prompt:
+                q_kw["prompt_name"] = q_prompt
+            q_vec = self.model.encode([query], **q_kw)[0]
             scores = np.dot(self.vectors, q_vec)
             top_indices = np.argsort(scores)[-top_k:][::-1]
             

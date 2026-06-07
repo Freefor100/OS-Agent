@@ -5,7 +5,393 @@
     {
       "question_id": "Q08_001",
       "question_type": "tri_state_impl",
-      "stem": "是否存在网络子系统实现（协议栈或 socket 层）？（必须三态）"
+      "stem": "是否存在网络子系统实现（协议栈或 socket 层）？（必须三态）",
+      "stage_id": "08_network",
+      "feature_ids": [
+        "feat_08_network_q08_001"
+      ],
+      "evidence_policy": {
+        "required_evidence_types": [
+          "definition",
+          "implementation_body",
+          "call_site",
+          "usage_flow",
+          "negative_search"
+        ],
+        "negative_search_policy": {
+          "keywords": [
+            "socket",
+            "bind",
+            "connect",
+            "sendto",
+            "recvfrom",
+            "Ethernet",
+            "ARP",
+            "IP",
+            "ICMP",
+            "UDP",
+            "TCP",
+            "smoltcp",
+            "lwip",
+            "netdev",
+            "virtio-net",
+            "e1000"
+          ],
+          "seed_paths": [
+            "kernel",
+            "net",
+            "network",
+            "driver",
+            "hal",
+            "syscall",
+            "include",
+            "Cargo.toml",
+            "Makefile"
+          ],
+          "minimum_keyword_coverage": 0.7,
+          "minimum_directory_coverage": 0.6
+        }
+      },
+      "tri_state_rule": {
+        "allowed_values": [
+          "implemented",
+          "stub",
+          "not_found",
+          "unknown"
+        ],
+        "feature_scope": "是否存在网络子系统实现（协议栈或 socket 层）？（必须三态）",
+        "diagnostic_checks": [
+          "“网络子系统实现”的内核定义、入口、对象或配置开关在哪里？",
+          "是否存在执行“网络子系统实现”语义的真实实现体，而不是声明、空函数或固定返回？",
+          "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
+          "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
+          "是否排除与“网络子系统实现”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？"
+        ],
+        "implemented": "必须由本题核心事实形成闭环：定义/入口、真实实现体、状态变化或调用链均有源码强证据；名称命中、README、声明或孤立结构不能判 implemented。",
+        "stub": "存在接口、常量、系统调用号、结构体壳、空实现、固定返回、ENOSYS/unsupported/todo/unimplemented 等占位形态时判 stub。",
+        "not_found": "只有完成本题 negative_search_coverage 或等价结构化负向搜索后仍无相关结构/实现/调用点，才判 not_found。",
+        "unknown": "证据不足、只找到弱线索、搜索覆盖不足、跨模块边界未闭合或多个事实冲突时判 unknown。",
+        "required_reasoning": "先完成 structured_facts，再按 concept_boundary 和 anti_examples 推出最终 value。"
+      },
+      "anti_examples": [
+        "RAG/grep 命中名称但没有读取实现体，不能判 implemented。",
+        "只有 trait/struct/extern/宏名/常量定义，不能判 implemented。",
+        "只搜索一个关键词或一个目录，不能判 not_found。"
+      ],
+      "diagnostic_checks": [
+        "“网络子系统实现”的内核定义、入口、对象或配置开关在哪里？",
+        "是否存在执行“网络子系统实现”语义的真实实现体，而不是声明、空函数或固定返回？",
+        "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
+        "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
+        "是否排除与“网络子系统实现”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+        "???????????????/socket/?????????????????"
+      ],
+      "structured_facts": [
+        {
+          "fact_id": "Q08_001_01",
+          "fact_key": "scope_definition",
+          "kind": "definition",
+          "question": "“网络子系统实现”的内核定义、入口、对象或配置开关在哪里？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_implemented_or_stub"
+        },
+        {
+          "fact_id": "Q08_001_02",
+          "fact_key": "real_implementation_body",
+          "kind": "implementation",
+          "question": "是否存在执行“网络子系统实现”语义的真实实现体，而不是声明、空函数或固定返回？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_implemented_or_stub"
+        },
+        {
+          "fact_id": "Q08_001_03",
+          "fact_key": "active_call_path",
+          "kind": "call_site",
+          "question": "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_implemented"
+        },
+        {
+          "fact_id": "Q08_001_04",
+          "fact_key": "state_or_effect",
+          "kind": "usage_flow",
+          "question": "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_implemented"
+        },
+        {
+          "fact_id": "Q08_001_05",
+          "fact_key": "stub_and_false_positive_filter",
+          "kind": "classification",
+          "question": "是否排除与“网络子系统实现”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "disambiguates_tri_state"
+        },
+        {
+          "fact_id": "Q08_001_06",
+          "fact_key": "negative_search_coverage",
+          "kind": "negative_search",
+          "question": "若未确认“网络子系统实现”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。",
+          "answer_type": "object",
+          "fields": {
+            "searched_keywords": "array<string>",
+            "searched_directories": "array<string>",
+            "file_count": "integer",
+            "match_count": "integer",
+            "coverage_sufficient": "boolean"
+          },
+          "evidence_required": [
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_not_found"
+        }
+      ],
+      "answer_contract": {
+        "mode": "structured_facts_first",
+        "final_field": "value",
+        "final_type": "enum",
+        "allowed_final_values": [
+          "implemented",
+          "stub",
+          "not_found",
+          "unknown"
+        ],
+        "required_fact_ids": [
+          "Q08_001_01",
+          "Q08_001_02",
+          "Q08_001_03",
+          "Q08_001_04",
+          "Q08_001_05",
+          "Q08_001_06"
+        ],
+        "evidence_reference": "evidence_id_only",
+        "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
+        "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。",
+        "allowed_values": [
+          "implemented",
+          "stub",
+          "not_found",
+          "unknown"
+        ]
+      },
+      "concept_boundary": "本题精确定义为：是否存在网络子系统实现（协议栈或 socket 层）？  本题属于网络子系统层，只看协议栈、socket API、网卡驱动衔接、协议支持和网络数据路径；块设备 DMA、普通 VFS fd 或孤立驱动 descriptor 不能替代网络语义。",
+      "task_hints": {
+        "diagnostic_checks": [
+          "“网络子系统实现”的内核定义、入口、对象或配置开关在哪里？",
+          "是否存在执行“网络子系统实现”语义的真实实现体，而不是声明、空函数或固定返回？",
+          "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
+          "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
+          "是否排除与“网络子系统实现”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+          "???????????????/socket/?????????????????"
+        ],
+        "structured_facts": [
+          {
+            "fact_id": "Q08_001_01",
+            "fact_key": "scope_definition",
+            "kind": "definition",
+            "question": "“网络子系统实现”的内核定义、入口、对象或配置开关在哪里？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_implemented_or_stub"
+          },
+          {
+            "fact_id": "Q08_001_02",
+            "fact_key": "real_implementation_body",
+            "kind": "implementation",
+            "question": "是否存在执行“网络子系统实现”语义的真实实现体，而不是声明、空函数或固定返回？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_implemented_or_stub"
+          },
+          {
+            "fact_id": "Q08_001_03",
+            "fact_key": "active_call_path",
+            "kind": "call_site",
+            "question": "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_implemented"
+          },
+          {
+            "fact_id": "Q08_001_04",
+            "fact_key": "state_or_effect",
+            "kind": "usage_flow",
+            "question": "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_implemented"
+          },
+          {
+            "fact_id": "Q08_001_05",
+            "fact_key": "stub_and_false_positive_filter",
+            "kind": "classification",
+            "question": "是否排除与“网络子系统实现”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "disambiguates_tri_state"
+          },
+          {
+            "fact_id": "Q08_001_06",
+            "fact_key": "negative_search_coverage",
+            "kind": "negative_search",
+            "question": "若未确认“网络子系统实现”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。",
+            "answer_type": "object",
+            "fields": {
+              "searched_keywords": "array<string>",
+              "searched_directories": "array<string>",
+              "file_count": "integer",
+              "match_count": "integer",
+              "coverage_sufficient": "boolean"
+            },
+            "evidence_required": [
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_not_found"
+          }
+        ],
+        "concept_boundary": "网络子系统需要 socket/API、协议栈状态机、网络设备或 loopback 数据路径。只有 syscall 号、用户头文件、README 声称或网卡常量不能判 implemented。"
+      },
+      "llm_answer_steps": [
+        "只回答 Q08_001 的题干，不使用相邻题结论替代。",
+        "先逐项填写 structured_facts 并绑定 evidence_id。",
+        "按 concept_boundary 排除同名或相似概念。",
+        "最后根据 answer_contract 输出 value；证据不足时降级 unknown。"
+      ]
     },
     {
       "question_id": "Q08_002",
@@ -16,22 +402,1441 @@
         "自研协议栈",
         "混合",
         "未发现"
+      ],
+      "stage_id": "08_network",
+      "feature_ids": [
+        "feat_08_network_q08_002"
+      ],
+      "evidence_policy": {
+        "required_evidence_types": [
+          "definition",
+          "implementation_body",
+          "call_site",
+          "usage_flow",
+          "negative_search"
+        ],
+        "negative_search_policy": {
+          "keywords": [
+            "socket",
+            "bind",
+            "connect",
+            "sendto",
+            "recvfrom",
+            "Ethernet",
+            "ARP",
+            "IP",
+            "ICMP",
+            "UDP",
+            "TCP",
+            "smoltcp",
+            "lwip",
+            "netdev",
+            "virtio-net",
+            "e1000"
+          ],
+          "seed_paths": [
+            "kernel",
+            "net",
+            "network",
+            "driver",
+            "hal",
+            "syscall",
+            "include",
+            "Cargo.toml",
+            "Makefile"
+          ],
+          "minimum_keyword_coverage": 0.7,
+          "minimum_directory_coverage": 0.6
+        }
+      },
+      "diagnostic_checks": [
+        "题目“协议栈来源更接近哪种？”的候选选项有哪些，是否只从题单 choices 中选择？",
+        "被选中的形态是否有源码、配置、调用链或数据结构证据直接支撑？",
+        "未选选项是否被源码证据、缺失证据或概念边界排除？",
+        "若多个选项同时成立或证据不足，是否按题意选择“其他/混合/unknown”并说明原因？",
+        "?????????????????????????????smoltcp/lwIP ??????????"
+      ],
+      "structured_facts": [
+        {
+          "fact_id": "Q08_002_01",
+          "fact_key": "candidate_set",
+          "kind": "classification",
+          "question": "题目“协议栈来源更接近哪种？”的候选选项有哪些，是否只从题单 choices 中选择？",
+          "answer_type": "list",
+          "item_shape": "evidence-backed item with status/path/symbol when applicable",
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q08_002_02",
+          "fact_key": "selected_choice_positive_evidence",
+          "kind": "usage_flow",
+          "question": "被选中的形态是否有源码、配置、调用链或数据结构证据直接支撑？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q08_002_03",
+          "fact_key": "alternative_choices_excluded",
+          "kind": "classification",
+          "question": "未选选项是否被源码证据、缺失证据或概念边界排除？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q08_002_04",
+          "fact_key": "mixed_or_unknown_handling",
+          "kind": "classification",
+          "question": "若多个选项同时成立或证据不足，是否按题意选择“其他/混合/unknown”并说明原因？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q08_002_05",
+          "fact_key": "negative_search_coverage",
+          "kind": "negative_search",
+          "question": "若未确认“协议栈来源更接近哪种？”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。",
+          "answer_type": "object",
+          "fields": {
+            "searched_keywords": "array<string>",
+            "searched_directories": "array<string>",
+            "file_count": "integer",
+            "match_count": "integer",
+            "coverage_sufficient": "boolean"
+          },
+          "evidence_required": [
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_not_found"
+        }
+      ],
+      "answer_contract": {
+        "mode": "structured_facts_first",
+        "final_field": "value",
+        "final_type": "choice",
+        "required_fact_ids": [
+          "Q08_002_01",
+          "Q08_002_02",
+          "Q08_002_03",
+          "Q08_002_04",
+          "Q08_002_05"
+        ],
+        "evidence_reference": "evidence_id_only",
+        "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
+        "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。"
+      },
+      "concept_boundary": "本题精确定义为：协议栈来源更接近哪种？  本题属于网络子系统层，只看协议栈、socket API、网卡驱动衔接、协议支持和网络数据路径；块设备 DMA、普通 VFS fd 或孤立驱动 descriptor 不能替代网络语义。",
+      "task_hints": {
+        "diagnostic_checks": [
+          "题目“协议栈来源更接近哪种？”的候选选项有哪些，是否只从题单 choices 中选择？",
+          "被选中的形态是否有源码、配置、调用链或数据结构证据直接支撑？",
+          "未选选项是否被源码证据、缺失证据或概念边界排除？",
+          "若多个选项同时成立或证据不足，是否按题意选择“其他/混合/unknown”并说明原因？",
+          "?????????????????????????????smoltcp/lwIP ??????????"
+        ],
+        "structured_facts": [
+          {
+            "fact_id": "Q08_002_01",
+            "fact_key": "candidate_set",
+            "kind": "classification",
+            "question": "题目“协议栈来源更接近哪种？”的候选选项有哪些，是否只从题单 choices 中选择？",
+            "answer_type": "list",
+            "item_shape": "evidence-backed item with status/path/symbol when applicable",
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_answer"
+          },
+          {
+            "fact_id": "Q08_002_02",
+            "fact_key": "selected_choice_positive_evidence",
+            "kind": "usage_flow",
+            "question": "被选中的形态是否有源码、配置、调用链或数据结构证据直接支撑？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_answer"
+          },
+          {
+            "fact_id": "Q08_002_03",
+            "fact_key": "alternative_choices_excluded",
+            "kind": "classification",
+            "question": "未选选项是否被源码证据、缺失证据或概念边界排除？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_answer"
+          },
+          {
+            "fact_id": "Q08_002_04",
+            "fact_key": "mixed_or_unknown_handling",
+            "kind": "classification",
+            "question": "若多个选项同时成立或证据不足，是否按题意选择“其他/混合/unknown”并说明原因？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_answer"
+          },
+          {
+            "fact_id": "Q08_002_05",
+            "fact_key": "negative_search_coverage",
+            "kind": "negative_search",
+            "question": "若未确认“协议栈来源更接近哪种？”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。",
+            "answer_type": "object",
+            "fields": {
+              "searched_keywords": "array<string>",
+              "searched_directories": "array<string>",
+              "file_count": "integer",
+              "match_count": "integer",
+              "coverage_sufficient": "boolean"
+            },
+            "evidence_required": [
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_not_found"
+          }
+        ],
+        "concept_boundary": "网络子系统需要 socket/API、协议栈状态机、网络设备或 loopback 数据路径。只有 syscall 号、用户头文件、README 声称或网卡常量不能判 implemented。"
+      },
+      "llm_answer_steps": [
+        "只回答 Q08_002 的题干，不使用相邻题结论替代。",
+        "先逐项填写 structured_facts 并绑定 evidence_id。",
+        "按 concept_boundary 排除同名或相似概念。",
+        "最后根据 answer_contract 输出 value；证据不足时降级 unknown。"
+      ],
+      "anti_examples": [
+        "RAG/grep 命中名称但没有读取实现体，不能判 implemented。",
+        "只有 trait/struct/extern/宏名/常量定义，不能判 implemented。",
+        "只搜索一个关键词或一个目录，不能判 not_found。"
       ]
     },
     {
       "question_id": "Q08_003",
       "question_type": "tri_state_impl",
-      "stem": "是否实现 socket 系统调用接口（socket/bind/connect/sendto/recvfrom 等）？（必须三态）"
+      "stem": "是否实现 socket 系统调用接口（socket/bind/connect/sendto/recvfrom 等）？（必须三态）",
+      "stage_id": "08_network",
+      "feature_ids": [
+        "feat_08_network_q08_003"
+      ],
+      "evidence_policy": {
+        "required_evidence_types": [
+          "definition",
+          "implementation_body",
+          "call_site",
+          "usage_flow",
+          "negative_search"
+        ],
+        "negative_search_policy": {
+          "keywords": [
+            "socket",
+            "bind",
+            "connect",
+            "sendto",
+            "recvfrom",
+            "Ethernet",
+            "ARP",
+            "IP",
+            "ICMP",
+            "UDP",
+            "TCP",
+            "smoltcp",
+            "lwip",
+            "netdev",
+            "virtio-net",
+            "e1000"
+          ],
+          "seed_paths": [
+            "kernel",
+            "net",
+            "network",
+            "driver",
+            "hal",
+            "syscall",
+            "include",
+            "Cargo.toml",
+            "Makefile"
+          ],
+          "minimum_keyword_coverage": 0.7,
+          "minimum_directory_coverage": 0.6
+        }
+      },
+      "tri_state_rule": {
+        "allowed_values": [
+          "implemented",
+          "stub",
+          "not_found",
+          "unknown"
+        ],
+        "feature_scope": "是否实现 socket 系统调用接口（socket/bind/connect/sendto/recvfrom 等）？（必须三态）",
+        "diagnostic_checks": [
+          "“socket 系统调用接口”的内核定义、入口、对象或配置开关在哪里？",
+          "是否存在执行“socket 系统调用接口”语义的真实实现体，而不是声明、空函数或固定返回？",
+          "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
+          "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
+          "是否排除与“socket 系统调用接口”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？"
+        ],
+        "implemented": "必须由本题核心事实形成闭环：定义/入口、真实实现体、状态变化或调用链均有源码强证据；名称命中、README、声明或孤立结构不能判 implemented。",
+        "stub": "存在接口、常量、系统调用号、结构体壳、空实现、固定返回、ENOSYS/unsupported/todo/unimplemented 等占位形态时判 stub。",
+        "not_found": "只有完成本题 negative_search_coverage 或等价结构化负向搜索后仍无相关结构/实现/调用点，才判 not_found。",
+        "unknown": "证据不足、只找到弱线索、搜索覆盖不足、跨模块边界未闭合或多个事实冲突时判 unknown。",
+        "required_reasoning": "先完成 structured_facts，再按 concept_boundary 和 anti_examples 推出最终 value。"
+      },
+      "anti_examples": [
+        "RAG/grep 命中名称但没有读取实现体，不能判 implemented。",
+        "只有 trait/struct/extern/宏名/常量定义，不能判 implemented。",
+        "只搜索一个关键词或一个目录，不能判 not_found。"
+      ],
+      "diagnostic_checks": [
+        "“socket 系统调用接口”的内核定义、入口、对象或配置开关在哪里？",
+        "是否存在执行“socket 系统调用接口”语义的真实实现体，而不是声明、空函数或固定返回？",
+        "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
+        "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
+        "是否排除与“socket 系统调用接口”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+        "???????socket ????? syscall ?????????????????????"
+      ],
+      "structured_facts": [
+        {
+          "fact_id": "Q08_003_01",
+          "fact_key": "scope_definition",
+          "kind": "definition",
+          "question": "“socket 系统调用接口”的内核定义、入口、对象或配置开关在哪里？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_implemented_or_stub"
+        },
+        {
+          "fact_id": "Q08_003_02",
+          "fact_key": "real_implementation_body",
+          "kind": "implementation",
+          "question": "是否存在执行“socket 系统调用接口”语义的真实实现体，而不是声明、空函数或固定返回？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_implemented_or_stub"
+        },
+        {
+          "fact_id": "Q08_003_03",
+          "fact_key": "active_call_path",
+          "kind": "call_site",
+          "question": "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_implemented"
+        },
+        {
+          "fact_id": "Q08_003_04",
+          "fact_key": "state_or_effect",
+          "kind": "usage_flow",
+          "question": "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_implemented"
+        },
+        {
+          "fact_id": "Q08_003_05",
+          "fact_key": "stub_and_false_positive_filter",
+          "kind": "classification",
+          "question": "是否排除与“socket 系统调用接口”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "disambiguates_tri_state"
+        },
+        {
+          "fact_id": "Q08_003_06",
+          "fact_key": "negative_search_coverage",
+          "kind": "negative_search",
+          "question": "若未确认“socket 系统调用接口”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。",
+          "answer_type": "object",
+          "fields": {
+            "searched_keywords": "array<string>",
+            "searched_directories": "array<string>",
+            "file_count": "integer",
+            "match_count": "integer",
+            "coverage_sufficient": "boolean"
+          },
+          "evidence_required": [
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_not_found"
+        }
+      ],
+      "answer_contract": {
+        "mode": "structured_facts_first",
+        "final_field": "value",
+        "final_type": "enum",
+        "allowed_final_values": [
+          "implemented",
+          "stub",
+          "not_found",
+          "unknown"
+        ],
+        "required_fact_ids": [
+          "Q08_003_01",
+          "Q08_003_02",
+          "Q08_003_03",
+          "Q08_003_04",
+          "Q08_003_05",
+          "Q08_003_06"
+        ],
+        "evidence_reference": "evidence_id_only",
+        "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
+        "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。",
+        "allowed_values": [
+          "implemented",
+          "stub",
+          "not_found",
+          "unknown"
+        ]
+      },
+      "concept_boundary": "本题精确定义为：是否实现 socket 系统调用接口（socket/bind/connect/sendto/recvfrom 等）？  本题属于网络子系统层，只看协议栈、socket API、网卡驱动衔接、协议支持和网络数据路径；块设备 DMA、普通 VFS fd 或孤立驱动 descriptor 不能替代网络语义。",
+      "task_hints": {
+        "diagnostic_checks": [
+          "“socket 系统调用接口”的内核定义、入口、对象或配置开关在哪里？",
+          "是否存在执行“socket 系统调用接口”语义的真实实现体，而不是声明、空函数或固定返回？",
+          "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
+          "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
+          "是否排除与“socket 系统调用接口”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+          "???????socket ????? syscall ?????????????????????"
+        ],
+        "structured_facts": [
+          {
+            "fact_id": "Q08_003_01",
+            "fact_key": "scope_definition",
+            "kind": "definition",
+            "question": "“socket 系统调用接口”的内核定义、入口、对象或配置开关在哪里？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_implemented_or_stub"
+          },
+          {
+            "fact_id": "Q08_003_02",
+            "fact_key": "real_implementation_body",
+            "kind": "implementation",
+            "question": "是否存在执行“socket 系统调用接口”语义的真实实现体，而不是声明、空函数或固定返回？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_implemented_or_stub"
+          },
+          {
+            "fact_id": "Q08_003_03",
+            "fact_key": "active_call_path",
+            "kind": "call_site",
+            "question": "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_implemented"
+          },
+          {
+            "fact_id": "Q08_003_04",
+            "fact_key": "state_or_effect",
+            "kind": "usage_flow",
+            "question": "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_implemented"
+          },
+          {
+            "fact_id": "Q08_003_05",
+            "fact_key": "stub_and_false_positive_filter",
+            "kind": "classification",
+            "question": "是否排除与“socket 系统调用接口”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "disambiguates_tri_state"
+          },
+          {
+            "fact_id": "Q08_003_06",
+            "fact_key": "negative_search_coverage",
+            "kind": "negative_search",
+            "question": "若未确认“socket 系统调用接口”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。",
+            "answer_type": "object",
+            "fields": {
+              "searched_keywords": "array<string>",
+              "searched_directories": "array<string>",
+              "file_count": "integer",
+              "match_count": "integer",
+              "coverage_sufficient": "boolean"
+            },
+            "evidence_required": [
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_not_found"
+          }
+        ],
+        "concept_boundary": "网络子系统需要 socket/API、协议栈状态机、网络设备或 loopback 数据路径。只有 syscall 号、用户头文件、README 声称或网卡常量不能判 implemented。"
+      },
+      "llm_answer_steps": [
+        "只回答 Q08_003 的题干，不使用相邻题结论替代。",
+        "先逐项填写 structured_facts 并绑定 evidence_id。",
+        "按 concept_boundary 排除同名或相似概念。",
+        "最后根据 answer_contract 输出 value；证据不足时降级 unknown。"
+      ]
     },
     {
       "question_id": "Q08_004",
       "question_type": "short_answer",
-      "stem": "选择一个发送路径（优先 sys_sendto），追踪：syscall → 协议栈 → 网卡驱动。列 3-6 个关键节点并给证据。"
+      "stem": "选择一个发送路径（优先 sys_sendto），追踪：syscall → 协议栈 → 网卡驱动。列 3-6 个关键节点并给证据。",
+      "stage_id": "08_network",
+      "feature_ids": [
+        "feat_08_network_q08_004"
+      ],
+      "evidence_policy": {
+        "required_evidence_types": [
+          "definition",
+          "implementation_body",
+          "call_site",
+          "usage_flow",
+          "negative_search"
+        ],
+        "negative_search_policy": {
+          "keywords": [
+            "socket",
+            "bind",
+            "connect",
+            "sendto",
+            "recvfrom",
+            "Ethernet",
+            "ARP",
+            "IP",
+            "ICMP",
+            "UDP",
+            "TCP",
+            "smoltcp",
+            "lwip",
+            "netdev",
+            "virtio-net",
+            "e1000"
+          ],
+          "seed_paths": [
+            "kernel",
+            "net",
+            "network",
+            "driver",
+            "hal",
+            "syscall",
+            "include",
+            "Cargo.toml",
+            "Makefile"
+          ],
+          "minimum_keyword_coverage": 0.7,
+          "minimum_directory_coverage": 0.6
+        }
+      },
+      "diagnostic_checks": [
+        "本题只回答“选择一个发送路径（优先 sys_sendto），追踪：syscall → 协议栈 → 网卡驱动。列 3-6 个关键节点并给证据。”，是否明确输出对象、范围、数量或状态字段？",
+        "支撑答案的主要源码/配置/文档锚点在哪里（路径、符号、结构体或常量）？",
+        "答案中的每个关键结论是否有实现体、调用链、状态变化或配置分支证据？",
+        "是否排除题干未要求的相邻模块、同名概念、用户态封装、README 口号或测试桩？",
+        "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？",
+        "????????????? sys_sendto ??????????/?????????"
+      ],
+      "structured_facts": [
+        {
+          "fact_id": "Q08_004_01",
+          "fact_key": "answer_scope",
+          "kind": "classification",
+          "question": "本题只回答“选择一个发送路径（优先 sys_sendto），追踪：syscall → 协议栈 → 网卡驱动。列 3-6 个关键节点并给证据。”，是否明确输出对象、范围、数量或状态字段？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q08_004_02",
+          "fact_key": "primary_evidence_anchor",
+          "kind": "definition",
+          "question": "支撑答案的主要源码/配置/文档锚点在哪里（路径、符号、结构体或常量）？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q08_004_03",
+          "fact_key": "implementation_or_flow_evidence",
+          "kind": "usage_flow",
+          "question": "答案中的每个关键结论是否有实现体、调用链、状态变化或配置分支证据？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q08_004_04",
+          "fact_key": "boundary_and_non_answers",
+          "kind": "classification",
+          "question": "是否排除题干未要求的相邻模块、同名概念、用户态封装、README 口号或测试桩？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "disambiguates_answer"
+        },
+        {
+          "fact_id": "Q08_004_05",
+          "fact_key": "unknown_or_partial_items",
+          "kind": "classification",
+          "question": "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q08_004_06",
+          "fact_key": "negative_search_coverage",
+          "kind": "negative_search",
+          "question": "若未确认“选择一个发送路径（优先 sys_sendto），追踪：syscall → 协议栈 → 网卡驱动。列 3-6 个关键节点并给证据。”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。",
+          "answer_type": "object",
+          "fields": {
+            "searched_keywords": "array<string>",
+            "searched_directories": "array<string>",
+            "file_count": "integer",
+            "match_count": "integer",
+            "coverage_sufficient": "boolean"
+          },
+          "evidence_required": [
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_not_found"
+        }
+      ],
+      "answer_contract": {
+        "mode": "structured_facts_first",
+        "final_field": "value",
+        "final_type": "structured_text",
+        "required_fact_ids": [
+          "Q08_004_01",
+          "Q08_004_02",
+          "Q08_004_03",
+          "Q08_004_04",
+          "Q08_004_05",
+          "Q08_004_06"
+        ],
+        "evidence_reference": "evidence_id_only",
+        "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
+        "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。"
+      },
+      "concept_boundary": "本题精确定义为：选择一个发送路径（优先 sys_sendto），追踪：syscall → 协议栈 → 网卡驱动。列 3-6 个关键节点并给证据。  本题属于网络子系统层，只看协议栈、socket API、网卡驱动衔接、协议支持和网络数据路径；块设备 DMA、普通 VFS fd 或孤立驱动 descriptor 不能替代网络语义。",
+      "task_hints": {
+        "diagnostic_checks": [
+          "本题只回答“选择一个发送路径（优先 sys_sendto），追踪：syscall → 协议栈 → 网卡驱动。列 3-6 个关键节点并给证据。”，是否明确输出对象、范围、数量或状态字段？",
+          "支撑答案的主要源码/配置/文档锚点在哪里（路径、符号、结构体或常量）？",
+          "答案中的每个关键结论是否有实现体、调用链、状态变化或配置分支证据？",
+          "是否排除题干未要求的相邻模块、同名概念、用户态封装、README 口号或测试桩？",
+          "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？",
+          "????????????? sys_sendto ??????????/?????????"
+        ],
+        "structured_facts": [
+          {
+            "fact_id": "Q08_004_01",
+            "fact_key": "answer_scope",
+            "kind": "classification",
+            "question": "本题只回答“选择一个发送路径（优先 sys_sendto），追踪：syscall → 协议栈 → 网卡驱动。列 3-6 个关键节点并给证据。”，是否明确输出对象、范围、数量或状态字段？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_answer"
+          },
+          {
+            "fact_id": "Q08_004_02",
+            "fact_key": "primary_evidence_anchor",
+            "kind": "definition",
+            "question": "支撑答案的主要源码/配置/文档锚点在哪里（路径、符号、结构体或常量）？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_answer"
+          },
+          {
+            "fact_id": "Q08_004_03",
+            "fact_key": "implementation_or_flow_evidence",
+            "kind": "usage_flow",
+            "question": "答案中的每个关键结论是否有实现体、调用链、状态变化或配置分支证据？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_answer"
+          },
+          {
+            "fact_id": "Q08_004_04",
+            "fact_key": "boundary_and_non_answers",
+            "kind": "classification",
+            "question": "是否排除题干未要求的相邻模块、同名概念、用户态封装、README 口号或测试桩？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "disambiguates_answer"
+          },
+          {
+            "fact_id": "Q08_004_05",
+            "fact_key": "unknown_or_partial_items",
+            "kind": "classification",
+            "question": "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_answer"
+          },
+          {
+            "fact_id": "Q08_004_06",
+            "fact_key": "negative_search_coverage",
+            "kind": "negative_search",
+            "question": "若未确认“选择一个发送路径（优先 sys_sendto），追踪：syscall → 协议栈 → 网卡驱动。列 3-6 个关键节点并给证据。”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。",
+            "answer_type": "object",
+            "fields": {
+              "searched_keywords": "array<string>",
+              "searched_directories": "array<string>",
+              "file_count": "integer",
+              "match_count": "integer",
+              "coverage_sufficient": "boolean"
+            },
+            "evidence_required": [
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_not_found"
+          }
+        ],
+        "concept_boundary": "网络子系统需要 socket/API、协议栈状态机、网络设备或 loopback 数据路径。只有 syscall 号、用户头文件、README 声称或网卡常量不能判 implemented。"
+      },
+      "llm_answer_steps": [
+        "只回答 Q08_004 的题干，不使用相邻题结论替代。",
+        "先逐项填写 structured_facts 并绑定 evidence_id。",
+        "按 concept_boundary 排除同名或相似概念。",
+        "最后根据 answer_contract 输出 value；证据不足时降级 unknown。"
+      ],
+      "anti_examples": [
+        "RAG/grep 命中名称但没有读取实现体，不能判 implemented。",
+        "只有 trait/struct/extern/宏名/常量定义，不能判 implemented。",
+        "只搜索一个关键词或一个目录，不能判 not_found。"
+      ]
     },
     {
       "question_id": "Q08_005",
       "question_type": "tri_state_impl",
-      "stem": "是否实现网卡驱动（virtio-net/e1000 等）与收包中断路径？（必须三态）"
+      "stem": "是否实现网卡驱动（virtio-net/e1000 等）与收包中断路径？（必须三态）",
+      "stage_id": "08_network",
+      "feature_ids": [
+        "feat_08_network_q08_005"
+      ],
+      "evidence_policy": {
+        "required_evidence_types": [
+          "definition",
+          "implementation_body",
+          "call_site",
+          "usage_flow",
+          "negative_search"
+        ],
+        "negative_search_policy": {
+          "keywords": [
+            "socket",
+            "bind",
+            "connect",
+            "sendto",
+            "recvfrom",
+            "Ethernet",
+            "ARP",
+            "IP",
+            "ICMP",
+            "UDP",
+            "TCP",
+            "smoltcp",
+            "lwip",
+            "netdev",
+            "virtio-net",
+            "e1000"
+          ],
+          "seed_paths": [
+            "kernel",
+            "net",
+            "network",
+            "driver",
+            "hal",
+            "syscall",
+            "include",
+            "Cargo.toml",
+            "Makefile"
+          ],
+          "minimum_keyword_coverage": 0.7,
+          "minimum_directory_coverage": 0.6
+        }
+      },
+      "tri_state_rule": {
+        "allowed_values": [
+          "implemented",
+          "stub",
+          "not_found",
+          "unknown"
+        ],
+        "feature_scope": "是否实现网卡驱动（virtio-net/e1000 等）与收包中断路径？（必须三态）",
+        "diagnostic_checks": [
+          "“网卡驱动”的内核定义、入口、对象或配置开关在哪里？",
+          "是否存在执行“网卡驱动”语义的真实实现体，而不是声明、空函数或固定返回？",
+          "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
+          "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
+          "是否排除与“网卡驱动”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？"
+        ],
+        "implemented": "必须由本题核心事实形成闭环：定义/入口、真实实现体、状态变化或调用链均有源码强证据；名称命中、README、声明或孤立结构不能判 implemented。",
+        "stub": "存在接口、常量、系统调用号、结构体壳、空实现、固定返回、ENOSYS/unsupported/todo/unimplemented 等占位形态时判 stub。",
+        "not_found": "只有完成本题 negative_search_coverage 或等价结构化负向搜索后仍无相关结构/实现/调用点，才判 not_found。",
+        "unknown": "证据不足、只找到弱线索、搜索覆盖不足、跨模块边界未闭合或多个事实冲突时判 unknown。",
+        "required_reasoning": "先完成 structured_facts，再按 concept_boundary 和 anti_examples 推出最终 value。"
+      },
+      "anti_examples": [
+        "RAG/grep 命中名称但没有读取实现体，不能判 implemented。",
+        "只有 trait/struct/extern/宏名/常量定义，不能判 implemented。",
+        "只搜索一个关键词或一个目录，不能判 not_found。"
+      ],
+      "diagnostic_checks": [
+        "“网卡驱动”的内核定义、入口、对象或配置开关在哪里？",
+        "是否存在执行“网卡驱动”语义的真实实现体，而不是声明、空函数或固定返回？",
+        "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
+        "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
+        "是否排除与“网卡驱动”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+        "??????????????????????/????????????"
+      ],
+      "structured_facts": [
+        {
+          "fact_id": "Q08_005_01",
+          "fact_key": "scope_definition",
+          "kind": "definition",
+          "question": "“网卡驱动”的内核定义、入口、对象或配置开关在哪里？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_implemented_or_stub"
+        },
+        {
+          "fact_id": "Q08_005_02",
+          "fact_key": "real_implementation_body",
+          "kind": "implementation",
+          "question": "是否存在执行“网卡驱动”语义的真实实现体，而不是声明、空函数或固定返回？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_implemented_or_stub"
+        },
+        {
+          "fact_id": "Q08_005_03",
+          "fact_key": "active_call_path",
+          "kind": "call_site",
+          "question": "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_implemented"
+        },
+        {
+          "fact_id": "Q08_005_04",
+          "fact_key": "state_or_effect",
+          "kind": "usage_flow",
+          "question": "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_implemented"
+        },
+        {
+          "fact_id": "Q08_005_05",
+          "fact_key": "stub_and_false_positive_filter",
+          "kind": "classification",
+          "question": "是否排除与“网卡驱动”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "disambiguates_tri_state"
+        },
+        {
+          "fact_id": "Q08_005_06",
+          "fact_key": "negative_search_coverage",
+          "kind": "negative_search",
+          "question": "若未确认“网卡驱动”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。",
+          "answer_type": "object",
+          "fields": {
+            "searched_keywords": "array<string>",
+            "searched_directories": "array<string>",
+            "file_count": "integer",
+            "match_count": "integer",
+            "coverage_sufficient": "boolean"
+          },
+          "evidence_required": [
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_not_found"
+        }
+      ],
+      "answer_contract": {
+        "mode": "structured_facts_first",
+        "final_field": "value",
+        "final_type": "enum",
+        "allowed_final_values": [
+          "implemented",
+          "stub",
+          "not_found",
+          "unknown"
+        ],
+        "required_fact_ids": [
+          "Q08_005_01",
+          "Q08_005_02",
+          "Q08_005_03",
+          "Q08_005_04",
+          "Q08_005_05",
+          "Q08_005_06"
+        ],
+        "evidence_reference": "evidence_id_only",
+        "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
+        "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。",
+        "allowed_values": [
+          "implemented",
+          "stub",
+          "not_found",
+          "unknown"
+        ]
+      },
+      "concept_boundary": "本题精确定义为：是否实现网卡驱动（virtio-net/e1000 等）与收包中断路径？  本题属于网络子系统层，只看协议栈、socket API、网卡驱动衔接、协议支持和网络数据路径；块设备 DMA、普通 VFS fd 或孤立驱动 descriptor 不能替代网络语义。",
+      "task_hints": {
+        "diagnostic_checks": [
+          "“网卡驱动”的内核定义、入口、对象或配置开关在哪里？",
+          "是否存在执行“网卡驱动”语义的真实实现体，而不是声明、空函数或固定返回？",
+          "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
+          "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
+          "是否排除与“网卡驱动”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+          "??????????????????????/????????????"
+        ],
+        "structured_facts": [
+          {
+            "fact_id": "Q08_005_01",
+            "fact_key": "scope_definition",
+            "kind": "definition",
+            "question": "“网卡驱动”的内核定义、入口、对象或配置开关在哪里？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_implemented_or_stub"
+          },
+          {
+            "fact_id": "Q08_005_02",
+            "fact_key": "real_implementation_body",
+            "kind": "implementation",
+            "question": "是否存在执行“网卡驱动”语义的真实实现体，而不是声明、空函数或固定返回？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_implemented_or_stub"
+          },
+          {
+            "fact_id": "Q08_005_03",
+            "fact_key": "active_call_path",
+            "kind": "call_site",
+            "question": "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_implemented"
+          },
+          {
+            "fact_id": "Q08_005_04",
+            "fact_key": "state_or_effect",
+            "kind": "usage_flow",
+            "question": "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_implemented"
+          },
+          {
+            "fact_id": "Q08_005_05",
+            "fact_key": "stub_and_false_positive_filter",
+            "kind": "classification",
+            "question": "是否排除与“网卡驱动”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "disambiguates_tri_state"
+          },
+          {
+            "fact_id": "Q08_005_06",
+            "fact_key": "negative_search_coverage",
+            "kind": "negative_search",
+            "question": "若未确认“网卡驱动”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。",
+            "answer_type": "object",
+            "fields": {
+              "searched_keywords": "array<string>",
+              "searched_directories": "array<string>",
+              "file_count": "integer",
+              "match_count": "integer",
+              "coverage_sufficient": "boolean"
+            },
+            "evidence_required": [
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_not_found"
+          }
+        ],
+        "concept_boundary": "网络子系统需要 socket/API、协议栈状态机、网络设备或 loopback 数据路径。只有 syscall 号、用户头文件、README 声称或网卡常量不能判 implemented。"
+      },
+      "llm_answer_steps": [
+        "只回答 Q08_005 的题干，不使用相邻题结论替代。",
+        "先逐项填写 structured_facts 并绑定 evidence_id。",
+        "按 concept_boundary 排除同名或相似概念。",
+        "最后根据 answer_contract 输出 value；证据不足时降级 unknown。"
+      ]
     },
     {
       "question_id": "Q08_006",
@@ -40,19 +1845,3320 @@
       "choices": [
         "Ethernet",
         "ARP",
-        "IPv4/IPv6",
+        "IPv4",
+        "IPv6",
         "ICMP",
         "UDP",
         "TCP",
         "DHCP",
         "DNS"
+      ],
+      "stage_id": "08_network",
+      "feature_ids": [
+        "feat_08_network_q08_006"
+      ],
+      "evidence_policy": {
+        "required_evidence_types": [
+          "definition",
+          "implementation_body",
+          "call_site",
+          "usage_flow",
+          "negative_search"
+        ],
+        "negative_search_policy": {
+          "keywords": [
+            "socket",
+            "bind",
+            "connect",
+            "sendto",
+            "recvfrom",
+            "Ethernet",
+            "ARP",
+            "IP",
+            "ICMP",
+            "UDP",
+            "TCP",
+            "smoltcp",
+            "lwip",
+            "netdev",
+            "virtio-net",
+            "e1000"
+          ],
+          "seed_paths": [
+            "kernel",
+            "net",
+            "network",
+            "driver",
+            "hal",
+            "syscall",
+            "include",
+            "Cargo.toml",
+            "Makefile"
+          ],
+          "minimum_keyword_coverage": 0.7,
+          "minimum_directory_coverage": 0.6
+        }
+      },
+      "diagnostic_checks": [
+        "逐项读取题单 choices，列出本题允许多选的全部候选项。",
+        "每个被选中的选项是否都有独立源码/配置/调用点证据？",
+        "未选选项是否经过关键词和目录搜索，而不是默认遗漏？",
+        "是否避免把相似选项、相邻模块或文档声称混作已选功能？",
+        "???????????????? DHCP/DNS/ARP/ICMP/TCP/UDP??????? not_found?"
+      ],
+      "structured_facts": [
+        {
+          "fact_id": "Q08_006_01",
+          "fact_key": "option_inventory",
+          "kind": "classification",
+          "question": "逐项读取题单 choices，列出本题允许多选的全部候选项。",
+          "answer_type": "list",
+          "item_shape": "evidence-backed item with status/path/symbol when applicable",
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q08_006_02",
+          "fact_key": "selected_options_evidence",
+          "kind": "usage_flow",
+          "question": "每个被选中的选项是否都有独立源码/配置/调用点证据？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q08_006_03",
+          "fact_key": "unselected_options_checked",
+          "kind": "negative_search",
+          "question": "未选选项是否经过关键词和目录搜索，而不是默认遗漏？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q08_006_04",
+          "fact_key": "no_option_conflation",
+          "kind": "classification",
+          "question": "是否避免把相似选项、相邻模块或文档声称混作已选功能？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q08_006_05",
+          "fact_key": "negative_search_coverage",
+          "kind": "negative_search",
+          "question": "若未确认“协议支持情况（多选；未发现则留空并在 notes 写 not_found）：”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。",
+          "answer_type": "object",
+          "fields": {
+            "searched_keywords": "array<string>",
+            "searched_directories": "array<string>",
+            "file_count": "integer",
+            "match_count": "integer",
+            "coverage_sufficient": "boolean"
+          },
+          "evidence_required": [
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_not_found"
+        }
+      ],
+      "answer_contract": {
+        "mode": "structured_facts_first",
+        "final_field": "value",
+        "final_type": "multi_choice",
+        "required_fact_ids": [
+          "Q08_006_01",
+          "Q08_006_02",
+          "Q08_006_03",
+          "Q08_006_04",
+          "Q08_006_05"
+        ],
+        "evidence_reference": "evidence_id_only",
+        "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
+        "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。"
+      },
+      "concept_boundary": "本题精确定义为：协议支持情况（多选；未发现则留空并在 notes 写 not_found）：  本题属于网络子系统层，只看协议栈、socket API、网卡驱动衔接、协议支持和网络数据路径；块设备 DMA、普通 VFS fd 或孤立驱动 descriptor 不能替代网络语义。",
+      "task_hints": {
+        "diagnostic_checks": [
+          "逐项读取题单 choices，列出本题允许多选的全部候选项。",
+          "每个被选中的选项是否都有独立源码/配置/调用点证据？",
+          "未选选项是否经过关键词和目录搜索，而不是默认遗漏？",
+          "是否避免把相似选项、相邻模块或文档声称混作已选功能？",
+          "???????????????? DHCP/DNS/ARP/ICMP/TCP/UDP??????? not_found?"
+        ],
+        "structured_facts": [
+          {
+            "fact_id": "Q08_006_01",
+            "fact_key": "option_inventory",
+            "kind": "classification",
+            "question": "逐项读取题单 choices，列出本题允许多选的全部候选项。",
+            "answer_type": "list",
+            "item_shape": "evidence-backed item with status/path/symbol when applicable",
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_answer"
+          },
+          {
+            "fact_id": "Q08_006_02",
+            "fact_key": "selected_options_evidence",
+            "kind": "usage_flow",
+            "question": "每个被选中的选项是否都有独立源码/配置/调用点证据？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_answer"
+          },
+          {
+            "fact_id": "Q08_006_03",
+            "fact_key": "unselected_options_checked",
+            "kind": "negative_search",
+            "question": "未选选项是否经过关键词和目录搜索，而不是默认遗漏？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_answer"
+          },
+          {
+            "fact_id": "Q08_006_04",
+            "fact_key": "no_option_conflation",
+            "kind": "classification",
+            "question": "是否避免把相似选项、相邻模块或文档声称混作已选功能？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_answer"
+          },
+          {
+            "fact_id": "Q08_006_05",
+            "fact_key": "negative_search_coverage",
+            "kind": "negative_search",
+            "question": "若未确认“协议支持情况（多选；未发现则留空并在 notes 写 not_found）：”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。",
+            "answer_type": "object",
+            "fields": {
+              "searched_keywords": "array<string>",
+              "searched_directories": "array<string>",
+              "file_count": "integer",
+              "match_count": "integer",
+              "coverage_sufficient": "boolean"
+            },
+            "evidence_required": [
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_not_found"
+          }
+        ],
+        "concept_boundary": "网络子系统需要 socket/API、协议栈状态机、网络设备或 loopback 数据路径。只有 syscall 号、用户头文件、README 声称或网卡常量不能判 implemented。"
+      },
+      "llm_answer_steps": [
+        "只回答 Q08_006 的题干，不使用相邻题结论替代。",
+        "先逐项填写 structured_facts 并绑定 evidence_id。",
+        "按 concept_boundary 排除同名或相似概念。",
+        "最后根据 answer_contract 输出 value；证据不足时降级 unknown。"
+      ],
+      "anti_examples": [
+        "RAG/grep 命中名称但没有读取实现体，不能判 implemented。",
+        "只有 trait/struct/extern/宏名/常量定义，不能判 implemented。",
+        "只搜索一个关键词或一个目录，不能判 not_found。"
       ]
     },
     {
       "question_id": "Q08_007",
-      "question_type": "tri_state_impl",
-      "stem": "是否存在零拷贝/共享缓冲/DMA 描述符等路径（zero-copy）？（必须三态；仅有名词不算 implemented）"
+      "question_type": "short_answer",
+      "stem": "网络数据路径中是否存在用户可见 zero-copy、内核共享缓冲、或网卡 DMA descriptor？请分别给状态与证据；普通 DMA descriptor 不自动等于 zero-copy。",
+      "stage_id": "08_network",
+      "feature_ids": [
+        "feat_08_network_q08_007"
+      ],
+      "evidence_policy": {
+        "required_evidence_types": [
+          "definition",
+          "implementation_body",
+          "call_site",
+          "usage_flow",
+          "negative_search"
+        ],
+        "negative_search_policy": {
+          "keywords": [
+            "socket",
+            "bind",
+            "connect",
+            "sendto",
+            "recvfrom",
+            "Ethernet",
+            "ARP",
+            "IP",
+            "ICMP",
+            "UDP",
+            "TCP",
+            "smoltcp",
+            "lwip",
+            "netdev",
+            "virtio-net",
+            "e1000",
+            "zero-copy",
+            "DMA"
+          ],
+          "seed_paths": [
+            "kernel",
+            "net",
+            "network",
+            "driver",
+            "hal",
+            "syscall",
+            "include",
+            "Cargo.toml",
+            "Makefile"
+          ],
+          "minimum_keyword_coverage": 0.7,
+          "minimum_directory_coverage": 0.6
+        }
+      },
+      "anti_examples": [
+        "virtio-net/e1000 descriptor 只说明 DMA，不等于用户可见 zero-copy。",
+        "只看到 packet buffer 类型，不等于端到端零拷贝。",
+        "块设备 DMA 不能作为网络 zero-copy 证据。"
+      ],
+      "diagnostic_checks": [
+        "本题只回答“网络数据路径中是否存在用户可见 zero-copy、内核共享缓冲、或网卡 DMA descriptor？请分别给状态与证据；普通 DMA descriptor 不自动等于 zero-copy。”，是否明确输出对象、范围、数量或状态字段？",
+        "支撑答案的主要源码/配置/文档锚点在哪里（路径、符号、结构体或常量）？",
+        "答案中的每个关键结论是否有实现体、调用链、状态变化或配置分支证据？",
+        "是否排除题干未要求的相邻模块、同名概念、用户态封装、README 口号或测试桩？",
+        "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？",
+        "???????zero-copy?????? DMA descriptor ??????? DMA descriptor ?????????????"
+      ],
+      "structured_facts": [
+        {
+          "fact_id": "Q08_007_01",
+          "fact_key": "answer_scope",
+          "kind": "classification",
+          "question": "本题只回答“网络数据路径中是否存在用户可见 zero-copy、内核共享缓冲、或网卡 DMA descriptor？请分别给状态与证据；普通 DMA descriptor 不自动等于 zero-copy。”，是否明确输出对象、范围、数量或状态字段？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q08_007_02",
+          "fact_key": "primary_evidence_anchor",
+          "kind": "definition",
+          "question": "支撑答案的主要源码/配置/文档锚点在哪里（路径、符号、结构体或常量）？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q08_007_03",
+          "fact_key": "implementation_or_flow_evidence",
+          "kind": "usage_flow",
+          "question": "答案中的每个关键结论是否有实现体、调用链、状态变化或配置分支证据？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q08_007_04",
+          "fact_key": "boundary_and_non_answers",
+          "kind": "classification",
+          "question": "是否排除题干未要求的相邻模块、同名概念、用户态封装、README 口号或测试桩？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "disambiguates_answer"
+        },
+        {
+          "fact_id": "Q08_007_05",
+          "fact_key": "unknown_or_partial_items",
+          "kind": "classification",
+          "question": "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q08_007_06",
+          "fact_key": "negative_search_coverage",
+          "kind": "negative_search",
+          "question": "若未确认“用户可见 zero-copy、内核共享缓冲、或网卡 DMA descriptor”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。",
+          "answer_type": "object",
+          "fields": {
+            "searched_keywords": "array<string>",
+            "searched_directories": "array<string>",
+            "file_count": "integer",
+            "match_count": "integer",
+            "coverage_sufficient": "boolean"
+          },
+          "evidence_required": [
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_not_found"
+        }
+      ],
+      "answer_contract": {
+        "mode": "structured_facts_first",
+        "final_field": "value",
+        "final_type": "structured_text",
+        "required_fact_ids": [
+          "Q08_007_01",
+          "Q08_007_02",
+          "Q08_007_03",
+          "Q08_007_04",
+          "Q08_007_05",
+          "Q08_007_06"
+        ],
+        "evidence_reference": "evidence_id_only",
+        "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
+        "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。"
+      },
+      "concept_boundary": "本题精确定义为：网络数据路径中是否存在用户可见 zero-copy、内核共享缓冲、或网卡 DMA descriptor？请分别给状态与证据；普通 DMA descriptor 不自动等于 zero-copy。 DMA 需要设备可访问物理地址或 descriptor 提交；zero-copy 需要用户/协议栈/设备路径减少复制，普通 descriptor 或 memcpy 优化不能互相替代。 本题属于网络子系统层，只看协议栈、socket API、网卡驱动衔接、协议支持和网络数据路径；块设备 DMA、普通 VFS fd 或孤立驱动 descriptor 不能替代网络语义。",
+      "task_hints": {
+        "diagnostic_checks": [
+          "本题只回答“网络数据路径中是否存在用户可见 zero-copy、内核共享缓冲、或网卡 DMA descriptor？请分别给状态与证据；普通 DMA descriptor 不自动等于 zero-copy。”，是否明确输出对象、范围、数量或状态字段？",
+          "支撑答案的主要源码/配置/文档锚点在哪里（路径、符号、结构体或常量）？",
+          "答案中的每个关键结论是否有实现体、调用链、状态变化或配置分支证据？",
+          "是否排除题干未要求的相邻模块、同名概念、用户态封装、README 口号或测试桩？",
+          "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？",
+          "???????zero-copy?????? DMA descriptor ??????? DMA descriptor ?????????????"
+        ],
+        "structured_facts": [
+          {
+            "fact_id": "Q08_007_01",
+            "fact_key": "answer_scope",
+            "kind": "classification",
+            "question": "本题只回答“网络数据路径中是否存在用户可见 zero-copy、内核共享缓冲、或网卡 DMA descriptor？请分别给状态与证据；普通 DMA descriptor 不自动等于 zero-copy。”，是否明确输出对象、范围、数量或状态字段？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_answer"
+          },
+          {
+            "fact_id": "Q08_007_02",
+            "fact_key": "primary_evidence_anchor",
+            "kind": "definition",
+            "question": "支撑答案的主要源码/配置/文档锚点在哪里（路径、符号、结构体或常量）？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_answer"
+          },
+          {
+            "fact_id": "Q08_007_03",
+            "fact_key": "implementation_or_flow_evidence",
+            "kind": "usage_flow",
+            "question": "答案中的每个关键结论是否有实现体、调用链、状态变化或配置分支证据？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_answer"
+          },
+          {
+            "fact_id": "Q08_007_04",
+            "fact_key": "boundary_and_non_answers",
+            "kind": "classification",
+            "question": "是否排除题干未要求的相邻模块、同名概念、用户态封装、README 口号或测试桩？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "disambiguates_answer"
+          },
+          {
+            "fact_id": "Q08_007_05",
+            "fact_key": "unknown_or_partial_items",
+            "kind": "classification",
+            "question": "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_answer"
+          },
+          {
+            "fact_id": "Q08_007_06",
+            "fact_key": "negative_search_coverage",
+            "kind": "negative_search",
+            "question": "若未确认“用户可见 zero-copy、内核共享缓冲、或网卡 DMA descriptor”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。",
+            "answer_type": "object",
+            "fields": {
+              "searched_keywords": "array<string>",
+              "searched_directories": "array<string>",
+              "file_count": "integer",
+              "match_count": "integer",
+              "coverage_sufficient": "boolean"
+            },
+            "evidence_required": [
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_not_found"
+          }
+        ],
+        "concept_boundary": "zero-copy 指用户缓冲、协议栈缓冲与设备传输之间减少或避免数据复制的端到端路径；共享 skb/packet buffer 是内核内部缓冲复用；网卡 DMA descriptor 只说明设备直接访问内存。三者相关但不能互相替代。"
+      },
+      "llm_answer_steps": [
+        "只回答 Q08_007 的题干，不使用相邻题结论替代。",
+        "先逐项填写 structured_facts 并绑定 evidence_id。",
+        "按 concept_boundary 排除同名或相似概念。",
+        "最后根据 answer_contract 输出 value；证据不足时降级 unknown。"
+      ]
     }
   ],
-  "stage_constraints_md": "**本阶段须额外覆盖**：\n- 若仅回环/仅 QEMU：写明**限制**；若多网卡：列**各自入口文件**与 feature 开关。\n- 若无网络实现：单列一节说明依据即可。\n\n必须回答：\n- 网络协议栈架构：自实现还是使用 `smoltcp`/`lwip` 等库？（**检查 Cargo.toml 依赖**）**如果完全没有网络支持，明确写“未实现网络功能（❌ 未实现）”**。\n- Socket 接口实现：是否有 `socket`/`bind`/`connect` 等 syscall？还是仅有 Loopback？\n- **功能限制声明（必须）**：分析项目是否已在真实物理网卡上测试过网络功能。如果仅在 QEMU 环境测试或仅支持本地回环通信，必须明确写出该限制。搜索 `loopback|LOOPBACK|127.0.0.1` 确认是否仅有回环设备。\n- **网卡驱动细节**：\n  - 搜索 `drivers/net/`, `virtio-drivers`, `ixgbe` 等。\n  - 列出支持的网卡类型（VirtIO, E1000, RTL8139, Intel 82599 等）。\n  - **PHY/MAC 层抽象**：是否存在独立的 PHY 驱动层？\n  - **错误处理**：描述一个网络操作失败（如 connect timeout）时的错误码传递流程。\n- **高级特性验证（必须 grep 代码）**：\n  - 零拷贝（Zero Copy）：搜索 `DMA` 或 `shared` buffer。只有在驱动层看到 DMA 描述符操作，或者协议栈层有 `mbuf` 传递引用，才算零拷贝。\n  - 多队列（Multi-queue）：是否有 RSS 支持？\n  - **协议支持**：DHCP, DNS, ARP, ICMP, TCP, UDP。\n  - **如果未找到代码，明确说明“不支持”**。\n- 数据包收发流程：追踪从 `virtio-net` 中断到 `tcp_recv` 的路径。\n- **禁止仅靠 README 断言**「支持某网卡/某平台/零拷贝」；须 `read_code_segment`/`grep_in_repo` 到驱动或协议栈源码。DMA/零拷贝声称须在驱动或 DMA 描述符路径上给出片段，否则标「未发现」。\n\n要求：\n- **语义发现（🥇 首选）**：使用 `rag_search_code` 搜索 \"smoltcp integration\", \"socket syscall\", \"VirtIO-Net driver\", \"network stack architecture\" 锁定网络源码。\n- 使用 `lsp_get_definition` 定位 `Socket` trait、`TcpSocket`/`UdpSocket` 结构体定义。\n- **【必须】使用 `lsp_get_call_graph` 追踪数据发送路径**（`sys_sendto` → 协议栈 → 网卡驱动）：\n  - `lsp_get_call_graph(repo_path, file_of_sys_sendto, \"sys_sendto\", direction=\"outgoing\", max_depth=4)`\n  - 如返回 `[⚠️ DEGRADED MODE]`，标注后继续使用 Grep 结果。\n- 使用 `lsp_get_references` 查找单层引用（如哪些地方调用了 `socket_write`、`tcp_send`）。\n- 使用 `lsp_get_document_outline` 浏览网络模块文件，发现所有 socket 操作和协议处理函数。\n- 辅以 grep_in_repo 搜索 net/、socket/、tcp/ 相关模块。\n- **严格区分**：使用了网络库（如 smoltcp）vs 自己实现了协议栈。\n\n**【评测与交付适配 — 本阶段启发式】**（须源码证据；无则略）：\n- 若测例涉及 iperf/netperf/网络吞吐，须与本仓网卡驱动和协议栈实现对照，写「能否实际跑通」结论并附路径。\n- 仅 QEMU/仅回环的限制（`loopback`/`127.0.0.1`）须明确声明；无多网卡或 `hostfwd` 时写「仅回环或 QEMU 虚拟网」。"
+  "features": [
+    {
+      "feature_id": "feat_08_network_q08_001",
+      "stage_id": "08_network",
+      "domain": "network_stack",
+      "feature_name": "Q08_001 是否存在网络子系统实现（协议栈或 socket 层）？（必须三态）",
+      "description": "是否存在网络子系统实现（协议栈或 socket 层）？（必须三态）",
+      "concept_boundary": "本题精确定义为：是否存在网络子系统实现（协议栈或 socket 层）？  本题属于网络子系统层，只看协议栈、socket API、网卡驱动衔接、协议支持和网络数据路径；块设备 DMA、普通 VFS fd 或孤立驱动 descriptor 不能替代网络语义。",
+      "dependencies": [
+        "05_fs_drivers",
+        "06_sync_ipc"
+      ],
+      "question_ids": [
+        "Q08_001"
+      ],
+      "tri_state_rule": {
+        "allowed_values": [
+          "implemented",
+          "stub",
+          "not_found",
+          "unknown"
+        ],
+        "feature_scope": "是否存在网络子系统实现（协议栈或 socket 层）？（必须三态）",
+        "diagnostic_checks": [
+          "“网络子系统实现”的内核定义、入口、对象或配置开关在哪里？",
+          "是否存在执行“网络子系统实现”语义的真实实现体，而不是声明、空函数或固定返回？",
+          "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
+          "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
+          "是否排除与“网络子系统实现”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？"
+        ],
+        "implemented": "必须由本题核心事实形成闭环：定义/入口、真实实现体、状态变化或调用链均有源码强证据；名称命中、README、声明或孤立结构不能判 implemented。",
+        "stub": "存在接口、常量、系统调用号、结构体壳、空实现、固定返回、ENOSYS/unsupported/todo/unimplemented 等占位形态时判 stub。",
+        "not_found": "只有完成本题 negative_search_coverage 或等价结构化负向搜索后仍无相关结构/实现/调用点，才判 not_found。",
+        "unknown": "证据不足、只找到弱线索、搜索覆盖不足、跨模块边界未闭合或多个事实冲突时判 unknown。",
+        "required_reasoning": "先完成 structured_facts，再按 concept_boundary 和 anti_examples 推出最终 value。"
+      },
+      "required_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ],
+      "negative_search_policy": {
+        "keywords": [
+          "socket",
+          "bind",
+          "connect",
+          "sendto",
+          "recvfrom",
+          "Ethernet",
+          "ARP",
+          "IP",
+          "ICMP",
+          "UDP",
+          "TCP",
+          "smoltcp",
+          "lwip",
+          "netdev",
+          "virtio-net",
+          "e1000"
+        ],
+        "seed_paths": [
+          "kernel",
+          "net",
+          "network",
+          "driver",
+          "hal",
+          "syscall",
+          "include",
+          "Cargo.toml",
+          "Makefile"
+        ],
+        "minimum_keyword_coverage": 0.7,
+        "minimum_directory_coverage": 0.6
+      },
+      "anti_examples": [
+        "RAG/grep 命中名称但没有读取实现体，不能判 implemented。",
+        "只有 trait/struct/extern/宏名/常量定义，不能判 implemented。",
+        "只搜索一个关键词或一个目录，不能判 not_found。"
+      ],
+      "diagnostic_checks": [
+        "“网络子系统实现”的内核定义、入口、对象或配置开关在哪里？",
+        "是否存在执行“网络子系统实现”语义的真实实现体，而不是声明、空函数或固定返回？",
+        "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
+        "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
+        "是否排除与“网络子系统实现”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？"
+      ],
+      "structured_facts": [
+        {
+          "fact_id": "Q08_001_01",
+          "fact_key": "scope_definition",
+          "kind": "definition",
+          "question": "“网络子系统实现”的内核定义、入口、对象或配置开关在哪里？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_implemented_or_stub"
+        },
+        {
+          "fact_id": "Q08_001_02",
+          "fact_key": "real_implementation_body",
+          "kind": "implementation",
+          "question": "是否存在执行“网络子系统实现”语义的真实实现体，而不是声明、空函数或固定返回？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_implemented_or_stub"
+        },
+        {
+          "fact_id": "Q08_001_03",
+          "fact_key": "active_call_path",
+          "kind": "call_site",
+          "question": "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_implemented"
+        },
+        {
+          "fact_id": "Q08_001_04",
+          "fact_key": "state_or_effect",
+          "kind": "usage_flow",
+          "question": "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_implemented"
+        },
+        {
+          "fact_id": "Q08_001_05",
+          "fact_key": "stub_and_false_positive_filter",
+          "kind": "classification",
+          "question": "是否排除与“网络子系统实现”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "disambiguates_tri_state"
+        },
+        {
+          "fact_id": "Q08_001_06",
+          "fact_key": "negative_search_coverage",
+          "kind": "negative_search",
+          "question": "若未确认“网络子系统实现”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。",
+          "answer_type": "object",
+          "fields": {
+            "searched_keywords": "array<string>",
+            "searched_directories": "array<string>",
+            "file_count": "integer",
+            "match_count": "integer",
+            "coverage_sufficient": "boolean"
+          },
+          "evidence_required": [
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_not_found"
+        }
+      ],
+      "answer_contract": {
+        "mode": "structured_facts_first",
+        "final_field": "value",
+        "final_type": "enum",
+        "allowed_final_values": [
+          "implemented",
+          "stub",
+          "not_found",
+          "unknown"
+        ],
+        "required_fact_ids": [
+          "Q08_001_01",
+          "Q08_001_02",
+          "Q08_001_03",
+          "Q08_001_04",
+          "Q08_001_05",
+          "Q08_001_06"
+        ],
+        "evidence_reference": "evidence_id_only",
+        "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
+        "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。",
+        "allowed_values": [
+          "implemented",
+          "stub",
+          "not_found",
+          "unknown"
+        ]
+      },
+      "graph_tags": [
+        "network",
+        "socket",
+        "protocol",
+        "driver",
+        "tri_state_impl"
+      ],
+      "seed_paths": [
+        "net",
+        "network",
+        "socket",
+        "driver",
+        "drivers",
+        "lwip",
+        "smoltcp"
+      ],
+      "keywords": [
+        "socket",
+        "tcp",
+        "udp",
+        "ip",
+        "arp",
+        "ethernet",
+        "sendto",
+        "recvfrom",
+        "网络"
+      ],
+      "task_hints": {
+        "diagnostic_checks": [
+          "“网络子系统实现”的内核定义、入口、对象或配置开关在哪里？",
+          "是否存在执行“网络子系统实现”语义的真实实现体，而不是声明、空函数或固定返回？",
+          "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
+          "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
+          "是否排除与“网络子系统实现”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？"
+        ],
+        "structured_facts": [
+          {
+            "fact_id": "Q08_001_01",
+            "fact_key": "scope_definition",
+            "kind": "definition",
+            "question": "“网络子系统实现”的内核定义、入口、对象或配置开关在哪里？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_implemented_or_stub"
+          },
+          {
+            "fact_id": "Q08_001_02",
+            "fact_key": "real_implementation_body",
+            "kind": "implementation",
+            "question": "是否存在执行“网络子系统实现”语义的真实实现体，而不是声明、空函数或固定返回？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_implemented_or_stub"
+          },
+          {
+            "fact_id": "Q08_001_03",
+            "fact_key": "active_call_path",
+            "kind": "call_site",
+            "question": "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_implemented"
+          },
+          {
+            "fact_id": "Q08_001_04",
+            "fact_key": "state_or_effect",
+            "kind": "usage_flow",
+            "question": "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_implemented"
+          },
+          {
+            "fact_id": "Q08_001_05",
+            "fact_key": "stub_and_false_positive_filter",
+            "kind": "classification",
+            "question": "是否排除与“网络子系统实现”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "disambiguates_tri_state"
+          },
+          {
+            "fact_id": "Q08_001_06",
+            "fact_key": "negative_search_coverage",
+            "kind": "negative_search",
+            "question": "若未确认“网络子系统实现”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。",
+            "answer_type": "object",
+            "fields": {
+              "searched_keywords": "array<string>",
+              "searched_directories": "array<string>",
+              "file_count": "integer",
+              "match_count": "integer",
+              "coverage_sufficient": "boolean"
+            },
+            "evidence_required": [
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_not_found"
+          }
+        ],
+        "concept_boundary": "网络子系统需要 socket/API、协议栈状态机、网络设备或 loopback 数据路径。只有 syscall 号、用户头文件、README 声称或网卡常量不能判 implemented。"
+      }
+    },
+    {
+      "feature_id": "feat_08_network_q08_002",
+      "stage_id": "08_network",
+      "domain": "network_stack",
+      "feature_name": "Q08_002 协议栈来源更接近哪种？",
+      "description": "协议栈来源更接近哪种？",
+      "concept_boundary": "本题精确定义为：协议栈来源更接近哪种？  本题属于网络子系统层，只看协议栈、socket API、网卡驱动衔接、协议支持和网络数据路径；块设备 DMA、普通 VFS fd 或孤立驱动 descriptor 不能替代网络语义。",
+      "dependencies": [
+        "05_fs_drivers",
+        "06_sync_ipc"
+      ],
+      "question_ids": [
+        "Q08_002"
+      ],
+      "required_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ],
+      "negative_search_policy": {
+        "keywords": [
+          "socket",
+          "bind",
+          "connect",
+          "sendto",
+          "recvfrom",
+          "Ethernet",
+          "ARP",
+          "IP",
+          "ICMP",
+          "UDP",
+          "TCP",
+          "smoltcp",
+          "lwip",
+          "netdev",
+          "virtio-net",
+          "e1000"
+        ],
+        "seed_paths": [
+          "kernel",
+          "net",
+          "network",
+          "driver",
+          "hal",
+          "syscall",
+          "include",
+          "Cargo.toml",
+          "Makefile"
+        ],
+        "minimum_keyword_coverage": 0.7,
+        "minimum_directory_coverage": 0.6
+      },
+      "anti_examples": [
+        "RAG/grep 命中名称但没有读取实现体，不能判 implemented。",
+        "只有 trait/struct/extern/宏名/常量定义，不能判 implemented。",
+        "只搜索一个关键词或一个目录，不能判 not_found。"
+      ],
+      "diagnostic_checks": [
+        "题目“协议栈来源更接近哪种？”的候选选项有哪些，是否只从题单 choices 中选择？",
+        "被选中的形态是否有源码、配置、调用链或数据结构证据直接支撑？",
+        "未选选项是否被源码证据、缺失证据或概念边界排除？",
+        "若多个选项同时成立或证据不足，是否按题意选择“其他/混合/unknown”并说明原因？"
+      ],
+      "structured_facts": [
+        {
+          "fact_id": "Q08_002_01",
+          "fact_key": "candidate_set",
+          "kind": "classification",
+          "question": "题目“协议栈来源更接近哪种？”的候选选项有哪些，是否只从题单 choices 中选择？",
+          "answer_type": "list",
+          "item_shape": "evidence-backed item with status/path/symbol when applicable",
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q08_002_02",
+          "fact_key": "selected_choice_positive_evidence",
+          "kind": "usage_flow",
+          "question": "被选中的形态是否有源码、配置、调用链或数据结构证据直接支撑？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q08_002_03",
+          "fact_key": "alternative_choices_excluded",
+          "kind": "classification",
+          "question": "未选选项是否被源码证据、缺失证据或概念边界排除？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q08_002_04",
+          "fact_key": "mixed_or_unknown_handling",
+          "kind": "classification",
+          "question": "若多个选项同时成立或证据不足，是否按题意选择“其他/混合/unknown”并说明原因？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q08_002_05",
+          "fact_key": "negative_search_coverage",
+          "kind": "negative_search",
+          "question": "若未确认“协议栈来源更接近哪种？”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。",
+          "answer_type": "object",
+          "fields": {
+            "searched_keywords": "array<string>",
+            "searched_directories": "array<string>",
+            "file_count": "integer",
+            "match_count": "integer",
+            "coverage_sufficient": "boolean"
+          },
+          "evidence_required": [
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_not_found"
+        }
+      ],
+      "answer_contract": {
+        "mode": "structured_facts_first",
+        "final_field": "value",
+        "final_type": "choice",
+        "required_fact_ids": [
+          "Q08_002_01",
+          "Q08_002_02",
+          "Q08_002_03",
+          "Q08_002_04",
+          "Q08_002_05"
+        ],
+        "evidence_reference": "evidence_id_only",
+        "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
+        "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。"
+      },
+      "graph_tags": [
+        "network",
+        "socket",
+        "protocol",
+        "driver",
+        "single_choice"
+      ],
+      "seed_paths": [
+        "net",
+        "network",
+        "socket",
+        "driver",
+        "drivers",
+        "lwip",
+        "smoltcp"
+      ],
+      "keywords": [
+        "socket",
+        "tcp",
+        "udp",
+        "ip",
+        "arp",
+        "ethernet",
+        "sendto",
+        "recvfrom"
+      ],
+      "task_hints": {
+        "diagnostic_checks": [
+          "题目“协议栈来源更接近哪种？”的候选选项有哪些，是否只从题单 choices 中选择？",
+          "被选中的形态是否有源码、配置、调用链或数据结构证据直接支撑？",
+          "未选选项是否被源码证据、缺失证据或概念边界排除？",
+          "若多个选项同时成立或证据不足，是否按题意选择“其他/混合/unknown”并说明原因？"
+        ],
+        "structured_facts": [
+          {
+            "fact_id": "Q08_002_01",
+            "fact_key": "candidate_set",
+            "kind": "classification",
+            "question": "题目“协议栈来源更接近哪种？”的候选选项有哪些，是否只从题单 choices 中选择？",
+            "answer_type": "list",
+            "item_shape": "evidence-backed item with status/path/symbol when applicable",
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_answer"
+          },
+          {
+            "fact_id": "Q08_002_02",
+            "fact_key": "selected_choice_positive_evidence",
+            "kind": "usage_flow",
+            "question": "被选中的形态是否有源码、配置、调用链或数据结构证据直接支撑？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_answer"
+          },
+          {
+            "fact_id": "Q08_002_03",
+            "fact_key": "alternative_choices_excluded",
+            "kind": "classification",
+            "question": "未选选项是否被源码证据、缺失证据或概念边界排除？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_answer"
+          },
+          {
+            "fact_id": "Q08_002_04",
+            "fact_key": "mixed_or_unknown_handling",
+            "kind": "classification",
+            "question": "若多个选项同时成立或证据不足，是否按题意选择“其他/混合/unknown”并说明原因？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_answer"
+          },
+          {
+            "fact_id": "Q08_002_05",
+            "fact_key": "negative_search_coverage",
+            "kind": "negative_search",
+            "question": "若未确认“协议栈来源更接近哪种？”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。",
+            "answer_type": "object",
+            "fields": {
+              "searched_keywords": "array<string>",
+              "searched_directories": "array<string>",
+              "file_count": "integer",
+              "match_count": "integer",
+              "coverage_sufficient": "boolean"
+            },
+            "evidence_required": [
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_not_found"
+          }
+        ],
+        "concept_boundary": "网络子系统需要 socket/API、协议栈状态机、网络设备或 loopback 数据路径。只有 syscall 号、用户头文件、README 声称或网卡常量不能判 implemented。"
+      }
+    },
+    {
+      "feature_id": "feat_08_network_q08_003",
+      "stage_id": "08_network",
+      "domain": "network_stack",
+      "feature_name": "Q08_003 是否实现 socket 系统调用接口（socket/bind/connect/sendto/recvfrom 等）？（必须三态）",
+      "description": "是否实现 socket 系统调用接口（socket/bind/connect/sendto/recvfrom 等）？（必须三态）",
+      "concept_boundary": "本题精确定义为：是否实现 socket 系统调用接口（socket/bind/connect/sendto/recvfrom 等）？  本题属于网络子系统层，只看协议栈、socket API、网卡驱动衔接、协议支持和网络数据路径；块设备 DMA、普通 VFS fd 或孤立驱动 descriptor 不能替代网络语义。",
+      "dependencies": [
+        "05_fs_drivers",
+        "06_sync_ipc"
+      ],
+      "question_ids": [
+        "Q08_003"
+      ],
+      "tri_state_rule": {
+        "allowed_values": [
+          "implemented",
+          "stub",
+          "not_found",
+          "unknown"
+        ],
+        "feature_scope": "是否实现 socket 系统调用接口（socket/bind/connect/sendto/recvfrom 等）？（必须三态）",
+        "diagnostic_checks": [
+          "“socket 系统调用接口”的内核定义、入口、对象或配置开关在哪里？",
+          "是否存在执行“socket 系统调用接口”语义的真实实现体，而不是声明、空函数或固定返回？",
+          "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
+          "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
+          "是否排除与“socket 系统调用接口”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？"
+        ],
+        "implemented": "必须由本题核心事实形成闭环：定义/入口、真实实现体、状态变化或调用链均有源码强证据；名称命中、README、声明或孤立结构不能判 implemented。",
+        "stub": "存在接口、常量、系统调用号、结构体壳、空实现、固定返回、ENOSYS/unsupported/todo/unimplemented 等占位形态时判 stub。",
+        "not_found": "只有完成本题 negative_search_coverage 或等价结构化负向搜索后仍无相关结构/实现/调用点，才判 not_found。",
+        "unknown": "证据不足、只找到弱线索、搜索覆盖不足、跨模块边界未闭合或多个事实冲突时判 unknown。",
+        "required_reasoning": "先完成 structured_facts，再按 concept_boundary 和 anti_examples 推出最终 value。"
+      },
+      "required_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ],
+      "negative_search_policy": {
+        "keywords": [
+          "socket",
+          "bind",
+          "connect",
+          "sendto",
+          "recvfrom",
+          "Ethernet",
+          "ARP",
+          "IP",
+          "ICMP",
+          "UDP",
+          "TCP",
+          "smoltcp",
+          "lwip",
+          "netdev",
+          "virtio-net",
+          "e1000"
+        ],
+        "seed_paths": [
+          "kernel",
+          "net",
+          "network",
+          "driver",
+          "hal",
+          "syscall",
+          "include",
+          "Cargo.toml",
+          "Makefile"
+        ],
+        "minimum_keyword_coverage": 0.7,
+        "minimum_directory_coverage": 0.6
+      },
+      "anti_examples": [
+        "RAG/grep 命中名称但没有读取实现体，不能判 implemented。",
+        "只有 trait/struct/extern/宏名/常量定义，不能判 implemented。",
+        "只搜索一个关键词或一个目录，不能判 not_found。"
+      ],
+      "diagnostic_checks": [
+        "“socket 系统调用接口”的内核定义、入口、对象或配置开关在哪里？",
+        "是否存在执行“socket 系统调用接口”语义的真实实现体，而不是声明、空函数或固定返回？",
+        "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
+        "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
+        "是否排除与“socket 系统调用接口”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？"
+      ],
+      "structured_facts": [
+        {
+          "fact_id": "Q08_003_01",
+          "fact_key": "scope_definition",
+          "kind": "definition",
+          "question": "“socket 系统调用接口”的内核定义、入口、对象或配置开关在哪里？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_implemented_or_stub"
+        },
+        {
+          "fact_id": "Q08_003_02",
+          "fact_key": "real_implementation_body",
+          "kind": "implementation",
+          "question": "是否存在执行“socket 系统调用接口”语义的真实实现体，而不是声明、空函数或固定返回？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_implemented_or_stub"
+        },
+        {
+          "fact_id": "Q08_003_03",
+          "fact_key": "active_call_path",
+          "kind": "call_site",
+          "question": "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_implemented"
+        },
+        {
+          "fact_id": "Q08_003_04",
+          "fact_key": "state_or_effect",
+          "kind": "usage_flow",
+          "question": "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_implemented"
+        },
+        {
+          "fact_id": "Q08_003_05",
+          "fact_key": "stub_and_false_positive_filter",
+          "kind": "classification",
+          "question": "是否排除与“socket 系统调用接口”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "disambiguates_tri_state"
+        },
+        {
+          "fact_id": "Q08_003_06",
+          "fact_key": "negative_search_coverage",
+          "kind": "negative_search",
+          "question": "若未确认“socket 系统调用接口”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。",
+          "answer_type": "object",
+          "fields": {
+            "searched_keywords": "array<string>",
+            "searched_directories": "array<string>",
+            "file_count": "integer",
+            "match_count": "integer",
+            "coverage_sufficient": "boolean"
+          },
+          "evidence_required": [
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_not_found"
+        }
+      ],
+      "answer_contract": {
+        "mode": "structured_facts_first",
+        "final_field": "value",
+        "final_type": "enum",
+        "allowed_final_values": [
+          "implemented",
+          "stub",
+          "not_found",
+          "unknown"
+        ],
+        "required_fact_ids": [
+          "Q08_003_01",
+          "Q08_003_02",
+          "Q08_003_03",
+          "Q08_003_04",
+          "Q08_003_05",
+          "Q08_003_06"
+        ],
+        "evidence_reference": "evidence_id_only",
+        "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
+        "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。",
+        "allowed_values": [
+          "implemented",
+          "stub",
+          "not_found",
+          "unknown"
+        ]
+      },
+      "graph_tags": [
+        "network",
+        "socket",
+        "protocol",
+        "driver",
+        "tri_state_impl"
+      ],
+      "seed_paths": [
+        "net",
+        "network",
+        "socket",
+        "driver",
+        "drivers",
+        "lwip",
+        "smoltcp"
+      ],
+      "keywords": [
+        "socket",
+        "tcp",
+        "udp",
+        "ip",
+        "arp",
+        "ethernet",
+        "sendto",
+        "recvfrom",
+        "bind",
+        "connect",
+        "系统调用"
+      ],
+      "task_hints": {
+        "diagnostic_checks": [
+          "“socket 系统调用接口”的内核定义、入口、对象或配置开关在哪里？",
+          "是否存在执行“socket 系统调用接口”语义的真实实现体，而不是声明、空函数或固定返回？",
+          "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
+          "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
+          "是否排除与“socket 系统调用接口”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？"
+        ],
+        "structured_facts": [
+          {
+            "fact_id": "Q08_003_01",
+            "fact_key": "scope_definition",
+            "kind": "definition",
+            "question": "“socket 系统调用接口”的内核定义、入口、对象或配置开关在哪里？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_implemented_or_stub"
+          },
+          {
+            "fact_id": "Q08_003_02",
+            "fact_key": "real_implementation_body",
+            "kind": "implementation",
+            "question": "是否存在执行“socket 系统调用接口”语义的真实实现体，而不是声明、空函数或固定返回？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_implemented_or_stub"
+          },
+          {
+            "fact_id": "Q08_003_03",
+            "fact_key": "active_call_path",
+            "kind": "call_site",
+            "question": "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_implemented"
+          },
+          {
+            "fact_id": "Q08_003_04",
+            "fact_key": "state_or_effect",
+            "kind": "usage_flow",
+            "question": "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_implemented"
+          },
+          {
+            "fact_id": "Q08_003_05",
+            "fact_key": "stub_and_false_positive_filter",
+            "kind": "classification",
+            "question": "是否排除与“socket 系统调用接口”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "disambiguates_tri_state"
+          },
+          {
+            "fact_id": "Q08_003_06",
+            "fact_key": "negative_search_coverage",
+            "kind": "negative_search",
+            "question": "若未确认“socket 系统调用接口”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。",
+            "answer_type": "object",
+            "fields": {
+              "searched_keywords": "array<string>",
+              "searched_directories": "array<string>",
+              "file_count": "integer",
+              "match_count": "integer",
+              "coverage_sufficient": "boolean"
+            },
+            "evidence_required": [
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_not_found"
+          }
+        ],
+        "concept_boundary": "网络子系统需要 socket/API、协议栈状态机、网络设备或 loopback 数据路径。只有 syscall 号、用户头文件、README 声称或网卡常量不能判 implemented。"
+      }
+    },
+    {
+      "feature_id": "feat_08_network_q08_004",
+      "stage_id": "08_network",
+      "domain": "network_stack",
+      "feature_name": "Q08_004 选择一个发送路径（优先 sys_sendto），追踪：syscall → 协议栈 → 网卡驱动。列 3-6 个关键节点并给证据。",
+      "description": "选择一个发送路径（优先 sys_sendto），追踪：syscall → 协议栈 → 网卡驱动。列 3-6 个关键节点并给证据。",
+      "concept_boundary": "本题精确定义为：选择一个发送路径（优先 sys_sendto），追踪：syscall → 协议栈 → 网卡驱动。列 3-6 个关键节点并给证据。  本题属于网络子系统层，只看协议栈、socket API、网卡驱动衔接、协议支持和网络数据路径；块设备 DMA、普通 VFS fd 或孤立驱动 descriptor 不能替代网络语义。",
+      "dependencies": [
+        "05_fs_drivers",
+        "06_sync_ipc"
+      ],
+      "question_ids": [
+        "Q08_004"
+      ],
+      "required_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ],
+      "negative_search_policy": {
+        "keywords": [
+          "socket",
+          "bind",
+          "connect",
+          "sendto",
+          "recvfrom",
+          "Ethernet",
+          "ARP",
+          "IP",
+          "ICMP",
+          "UDP",
+          "TCP",
+          "smoltcp",
+          "lwip",
+          "netdev",
+          "virtio-net",
+          "e1000"
+        ],
+        "seed_paths": [
+          "kernel",
+          "net",
+          "network",
+          "driver",
+          "hal",
+          "syscall",
+          "include",
+          "Cargo.toml",
+          "Makefile"
+        ],
+        "minimum_keyword_coverage": 0.7,
+        "minimum_directory_coverage": 0.6
+      },
+      "anti_examples": [
+        "RAG/grep 命中名称但没有读取实现体，不能判 implemented。",
+        "只有 trait/struct/extern/宏名/常量定义，不能判 implemented。",
+        "只搜索一个关键词或一个目录，不能判 not_found。"
+      ],
+      "diagnostic_checks": [
+        "本题只回答“选择一个发送路径（优先 sys_sendto），追踪：syscall → 协议栈 → 网卡驱动。列 3-6 个关键节点并给证据。”，是否明确输出对象、范围、数量或状态字段？",
+        "支撑答案的主要源码/配置/文档锚点在哪里（路径、符号、结构体或常量）？",
+        "答案中的每个关键结论是否有实现体、调用链、状态变化或配置分支证据？",
+        "是否排除题干未要求的相邻模块、同名概念、用户态封装、README 口号或测试桩？",
+        "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？"
+      ],
+      "structured_facts": [
+        {
+          "fact_id": "Q08_004_01",
+          "fact_key": "answer_scope",
+          "kind": "classification",
+          "question": "本题只回答“选择一个发送路径（优先 sys_sendto），追踪：syscall → 协议栈 → 网卡驱动。列 3-6 个关键节点并给证据。”，是否明确输出对象、范围、数量或状态字段？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q08_004_02",
+          "fact_key": "primary_evidence_anchor",
+          "kind": "definition",
+          "question": "支撑答案的主要源码/配置/文档锚点在哪里（路径、符号、结构体或常量）？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q08_004_03",
+          "fact_key": "implementation_or_flow_evidence",
+          "kind": "usage_flow",
+          "question": "答案中的每个关键结论是否有实现体、调用链、状态变化或配置分支证据？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q08_004_04",
+          "fact_key": "boundary_and_non_answers",
+          "kind": "classification",
+          "question": "是否排除题干未要求的相邻模块、同名概念、用户态封装、README 口号或测试桩？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "disambiguates_answer"
+        },
+        {
+          "fact_id": "Q08_004_05",
+          "fact_key": "unknown_or_partial_items",
+          "kind": "classification",
+          "question": "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q08_004_06",
+          "fact_key": "negative_search_coverage",
+          "kind": "negative_search",
+          "question": "若未确认“选择一个发送路径（优先 sys_sendto），追踪：syscall → 协议栈 → 网卡驱动。列 3-6 个关键节点并给证据。”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。",
+          "answer_type": "object",
+          "fields": {
+            "searched_keywords": "array<string>",
+            "searched_directories": "array<string>",
+            "file_count": "integer",
+            "match_count": "integer",
+            "coverage_sufficient": "boolean"
+          },
+          "evidence_required": [
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_not_found"
+        }
+      ],
+      "answer_contract": {
+        "mode": "structured_facts_first",
+        "final_field": "value",
+        "final_type": "structured_text",
+        "required_fact_ids": [
+          "Q08_004_01",
+          "Q08_004_02",
+          "Q08_004_03",
+          "Q08_004_04",
+          "Q08_004_05",
+          "Q08_004_06"
+        ],
+        "evidence_reference": "evidence_id_only",
+        "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
+        "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。"
+      },
+      "graph_tags": [
+        "network",
+        "socket",
+        "protocol",
+        "driver",
+        "short_answer"
+      ],
+      "seed_paths": [
+        "net",
+        "network",
+        "socket",
+        "driver",
+        "drivers",
+        "lwip",
+        "smoltcp"
+      ],
+      "keywords": [
+        "socket",
+        "tcp",
+        "udp",
+        "ip",
+        "arp",
+        "ethernet",
+        "sendto",
+        "recvfrom",
+        "sys_sendto",
+        "syscall"
+      ],
+      "task_hints": {
+        "diagnostic_checks": [
+          "本题只回答“选择一个发送路径（优先 sys_sendto），追踪：syscall → 协议栈 → 网卡驱动。列 3-6 个关键节点并给证据。”，是否明确输出对象、范围、数量或状态字段？",
+          "支撑答案的主要源码/配置/文档锚点在哪里（路径、符号、结构体或常量）？",
+          "答案中的每个关键结论是否有实现体、调用链、状态变化或配置分支证据？",
+          "是否排除题干未要求的相邻模块、同名概念、用户态封装、README 口号或测试桩？",
+          "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？"
+        ],
+        "structured_facts": [
+          {
+            "fact_id": "Q08_004_01",
+            "fact_key": "answer_scope",
+            "kind": "classification",
+            "question": "本题只回答“选择一个发送路径（优先 sys_sendto），追踪：syscall → 协议栈 → 网卡驱动。列 3-6 个关键节点并给证据。”，是否明确输出对象、范围、数量或状态字段？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_answer"
+          },
+          {
+            "fact_id": "Q08_004_02",
+            "fact_key": "primary_evidence_anchor",
+            "kind": "definition",
+            "question": "支撑答案的主要源码/配置/文档锚点在哪里（路径、符号、结构体或常量）？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_answer"
+          },
+          {
+            "fact_id": "Q08_004_03",
+            "fact_key": "implementation_or_flow_evidence",
+            "kind": "usage_flow",
+            "question": "答案中的每个关键结论是否有实现体、调用链、状态变化或配置分支证据？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_answer"
+          },
+          {
+            "fact_id": "Q08_004_04",
+            "fact_key": "boundary_and_non_answers",
+            "kind": "classification",
+            "question": "是否排除题干未要求的相邻模块、同名概念、用户态封装、README 口号或测试桩？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "disambiguates_answer"
+          },
+          {
+            "fact_id": "Q08_004_05",
+            "fact_key": "unknown_or_partial_items",
+            "kind": "classification",
+            "question": "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_answer"
+          },
+          {
+            "fact_id": "Q08_004_06",
+            "fact_key": "negative_search_coverage",
+            "kind": "negative_search",
+            "question": "若未确认“选择一个发送路径（优先 sys_sendto），追踪：syscall → 协议栈 → 网卡驱动。列 3-6 个关键节点并给证据。”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。",
+            "answer_type": "object",
+            "fields": {
+              "searched_keywords": "array<string>",
+              "searched_directories": "array<string>",
+              "file_count": "integer",
+              "match_count": "integer",
+              "coverage_sufficient": "boolean"
+            },
+            "evidence_required": [
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_not_found"
+          }
+        ],
+        "concept_boundary": "网络子系统需要 socket/API、协议栈状态机、网络设备或 loopback 数据路径。只有 syscall 号、用户头文件、README 声称或网卡常量不能判 implemented。"
+      }
+    },
+    {
+      "feature_id": "feat_08_network_q08_005",
+      "stage_id": "08_network",
+      "domain": "network_stack",
+      "feature_name": "Q08_005 是否实现网卡驱动（virtio-net/e1000 等）与收包中断路径？（必须三态）",
+      "description": "是否实现网卡驱动（virtio-net/e1000 等）与收包中断路径？（必须三态）",
+      "concept_boundary": "本题精确定义为：是否实现网卡驱动（virtio-net/e1000 等）与收包中断路径？  本题属于网络子系统层，只看协议栈、socket API、网卡驱动衔接、协议支持和网络数据路径；块设备 DMA、普通 VFS fd 或孤立驱动 descriptor 不能替代网络语义。",
+      "dependencies": [
+        "05_fs_drivers",
+        "06_sync_ipc"
+      ],
+      "question_ids": [
+        "Q08_005"
+      ],
+      "tri_state_rule": {
+        "allowed_values": [
+          "implemented",
+          "stub",
+          "not_found",
+          "unknown"
+        ],
+        "feature_scope": "是否实现网卡驱动（virtio-net/e1000 等）与收包中断路径？（必须三态）",
+        "diagnostic_checks": [
+          "“网卡驱动”的内核定义、入口、对象或配置开关在哪里？",
+          "是否存在执行“网卡驱动”语义的真实实现体，而不是声明、空函数或固定返回？",
+          "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
+          "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
+          "是否排除与“网卡驱动”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？"
+        ],
+        "implemented": "必须由本题核心事实形成闭环：定义/入口、真实实现体、状态变化或调用链均有源码强证据；名称命中、README、声明或孤立结构不能判 implemented。",
+        "stub": "存在接口、常量、系统调用号、结构体壳、空实现、固定返回、ENOSYS/unsupported/todo/unimplemented 等占位形态时判 stub。",
+        "not_found": "只有完成本题 negative_search_coverage 或等价结构化负向搜索后仍无相关结构/实现/调用点，才判 not_found。",
+        "unknown": "证据不足、只找到弱线索、搜索覆盖不足、跨模块边界未闭合或多个事实冲突时判 unknown。",
+        "required_reasoning": "先完成 structured_facts，再按 concept_boundary 和 anti_examples 推出最终 value。"
+      },
+      "required_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ],
+      "negative_search_policy": {
+        "keywords": [
+          "socket",
+          "bind",
+          "connect",
+          "sendto",
+          "recvfrom",
+          "Ethernet",
+          "ARP",
+          "IP",
+          "ICMP",
+          "UDP",
+          "TCP",
+          "smoltcp",
+          "lwip",
+          "netdev",
+          "virtio-net",
+          "e1000"
+        ],
+        "seed_paths": [
+          "kernel",
+          "net",
+          "network",
+          "driver",
+          "hal",
+          "syscall",
+          "include",
+          "Cargo.toml",
+          "Makefile"
+        ],
+        "minimum_keyword_coverage": 0.7,
+        "minimum_directory_coverage": 0.6
+      },
+      "anti_examples": [
+        "RAG/grep 命中名称但没有读取实现体，不能判 implemented。",
+        "只有 trait/struct/extern/宏名/常量定义，不能判 implemented。",
+        "只搜索一个关键词或一个目录，不能判 not_found。"
+      ],
+      "diagnostic_checks": [
+        "“网卡驱动”的内核定义、入口、对象或配置开关在哪里？",
+        "是否存在执行“网卡驱动”语义的真实实现体，而不是声明、空函数或固定返回？",
+        "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
+        "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
+        "是否排除与“网卡驱动”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？"
+      ],
+      "structured_facts": [
+        {
+          "fact_id": "Q08_005_01",
+          "fact_key": "scope_definition",
+          "kind": "definition",
+          "question": "“网卡驱动”的内核定义、入口、对象或配置开关在哪里？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_implemented_or_stub"
+        },
+        {
+          "fact_id": "Q08_005_02",
+          "fact_key": "real_implementation_body",
+          "kind": "implementation",
+          "question": "是否存在执行“网卡驱动”语义的真实实现体，而不是声明、空函数或固定返回？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_implemented_or_stub"
+        },
+        {
+          "fact_id": "Q08_005_03",
+          "fact_key": "active_call_path",
+          "kind": "call_site",
+          "question": "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_implemented"
+        },
+        {
+          "fact_id": "Q08_005_04",
+          "fact_key": "state_or_effect",
+          "kind": "usage_flow",
+          "question": "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_implemented"
+        },
+        {
+          "fact_id": "Q08_005_05",
+          "fact_key": "stub_and_false_positive_filter",
+          "kind": "classification",
+          "question": "是否排除与“网卡驱动”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "disambiguates_tri_state"
+        },
+        {
+          "fact_id": "Q08_005_06",
+          "fact_key": "negative_search_coverage",
+          "kind": "negative_search",
+          "question": "若未确认“网卡驱动”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。",
+          "answer_type": "object",
+          "fields": {
+            "searched_keywords": "array<string>",
+            "searched_directories": "array<string>",
+            "file_count": "integer",
+            "match_count": "integer",
+            "coverage_sufficient": "boolean"
+          },
+          "evidence_required": [
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_not_found"
+        }
+      ],
+      "answer_contract": {
+        "mode": "structured_facts_first",
+        "final_field": "value",
+        "final_type": "enum",
+        "allowed_final_values": [
+          "implemented",
+          "stub",
+          "not_found",
+          "unknown"
+        ],
+        "required_fact_ids": [
+          "Q08_005_01",
+          "Q08_005_02",
+          "Q08_005_03",
+          "Q08_005_04",
+          "Q08_005_05",
+          "Q08_005_06"
+        ],
+        "evidence_reference": "evidence_id_only",
+        "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
+        "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。",
+        "allowed_values": [
+          "implemented",
+          "stub",
+          "not_found",
+          "unknown"
+        ]
+      },
+      "graph_tags": [
+        "network",
+        "socket",
+        "protocol",
+        "driver",
+        "tri_state_impl"
+      ],
+      "seed_paths": [
+        "net",
+        "network",
+        "socket",
+        "driver",
+        "drivers",
+        "lwip",
+        "smoltcp"
+      ],
+      "keywords": [
+        "socket",
+        "tcp",
+        "udp",
+        "ip",
+        "arp",
+        "ethernet",
+        "sendto",
+        "recvfrom",
+        "virtio-net",
+        "e1000",
+        "中断"
+      ],
+      "task_hints": {
+        "diagnostic_checks": [
+          "“网卡驱动”的内核定义、入口、对象或配置开关在哪里？",
+          "是否存在执行“网卡驱动”语义的真实实现体，而不是声明、空函数或固定返回？",
+          "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
+          "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
+          "是否排除与“网卡驱动”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？"
+        ],
+        "structured_facts": [
+          {
+            "fact_id": "Q08_005_01",
+            "fact_key": "scope_definition",
+            "kind": "definition",
+            "question": "“网卡驱动”的内核定义、入口、对象或配置开关在哪里？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_implemented_or_stub"
+          },
+          {
+            "fact_id": "Q08_005_02",
+            "fact_key": "real_implementation_body",
+            "kind": "implementation",
+            "question": "是否存在执行“网卡驱动”语义的真实实现体，而不是声明、空函数或固定返回？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_implemented_or_stub"
+          },
+          {
+            "fact_id": "Q08_005_03",
+            "fact_key": "active_call_path",
+            "kind": "call_site",
+            "question": "该实现是否接入实际启动、trap、syscall、调度、I/O 或运行时主路径？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_implemented"
+          },
+          {
+            "fact_id": "Q08_005_04",
+            "fact_key": "state_or_effect",
+            "kind": "usage_flow",
+            "question": "执行后是否产生本题要求的可观察状态变化、硬件寄存器变化、对象生命周期变化或错误返回？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_implemented"
+          },
+          {
+            "fact_id": "Q08_005_05",
+            "fact_key": "stub_and_false_positive_filter",
+            "kind": "classification",
+            "question": "是否排除与“网卡驱动”相似但不等价的 syscall 号、trait/struct 壳、文档声称、测试桩或相邻模块机制？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "disambiguates_tri_state"
+          },
+          {
+            "fact_id": "Q08_005_06",
+            "fact_key": "negative_search_coverage",
+            "kind": "negative_search",
+            "question": "若未确认“网卡驱动”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。",
+            "answer_type": "object",
+            "fields": {
+              "searched_keywords": "array<string>",
+              "searched_directories": "array<string>",
+              "file_count": "integer",
+              "match_count": "integer",
+              "coverage_sufficient": "boolean"
+            },
+            "evidence_required": [
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_not_found"
+          }
+        ],
+        "concept_boundary": "网络子系统需要 socket/API、协议栈状态机、网络设备或 loopback 数据路径。只有 syscall 号、用户头文件、README 声称或网卡常量不能判 implemented。"
+      }
+    },
+    {
+      "feature_id": "feat_08_network_q08_006",
+      "stage_id": "08_network",
+      "domain": "network_stack",
+      "feature_name": "Q08_006 协议支持情况（多选；未发现则留空并在 notes 写 not_found）：",
+      "description": "协议支持情况（多选；未发现则留空并在 notes 写 not_found）：",
+      "concept_boundary": "本题精确定义为：协议支持情况（多选；未发现则留空并在 notes 写 not_found）：  本题属于网络子系统层，只看协议栈、socket API、网卡驱动衔接、协议支持和网络数据路径；块设备 DMA、普通 VFS fd 或孤立驱动 descriptor 不能替代网络语义。",
+      "dependencies": [
+        "05_fs_drivers",
+        "06_sync_ipc"
+      ],
+      "question_ids": [
+        "Q08_006"
+      ],
+      "required_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ],
+      "negative_search_policy": {
+        "keywords": [
+          "socket",
+          "bind",
+          "connect",
+          "sendto",
+          "recvfrom",
+          "Ethernet",
+          "ARP",
+          "IP",
+          "ICMP",
+          "UDP",
+          "TCP",
+          "smoltcp",
+          "lwip",
+          "netdev",
+          "virtio-net",
+          "e1000"
+        ],
+        "seed_paths": [
+          "kernel",
+          "net",
+          "network",
+          "driver",
+          "hal",
+          "syscall",
+          "include",
+          "Cargo.toml",
+          "Makefile"
+        ],
+        "minimum_keyword_coverage": 0.7,
+        "minimum_directory_coverage": 0.6
+      },
+      "anti_examples": [
+        "RAG/grep 命中名称但没有读取实现体，不能判 implemented。",
+        "只有 trait/struct/extern/宏名/常量定义，不能判 implemented。",
+        "只搜索一个关键词或一个目录，不能判 not_found。"
+      ],
+      "diagnostic_checks": [
+        "逐项读取题单 choices，列出本题允许多选的全部候选项。",
+        "每个被选中的选项是否都有独立源码/配置/调用点证据？",
+        "未选选项是否经过关键词和目录搜索，而不是默认遗漏？",
+        "是否避免把相似选项、相邻模块或文档声称混作已选功能？"
+      ],
+      "structured_facts": [
+        {
+          "fact_id": "Q08_006_01",
+          "fact_key": "option_inventory",
+          "kind": "classification",
+          "question": "逐项读取题单 choices，列出本题允许多选的全部候选项。",
+          "answer_type": "list",
+          "item_shape": "evidence-backed item with status/path/symbol when applicable",
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q08_006_02",
+          "fact_key": "selected_options_evidence",
+          "kind": "usage_flow",
+          "question": "每个被选中的选项是否都有独立源码/配置/调用点证据？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q08_006_03",
+          "fact_key": "unselected_options_checked",
+          "kind": "negative_search",
+          "question": "未选选项是否经过关键词和目录搜索，而不是默认遗漏？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q08_006_04",
+          "fact_key": "no_option_conflation",
+          "kind": "classification",
+          "question": "是否避免把相似选项、相邻模块或文档声称混作已选功能？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q08_006_05",
+          "fact_key": "negative_search_coverage",
+          "kind": "negative_search",
+          "question": "若未确认“协议支持情况（多选；未发现则留空并在 notes 写 not_found）：”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。",
+          "answer_type": "object",
+          "fields": {
+            "searched_keywords": "array<string>",
+            "searched_directories": "array<string>",
+            "file_count": "integer",
+            "match_count": "integer",
+            "coverage_sufficient": "boolean"
+          },
+          "evidence_required": [
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_not_found"
+        }
+      ],
+      "answer_contract": {
+        "mode": "structured_facts_first",
+        "final_field": "value",
+        "final_type": "multi_choice",
+        "required_fact_ids": [
+          "Q08_006_01",
+          "Q08_006_02",
+          "Q08_006_03",
+          "Q08_006_04",
+          "Q08_006_05"
+        ],
+        "evidence_reference": "evidence_id_only",
+        "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
+        "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。"
+      },
+      "graph_tags": [
+        "network",
+        "socket",
+        "protocol",
+        "driver",
+        "multi_choice"
+      ],
+      "seed_paths": [
+        "net",
+        "network",
+        "socket",
+        "driver",
+        "drivers",
+        "lwip",
+        "smoltcp"
+      ],
+      "keywords": [
+        "socket",
+        "tcp",
+        "udp",
+        "ip",
+        "arp",
+        "ethernet",
+        "sendto",
+        "recvfrom",
+        "notes",
+        "not_found"
+      ],
+      "task_hints": {
+        "diagnostic_checks": [
+          "逐项读取题单 choices，列出本题允许多选的全部候选项。",
+          "每个被选中的选项是否都有独立源码/配置/调用点证据？",
+          "未选选项是否经过关键词和目录搜索，而不是默认遗漏？",
+          "是否避免把相似选项、相邻模块或文档声称混作已选功能？"
+        ],
+        "structured_facts": [
+          {
+            "fact_id": "Q08_006_01",
+            "fact_key": "option_inventory",
+            "kind": "classification",
+            "question": "逐项读取题单 choices，列出本题允许多选的全部候选项。",
+            "answer_type": "list",
+            "item_shape": "evidence-backed item with status/path/symbol when applicable",
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_answer"
+          },
+          {
+            "fact_id": "Q08_006_02",
+            "fact_key": "selected_options_evidence",
+            "kind": "usage_flow",
+            "question": "每个被选中的选项是否都有独立源码/配置/调用点证据？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_answer"
+          },
+          {
+            "fact_id": "Q08_006_03",
+            "fact_key": "unselected_options_checked",
+            "kind": "negative_search",
+            "question": "未选选项是否经过关键词和目录搜索，而不是默认遗漏？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_answer"
+          },
+          {
+            "fact_id": "Q08_006_04",
+            "fact_key": "no_option_conflation",
+            "kind": "classification",
+            "question": "是否避免把相似选项、相邻模块或文档声称混作已选功能？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_answer"
+          },
+          {
+            "fact_id": "Q08_006_05",
+            "fact_key": "negative_search_coverage",
+            "kind": "negative_search",
+            "question": "若未确认“协议支持情况（多选；未发现则留空并在 notes 写 not_found）：”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。",
+            "answer_type": "object",
+            "fields": {
+              "searched_keywords": "array<string>",
+              "searched_directories": "array<string>",
+              "file_count": "integer",
+              "match_count": "integer",
+              "coverage_sufficient": "boolean"
+            },
+            "evidence_required": [
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_not_found"
+          }
+        ],
+        "concept_boundary": "网络子系统需要 socket/API、协议栈状态机、网络设备或 loopback 数据路径。只有 syscall 号、用户头文件、README 声称或网卡常量不能判 implemented。"
+      }
+    },
+    {
+      "feature_id": "feat_08_network_q08_007",
+      "stage_id": "08_network",
+      "domain": "network_stack",
+      "feature_name": "Q08_007 网络数据路径中是否存在用户可见 zero-copy、内核共享缓冲、或网卡 DMA descriptor？请分别给状态与证据；普通 DMA descriptor 不自动等于 zero-copy。",
+      "description": "网络数据路径中是否存在用户可见 zero-copy、内核共享缓冲、或网卡 DMA descriptor？请分别给状态与证据；普通 DMA descriptor 不自动等于 zero-copy。",
+      "concept_boundary": "本题精确定义为：网络数据路径中是否存在用户可见 zero-copy、内核共享缓冲、或网卡 DMA descriptor？请分别给状态与证据；普通 DMA descriptor 不自动等于 zero-copy。 DMA 需要设备可访问物理地址或 descriptor 提交；zero-copy 需要用户/协议栈/设备路径减少复制，普通 descriptor 或 memcpy 优化不能互相替代。 本题属于网络子系统层，只看协议栈、socket API、网卡驱动衔接、协议支持和网络数据路径；块设备 DMA、普通 VFS fd 或孤立驱动 descriptor 不能替代网络语义。",
+      "dependencies": [
+        "05_fs_drivers",
+        "06_sync_ipc"
+      ],
+      "question_ids": [
+        "Q08_007"
+      ],
+      "required_evidence_types": [
+        "definition",
+        "implementation_body",
+        "call_site",
+        "usage_flow",
+        "negative_search"
+      ],
+      "negative_search_policy": {
+        "keywords": [
+          "socket",
+          "bind",
+          "connect",
+          "sendto",
+          "recvfrom",
+          "Ethernet",
+          "ARP",
+          "IP",
+          "ICMP",
+          "UDP",
+          "TCP",
+          "smoltcp",
+          "lwip",
+          "netdev",
+          "virtio-net",
+          "e1000",
+          "zero-copy",
+          "DMA"
+        ],
+        "seed_paths": [
+          "kernel",
+          "net",
+          "network",
+          "driver",
+          "hal",
+          "syscall",
+          "include",
+          "Cargo.toml",
+          "Makefile"
+        ],
+        "minimum_keyword_coverage": 0.7,
+        "minimum_directory_coverage": 0.6
+      },
+      "anti_examples": [
+        "virtio-net/e1000 descriptor 只说明 DMA，不等于用户可见 zero-copy。",
+        "只看到 packet buffer 类型，不等于端到端零拷贝。",
+        "块设备 DMA 不能作为网络 zero-copy 证据。"
+      ],
+      "diagnostic_checks": [
+        "本题只回答“网络数据路径中是否存在用户可见 zero-copy、内核共享缓冲、或网卡 DMA descriptor？请分别给状态与证据；普通 DMA descriptor 不自动等于 zero-copy。”，是否明确输出对象、范围、数量或状态字段？",
+        "支撑答案的主要源码/配置/文档锚点在哪里（路径、符号、结构体或常量）？",
+        "答案中的每个关键结论是否有实现体、调用链、状态变化或配置分支证据？",
+        "是否排除题干未要求的相邻模块、同名概念、用户态封装、README 口号或测试桩？",
+        "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？"
+      ],
+      "structured_facts": [
+        {
+          "fact_id": "Q08_007_01",
+          "fact_key": "answer_scope",
+          "kind": "classification",
+          "question": "本题只回答“网络数据路径中是否存在用户可见 zero-copy、内核共享缓冲、或网卡 DMA descriptor？请分别给状态与证据；普通 DMA descriptor 不自动等于 zero-copy。”，是否明确输出对象、范围、数量或状态字段？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q08_007_02",
+          "fact_key": "primary_evidence_anchor",
+          "kind": "definition",
+          "question": "支撑答案的主要源码/配置/文档锚点在哪里（路径、符号、结构体或常量）？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q08_007_03",
+          "fact_key": "implementation_or_flow_evidence",
+          "kind": "usage_flow",
+          "question": "答案中的每个关键结论是否有实现体、调用链、状态变化或配置分支证据？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q08_007_04",
+          "fact_key": "boundary_and_non_answers",
+          "kind": "classification",
+          "question": "是否排除题干未要求的相邻模块、同名概念、用户态封装、README 口号或测试桩？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "disambiguates_answer"
+        },
+        {
+          "fact_id": "Q08_007_05",
+          "fact_key": "unknown_or_partial_items",
+          "kind": "classification",
+          "question": "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？",
+          "answer_type": "enum",
+          "allowed_values": [
+            "yes_strong",
+            "yes_weak",
+            "stub_or_declaration_only",
+            "no_after_negative_search",
+            "unknown"
+          ],
+          "evidence_required": [
+            "definition",
+            "implementation_body",
+            "call_site",
+            "usage_flow",
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_answer"
+        },
+        {
+          "fact_id": "Q08_007_06",
+          "fact_key": "negative_search_coverage",
+          "kind": "negative_search",
+          "question": "若未确认“用户可见 zero-copy、内核共享缓冲、或网卡 DMA descriptor”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。",
+          "answer_type": "object",
+          "fields": {
+            "searched_keywords": "array<string>",
+            "searched_directories": "array<string>",
+            "file_count": "integer",
+            "match_count": "integer",
+            "coverage_sufficient": "boolean"
+          },
+          "evidence_required": [
+            "negative_search"
+          ],
+          "conclusion_role": "required_for_not_found"
+        }
+      ],
+      "answer_contract": {
+        "mode": "structured_facts_first",
+        "final_field": "value",
+        "final_type": "structured_text",
+        "required_fact_ids": [
+          "Q08_007_01",
+          "Q08_007_02",
+          "Q08_007_03",
+          "Q08_007_04",
+          "Q08_007_05",
+          "Q08_007_06"
+        ],
+        "evidence_reference": "evidence_id_only",
+        "free_text_policy": "notes 只能解释 structured_facts 与最终值的关系，不能引入未被 evidence_id 支撑的新事实。",
+        "reproducibility_rule": "先逐项完成 structured_facts；每项必须绑定本题可见 evidence_id；由事实机械推出最终 value/choice；缺强证据时降级 unknown，not_found 必须有结构化负向搜索。"
+      },
+      "graph_tags": [
+        "network",
+        "socket",
+        "protocol",
+        "driver",
+        "tri_state_impl"
+      ],
+      "seed_paths": [
+        "net",
+        "network",
+        "socket",
+        "driver",
+        "drivers",
+        "lwip",
+        "smoltcp"
+      ],
+      "keywords": [
+        "socket",
+        "tcp",
+        "udp",
+        "ip",
+        "arp",
+        "ethernet",
+        "sendto",
+        "recvfrom",
+        "DMA",
+        "zero-copy",
+        "implemented"
+      ],
+      "task_hints": {
+        "diagnostic_checks": [
+          "本题只回答“网络数据路径中是否存在用户可见 zero-copy、内核共享缓冲、或网卡 DMA descriptor？请分别给状态与证据；普通 DMA descriptor 不自动等于 zero-copy。”，是否明确输出对象、范围、数量或状态字段？",
+          "支撑答案的主要源码/配置/文档锚点在哪里（路径、符号、结构体或常量）？",
+          "答案中的每个关键结论是否有实现体、调用链、状态变化或配置分支证据？",
+          "是否排除题干未要求的相邻模块、同名概念、用户态封装、README 口号或测试桩？",
+          "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？"
+        ],
+        "structured_facts": [
+          {
+            "fact_id": "Q08_007_01",
+            "fact_key": "answer_scope",
+            "kind": "classification",
+            "question": "本题只回答“网络数据路径中是否存在用户可见 zero-copy、内核共享缓冲、或网卡 DMA descriptor？请分别给状态与证据；普通 DMA descriptor 不自动等于 zero-copy。”，是否明确输出对象、范围、数量或状态字段？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_answer"
+          },
+          {
+            "fact_id": "Q08_007_02",
+            "fact_key": "primary_evidence_anchor",
+            "kind": "definition",
+            "question": "支撑答案的主要源码/配置/文档锚点在哪里（路径、符号、结构体或常量）？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_answer"
+          },
+          {
+            "fact_id": "Q08_007_03",
+            "fact_key": "implementation_or_flow_evidence",
+            "kind": "usage_flow",
+            "question": "答案中的每个关键结论是否有实现体、调用链、状态变化或配置分支证据？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_answer"
+          },
+          {
+            "fact_id": "Q08_007_04",
+            "fact_key": "boundary_and_non_answers",
+            "kind": "classification",
+            "question": "是否排除题干未要求的相邻模块、同名概念、用户态封装、README 口号或测试桩？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "disambiguates_answer"
+          },
+          {
+            "fact_id": "Q08_007_05",
+            "fact_key": "unknown_or_partial_items",
+            "kind": "classification",
+            "question": "多项作答时，未找到或只找到弱证据的子项是否分别标注 unknown/not_found/stub，而不是合并成强结论？",
+            "answer_type": "enum",
+            "allowed_values": [
+              "yes_strong",
+              "yes_weak",
+              "stub_or_declaration_only",
+              "no_after_negative_search",
+              "unknown"
+            ],
+            "evidence_required": [
+              "definition",
+              "implementation_body",
+              "call_site",
+              "usage_flow",
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_answer"
+          },
+          {
+            "fact_id": "Q08_007_06",
+            "fact_key": "negative_search_coverage",
+            "kind": "negative_search",
+            "question": "若未确认“用户可见 zero-copy、内核共享缓冲、或网卡 DMA descriptor”，记录 searched_keywords、searched_directories、file_count、match_count；覆盖不足时最终只能 unknown，不能判 not_found。",
+            "answer_type": "object",
+            "fields": {
+              "searched_keywords": "array<string>",
+              "searched_directories": "array<string>",
+              "file_count": "integer",
+              "match_count": "integer",
+              "coverage_sufficient": "boolean"
+            },
+            "evidence_required": [
+              "negative_search"
+            ],
+            "conclusion_role": "required_for_not_found"
+          }
+        ],
+        "concept_boundary": "zero-copy 指用户缓冲、协议栈缓冲与设备传输之间减少或避免数据复制的端到端路径；共享 skb/packet buffer 是内核内部缓冲复用；网卡 DMA descriptor 只说明设备直接访问内存。三者相关但不能互相替代。"
+      }
+    }
+  ]
 }

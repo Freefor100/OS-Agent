@@ -1,0 +1,40 @@
+{
+  "task_id": "task_07_arch_support",
+  "stage_id": "07_security",
+  "question_id": "Q07_009",
+  "question_ids": [
+    "Q07_009"
+  ],
+  "status": "done",
+  "evidence_ids": [
+    "ev_task_07_arch_support_2a109582",
+    "ev_task_07_arch_support_340a239e",
+    "ev_task_07_arch_support_70231d6f",
+    "ev_task_07_arch_support_c4ba07da",
+    "ev_task_07_arch_support_a3501742",
+    "ev_task_07_arch_support_7104313c",
+    "ev_task_07_arch_support_ed8bf52a",
+    "ev_task_07_arch_support_dcdb13ef",
+    "ev_task_07_arch_support_77c6307a",
+    "ev_task_07_arch_support_f27b165a",
+    "ev_task_07_arch_support_392e36a3",
+    "ev_task_07_arch_support_6351c725",
+    "ev_task_07_arch_support_a0f66d7d"
+  ],
+  "draft_answer_ids": [
+    "draft_task_07_arch_support_Q07_009_18556841"
+  ],
+  "findings": [
+    "PMP (Physical Memory Protection) 寄存器配置未在内核代码中发现。PMP 通常由 M-mode SBI 管理，内核运行在 S-mode 不直接配置 PMP。如需确认 PMP 是否在 SBI 中配置，需检查 psicasbi 源码（不在本仓库中）。",
+    "k210 平台使用 RISC-V 1.9.1 草案规范（非标准 v1.11），SSTATUS_PUM 是 k210 特有的用户内存保护位，qemu 平台使用标准 SSTATUS_SUM。"
+  ],
+  "confidence": "high",
+  "errors": [],
+  "token_usage": {},
+  "metadata": {
+    "evidence_count": 13,
+    "mode": "react",
+    "summary": "查证了 xv6-k210 项目的架构支持与安全初始化。项目仅支持 riscv64 架构（k210 开发板和 qemu-system-riscv64），有完整的 S-mode/U-mode 特权级分离、页表保护、用户内存保护（PUM/SUM）、COW fork 等安全初始化代码。aarch64、x86_64、loongarch64 均无任何支持证据。PMP 寄存器未在内核代码中配置。",
+    "raw_output_excerpt": "Now I have all the evidence. Let me produce the final structured JSON output.\n\n```json\n{\n  \"status\": \"done\",\n  \"summary\": \"查证了 xv6-k210 项目的架构支持与安全初始化。项目仅支持 riscv64 架构（k210 开发板和 qemu-system-riscv64），有完整的 S-mode/U-mode 特权级分离、页表保护、用户内存保护（PUM/SUM）、COW fork 等安全初始化代码。aarch64、x86_64、loongarch64 均无任何支持证据。PMP 寄存器未在内核代码中配置。\",\n  \"claim\": \"xv6-k210 项目仅支持 riscv64 架构，具有 S-mode/U-mode 特权级分离、页表保护（satp/SV39）、用户内存隔离（SSTATUS_PUM/SUM）、PTE U-bit 用户/内核隔离、COW fork 等安全初始化。aarch64、x86_64、loongarch64 无支持。\",\n  \"structured_fact_results\": [\n    {\n      \"fact_id\": \"Q07_009_ARCH_01\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],\n      \"notes\": \"riscv64 架构支持强证据：Makefile 使用 riscv64-unknown-elf- 工具链，linker64.ld 使用 OUTPUT_ARCH(riscv)，入口文件 entry.S/entry_k210.S/entry_qemu.S 均为 RISC-V 汇编。安全初始化：SBI bootloader 通过 mstatus.set_mpp(MPP::Supervisor) 设置 S-mode 特权级，内核使用 satp/SV39 页表，SSTATUS_PUM/SUM 保护用户内存访问，PTE_U 位隔离用户/内核页，usertrap 检查 SSTATUS_SPP 确保来自用户态，usertrapret 设置 SPP=0 返回用户态。\"\n    },\n    {\n      \"fact_id\": \"Q07_009_ARCH_02\",\n      \"status_or_value\": \"no_after_negative_search\",\n      \"evidence_candidate_indexes\": [10],\n      \"notes\": \"aarch64 无任何支持证据。grep 搜索 'aarch64|ARM64|arm64|AArch64' 无匹配。无 arch/aarch64 目录，无相关入口文件或链接脚本。\"\n    },\n    {\n      \"fact_id\": \"Q07_009_ARCH_03\",\n      \"status_or_value\": \"no_after_negative_search\",\n      \"evidence_candidate_indexes\": [11],\n      \"notes\": \"x86_64 无任何支持证据。grep 搜索 'x86_64|x86|i386|SMEP|SMAP|KPTI|CR0|CR4' 无架构相关匹配（仅 tools/kflash.py 中的 AES 查找表）。无 arch/x86 目录，无 SMEP/SMAP/KPTI 相关代码。\"\n    },\n    {\n      \"fact_id\": \"Q07_009_ARCH_04\",\n      \"status_or_value\": \"no_after_negative_search\",\n      \"evidence_candidate_indexes\": [12],\n      \"notes\": \"loongarch64 无任何支持证据。grep 搜索 'loongarch|loongson|LoongArch|LA64' 无匹配。无 arch/loongarch 目录。\"\n    },\n    {\n      \"fact_id\": \"Q07_009_NEG\",\n      \"status_or_value\": {\n        \"searched_keywords\": [\"riscv64\", \"aarch64\", \"ARM64\", \"arm64\", \"AArch64\", \"x86_64\", \"x86\", \"i386\", \"SMEP\", "
+  }
+}

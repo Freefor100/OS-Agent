@@ -1,0 +1,728 @@
+现在我已经收集了足够的证据。让我生成最终的 JSON 报告。
+
+```json
+{
+  "schema_version": "v1",
+  "stage_id": "03_mem_mgmt",
+  "stage_title": "内存管理（物理/虚拟/分配器）",
+  "terminology_profile": "stallings_en_zh",
+  "answers": [
+    {
+      "question_id": "Q03_001",
+      "question_type": "single_choice",
+      "stem": "该 OS 的内存管理实现语言/形态更接近哪类？",
+      "value": "B. C/Makefile 风格内核（xv6 类）",
+      "evidence": [
+        {
+          "path": "kernel/mem/buddysystem.cc",
+          "symbol_kind": "source_file",
+          "symbol_name": "buddy_system_impl",
+          "excerpt": "C++ 实现的伙伴系统物理页分配器，使用 namespace mem 和 class BuddySystem，风格类似 xv6 但用 C++ 重写"
+        },
+        {
+          "path": "kernel/mem/physical_memory_manager.cc",
+          "symbol_kind": "source_file",
+          "symbol_name": "pmm_impl",
+          "excerpt": "PhysicalMemoryManager 类封装 BuddySystem，使用 C++ 静态成员函数和 SpinLock 进行并发控制"
+        }
+      ]
+    },
+    {
+      "question_id": "Q03_002",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在物理页帧分配器 (Physical Frame Allocator) 的真实实现？",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/mem/buddysystem.cc",
+          "symbol_kind": "class",
+          "symbol_name": "BuddySystem::Alloc",
+          "excerpt": "BuddySystem::Alloc(int size) 实现伙伴系统分配算法，返回页号偏移量（kernel/mem/buddysystem.cc:146-208）"
+        },
+        {
+          "path": "kernel/mem/physical_memory_manager.cc",
+          "symbol_kind": "class",
+          "symbol_name": "PhysicalMemoryManager::alloc_page",
+          "excerpt": "PhysicalMemoryManager::alloc_page() 调用 BuddySystem::Alloc(0) 分配单个物理页（kernel/mem/physical_memory_manager.cc:137-145）"
+        }
+      ]
+    },
+    {
+      "question_id": "Q03_003",
+      "question_type": "single_choice",
+      "stem": "物理内存分配算法更接近哪种？",
+      "value": "A. 伙伴系统 (伙伴系统 (Buddy System))",
+      "evidence": [
+        {
+          "path": "kernel/mem/buddysystem.hh",
+          "symbol_kind": "enum",
+          "symbol_name": "NodeState",
+          "excerpt": "enum NodeState { NODE_UNUSED, NODE_USED, NODE_SPLIT, NODE_FULL } 用于伙伴树节点状态标记"
+        },
+        {
+          "path": "kernel/mem/buddysystem.cc",
+          "symbol_kind": "class",
+          "symbol_name": "BuddySystem::Alloc",
+          "excerpt": "使用完全二叉树结构实现伙伴系统，支持 2 的幂次大小分配（kernel/mem/buddysystem.cc:146-208）"
+        }
+      ]
+    },
+    {
+      "question_id": "Q03_004",
+      "question_type": "short_answer",
+      "stem": "物理页帧分配器的核心数据结构是什么？",
+      "value": "BuddySystem 类使用 uint8* tree 数组实现完全二叉树（伙伴树），每个节点用 NodeState 枚举标记状态（NODE_UNUSED/NODE_USED/NODE_SPLIT/NODE_FULL）。tree 数组大小为(1 << (level + 1)) - 1，叶子节点对应物理页帧。",
+      "evidence": [
+        {
+          "path": "kernel/mem/buddysystem.hh",
+          "symbol_kind": "class_member",
+          "symbol_name": "BuddySystem::tree",
+          "excerpt": "uint8* tree; // 伙伴树数组，每个节点用 NodeState 枚举标记状态"
+        },
+        {
+          "path": "kernel/mem/buddysystem.hh",
+          "symbol_kind": "enum",
+          "symbol_name": "NodeState",
+          "excerpt": "enum NodeState { NODE_UNUSED = 0, NODE_USED = 1, NODE_SPLIT = 2, NODE_FULL = 3 }"
+        },
+        {
+          "path": "kernel/mem/buddysystem.cc",
+          "symbol_kind": "method",
+          "symbol_name": "BuddySystem::Initialize",
+          "excerpt": "tree = base_ptr - BSSIZE * PGSIZE + sizeof(BuddySystem); level 计算基于 capacity_pages 的 2 的幂次（kernel/mem/buddysystem.cc:28-75）"
+        }
+      ]
+    },
+    {
+      "question_id": "Q03_005",
+      "question_type": "short_answer",
+      "stem": "物理分配器的并发控制锁粒度是什么？",
+      "value": "全局大锁：PhysicalMemoryManager::memlock 是静态 SpinLock 自旋锁，保护整个物理页分配器。持锁范围覆盖 alloc_page/free_page/kmalloc 等所有分配操作，但代码中未显式加锁（依赖调用者在 PMM 层加锁）。",
+      "evidence": [
+        {
+          "path": "kernel/mem/physical_memory_manager.hh",
+          "symbol_kind": "class_member",
+          "symbol_name": "PhysicalMemoryManager::memlock",
+          "excerpt": "static class SpinLock memlock; // 全局自旋锁"
+        },
+        {
+          "path": "kernel/mem/physical_memory_manager.cc",
+          "symbol_kind": "class_member",
+          "symbol_name": "PhysicalMemoryManager::memlock",
+          "excerpt": "SpinLock PhysicalMemoryManager::memlock; // 静态成员定义（kernel/mem/physical_memory_manager.cc:15）"
+        },
+        {
+          "path": "kernel/mem/physical_memory_manager.cc",
+          "symbol_kind": "method",
+          "symbol_name": "PhysicalMemoryManager::init",
+          "excerpt": "memlock.init(\"memlock\"); // 初始化锁（kernel/mem/physical_memory_manager.cc:50）"
+        }
+      ]
+    },
+    {
+      "question_id": "Q03_006",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在页表 (page table) 结构体 + walk/map/unmap 的真实实现？",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/mem/riscv/pagetable.hh",
+          "symbol_kind": "class",
+          "symbol_name": "PageTable",
+          "excerpt": "class PageTable { Pte walk(uint64 va, bool alloc); void freewalk(); ... }"
+        },
+        {
+          "path": "kernel/mem/riscv/pagetable.cc",
+          "symbol_kind": "method",
+          "symbol_name": "PageTable::walk",
+          "excerpt": "Pte PageTable::walk(uint64 va, bool alloc) 实现三级页表遍历，支持分配中间级页表（kernel/mem/riscv/pagetable.cc:82-147）"
+        },
+        {
+          "path": "kernel/mem/virtual_memory_manager.cc",
+          "symbol_kind": "method",
+          "symbol_name": "VirtualMemoryManager::map_pages",
+          "excerpt": "bool VirtualMemoryManager::map_pages(PageTable &pt, uint64 va, uint64 size, uint64 pa, uint64 flags) 实现页表映射（kernel/mem/virtual_memory_manager.cc:93-138）"
+        },
+        {
+          "path": "kernel/mem/virtual_memory_manager.cc",
+          "symbol_kind": "method",
+          "symbol_name": "VirtualMemoryManager::vmunmap",
+          "excerpt": "void VirtualMemoryManager::vmunmap(PageTable &pt, uint64 va, uint64 npages, int do_free) 实现页表解映射（kernel/mem/virtual_memory_manager.cc:851-873）"
+        }
+      ]
+    },
+    {
+      "question_id": "Q03_007",
+      "question_type": "short_answer",
+      "stem": "页表操作 API（walk/map/unmap 或等价）对应的函数名/模块是什么？",
+      "value": "1. PageTable::walk(uint64 va, bool alloc) - 软件遍历页表，返回最后一级 PTE（kernel/mem/riscv/pagetable.cc:82-147）\n2. VirtualMemoryManager::map_pages(PageTable &pt, uint64 va, uint64 size, uint64 pa, uint64 flags) - 建立虚拟地址到物理地址的映射（kernel/mem/virtual_memory_manager.cc:93-138）\n3. VirtualMemoryManager::vmunmap(PageTable &pt, uint64 va, uint64 npages, int do_free) - 取消页表映射，可选择释放物理页（kernel/mem/virtual_memory_manager.cc:851-873）",
+      "evidence": [
+        {
+          "path": "kernel/mem/riscv/pagetable.cc",
+          "symbol_kind": "method",
+          "symbol_name": "PageTable::walk",
+          "excerpt": "Pte PageTable::walk(uint64 va, bool alloc) 遍历三级页表，alloc=true 时分配中间级页表"
+        },
+        {
+          "path": "kernel/mem/virtual_memory_manager.cc",
+          "symbol_kind": "method",
+          "symbol_name": "VirtualMemoryManager::map_pages",
+          "excerpt": "bool VirtualMemoryManager::map_pages(...) 循环调用 pt.walk(a, true) 建立映射，设置 PTE 权限位"
+        },
+        {
+          "path": "kernel/mem/virtual_memory_manager.cc",
+          "symbol_kind": "method",
+          "symbol_name": "VirtualMemoryManager::vmunmap",
+          "excerpt": "void VirtualMemoryManager::vmunmap(...) 循环调用 pt.walk(a, 0) 获取 PTE，调用 pte.clear_data() 清除映射"
+        }
+      ]
+    },
+    {
+      "question_id": "Q03_008",
+      "question_type": "short_answer",
+      "stem": "页表修改路径的并发控制是什么？",
+      "value": "VirtualMemoryManager 使用 _virt_mem_lock 自旋锁进行并发控制（kernel/mem/virtual_memory_manager.hh:24）。但在实际 map_pages/vmunmap 路径中未显式加锁，依赖调用者（如进程内存管理器）持有进程级锁。页表 walk 操作本身无锁保护。",
+      "evidence": [
+        {
+          "path": "kernel/mem/virtual_memory_manager.hh",
+          "symbol_kind": "class_member",
+          "symbol_name": "VirtualMemoryManager::_virt_mem_lock",
+          "excerpt": "SpinLock _virt_mem_lock; // 虚拟内存管理器锁"
+        },
+        {
+          "path": "kernel/mem/virtual_memory_manager.cc",
+          "symbol_kind": "method",
+          "symbol_name": "VirtualMemoryManager::init",
+          "excerpt": "_virt_mem_lock.init(lock_name); // 初始化锁（kernel/mem/virtual_memory_manager.cc:53）"
+        }
+      ]
+    },
+    {
+      "question_id": "Q03_009",
+      "question_type": "single_choice",
+      "stem": "内核与用户地址空间关系更接近哪种？",
+      "value": "B. 共享同一页表（内核映射常驻，高半核等）",
+      "evidence": [
+        {
+          "path": "kernel/mem/virtual_memory_manager.cc",
+          "symbol_kind": "method",
+          "symbol_name": "VirtualMemoryManager::kvmmake",
+          "excerpt": "内核页表映射 KERNBASE 到 PHYSTOP 的物理内存，用户页表通过 uvmfirst/uvmalloc 创建，但 trampoline 页在用户和内核页表中都映射到相同虚拟地址（kernel/mem/virtual_memory_manager.cc:1056-1108）"
+        },
+        {
+          "path": "kernel/mem/memlayout.hh",
+          "symbol_kind": "macro",
+          "symbol_name": "KERNBASE",
+          "excerpt": "#define KERNBASE 0x80200000 // RISC-V 内核基地址，用户地址空间 0 到 MAXVA(128TB)，内核映射在高地址"
+        }
+      ]
+    },
+    {
+      "question_id": "Q03_010",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在缺页异常 (Page Fault) 处理逻辑并与内存分配/映射联动？",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/trap/riscv/trap.cc",
+          "symbol_kind": "function",
+          "symbol_name": "mmap_handler",
+          "excerpt": "int mmap_handler(uint64 va, int cause) 处理 RISC-V 缺页异常（cause=12/13/15），查找 VMA 并调用 allocate_vma_page（kernel/trap/riscv/trap.cc:396-447）"
+        },
+        {
+          "path": "kernel/mem/virtual_memory_manager.cc",
+          "symbol_kind": "method",
+          "symbol_name": "VirtualMemoryManager::allocate_vma_page",
+          "excerpt": "int VirtualMemoryManager::allocate_vma_page(PageTable &pt, uint64 va, proc::vma *vm, int access_type) 统一处理文件/匿名映射的缺页分配（kernel/mem/virtual_memory_manager.cc:544-658）"
+        }
+      ]
+    },
+    {
+      "question_id": "Q03_011",
+      "question_type": "short_answer",
+      "stem": "追踪一条缺页链路：trap/异常入口 → 缺页处理函数 → 分配页帧 → 建立映射",
+      "value": "1. usertrap() [kernel/trap/riscv/trap.cc:226] - 用户态异常入口，检测 scause=12/13/15（缺页）\n2. mmap_handler(r_stval(), cause) [kernel/trap/riscv/trap.cc:240] - 根据 stval 获取故障 VA，查找对应 VMA\n3. allocate_vma_page(pt, va, vm, access_type) [kernel/mem/virtual_memory_manager.cc:544] - 检查 VMA 权限，分配物理页\n4. k_pmm.alloc_page() [kernel/mem/virtual_memory_manager.cc:618] - 调用 BuddySystem 分配物理页帧\n5. map_pages(pt, page_va, PGSIZE, pa, pte_flags) [kernel/mem/virtual_memory_manager.cc:649] - 建立页表映射",
+      "evidence": [
+        {
+          "path": "kernel/trap/riscv/trap.cc",
+          "symbol_kind": "function",
+          "symbol_name": "usertrap",
+          "excerpt": "else if (cause == 13 || cause == 15 || cause == 12) { if (mmap_handler(r_stval(), cause) != 0) { ... send SIGSEGV ... } }"
+        },
+        {
+          "path": "kernel/trap/riscv/trap.cc",
+          "symbol_kind": "function",
+          "symbol_name": "mmap_handler",
+          "excerpt": "return mem::k_vmm.allocate_vma_page(*p->get_pagetable(), va, vm, access_type);"
+        },
+        {
+          "path": "kernel/mem/virtual_memory_manager.cc",
+          "symbol_kind": "method",
+          "symbol_name": "VirtualMemoryManager::allocate_vma_page",
+          "excerpt": "void *pa = k_pmm.alloc_page(); ... this->map_pages(pt, page_va, PGSIZE, (uint64)pa, pte_flags);"
+        }
+      ]
+    },
+    {
+      "question_id": "Q03_012",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现写时复制 (Copy-on-Write, CoW)？",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/mem/virtual_memory_manager.cc",
+          "symbol_kind": "search",
+          "symbol_name": "cow_scan",
+          "excerpt": "搜索 copy_on_write|COW|cow 关键词，0 命中；vm_copy 函数直接复制页面而非建立 CoW 映射"
+        },
+        {
+          "path": "kernel/proc/process_memory_manager.cc",
+          "symbol_kind": "search",
+          "symbol_name": "fork_cow_scan",
+          "excerpt": "clone_for_fork() 调用 vm_copy 复制所有页面，未设置写保护或 CoW 标志"
+        }
+      ]
+    },
+    {
+      "question_id": "Q03_013",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现惰性分配 (Lazy Allocation)？",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/mem/virtual_memory_manager.cc",
+          "symbol_kind": "method",
+          "symbol_name": "VirtualMemoryManager::allocate_vma_page",
+          "excerpt": "mmap 系统调用仅创建 VMA 结构，不立即分配物理页；缺页时通过 allocate_vma_page 分配（kernel/mem/virtual_memory_manager.cc:544-658）"
+        },
+        {
+          "path": "kernel/mem/virtual_memory_manager.cc",
+          "symbol_kind": "method",
+          "symbol_name": "VirtualMemoryManager::copy_in",
+          "excerpt": "copy_in 中检测 pa==0 时，检查是否在 VMA 范围内并调用 allocate_vma_page 进行懒分配（kernel/mem/virtual_memory_manager.cc:236-274）"
+        },
+        {
+          "path": "kernel/trap/riscv/trap.cc",
+          "symbol_kind": "function",
+          "symbol_name": "mmap_handler",
+          "excerpt": "缺页异常触发 allocate_vma_page，实现按需调页（kernel/trap/riscv/trap.cc:396-447）"
+        }
+      ]
+    },
+    {
+      "question_id": "Q03_014",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 swap（swap_in/swap_out 或等价页面置换）？",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/mem/",
+          "symbol_kind": "search",
+          "symbol_name": "swap_scan",
+          "excerpt": "搜索 swap_in|swap_out|page_replacement|kswapd 关键词，仅找到 bswap32/bswap64（字节序转换），无页面置换实现"
+        },
+        {
+          "path": "kernel/proc/proc_manager.cc",
+          "symbol_kind": "search",
+          "symbol_name": "swap_search",
+          "excerpt": "mmap 实现中检查 MAP_NORESERVE 标志但无实际 swap 预留逻辑"
+        }
+      ]
+    },
+    {
+      "question_id": "Q03_015",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 mmap（文件映射/匿名映射）且处理标志位？",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/proc/proc_manager.cc",
+          "symbol_kind": "method",
+          "symbol_name": "ProcessManager::mmap",
+          "excerpt": "void *ProcessManager::mmap(...) 完整实现 mmap 系统调用，支持 MAP_SHARED/MAP_PRIVATE/MAP_ANONYMOUS/MAP_FIXED 等标志（kernel/proc/proc_manager.cc:2464-2600+）"
+        },
+        {
+          "path": "kernel/sys/syscall_handler.cc",
+          "symbol_kind": "method",
+          "symbol_name": "SyscallHandler::sys_mmap",
+          "excerpt": "uint64 SyscallHandler::sys_mmap() 解析用户参数并调用 ProcessManager::mmap，处理 memfd 文件的 F_SEAL_WRITE 密封（kernel/sys/syscall_handler.cc:2170-2250）"
+        },
+        {
+          "path": "kernel/mem/mem.hh",
+          "symbol_kind": "macro",
+          "symbol_name": "mmap_flags",
+          "excerpt": "#define MAP_SHARED 0x01, MAP_PRIVATE 0x02, MAP_ANONYMOUS 0x20, MAP_FIXED 0x10, PROT_READ/WRITE/EXEC 等完整定义"
+        }
+      ]
+    },
+    {
+      "question_id": "Q03_016",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 Page Cache（页缓存/文件页缓存）管理？",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/fs/",
+          "symbol_kind": "search",
+          "symbol_name": "page_cache_scan",
+          "excerpt": "搜索 page_cache|buffer_cache|page_cache_entry 关键词，未发现统一的页缓存管理结构"
+        },
+        {
+          "path": "kernel/mem/virtual_memory_manager.cc",
+          "symbol_kind": "search",
+          "symbol_name": "file_mapping_scan",
+          "excerpt": "文件映射直接读写文件内容，未通过页缓存层"
+        }
+      ]
+    },
+    {
+      "question_id": "Q03_017",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在脏页回写 (dirty page writeback) 机制？",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/proc/process_memory_manager.cc",
+          "symbol_kind": "method",
+          "symbol_name": "ProcessMemoryManager::free_single_vma",
+          "excerpt": "释放 MAP_SHARED 且可写的 VMA 时，遍历所有映射页面并调用 vfile->write() 写回文件（kernel/proc/process_memory_manager.cc:476-520）"
+        }
+      ]
+    },
+    {
+      "question_id": "Q03_018",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在 TLB 射击 (TLB Shootdown / Remote TLB Flush) 机制？",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/",
+          "symbol_kind": "search",
+          "symbol_name": "tlb_shootdown_scan",
+          "excerpt": "搜索 sbi_remote_sfence_vma|shootdown|ipi.*tlb|remote_flush 关键词，0 命中"
+        },
+        {
+          "path": "kernel/mem/virtual_memory_manager.cc",
+          "symbol_kind": "search",
+          "symbol_name": "remote_tlb_scan",
+          "excerpt": "仅找到本地 sfence_vma() 调用，无跨核 TLB 刷新机制"
+        }
+      ]
+    },
+    {
+      "question_id": "Q03_019",
+      "question_type": "short_answer",
+      "stem": "TLB 刷新指令/函数点是什么？",
+      "value": "RISC-V: sfence_vma() 函数封装 sfence.vma 指令（kernel/platform.hh:349 定义 inline void sfence_vma() { asm volatile(\"sfence.vma zero, zero\"); }）\nLoongArch: invtlb 指令（kernel/mem/virtual_memory_manager.cc:32 tlbinit() 中使用 asm volatile(\"invtlb 0x0,$zero,$zero\")）",
+      "evidence": [
+        {
+          "path": "kernel/platform.hh",
+          "symbol_kind": "function",
+          "symbol_name": "sfence_vma",
+          "excerpt": "inline void sfence_vma() { asm volatile(\"sfence.vma zero, zero\"); } // RISC-V TLB 刷新"
+        },
+        {
+          "path": "kernel/mem/virtual_memory_manager.cc",
+          "symbol_kind": "function",
+          "symbol_name": "tlbinit",
+          "excerpt": "void tlbinit(void) { asm volatile(\"invtlb 0x0,$zero,$zero\"); ... } // LoongArch TLB 初始化"
+        },
+        {
+          "path": "kernel/sys/syscall_handler.cc",
+          "symbol_kind": "search",
+          "symbol_name": "tlb_flush_usage",
+          "excerpt": "sys_munmap 和 execve 路径调用 sfence_vma() 刷新 TLB（kernel/sys/syscall_handler.cc:8761, 8964）"
+        }
+      ]
+    },
+    {
+      "question_id": "Q03_020",
+      "question_type": "short_answer",
+      "stem": "用户指针安全检查机制是什么？",
+      "value": "VirtualMemoryManager::copy_in/copy_out 通过页表 walk 验证用户地址：1) 调用 pt.walk_addr(va) 获取物理地址，若返回 0 则检查是否在 VMA 范围内；2) 若在 VMA 内则调用 allocate_vma_page 进行懒分配；3) 若不在 VMA 内则返回 -1/-EFAULT。无独立 access_ok 函数，依赖页表硬件保护。",
+      "evidence": [
+        {
+          "path": "kernel/mem/virtual_memory_manager.cc",
+          "symbol_kind": "method",
+          "symbol_name": "VirtualMemoryManager::copy_in",
+          "excerpt": "pa = (uint64)pt.walk_addr(va); if (pa == 0) { 检查 VMA 范围 ... if (target_vm != nullptr) allocate_vma_page(...) else return -1; }"
+        },
+        {
+          "path": "kernel/mem/virtual_memory_manager.cc",
+          "symbol_kind": "method",
+          "symbol_name": "VirtualMemoryManager::copy_out",
+          "excerpt": "Pte pte = pt.walk(a, 0); if ((pte.is_null() || pte.get_data() == 0) && target_vm != nullptr) allocate_vma_page(...) else if (...) return -1;"
+        }
+      ]
+    },
+    {
+      "question_id": "Q03_021",
+      "question_type": "single_choice",
+      "stem": "若实现了页面置换 (Page Replacement)，使用的算法最接近哪种？",
+      "value": "F. 未实现页面置换（无 swap）",
+      "evidence": [
+        {
+          "path": "kernel/mem/",
+          "symbol_kind": "search",
+          "symbol_name": "replacement_scan",
+          "excerpt": "搜索 page_replacement|lru|clock|fifo|optimal 关键词，0 命中；无 swap 机制故无置换算法"
+        }
+      ]
+    },
+    {
+      "question_id": "Q03_022",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在工作集模型 (Working Set Model, WSM) 或抖动检测/防止 (Thrashing Prevention) 机制？",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/",
+          "symbol_kind": "search",
+          "symbol_name": "working_set_scan",
+          "excerpt": "搜索 working_set|thrash|resident_set|memory_pressure 关键词，0 命中"
+        }
+      ]
+    },
+    {
+      "question_id": "Q03_023",
+      "question_type": "fill_in",
+      "stem": "物理内存总量（Physical Memory Size）：____ KB/MB；页大小（Page Size）：____ bytes；最大进程虚拟地址空间（Virtual Address Space）：____ bits。",
+      "value": "物理内存总量：752 MB（PHYSTOP 0xaf000000 - KERNBASE 0x80200000，RISC-V）；页大小：4096 bytes（PGSIZE）；最大进程虚拟地址空间：39 bits（Sv39，MAXVA = 1L << 47-1 = 128TB）",
+      "evidence": [
+        {
+          "path": "kernel/mem/memlayout.hh",
+          "symbol_kind": "macro",
+          "symbol_name": "PHYSTOP",
+          "excerpt": "#define PHYSTOP 0xaf000000 // RISC-V 物理内存上限"
+        },
+        {
+          "path": "kernel/platform.hh",
+          "symbol_kind": "macro",
+          "symbol_name": "PGSIZE",
+          "excerpt": "#define PGSIZE 4096 // bytes per page"
+        },
+        {
+          "path": "kernel/platform.hh",
+          "symbol_kind": "macro",
+          "symbol_name": "MAXVA",
+          "excerpt": "#define MAXVA (1L << (9 + 9 + 9 + 12 - 1)) // 128TB (Sv39 39-bit 虚拟地址空间)"
+        }
+      ]
+    },
+    {
+      "question_id": "Q03_024",
+      "question_type": "single_choice",
+      "stem": "内存保护机制 (Memory Protection) 的实现形式更接近哪种？",
+      "value": "C. 硬件页表 + 软件指针检查双重保护",
+      "evidence": [
+        {
+          "path": "kernel/platform.hh",
+          "symbol_kind": "macro",
+          "symbol_name": "PTE_FLAGS",
+          "excerpt": "#define PTE_U (1L << 4) // user can access; PTE_R/W/X 权限位由 MMU 硬件检查"
+        },
+        {
+          "path": "kernel/mem/virtual_memory_manager.cc",
+          "symbol_kind": "method",
+          "symbol_name": "VirtualMemoryManager::copy_in",
+          "excerpt": "软件检查用户地址是否在 VMA 范围内，若不在则返回错误（kernel/mem/virtual_memory_manager.cc:236-274）"
+        }
+      ]
+    },
+    {
+      "question_id": "Q03_025",
+      "question_type": "short_answer",
+      "stem": "逻辑内存组织 (Logical Memory Organization)：进程地址空间中 text/data/heap/stack/mmap 各区域是否由统一的映射管理结构维护？",
+      "value": "是，使用 VMA（虚拟内存区域）数组维护。proc::VMA 结构包含 vma _vm[NVMA] 数组（NVMA=50），每个 vma 条目记录 addr/len/prot/flags/vfile/offset 等字段。mmap 区域通过 VMA 管理，heap/stack 通过 uvmalloc/uvmfirst 直接映射。",
+      "evidence": [
+        {
+          "path": "kernel/proc/process_memory_manager.hh",
+          "symbol_kind": "struct",
+          "symbol_name": "proc::VMA",
+          "excerpt": "struct VMA { vma _vm[NVMA]; }; constexpr int NVMA = 50;"
+        },
+        {
+          "path": "kernel/proc/proc.hh",
+          "symbol_kind": "search",
+          "symbol_name": "vma_struct",
+          "excerpt": "vma 结构体定义包含 addr/len/prot/flags/vfile/vfd/used 等字段"
+        }
+      ]
+    },
+    {
+      "question_id": "Q03_026",
+      "question_type": "single_choice",
+      "stem": "是否存在显式的硬件分段机制 (Hardware Segmentation)？",
+      "value": "C. 纯分页无分段（RISC-V/AArch64 常见）",
+      "evidence": [
+        {
+          "path": "kernel/mem/riscv/pagetable.hh",
+          "symbol_kind": "class",
+          "symbol_name": "PageTable",
+          "excerpt": "RISC-V Sv39 纯分页机制，无段描述符或 GDT/LDT 结构"
+        },
+        {
+          "path": "kernel/platform.hh",
+          "symbol_kind": "macro",
+          "symbol_name": "PX_PXSHIFT",
+          "excerpt": "#define PX(level, va) 宏提取三级页表索引，纯分页地址转换"
+        }
+      ]
+    },
+    {
+      "question_id": "Q03_027",
+      "question_type": "single_choice",
+      "stem": "取页策略 (Fetch Policy) 更接近哪种？",
+      "value": "B. 惰性分配 (Lazy Allocation)：分配虚拟地址但推迟物理页到缺页时",
+      "evidence": [
+        {
+          "path": "kernel/mem/virtual_memory_manager.cc",
+          "symbol_kind": "method",
+          "symbol_name": "VirtualMemoryManager::allocate_vma_page",
+          "excerpt": "mmap 仅创建 VMA，缺页时通过 mmap_handler → allocate_vma_page 分配物理页（kernel/mem/virtual_memory_manager.cc:544-658）"
+        },
+        {
+          "path": "kernel/trap/riscv/trap.cc",
+          "symbol_kind": "function",
+          "symbol_name": "usertrap",
+          "excerpt": "scause=12/13/15 时调用 mmap_handler 处理缺页（kernel/trap/riscv/trap.cc:238-245）"
+        }
+      ]
+    },
+    {
+      "question_id": "Q03_028",
+      "question_type": "short_answer",
+      "stem": "放置策略 (Placement Policy)：新的匿名映射或堆区域增长时，系统如何选择虚拟地址区间？",
+      "value": "未发现显式的放置策略实现。mmap 系统调用中若 addr=0 则内核选择地址，但代码中未找到类似 mmap_base 向下生长或首次适配算法的明确实现。堆增长通过 grow_heap 从 heap_start 向上线性增长。",
+      "evidence": [
+        {
+          "path": "kernel/proc/process_memory_manager.cc",
+          "symbol_kind": "method",
+          "symbol_name": "ProcessMemoryManager::grow_heap",
+          "excerpt": "grow_heap 从 current_end 向上分配页面，无地址选择策略（kernel/proc/process_memory_manager.cc:350-400）"
+        },
+        {
+          "path": "kernel/proc/proc_manager.cc",
+          "symbol_kind": "search",
+          "symbol_name": "mmap_addr_selection",
+          "excerpt": "mmap 函数中若 addr!=0 且 MAP_FIXED 则使用指定地址，否则未找到地址选择算法"
+        }
+      ]
+    },
+    {
+      "question_id": "Q03_029",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在驻留集管理/内存负载控制 (Resident Set Management / Load Control)？",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/",
+          "symbol_kind": "search",
+          "symbol_name": "load_control_scan",
+          "excerpt": "搜索 resident_set|load_control|oom_killer|memory_reclaim|kswapd 关键词，0 命中"
+        }
+      ]
+    },
+    {
+      "question_id": "Q03_030",
+      "question_type": "short_answer",
+      "stem": "内存主链路（必须给出，尽量以 Mermaid graph TD 表达）",
+      "value": "graph TD\nA[usertrap kernel/trap/riscv/trap.cc:226] --> B[mmap_handler kernel/trap/riscv/trap.cc:396]\nB --> C[allocate_vma_page kernel/mem/virtual_memory_manager.cc:544]\nC --> D[k_pmm.alloc_page kernel/mem/physical_memory_manager.cc:137]\nD --> E[BuddySystem::Alloc kernel/mem/buddysystem.cc:146]\nC --> F[map_pages kernel/mem/virtual_memory_manager.cc:93]\nF --> G[PageTable::walk kernel/mem/riscv/pagetable.cc:82]",
+      "evidence": [
+        {
+          "path": "kernel/trap/riscv/trap.cc",
+          "symbol_kind": "function",
+          "symbol_name": "usertrap",
+          "excerpt": "缺页异常入口，调用 mmap_handler"
+        },
+        {
+          "path": "kernel/trap/riscv/trap.cc",
+          "symbol_kind": "function",
+          "symbol_name": "mmap_handler",
+          "excerpt": "查找 VMA 并调用 allocate_vma_page"
+        },
+        {
+          "path": "kernel/mem/virtual_memory_manager.cc",
+          "symbol_kind": "method",
+          "symbol_name": "VirtualMemoryManager::allocate_vma_page",
+          "excerpt": "分配物理页并建立映射"
+        }
+      ]
+    },
+    {
+      "question_id": "Q03_031",
+      "question_type": "single_choice",
+      "stem": "该系统更容易出现哪种内存碎片 (Memory Fragmentation)？",
+      "value": "D. 无明显碎片问题（buddy/slab 等机制缓解）",
+      "evidence": [
+        {
+          "path": "kernel/mem/buddysystem.cc",
+          "symbol_kind": "class",
+          "symbol_name": "BuddySystem",
+          "excerpt": "伙伴系统通过合并空闲块缓解外部碎片（kernel/mem/buddysystem.cc:224-241 Combine 函数）"
+        },
+        {
+          "path": "kernel/mem/slab.hh",
+          "symbol_kind": "header",
+          "symbol_name": "SlabAllocator",
+          "excerpt": "Slab 分配器管理小对象，减少内部碎片"
+        }
+      ]
+    },
+    {
+      "question_id": "Q03_032",
+      "question_type": "single_choice",
+      "stem": "地址重定位 (Address Relocation) 的绑定时机更接近哪种？",
+      "value": "C. 运行时动态绑定 (Run-time / Dynamic Relocation)：通过 MMU 基址+界限或页表在每次访问时转换",
+      "evidence": [
+        {
+          "path": "kernel/platform.hh",
+          "symbol_kind": "macro",
+          "symbol_name": "PX_PXSHIFT",
+          "excerpt": "RISC-V Sv39 页表机制，每次内存访问通过 MMU 硬件进行 VA→PA 转换"
+        },
+        {
+          "path": "kernel/mem/virtual_memory_manager.cc",
+          "symbol_kind": "method",
+          "symbol_name": "VirtualMemoryManager::init",
+          "excerpt": "w_satp(MAKE_SATP(k_pagetable.get_base())) 设置页表基址寄存器（kernel/mem/virtual_memory_manager.cc:69）"
+        }
+      ]
+    },
+    {
+      "question_id": "Q03_033",
+      "question_type": "single_choice",
+      "stem": "页面置换的作用域策略 (Replacement Scope) 更接近哪种？",
+      "value": "C. 未实现置换（无 swap）",
+      "evidence": [
+        {
+          "path": "kernel/mem/",
+          "symbol_kind": "search",
+          "symbol_name": "swap_scope_scan",
+          "excerpt": "无 swap 机制，故无置换作用域概念"
+        }
+      ]
+    },
+    {
+      "question_id": "Q03_034",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在清理策略 (Cleaning Policy)？",
+      "value": "stub",
+      "evidence": [
+        {
+          "path": "kernel/proc/process_memory_manager.cc",
+          "symbol_kind": "method",
+          "symbol_name": "ProcessMemoryManager::free_single_vma",
+          "excerpt": "仅在释放 VMA 时同步写回 MAP_SHARED 可写页面，无后台清理线程（kernel/proc/process_memory_manager.cc:476-520）"
+        },
+        {
+          "path": "kernel/",
+          "symbol_kind": "search",
+          "symbol_name": "background_writeback_scan",
+          "excerpt": "搜索 background_writeback|cleaner_thread|pdflush 关键词，0 命中；无异步清理策略"
+        }
+      ]
+    }
+  ]
+}
+```

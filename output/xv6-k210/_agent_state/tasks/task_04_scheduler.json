@@ -1,0 +1,52 @@
+{
+  "task_id": "task_04_scheduler",
+  "stage_id": "04_process_smp",
+  "question_id": "Q04_005",
+  "question_ids": [
+    "Q04_005",
+    "Q04_006",
+    "Q04_023",
+    "Q04_024",
+    "Q04_025",
+    "Q04_026",
+    "Q04_027",
+    "Q04_040",
+    "Q04_042"
+  ],
+  "status": "done",
+  "evidence_ids": [
+    "ev_task_04_scheduler_c57f4130",
+    "ev_task_04_scheduler_e33a92a2",
+    "ev_task_04_scheduler_fbe1c1e5",
+    "ev_task_04_scheduler_1d391c0f",
+    "ev_task_04_scheduler_dc16437f",
+    "ev_task_04_scheduler_504f5bcb",
+    "ev_task_04_scheduler_f6f4ce10",
+    "ev_task_04_scheduler_9a5ba431",
+    "ev_task_04_scheduler_bc64bda7",
+    "ev_task_04_scheduler_96ec44a8",
+    "ev_task_04_scheduler_f138ac44",
+    "ev_task_04_scheduler_3898f1a3"
+  ],
+  "draft_answer_ids": [
+    "draft_task_04_scheduler_Q04_005_90cdc2f8",
+    "draft_task_04_scheduler_Q04_006_aaf54c87",
+    "draft_task_04_scheduler_Q04_023_bd1ad56d",
+    "draft_task_04_scheduler_Q04_024_ad06b43b",
+    "draft_task_04_scheduler_Q04_025_104c528f",
+    "draft_task_04_scheduler_Q04_026_1296e76f",
+    "draft_task_04_scheduler_Q04_027_0c6227d4",
+    "draft_task_04_scheduler_Q04_040_32935fb8",
+    "draft_task_04_scheduler_Q04_042_25d6d074"
+  ],
+  "findings": [],
+  "confidence": "high",
+  "errors": [],
+  "token_usage": {},
+  "metadata": {
+    "evidence_count": 12,
+    "mode": "react",
+    "summary": "查证了 xv6-k210 的调度器实现。调度算法为基于 3 级优先级队列的 Round-Robin 风格（PRIORITY_TIMEOUT=0, PRIORITY_IRQ=1, PRIORITY_NORMAL=2），每个优先级内 FCFS。核心入口 scheduler() 调用 __get_runnable_no_lock() 按优先级遍历选择第一个 RUNNABLE 进程。timer 字段作为时间片（TIMER_NORMAL=10），proc_tick() 在时钟中断中递减 timer，超时后移入 PRIORITY_TIMEOUT 队列。未实现 aging、fair-share、SJF/SRTF、实时调度、NUMA、负载均衡、每核队列。仅短程调度，无中程/长程调度。",
+    "raw_output_excerpt": "Now I have a thorough understanding. Let me compile the final JSON output.\n\nKey findings:\n1. **Ready queue**: `proc_runnable[PRIORITY_NUMBER]` array with 3 priority levels (TIMEOUT=0, IRQ=1, NORMAL=2). Each is a linked list via `sched_next/sched_pprev`. Also `proc_sleep` for sleeping processes.\n2. **Selection logic**: `__get_runnable_no_lock()` iterates priority levels 0→2, returns first RUNNABLE process found (FCFS within each priority level).\n3. **Policy fields**: `timer` field (timeslice), `state` (RUNNABLE/RUNNING/SLEEPING/ZOMBIE), `priority` via which runqueue list the proc is on.\n4. **Preemption**: Timer interrupt calls `proc_tick()` which decrements `timer` for non-running processes; when timer hits 0, process is moved to `PRIORITY_TIMEOUT` queue. `yield()` is called from trap handler on interrupts.\n5. **No aging, fair-share, SJF/SRTF, real-time, NUMA, load balancing, per-CPU queues**.\n6. **Scheduling levels**: Only short-term scheduler (ready/running/blocked). No suspended/swapped-out state, no admission control, no medium/long-term scheduler.\n\nLet me now produce the output:\n\n```json\n{\n  \"status\": \"done\",\n  \"summary\": \"查证了 xv6-k210 的调度器实现。调度算法为基于 3 级优先级队列的 Round-Robin 风格（PRIORITY_TIMEOUT=0, PRIORITY_IRQ=1, PRIORITY_NORMAL=2），每个优先级内 FCFS。核心入口 scheduler() 调用 __get_runnable_no_lock() 按优先级遍历选择第一个 RUNNABLE 进程。timer 字段作为时间片（TIMER_NORMAL=10），proc_tick() 在时钟中断中递减 timer，超时后移入 PRIORITY_TIMEOUT 队列。未实现 aging、fair-share、SJF/SRTF、实时调度、NUMA、负载均衡、每核队列。仅短程调度，无中程/长程调度。\",\n  \"claim\": \"xv6-k210 实现了基于 3 级优先级队列的抢占式 Round-Robin 调度（优先级内 FCFS），使用 timer 时间片（TIMER_NORMAL=10），时钟中断触发 proc_tick() 递减 timer 并重排队列。未实现 aging、fair-share、SJF/SRTF、实时调度、NUMA、负载均衡、每核队列。仅短程调度。\",\n  \"structured_fact_results\": [\n    {\n      \"fact_id\": \"Q04_005_01\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [0, 1],\n      \"notes\": \"proc_runnable[3] 数组作为就绪队列，每个优先级一个链表，通过 sched_next/sched_pprev 链接。定义在 kernel/sched/proc.c:245，插入/删除宏在 :279-287。\"\n    },\n    {\n      \"fact_id\": \"Q04_005_02\",\n  "
+  }
+}

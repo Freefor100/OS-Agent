@@ -1,0 +1,231 @@
+{
+  "schema_version": "describe_review_v1",
+  "stage_id": "02_boot_trap",
+  "stage_title": "启动/架构与 Trap/系统调用",
+  "confidence": 0.75,
+  "question_reviews": [
+    {
+      "question_id": "Q02_001",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "答案明确给出 linker 入口与汇编标签，证据摘录直接对应 ENTRY 定义与 _entry 标号，完全符合题面要求。"
+    },
+    {
+      "question_id": "Q02_002",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "选项文本与题面 Choice A 一致，Makefile 证据清晰展示了 -bios 参数与 SBI 固件路径，支撑充分。"
+    },
+    {
+      "question_id": "Q02_003",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态格式正确。证据展示了 sstatus.SPP 位的清除操作，直接证明特权级切换逻辑存在。"
+    },
+    {
+      "question_id": "Q02_004",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "列出了关键寄存器与位，证据包含宏定义与实际写入指令，完全覆盖题面核对点。"
+    },
+    {
+      "question_id": "Q02_005",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "三态格式正确。证据展示了页表分配与 satp 写入，确证 MMU 初始化已实现。"
+    },
+    {
+      "question_id": "Q02_006",
+      "score_evidence": 0.85,
+      "score_consistency": 0.95,
+      "review": "跳转链节点清晰，但证据主要覆盖 entry->main->scheduler，usertrap 环节证据略弱，整体逻辑连贯。"
+    },
+    {
+      "question_id": "Q02_007",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "填空格式规范。BSS 证据仅展示段定义但结论为 not_found 合理；UART 与页表证据充分。"
+    },
+    {
+      "question_id": "Q02_008",
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "三态格式正确。证据为搜索总结文本而非代码摘录，但对于 not_found 结论可接受。"
+    },
+    {
+      "question_id": "Q02_009",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "三态格式正确。证据直接展示 stvec 写入函数，支撑 implemented 结论。"
+    },
+    {
+      "question_id": "Q02_010",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "准确描述了 Makefile 变量与编译标志，证据摘录包含 MAC/FS 判断逻辑，完全符合题面。"
+    },
+    {
+      "question_id": "Q02_011",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "三态格式正确。Makefile 与 sbi.h 证据共同证实了固件链与 SBI 调用接口。"
+    },
+    {
+      "question_id": "Q02_012",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "三态格式正确。证据指出使用 SBI 而非直接 UART 映射，支撑 stub 结论。"
+    },
+    {
+      "question_id": "Q02_013",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "三态格式正确。证据包含 stvec 设置与 sret 指令，完整展示返回用户态路径。"
+    },
+    {
+      "question_id": "Q02_014",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "明确说明支持平台与不支持平台，证据包含 README 与搜索结论，符合题面要求。"
+    },
+    {
+      "question_id": "Q02_015",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "准确指出用户态与内核态入口标签，证据摘录直接显示标号定义。"
+    },
+    {
+      "question_id": "Q02_016",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "选项与 Choice C 一致，证据展示 TRAPFRAME 宏定义与 VMA 分配，支撑用户空间预留页结论。"
+    },
+    {
+      "question_id": "Q02_017",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "结构体定义、寄存器数量与字节数计算均准确，证据直接引用 struct 定义。"
+    },
+    {
+      "question_id": "Q02_018",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "三态格式正确。证据展示 syscalls 函数指针数组与分发逻辑，确证 implemented。"
+    },
+    {
+      "question_id": "Q02_019",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "三态格式正确。证据展示边界检查代码与错误处理分支，支撑 implemented。"
+    },
+    {
+      "question_id": "Q02_020",
+      "score_evidence": 0.75,
+      "score_consistency": 0.9,
+      "review": "追踪链节点完整，但证据仅覆盖实现体部分，缺少 uservec/usertrap 环节的直接代码摘录。"
+    },
+    {
+      "question_id": "Q02_021",
+      "score_evidence": 0.6,
+      "score_consistency": 0.7,
+      "review": "题面要求“为每个至少给一条证据”，但答案列出 10 个 syscall 仅提供 3 条证据，严重缺失支撑材料，违反题面约束。"
+    },
+    {
+      "question_id": "Q02_022",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "三态格式正确。证据展示 copyin/copyout 中的 walkaddr 检查，确证安全检查机制。"
+    },
+    {
+      "question_id": "Q02_023",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "三态格式正确。证据展示 timer tick 中调用 yield 及 yield 实现，支撑抢占调度结论。"
+    },
+    {
+      "question_id": "Q02_024",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态格式正确。证据覆盖 trap 中信号检查、处理函数及 sigreturn，链路完整。"
+    },
+    {
+      "question_id": "Q02_025",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "准确描述缺页处理现状（框架存在但 CoW 不明确），证据支持该结论。"
+    },
+    {
+      "question_id": "Q02_026",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "清晰描述多核初始化顺序，证据展示 main 中 hart0 与其他核的同步逻辑。"
+    },
+    {
+      "question_id": "Q02_027",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "填空格式规范，统计数据有脚本与代码证据支撑，区间估计合理。"
+    },
+    {
+      "question_id": "Q02_028",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "对照 README 与代码实现，结论客观，证据引用 README 章节。"
+    },
+    {
+      "question_id": "Q02_029",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "搜索结论明确，证据为搜索总结文本，对于否定结论可接受。"
+    },
+    {
+      "question_id": "Q02_030",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "三态格式正确。证据展示 devintr 中注释掉的 plic_claim，确证 stub 状态。"
+    },
+    {
+      "question_id": "Q02_031",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "三态格式正确。证据展示信号定义中无 SIGSEGV 且 trap 中使用 SIGTERM，支撑 not_found。"
+    },
+    {
+      "question_id": "Q02_032",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "准确列出支持的信号发送粒度，证据包含 sys_kill 与 sys_tgkill 实现。"
+    },
+    {
+      "question_id": "Q02_033",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "选项与 Choice A 一致，证据展示 scause 寄存器判断逻辑，支撑硬件原因号区分机制。"
+    },
+    {
+      "question_id": "Q02_034",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态格式正确。证据展示 kerneltrap 中中断开启检查与 panic，支撑不支持嵌套结论。"
+    }
+  ],
+  "findings": [
+    {
+      "severity": "warn",
+      "message": "Q02_021 题面要求为列出的每个 syscall 提供至少一条证据，但答案仅提供 3 条证据覆盖 10 个 syscall，证据充分性严重不足。"
+    }
+  ],
+  "summary_zh": "整体报告质量较高，大部分题目证据详实且严格遵循题面格式。主要缺陷在于 Q02_021 未满足“为每个 syscall 提供证据”的题面约束，导致证据支撑度显著下降。另有 Q02_020 部分链路节点缺乏直接代码证据。全阶段置信度受 Q02_021 低分项影响，按方案 A 规则截断至 0.75。",
+  "report_quality_score": 0.97,
+  "_meta": {
+    "quality": {
+      "mean_question_confidence": 0.9691
+    },
+    "review_model": "qwen3.5-plus",
+    "baseline": true,
+    "run_at": "2026-04-24T09:08:10",
+    "baseline_execute_tokens": 196563,
+    "baseline_review_tokens": 22365,
+    "baseline_stage_total_tokens": 218928
+  }
+}

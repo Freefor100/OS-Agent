@@ -1,0 +1,65 @@
+{
+  "schema_version": "describe_review_v1",
+  "stage_id": "09_debug_error",
+  "stage_title": "调试机制与错误处理",
+  "confidence": 0.97,
+  "question_reviews": [
+    {
+      "question_id": "Q09_001",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "答案判定 implemented，证据提供了日志宏定义（含级别区分）及 printf 实现，直接支撑结论。题面三态要求满足，无跑题。"
+    },
+    {
+      "question_id": "Q09_002",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "答案判定 implemented，证据链完整（宏->函数->调用点），清晰展示 panic 路径。符合三态契约，证据与结论一致。"
+    },
+    {
+      "question_id": "Q09_003",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "短答案详细列出了输出内容并明确排除了寄存器 dump（引用 trap 路径证据），证据与结论逻辑自洽，符合引用实现证据的要求。"
+    },
+    {
+      "question_id": "Q09_004",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "证据展示了基于帧指针的遍历逻辑，证明非仅打印 ra，满足题干对栈回溯的严格定义。三态选择正确，无格式错误。"
+    },
+    {
+      "question_id": "Q09_005",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "针对内核监视器的严格定义，答案通过搜索内核目录无命中来支撑 not_found 结论，逻辑合理。虽为否定证据但符合题面排除用户态 shell 的要求。"
+    },
+    {
+      "question_id": "Q09_006",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "通过关键字搜索无命中支撑 GDB stub 不存在的结论，证据类型适合否定性回答。三态符合，无契约违例。"
+    },
+    {
+      "question_id": "Q09_007",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "清晰描述了 errno 体系，证据涵盖定义头文件及多处传播点（返回值），满足短答案对类型定义与传播点的要求。"
+    },
+    {
+      "question_id": "Q09_008",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "准确识别出仅有接口定义而无实际逻辑的状态，判定为 stub 而非 implemented/not_found，证据对比了声明与实现缺失，区分度高。"
+    }
+  ],
+  "findings": [],
+  "summary_zh": "本报告整体质量较高，所有题目均严格遵循题面约束（三态/短答案）。证据引用具体（路径、符号、摘录），特别是 Q09_003/Q09_007 的短答案逻辑清晰，Q09_008 对 stub 状态的判定体现了对实现程度的准确评估。否定性题目（Q09_005/006）使用了搜索证据支撑，符合审计预期。全阶段分按各题均值方案 A 汇总。",
+  "report_quality_score": 0.97,
+  "_meta": {
+    "quality": {
+      "mean_question_confidence": 0.9687
+    },
+    "review_model": "qwen3.5-plus"
+  }
+}

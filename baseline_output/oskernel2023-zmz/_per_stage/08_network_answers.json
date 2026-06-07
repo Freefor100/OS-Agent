@@ -1,0 +1,178 @@
+{
+  "schema_version": "v1",
+  "stage_id": "08_network",
+  "stage_title": "网络子系统与协议栈",
+  "terminology_profile": "stallings_en_zh",
+  "answers": [
+    {
+      "question_id": "Q08_001",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在网络子系统实现（协议栈或 socket 层）？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "include/sysnum.h",
+          "symbol_kind": "search",
+          "symbol_name": "SYS_socket,SYS_bind,SYS_connect",
+          "excerpt": "在附件源码中检索 socket 相关系统调用号，未找到 SYS_socket、SYS_bind、SYS_connect、SYS_sendto、SYS_recvfrom 等网络相关 syscall 定义。sysnum.h 中仅包含文件、进程、内存等基础系统调用。"
+        },
+        {
+          "path": "kernel/syscall/syscall.c",
+          "symbol_kind": "search",
+          "symbol_name": "syscalls[]",
+          "excerpt": "syscall.c 中的 syscalls 函数指针表仅包含文件操作 (read/write/open)、进程管理 (fork/exec/wait)、内存管理 (brk/sbrk/mmap) 等，无网络相关 syscall 处理函数。"
+        },
+        {
+          "path": "kernel/fs",
+          "symbol_kind": "list",
+          "symbol_name": "fs directory",
+          "excerpt": "遍历 kernel/fs 目录，仅包含 bio.c、blkdev.c、file.c、fs.c、fat32/等文件系统相关实现，无 socket.c 或 network.c 等网络子系统文件。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q08_002",
+      "question_type": "single_choice",
+      "stem": "协议栈来源更接近哪种？",
+      "value": "未发现",
+      "evidence": [
+        {
+          "path": "include",
+          "symbol_kind": "list",
+          "symbol_name": "include directory",
+          "excerpt": "遍历 include 目录，未找到任何第三方网络协议栈头文件（如 smoltcp.h、lwip.h、uip.h 等），也无自研协议栈相关头文件。"
+        },
+        {
+          "path": "kernel",
+          "symbol_kind": "search",
+          "symbol_name": "tcp,udp,ip,ethernet",
+          "excerpt": "在 kernel 目录中搜索 tcp、udp、ip、ethernet 等关键词，未找到任何协议栈实现代码。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q08_003",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 socket 系统调用接口（socket/bind/connect/sendto/recvfrom 等）？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "include/sysnum.h",
+          "symbol_kind": "read",
+          "symbol_name": "SYS_* definitions",
+          "excerpt": "sysnum.h 中定义的系统调用号包括 SYS_fork(1)、SYS_read(63)、SYS_write(64)、SYS_openat(56)、SYS_close(57) 等，但无 SYS_socket、SYS_bind、SYS_connect、SYS_sendto、SYS_recvfrom 等 socket 相关调用号。"
+        },
+        {
+          "path": "kernel/syscall/syscall.c",
+          "symbol_kind": "read",
+          "symbol_name": "syscalls[]",
+          "excerpt": "syscall.c 中 syscalls 数组最大索引为 SYS_get_random(1001)，但中间无 socket 相关 syscall 处理函数。所有 syscall 处理函数如 sys_read、sys_write、sys_openat 等均与文件/进程相关。"
+        },
+        {
+          "path": "xv6-user/user.h",
+          "symbol_kind": "read",
+          "symbol_name": "user library functions",
+          "excerpt": "user.h 中声明的用户库函数包括 fork、exec、open、read、write、mmap 等，无 socket、bind、connect、send、recv 等网络相关函数声明。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q08_004",
+      "question_type": "short_answer",
+      "stem": "选择一个发送路径（优先 sys_sendto），追踪：syscall → 协议栈 → 网卡驱动。列 3-6 个关键节点并给证据。",
+      "value": "not_found: 该 OS 未实现网络子系统，无 sendto 系统调用，无协议栈，无网卡驱动。无法追踪发送路径。",
+      "evidence": [
+        {
+          "path": "include/sysnum.h",
+          "symbol_kind": "search",
+          "symbol_name": "SYS_sendto",
+          "excerpt": "在 sysnum.h 中搜索 SYS_sendto，未找到该 syscall 定义。"
+        },
+        {
+          "path": "kernel/hal",
+          "symbol_kind": "list",
+          "symbol_name": "hal drivers",
+          "excerpt": "kernel/hal 目录包含 disk.c、sdcard.c、virtio_disk.c（块设备驱动）、spi.c、uart（串口）、gpiohs.c 等，但无 virtio_net.c、e1000.c、ne2000.c 等网卡驱动。"
+        },
+        {
+          "path": "kernel/hal/virtio.h",
+          "symbol_kind": "read",
+          "symbol_name": "VIRTIO_BLK_T_*",
+          "excerpt": "virtio.h 中仅定义 VIRTIO_BLK_T_IN(0) 和 VIRTIO_BLK_T_OUT(1) 用于块设备读写，无 VIRTIO_NET_* 相关定义，说明 virtio 仅用于磁盘而非网络。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q08_005",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现网卡驱动（virtio-net/e1000 等）与收包中断路径？（必须三态）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/hal/virtio_disk.c",
+          "symbol_kind": "read",
+          "symbol_name": "virtio_disk_init,virtio_disk_intr",
+          "excerpt": "virtio_disk.c 实现的是 virtio 块设备驱动（磁盘），virtio_disk_intr() 处理的是磁盘读写完成中断，非网络收包中断。"
+        },
+        {
+          "path": "kernel/hal/sdcard.c",
+          "symbol_kind": "read",
+          "symbol_name": "sdcard_intr",
+          "excerpt": "sdcard.c 实现 SD 卡驱动，sdcard_intr() 处理 SD 卡读写中断，与网络无关。"
+        },
+        {
+          "path": "kernel/trap/trap.c",
+          "symbol_kind": "search",
+          "symbol_name": "INTR_EXTERNAL,DISK_IRQ,UART_IRQ",
+          "excerpt": "trap.c 中处理的外部中断仅包括 UART_IRQ(串口) 和 DISK_IRQ(磁盘)，无 NET_IRQ 或类似网络中断处理。plic.h 中定义 DISK_IRQ=1, UART_IRQ=33(k210) 或 10(qemu)，无网络中断号。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q08_006",
+      "question_type": "multi_choice",
+      "stem": "协议支持情况（多选；未发现则留空并在 notes 写 not_found）：",
+      "value": [],
+      "evidence": [
+        {
+          "path": "kernel",
+          "symbol_kind": "search",
+          "symbol_name": "ethernet,arp,ipv4,ipv6,icmp,udp,tcp,dhcp,dns",
+          "excerpt": "在整个 kernel 目录中搜索 ethernet、arp、ipv4、ipv6、icmp、udp、tcp、dhcp、dns 等关键词，均未找到任何协议实现代码或数据结构定义。"
+        },
+        {
+          "path": "include",
+          "symbol_kind": "search",
+          "symbol_name": "sockaddr,ip_hdr,tcp_hdr,udp_hdr",
+          "excerpt": "在 include 目录中搜索 sockaddr、ip_hdr、tcp_hdr、udp_hdr 等网络协议相关结构体，均未找到。"
+        }
+      ]
+    },
+    {
+      "question_id": "Q08_007",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在零拷贝/共享缓冲/DMA 描述符等路径（zero-copy）？（必须三态；仅有名词不算 implemented）",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/hal/dmac.c",
+          "symbol_kind": "read",
+          "symbol_name": "dmac_set_single_mode,dmac_lli_item_t",
+          "excerpt": "dmac.c 实现 DMA 控制器驱动，dmac_lli_item_t 为 DMA 链表项结构，但仅用于 SD 卡/SPI 数据传输（见 sdcard.c 中 sd_read_data_dma），无网络相关的零拷贝或共享缓冲实现。"
+        },
+        {
+          "path": "kernel/mm/mmap.c",
+          "symbol_kind": "search",
+          "symbol_name": "zero-copy,shared buffer",
+          "excerpt": "mmap.c 实现内存映射，但仅用于文件映射和匿名映射，无网络 zero-copy 相关实现（如 sendfile、splice 等）。"
+        },
+        {
+          "path": "kernel/fs/file.c",
+          "symbol_kind": "search",
+          "symbol_name": "copyin,copyout",
+          "excerpt": "file.c 中 fileread/filewrite 使用 copyin/copyout 进行用户/内核空间数据拷贝，无零拷贝优化。且这些是文件操作，非网络操作。"
+        }
+      ]
+    }
+  ]
+}

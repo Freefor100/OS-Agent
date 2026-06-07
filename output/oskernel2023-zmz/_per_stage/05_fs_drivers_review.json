@@ -1,0 +1,232 @@
+{
+  "schema_version": "describe_review_v1",
+  "stage_id": "05_fs_drivers",
+  "stage_title": "文件系统与设备 I/O",
+  "confidence": 0.75,
+  "question_reviews": [
+    {
+      "question_id": "Q05_001",
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "题面要求接口定义证据，答案提供了结构体定义路径及功能描述。证据 excerpt 为文本摘要而非代码原文，支撑度略减，但结论与题面一致。"
+    },
+    {
+      "question_id": "Q05_002",
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "单选答案文本与选项 A 一致。证据引用了初始化和挂载代码路径，支撑结论。"
+    },
+    {
+      "question_id": "Q05_003",
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "题面要求引用 Cargo/Makefile 证据，答案引用了 Makefile 构建规则及目录结构，符合要求。"
+    },
+    {
+      "question_id": "Q05_004",
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "列出了 6 个关键节点，满足 3-6 个要求。证据引用了对应函数文件，支撑调用链描述。"
+    },
+    {
+      "question_id": "Q05_005",
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "题面要求结构体定义证据，答案引用了 file.h 中 fdtable 定义，符合要求。"
+    },
+    {
+      "question_id": "Q05_006",
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "三态值合法。证据引用了 bio.c 中缓存初始化及管理函数，支撑 implemented 结论。"
+    },
+    {
+      "question_id": "Q05_007",
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "题面要求指出判断依据，答案指出了 LRU 链表及移动逻辑，证据支撑充分。"
+    },
+    {
+      "question_id": "Q05_008",
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "三态值合法。证据引用了 mmap 处理函数，支撑页缓存/映射结论。"
+    },
+    {
+      "question_id": "Q05_009",
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "三态值合法。证据引用了 do_mmap 及缺页处理，支撑匿名/文件映射结论。"
+    },
+    {
+      "question_id": "Q05_010",
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "三态值合法。证据说明了内部有实现但无系统调用入口，支撑 stub 结论。"
+    },
+    {
+      "question_id": "Q05_011",
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "三态值合法。证据引用了路径解析函数及对 . .. 的处理逻辑，支撑结论。"
+    },
+    {
+      "question_id": "Q05_012",
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "三态值合法。证据说明了 readlink 存在但 open 路径无跟随，支撑 stub 结论。"
+    },
+    {
+      "question_id": "Q05_013",
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "三态值合法。证据引用了 pipe 分配及系统调用，支撑 implemented 结论。"
+    },
+    {
+      "question_id": "Q05_014",
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "三态值合法。证据通过搜索结果为空及测试用例注释支撑 not_found 结论。"
+    },
+    {
+      "question_id": "Q05_015",
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "三态值合法。证据引用了 rootfs 初始化中 devfs/procfs 的创建，支撑结论。"
+    },
+    {
+      "question_id": "Q05_016",
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "单选答案文本与选项 A 一致。证据引用了进程访问 fd 表的代码，支撑 Per-Process 结论。"
+    },
+    {
+      "question_id": "Q05_017",
+      "score_evidence": 0.85,
+      "score_consistency": 0.4,
+      "review": "严重不符：题面为单选（选项 A-F），答案 value 为 'FAT 表内嵌空闲链'，未匹配任何给定选项文本（应为 B 链式分配或 F）。违反单选契约。"
+    },
+    {
+      "question_id": "Q05_018",
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "单选答案文本与选项 E 一致。证据引用了 FAT 表空闲簇管理字段，支撑结论。"
+    },
+    {
+      "question_id": "Q05_019",
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "单选答案文本与选项 C 一致。证据引用了路径解析及目录项结构，支撑树形结构结论。"
+    },
+    {
+      "question_id": "Q05_020",
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "单选答案文本与选项 A 一致。证据引用了读写接口及偏移参数，支撑字节流结论。"
+    },
+    {
+      "question_id": "Q05_021",
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "单选答案文本与选项 C 一致。证据引用了硬编码地址宏及初始化代码，支撑结论。"
+    },
+    {
+      "question_id": "Q05_022",
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "三态值合法。证据说明了 dtb 参数未使用且无解析代码，支撑 not_found 结论。"
+    },
+    {
+      "question_id": "Q05_023",
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "题面要求接口定义证据，答案说明了无统一框架并引用了直接初始化函数，符合要求。"
+    },
+    {
+      "question_id": "Q05_024",
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "列出了 5 个关键节点，满足 3-6 个要求。证据引用了 main 函数初始化序列。"
+    },
+    {
+      "question_id": "Q05_025",
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "三态值合法。证据引用了 console 及 SBI 输出函数，支撑早期输出结论。"
+    },
+    {
+      "question_id": "Q05_026",
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "三态值合法。证据引用了 virtio 及 sdcard 驱动实现，支撑结论。"
+    },
+    {
+      "question_id": "Q05_027",
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "三态值合法。证据通过搜索结果为空支撑 not_found 结论。"
+    },
+    {
+      "question_id": "Q05_028",
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "三态值合法。证据引用了 PLIC 初始化及中断分发处理，支撑结论。"
+    },
+    {
+      "question_id": "Q05_029",
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "题面要求证据，答案引用了地址宏定义及页表映射代码，支撑硬编码 + 转换结论。"
+    },
+    {
+      "question_id": "Q05_030",
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "题面要求证据，答案引用了 Makefile 平台选择及条件编译宏，支撑结论。"
+    },
+    {
+      "question_id": "Q05_031",
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "三态值合法。证据引用了 SBI 早期输出及 MMU 启用后虚拟地址映射，支撑切换逻辑。"
+    },
+    {
+      "question_id": "Q05_032",
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "单选答案文本与选项 D 一致。证据引用了缓冲池数组及管理逻辑，支撑结论。"
+    },
+    {
+      "question_id": "Q05_033",
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "单选答案文本与选项 A 一致。证据说明了请求按顺序提交无优化，支撑 FCFS 结论。"
+    },
+    {
+      "question_id": "Q05_034",
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "单选答案文本与选项 B 一致。证据引用了中断处理及唤醒逻辑，支撑中断驱动结论。"
+    },
+    {
+      "question_id": "Q05_035",
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "三态值合法。证据引用了 VirtIO 描述符环结构及设置逻辑，支撑 DMA 等价机制结论。"
+    }
+  ],
+  "findings": [
+    {
+      "severity": "blocker",
+      "message": "Q05_017 答案 value 未匹配题面给定的单选选项（A-F），违反单选契约。"
+    }
+  ],
+  "summary_zh": "本报告整体证据引用较为规范，大部分题目能准确对应题面要求并提供文件路径及逻辑描述作为证据。主要问题在于 Q05_017 未遵守单选选项约束，value 文本与给定选项不匹配。此外，多数证据 excerpt 为代码逻辑摘要而非代码原文，证据直接性略有不足。全阶段置信度因 Q05_017 严重一致性错误被截断至 0.75。",
+  "report_quality_score": 0.92,
+  "_meta": {
+    "quality": {
+      "mean_question_confidence": 0.9164
+    },
+    "review_model": "qwen3.5-plus"
+  }
+}

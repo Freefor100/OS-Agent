@@ -1,0 +1,221 @@
+{
+  "schema_version": "describe_review_v1",
+  "stage_id": "02_boot_trap",
+  "stage_title": "启动/架构与 Trap/系统调用",
+  "confidence": 0.98,
+  "question_reviews": [
+    {
+      "question_id": "Q02_001",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "题面要求文件路径 + 符号证据，答案提供了 linker.ld 与 entry.S 的具体摘录，证据充分且直接支撑结论。"
+    },
+    {
+      "question_id": "Q02_002",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "选项选择正确。证据中 main 函数参数符合 SBI 约定，但 sbi/目录存在仅证明有文件，未直接展示固件交接入点代码，证据链略弱。"
+    },
+    {
+      "question_id": "Q02_003",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "三态结论明确。证据展示了 sstatus 位操作与 sret 指令，直接证明特权级切换逻辑。"
+    },
+    {
+      "question_id": "Q02_004",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "列举了关键寄存器位并给出宏定义与使用处摘录，完全符合题面证据要求。"
+    },
+    {
+      "question_id": "Q02_005",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "MMU 启用证据确凿（satp 写入与 sfence），三态格式正确。"
+    },
+    {
+      "question_id": "Q02_006",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "跳转链节点清晰（6 个），证据覆盖了汇编入口到 C main 的调用，逻辑连贯。"
+    },
+    {
+      "question_id": "Q02_007",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "四项状态填写完整。DTB 解析为 not_found 的负面结论难以用代码摘录直接证明，但已说明理由，格式符合要求。"
+    },
+    {
+      "question_id": "Q02_008",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "FPU 初始化代码摘录清晰，三态结论与证据一致。"
+    },
+    {
+      "question_id": "Q02_009",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "stvec 设置代码直接作为证据，支撑 trap 向量初始化结论。"
+    },
+    {
+      "question_id": "Q02_010",
+      "score_evidence": 0.85,
+      "score_consistency": 1.0,
+      "review": "题面要求引用配置证据，Makefile 摘录为描述性文本而非原始配置代码片段，证据力度稍弱。"
+    },
+    {
+      "question_id": "Q02_011",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "SBI 目录与头文件证据支持固件链存在，三态格式正确。"
+    },
+    {
+      "question_id": "Q02_012",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "UART 虚实地址映射代码作为证据，支撑 MMU 前后地址切换逻辑。"
+    },
+    {
+      "question_id": "Q02_013",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "usertrapret 与 trampoline 代码直接证明返回用户态路径，证据充分。"
+    },
+    {
+      "question_id": "Q02_014",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "明确说明支持的平台与不支持的关键词搜索结果，符合题面搜索要求。"
+    },
+    {
+      "question_id": "Q02_015",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "kernelvec 与 uservec 标签摘录准确，直接定位向量入口。"
+    },
+    {
+      "question_id": "Q02_016",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "选项 C 与证据（memlayout 定义、注释、结构体成员）完全吻合。"
+    },
+    {
+      "question_id": "Q02_017",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "结构体定义摘录略去中间部分（...），但首尾足以说明大小与字段，基本符合要求。"
+    },
+    {
+      "question_id": "Q02_018",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "syscalls 数组与分发逻辑代码直接证明分发表存在。"
+    },
+    {
+      "question_id": "Q02_019",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "边界检查代码（num < NELEM）摘录清晰，支撑 implemented 结论。"
+    },
+    {
+      "question_id": "Q02_020",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "调用链节点清晰（5 个），证据覆盖 trap 到 syscall 实现的关键路径。"
+    },
+    {
+      "question_id": "Q02_021",
+      "score_evidence": 0.8,
+      "score_consistency": 1.0,
+      "review": "题面要求为每个 syscall 至少给一条证据，但 evidence 数组仅提供 4 条摘录覆盖 10 个 syscall，证据覆盖度不足。"
+    },
+    {
+      "question_id": "Q02_022",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "copyin/copyout 函数代码直接证明安全检查机制存在。"
+    },
+    {
+      "question_id": "Q02_023",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "时钟中断处理中调用 yield 的代码证据充分，支撑抢占调度结论。"
+    },
+    {
+      "question_id": "Q02_024",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "信号处理链路（sighandle/sigreturn）代码摘录完整，三态结论明确。"
+    },
+    {
+      "question_id": "Q02_025",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "缺页异常入口与 COW 引用计数表证据支撑联动逻辑，描述清晰。"
+    },
+    {
+      "question_id": "Q02_026",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "多核初始化代码摘录支持 per-CPU 陷阱初始化一致性结论。"
+    },
+    {
+      "question_id": "Q02_027",
+      "score_evidence": 0.9,
+      "score_consistency": 1.0,
+      "review": "统计数量为估算值（约 60/5），证据仅展示数组片段，虽说明理由但精确度略低。"
+    },
+    {
+      "question_id": "Q02_028",
+      "score_evidence": 0.95,
+      "score_consistency": 1.0,
+      "review": "README 与代码对照结论合理，证据支持无冲突声明。"
+    },
+    {
+      "question_id": "Q02_029",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "搜索结论明确（0 命中），证据为搜索结果摘录，符合题面要求。"
+    },
+    {
+      "question_id": "Q02_030",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "外部中断分发逻辑（PLIC claim）代码证据充分。"
+    },
+    {
+      "question_id": "Q02_031",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "负面结论（not_found）有搜索证据支持，并指出替代行为（SIGTERM），逻辑自洽。"
+    },
+    {
+      "question_id": "Q02_032",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "信号粒度结论明确，sys_kill 代码与 tkill 搜索结果为证。"
+    },
+    {
+      "question_id": "Q02_033",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "选项 A 与 scause 读取代码完全匹配，证据直接支撑区分机制。"
+    },
+    {
+      "question_id": "Q02_034",
+      "score_evidence": 1.0,
+      "score_consistency": 1.0,
+      "review": "中断嵌套负面结论有断言代码（intr_get）与搜索结果支撑，证据充分。"
+    }
+  ],
+  "findings": [],
+  "summary_zh": "整体报告质量较高，题面相符度好，绝大多数题目证据摘录直接有效。主要扣分点在于 Q02_021 未为列举的 10 个 syscall 逐一提供证据摘录，Q02_010 Makefile 证据为描述性文本而非代码。全阶段分按各题均值方案 A 汇总。",
+  "report_quality_score": 0.98,
+  "_meta": {
+    "quality": {
+      "mean_question_confidence": 0.9831
+    },
+    "review_model": "qwen3.5-plus"
+  }
+}

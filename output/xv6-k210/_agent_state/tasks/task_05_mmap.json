@@ -1,0 +1,41 @@
+{
+  "task_id": "task_05_mmap",
+  "stage_id": "05_fs_drivers",
+  "question_id": "Q05_009",
+  "question_ids": [
+    "Q05_009"
+  ],
+  "status": "done",
+  "evidence_ids": [
+    "ev_task_05_mmap_50091e36",
+    "ev_task_05_mmap_141019e4",
+    "ev_task_05_mmap_2664b81d",
+    "ev_task_05_mmap_a68864bb",
+    "ev_task_05_mmap_68022a79",
+    "ev_task_05_mmap_5c81f579",
+    "ev_task_05_mmap_f2d86b68",
+    "ev_task_05_mmap_192d5dda",
+    "ev_task_05_mmap_6cbf9551",
+    "ev_task_05_mmap_38793e88",
+    "ev_task_05_mmap_e1bf481b",
+    "ev_task_05_mmap_9cf14c63",
+    "ev_task_05_mmap_5a5f02a8",
+    "ev_task_05_mmap_e8172b21",
+    "ev_task_05_mmap_0dd1ae53",
+    "ev_task_05_mmap_77564db2",
+    "ev_task_05_mmap_16c39d54"
+  ],
+  "draft_answer_ids": [
+    "draft_task_05_mmap_Q05_009_58c98657"
+  ],
+  "findings": [],
+  "confidence": "high",
+  "errors": [],
+  "token_usage": {},
+  "metadata": {
+    "evidence_count": 17,
+    "mode": "react",
+    "summary": "在 xv6-k210 中找到了完整的 mmap/munmap 实现：syscall 入口 (sys_mmap/sys_munmap) 注册且非桩，完整解析 addr/len/prot/flags/fd/offset 及 MAP_SHARED/MAP_PRIVATE/MAP_ANONYMOUS/MAP_FIXED 等关键 flags；VMA 结构为 struct seg (type=MMAP) 挂载到进程的 segment 链表；page fault 路径 handle_page_fault_mmap 根据 VMA 类型分配匿名页或读取文件页；munmap/exit 通过 mmapdel/delsegs 释放映射、页表和文件引用。",
+    "raw_output_excerpt": "Now I have all the evidence. Let me produce the final JSON output.\n\n```json\n{\n  \"status\": \"done\",\n  \"summary\": \"在 xv6-k210 中找到了完整的 mmap/munmap 实现：syscall 入口 (sys_mmap/sys_munmap) 注册且非桩，完整解析 addr/len/prot/flags/fd/offset 及 MAP_SHARED/MAP_PRIVATE/MAP_ANONYMOUS/MAP_FIXED 等关键 flags；VMA 结构为 struct seg (type=MMAP) 挂载到进程的 segment 链表；page fault 路径 handle_page_fault_mmap 根据 VMA 类型分配匿名页或读取文件页；munmap/exit 通过 mmapdel/delsegs 释放映射、页表和文件引用。\",\n  \"claim\": \"xv6-k210 实现了完整的 mmap 文件映射和匿名映射，包括 syscall 入口、参数/flag 解析、VMA 结构、page fault 懒分配路径、munmap 和 exit 清理逻辑。\",\n  \"structured_fact_results\": [\n    {\n      \"fact_id\": \"Q05_009_01\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [0, 1, 2, 3],\n      \"notes\": \"sys_mmap (SYS_mmap=222) 和 sys_munmap (SYS_munmap=215) 在 syscall.c 的 syscalls[] 表中注册，实现体在 sysmem.c 中，非桩。sys_mmap 调用 do_mmap，sys_munmap 调用 do_munmap，均有完整实现。\"\n    },\n    {\n      \"fact_id\": \"Q05_009_02\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [0, 3, 4],\n      \"notes\": \"sys_mmap 通过 argaddr/argint/argfd 解析 start, len, prot, flags, fd, offset 六个参数；验证 MAP_SHARED/MAP_PRIVATE 必须提供一个，MAP_ANONYMOUS 时 fd 可为 NULL，MAP_FIXED 时调用 lookup_fixed_segment。prot 转换为 PTE 权限位。do_mmap 中检查文件权限匹配。\"\n    },\n    {\n      \"fact_id\": \"Q05_009_03\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [5, 6, 7],\n      \"notes\": \"struct seg (include/mm/usrmm.h) 包含 type(MMAP), addr, sz, flag, mmap(文件/匿名指针), f_off, f_sz 等字段。进程通过 p->segment 链表管理所有段。do_mmap 中通过 lookup_segment/lookup_fixed_segment 创建 MMAP 段并插入链表。\"\n    },\n    {\n      \"fact_id\": \"Q05_009_04\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_candidate_indexes\": [8, 9, 10, 11],\n      \"notes\": \"handle_page_fault (vm.c) 根据 seg->type==MMAP 调用 handle_page_fault_mmap (mmap.c)。该函数处理三种情况：匿名私有(uvmalloc分配零页)、匿名共享(handle_anonymous_shared分配共享页)、文件映射(handle_file_mmap读取文件页或从共享页拷贝)。实现了懒分配机制。\"\n    },\n    {\n      \"fact_id\": \"Q05_009_05\",\n      \"status_or_value\": \"yes_strong\",\n      \"evidence_c"
+  }
+}

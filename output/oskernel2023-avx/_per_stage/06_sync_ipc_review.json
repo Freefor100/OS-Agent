@@ -1,0 +1,133 @@
+{
+  "schema_version": "describe_review_v1",
+  "stage_id": "06_sync_ipc",
+  "stage_title": "同步互斥与进程间通信",
+  "confidence": 0.96,
+  "question_reviews": [
+    {
+      "question_id": "Q06_001",
+      "confidence": 0.9,
+      "review": "答案列出了 6 种原语，但 evidence 仅提供了 4 项（spinlock, semaphore, FutexQueue, pipe）的结构体定义摘录。SleepLock 和 WaitQueue（chan 机制）在 value 中被声明为已实现，但本题 evidence 中缺少对应的头文件或结构体定义摘录（虽在其他题证据中出现，但本题证据链不完整）。题面要求列出类型定义证据，存在轻微覆盖不足。"
+    },
+    {
+      "question_id": "Q06_002",
+      "confidence": 0.95,
+      "review": "value 选择阻塞锁，evidence 摘录了 acquiresleep 调用 sleep 的代码，直接支撑了阻塞/挂起的结论。题答一致，证据充分。"
+    },
+    {
+      "question_id": "Q06_003",
+      "confidence": 0.95,
+      "review": "tri_state 选择 implemented，evidence 包含 sleep/wakeup 函数实现及 FutexQueue 结构，直接对应题面要求的等待队列与阻塞/唤醒机制。"
+    },
+    {
+      "question_id": "Q06_004",
+      "confidence": 0.95,
+      "review": "fill_in 格式完整，value 中关于锁持有与释放顺序的描述与 evidence 中 sleep 函数内的 acquire/release 逻辑一致。防丢 wakeup 机制的注释引用也存在于证据逻辑中。"
+    },
+    {
+      "question_id": "Q06_005",
+      "confidence": 0.95,
+      "review": "tri_state 选择 implemented，evidence 提供了 pipealloc、sys_pipe 及系统调用号定义，完整支撑管道实现的结论。"
+    },
+    {
+      "question_id": "Q06_006",
+      "confidence": 1.0,
+      "review": "value 选择字节环形缓冲区，evidence 明确展示了 data 数组定义及 nwrite/nread 的取模操作，直接证明环形缓冲形态。证据与结论完全吻合。"
+    },
+    {
+      "question_id": "Q06_007",
+      "confidence": 1.0,
+      "review": "value 选择阻塞语义，evidence 展示了 pipewrite/piperead 中满/空时调用 sleep 的代码，直接支撑挂起等待的结论。"
+    },
+    {
+      "question_id": "Q06_008",
+      "confidence": 0.95,
+      "review": "tri_state 选择 stub，value 解释信号量原语已实现但 SysV 系统调用未实现。evidence 通过 grep 结果和文件扫描支撑了这一区分，符合题面要求的三态及说明。"
+    },
+    {
+      "question_id": "Q06_009",
+      "confidence": 1.0,
+      "review": "tri_state 选择 implemented，evidence 包含 futex.c 实现、系统调用入口及系统调用号，证据链完整。"
+    },
+    {
+      "question_id": "Q06_010",
+      "confidence": 1.0,
+      "review": "tri_state 选择 implemented，evidence 覆盖 sigaction、sigreturn、trampoline 及 kill，完整支撑信号机制已实现的结论。"
+    },
+    {
+      "question_id": "Q06_011",
+      "confidence": 0.95,
+      "review": "short_answer 详细描述了上下文构建与恢复流程。evidence 摘录了 sighandle、rt_sigreturn 及 trampoline 汇编，与 value 中的步骤描述（保存 trapframe、修改 epc、ecall）一致。"
+    },
+    {
+      "question_id": "Q06_012",
+      "confidence": 0.95,
+      "review": "single_choice 选择未发现，evidence 为 grep 扫描结果（0 命中），逻辑自洽，支撑结论。"
+    },
+    {
+      "question_id": "Q06_013",
+      "confidence": 0.95,
+      "review": "single_choice 选择自定义汇编，evidence 展示了 __sync 内置函数及注释说明其生成的原子指令（amoswap）。虽然 value 文本举例了 ARM/x86 指令，但核心结论（底层原子指令）与证据一致。"
+    },
+    {
+      "question_id": "Q06_014",
+      "confidence": 0.95,
+      "review": "short_answer 逐条分析了死锁四条件。evidence 提供了 acquire、pipewrite、sem_wait 代码，分别支撑互斥、持有并等待等条件的成立依据。"
+    },
+    {
+      "question_id": "Q06_015",
+      "confidence": 0.95,
+      "review": "single_choice 选择忽略策略，evidence 通过 grep 未发现检测机制及注释暗示依赖人工规范，支撑 Ostrich 算法的结论。"
+    },
+    {
+      "question_id": "Q06_016",
+      "confidence": 0.95,
+      "review": "tri_state 选择 stub，value 说明仅有注释无形式化规范。evidence 摘录了相关注释及 grep 结果，支撑了“存在注释但无规范/检测代码”的 stub 状态。"
+    },
+    {
+      "question_id": "Q06_017",
+      "confidence": 0.95,
+      "review": "tri_state 选择 not_found，evidence 为 grep 扫描及头文件检查，均显示未发现 Condvar/Monitor，结论与证据一致。"
+    },
+    {
+      "question_id": "Q06_018",
+      "confidence": 0.95,
+      "review": "short_answer 回答三个经典问题均未发现。evidence 为 grep 扫描结果（0 命中），支撑 not_found 结论。"
+    },
+    {
+      "question_id": "Q06_019",
+      "confidence": 0.95,
+      "review": "tri_state 选择 not_found，evidence 为消息传递相关关键词的 grep 扫描及系统调用表检查，支撑结论。"
+    },
+    {
+      "question_id": "Q06_020",
+      "confidence": 0.95,
+      "review": "tri_state 选择 not_found，evidence 为 barrier 相关关键词的 grep 扫描及头文件检查，支撑结论。"
+    }
+  ],
+  "dimensions": {
+    "evidence_supports_answers": 0.95,
+    "question_answer_consistency": 0.95,
+    "requirements_fit": 0.95
+  },
+  "findings": [],
+  "summary_zh": "本报告整体质量较高，JSON 契约符合度好，题答一致性高。绝大多数题目的 value 结论均有对应的代码摘录或搜索证据支撑，逻辑自洽。仅 Q06_001 在列举多项原语时，证据摘录未覆盖全部列出的类型定义（缺 SleepLock/WaitQueue 结构体摘录），存在轻微证据覆盖不足。全阶段置信度按各题均值计算，无严重阻断性问题。",
+  "report_quality_score": 0.98,
+  "_meta": {
+    "quality": {
+      "excerpt_coverage": 1.0,
+      "evidence_richness": 1.0,
+      "total_evidence_items": 50,
+      "nonempty_excerpt_items": 50,
+      "mean_question_confidence": 0.9575,
+      "mean_dimensions": 0.95,
+      "weights": {
+        "w_mean": 0.45,
+        "w_excerpt": 0.25,
+        "w_rich": 0.2,
+        "w_dim": 0.1
+      }
+    },
+    "review_model": "qwen3.5-plus"
+  }
+}

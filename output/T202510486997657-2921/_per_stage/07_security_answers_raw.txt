@@ -1,0 +1,352 @@
+现在我已经收集了足够的证据来回答所有问题。让我整理并输出最终的 JSON 报告。
+
+```json
+{
+  "schema_version": "v1",
+  "stage_id": "07_security",
+  "stage_title": "安全机制与权限模型",
+  "terminology_profile": "stallings_en_zh",
+  "answers": [
+    {
+      "question_id": "Q07_001",
+      "question_type": "single_choice",
+      "stem": "特权级隔离形态更接近哪种？",
+      "value": "有用户态/内核态隔离（user mode/kernel mode）",
+      "evidence": [
+        {
+          "path": "kernel/hal/riscv/rv_csr.hh:424-425",
+          "symbol_kind": "enum",
+          "symbol_name": "Sstatus::sstatus_sum_s",
+          "excerpt": "RISC-V S 模式状态寄存器定义 sstatus_sum_s = 18，支持 Supervisor User Memory access (SUM) 位，允许 S 模式访问用户空间内存"
+        },
+        {
+          "path": "kernel/trap/riscv/trap.cc:370-372",
+          "symbol_kind": "function",
+          "symbol_name": "usertrapret",
+          "excerpt": "w_sstatus(x) 清除 SPP 位 (sstatus_spp_m)，设置 SPPIE 位，从 S 模式返回 U 模式执行用户代码"
+        },
+        {
+          "path": "kernel/mem/riscv/trampoline.S:1-148",
+          "symbol_kind": "asm",
+          "symbol_name": "uservec/userret",
+          "excerpt": "trampoline.S 实现 uservec 和 userret，在用户态和内核态之间切换时交换 satp 寄存器 (页表)，实现特权级隔离"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_002",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在凭证/权限数据结构（UID/GID/Credential/Capability/ACL 等）？",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/proc/proc.hh:97-104",
+          "symbol_kind": "struct",
+          "symbol_name": "Pcb",
+          "excerpt": "Pcb 结构体包含 8 个 UID/GID 凭证字段：_uid (真实用户 ID), _euid (有效用户 ID), _suid (保存的设置用户 ID), _fsuid (文件系统用户 ID), _gid (真实组 ID), _egid (有效组 ID), _sgid (保存的设置组 ID), _fsgid (文件系统组 ID)"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_003",
+      "question_type": "tri_state_impl",
+      "stem": "是否能证实在 syscall 路径上真实执行了权限检查（open/exec/write 等）？",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/sys/syscall_handler.cc:2765-2795",
+          "symbol_kind": "function",
+          "symbol_name": "sys_setgid/sys_setuid",
+          "excerpt": "sys_setgid 检查 p->_euid != 0 && gid != p->_egid && gid != p->_gid 时返回 -EPERM；sys_setuid 对非特权用户检查 uid != p->_uid && uid != p->_euid 时返回 -EPERM"
+        },
+        {
+          "path": "kernel/sys/syscall_handler.cc:5056-5290",
+          "symbol_kind": "function",
+          "symbol_name": "sys_faccessat",
+          "excerpt": "sys_faccessat 实现完整的 R_OK/W_OK/X_OK 权限检查链，遍历路径中每个父目录的执行权限，检查文件所有者/组/其他权限位，返回-EACCES 或 0"
+        },
+        {
+          "path": "kernel/sys/syscall_handler.cc:3470-3510",
+          "symbol_kind": "function",
+          "symbol_name": "sys_readlinkat",
+          "excerpt": "sys_readlinkat 在路径遍历中检查每个目录组件的搜索权限 (S_IXUSR/S_IXGRP/S_IXOTH)，root 用户总是有权限，非 root 用户根据 UID/GID 匹配检查对应权限位"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_004",
+      "question_type": "short_answer",
+      "stem": "若存在权限检查：入口点与核心检查函数链路是什么？",
+      "value": "权限检查入口点与核心函数链路：\n1. sys_faccessat (kernel/sys/syscall_handler.cc:5056) → 检查 R_OK/W_OK/X_OK 权限\n2. ext4_mode_get/ext4_owner_get (kernel/fs/lwext4/ext4.cc) → 获取文件权限模式和所有者信息\n3. sys_readlinkat (kernel/sys/syscall_handler.cc:3216) → 路径遍历中调用 vfs_mode_get/vfs_owner_get 检查目录搜索权限\n4. sys_setuid/sys_setgid (kernel/sys/syscall_handler.cc:2765-2795) → EPERM 权限检查\n5. vfs_ext_faccessat (kernel/fs/vfs/vfs_ext4_ext.cc:1047) → VFS 层权限检查接口",
+      "evidence": [
+        {
+          "path": "kernel/sys/syscall_handler.cc:5056-5290",
+          "symbol_kind": "function",
+          "symbol_name": "sys_faccessat",
+          "excerpt": "系统调用入口，检查 dirfd、路径解析、逐段检查父目录执行权限、最终文件 R/W/X 权限检查"
+        },
+        {
+          "path": "kernel/fs/vfs/vfs_ext4_ext.cc:1047",
+          "symbol_kind": "function",
+          "symbol_name": "vfs_ext_faccessat",
+          "excerpt": "VFS 层权限检查函数，被 syscall 层调用"
+        },
+        {
+          "path": "kernel/sys/syscall_handler.cc:3470-3510",
+          "symbol_kind": "function",
+          "symbol_name": "sys_readlinkat",
+          "excerpt": "路径遍历中调用 vfs_mode_get/vfs_owner_get 检查每个目录组件的搜索权限"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_005",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现用户指针验证（access_ok/verify_area/UserInPtr/copyin/copyout 等）？",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/fs/fat32/fat32.cc:17-35",
+          "symbol_kind": "function",
+          "symbol_name": "either_copyin/either_copyout",
+          "excerpt": "either_copyin 根据 user 标志决定调用 mem::k_vmm.copy_in (用户空间) 或直接 memmove (内核空间)；either_copyout 同理，实现用户指针验证和安全拷贝"
+        },
+        {
+          "path": "kernel/mem/userspace_stream.cc:15-130",
+          "symbol_kind": "class",
+          "symbol_name": "UserspaceStream",
+          "excerpt": "UserspaceStream 类封装用户空间内存访问，通过 _pt (页表指针) 和 _start_addr/_end_addr 边界检查，operator<< 和 operator>> 实现安全的用户空间读写"
+        },
+        {
+          "path": "kernel/sys/syscall_handler.cc:3216-3293",
+          "symbol_kind": "function",
+          "symbol_name": "sys_readlinkat",
+          "excerpt": "使用 _arg_int/_arg_str/_arg_addr 获取用户参数，通过 mem::k_vmm.copy_out 将结果拷贝到用户空间，失败时返回-EFAULT"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_006",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现 seccomp/prctl/sandbox 等系统调用过滤/沙箱？",
+      "value": "stub",
+      "evidence": [
+        {
+          "path": "kernel/sys/syscall_handler.cc:12621-12720",
+          "symbol_kind": "function",
+          "symbol_name": "sys_prctl",
+          "excerpt": "sys_prctl 仅实现 PR_SET_NAME (设置进程名称) 和 PR_GET_NAME (获取进程名称) 等基础功能，无 BPF 过滤、无 seccomp 模式支持。Pcb 中有 _no_new_privs 和 _securebits 字段但未在 syscall 中使用"
+        },
+        {
+          "path": "kernel/sys/syscall_defs.hh:345-346",
+          "symbol_kind": "macro",
+          "symbol_name": "PR_SET_NAME/PR_GET_NAME",
+          "excerpt": "仅定义 PR_SET_NAME=15 和 PR_GET_NAME=16，无 PR_SET_SECCOMP、PR_GET_SECCOMP 等 seccomp 相关常量"
+        },
+        {
+          "path": "kernel/fs/vfs/file/virtual_file.cc:1011-1012",
+          "symbol_kind": "comment",
+          "symbol_name": "seccomp_comment",
+          "excerpt": "注释中提到 'Seccomp: seccomp 模式' 但输出固定值 0，无实际实现"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_007",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在栈保护/溢出防护（stack canary/guard page）或等价机制？",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/mem/memlayout.hh:7-8",
+          "symbol_kind": "macro",
+          "symbol_name": "KSTACK_GUARD_PAGES",
+          "excerpt": "定义 KSTACK_GUARD_PAGES = 1 (guard page 数量)，KSTACK_TOTAL_PAGES = KSTACK_PAGES + KSTACK_GUARD_PAGES (总分配页面数)"
+        },
+        {
+          "path": "kernel/proc/proc_manager.cc:4172",
+          "symbol_kind": "function_call",
+          "symbol_name": "uvmclear",
+          "excerpt": "mem::k_vmm.uvmclear(new_pt, stack_start) 设置 guard page，清除用户访问权限位"
+        },
+        {
+          "path": "kernel/mem/virtual_memory_manager.cc:954-962",
+          "symbol_kind": "function",
+          "symbol_name": "uvmclear",
+          "excerpt": "uvmclear 函数清除 PTE 的 user 位 (RISC-V: pte_user_m, LoongArch: pte_plv_m)，使 guard page 不可被用户态访问"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_008",
+      "question_type": "tri_state_impl",
+      "stem": "是否存在审计/安全启动（audit/secure_boot/signature）相关逻辑？",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/fs/lwext4/ext4_mbr.cc:48-92",
+          "symbol_kind": "search",
+          "symbol_name": "signature_scan",
+          "excerpt": "仅在 MBR 结构中发现 signature 字段 (0xAA55 魔数)，用于验证 MBR 有效性，非安全启动签名验证。搜索 audit、secure_boot、verify_sig 等关键词 0 命中"
+        },
+        {
+          "path": "kernel/fs/fat32/fat32.cc:133",
+          "symbol_kind": "search",
+          "symbol_name": "fat32_signature",
+          "excerpt": "FAT32 signature 仅用于文件系统标识 (\"MSWIN4.1\")，非安全签名。未发现 audit 日志、secure boot 验证、代码签名等安全机制"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_009",
+      "question_type": "short_answer",
+      "stem": "本项目支持哪些架构？每种架构的安全相关初始化是否有代码证据？",
+      "value": "支持架构及安全初始化证据：\n\n1. RISC-V64 (riscv64gc-unknown-none-elf):\n   - 特权级配置：kernel/trap/riscv/trap.cc:50-54 设置 stvec=kernelvec, sstatus|=SSTATUS_SIE, sie|=SEIE|STIE|SSIE\n   - 用户/内核隔离：kernel/mem/riscv/trampoline.S:1-148 实现 uservec/userret，切换 satp 页表\n   - SUM 位支持：kernel/hal/riscv/rv_csr.hh:424-425 定义 sstatus_sum_s，但未在代码中显式启用\n\n2. LoongArch64 (loongarch64-unknown-none-elf):\n   - 特权级配置：kernel/trap/loongarch/trap.cc:47-57 设置 ecfg=(0<<VS)|HWI_VEC|TI_VEC, tcfg=0x1000000UL|EN|PER, eentry=kernelvec\n   - TLB 异常处理：w_csr_tlbrentry=handle_tlbr, w_csr_merrentry=handle_merr\n   - 未发现 PMP/MPU/SMEP 等价机制配置代码",
+      "evidence": [
+        {
+          "path": "kernel/trap/riscv/trap.cc:50-54",
+          "symbol_kind": "function",
+          "symbol_name": "trap_manager::inithart",
+          "excerpt": "RISC-V: w_stvec((uint64)kernelvec); w_sstatus(r_sstatus() | SSTATUS_SIE); w_sie(r_sie() | SIE_SEIE | SIE_STIE | SIE_SSIE)"
+        },
+        {
+          "path": "kernel/trap/loongarch/trap.cc:47-57",
+          "symbol_kind": "function",
+          "symbol_name": "trap_manager::inithart",
+          "excerpt": "LoongArch: w_csr_ecfg(ecfg); w_csr_tcfg(tcfg); w_csr_eentry((uint64)kernelvec); w_csr_tlbrentry((uint64)handle_tlbr)"
+        },
+        {
+          "path": "kernel/mem/riscv/trampoline.S:1-148",
+          "symbol_kind": "asm",
+          "symbol_name": "uservec/userret",
+          "excerpt": "RISC-V trampoline 实现用户/内核页表切换，uservec 保存用户寄存器并切换到内核页表，userret 恢复用户页表并 sret 返回"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_010",
+      "question_type": "tri_state_impl",
+      "stem": "若项目使用 Rust，是否存在 RAII/所有权/生命周期相关的内核安全机制？",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/proc/proc.hh:1-450",
+          "symbol_kind": "search",
+          "symbol_name": "language_check",
+          "excerpt": "本项目使用 C++ 编写 (非 Rust)，使用 EASTL 替代标准库。文件扩展名为.cc/.hh/.S，无.rs 文件。使用 SpinLock (kernel/devs/spinlock.hh) 需手动 acquire/release，无 RAII 自动释放机制"
+        },
+        {
+          "path": "kernel/devs/spinlock.hh:10-36",
+          "symbol_kind": "class",
+          "symbol_name": "SpinLock",
+          "excerpt": "C++ SpinLock 类，使用 eastl::atomic<Cpu*> 实现 CAS 操作，需手动调用 acquire() 和 release()，无 std::lock_guard 类 RAII 封装"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_011",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现了内核/用户页表隔离 (KPTI 或等价机制)？",
+      "value": "implemented",
+      "evidence": [
+        {
+          "path": "kernel/mem/riscv/trampoline.S:1-148",
+          "symbol_kind": "asm",
+          "symbol_name": "uservec/userret",
+          "excerpt": "RISC-V 实现 KPTI 等价机制：uservec 中 ld t1, 0(a0) 加载内核页表基址到 satp，sfence.vma 刷新 TLB 后切换；userret 中 csrw satp, a1 切换回用户页表"
+        },
+        {
+          "path": "kernel/trap/riscv/trap.cc:363-372",
+          "symbol_kind": "function",
+          "symbol_name": "usertrapret",
+          "excerpt": "设置 p->_trapframe->kernel_satp = r_satp() 保存内核页表，将 TRAMPOLINE 页映射到用户页表，通过 trampoline 实现用户/内核页表隔离"
+        },
+        {
+          "path": "kernel/mem/memlayout.hh:70-83",
+          "symbol_kind": "macro",
+          "symbol_name": "KSTACK/TRAMPOLINE",
+          "excerpt": "定义 TRAMPOLINE = (MAXVA>>1) - PGSIZE 映射到用户和内核空间同一虚拟地址，KSTACK 周围有 guard pages 隔离"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_012",
+      "question_type": "short_answer",
+      "stem": "UID/GID 字段是否在 syscall 路径上真实执行权限检查？",
+      "value": "UID/GID 字段在 syscall 路径上真实执行权限检查，证据链完整：\n\n1. sys_setuid/sys_setgid (kernel/sys/syscall_handler.cc:2765-2795):\n   - sys_setgid: 检查 p->_euid != 0 && gid != p->_egid && gid != p->_gid 时返回 -EPERM\n   - sys_setuid: 非特权用户检查 uid != p->_uid && uid != p->_euid 时返回 -EPERM\n\n2. sys_faccessat (kernel/sys/syscall_handler.cc:5056-5290):\n   - 获取 current_proc->_uid 和 current_proc->_gid\n   - 目录权限检查：check_uid == dir_uid 用 owner_perms，check_gid == dir_gid 用 group_perms，否则用 other_perms\n   - 文件权限检查：current_uid == file_uid 用 owner_perms，current_gid == file_gid 用 group_perms，否则用 other_perms\n   - 缺少权限时返回 -EACCES\n\n3. sys_readlinkat (kernel/sys/syscall_handler.cc:3470-3510):\n   - 路径遍历中调用 vfs_mode_get/vfs_owner_get 获取目录权限和所有者\n   - proc_uid == dir_uid 检查 S_IXUSR，proc_gid == dir_gid 检查 S_IXGRP，否则检查 S_IXOTH\n   - 无搜索权限时返回 SYS_EACCES\n\n结论：UID/GID 字段不仅存在，且在多个 syscall 中强制执行权限检查，非桩函数。",
+      "evidence": [
+        {
+          "path": "kernel/sys/syscall_handler.cc:2765-2795",
+          "symbol_kind": "function",
+          "symbol_name": "sys_setuid/sys_setgid",
+          "excerpt": "sys_setgid 检查 EPERM：if (p->_euid != 0 && gid != p->_egid && gid != p->_gid) return -EPERM; sys_setuid 对非特权用户检查 uid != p->_uid && uid != p->_euid 返回 -EPERM"
+        },
+        {
+          "path": "kernel/sys/syscall_handler.cc:5164-5272",
+          "symbol_kind": "function",
+          "symbol_name": "sys_faccessat",
+          "excerpt": "完整的 UID/GID 权限检查链：比较 check_uid/check_gid 与 dir_uid/dir_gid，确定 effective_perms，检查 R_OK/W_OK/X_OK 后返回-EACCES 或 0"
+        },
+        {
+          "path": "kernel/sys/syscall_handler.cc:3470-3510",
+          "symbol_kind": "function",
+          "symbol_name": "sys_readlinkat",
+          "excerpt": "路径遍历中检查目录搜索权限：proc_uid == dir_uid 检查 S_IXUSR，proc_gid == dir_gid 检查 S_IXGRP，否则检查 S_IXOTH，无权限返回 SYS_EACCES"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_013",
+      "question_type": "single_choice",
+      "stem": "访问控制模型 (Access Control Model, Stallings Ch15) 更接近哪种？",
+      "value": "自主访问控制 DAC (Discretionary Access Control)：所有者自主设置权限（Unix 权限位）",
+      "evidence": [
+        {
+          "path": "kernel/sys/syscall_handler.cc:5164-5272",
+          "symbol_kind": "function",
+          "symbol_name": "sys_faccessat",
+          "excerpt": "实现 Unix 风格 DAC 模型：文件权限分为 owner/group/other 三组，每组有 rwx 权限位。进程根据 UID/GID 匹配确定使用哪组权限，文件所有者可自主设置权限位 (通过 chmod 等系统调用)"
+        },
+        {
+          "path": "kernel/fs/lwext4/ext4.cc:2239",
+          "symbol_kind": "function",
+          "symbol_name": "ext4_mode_set",
+          "excerpt": "ext4_mode_set 函数允许设置文件权限模式 (mode)，符合 DAC 模型中资源所有者自主控制访问权限的特征"
+        },
+        {
+          "path": "kernel/proc/proc.hh:130",
+          "symbol_kind": "struct_field",
+          "symbol_name": "Pcb::_umask",
+          "excerpt": "Pcb 包含 _umask 字段 (文件模式创建掩码)，用于屏蔽新创建文件的权限位，符合 Unix DAC 模型的 umask 机制"
+        }
+      ]
+    },
+    {
+      "question_id": "Q07_014",
+      "question_type": "tri_state_impl",
+      "stem": "是否实现完整性策略 (Integrity Policy, Stallings Ch15)？",
+      "value": "not_found",
+      "evidence": [
+        {
+          "path": "kernel/mem/virtual_memory_manager.cc:954-962",
+          "symbol_kind": "search",
+          "symbol_name": "wx_protection_check",
+          "excerpt": "搜索 W^X (Write XOR Execute) 保护机制：未发现页表项同时清除 writable 和 executable 位的代码。RISC-V PTE 定义 pte_writable_m 和 pte_executable_m 独立，未强制互斥"
+        },
+        {
+          "path": "kernel/hal/riscv/rv_csr.hh:424-425",
+          "symbol_kind": "search",
+          "symbol_name": "pmp_check",
+          "excerpt": "搜索 PMP (Physical Memory Protection) 配置：rv_csr.hh 仅定义 sstatus_sum_s (SUM 位)，未发现 pmpcfg/pmpaddr 寄存器配置代码。LoongArch 未发现 MPU/SMEP/SMAP 等价机制"
+        },
+        {
+          "path": "kernel/proc/proc.hh:1-450",
+          "symbol_kind": "search",
+          "symbol_name": "biba_selinux_check",
+          "excerpt": "搜索 Biba 模型、SELinux、AppArmor、安全标签 (security label)、capability 机制：0 命中。Pcb 中仅有 UID/GID 凭证，无完整性级别字段"
+        }
+      ]
+    }
+  ]
+}
+```

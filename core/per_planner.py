@@ -401,6 +401,47 @@ def _find_repo_docs(repo_path: str) -> List[str]:
     return docs
 
 
+def _infer_board_guesses(blob: str) -> List[str]:
+    """README/构建文件头中常见赛用板与 QEMU 机模子串 → 去重标签（供 Plan 侧车 board_guess）。"""
+    low = (blob or "").lower()
+    # (子串, 标签)；子串越长/越特异的条目放前面，避免短串误伤
+    markers: tuple[tuple[str, str], ...] = (
+        ("-machine virt", "qemu-virt"),
+        ("riscv-virt", "qemu-virt"),
+        ("qemu-system", "qemu"),
+        ("qemu-virt", "qemu-virt"),
+        ("fu740-c000", "fu740"),
+        ("fu740", "fu740"),
+        ("u740", "fu740"),
+        ("2k1000la", "2k1000la"),
+        ("2k1000-la", "2k1000la"),
+        ("2k1000", "2k1000"),
+        ("2k0500", "2k0500"),
+        ("ls2k", "ls2k"),
+        ("ls7a", "ls7a"),
+        ("ls3a", "ls3a"),
+        ("loongson", "loongson"),
+        ("jh7110", "jh7110"),
+        ("visionfive", "visionfive"),
+        ("vf2", "visionfive2"),
+        ("starfive", "starfive"),
+        ("sifive", "sifive"),
+        ("sophgo", "sophgo"),
+        ("k230", "k230"),
+        ("k210", "k210"),
+        ("nezha", "nezha"),
+        ("milkv", "milkv"),
+        ("allwinner-d1", "allwinner-d1"),
+        ("lichee", "lichee"),
+        ("qemu", "qemu"),
+    )
+    out: List[str] = []
+    for needle, label in markers:
+        if needle in low:
+            out.append(label)
+    return _dedupe_keep_order(out)
+
+
 def build_repo_profile(repo_url: str, repo_path: str) -> Dict[str, Any]:
     root_entries = _list_root_entries(repo_path)
     readme_text = ""
@@ -415,12 +456,13 @@ def build_repo_profile(repo_url: str, repo_path: str) -> Dict[str, Any]:
         for name in ("Cargo.toml", "Makefile", "rust-toolchain.toml")
         if os.path.exists(os.path.join(repo_path, name))
     )
-    arch_guesses = _guess_architecture(readme_text + "\n" + config_text, root_entries)
-    framework_guesses = _guess_framework(readme_text + "\n" + config_text, root_entries)
+    scan_blob = readme_text + "\n" + config_text
+    arch_guesses = _guess_architecture(scan_blob, root_entries)
+    framework_guesses = _guess_framework(scan_blob, root_entries)
     core_paths = _walk_core_paths(repo_path, max_depth=2)
     entry_candidates = _dedupe_keep_order([
         symbol for symbol in ("_start", "start", "rust_main", "kernel_main", "main", "trap_handler")
-        if symbol in (readme_text + "\n" + config_text)
+        if symbol in scan_blob
     ])
 
     return {
@@ -428,12 +470,8 @@ def build_repo_profile(repo_url: str, repo_path: str) -> Dict[str, Any]:
         "repo_path": repo_path,
         "framework_guess": framework_guesses,
         "arch_guess": arch_guesses,
-        "board_guess": _dedupe_keep_order([
-            board
-            for board in ("k210", "visionfive", "jh7110", "qemu", "virt")
-            if board in (readme_text + "\n" + config_text).lower()
-        ]),
-        "language_mix": _guess_language_mix(readme_text + "\n" + config_text, root_entries),
+        "board_guess": _infer_board_guesses(scan_blob),
+        "language_mix": _guess_language_mix(scan_blob, root_entries),
         "core_paths": core_paths,
         "entry_candidates": entry_candidates,
         "doc_paths": _find_repo_docs(repo_path),
@@ -441,55 +479,6 @@ def build_repo_profile(repo_url: str, repo_path: str) -> Dict[str, Any]:
         "root_entries": root_entries[:80],
         "readme_summary": _norm(readme_text[:800]),
     }
-
-
-def extract_stage_questions(prompt: str) -> List[str]:
-    """从阶段 prompt 抽取 must_cover：优先「必须回答」段内条项，再拼接其前的「本章侧重/本阶段须额外覆盖」等条项。
-
-    避免把「要求/强制要求」里偏流程的 `-` 条混进前 12 条（旧逻辑按全文顺序截断会挤掉真正必答项）。
-    """
-    lines = prompt.splitlines()
-
-    def _bullet_text(stripped: str) -> str | None:
-        if not stripped.startswith("- ") or len(stripped) < 6:
-            return None
-        candidate = re.sub(r"^\-\s*", "", stripped).strip()
-        if len(candidate) >= 4:
-            return candidate
-        return None
-
-    must_start = next((i for i, ln in enumerate(lines) if "必须回答" in ln.strip()), -1)
-    if must_start < 0:
-        # 无「必须回答」标题的章节（如 01_overview）：保持全文顺序取前 12 条
-        questions: List[str] = []
-        for raw in lines:
-            t = _bullet_text(raw.strip())
-            if t:
-                questions.append(t)
-        return _dedupe_keep_order(questions[:12])
-
-    must_end = next(
-        (
-            i
-            for i in range(must_start + 1, len(lines))
-            if re.match(r"^(\*\*强制要求\*\*|要求：|输出格式)", lines[i].strip())
-        ),
-        len(lines),
-    )
-    preferred: List[str] = []
-    for raw in lines[must_start:must_end]:
-        t = _bullet_text(raw.strip())
-        if t:
-            preferred.append(t)
-    secondary: List[str] = []
-    for raw in lines[:must_start]:
-        t = _bullet_text(raw.strip())
-        if t:
-            secondary.append(t)
-    # 先 must_cover 核心（必须回答），再补本章侧重/额外覆盖。
-    # JSON-QA 题单可能较长：上限放宽，避免截断导致 planner 覆盖不足。
-    merged = _dedupe_keep_order(preferred + secondary)
-    return merged[:30]
 
 
 def _match_stage_hints(stage_id: str) -> Dict[str, List[str]]:
@@ -522,29 +511,10 @@ def infer_entry_symbols(stage_id: str, repo_profile: Dict[str, Any]) -> List[str
     return _dedupe_keep_order(list(hints.get("entry_symbols", [])) + repo_profile.get("entry_candidates", []))[:10]
 
 
-def estimate_context_budget(stage_id: str) -> Dict[str, int]:
-    base = {
-        "max_prev_section_chars": 6000,
-        "max_seed_paths": 8,
-        "max_evidence_items": 12,
-        "max_memory_items": 8,
-    }
-    if "01_overview" in stage_id:
-        base["max_prev_section_chars"] = 12000
-        base["max_evidence_items"] = 18
-    if "10_history" in stage_id:
-        base["max_prev_section_chars"] = 4000
-    return base
-
-
 def plan_stage(state: StageState, repo_profile: Dict[str, Any], global_memory: Dict[str, Any]) -> PlanSpec:
-    must_cover = extract_stage_questions(state.stage_prompt)
     hints = _match_stage_hints(state.stage_id)
-    goal_line = next((line.strip() for line in state.stage_prompt.splitlines() if line.strip()), state.stage_title)
     return PlanSpec(
         stage_id=state.stage_id,
-        goal=_norm(goal_line)[:120],
-        must_cover=must_cover,
         evidence_targets=hints.get("evidence_targets", []),
         seed_paths=infer_seed_paths(state.stage_id, repo_profile, global_memory),
         framework_guess=repo_profile.get("framework_guess", []),
@@ -553,7 +523,6 @@ def plan_stage(state: StageState, repo_profile: Dict[str, Any], global_memory: D
         repo_hotspots=repo_profile.get("core_paths", [])[:10],
         preferred_tools=["rag_search_code", "lsp_get_call_graph", "lsp_get_definition", "read_code_segment"],
         avoid_tools=["blind_read_large_files", "full_repo_scan_with_read_code_segment"],
-        context_budget=estimate_context_budget(state.stage_id),
     )
 
 
@@ -575,11 +544,6 @@ def apply_llm_plan_overlay(base: PlanSpec, overlay: Dict[str, Any]) -> PlanSpec:
     """将 LLM 规划 JSON 合并进启发式 PlanSpec（LLM 列表优先去重拼接）。"""
     if not overlay:
         return base
-    g = overlay.get("goal")
-    new_goal = _norm(str(g))[:120] if isinstance(g, str) and g.strip() else base.goal
-
-    must_llm = _coerce_str_list(overlay.get("must_cover"), 16)
-    must_cover = _dedupe_keep_order(must_llm + base.must_cover)[:22]
 
     et_llm = _coerce_str_list(overlay.get("evidence_targets"), 12)
     evidence_targets = _dedupe_keep_order(et_llm + base.evidence_targets)[:16]
@@ -597,13 +561,11 @@ def apply_llm_plan_overlay(base: PlanSpec, overlay: Dict[str, Any]) -> PlanSpec:
     pt_llm = _coerce_str_list(overlay.get("preferred_tools"), 8)
     preferred_tools = pt_llm if pt_llm else base.preferred_tools
 
-    steps_llm = _coerce_str_list(overlay.get("execution_steps"), 32)
+    steps_llm = _coerce_str_list(overlay.get("execution_steps"), 40)
     execution_steps = steps_llm if steps_llm else base.execution_steps
 
     return replace(
         base,
-        goal=new_goal,
-        must_cover=must_cover,
         evidence_targets=evidence_targets,
         seed_paths=seed_paths,
         entry_symbols=entry_symbols,
@@ -613,19 +575,15 @@ def apply_llm_plan_overlay(base: PlanSpec, overlay: Dict[str, Any]) -> PlanSpec:
 
 
 def ensure_execution_steps(plan: PlanSpec) -> PlanSpec:
-    """若尚无逐步清单，用通用三步 + must_cover 摘要补齐，保证 Execute 总有锁定步骤。"""
+    """若尚无逐步清单，用通用三步补齐，保证 Execute 总有锁定步骤。"""
     if plan.execution_steps:
         return plan
     steps = [
         "对照 seed_paths、entry_symbols，用 rag_search_code / list_repo_structure / LSP 锁定与本阶段相关的关键文件与符号。",
         "对核心入口使用 lsp_get_document_outline → lsp_get_call_graph（单入口、浅深度）→ 必要时 read_code_segment 精读。",
-        "按 must_cover 逐项输出结论，每条附反引号源码路径；无实现则显式写「未发现/桩函数」等，勿臆测。",
+        "按题单逐项输出结论，每条附反引号源码路径；无实现则显式写「未发现/桩函数」等，勿臆测。",
     ]
-    for q in plan.must_cover[:5]:
-        qn = _norm(q)[:120]
-        if qn:
-            steps.append(f"覆盖要点：{qn}")
-    return replace(plan, execution_steps=steps[:32])
+    return replace(plan, execution_steps=steps[:40])
 
 
 def _shorten(text: str, limit: int = 400) -> str:
@@ -633,32 +591,6 @@ def _shorten(text: str, limit: int = 400) -> str:
     if len(text) <= limit:
         return text
     return text[: limit - 3] + "..."
-
-
-def build_dynamic_context(
-    state: StageState,
-    repo_profile: Dict[str, Any],
-    global_memory: Dict[str, Any],
-) -> Dict[str, Any]:
-    related_sections = global_memory.get("section_summaries", {}) or {}
-    max_sections = state.plan.context_budget.get("max_memory_items", 8) if state.plan else 8
-    recent_sections = [
-        {"stage_id": sid, "summary": _shorten(summary, 280)}
-        for sid, summary in list(related_sections.items())[-max_sections:]
-    ]
-    return {
-        "repo_profile": {
-            "framework_guess": repo_profile.get("framework_guess", []),
-            "arch_guess": repo_profile.get("arch_guess", []),
-            "language_mix": repo_profile.get("language_mix", []),
-            "core_paths": repo_profile.get("core_paths", [])[:10],
-            "board_guess": repo_profile.get("board_guess", []),
-        },
-        "plan_summary": state.plan.to_dict() if state.plan else {},
-        "recent_sections": recent_sections,
-        "evidence_cache": [item.to_dict() for item in state.evidence_index[: state.plan.context_budget.get("max_evidence_items", 12)]],
-        "external_background": global_memory.get("external_background", {}),
-    }
 
 
 def render_plan_context(state: StageState) -> str:
@@ -669,8 +601,6 @@ def render_plan_context(state: StageState) -> str:
     lines = [
         "## 阶段执行计划（请先按此计划收集证据，再写报告）",
         f"- stage_id: {plan.stage_id}",
-        f"- goal: {plan.goal}",
-        f"- must_cover: {', '.join(plan.must_cover[:8]) or '无'}",
         f"- evidence_targets: {', '.join(plan.evidence_targets[:8]) or '无'}",
         f"- seed_paths: {', '.join(plan.seed_paths[:8]) or '无'}",
         f"- framework_guess: {', '.join(plan.framework_guess[:6]) or '未知'}",
@@ -685,7 +615,7 @@ def render_plan_context(state: StageState) -> str:
     if plan.execution_steps:
         lines.append("")
         lines.append("## 须按序完成的执行步骤（Execute 阶段必须遵守；未列事项勿擅自长篇展开）")
-        for i, st in enumerate(plan.execution_steps[:32], 1):
+        for i, st in enumerate(plan.execution_steps[:40], 1):
             lines.append(f"{i}. {st}")
     lines.extend(
         [
@@ -703,34 +633,3 @@ def render_plan_context(state: StageState) -> str:
             lines.append(f"- {item['stage_id']}: {item['summary']}")
     return "\n".join(lines).strip()
 
-
-def build_coarse_preplan(target_name: str, target_sections_dir: str) -> Dict[str, Any]:
-    section_files = []
-    if os.path.isdir(target_sections_dir):
-        for name in sorted(os.listdir(target_sections_dir)):
-            if name.endswith(".md"):
-                section_files.append(name)
-    overview_text = ""
-    for name in section_files:
-        if name.startswith("01_"):
-            overview_text = _read_head(os.path.join(target_sections_dir, name), 2500)
-            break
-    lowered = overview_text.lower()
-    framework_guess = _guess_framework(overview_text, section_files)
-    arch_guess = _guess_architecture(overview_text, section_files)
-    critical_dims = []
-    if any(x in lowered for x in ("arceos", "rcore", "xv6")):
-        critical_dims.append("framework")
-    if any(x in lowered for x in ("buddy", "bitmap", "allocator")):
-        critical_dims.append("allocator")
-    if any(x in lowered for x in ("trapframe", "syscall")):
-        critical_dims.append("trapframe/syscall")
-    if not critical_dims:
-        critical_dims = ["framework", "allocator", "syscall_count_real"]
-    return {
-        "target": target_name,
-        "framework_guess": framework_guess,
-        "arch_guess": arch_guess,
-        "critical_dims": _dedupe_keep_order(critical_dims),
-        "available_sections": section_files,
-    }

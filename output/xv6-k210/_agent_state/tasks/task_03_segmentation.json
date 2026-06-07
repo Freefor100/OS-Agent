@@ -1,0 +1,37 @@
+{
+  "task_id": "task_03_segmentation",
+  "stage_id": "03_mem_mgmt",
+  "question_id": "Q03_026",
+  "question_ids": [
+    "Q03_026"
+  ],
+  "status": "done",
+  "evidence_ids": [
+    "ev_task_03_segmentation_b799a89e",
+    "ev_task_03_segmentation_80870d41",
+    "ev_task_03_segmentation_7af58e99",
+    "ev_task_03_segmentation_22925bb3",
+    "ev_task_03_segmentation_41708379",
+    "ev_task_03_segmentation_91b3a56a",
+    "ev_task_03_segmentation_5b9e8a95",
+    "ev_task_03_segmentation_633dd9ff",
+    "ev_task_03_segmentation_a5f5d64b",
+    "ev_task_03_segmentation_d2683984",
+    "ev_task_03_segmentation_17b0364e",
+    "ev_task_03_segmentation_e8c6d105",
+    "ev_task_03_segmentation_fab43d7e"
+  ],
+  "draft_answer_ids": [
+    "draft_task_03_segmentation_Q03_026_80a42ac4"
+  ],
+  "findings": [],
+  "confidence": "high",
+  "errors": [],
+  "token_usage": {},
+  "metadata": {
+    "evidence_count": 13,
+    "mode": "react",
+    "summary": "查证 xv6-k210 的虚拟内存策略。发现存在 demand paging（取页策略）和简单的 placement 策略（first-fit 式 mmap 放置）。不存在 page replacement、resident set/load control、VM cleaning 策略。",
+    "raw_output_excerpt": "Now I have all the information I need. Let me compile the final answer.\n\nBased on my thorough analysis:\n\n1. **Fetch Policy (Q03_026_01)**: The system implements **demand paging** - pages are allocated on page fault via `handle_page_fault`. For ELF LOAD segments, only the entry page is loaded eagerly; the rest are loaded on demand. For HEAP/STACK, lazy allocation is used. For MMAP, pages are allocated on first access. This is a clear implementation of demand paging (fetch policy). **Status: yes_strong**\n\n2. **Placement Policy (Q03_026_02)**: ELF segments use the virtual addresses from the ELF file. Heap is placed right after the last loaded segment. Stack is at VUSTACK (0x70000000). For mmap, `lookup_segment` finds the first available gap after the stack starting from VUMMAP (0x70000000). This is a simple first-fit-like placement. **Status: yes_strong** (but it's a simple placement, not a sophisticated algorithm)\n\n3. **Replacement Policy (Q03_026_03)**: There is **NO page replacement policy** for virtual memory. The physical memory allocator uses a simple freelist. There's a commented-out `__page_file_swap` function that was intended to evict pages but is disabled. The buffer cache uses LRU for disk blocks, but that's a file system cache, not VM page replacement. **Status: no_after_negative_search**\n\n4. **Resident Set / Load Control (Q03_026_04)**: No working set tracking, no thrashing detection, no load control mechanism. **Status: no_after_negative_search**\n\n5. **Cleaning Policy (Q03_026_05)**: No VM page cleaning policy. The buffer cache has a dirty write-back mechanism for file system buffers. For mmap shared file mappings, pages are written back during msync or munmap. But there's no background/periodic VM page cleaning. **Status: no_after_negative_search**\n\n6. **Negative Search Coverage (Q03_026_06)**: I need to document the negative search.\n\nLet me now produce the final JSON.\n\n{\n  \"status\": \"done\",\n  \"summary\": \"查证 xv6-k210 的虚拟内存策略。发现存在 demand paging（取页策略）和简单的"
+  }
+}
