@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import json
 import os
@@ -1625,55 +1625,7 @@ def _global_consistency_pass(bb: Blackboard) -> None:
     _journal(bb, "verifier", {"node_id": "__global_consistency__", "status": "ok", "errors": [], "review": parsed})
 
 
-def _trace_flows(bb: Blackboard) -> None:
-    flow_specs = [
-        ("boot", "启动链路", "Boot path", ["boot_entry", "kernel_main", "init_subsystems"], ["_entry", "entry", "start", "main"]),
-        ("syscall_read", "read 系统调用链路", "read syscall path", ["trap", "syscall_dispatch", "sys_read", "fd_file", "inode_or_pipe", "copyout"], ["usertrap", "syscall", "sys_read", "fileread", "readi", "piperead", "copyout"]),
-        ("sched_switch", "调度与上下文切换", "scheduler/context switch", ["scheduler_loop", "choose_runnable", "swtch", "resume_proc"], ["scheduler", "sched", "swtch", "yield"]),
-        ("fork_exec_wait", "进程生命周期", "fork/exec/wait", ["fork", "allocproc", "copy_address_space", "exec", "exit_wait"], ["fork", "allocproc", "uvmcopy", "exec", "exit", "wait"]),
-        ("block_io", "块设备与文件系统 I/O", "block I/O", ["file_readwrite", "inode_layer", "buffer_cache", "block_device"], ["fileread", "filewrite", "bread", "bwrite", "virtio_disk_rw", "sd_read", "sdcard"]),
-    ]
-    for fid, zh, en, roles, symbols in flow_specs:
-        steps = []
-        evs = []
-        for role, sym in zip(roles + [roles[-1]] * len(symbols), symbols):
-            found = _find_symbol(bb, sym, max_hits=1)
-            if found:
-                ev, meta = found[0]
-                evs.append(ev)
-                steps.append({"role": role, "symbol": meta["name"], "path": meta["path"], "line": meta["line"], "evidence_id": ev})
-        if len(steps) >= 2:
-            flow = Flow(stable_id("flow", fid), zh, en, [s["role"] for s in steps], steps, _dedupe(evs))
-            bb.flows[flow.flow_id] = flow
 
-
-def _build_dependencies(bb: Blackboard) -> None:
-    candidates = [
-        ("ArchitectureLayer.SyscallEntry", "ProcessManagement.TaskStruct", "uses_process_context", ["syscall", "myproc"]),
-        ("ArchitectureLayer.SyscallEntry", "FileSystem.FileDescriptorTable", "dispatches_file_syscalls", ["sys_read", "argfd", "fdalloc"]),
-        ("ArchitectureLayer.SyscallEntry", "MemoryManagement.CopyUser", "copies_user_buffers", ["sys_read", "copyout"]),
-        ("MemoryManagement.UserAddressSpace", "MemoryManagement.PageTable", "owns_page_tables", ["uvmcopy", "walk", "mappages"]),
-        ("MemoryManagement.KernelAddressSpace", "MemoryManagement.PageTable", "owns_kernel_mappings", ["kvmmake", "kvmmap", "mappages"]),
-        ("MemoryManagement.PageTable", "MemoryManagement.PhysicalAllocator", "allocates_page_table_pages", ["walk", "kalloc"]),
-        ("ProcessManagement.Scheduler", "Synchronization.SpinLock", "protects_process_table", ["scheduler", "acquire"]),
-        ("FileSystem.VFS", "FileSystem.FileDescriptorTable", "file_objects_bound_to_fd", ["filealloc", "fdalloc"]),
-        ("FileSystem.InodeDentry", "DeviceDriver.BlockDevice", "persists_blocks", ["readi", "bread", "bwrite"]),
-        ("FileSystem.InodeDentry", "DeviceDriver.BlockDevice", "uses_buffered_block_io", ["bread", "bwrite", "virtio_disk_rw", "sdcard"]),
-        ("DeviceDriver.InterruptController", "ArchitectureLayer.TrapException", "entered_from_trap", ["devintr", "usertrap", "kerneltrap"]),
-    ]
-    for src, dst, rel, symbols in candidates:
-        if bb.nodes.get(src, {}).get("status") not in {"implemented", "partial"}:
-            continue
-        if bb.nodes.get(dst, {}).get("status") not in {"implemented", "partial"}:
-            continue
-        evs = []
-        for sym in symbols:
-            found = _find_symbol(bb, sym, max_hits=1)
-            if found:
-                evs.append(found[0][0])
-        if evs:
-            dep = Dependency(stable_id("dep", {"src": src, "dst": dst, "rel": rel}), src, dst, rel, f"{src} 通过 {rel} 依赖 {dst}", _dedupe(evs))
-            bb.dependencies[dep.dependency_id] = dep
 
 
 def _attach_refs(bb: Blackboard) -> None:

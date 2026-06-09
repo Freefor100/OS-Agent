@@ -1,6 +1,3 @@
-# OS-Agent D 依赖包
-# Python >= 3.10 recommended
-# 最后更新: 2026-03-05 
 
 # ===== Agent D 编排、节点 ReAct、checkpoint 与 TUI =====
 langgraph>=1.0,<2
@@ -9,7 +6,6 @@ langchain>=1.2,<2
 langchain-core>=1.2,<2
 langchain-openai>=1.1,<2
 rich>=13,<15
-
 # ===== LLM API =====
 # OpenAI API（支持 OpenRouter、DeepSeek 等兼容服务）
 openai>=1.0.0
@@ -17,41 +13,13 @@ openai>=1.0.0
 # ===== Git 操作 =====
 # Git 仓库操作与历史分析
 gitpython>=3.1.0
-
-# ===== 环境配置 =====
-# 环境变量管理
 python-dotenv>=1.0.0
-
-# ===== Agent D: 本地向量 RAG & AST/CPG-lite 解析 =====
 numpy>=1.24.0
-sentence-transformers>=2.2.0    # 本地 Embedding 模型
-transformers>=4.36.0,<4.58.0     # 兼容 optimum-onnx(>=4.36,<4.58) 和 Jina 模型
 tree-sitter>=0.23.2              # AST 解析接口
 tree-sitter-c                  # C 语言支持
 tree-sitter-cpp                # C++ 语言支持
 tree-sitter-rust               # Rust 语言支持
 tree-sitter-go                 # Go 语言支持
 tree-sitter-zig                # Zig 语言支持
-hf_transfer                    # 高速模型下载加速
-optimum                        # Jina 模型加速 (ONNX)
-optimum-onnx                   # Jina 模型加速 (ONNX)
-# ONNX Runtime：本文件只声明 GPU 版。勿添加 onnxruntime（CPU 包），二者共用 onnxruntime 模块会冲突。
-# pymupdf-layout 可能在元数据里要求 onnxruntime 包名，pip 会提示冲突，以已安装的 onnxruntime-gpu 为准即可。
-onnxruntime-gpu>=1.23.0
-torch>=2.0.0                    # PyTorch 核心 (建议安装 CUDA 版本)
-
-# ===== 开发工具（可选）=====
-# ipython>=8.0.0
-# jupyter>=1.0.0
-
-tree-sitter
-tree-sitter-c
-tree-sitter-cpp
-tree-sitter-rust
-tree-sitter-go
-tree-sitter-zig
-
-# 可选：Call Graph 语义过滤（条件编译裁掉的符号）需 pip install clang 与系统 libclang
-# clang>=14.0
-
+clang>=14.0
 openpyxl
