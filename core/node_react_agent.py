@@ -339,6 +339,11 @@ def run_node_react_agent(
         "每个 claim 必须基于证据判断 maturity 成熟度："
         "textbook=教科书/原型级最小实现（如 xv6 的 round-robin、free-list）；"
         "simplified=有一定工程化但简化的实现；production=生产级完整实现（如 CFS 红黑树、buddy+slab、RCU）。"
+        "【特定硬件属性处理】禁止在候选词或声明中捏造或硬编码任何特定芯片/板子特有特性（如 thead_c906_pbmt 属性、cv1811h_sdcard 等）。"
+        "如果工具发现了特定芯片的定制（如特殊页表最高位属性、PIO外设轮询），必须在 extension_requests 中通过 extension:<feature>（如 extension:custom_pte_attributes, extension:pio_device_io）动态声明扩展标签，并绑定其源码强证据。"
+        "【Mock/Stub 审查原则】严防 Mock 伪装的桩函数。若系统调用仅包含空体、硬编码返回值（如直接 return 0/1/0xAA）、或在 shm 中映射完全隔离的私有进程内存，该节点的状态绝对不能判定为 implemented，必须降级为 partial 或 not_found，并且必须在 summary_zh 和 claim 描述中包含 'Mock 伪装实现 (Stub / Placeholder)' 关键字，写明在真实多进程/多线程通信下的失效性质。"
+        "【ArceOS 与自研内核表征】必须精确区分 ArceOS 组件封装与自研单体内核。若发现是基于 ArceOS 组件包（如 axtask、axmem、axfs），请说明这仅是独核（Unikernel）底座的包装层，并非自主研发的抢占式调度与页表管理。"
+        "【异步调度表征】识别异步协程调度模型。若是这类设计，请说明进程/线程以 Future 形式运行且在协作式出让点出让，而非传统的时钟中断抢占调度。"
         "不要输出内部思维链。"
     )
     agent = create_agent(

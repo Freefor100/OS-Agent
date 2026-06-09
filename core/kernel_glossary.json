@@ -9034,6 +9034,284 @@
       ],
       "c_example": "lock_acquire(&lock->dep_map, 0, 0, 0, 1, NULL, _RET_IP_);",
       "rust_example": "lockdep::acquire(&self.dep_map);"
+    },
+    "async_coroutine_executor": {
+      "title_zh": "异步协程执行器",
+      "title_en": "Async coroutine executor",
+      "definition_zh": "基于协作式（Cooperative）协程调度的内核任务执行器，通过执行 Future/Coroutine 实现多任务调度，通常在出让点（yield）由任务主动出让 CPU 资源。",
+      "definition_en": "A kernel task executor based on cooperative coroutine scheduling, executing Futures/Coroutines for multi-tasking where tasks explicitly yield CPU control at cooperative yield points.",
+      "include": [
+        "Future 执行器/轮询（executor/poll）",
+        "协作式出让（cooperative yield/pending）",
+        "Waker/Reactor 机制"
+      ],
+      "exclude": [
+        "传统的时钟中断抢占调度器",
+        "纯操作系统的进程/线程硬切换"
+      ],
+      "confusions": [
+        "异步协程调度是协作式的，不同于依靠硬件时钟中断和上下文强制切换（context switch）的传统抢占式调度。"
+      ],
+      "recognition_cues": [
+        "Executor::run",
+        "poll(",
+        "Future",
+        "async fn",
+        "cooperative",
+        "yield_now"
+      ],
+      "c_example": "// Standard textbook cooperative scheduler loop in C:\nvoid scheduler(void) {\n    struct proc *p;\n    for(p = proc; p < &proc[NPROC]; p++){\n        if(p->state == RUNNABLE) {\n            p->state = RUNNING;\n            c->proc = p;\n            swtch(&c->context, &p->context);\n        }\n    }\n}",
+      "rust_example": "// Standard simple poll-based block_on executor:\npub fn block_on<F: Future>(mut future: F) -> F::Output {\n    let waker = Waker::from(Arc::new(DummyWaker));\n    let mut cx = Context::from_waker(&waker);\n    let mut future = unsafe { Pin::new_unchecked(&mut future) };\n    loop {\n        match future.as_mut().poll(&mut cx) {\n            Poll::Ready(val) => return val,\n            Poll::Pending => {\n                // Yield execution thread or park until waker notification\n                thread::yield_now();\n            }\n        }\n    }\n}"
+    },
+    "iterative_hint_mapping": {
+      "title_zh": "迭代提示映射",
+      "title_en": "Iterative hint mapping",
+      "definition_zh": "通过迭代或循序渐进的方式，利用页表属性或硬件翻译提示（Hint）来建立虚拟地址到物理地址映射的机制，例如支持大页、超级页翻译或特定架构下的 TLB 匹配提示。",
+      "definition_en": "A mechanism to establish virtual-to-physical address mappings iteratively, utilizing page table attributes or hardware translation hints (such as huge/super pages or architecture-specific TLB matching hints).",
+      "include": [
+        "迭代页表步进（iterative walk/map）",
+        "TLB 匹配提示（translation hint/HUGE page hint）",
+        "特定硬件页表属性（PTE hint bits）"
+      ],
+      "exclude": [
+        "一次性的标准 Sv39 简单 walk 映射"
+      ],
+      "confusions": [
+        "迭代提示映射侧重于映射逻辑的逐步细化或带硬件暗示（Hint）的页表构建，不是普通的单次线性物理内存填充。"
+      ],
+      "recognition_cues": [
+        "map_hint",
+        "iterative_map",
+        "tlb_hint",
+        "PBMT",
+        "page_hint"
+      ],
+      "c_example": "// Standard Linux RISC-V Svpbmt definitions and mapping:\n#define _PAGE_MTMASK   (3ULL << 61)\n#define _PAGE_PMA      (0ULL << 61)  /* Normal Cacheable */\n#define _PAGE_NOCACHE  (1ULL << 61)  /* Non-cacheable, weakly-ordered */\n#define _PAGE_IO       (2ULL << 61)  /* Strongly-ordered, I/O */\n\nvoid set_pte_attribute(pte_t *pte, uint64 flags) {\n    *pte = (*pte & ~_PAGE_MTMASK) | flags;\n}",
+      "rust_example": "// Standard multi-level page mapping loop in Rust (rCore-Tutorial style):\npub fn map_range(&mut self, vpn_range: VPNRange, ppn_range: PPNRange, flags: MapFlags) {\n    for (vpn, ppn) in vpn_range.zip(ppn_range) {\n        let pte = self.page_table.walk_create(vpn).unwrap();\n        *pte = PageTableEntry::new(ppn, flags | PageTableFlags::VALID);\n    }\n}"
+    },
+    "cow_btree_refcount": {
+      "title_zh": "BTree写时复制引用计数",
+      "title_en": "COW BTree reference count",
+      "definition_zh": "写时复制（COW）物理页共享管理中，通过全局静态的 BTreeMap 或类似哈希结构记录物理页帧号（PPN）对应的共享引用计数。",
+      "definition_en": "COW physical page sharing management using a global static BTreeMap or similar hash map structure to record reference counts indexed by PPN.",
+      "include": [
+        "BTreeMap",
+        "引用计数表",
+        "COW页面跟踪"
+      ],
+      "exclude": [
+        "智能指针引用计数",
+        "完全不记录引用计数的物理页管理"
+      ],
+      "confusions": [
+        "它需要一个全局静态或进程共享的红黑树/BTree，不同于将计数直接分配在物理页帧元数据（FrameTracker）里的模型。"
+      ],
+      "recognition_cues": [
+        "BTreeMap",
+        "cow",
+        "ref",
+        "count"
+      ],
+      "c_example": "// In C: static int ref_count[NPHYS_PAGES];",
+      "rust_example": "static ref PAGE_REFS: SpinMutex<BTreeMap<usize, usize>> = SpinMutex::new(BTreeMap::new());"
+    },
+    "cow_arc_refcount": {
+      "title_zh": "智能指针写时复制引用计数",
+      "title_en": "COW Arc reference count",
+      "definition_zh": "写时复制（COW）物理页共享管理中，使用 Rust 智能指针（如 Arc<FrameTracker>）生命周期和内部强/弱计数天然跟踪物理页的引用情况。",
+      "definition_en": "COW physical page sharing management using Rust smart pointers (such as Arc<FrameTracker>) to naturally track reference counts via Arc strong/weak count.",
+      "include": [
+        "Arc智能指针",
+        "strong_count",
+        "物理页生命周期管理"
+      ],
+      "exclude": [
+        "静态全局引用计数表",
+        "C 语言手动管理计数"
+      ],
+      "confusions": [
+        "利用了 Rust 智能指针的生命周期机制，其计数是原子的且与 FrameTracker 实例绑定，而不是用一个全局的数据结构进行检索。"
+      ],
+      "recognition_cues": [
+        "Arc<FrameTracker>",
+        "strong_count",
+        "clone"
+      ],
+      "c_example": "// C does not support smart pointers directly.",
+      "rust_example": "if Arc::strong_count(&old_frame) > 1 { let new_frame = old_frame.clone_page(); }"
+    },
+    "lazy_paging_vma": {
+      "title_zh": "延迟分页虚拟内存区域",
+      "title_en": "Lazy paging with VMA",
+      "definition_zh": "用户虚拟地址空间采用虚拟内存区域（VMA/VmArea）布局维护，支持页表延迟物理映射分配，在产生缺页异常（Page Fault）时动态分配物理内存。",
+      "definition_en": "User virtual address spaces managed by Virtual Memory Areas (VMA/VmArea), supporting lazy page table mapping and allocating physical memory dynamically on Page Faults.",
+      "include": [
+        "VmArea / VMA 结构体",
+        "延迟物理映射 (Lazy Mapping)",
+        "缺页异常触发分配"
+      ],
+      "exclude": [
+        "积极页面深拷贝 (Eager Copy)"
+      ],
+      "confusions": [
+        "VMA 描述的是虚拟内存段的范围和权限；而 PageTable 描述物理映射的具体硬件结构。VMA 可以帮助页异常处理器判定该地址是否合法。"
+      ],
+      "recognition_cues": [
+        "VmArea",
+        "vma",
+        "PmAreaLazy",
+        "lazy"
+      ],
+      "c_example": "struct vm_area { uint64 vm_start; uint64 vm_end; int flags; };",
+      "rust_example": "pub struct VmArea { pub start: VirtAddr, pub end: VirtAddr, pub flags: MapFlags, pub pma: Arc<dyn PmAreaLazy> }"
+    },
+    "eager_page_copy": {
+      "title_zh": "积极页面拷贝",
+      "title_en": "Eager page copy",
+      "definition_zh": "在进程分支（fork）或地址空间复制时，一次性将所有的虚拟页所映射的物理内存进行全部深拷贝，不支持缺页懒分配机制。",
+      "definition_en": "Duplicating task address space by eagerly deep-copying all virtual page mapped physical memory at fork, without supporting lazy mapping page faults.",
+      "include": [
+        "物理内存深拷贝",
+        "线性地址段完全复制"
+      ],
+      "exclude": [
+        "写时复制 (COW)",
+        "延迟页面分配"
+      ],
+      "confusions": [
+        "这是最经典的简单 OS 行为，分配发生时立刻搬运数据，不存在任何缺页拦截和保护位设置。"
+      ],
+      "recognition_cues": [
+        "copy_from",
+        "clone",
+        "frame_alloc",
+        "eager"
+      ],
+      "c_example": "memmove(new_page, old_page, PGSIZE);",
+      "rust_example": "for page in parent_pagetable { let new_frame = frame_alloc().unwrap(); new_frame.write_all(page.data()); }"
+    },
+    "elf_interpreter_auxv": {
+      "title_zh": "ELF解释器与辅助向量",
+      "title_en": "ELF interpreter and AUXV",
+      "definition_zh": "进程加载执行中，解析 ELF 头部的 PT_INTERP 并将动态链接器（如 ld.so/libc.so）加载到内存，同时在用户栈上构造辅助向量（AUXV）来传递入口信息。",
+      "definition_en": "Process execution loading that parses ELF PT_INTERP, loads the dynamic linker, and constructs Auxiliary Vectors (AUXV) on the user stack to pass entry arguments.",
+      "include": [
+        "PT_INTERP 解析",
+        "ld.so / libc.so 加载",
+        "AUXV (Auxiliary Vector) 构建"
+      ],
+      "exclude": [
+        "静态链接 ELF 简单加载"
+      ],
+      "confusions": [
+        "动态链接加载不仅需要加载用户程序本身，还要把入口重定向至动态链接器（ld.so），并且必须为链接器准备 AUXV 数据，否则无法运行。"
+      ],
+      "recognition_cues": [
+        "PT_INTERP",
+        "libc.so",
+        "AT_PHDR",
+        "AT_BASE",
+        "AuxEntry"
+      ],
+      "c_example": "Elf64_Phdr *phdr; if(phdr->p_type == PT_INTERP) { load_interpreter(path); }",
+      "rust_example": "stack.push(AuxEntry(AT_BASE, interpreter_base)); stack.push(AuxEntry(AT_ENTRY, user_entry));"
+    },
+    "loopback_socket_forward": {
+      "title_zh": "本地回环套接字端口转发",
+      "title_en": "Loopback socket port forward",
+      "definition_zh": "在网络套接字（Socket）抽象中，直接利用内存中的端口号到管道或环形缓冲区的映射（Port Map）实现本地回环进程间通信，避免复杂的真实网卡收发流程。",
+      "definition_en": "Loopback Socket communication emulated via in-memory port-to-pipe mappings (Port Map) to achieve localhost IPC without invoking full netcard drivers.",
+      "include": [
+        "Port Map 映射表",
+        "管道代理套接字"
+      ],
+      "exclude": [
+        "完整的 lwIP/lose-net-stack 网络协议栈"
+      ],
+      "confusions": [
+        "它不需要底层真正构建 TCP 三次握手和 IP 封包发送，而是直接通过在内存中绑定对端端口的 Buffer 管道实现数据转发。"
+      ],
+      "recognition_cues": [
+        "PORT_MAP",
+        "PipeSocket",
+        "port_map",
+        "loopback"
+      ],
+      "c_example": "// Memory-based port forwarding lookup in C.",
+      "rust_example": "static ref PORT_MAP: SpinMutex<BTreeMap<u16, Arc<PipeSocket>>> = SpinMutex::new(BTreeMap::new());"
+    },
+    "devfs_bypass_interceptor": {
+      "title_zh": "设备文件系统旁路拦截器",
+      "title_en": "Devfs bypass interceptor",
+      "definition_zh": "在 openat/open 系统调用中，硬编码匹配包含 '/dev' 或特定设备文件路径，直接返回固定的控制台、串口或伪设备描述符，以此规避实现完整的虚拟文件树。",
+      "definition_en": "System call file opening path interceptor that hardcodes '/dev' prefix checks and directly returns console/tty FDs to bypass a real device file system.",
+      "include": [
+        "path.contains(\"/dev\") 匹配",
+        "硬编码返回 Console 描述符"
+      ],
+      "exclude": [
+        "设备 inode 注册与文件系统虚拟挂载"
+      ],
+      "confusions": [
+        "属于过测用的旁路（Bypass）策略，跳过了实际设备注册和 VFS 查找过程。"
+      ],
+      "recognition_cues": [
+        "/dev",
+        "Console",
+        "bypass",
+        "contains(\"/dev\")"
+      ],
+      "c_example": "if (strncmp(path, \"/dev/\", 5) == 0) return CONSOLE_FD;",
+      "rust_example": "if path.contains(\"/dev\") { return Ok(FileDescriptor::new(TTY.clone())); }"
+    },
+    "polyhal_dual_arch": {
+      "title_zh": "PolyHAL双架构支持",
+      "title_en": "PolyHAL dual arch support",
+      "definition_zh": "利用统一的硬件抽象接口层（如 PolyHAL 库）来解耦操作系统内核与底层硬件架构，实现单一内核对 RISC-V 和 LoongArch 等多 CPU 架构的无缝编译运行。",
+      "definition_en": "Utilizing a unified hardware abstraction layer (e.g., PolyHAL) to decouple kernel logic from low-level architecture, supporting RISC-V and LoongArch seamless compilation.",
+      "include": [
+        "polyhal 库",
+        "RISC-V/LoongArch 统一硬件适配"
+      ],
+      "exclude": [
+        "手写特定架构的 inline 汇编"
+      ],
+      "confusions": [
+        "不同于为每个架构单独写独立的 boot/trap/paging 代码分支，而是通过引入第三方/外部 PolyHAL 库进行统一调用。"
+      ],
+      "recognition_cues": [
+        "polyhal",
+        "TrapFrame",
+        "PageTable",
+        "PageTableWrapper"
+      ],
+      "c_example": "// Typically Rust-specific library abstraction.",
+      "rust_example": "use polyhal::arch::riscv::TrapFrame; // Polyhal imports"
+    },
+    "pio_block_transfer": {
+      "title_zh": "程序控制IO块设备传输",
+      "title_en": "Programmed I/O block transfer",
+      "definition_zh": "块设备（如 SD 卡/磁盘）读写驱动中，完全通过 CPU 循环读取外设映射寄存器的数据端口来逐字搬运块缓冲区数据，无需依赖 DMA 传输，规避缓存一致性刷洗。",
+      "definition_en": "Block device driver reading/writing data entirely via CPU loops polling device registers word-by-word, bypassing DMA transfer and cache cleaning.",
+      "include": [
+        "CPU 循环读取寄存器",
+        "Word-by-word 搬运数据"
+      ],
+      "exclude": [
+        "DMA 传输",
+        "Cache 刷脏/一致性清洗"
+      ],
+      "confusions": [
+        "PIO 的性能低于 DMA，但实现极其简单，且不需要处理 DMA 控制器、虚实地址转换及多核缓存同步的问题。"
+      ],
+      "recognition_cues": [
+        "read_data",
+        "SD_DATA",
+        "loop",
+        "word"
+      ],
+      "c_example": "for(int i=0; i<512/4; i++) buf[i] = read_reg(SD_DATA_PORT);",
+      "rust_example": "for i in 0..128 { buf[i] = self.regs.read_data_reg(); }"
     }
   }
 }

@@ -1060,6 +1060,34 @@ def _tag_meta(bb: Blackboard, node_id: str, tag: str) -> dict[str, Any]:
     return {"tag": tag, "compare_role": "primary", "category": "mechanism"}
 
 
+def _is_mock_code(code: str) -> bool:
+    if not code or not isinstance(code, str):
+        return False
+    # Strip single-line comments
+    clean = re.sub(r"//.*", "", code)
+    # Strip multi-line comments
+    clean = re.sub(r"/\*.*?\*/", "", clean, flags=re.DOTALL)
+    # Strip shell/python comments
+    clean = re.sub(r"#.*", "", clean)
+    clean = clean.strip()
+    clean_no_whitespace = re.sub(r"\s+", "", clean)
+    
+    # Outermost brace content search
+    m = re.search(r"\{([^}]+)\}", clean_no_whitespace)
+    if m:
+        body = m.group(1)
+        if body in {"0", "1", "-1", "Ok(0)", "Ok(())", "Ok(1)", "Ok(None)", "return0", "return-1", "return1", "returnOk(0)", "returnOk(())", "returnOk(1)", "returnOk(None)"}:
+            return True
+        if "println!" in body or "print!" in body or "log::" in body or "info!" in body:
+            stripped_body = re.sub(r"(?:println!|print!|log::|info!|debug!|warn!|error!|trace!)\(.*?\);?", "", body)
+            if stripped_body in {"", "0", "1", "-1", "Ok(0)", "Ok(())", "Ok(1)", "Ok(None)", "return0", "return-1", "return1", "returnOk(0)", "returnOk(())", "returnOk(1)", "returnOk(None)"}:
+                return True
+    if len(clean_no_whitespace) < 40:
+        if any(pat in clean_no_whitespace for pat in ("return0", "returnOk(0)", "returnOk(())", "Ok(0)", "Ok(())")):
+            return True
+    return False
+
+
 def _verify_node_draft(bb: Blackboard, node_id: str, draft: dict[str, Any]) -> dict[str, Any]:
     errors: list[str] = []
     status = draft.get("status")
@@ -1095,6 +1123,27 @@ def _verify_node_draft(bb: Blackboard, node_id: str, draft: dict[str, Any]) -> d
             errors.append(f"claim[{idx}] references unknown evidence_id(s): {missing}")
             continue
         records = [bb.evidence.by_id(eid) for eid in ev_ids]
+        
+        # Check for Mock/Stub characteristics in evidence
+        has_mock_evidence = False
+        for rec in records:
+            if rec and rec.kind in {"source_span", "function_definition"}:
+                if _is_mock_code(rec.excerpt):
+                    has_mock_evidence = True
+                    break
+        if has_mock_evidence:
+            if status == "implemented":
+                errors.append(
+                    f"claim[{idx}] references mock/stub source code (e.g., empty return or static fallback). "
+                    f"You must set status to 'partial' or 'not_found' instead of 'implemented'."
+                )
+            summary_zh = str(draft.get("summary_zh", ""))
+            if status in {"implemented", "partial"} and not any(kw in summary_zh for kw in ("Mock 伪装", "桩函数", "Placeholder", "Mock", "Stub")):
+                errors.append(
+                    f"claim[{idx}] uses a mock/stub implementation, but summary_zh does not contain "
+                    f"the required warning 'Mock 伪装实现 (Stub / Placeholder)' describing its limitations."
+                )
+
         meta = _tag_meta(bb, node_id, tag)
         if meta.get("compare_role") == "weak_hint" and status in {"implemented", "partial"}:
             errors.append(f"claim[{idx}] uses weak_hint tag {tag!r}; weak_hint is navigation only")
