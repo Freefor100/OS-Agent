@@ -6,7 +6,7 @@
 
 ## MCP 工具
 
-以下 6 个确定性计算工具通过 MCP 暴露。文件操作(读源码/grep/列目录)直接用 Claude Code 内置的 bash,不重复暴露。
+以下 8 个工具通过 MCP 暴露。文件操作(读源码/grep/列目录)直接用 Claude Code 内置的 bash。
 
 | 工具 | 用途 | 何时调用 |
 |---|---|---|
@@ -15,6 +15,8 @@
 | `exclude_rules(target)` | 哪些代码被排除、为什么 | 第一步 |
 | `deep_compare(target, base)` | 函数级 COPIED/DISGUISE/MODIFIED/NOVEL vs base | 有候选时 |
 | `attribution(target, base)` | 每个节点的函数清单+出身(五分类) | 核心,决定分析深度 |
+| `lsp_definition(target, symbol, file)` | LSP 跳转定义(clangd/rust-analyzer,tree-sitter 退化) | 写分析时定位符号 |
+| `read_doc(target, path)` | 读 PDF/Docx 文档 | 读选手报告/设计文档时 |
 | `node_taxonomy()` | 内核设计树骨架(14 子系统,112 叶子) | 组装报告前 |
 
 ## 流程

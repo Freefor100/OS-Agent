@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """MCP server — exposes deterministic pipeline data for Claude Code + Skill.
 
-6 compute-only tools. Claude Code has bash for file ops (ls/cat/grep) so
-those aren't exposed here — only what bash can't do.
+8 tools: 6 compute-only (what bash can't do) + LSP definition lookup + PDF/Docx
+reader. File ops (ls/cat/grep) use Claude Code's built-in bash.
 
 Tools:
   search_candidates  1-vs-N similarity search (token + AST dual dimension)
@@ -11,6 +11,8 @@ Tools:
   node_taxonomy      kernel design tree skeleton (14 subsystems / 112 leaves)
   declared_deps      extracted declarations (Cargo/gitmodules/README refs)
   exclude_rules      exclusion rules applied to this target
+  lsp_definition     LSP goto-def (clangd/rust-analyzer, tree-sitter fallback)
+  read_doc           read PDF/Docx documents (bash can't do this)
 """
 from __future__ import annotations
 
@@ -195,6 +197,29 @@ def exclude_rules(target: str) -> dict:
     """Exclusion rules applied to this target (what was removed and why)."""
     from scripts.exclude import load_rules as load_exclude_rules
     return {"target": target, "rules": load_exclude_rules(target)}
+
+
+# ── tool: lsp_definition ────────────────────────────────────────────
+
+@mcp.tool()
+def lsp_definition(target: str, symbol: str, file: str = "") -> str:
+    """Real LSP goto-definition via clangd/rust-analyzer. Falls back through
+    tree-sitter → language-aware regex → grep → asm lexical parser if LSP
+    is unavailable. Returns file:line locations with confidence metadata."""
+    from tools.lsp_ops import lsp_get_definition
+    repo = _target_path(target)
+    return lsp_get_definition(repo, file, symbol)
+
+
+# ── tool: read_doc ───────────────────────────────────────────────────
+
+@mcp.tool()
+def read_doc(target: str, path: str, start_page: int = 1, end_page: int = 0) -> str:
+    """Read a PDF or Docx document from the target repo. For PDF, reads pages.
+    For Docx, reads paragraphs. Claude Code's built-in bash can't do this."""
+    from tools.file_ops import read_code_segment
+    return read_code_segment(f"{_target_path(target)}/{path}",
+                              start_page=start_page, end_page=end_page or None)
 
 
 # ── entry ────────────────────────────────────────────────────────────
