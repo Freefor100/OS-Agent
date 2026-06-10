@@ -63,7 +63,11 @@ def run_one(target: str):
     candidates = do_search(target, top_k=20)
     fw = pick_framework(candidates)
 
-    # [D] report — pass top candidates as peers
+    # [D] deep comparison vs best candidate
+    print("  [D] deep compare...")
+    subprocess.run([sys.executable, "scripts/attribute.py", target], check=False)
+
+    # [E] report — pass top candidates as peers
     peers = [c["repo"] for c in candidates[:10] if not c["is_framework"]]
     paradigm = "组件化" if fw != "none" else "宏内核"
     print(f"  [{paradigm}] framework={fw}  peers={len(peers)}")

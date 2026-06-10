@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """MCP server — thin read-only layer over the deterministic pipeline.
 
-Exposes 8 tools so Claude Code (with the Skill) can produce judge-facing
+Exposes 9 tools so Claude Code (with the Skill) can produce judge-facing
 reports. Every tool is read-only; all the heavy computation lives in scripts/.
 
 Tools:
   search_candidates  1-vs-N rough search → top similar repos (token + AST)
+  deep_compare       function-level COPIED/DISGUISE/MODIFIED/NOVEL vs base
   attribution        per-function provenance + coarse node assignment
   unit_source        read source code at file:line
   grep_repo          regex search across the repo (find symbols/patterns)
@@ -200,6 +201,31 @@ def node_taxonomy(node_id: str = "") -> dict:
         }
     return {"roots": tree, "leaf_count": len(ANALYSIS_ORDER_V2),
             "order": ANALYSIS_ORDER_V2}
+
+
+# ── tool: deep_compare ──────────────────────────────────────────────
+
+@mcp.tool()
+def deep_compare(target: str, base: str = "") -> dict:
+    """Function-level comparison vs a base repo. Returns COPIED/DISGUISE/MODIFIED/NOVEL counts and per-module breakdown. If base is empty, auto-resolves from search."""
+    from scripts.attribute import deep_compare as dc
+    if not base:
+        from scripts.search import search, corpus_fingerprints
+        candidates = search(target, corpus=corpus_fingerprints(), top_k=3)
+        peers = [c for c in candidates if not c.get("is_framework")]
+        base = peers[0]["repo"] if peers else ""
+    classes = dc(target, base)
+    summary = {k: len(v) for k, v in classes.items()}
+    # per-module
+    from collections import defaultdict
+    mods = defaultdict(lambda: defaultdict(int))
+    for cls, fns in classes.items():
+        for f in fns:
+            parts = [p for p in f["file"].split("/") if p not in ("", "src", "kernel", "os")]
+            m = parts[0] if parts else "(root)"
+            mods[m][cls] += max(1, f["sz"])
+    return {"target": target, "base": base, "summary": summary,
+            "per_module": {m: dict(st) for m, st in mods.items()}}
 
 
 # ── tool: declared_deps ──────────────────────────────────────────────

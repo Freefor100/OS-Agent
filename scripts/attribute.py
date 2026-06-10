@@ -1,18 +1,16 @@
 #!/usr/bin/env python3
-"""Stage-2 function-level attribution — zero LLM.
+"""Stage-4 function-level deep comparison — COPIED / DISGUISE / MODIFIED / NOVEL.
 
-Given a NEWER repo (target) and an OLDER repo (base) in the same lineage,
-classify every target function against the base:
+Takes a target repo and a base (from search.py or explicit), classifies every
+non-excluded target function against the base:
 
-  COPIED   exact normalized-token hash present in base, same name  -> carried over
-  DISGUISE exact hash present in base, but renamed                 -> copy + rename
-  MODIFIED same name exists in base, hash differs                  -> changed (flagged)
-  NOVEL    neither name nor hash found in base                     -> new code
+  COPIED    exact fp in base, same name    — carried over unchanged
+  DISGUISE  exact fp in base, name differs — renamed copy (plagiarism signal)
+  MODIFIED  same name, fp differs          — changed (most interesting to read)
+  NOVEL     neither name nor fp in base    — new code
 
-Aggregates per top-level module dir -> a contribution skeleton:
-"how much of this submission is inherited vs the student's real work."
-
-Emits NOVEL + MODIFIED function lists (the only inputs an LLM would need to read).
+Uses fingerprint.build_units (code + asm) and exclude.load_rules (EXTERNAL skip).
+Outputs a JSON work-list (MODIFIED + NOVEL by module) for the LLM / report stage.
 """
 from __future__ import annotations
 
@@ -22,126 +20,115 @@ from collections import defaultdict
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from core.code_atlas.builder import build_code_atlas
-from agent_d import _fn_structure_fingerprint
+from scripts.fingerprint import build_units, fingerprint_set
+from scripts.exclude import load_rules
 
-LANGS = {"c", "cpp", "rust"}
+PEER_TOKEN_FLOOR = 100
 
 
-def fingerprints(repo: str):
-    atlas = build_code_atlas(repo_path=f"repos/{repo}", repo_name=repo)
-    fns = []
-    skipped = 0
-    for fn in atlas.get("functions", {}).values():
-        if fn.get("lang") not in LANGS:
+def deep_compare(target: str, base: str) -> dict:
+    """Classify every target unit against base. Returns {COPIED/DISGUISE/MODIFIED/NOVEL: [unit]}."""
+    units = build_units(f"repos/{target}")
+    rules = load_rules(target)
+    if base:
+        base_fps = fingerprint_set(f"repos/{base}")
+    else:
+        base_fps = set()
+
+    # index base functions by name for MODIFIED detection
+    base_units = build_units(f"repos/{base}") if base else []
+    base_names: dict[str, list[dict]] = defaultdict(list)
+    base_hash_to_names: dict[str, set[str]] = defaultdict(set)
+    for u in base_units:
+        base_names[u["name"].lower()].append(u)
+        base_hash_to_names[u["fp"]].add(u["name"])
+
+    classes = {"COPIED": [], "DISGUISE": [], "MODIFIED": [], "NOVEL": []}
+
+    for u in units:
+        # skip excluded units (EXTERNAL — not the student's code anyway)
+        from scripts.exclude import apply_exclude
+        excluded, _ = apply_exclude(rules, u["file"])
+        if excluded:
             continue
-        path = str(fn.get("file", "")).replace("\\", "/")
-        if path.startswith("vendor/"):
-            skipped += 1
-            continue
-        fp = _fn_structure_fingerprint(fn)
-        fns.append({
-            "name": fn.get("name", ""),
-            "file": path,
-            "line": fn.get("line", 0),
-            "ntok": fp["normalized_token_fingerprint"],
-            "ntoks": len(fn.get("tokens_normalized") or []),
-        })
-    if skipped:
-        print(f"  [{repo}] excluded {skipped} vendored/third-party functions")
-    return fns
+
+        name = u["name"].lower()
+        fp = u["fp"]
+        if fp and fp in base_fps:
+            if name in base_names and any(b["fp"] == fp for b in base_names[name]):
+                classes["COPIED"].append(u)
+            else:
+                classes["DISGUISE"].append(u)
+        elif name in base_names:
+            classes["MODIFIED"].append(u)
+        else:
+            classes["NOVEL"].append(u)
+
+    return classes
 
 
 def module_of(path: str) -> str:
-    """Coarse module = first meaningful path segment."""
     parts = [p for p in path.split("/") if p not in ("", ".", "src", "kernel", "os")]
     return parts[0] if parts else "(root)"
 
 
 def main():
-    base_name, target_name = sys.argv[1], sys.argv[2]
-    print(f"BASE (older):  {base_name}")
-    print(f"TARGET (newer): {target_name}\n")
+    target = sys.argv[1]
+    base = sys.argv[2] if len(sys.argv) > 2 else ""
 
-    base = fingerprints(base_name)
-    target = fingerprints(target_name)
-    print(f"base fns: {len(base)}  target fns: {len(target)}\n")
+    # auto-resolve base from search if not given (cached-only — fast)
+    if not base:
+        from scripts.search import search, corpus_fingerprints
+        corpus = corpus_fingerprints(build_missing=False)  # only cached, fast
+        candidates = search(target, corpus=corpus, top_k=3)
+        peers = [c for c in candidates if not c.get("is_framework")]
+        base = peers[0]["repo"] if peers else ""
+        print(f"[auto] base = {base} (from {len(corpus)} cached members)")
 
-    base_hashes = {f["ntok"] for f in base}
-    base_names = defaultdict(list)
-    for f in base:
-        base_names[f["name"]].append(f)
-    hash_to_basename = defaultdict(set)
-    for f in base:
-        hash_to_basename[f["ntok"]].add(f["name"])
+    print(f"TARGET: {target}  BASE: {base}\n")
+    classes = deep_compare(target, base)
 
-    classes = {"COPIED": [], "DISGUISE": [], "MODIFIED": [], "NOVEL": []}
-    # weight by token count so big functions count more than trivial getters
-    mod_stats = defaultdict(lambda: defaultdict(int))
-
-    for f in target:
-        same_name = base_names.get(f["name"])
-        w = max(1, f["ntoks"])
-        if f["ntok"] in base_hashes:
-            if same_name and any(b["ntok"] == f["ntok"] for b in same_name):
-                cls = "COPIED"
-            else:
-                cls = "DISGUISE"
-        elif same_name:
-            cls = "MODIFIED"
-        else:
-            cls = "NOVEL"
-        classes[cls].append(f)
-        mod_stats[module_of(f["file"])][cls] += w
-
-    total = len(target)
+    total = sum(len(v) for v in classes.values()) or 1
     print("=" * 72)
-    print("ATTRIBUTION SUMMARY (function counts)")
+    print("DEEP COMPARISON")
     print("=" * 72)
     for c in ("COPIED", "DISGUISE", "MODIFIED", "NOVEL"):
         n = len(classes[c])
         print(f"  {c:9s}: {n:5d}  ({100*n/total:.0f}%)")
+
     inherited = len(classes["COPIED"]) + len(classes["DISGUISE"])
     realwork = len(classes["MODIFIED"]) + len(classes["NOVEL"])
     print(f"  {'-'*40}")
-    print(f"  inherited (copied+disguise): {100*inherited/total:.0f}%")
-    print(f"  real work (modified+novel) : {100*realwork/total:.0f}%   <-- student contribution")
+    print(f"  inherited: {100*inherited/total:.0f}%   real work: {100*realwork/total:.0f}%")
 
+    # per-module breakdown
     print("\n" + "=" * 72)
-    print("PER-MODULE (token-weighted: inherited% vs real-work%)")
+    print("PER-MODULE")
     print("=" * 72)
-    rows = []
-    for mod, st in mod_stats.items():
+    modst = defaultdict(lambda: defaultdict(int))
+    for cls, fns in classes.items():
+        for f in fns:
+            modst[module_of(f["file"])][cls] += max(1, f["sz"])
+    for mod, st in sorted(modst.items(), key=lambda kv: -sum(kv[1].values())):
         inh = st["COPIED"] + st["DISGUISE"]
         rw = st["MODIFIED"] + st["NOVEL"]
         tot = inh + rw
-        rows.append((tot, mod, inh, rw, st))
-    for tot, mod, inh, rw, st in sorted(rows, reverse=True)[:18]:
-        print(f"  {mod[:28]:28s} {tot:6d}tok  inherited={100*inh/tot:3.0f}%  realwork={100*rw/tot:3.0f}%"
-              f"  (N={st['NOVEL']} M={st['MODIFIED']} C={st['COPIED']} D={st['DISGUISE']})")
+        if tot < 50:
+            continue
+        print(f"  {mod[:28]:28s} {tot:6d}tok  inh={100*inh/tot:3.0f}%  rw={100*rw/tot:3.0f}%  "
+              f"(N={st['NOVEL']} M={st['MODIFIED']} C={st['COPIED']} D={st['DISGUISE']})")
 
-    print("\n" + "=" * 72)
-    print("DISGUISE samples (copied + renamed — strongest plagiarism signal)")
-    print("=" * 72)
-    for f in sorted(classes["DISGUISE"], key=lambda x: -x["ntoks"])[:12]:
-        origins = sorted(hash_to_basename[f["ntok"]])[:3]
-        print(f"  {f['name'][:30]:30s} ({f['file'].split('/')[-1]}, {f['ntoks']}tok)  <== base: {origins}")
-
-    print("\n" + "=" * 72)
-    print("NOVEL samples (new code — what the LLM would read & describe)")
-    print("=" * 72)
-    for f in sorted(classes["NOVEL"], key=lambda x: -x["ntoks"])[:15]:
-        print(f"  {f['name'][:34]:34s} ({f['file'].split('/')[-1]}, {f['ntoks']}tok)")
-
-    # dump the LLM work-list (modified+novel) so stage-3 has a concrete input
+    # work-list for LLM
     worklist = {
-        "base": base_name, "target": target_name,
-        "modified": [{"name": f["name"], "file": f["file"], "line": f["line"]} for f in classes["MODIFIED"]],
-        "novel": [{"name": f["name"], "file": f["file"], "line": f["line"]} for f in classes["NOVEL"]],
+        "target": target, "base": base,
+        "modified": [{"name": f["name"], "file": f["file"], "line": f.get("line", 0), "lang": f.get("lang", "")}
+                     for f in classes["MODIFIED"]],
+        "novel": [{"name": f["name"], "file": f["file"], "line": f.get("line", 0), "lang": f.get("lang", "")}
+                  for f in classes["NOVEL"]],
     }
-    out = Path(f"/tmp/worklist_{target_name}.json")
+    out = Path(f"/tmp/worklist_{target}.json")
     out.write_text(json.dumps(worklist, ensure_ascii=False, indent=2))
-    print(f"\nLLM work-list ({len(worklist['modified'])} modified + {len(worklist['novel'])} novel) -> {out}")
+    print(f"\nwork-list ({len(worklist['modified'])}M + {len(worklist['novel'])}N) -> {out}")
 
 
 if __name__ == "__main__":
