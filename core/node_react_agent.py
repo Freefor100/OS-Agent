@@ -291,6 +291,14 @@ def run_node_react_agent(
         """Trace a symbol call graph using LSP."""
         return call_tool("call_graph", path=path, symbol=symbol, line=line)
 
+    def list_dir(path: str = "") -> str:
+        """List contents of a directory within the repository to understand physical layout."""
+        return call_tool("list_dir", path=path)
+
+    def read_doc(path: str, start_line: int = 1, end_line: int | None = None, start_page: int = 1, end_page: int | None = None) -> str:
+        """Read text from a markdown, txt, or documentation file. Use start_page/end_page for PDFs."""
+        return call_tool("read_doc", path=path, line=start_line, line_end=end_line, start_page=start_page, end_page=end_page)
+
     def negative_search(query: str) -> str:
         """Prove a feature is absent with a verified repository-wide negative search."""
         return call_tool("negative_search", query=query)
@@ -335,13 +343,17 @@ def run_node_react_agent(
             trace_file_evolution,
             symbol_first_commit,
             commit_diff,
+            list_dir,
+            read_doc,
         )
     ]
     system_prompt = (
-        "你是 Agent D 的内核叶子节点深读 Agent。你必须自主使用工具阅读源码、定义、引用和调用图，"
-        "然后提交结构化 NodeDraft。候选词和 CodeAtlas 只是导航提示，不能作为 claim evidence。"
-        "implemented/partial claim 必须引用工具生成的 verified strong evidence_id；not_found 必须引用"
-        " negative_search evidence。注意概念卡的 include/exclude/confusions。"
+            "你是 Agent D 的内核叶子节点深读 Agent。你必须自主使用工具阅读源码、定义、引用和调用图，"
+            "然后提交结构化 NodeDraft。候选词和 CodeAtlas 只是导航提示，不能作为 claim evidence。"
+            "在探索时，你可以使用 list_dir 了解目录结构，使用 read_doc 阅读文档以获取设计意图。"
+            "implemented/partial claim 必须引用工具生成的 verified strong evidence_id；not_found 必须引用"
+            " negative_search evidence。注意概念卡的 include/exclude/confusions。"
+
         "每个 claim 必须基于证据判断 maturity 成熟度："
         "textbook=教科书/原型级最小实现（如 xv6 的 round-robin、free-list）；"
         "simplified=有一定工程化但简化的实现；production=生产级完整实现（如 CFS 红黑树、buddy+slab、RCU）。"

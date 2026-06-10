@@ -13,7 +13,7 @@ from threading import Lock
 from typing import Any
 
 
-SOURCE_EXTS = {".c", ".h", ".S", ".s", ".rs", ".cpp", ".cc", ".hpp", ".ld", ".lds", ".toml", ".mk", ".cmake", ".txt", ".md"}
+SOURCE_EXTS = {".c", ".h", ".S", ".s", ".rs", ".cpp", ".cc", ".hpp", ".ld", ".lds", ".toml", ".mk", ".cmake", ".txt", ".md", ".pdf", ".docx"}
 TEXT_NAMES = {"Makefile", "makefile", "justfile", ".gitignore", ".os_agent_lsp_target"}
 
 
@@ -251,6 +251,26 @@ class EvidenceStore:
         if cand.kind == "negative_search":
             verified = cand.tool == "negative_search" and cand.metadata.get("matches", 1) == 0
             notes.append("negative search verified by tool result" if verified else "negative search missing zero-match proof")
+        elif cand.kind == "documentation":
+            root = Path(self.repo_path).resolve()
+            path = (root / cand.path).resolve()
+            if root in path.parents or path == root:
+                content = _read_doc_content(
+                    path,
+                    start_line=cand.line_start,
+                    end_line=cand.line_end,
+                    start_page=cand.metadata.get("start_page"),
+                    end_page=cand.metadata.get("end_page"),
+                )
+                if content:
+
+                    excerpt = content[:5000]  # documentation gets a larger excerpt
+                    verified = True
+                    notes.append("documentation file verified and read")
+                else:
+                    notes.append("documentation file empty or could not be read")
+            else:
+                notes.append("documentation path outside workspace")
         elif cand.kind in {"function_definition", "type_definition", "macro_definition", "constant_definition", "config_entry", "linker_symbol", "assembly_label", "source_span", "lsp_definition", "lsp_reference"}:
             lines = _safe_read_lines(self.repo_path, cand.path)
             if lines and cand.line_start and 1 <= cand.line_start <= len(lines):
@@ -397,6 +417,51 @@ def _visible_char(ch: str) -> str:
     if ch in "\n\r\t" or code >= 32:
         return ch
     return f"\\x{code:02x}"
+
+
+def _read_doc_content(
+    path: Path,
+    start_line: int | None = None,
+    end_line: int | None = None,
+    start_page: int | None = None,
+    end_page: int | None = None,
+) -> str:
+    if not path.is_file():
+        return ""
+    suffix = path.suffix.lower()
+    if suffix == ".pdf":
+        try:
+            from pypdf import PdfReader
+            reader = PdfReader(path)
+            total_pages = len(reader.pages)
+            sp = max(1, start_page or 1)
+            ep = min(total_pages, end_page or (sp + 9))
+            text = f"[PDF Pages {sp}-{ep} of {total_pages}]\n"
+            for i in range(sp - 1, ep):
+                text += reader.pages[i].extract_text() + "\n"
+            return text
+        except Exception as exc:
+            return f"Error reading PDF: {exc}"
+    elif suffix == ".docx":
+        try:
+            import docx
+            doc = docx.Document(path)
+            all_text = [para.text for para in doc.paragraphs]
+            start = max(0, (start_line or 1) - 1)
+            end = end_line if end_line else len(all_text)
+            return "\n".join(all_text[start:end])
+        except Exception as exc:
+            return f"Error reading DOCX: {exc}"
+    try:
+        text = path.read_text(encoding="utf-8", errors="ignore")
+        if start_line or end_line:
+            lines = text.splitlines()
+            start = max(0, (start_line or 1) - 1)
+            end = end_line if end_line else len(lines)
+            return "\n".join(lines[start:end])
+        return text
+    except OSError:
+        return ""
 
 
 def classify_source_kind(path: str, line_text: str, symbol: str = "") -> str:

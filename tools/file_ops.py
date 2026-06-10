@@ -28,13 +28,43 @@ def read_code_segment(
     start_line: Optional[int] = None,
     end_line: Optional[int] = None,
     max_chars: Optional[int] = None,
+    start_page: Optional[int] = None,
+    end_page: Optional[int] = None,
 ) -> str:
     if not _safe_repo_path(os.getcwd(), file_path):
         return f"Error: path outside workspace: {file_path}"
     if not os.path.isfile(file_path):
         return f"Error: File not found: {file_path}"
-    with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-        lines = f.readlines()
+    
+    suffix = os.path.splitext(file_path)[1].lower()
+    if suffix == ".pdf":
+        try:
+            from pypdf import PdfReader
+            reader = PdfReader(file_path)
+            total_pages = len(reader.pages)
+            sp = max(1, start_page or 1)
+            ep = min(total_pages, end_page or (sp + 9))
+            text = f"[PDF: {file_path}, Pages {sp}-{ep} of {total_pages}]\n"
+            for i in range(sp - 1, ep):
+                text += reader.pages[i].extract_text() + "\n"
+            return text[:max_chars or MAX_FILE_CHARS]
+        except Exception as exc:
+            return f"Error reading PDF: {exc}"
+    elif suffix == ".docx":
+        try:
+            import docx
+            doc = docx.Document(file_path)
+            text = "\n".join([para.text for para in doc.paragraphs])
+            return text[:max_chars or MAX_FILE_CHARS]
+        except Exception as exc:
+            return f"Error reading DOCX: {exc}"
+
+    try:
+        with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+            lines = f.readlines()
+    except OSError as e:
+        return f"Error reading file: {e}"
+    
     start = max(0, (start_line or 1) - 1)
     end = end_line if end_line else len(lines)
     content = "".join(lines[start:end])

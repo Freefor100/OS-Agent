@@ -766,6 +766,9 @@ def _execute_evidence_request(bb: Blackboard, node_id: str, req: dict[str, Any],
     symbol = str(req.get("symbol") or query).strip()
     path = str(req.get("path") or "").strip().replace("\\", "/")
     line = int(req.get("line") or 1)
+    line_end = int(req.get("line_end") or 0) or None
+    start_page = int(req.get("start_page") or 0) or None
+    end_page = int(req.get("end_page") or 0) or None
     added: list[tuple[str, dict[str, Any]]] = []
     glossary_rows: list[dict[str, Any]] = []
     try:
@@ -778,6 +781,41 @@ def _execute_evidence_request(bb: Blackboard, node_id: str, req: dict[str, Any],
                 error = f"glossary entry not found: {query or symbol}"
         elif tool in {"atlas_search", "atlas_symbol", "atlas_neighbors", "atlas_fingerprint"}:
             added.extend(_run_atlas_tool(bb, tool, query=query, symbol=symbol, limit=int(req.get("limit") or 12)))
+        elif tool == "list_dir":
+            from tools.file_ops import list_directory
+            content = list_directory(bb.repo_path, path or query)
+            from core.evidence import EvidenceCandidate
+            ev = bb.evidence.add(EvidenceCandidate(
+                tool="file_ops", kind="list_dir", label=f"list_dir: {path or query}",
+                strength="weak", content=content,
+                metadata={"path": path or query},
+            ))
+            added.append((ev, {"name": tool, "path": path or query, "line": 1, "kind": "directory_list", "evidence_id": ev}))
+        elif tool == "read_doc":
+            # read_doc is an alias for read_path with focus on documentation files (md, txt, pdf)
+            # kind="documentation" ensures it is handled as strong evidence for design claims.
+            target_path = path or query
+            ev = bb.evidence.add_source(
+                kind="documentation",
+                path=target_path,
+                line=line,
+                symbol=symbol,
+                label=symbol or target_path,
+                strength="strong",
+                metadata={
+                    "phase": phase,
+                    "node_id": node_id,
+                    "line_end": line_end,
+                    "start_page": start_page,
+                    "end_page": end_page
+                }
+            )
+            # We also need to set line_end on the record if it exists
+            rec = bb.evidence.by_id(ev)
+            if rec and line_end:
+                rec.line_end = line_end
+
+            added.append((ev, {"name": symbol or Path(target_path).name, "path": target_path, "line": line, "kind": "documentation", "evidence_id": ev}))
         elif tool == "read_symbol" and symbol:
             added.extend(_find_symbol(bb, symbol, max_hits=4))
         elif tool == "read_path" and path:

@@ -91,3 +91,12 @@
   design_layer + relation_layer(调用图同构) + code_structure_layer(ast_shape_hash) + lineage_layer
 - OS-Agent C 的目标查重报告需包含：
   《模块宏观架构图》、《底层侵入式修改占比》、《高阶 Syscall 代码相似度矩阵》及《独立创新代码解析》。
+
+## 4. 架构优化：迁移至 MCP (Model Context Protocol)
+- [ ] 将 `tools/` 目录下的核心能力（LSP, CodeAtlas, GitOps, FileOps）封装为 MCP Server。
+- [ ] 使工具能够被外部 MCP Client（如 Cursor, Claude Desktop）直接调用。
+- [ ] Agent D 核心流程改造为 MCP Client，通过标准协议调用工具，解耦工具实现与调度逻辑。
+- [ ] 探索通过 MCP Resources 共享 Blackboard 状态。
+
+## 5. 工具能力增强
+- [ ] 在 `read_doc` 中增加对 PDF/Doc 等二进制文档格式的解析支持（目前仅支持纯文本/Markdown）。
