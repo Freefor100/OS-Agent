@@ -47,16 +47,6 @@ python scripts/run.py T202510216995249-4014
 - 自报依赖与血缘
 - 选手自研函数清单 (带 file:line 证据)
 
-## 环境变量 (.env)
-
-```env
-OPENAI_API_KEY=sk-...
-OPENAI_API_BASE=https://api.openai.com/v1
-MODEL_NAME=deepseek/deepseek-chat
-```
-
-仅旧 Agent D 流需要。新查重流水线无需 LLM。
-
 ---
 
 ## 项目结构
@@ -102,38 +92,16 @@ OS-Agent/
 │   ├── kernel_glossary.json     334 条机制定义 (中英 + 代码示例)
 │   └── evidence.py              源码证据存储
 │
-├── agent_d.py                   Agent D 入口 (旧分析流程,保留)
-├── agent_c.py                   Agent C 入口 (旧比对流程,保留)
-│
 ├── repos/                       语料库 (~160 参赛内核, gitignored)
 ├── .fp_cache/                   指纹缓存 (gitignored)
 └── output/                      报告产物 (gitignored)
 ```
 
-## 旧 Agent D / Agent C
-
-以下命令仍可用，但新流水线 (`scripts/run.py`) 是当前开发方向:
-
-```bash
-# 旧 Agent D — LLM 填描述树
-python agent_d.py repos/xv6-riscv --repo-name xv6-riscv
-
-# 旧 Agent C — 比对已分析内核
-python agent_c.py xv6-k210 xv6-riscv
-
-# 冒烟测试
-AGENT_D_NODE_LIMIT=3 python agent_d.py repos/xv6-riscv --repo-name xv6-riscv
-```
-
-详见 `CLAUDE.md`。
-
----
-
 ## 注意事项
 
 **LSP 支持（可选）**
 
-安装 `clangd`（C/C++）或 `rust-analyzer`（Rust）后，Agent 可获取更精准的符号定义和调用关系。未安装时退化到 grep 搜索。
+安装 `clangd`（C/C++）或 `rust-analyzer`（Rust）后，`lsp_lookup` 工具可获取精准的符号定义。未安装时自动退化到 grep。
 
 ---
 

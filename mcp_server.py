@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """MCP server — thin read-only layer over the deterministic pipeline.
 
-Exposes 9 tools so Claude Code (with the Skill) can produce judge-facing
+Exposes 11 tools so Claude Code (with the Skill) can produce judge-facing
 reports. Every tool is read-only; all the heavy computation lives in scripts/.
 
 Tools:
@@ -9,7 +9,9 @@ Tools:
   deep_compare       function-level COPIED/DISGUISE/MODIFIED/NOVEL vs base
   attribution        per-function provenance + coarse node assignment
   unit_source        read source code at file:line
+  read_code          read source file with line range (PDF/Docx support)
   grep_repo          regex search across the repo (find symbols/patterns)
+  lsp_lookup         jump to symbol definition (clangd/rust-analyzer or grep)
   list_dir           list directory contents (explore project structure)
   node_taxonomy      kernel design tree skeleton (112 leaf nodes)
   declared_deps      extracted declarations (Cargo/gitmodules/README)
@@ -174,6 +176,27 @@ def list_dir(target: str, path: str = "") -> str:
     """List a directory within the target repo. Use to explore project structure."""
     from tools.file_ops import list_directory
     return list_directory(_target_path(target), path)
+
+
+# ── tool: lsp_lookup ──────────────────────────────────────────────
+
+@mcp.tool()
+def lsp_lookup(target: str, symbol: str, file: str = "") -> str:
+    """Jump to a symbol's definition. Uses clangd/rust-analyzer if available;
+    degrades to grep-based fallback. Returns file:line locations."""
+    repo = _target_path(target)
+    from tools.lsp_ops import fallback_definition
+    return fallback_definition(repo, file, symbol)
+
+
+# ── tool: read_code ───────────────────────────────────────────────
+
+@mcp.tool()
+def read_code(target: str, path: str, start_line: int = 1, end_line: int = 0) -> str:
+    """Read source code from a file in the target repo. For PDF/Docx, reads pages."""
+    from tools.file_ops import read_code_segment
+    return read_code_segment(f"{_target_path(target)}/{path}",
+                              start_line=start_line, end_line=end_line or None)
 
 
 # ── tool: node_taxonomy ──────────────────────────────────────────────

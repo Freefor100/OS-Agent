@@ -4,65 +4,87 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-OS-Agent reads an operating-system kernel source repo and produces a fixed-shape "kernel design tree" with source-backed claims, then compares trees across kernels for similarity / lineage analysis. Built for the 全国大学生计算机系统能力大赛 (proj18). Two agents:
+OS-Agent is a plagiarism-detection system for OS kernel competition submissions. It builds deterministic code fingerprints (normalized token + AST shape), runs 1-vs-N similarity search against a corpus of ~160 kernels, and produces judge-facing HTML reports with provenance-colored kernel design trees.
 
-- **Agent D** (`agent_d.py`): reads source, fills a fixed kernel-design-tree taxonomy, emits static HTML + JSON artifacts.
-- **Agent C** (`agent_c.py`): compares already-analyzed kernels. Reads only `output/<name>/_agent_d/` artifacts, never source.
+Built for 全国大学生计算机系统能力大赛 (proj18).
 
 ## Commands
 
 ```bash
 pip install -r requirements.txt          # Python 3.10+
 
-# Analyze a kernel (clone URL or local path both work)
-python agent_d.py repos/xv6-riscv --repo-name xv6-riscv
-python agent_d.py https://github.com/mit-pdos/xv6-riscv --repo-name xv6-riscv
-python agent_d.py repos/xv6-riscv --repo-name xv6-riscv --ui     # live browser dashboard
-python agent_d.py repos/xv6-riscv --repo-name xv6-riscv --serve  # serve result after run
-python agent_d.py repos/xv6-riscv --repo-name xv6-riscv --fresh  # ignore checkpoint, restart
+# Pre-build corpus fingerprints (one-time, ~8 min)
+python scripts/run.py --build
 
-# Smoke-test config cheaply before a full run (3 nodes only)
-AGENT_D_NODE_LIMIT=3 python agent_d.py repos/xv6-riscv --repo-name xv6-riscv
+# Analyze a single submission
+python scripts/run.py <repo-name>        # e.g. python scripts/run.py xv6-k210
 
-# Compare kernels (each must have been run through Agent D first)
-python agent_c.py xv6-k210 xv6-riscv [more-kernels...]
+# Single-tool invocation
+python scripts/search.py <repo>          # 1-vs-N similarity search
+python scripts/attribute.py <repo>       # deep compare COPIED/MODIFIED/NOVEL
+python scripts/fingerprint.py <repo>     # build fingerprints only (no comparison)
 
 # Tests — pytest is NOT installed; use unittest
 python -m unittest discover -s tests
-python -m unittest tests.test_agent_d_langgraph              # single module
-python -m unittest tests.test_agent_d_langgraph.AgentDLangGraphTests.test_fanout_fanin_and_sqlite_checkpoint
+python -m unittest tests.test_agent_c_compare
 ```
-
-Config lives in `.env` (copy from `.env.example`). Required: `OPENAI_API_KEY`, `OPENAI_API_BASE`, `MODEL_NAME` (any OpenAI-compatible endpoint — DeepSeek, OpenRouter, local vLLM). Output goes to `output/<repo-name>/_agent_d/`; the human-facing result is `index.html` there.
 
 ## Architecture
 
-The two CLI entry points are thin. The orchestration lives in `core/`, executed as **two nested LangGraph state machines**:
+### Pipeline (scripts/)
 
-1. **Global graph** (`core/agent_d_graph.py`, `AgentDGraphState`): drives the run batch-by-batch over the taxonomy. Nodes are analyzed in dependency batches defined by `ANALYSIS_BATCHES_V2` in `core/kernel_tree.py`. After all node batches: `trace_flows` → `build_dependencies` → `global_consistency` → `generate_architecture` → `finalize`. State is checkpointed to SQLite (langgraph-checkpoint-sqlite) so runs resume.
+`python scripts/run.py <target>` drives four stages:
 
-2. **Per-node subgraph** (`core/node_analysis_graph.py`, `NodeAnalysisState`): for each taxonomy node, runs **ReAct → verify → commit** with repair retries (`AGENT_D_REPAIR_ROUNDS`). The ReAct loop is `core/node_react_agent.py`, which forces a strict `NodeDraft` Pydantic schema as final output.
+```
+[A] declarations.py   extract Cargo structure, git deps, lineage refs
+[B] fingerprint.py    build fingerprints (c/cpp/rust via tree-sitter + asm via tokenizer)
+[C] search.py         1-vs-N similarity (token + AST dual dimension)
+[D] attribute.py      COPIED / DISGUISE / MODIFIED / NOVEL deep comparison
+[E] report.py         assemble HTML: contribution table + design tree + arch graph
+```
 
-The "runtime" objects (`AgentDGraphRuntime`, `NodeAnalysisRuntime`) are dataclasses of callbacks. The graph modules are pure plumbing; the actual analysis logic (snapshotting, node analysis, merging, flow tracing, finalize) is implemented as closures **inside `agent_d.py`** and injected via these runtimes. To understand what a graph step does, find the matching callback in `agent_d.py`, not in `core/`.
+| File | Role |
+|---|---|
+| `fingerprint.py` | Build fingerprints. `build_units(repo)` → unified unit list `{lang, file, name, fp, ast, sz}`. `fingerprint_set(repo)` → set of exact hashes. `ast_fingerprint_set(repo)` → AST shape hashes. Cached to `.fp_cache/`. |
+| `provenance.py` | 5-way classification: EXTERNAL / PORTED-FRAMEWORK / PORTED-PEER / ORIGINAL / TRIVIAL. `classify_provenance(units, fw, peers, exclude_rules)`. |
+| `search.py` | 1-vs-N search. `combined = max(token_min, ast_min)`. `corpus_fingerprints(build_missing=False)` returns cached fingerprints only (fast). |
+| `declarations.py` | Read Cargo.toml (workspace members/exclude/path deps), .gitmodules, README references (github + gitlab.eduxiji.net). |
+| `exclude.py` | Exclusion rule engine. Consumes declarations, generates include/exclude rules. No preset dictionary — LLM fills `llm_external_dirs`/`llm_student_dirs` fields. |
+| `attribute.py` | Deep compare: COPIED (same fp + name) / DISGUISE (same fp, different name) / MODIFIED (same name, different fp) / NOVEL (no match). |
+| `report.py` | HTML report: contribution table, 14-subsystem design tree (provenance-colored via `core/kernel_tree.py`), Mermaid arch graph, declared deps, original function list. |
+| `run.py` | One-button driver: `run <target>` runs A→E. `--build` pre-builds corpus fingerprints. |
 
-### Key concepts
+### Tool layer
 
-- **Taxonomy / design tree** (`core/kernel_tree.py`): the tree skeleton is fixed (`ROOT_NODES_V2`, 14 subsystems from BuildAndConfig to EvolutionHistory). Every kernel fills the same structure. `ANALYSIS_ORDER_V2` flattens the batches into linear order.
-- **Blackboard** (`agent_d.py`): shared run state passed to node analysis. Forked per node (`_fork_blackboard`) and merged back (`_merge_node_results`); the fork deliberately does NOT copy extension history (see test `test_child_blackboard_does_not_copy...`).
-- **Glossary** (`core/kernel_glossary.py` + `kernel_glossary.json`): ~334 mechanism definitions (bilingual + C/Rust code samples) that seed candidate mechanisms per node.
-- **Evidence** (`core/evidence.py`): every claim links to source evidence (path, line, excerpt). Excerpts stored on disk (`evidence_store.jsonl`) with a bounded in-memory cache; recovery is idempotent.
-- **Code Atlas** (`tools/code_atlas/`, `core/code_atlas/`): tree-sitter AST index (C/C++/Rust/Go/Zig) producing functions/types/edges, PageRank, and MinHash fingerprints. Used both by Agent D's `atlas_search` tool and by Agent C for fuzzy code-structure similarity.
-- **ReAct tools** exposed to the node agent: `atlas_search`, `grep`, `lsp_definition`, `lsp_references`, `list_dir`, `read_doc`, `negative_search`, `git_history`. LSP (`tools/lsp_ops.py`) needs `clangd` or `rust-analyzer` installed — degrades to static search if absent.
+| File | Role |
+|---|---|
+| `tools/code_atlas/minhash.py` | MinHash signatures + jaccard estimate. `signature_from_tokens(tokens)` is the fingerprint primitive — does NOT require tree-sitter. |
+| `tools/code_atlas/ast_shape.py` | AST shape merkle hash — ignores variable names/literals. Same structure → same hash. |
+| `tools/code_atlas/asm_tokenize.py` | Assembly tokenizer — normalizes registers→REG, labels→LBL, keeps mnemonics/offsets. Splits by label block. |
+| `tools/file_ops.py` | `grep_in_repo`, `list_directory`, `read_code_segment` (PDF/Docx support). |
+| `tools/lsp_ops.py` | LSP client. `fallback_definition` for grep-based symbol lookup when clangd is unavailable. |
+| `core/code_atlas/builder.py` | Tree-sitter code atlas: parse repo → functions, types, edges, PageRank, normalized tokens. |
+| `core/kernel_tree.py` | Fixed taxonomy: 14 subsystems, 112 leaf nodes. `EXTRA_NODE_SPECS` maps function names to tree nodes. |
+| `core/evidence.py` | Evidence store. `stable_id(prefix, payload)` → deterministic hash-based ID. |
 
-### Agent C scoring
+### MCP & Skill
 
-`agent_c.py` is a single large scoring module (no LLM at compare time). It loads `compare_index.json` + `kernel_design_tree.json` per kernel and combines several signals: `_design_score`, `_relation_score`, `_code_structure_score` (atlas MinHash/symbol-name overlap), and `_lineage_hint_score`. "Base coverage" functions handle teaching-prototype lineage: a fork should still match its base even after tag renames / additions (see `test_agent_c_compare.py`).
+`mcp_server.py` exposes 11 read-only tools for Claude Code: `search_candidates`, `deep_compare`, `attribution`, `unit_source`, `read_code`, `grep_repo`, `lsp_lookup`, `list_dir`, `node_taxonomy`, `declared_deps`, `exclude_rules`.
 
-## Conventions and gotchas
+`SKILL.md` defines the Claude Code workflow: Phase 1 determine report type (incl. low-score declaration check) → Phase 2 attribution → Phase 3 sub-agent batch analysis → Phase 4 assemble three-color tree report.
 
-- **Checkpoint reuse keys on a content hash** (`compute_input_hash`): source content + taxonomy + model config. Change any of those and it treats it as a new run. Use `--fresh` to force.
-- **`scripts/run_describe.py` and `scripts/run_compare.py`** are compatibility shims for `agent_d.py` / `agent_c.py` — prefer the top-level entry points.
-- **Shallow clones** (`--depth=1`) lack git history, so the `EvolutionHistory` node degrades. Clone with full history if evolution analysis matters.
-- **Token cost** is significant (~200k–800k tokens for a ~20k-LOC kernel). Always validate config with `AGENT_D_NODE_LIMIT=3` first.
-- **Concurrency** is env-tuned: `AGENT_D_NODE_CONCURRENCY` (tree nodes in parallel), `AGENT_D_LLM_CONCURRENCY` (in-flight model calls), `AGENT_D_REACT_MAX_STEPS`, `AGENT_D_CONTEXT_BUDGET_TOKENS`. Memory ceiling via `AGENT_D_MEMORY_SOFT_LIMIT_GB`.
-- `repos/` (source) and `output/` (artifacts) are gitignored; `collected-data.xlsx` holds team/school metadata matched onto result pages via `core/submission_meta.py`.
+### Key design constraints
+
+- **No preset external-dependency list**: declarations drive exclusion. LLM fills gaps via `llm_external_dirs`.
+- **Version-sensitive baselines**: ArceOS family must use `oscomp/arceos` (contest fork), not upstream `arceos-org`.
+- **Token floor (~100)**: only suppresses PEER false-positives (Rust boilerplate). Small functions with no match → ORIGINAL.
+- **Direction requires timestamps**: fingerprint similarity is undirected. Year/git history required for "who copied whom".
+- **rv6 limit case**: README says "based on xv6-k210" but token=0.088/ast=0.065. SKILL Phase 1 handles this: low-score → read declarations → force comparison.
+
+### .fp_cache
+
+Fingerprint caches live in `.fp_cache/` (gitignored): `units_*.pkl` (full unit lists), `fpset_*.pkl` (exact hash sets), `astset_*.pkl` (AST hash sets), `exclude_*.pkl` (exclusion rules). Delete to force rebuild.
+
+### Corpus
+
+`repos/` (gitignored) contains ~160 submissions + teaching prototypes. `repos/_baseline_oscomp-arceos/` is the contest-fork ArceOS baseline (`git clone https://github.com/oscomp/arceos.git`).

@@ -32,9 +32,31 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from core.code_atlas.builder import build_code_atlas
-from agent_d import _fn_structure_fingerprint
+from core.evidence import stable_id
 from tools.code_atlas.asm_tokenize import tokenize_asm
 from tools.code_atlas.minhash import signature_from_tokens
+
+
+def _semantic_fn_id(fn: dict) -> str:
+    """Stable id from normalized tokens + AST shape — same inputs, same id."""
+    tokens = fn.get("tokens_normalized") or fn.get("normalized_tokens") or fn.get("signature") or fn.get("name", "")
+    text = " ".join(tokens[:200]) if isinstance(tokens, list) else str(tokens)[:1000]
+    return stable_id("sfn", {"tokens": text, "ast": fn.get("ast_shape_hash", "")}, 16)
+
+
+def _fn_structure_fingerprint(fn: dict) -> dict:
+    """Extracted from agent_d.py. Returns {normalized_token_fingerprint, ast_shape_hash, ...}."""
+    tokens = fn.get("tokens_normalized") or fn.get("normalized_tokens") or []
+    token_text = " ".join(tokens[:400]) if isinstance(tokens, list) else str(tokens)[:2000]
+    literals = fn.get("literal_set") or []
+    return {
+        "semantic_fn_id": _semantic_fn_id(fn),
+        "path": str(fn.get("file", "")).replace("\\", "/"),
+        "symbol": fn.get("name", ""),
+        "ast_shape_hash": fn.get("ast_shape_hash"),
+        "normalized_token_fingerprint": stable_id("ntok", {"tokens": token_text}, 16),
+        "literal_fingerprint": stable_id("lit", {"literals": sorted(map(str, literals))}, 16) if literals else "",
+    }
 
 CODE_LANGS = ("c", "cpp", "rust")
 ASM_MIN_TOK = 12          # asm blocks below this are too generic (save/restore stubs)

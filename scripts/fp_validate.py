@@ -20,8 +20,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from core.code_atlas.builder import build_code_atlas
 from tools.code_atlas.minhash import signature_from_tokens, jaccard_estimate
 
-# reuse the exact production fingerprint so we test what Agent D actually emits
-from agent_d import _fn_structure_fingerprint
+# reuse the exact production fingerprint (now in fingerprint.py, extracted from agent_d)
+from scripts.fingerprint import _fn_structure_fingerprint
 
 
 def fingerprint_functions(repo_path: str, repo_name: str) -> dict:
