@@ -199,6 +199,22 @@ def exclude_rules(target: str) -> dict:
     return {"target": target, "rules": load_exclude_rules(target)}
 
 
+# ── tool: compile_flags ─────────────────────────────────────────────
+
+@mcp.tool()
+def compile_flags(target: str) -> dict:
+    """Generate compile_flags.txt for LSP (clangd/rust-analyzer). Detects
+    architecture, include paths, and defines from Makefile/Cargo.toml.
+    clangd reads this automatically — no GCC cross-compiler needed."""
+    from scripts.compile_flags import generate, _detect_arch
+    repo = _target_path(target)
+    content = generate(repo)
+    from pathlib import Path
+    Path(repo, "compile_flags.txt").write_text(content + "\n")
+    return {"target": target, "arch": _detect_arch(Path(repo)),
+            "flags": content.splitlines()}
+
+
 # ── tool: lsp_definition ────────────────────────────────────────────
 
 @mcp.tool()

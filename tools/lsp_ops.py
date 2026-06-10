@@ -358,59 +358,38 @@ class LSPClient:
         self._dead = False
         self.build_scripts_disabled = disable_build_scripts
         env = os.environ.copy()
-        
-        # 强化外部路径注入：确保 rust-analyzer 能看到 check_env.py 深度扫描到的 make 和 cmake
-        try:
-            import sys
-            sys.path.insert(0, os.path.dirname(os.path.dirname(_abspath(__file__))))
-            from check_env import _find_build_tool, get_git_usr_bin
-            
-            extra_paths = []
-            for tool in ["make", "cmake", "gcc", "clang"]:
-                p = _find_build_tool(tool)
-                if p:
-                    extra_paths.append(os.path.dirname(p))
-            
-            # --- 交叉编译器注入 (Multi-Arch Context) ---
-            target_arch = detect_target_arch(self.cwd)
-            # 定义架构到编译器的映射
-            arch_to_cc = {
-                "riscv64": "riscv-none-elf-gcc",
-                "riscv32": "riscv-none-elf-gcc",
-                "aarch64": "arm-none-eabi-gcc",
-                "arm": "arm-none-eabi-gcc",
-                "loongarch64": "loongarch64-unknown-elf-gcc",
-            }
-            
-            # 无论是否匹配架构，先扫描所有已知编译器并注入 PATH
-            for arch_key, cc_base in arch_to_cc.items():
-                cc_path = _resolve_lsp_binary(cc_base, cwd=self.cwd)
-                if os.path.isabs(cc_path):
-                    cc_dir = os.path.dirname(cc_path)
-                    if cc_dir not in extra_paths:
-                        extra_paths.append(cc_dir)
-                    
-                    # 如果匹配当前检测到的架构，或者尚未设置 CC，则注入环境变量
-                    if (target_arch and arch_key in target_arch.lower()) or "CC" not in env:
-                        env["CC"] = cc_path
-                        env["CXX"] = cc_path.replace("gcc", "g++").replace("-cc", "-c++")
-                        ld_base = cc_base.replace("-cc", "-ld").replace("-gcc", "-ld")
-                        ld_path = _resolve_lsp_binary(ld_base, cwd=self.cwd)
-                        if os.path.isabs(ld_path):
-                            env["LD"] = ld_path
 
-            # Windows 特供：注入 Git 内置的 Linux 命令环境 (包含 rm, test, sh 等)，解决跨平台 Makefile 报错
-            if platform.system() == "Windows":
-                git_usr_bin = get_git_usr_bin()
-                if git_usr_bin and git_usr_bin not in extra_paths:
-                    extra_paths.append(git_usr_bin)
-            
-            if extra_paths:
-                # prepend the discovered tool directories to PATH
-                current_path = env.get("PATH", "")
-                env["PATH"] = os.pathsep.join(extra_paths) + os.pathsep + current_path
-        except Exception as e:
-            logger.warning(f"Failed to inject check_env build tool paths into LSP environment: {e}")
+        # PATH enrichment: scan for known cross-compiler toolchain bins.
+        # compile_flags.txt already provides --target=riscv64 etc. to clangd;
+        # the compiler binary itself is only needed when the LSP needs to resolve
+        # system headers from the toolchain's sysroot. We keep this as a
+        # best-effort PATH extension — missing toolchains are harmless.
+        extra_paths: list = []
+        target_arch_lower = (detect_target_arch(self.cwd) or "").lower()
+        arch_to_cc = {
+            "riscv64": "riscv64-unknown-elf-gcc",
+            "riscv32": "riscv32-unknown-elf-gcc",
+            "aarch64": "aarch64-unknown-elf-gcc",
+            "arm": "arm-none-eabi-gcc",
+            "loongarch64": "loongarch64-unknown-elf-gcc",
+        }
+        for arch_key, cc_base in arch_to_cc.items():
+            cc_path = _resolve_lsp_binary(cc_base, cwd=self.cwd)
+            if os.path.isabs(cc_path):
+                cc_dir = os.path.dirname(cc_path)
+                if cc_dir not in extra_paths:
+                    extra_paths.append(cc_dir)
+                if (target_arch_lower and arch_key in target_arch_lower) or "CC" not in env:
+                    env["CC"] = cc_path
+                    env["CXX"] = cc_path.replace("gcc", "g++").replace("-cc", "-c++")
+                    ld_base = cc_base.replace("-cc", "-ld").replace("-gcc", "-ld")
+                    ld_path = _resolve_lsp_binary(ld_base, cwd=self.cwd)
+                    if os.path.isabs(ld_path):
+                        env["LD"] = ld_path
+
+        if extra_paths:
+            current_path = env.get("PATH", "")
+            env["PATH"] = os.pathsep.join(extra_paths) + os.pathsep + current_path
 
         # 强化隔离：防止在线拉取卡死，允许不稳定特性 (全局对 rust-analyzer 生效)
         if "rust-analyzer" in self.cmd[0]:

@@ -44,6 +44,9 @@ def pick_framework(candidates: list[dict], threshold: float = 0.10) -> str:
 def run_one(target: str):
     print(f"\n=== {target} ===")
 
+    # [0] compile_flags for LSP (clangd needs --target=riscv64 etc.)
+    subprocess.run([sys.executable, "scripts/compile_flags.py", f"repos/{target}"], check=False)
+
     # [A] declarations
     print("  [A] declarations...")
     subprocess.run([sys.executable, "scripts/declarations.py", target], check=False)
