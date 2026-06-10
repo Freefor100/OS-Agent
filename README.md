@@ -40,19 +40,12 @@ python scripts/run.py T202510216995249-4014
 
 ### 3. 查看报告
 
-报告在 `output/<作品名>/_report/index.html`，包含:
+打开 `output/<作品名>/_report/index.html`，包含：
 - 贡献占比表 (五分类来源)
 - 内核设计树 (14 子系统 × 112 叶子节点 × 三色出身标注)
 - Mermaid 模块架构图 (模块级调用 + 出身染色)
 - 自报依赖与血缘
 - 选手自研函数清单 (带 file:line 证据)
-
-### 4. 排查语法 (仅对确认的)
-
-```bash
-# 仅对一个作品查重
-python scripts/run.py xv6-k210
-```
 
 ## 环境变量 (.env)
 
@@ -133,3 +126,20 @@ AGENT_D_NODE_LIMIT=3 python agent_d.py repos/xv6-riscv --repo-name xv6-riscv
 ```
 
 详见 `CLAUDE.md`。
+
+---
+
+## 注意事项
+
+**LSP 支持（可选）**
+
+安装 `clangd`（C/C++）或 `rust-analyzer`（Rust）后，Agent 可获取更精准的符号定义和调用关系。未安装时退化到 grep 搜索。
+
+---
+
+## 参赛信息
+
+- 赛事：2026 全国大学生计算机系统能力大赛（操作系统赛）
+- 项目：proj18 · 面向小型操作系统的分析比对智能体系统设计
+- 参赛作品信息从 `collected-data.xlsx` 中读取，自动显示在结果页顶部
+- 教学原型仓库（xv6、rCore、ArceOS 等）单独标注，不显示队伍信息
