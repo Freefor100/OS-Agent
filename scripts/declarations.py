@@ -31,6 +31,45 @@ CRATE_RE = re.compile(r'^\s*([a-zA-Z0-9_-]+)\s*=\s*"[\d.]+"', re.MULTILINE)
 SUBMOD_RE = re.compile(r'url\s*=\s*(\S+)')
 
 
+def parse_cargo_structure(repo: Path) -> dict[str, list[str]]:
+    """Extract workspace structure from root Cargo.toml.
+
+    Returns {workspace_members, path_deps, vendored_frameworks, external_dirs}.
+    vendored_frameworks = dirs explicitly excluded from the workspace AND
+    containing their own Cargo.toml (e.g. vendored arceos/). external_dirs =
+    other excluded top-level dirs (test programs, tooling).
+    """
+    root = repo / "Cargo.toml"
+    txt = read(root) if root.exists() else ""
+    members = _toml_list(txt, r'^\s*members\s*=\s*\[(.*?)\]')
+    exclude = _toml_list(txt, r'^\s*exclude\s*=\s*\[(.*?)\]')
+    path_deps = set()
+    for m in re.finditer(r'=\s*\{[^}]*path\s*=\s*"([^"]+)"', txt):
+        path_deps.add(m.group(1).lstrip("./"))
+
+    vendored, extdirs = [], []
+    for d in exclude:
+        d = d.strip('"')
+        if (repo / d).is_dir() and (repo / d / "Cargo.toml").exists():
+            vendored.append(d)
+        else:
+            extdirs.append(d)
+    return {
+        "workspace_members": members,
+        "path_deps": sorted(path_deps),
+        "vendored_frameworks": vendored,
+        "external_dirs": extdirs,
+    }
+
+
+def _toml_list(text: str, pattern: str) -> list[str]:
+    """Extract a TOML inline list like members = ["a", "b"] from text."""
+    m = re.search(pattern, text, re.MULTILINE)
+    if not m:
+        return []
+    return [x.strip().strip('"') for x in m.group(1).split(",") if x.strip()]
+
+
 def read(p: Path) -> str:
     try:
         return p.read_text(encoding="utf-8", errors="ignore")
@@ -65,11 +104,17 @@ def extract(repo: Path) -> dict:
                       url.rstrip("/"))
         return m.group(1) if m else url
 
+    structure = parse_cargo_structure(repo)
+
     return {
         "git_deps": sorted({owner_repo(u) for u in git_deps}),
         "crates": sorted(crates)[:40],
         "submodules": sorted({owner_repo(u) for u in submodules}),
         "readme_refs": sorted({owner_repo(u) for u in readme_refs}),
+        "workspace_members": structure["workspace_members"],
+        "path_deps": structure["path_deps"],
+        "vendored_frameworks": structure["vendored_frameworks"],
+        "external_dirs": structure["external_dirs"],
     }
 
 

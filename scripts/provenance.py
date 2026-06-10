@@ -13,94 +13,44 @@ confirm what's declared external and to cross-check these fingerprint verdicts.
 """
 from __future__ import annotations
 
-import pickle
-import re
 import sys
 from collections import defaultdict
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from core.code_atlas.builder import build_code_atlas
-from agent_d import _fn_structure_fingerprint
-
-FP = "normalized_token_fingerprint"
-
-# vendored third-party code lives in many places, NOT just vendor/. Top-level
-# dirs like bash-5.1.16/, dependency/, busybox/ are GNU/third-party sources that
-# would otherwise dominate the metric (npucore: bash=345k tok, dependency=248k).
-# This is path-based detection of *known third-party project layouts*, distinct
-# from fingerprint-based provenance. See DESIGN.md §9.2. The stage-3 LLM later
-# confirms these against declared deps (Cargo.toml/Makefile/.gitmodules).
-VENDOR_RE = re.compile(
-    r"(^|/)(bash-[\d.]+|busybox\w*|dependency|vendor|third[_-]?party|deps|extern(al)?|"
-    r"lwext4\w*|fat32[\w-]*|libc-test|musl\w*|lua|sqlite|riscv-tests|\.cargo)(/|$)",
-    re.IGNORECASE,
-)
-
-
-def is_vendor(path: str) -> bool:
-    return bool(VENDOR_RE.search(path))
+# Stage-1 fingerprint building lives in fingerprint.py now (build vs compare split,
+# DESIGN §7 阶段1). Stage-B exclusion rules come from exclude.py.
+from scripts.fingerprint import build_units, fingerprint_set, lang_summary
+from scripts.exclude import load_rules as load_exclude_rules, apply_exclude
 
 
 def fingerprints(repo_path: str, want_meta=False):
-    """Return set of fingerprints, or list of {name,file,line,fp,sz} if want_meta.
+    """Return the fingerprint set, or the unit list if want_meta.
 
-    The set form is cached to .fp_cache/fpset_<name>.pkl so --all batch runs reuse
-    peer fingerprints across targets instead of rebuilding each atlas. The meta
-    form is not cached (per-target, includes fn_id/edges).
+    Delegates to fingerprint.py (build vs compare split). Now includes asm units,
+    which v1 dropped. The set form is cached there for 1-vs-N peer reuse.
     """
-    name = Path(repo_path).name
     if not want_meta:
-        cf = Path(".fp_cache") / f"fpset_{name}.pkl"
-        if cf.exists():
-            return pickle.loads(cf.read_bytes())
-        atlas = build_code_atlas(repo_path=repo_path, repo_name=name)
-        s = set()
-        for fn in atlas.get("functions", {}).values():
-            if fn.get("lang") in ("c", "cpp", "rust"):
-                s.add(_fn_structure_fingerprint(fn)[FP])
-        cf.parent.mkdir(exist_ok=True)
-        cf.write_bytes(pickle.dumps(s))
-        return s
-    atlas = build_code_atlas(repo_path=repo_path, repo_name=name)
-    out = []
-    for fn_id, fn in atlas.get("functions", {}).items():
-        if fn.get("lang") not in ("c", "cpp", "rust"):
-            continue
-        out.append({
-            "fn_id": fn_id,
-            "name": fn.get("name", ""),
-            "file": str(fn.get("file", "")).replace("\\", "/"),
-            "line": fn.get("line", 0),
-            "fp": _fn_structure_fingerprint(fn)[FP],
-            "sz": len(fn.get("tokens_normalized") or []),
-        })
-    return out
+        return fingerprint_set(repo_path)
+    return build_units(repo_path)
 
 
 def functions_and_edges(repo_path: str):
-    """One atlas build -> (fn_meta_list, internal_edges).
+    """(unit_list, internal_edges) for the architecture graph.
 
-    internal_edges = [(src_fn_id, dst_fn_id)] for resolved intra-repo calls only
-    (dst_fn_id is None for external/unresolved). Used by stage-4 to build a
-    module-level call graph. fn_ids are consistent with the returned meta list.
+    Returns all units from fingerprint.py (code + asm) plus call edges from the
+    atlas. Code units already carry fn_id from fingerprint.build_units();
+    asm units have no fn_id (no call graph).
     """
-    atlas = build_code_atlas(repo_path=repo_path, repo_name=Path(repo_path).name)
-    fns = {}
-    for fn_id, fn in atlas.get("functions", {}).items():
-        if fn.get("lang") not in ("c", "cpp", "rust"):
-            continue
-        fns[fn_id] = {
-            "fn_id": fn_id,
-            "name": fn.get("name", ""),
-            "file": str(fn.get("file", "")).replace("\\", "/"),
-            "line": fn.get("line", 0),
-            "fp": _fn_structure_fingerprint(fn)[FP],
-            "sz": len(fn.get("tokens_normalized") or []),
-        }
+    from core.code_atlas.builder import build_code_atlas
+
+    units = build_units(repo_path)
+    name = Path(repo_path).name
+    atlas = build_code_atlas(repo_path=repo_path, repo_name=name)
+    fn_ids = {u["fn_id"] for u in units if u.get("fn_id")}
     edges = [(e["src_fn_id"], e["dst_fn_id"]) for e in atlas.get("edges", [])
-             if e.get("dst_fn_id") and e.get("src_fn_id") in fns and e.get("dst_fn_id") in fns]
-    return list(fns.values()), edges
+             if e.get("dst_fn_id") and e.get("src_fn_id") in fn_ids and e.get("dst_fn_id") in fn_ids]
+    return units, edges
 
 
 def top_dir(path: str) -> str:
@@ -117,15 +67,22 @@ def top_dir(path: str) -> str:
 PEER_TOKEN_FLOOR = 100
 
 
-def classify_provenance(tfns: list, fw: set, peer_fps: set, floor: int = PEER_TOKEN_FLOOR) -> dict:
+def classify_provenance(tfns: list, fw: set, peer_fps: set, floor: int = PEER_TOKEN_FLOOR,
+                        exclude_rules: list[dict] | None = None) -> dict:
     """Four-way + TRIVIAL classification. Shared by stage-2 CLI and stage-4 report.
 
     tfns: list of {name,file,line,fp,sz}; fw/peer_fps: fingerprint sets.
+    exclude_rules: from exclude.load_rules(), for stage-B EXTERNAL tagging.
     Returns {class_name: [fn,...]}.
     """
     classes = {"EXTERNAL": [], "PORTED-FRAMEWORK": [], "PORTED-PEER": [], "ORIGINAL": [], "TRIVIAL": []}
     for f in tfns:
-        if is_vendor(f["file"]):
+        if exclude_rules is not None:
+            is_excluded, _ = apply_exclude(exclude_rules, f["file"])
+        else:
+            # no exclude rules = LLM hasn't run yet; only vendor/ is certain (tool convention)
+            is_excluded = f["file"].startswith("vendor/")
+        if is_excluded:
             cls = "EXTERNAL"
         elif f["fp"] in fw:
             cls = "PORTED-FRAMEWORK"
@@ -157,8 +114,11 @@ def main():
         peer_fps |= fingerprints(f"repos/{p}")
     print(f"  peer corpus: {len(peer_fps)} fps\n")
 
+    # stage-B exclude rules (Agent understanding -> deterministic exclusion)
+    rules = load_exclude_rules(target)
+
     # token floor: see classify_provenance / DESIGN.md §5.7
-    classes = classify_provenance(tfns, fw, peer_fps)
+    classes = classify_provenance(tfns, fw, peer_fps, exclude_rules=rules)
 
     total = len(tfns)
     tot_sz = sum(f["sz"] for f in tfns) or 1

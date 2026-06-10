@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
-"""One-button driver — auto-detect paradigm, pick baseline, run report.
+"""One-button 1-vs-N pipeline driver.
 
-Closes the last manual seam: the operator no longer decides "is this ArceOS or
-macrokernel?" nor types a framework baseline. Both are derived from the stage-1
-cluster file (output/lineage_clusters.json).
+Per-repo flow:
+  [A] declarations.py   extract Cargo structure + submodules + lineage refs
+  [B] fingerprint.py    build unified fingerprints (code + asm), cached
+  [C] search.py         1-vs-N search -> top-K similar corpus members
+  [D] report.py          provenance + report (peers = search candidates)
 
-Paradigm = if the target's lineage family contains a known framework baseline
-(arceos/rCore/...), it's component-based -> use that baseline; else macrokernel
--> framework=none, earlier same-family member acts as base via PORTED-PEER.
+Framework baseline is auto-detected from search results: if a known framework
+appears among top candidates, use it. Otherwise macrokernel -> framework=none.
 
 Usage:
   python scripts/run.py <target>            # single repo
-  python scripts/run.py --all               # every clustered repo + overview
+  python scripts/run.py --build             # pre-build corpus fingerprints (once)
 """
 from __future__ import annotations
 
@@ -20,46 +21,66 @@ import subprocess
 import sys
 from pathlib import Path
 
-# known framework baselines and the repo dir that holds the version-correct copy
-FRAMEWORK_BASELINE = {
-    "arceos": "repos/_baseline_oscomp-arceos",       # contest fork, see DESIGN §9
-    "Starry": "repos/_baseline_oscomp-arceos",
-    "starry-mix": "repos/_baseline_oscomp-arceos",
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+# frameworks whose presence in search results signals a component-based paradigm
+FRAMEWORKS = {
+    "_baseline_oscomp-arceos": "repos/_baseline_oscomp-arceos",
+    "arceos": "repos/_baseline_oscomp-arceos",
     "rCore-Tutorial-v3": "repos/rCore-Tutorial-v3",
     "ucore_os_lab": "repos/ucore_os_lab",
 }
 
 
-def pick_framework(target: str, clusters: dict) -> str:
-    """Return baseline repo path, or 'none' for macrokernel paradigm."""
-    fam = next((f for f in clusters["families"] if target in f), [target])
-    for member in fam:
-        if member in FRAMEWORK_BASELINE and Path(FRAMEWORK_BASELINE[member]).exists():
-            return FRAMEWORK_BASELINE[member]
+def pick_framework(candidates: list[dict], threshold: float = 0.10) -> str:
+    """If a known framework appears among top candidates above threshold,
+    it's the component baseline. Otherwise macrokernel."""
+    for c in candidates:
+        if c["repo"] in FRAMEWORKS and c["combined"] >= threshold:
+            return FRAMEWORKS[c["repo"]]
     return "none"
 
 
-def run_one(target: str, clusters: dict):
-    fw = pick_framework(target, clusters)
-    paradigm = "组件化" if fw != "none" else "宏内核"
-    print(f"\n=== {target}  [{paradigm}]  framework={fw} ===")
-    # 3a: deterministic declaration extraction (Cargo/.gitmodules/README github refs)
+def run_one(target: str):
+    print(f"\n=== {target} ===")
+
+    # [A] declarations
+    print("  [A] declarations...")
     subprocess.run([sys.executable, "scripts/declarations.py", target], check=False)
-    # 4: report assembly
-    subprocess.run([sys.executable, "scripts/report.py", target, fw], check=False)
+
+    # [B] build fingerprint (cached — instant if already built)
+    print("  [B] fingerprint...")
+    subprocess.run([sys.executable, "-c",
+                    f"from scripts.fingerprint import build_units; u=build_units('repos/{target}'); print('  units='+str(len(u)))"],
+                   check=False)
+
+    # [C] 1-vs-N search (cached corpus — instant if pre-built with --build)
+    print("  [C] search...")
+    subprocess.run([sys.executable, "scripts/search.py", target, "10"], check=False)
+
+    # auto-detect paradigm from search results
+    from scripts.search import search as do_search
+    candidates = do_search(target, top_k=20)
+    fw = pick_framework(candidates)
+
+    # [D] report — pass top candidates as peers
+    peers = [c["repo"] for c in candidates[:10] if not c["is_framework"]]
+    paradigm = "组件化" if fw != "none" else "宏内核"
+    print(f"  [{paradigm}] framework={fw}  peers={len(peers)}")
+    cmd = [sys.executable, "scripts/report.py", target, fw] + peers
+    subprocess.run(cmd, check=False)
 
 
 def main():
-    clusters = json.loads(Path("output/lineage_clusters.json").read_text())
-    if sys.argv[1:] == ["--all"]:
-        targets = [t for t in clusters["year"]
-                   if t not in FRAMEWORK_BASELINE and not t.startswith("_baseline")]
-        print(f"running {len(targets)} repos...")
-        for t in targets:
-            run_one(t, clusters)
-        subprocess.run([sys.executable, "scripts/overview.py"], check=False)
+    if sys.argv[1:] == ["--build"]:
+        print("pre-building corpus fingerprints (one-time, then cached)...")
+        subprocess.run([sys.executable, "-c",
+                        "from scripts.search import corpus_fingerprints; "
+                        "c=corpus_fingerprints(build_missing=True); "
+                        "print(f'corpus: {len(c)} repos indexed')"],
+                       check=False)
     else:
-        run_one(sys.argv[1], clusters)
+        run_one(sys.argv[1])
 
 
 if __name__ == "__main__":

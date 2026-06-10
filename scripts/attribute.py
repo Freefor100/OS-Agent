@@ -24,8 +24,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from core.code_atlas.builder import build_code_atlas
 from agent_d import _fn_structure_fingerprint
-# shared vendored-code detector (single source of truth — see provenance.py / DESIGN.md §9.2)
-from scripts.provenance import is_vendor
 
 LANGS = {"c", "cpp", "rust"}
 
@@ -38,7 +36,7 @@ def fingerprints(repo: str):
         if fn.get("lang") not in LANGS:
             continue
         path = str(fn.get("file", "")).replace("\\", "/")
-        if is_vendor(path):
+        if path.startswith("vendor/"):
             skipped += 1
             continue
         fp = _fn_structure_fingerprint(fn)

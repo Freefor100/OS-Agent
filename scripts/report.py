@@ -20,7 +20,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from scripts.provenance import (fingerprints, functions_and_edges, classify_provenance,
-                                 top_dir, is_vendor, PEER_TOKEN_FLOOR)
+                                 top_dir, PEER_TOKEN_FLOOR)
+from scripts.exclude import load_rules as load_exclude_rules, apply_exclude
+from core.kernel_tree import ROOT_NODES_V2, EXTRA_NODE_SPECS, node_title_zh, ANALYSIS_ORDER_V2
 
 COLORS = {
     "ORIGINAL": "#2e7d32",          # green — student's own
@@ -69,7 +71,7 @@ def mermaid_arch(fns_by_id: dict, edges, fp_class: dict) -> str:
     mod_class_sz = defaultdict(lambda: defaultdict(int))   # module -> class -> tok
     fn_mod = {}
     for fid, f in fns_by_id.items():
-        if is_vendor(f["file"]):
+        if f["file"].startswith("vendor/"):
             continue
         m = module_of(f["file"])
         fn_mod[fid] = m
@@ -103,6 +105,61 @@ def mermaid_arch(fns_by_id: dict, edges, fp_class: dict) -> str:
     return "\n".join(lines)
 
 
+def tree_section(classes: dict) -> str:
+    """Kernel design tree (14 subsystems, 112 leaf nodes) with provenance coloring."""
+    LABEL_DOM = {"ORIGINAL": "自研", "PORTED-FRAMEWORK": "框架底座",
+                 "PORTED-PEER": "移植/共享", "EXTERNAL": "外部依赖",
+                 "TRIVIAL": "样板"}
+    COLOR = {"ORIGINAL": "#2e7d32", "PORTED-FRAMEWORK": "#f9a825",
+             "PORTED-PEER": "#c62828", "EXTERNAL": "#9e9e9e", "TRIVIAL": "#cfd8dc"}
+
+    # index all functions by name, with their provenance class
+    fn_prov: dict[str, list[str]] = {}
+    for cname, fns in classes.items():
+        prov_label = LABEL_DOM.get(cname, cname)
+        for f in fns:
+            fn_prov.setdefault(f["name"].lower(), []).append(prov_label)
+
+    def node_provenance(node_id: str) -> dict:
+        specs = EXTRA_NODE_SPECS.get(node_id, {})
+        symbols = [s.lower() for s in specs.get("symbols", [])]
+        prov_counts: dict[str, int] = defaultdict(int)
+        matched_names: list[str] = []
+        for s in symbols:
+            if s in fn_prov:
+                matched_names.append(s)
+                for prov in fn_prov[s]:
+                    prov_counts[prov] += 1
+        if not prov_counts:
+            return {"status": "unimplemented", "color": "#cfd8dc", "label": "未实现",
+                    "fns": ""}
+        dom = max(prov_counts, key=prov_counts.get)
+        return {"status": "implemented", "color": COLOR.get(dom, "#cfd8dc"),
+                "label": dom, "fns": ", ".join(matched_names[:4])}
+
+    rows = []
+    for root, children in ROOT_NODES_V2.items():
+        rp = node_provenance(root)
+        rows.append(f'<tr style="font-weight:600;background:#f5f5f5">'
+                    f'<td colspan="3">{esc(node_title_zh(root))} ({root})</td>'
+                    f'<td><span style="display:inline-block;width:10px;height:10px;'
+                    f'background:{rp["color"]};border-radius:2px"></span></td></tr>')
+        for child in children:
+            child_id = f"{root}.{child}"
+            cp = node_provenance(child_id)
+            rows.append(f'<tr><td></td><td>{esc(node_title_zh(child_id))} '
+                        f'<span style="font-size:11px;color:#888">({child})</span></td>'
+                        f'<td style="font-size:11px">{esc(cp["fns"]) or "—"}</td>'
+                        f'<td><span style="display:inline-block;width:10px;height:10px;'
+                        f'background:{cp["color"]};border-radius:2px" '
+                        f'title="{cp["label"]}"></span> {cp["label"]}</td></tr>')
+    return (f'<h2>内核设计树</h2>'
+            f'<p class="note">14 子系统 × 三色出身标注。🟩自研 🟨框架底座 🟥移植/共享 '
+            f'⬜外部 ▫️未实现。函数名来自 NODE_SPECS 符号匹配,非 xv6 系内核可能匹配不全。</p>'
+            f'<table><tr><th>子系统</th><th>节点</th><th>关键函数</th><th>出身</th></tr>'
+            f'{"".join(rows)}</table>')
+
+
 def build_html(target: str, framework: str, classes: dict, xcheck: dict | None,
                arch: str = "", declared: dict | None = None) -> str:
     order = ["ORIGINAL", "PORTED-FRAMEWORK", "PORTED-PEER", "EXTERNAL", "TRIVIAL"]
@@ -130,7 +187,7 @@ def build_html(target: str, framework: str, classes: dict, xcheck: dict | None,
     dirstat = defaultdict(lambda: defaultdict(int))
     for c, fns in classes.items():
         for f in fns:
-            if is_vendor(f["file"]):
+            if f["file"].startswith("vendor/"):
                 continue
             dirstat[top_dir(f["file"])][c] += f["sz"]
     dir_rows = []
@@ -216,6 +273,7 @@ code{{font-size:12px}} .note{{color:#888;font-size:13px}} .meta{{color:#666;font
 <p class="note">「自研 + 同源/共享」中真正属于选手的工作量(token)≈ {realwork}。
 框架底座/外部依赖不计入选手贡献;样板函数无判别力,单列。</p>
 {arch_section}
+{tree_section(classes)}
 <h2>各目录来源构成</h2>
 <table><tr><th>目录</th><th>规模</th><th>构成</th></tr>{dir_mix}</table>
 {decl_section}
@@ -235,16 +293,9 @@ def main():
     peers = sys.argv[3:]
     has_fw = framework not in ("none", "-", "")
 
-    # auto-resolve peers from stage-1 cluster file when not given on the CLI
-    # (closes the hand-typed-args seam). Exclude the framework baseline's own name
-    # from peers so framework code is attributed to FRAMEWORK, not PEER.
+    # peers come from the CLI (run.py passes search.py results).
+    # framework baseline name is excluded to avoid miscounting framework code as PEER.
     fw_name = Path(framework).name.replace("_baseline_", "").replace("oscomp-", "") if has_fw else ""
-    if not peers:
-        cl = Path("output/lineage_clusters.json")
-        if cl.exists():
-            data = json.loads(cl.read_text())
-            peers = data.get("peers", {}).get(target, [])
-            print(f"[auto] {len(peers)} peers from cluster file")
     if has_fw:
         # drop any peer that is the framework baseline (e.g. 'arceos' upstream)
         peers = [p for p in peers if p not in (fw_name, "arceos", Path(framework).name)]
@@ -254,14 +305,16 @@ def main():
     peer_fps = set()
     for p in peers:
         peer_fps |= fingerprints(f"repos/{p}")
-    classes = classify_provenance(tfns, fw, peer_fps)
+    classes = classify_provenance(tfns, fw, peer_fps,
+                                   exclude_rules=load_exclude_rules(target))
 
-    # per-fn_id class map for the architecture graph
+    # per-fn_id class map for the architecture graph (code units only; asm has no fn_id/edges)
     fp_class = {}
-    fns_by_id = {f["fn_id"]: f for f in tfns}
+    fns_by_id = {f["fn_id"]: f for f in tfns if f.get("fn_id")}
     for cname, fns in classes.items():
         for f in fns:
-            fp_class[f["fn_id"]] = cname
+            if f.get("fn_id"):
+                fp_class[f["fn_id"]] = cname
     arch = mermaid_arch(fns_by_id, edges, fp_class)
 
     xpath = Path(f"/tmp/xcheck_{target}.json")
