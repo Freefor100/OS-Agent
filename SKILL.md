@@ -13,9 +13,10 @@
 | `search_candidates(target)` | 1-vs-N 查重(token+AST 双维度) | 第一步 |
 | `declared_deps(target)` | 选手声明的依赖/血缘(Cargo/gitmodules/README) | 第一步 |
 | `exclude_rules(target)` | 哪些代码被排除、为什么 | 第一步 |
+| `compile_flags(target)` | 生成 clangd 编译标志(架构+include+宏,不需交叉编译器) | 第一步(自动) |
 | `deep_compare(target, base)` | 函数级 COPIED/DISGUISE/MODIFIED/NOVEL vs base | 有候选时 |
 | `attribution(target, base)` | 每个节点的函数清单+出身(五分类) | 核心,决定分析深度 |
-| `lsp_definition(target, symbol, file)` | LSP 跳转定义(clangd/rust-analyzer,tree-sitter 退化) | 写分析时定位符号 |
+| `lsp_definition(target, symbol, file)` | LSP 跳转定义(clangd/rust-analyzer,compile_flags 提供交叉架构支持) | 写分析时定位符号 |
 | `read_doc(target, path)` | 读 PDF/Docx 文档 | 读选手报告/设计文档时 |
 | `node_taxonomy()` | 内核设计树骨架(14 子系统,112 叶子) | 组装报告前 |
 

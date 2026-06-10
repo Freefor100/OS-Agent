@@ -58,6 +58,7 @@ python -m unittest tests.test_agent_c_compare
 
 | File | Role |
 |---|---|
+| `scripts/compile_flags.py` | Generate `compile_flags.txt` per repo (arch + includes + defines from Makefile/Cargo.toml). clangd reads this for cross-arch RISC-V/LoongArch/ARM headers. No GCC cross-compiler required. |
 | `tools/code_atlas/minhash.py` | MinHash signatures + jaccard estimate. `signature_from_tokens(tokens)` is the fingerprint primitive — does NOT require tree-sitter. |
 | `tools/code_atlas/ast_shape.py` | AST shape merkle hash — ignores variable names/literals. Same structure → same hash. |
 | `tools/code_atlas/asm_tokenize.py` | Assembly tokenizer — normalizes registers→REG, labels→LBL, keeps mnemonics/offsets. Splits by label block. |
@@ -69,7 +70,7 @@ python -m unittest tests.test_agent_c_compare
 
 ### MCP & Skill
 
-`mcp_server.py` exposes 8 tools: `search_candidates`, `deep_compare`, `attribution`, `node_taxonomy`, `declared_deps`, `exclude_rules`, `lsp_definition`, `read_doc`. File ops (ls/cat/grep) use Claude Code's built-in bash.
+`mcp_server.py` exposes 9 tools: `search_candidates`, `deep_compare`, `attribution`, `node_taxonomy`, `declared_deps`, `exclude_rules`, `lsp_definition`, `read_doc`, `compile_flags`. File ops (ls/cat/grep) use Claude Code's built-in bash.
 
 `SKILL.md` defines the Claude Code workflow: Phase 1 determine report type (incl. low-score declaration check) → Phase 2 attribution → Phase 3 sub-agent batch analysis → Phase 4 assemble three-color tree report.
 

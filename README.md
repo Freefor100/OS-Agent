@@ -68,6 +68,7 @@ OS-Agent/
 │   ├── exclude.py               排除规则引擎 (不预设字典)
 │   ├── run.py                   一键驱动
 │   ├── report.py                HTML 报告组装
+│   ├── compile_flags.py         LSP 编译标志生成 (架构检测 + include + 宏)
 │   ├── attribute.py             函数级精查 (COPIED/DISGUISE/MODIFIED/NOVEL vs base)
 │   ├── fp_validate.py           指纹判别力验证
 │   ├── overview.py              全库总览 (辅助)
