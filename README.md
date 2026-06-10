@@ -5,6 +5,9 @@
 
 读一份操作系统内核仓库，产出一棵可视化的"内核设计树"；用这棵树和其他内核做结构比对、查重和谱系分析。
 
+> **新方向（确定性查重流水线）**：项目正从"为每个内核填描述树"转向"以代码指纹查重为主、LLM 只解读差异"。
+> 完整设计、验证数据与实现状态见 [DESIGN.md](DESIGN.md)。新流水线的用法见下方[「查重流水线」](#查重流水线确定性零-llm)一节。
+
 ---
 
 ## 它解决什么问题
@@ -222,6 +225,36 @@ repos/                  本地源码仓库（不提交到 git）
 output/                 运行产物（不提交到 git）
 collected-data.xlsx     参赛作品信息表（队伍/学校/仓库地址）
 ```
+
+---
+
+## 查重流水线（确定性，零 LLM）
+
+新方向的核心是一条确定性流水线：用归一化 token 指纹做查重，把每个函数归到「外部依赖 / 框架底座 / 移植自前代 / 自研」四类，再组装成评委可读的报告。**前四个阶段完全不用 LLM**，LLM 只在最后解读差异（设计与验证数据见 [DESIGN.md](DESIGN.md)）。
+
+```bash
+# 阶段0：为 repos/ 下所有作品建代码指纹（首次 ~8 分钟，缓存到 .fp_cache/，复跑秒级）
+# 同时需要大赛 fork 的 ArceOS 作为版本正确的框架基准：
+git clone https://github.com/oscomp/arceos.git repos/_baseline_oscomp-arceos
+
+# 阶段1：全库血缘分流 → 18 个跨届家族 + 孤儿 + 同届互抄候选
+python scripts/lineage_idf.py            # 产出 output/lineage_clusters.json
+
+# 阶段2-4：单个作品的出身分类 + 报告（自动判范式、自动选框架基准、自动取同簇 peers）
+python scripts/run.py <作品目录名>        # 例: python scripts/run.py T202510216995249-4014
+
+# 全库批量：为每个作品生成报告，并产出全库总览
+python scripts/run.py --all              # 产出 output/_overview/index.html
+
+# 全库查重总览（家族谱系 / 孤儿榜 / 同届复审重点）
+python scripts/overview.py
+```
+
+产物：
+- `output/<作品>/_report/index.html` — 单作品报告：贡献占比、三色架构图、声明核查、自研函数清单。
+- `output/_overview/index.html` — 全库总览：18 个家族谱系、原创候选、同届互抄复审重点。
+
+辅助验证脚本：`scripts/fp_validate.py`（指纹判别力）、`scripts/attribute.py`（函数级溯源 + LLM work-list）、`scripts/provenance.py`（四分类，可单独跑）。
 
 ---
 
