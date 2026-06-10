@@ -182,11 +182,12 @@ def list_dir(target: str, path: str = "") -> str:
 
 @mcp.tool()
 def lsp_lookup(target: str, symbol: str, file: str = "") -> str:
-    """Jump to a symbol's definition. Uses clangd/rust-analyzer if available;
-    degrades to grep-based fallback. Returns file:line locations."""
+    """Jump to a symbol's definition using regex grep.
+    Matches function defs, labels, .globl/.global/.macro directives."""
+    from tools.file_ops import grep_in_repo
     repo = _target_path(target)
-    from tools.lsp_ops import fallback_definition
-    return fallback_definition(repo, file, symbol)
+    return grep_in_repo(repo, symbol, max_results=20,
+                        file_extensions=".c,.h,.rs,.cpp,.s,.S,.asm")
 
 
 # ── tool: read_code ───────────────────────────────────────────────
