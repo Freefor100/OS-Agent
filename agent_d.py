@@ -87,6 +87,7 @@ class Blackboard:
     claims: dict[str, Claim] = field(default_factory=dict)
     flows: dict[str, Flow] = field(default_factory=dict)
     dependencies: dict[str, Dependency] = field(default_factory=dict)
+    architecture: dict[str, Any] = field(default_factory=dict)
     extension_requests: list[dict[str, Any]] = field(default_factory=list)
     current_batch_snapshot: dict[str, Any] | None = None
     recorder: RunRecorder | None = None
@@ -208,6 +209,7 @@ def run_agent_d(
         trace_flows=lambda: _trace_flows_deep(bb),
         build_dependencies=lambda: _build_dependencies_deep(bb),
         global_consistency=lambda: (_attach_refs(bb), _global_consistency_pass(bb)),
+        generate_architecture=lambda: _generate_architecture_diagram(bb),
         finalize=finalize,
         persist_debug=lambda: _write_debug_artifacts(out, bb),
     )
@@ -595,6 +597,11 @@ def _build_evidence_pack(bb: Blackboard, node_id: str) -> dict[str, Any]:
     key_symbols = _dedupe(key_symbols)
     vocab = bb.vocab.get(node_id, {})
     vocab_tags = [str(item.get("tag")) for item in vocab.get("mechanisms", []) if isinstance(item, dict) and item.get("tag")]
+    
+    blackboard_context = bb.current_batch_snapshot or _blackboard_summary(bb)
+    if node_id == "EvolutionHistory":
+        blackboard_context = {"repo_name": bb.repo_name, "_note": "Context truncated for git history focus."}
+
     return {
         "node_id": node_id,
         "node_identity": {
@@ -614,7 +621,7 @@ def _build_evidence_pack(bb: Blackboard, node_id: str) -> dict[str, Any]:
         "evidence_ids": evidence_ids,
         "key_symbols": key_symbols[:18],
         "evidence": _evidence_for_llm(bb, evidence_ids),
-        "blackboard": bb.current_batch_snapshot or _blackboard_summary(bb),
+        "blackboard": blackboard_context,
     }
 
 
@@ -1674,7 +1681,33 @@ def _global_consistency_pass(bb: Blackboard) -> None:
     _journal(bb, "verifier", {"node_id": "__global_consistency__", "status": "ok", "errors": [], "review": parsed})
 
 
-
+def _generate_architecture_diagram(bb: Blackboard) -> None:
+    from core.node_react_agent import run_architecture_react_agent
+    
+    nodes_summary = {
+        n_id: {
+            "status": n.get("status"),
+            "mechanisms": n.get("mechanisms"),
+        }
+        for n_id, n in bb.nodes.items()
+        if n.get("status") in ("implemented", "partial")
+    }
+    deps_summary = [
+        {"src": d.src, "dst": d.dst, "reason": d.reason_zh}
+        for d in bb.dependencies.values()
+    ]
+    
+    context = {
+        "nodes": nodes_summary,
+        "dependencies": deps_summary,
+    }
+    
+    result = run_architecture_react_agent(repo_path=bb.repo_path, context=context)
+    if result:
+        bb.architecture = result
+        _journal(bb, "llm_draft", {"node_id": "__architecture__", "draft": result, "llm_meta": {}})
+    else:
+        bb.architecture = {}
 
 
 def _attach_refs(bb: Blackboard) -> None:
@@ -1927,6 +1960,7 @@ def _build_judge_view(bb: Blackboard, tree: dict[str, Any], compare_index: dict[
         "claim_glossary": used_glossary,
         "flows": {k: asdict(v) for k, v in bb.flows.items()},
         "dependencies": {k: asdict(v) for k, v in bb.dependencies.items()},
+        "architecture": bb.architecture,
         "evidence": {
             rec.evidence_id: rec.compact() | {"excerpt": rec.excerpt, "verifier_notes": rec.verifier_notes}
             for rec in bb.evidence.iter_full()

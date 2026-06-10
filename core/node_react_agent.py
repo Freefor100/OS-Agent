@@ -117,6 +117,12 @@ class ExtensionRequestDraft(BaseModel):
     reason: str
 
 
+class ArchitectureDraft(BaseModel):
+    architecture_name: str
+    design_highlights: str
+    mermaid_graph: str
+
+
 class NodeDraft(BaseModel):
     status: Literal["implemented", "partial", "not_found", "unknown"]
     confidence: Literal["high", "medium", "low"] = "medium"
@@ -479,3 +485,77 @@ def _compact_observation(result: dict[str, Any]) -> dict[str, Any]:
         "concept_results": list(result.get("concept_results") or [])[:8],
         "evidence": evidence[:16],
     }
+
+
+def run_architecture_react_agent(
+    *,
+    repo_path: str,
+    context: dict[str, Any],
+) -> dict[str, Any]:
+    from langchain.agents import create_tool_calling_agent, AgentExecutor
+    from langchain_core.prompts import ChatPromptTemplate
+    from langchain_core.tools import StructuredTool
+    from tools.file_ops import list_directory, read_code_segment, grep_in_repo
+    import re
+
+    def list_dir(dir_path: str = "") -> str:
+        """List contents of a directory within the repository."""
+        return list_directory(repo_path, dir_path)
+
+    def read_doc(file_path: str) -> str:
+        """Read text from a markdown, pdf, txt, or source file."""
+        return read_code_segment(os.path.join(repo_path, file_path))
+
+    def grep(pattern: str, file_extensions: str = "") -> str:
+        """Search repository files for a keyword or regex pattern."""
+        exts = file_extensions if file_extensions else None
+        return grep_in_repo(repo_path, pattern, max_results=30, file_extensions=exts)
+
+    tools = [
+        StructuredTool.from_function(list_dir),
+        StructuredTool.from_function(read_doc),
+        StructuredTool.from_function(grep),
+    ]
+
+    system_prompt = (
+        "你是一个资深的操作系统架构分析师。你的任务是为当前评测的 OS 项目输出一幅 Mermaid 格式的内核架构图。\n\n"
+        "已知当前项目的模块和依赖事实：\n{context}\n\n"
+        "你的行动指南：\n"
+        "1. 使用 list_dir 工具探索项目根目录，观察它的目录划分（例如：是否将驱动独立成库？文件系统是 VFS 还是写死在内核侧？这是传统宏内核还是类似 ArceOS 的组件化库OS？）。\n"
+        "2. 寻找并使用 read_doc 阅读设计文档（如 README.md、docs/ 目录下的 md、txt）。找出作者自己声明的架构划分和设计亮点。\n"
+        "3. 结合传入的已知机制列表（如 sv39, buddy_allocator 等），把这些作为标签（Badge）融入到你即将画出的架构图的各个模块节点中。\n"
+        "4. 使用 `graph TD` 语法的 Mermaid 文本绘制出能反映该项目真实物理和逻辑分层的架构图。\n\n"
+        "请调用你的工具去完成分析，不要猜测。分析完成后，由于你需要输出 JSON 结构，所以最后请输出以下格式（在思考和分析完成后）：\n"
+        "```json\n"
+        "{{\n"
+        '  "architecture_name": "名称",\n'
+        '  "design_highlights": "设计亮点总结",\n'
+        '  "mermaid_graph": "graph TD\\n..."\n'
+        "}}\n"
+        "```"
+    )
+
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", system_prompt),
+        ("placeholder", "{agent_scratchpad}"),
+    ])
+    
+    agent = create_tool_calling_agent(DeepSeekChatOpenAI.build(), tools, prompt)
+    agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=False, max_iterations=10)
+    
+    try:
+        response = agent_executor.invoke({"context": json.dumps(context, ensure_ascii=False)})
+        output_str = response.get("output", "")
+        # Extract JSON from output
+        json_match = re.search(r"```json\s*(.*?)\s*```", output_str, re.DOTALL)
+        if json_match:
+            return json.loads(json_match.group(1))
+        # Fallback to general `{` parse
+        start = output_str.find("{")
+        end = output_str.rfind("}")
+        if start != -1 and end != -1:
+            return json.loads(output_str[start:end+1])
+        return {}
+    except Exception as exc:
+        print(f"Error in ArchitectureGenerator: {exc}")
+        return {}

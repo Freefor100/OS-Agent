@@ -63,9 +63,11 @@ class AgentDGraphRuntime:
     trace_flows: Callable[[], None]
     build_dependencies: Callable[[], None]
     global_consistency: Callable[[], None]
+    generate_architecture: Callable[[], None]
     finalize: Callable[[], dict[str, str]]
     persist_debug: Callable[[], None]
     checkpointer: Any = None
+
 
 
 _RUNTIMES: dict[str, AgentDGraphRuntime] = {}
@@ -238,6 +240,7 @@ def _build_graph(checkpointer: Any):
     builder.add_node("FlowTracer", _flow_tracer)
     builder.add_node("DependencyBuilder", _dependency_builder)
     builder.add_node("GlobalConsistency", _global_consistency)
+    builder.add_node("ArchitectureGenerator", _architecture_generator)
     builder.add_node("Finalizer", _finalizer)
     builder.add_node("Complete", _complete)
     builder.add_edge(START, "BootstrapContext")
@@ -248,7 +251,8 @@ def _build_graph(checkpointer: Any):
     builder.add_conditional_edges("MergeBatch", _after_merge, {"continue": "SelectBatch", "failed": "Complete"})
     builder.add_edge("FlowTracer", "DependencyBuilder")
     builder.add_edge("DependencyBuilder", "GlobalConsistency")
-    builder.add_edge("GlobalConsistency", "Finalizer")
+    builder.add_edge("GlobalConsistency", "ArchitectureGenerator")
+    builder.add_edge("ArchitectureGenerator", "Finalizer")
     builder.add_edge("Finalizer", "Complete")
     builder.add_edge("Complete", END)
     return builder.compile(checkpointer=checkpointer)
@@ -393,6 +397,15 @@ def _global_consistency(state: AgentDGraphState) -> dict[str, Any]:
         return {}
     rt.recorder.graph_event("graph_node", phase="consistency", data={"summary": "GlobalConsistency"})
     rt.global_consistency()
+    return {}
+
+
+def _architecture_generator(state: AgentDGraphState) -> dict[str, Any]:
+    rt = _runtime(state)
+    if int(os.environ.get("AGENT_D_NODE_LIMIT", "0") or 0):
+        return {}
+    rt.recorder.graph_event("graph_node", phase="architecture", data={"summary": "ArchitectureGenerator"})
+    rt.generate_architecture()
     return {}
 
 

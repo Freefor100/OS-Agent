@@ -154,3 +154,19 @@ def confirm_symbol_absent(repo_path: str, patterns: str, file_extensions: Option
             lines.append(f"  ✗ [{pat}] {count} 处匹配 — 存在")
             lines.extend(f"    {ex}" for ex in examples)
     return "\n".join(lines)
+
+
+def list_directory(repo_path: str, dir_path: str = "") -> str:
+    target = os.path.join(repo_path, dir_path) if dir_path else repo_path
+    if not _safe_repo_path(repo_path, dir_path):
+        return f"Error: path outside workspace: {dir_path}"
+    if not os.path.isdir(target):
+        return f"Error: directory not found: {dir_path}"
+    try:
+        items = sorted(os.listdir(target))
+        dirs = [d + "/" for d in items if os.path.isdir(os.path.join(target, d)) and d not in {".git", "target", "build", "vendor", "node_modules", ".vscode", ".idea"}]
+        files = [f for f in items if os.path.isfile(os.path.join(target, f))]
+        return "\n".join(dirs + files) or "(empty directory)"
+    except OSError as e:
+        return f"Error listing directory: {e}"
+

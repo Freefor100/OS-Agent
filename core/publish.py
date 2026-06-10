@@ -128,6 +128,8 @@ _TEMPLATE = r"""<!doctype html>
   <aside><div class="tree" id="tree"></div></aside>
   <section id="detail"></section>
 </main>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({startOnLoad: false, theme: 'default'});</script>
 <script type="application/json" id="agent-d-data">__PAYLOAD__</script>
 <script>
 __REST__
@@ -235,28 +237,39 @@ function flowLane(f){
   return `<div class="flow-title">${escapeHtml(f.title_zh||f.title_en||'流程')}</div><div class="flow-lane">${lane||'<span class="empty">无步骤</span>'}</div>`;
 }
 
-// ---- module dependency graph (SVG, root only) ----
-const STATUS_COLOR={implemented:'#1f8a63',partial:'#c8860d',not_found:'#c0392b',unknown:'#8a928c'};
-function moduleStatus(mod){ const n=byNode.get(mod); return n?statusOf(n):'unknown'; }
-function dependencyGraph(deps){
-  const mods=[]; const seen=new Set();
-  deps.forEach(d=>{[d.src,d.dst].forEach(m=>{ const top=String(m||'').split('.')[0]; if(top&&!seen.has(top)){ seen.add(top); mods.push(top); } });});
-  if(!mods.length) return '<div class="empty">无依赖</div>';
-  const W=720, cx=W/2, cy=Math.max(200,mods.length*16), R=Math.min(cx,cy)-60;
-  const pos={}; mods.forEach((m,i)=>{ const a=-Math.PI/2 + i*2*Math.PI/mods.length; pos[m]={x:cx+R*Math.cos(a), y:cy+R*Math.sin(a)}; });
-  const edgeSet=new Set(); const edges=[];
-  deps.forEach(d=>{ const s=String(d.src||'').split('.')[0], t=String(d.dst||'').split('.')[0]; if(s&&t&&s!==t&&pos[s]&&pos[t]){ const k=s+'>'+t; if(!edgeSet.has(k)){ edgeSet.add(k); edges.push([s,t]); } } });
-  const lines=edges.map(([s,t])=>`<line x1="${pos[s].x.toFixed(0)}" y1="${pos[s].y.toFixed(0)}" x2="${pos[t].x.toFixed(0)}" y2="${pos[t].y.toFixed(0)}" stroke="#b9c4bc" stroke-width="1.2" marker-end="url(#arr)"/>`).join('');
-  const nodes=mods.map(m=>{ const p=pos[m]; const c=STATUS_COLOR[moduleStatus(m)]; const lbl=(byNode.get(m)||{}).title_zh||m; return `<g><circle cx="${p.x.toFixed(0)}" cy="${p.y.toFixed(0)}" r="9" fill="${c}" stroke="#fff" stroke-width="1.5"/><text x="${p.x.toFixed(0)}" y="${(p.y-13).toFixed(0)}" text-anchor="middle">${escapeHtml(lbl)}</text></g>`; }).join('');
-  return `<svg class="dep-graph" viewBox="0 0 ${W} ${cy*2}" preserveAspectRatio="xMidYMid meet"><defs><marker id="arr" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#9aa89f"/></marker></defs>${lines}${nodes}</svg>`;
-}
+// ---- architecture & dependencies (root only) ----
 function rootOverview(){
-  const flows=Object.values(DATA.flows||{});
-  const deps=Object.values(DATA.dependencies||{});
-  const flowHtml=flows.length?flows.slice(0,12).map(flowLane).join(''):'<div class="empty">无</div>';
-  const depList=deps.length?deps.slice(0,20).map(d=>`<div class="dep-row"><b>${escapeHtml(formatNodeId(d.src))}</b> → <b>${escapeHtml(formatNodeId(d.dst))}</b><div class="muted">${escapeHtml(depText(d))}</div></div>`).join(''):'<div class="empty">无</div>';
-  const legend=`<div class="legend"><span><i style="background:#1f8a63"></i>已实现</span><span><i style="background:#c8860d"></i>部分</span><span><i style="background:#c0392b"></i>未实现</span><span><i style="background:#8a928c"></i>未知</span></div>`;
-  return `<div class="grid"><div class="panel accent wide"><h3>模块依赖关系图（全局）</h3>${legend}${dependencyGraph(deps)}</div><div class="panel accent"><h3>关键链路 / 执行流程</h3>${flowHtml}</div><div class="panel"><h3>模块依赖明细</h3>${depList}</div></div>`;
+  const arch = DATA.architecture || {};
+  const deps = Object.values(DATA.dependencies||{});
+  
+  let archHtml = '<div class="empty">无架构图数据</div>';
+  if(arch.mermaid_graph) {
+    archHtml = `
+      <div class="arch-name"><b>${escapeHtml(arch.architecture_name || '架构图')}</b></div>
+      ${arch.design_highlights ? `<div class="arch-highlights" style="margin-bottom:12px;color:#555;">${escapeHtml(arch.design_highlights)}</div>` : ''}
+      <div class="mermaid">${escapeHtml(arch.mermaid_graph.trim())}</div>
+    `;
+  }
+  
+  const depGroups = {};
+  deps.forEach(d => {
+    const src = formatNodeId(d.src);
+    if(!depGroups[src]) depGroups[src] = [];
+    depGroups[src].push(d);
+  });
+  
+  let depHtml = '<div class="empty">无</div>';
+  if(deps.length) {
+    depHtml = Object.keys(depGroups).sort().map(src => {
+      const items = depGroups[src].map(d => `<div style="margin-left: 20px;">→ <b>${escapeHtml(formatNodeId(d.dst))}</b> <span class="muted">${escapeHtml(depText(d))}</span></div>`).join('');
+      return `<div style="margin-bottom: 12px;"><div style="font-weight:bold; color:var(--primary);">${escapeHtml(src)}</div>${items}</div>`;
+    }).join('');
+  }
+
+  const flows = Object.values(DATA.flows||{});
+  const flowHtml = flows.length ? flows.slice(0,12).map(flowLane).join('') : '<div class="empty">无</div>';
+
+  return `<div class="grid"><div class="panel accent wide"><h3>内核架构图</h3>${archHtml}</div><div class="panel accent"><h3>关键链路 / 执行流程</h3>${flowHtml}</div><div class="panel"><h3>模块依赖明细</h3>${depHtml}</div></div>`;
 }
 
 // ---- module child cards ----
@@ -287,7 +300,12 @@ function renderDetail(n){
   if(isGroup){
     // Global flows/deps belong ONLY to the project root; module groups show just their children.
     const overview = isRoot ? rootOverview() : '';
-    el.innerHTML = head + overview + `<div class="cards">${n.children.map(childCard).join('')}</div>`;
+    const childrenHtml = isRoot ? '' : `<div class="cards">${n.children.map(childCard).join('')}</div>`;
+    el.innerHTML = head + overview + childrenHtml;
+    // We must call mermaid.init() explicitly for dynamically added mermaid blocks
+    if (isRoot && window.mermaid) {
+      setTimeout(() => mermaid.init(undefined, document.querySelectorAll('.mermaid')), 100);
+    }
     return;
   }
   if(n.node_id==='EvolutionHistory'){ el.innerHTML = head + historyPanel(n); return; }
