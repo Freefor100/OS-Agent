@@ -61,15 +61,13 @@ python -m unittest tests.test_agent_c_compare
 | `tools/code_atlas/minhash.py` | MinHash signatures + jaccard estimate. `signature_from_tokens(tokens)` is the fingerprint primitive — does NOT require tree-sitter. |
 | `tools/code_atlas/ast_shape.py` | AST shape merkle hash — ignores variable names/literals. Same structure → same hash. |
 | `tools/code_atlas/asm_tokenize.py` | Assembly tokenizer — normalizes registers→REG, labels→LBL, keeps mnemonics/offsets. Splits by label block. |
-| `tools/file_ops.py` | `grep_in_repo`, `list_directory`, `read_code_segment` (PDF/Docx support). |
-| `tools/lsp_ops.py` | LSP client. `fallback_definition` for grep-based symbol lookup when clangd is unavailable. |
 | `core/code_atlas/builder.py` | Tree-sitter code atlas: parse repo → functions, types, edges, PageRank, normalized tokens. |
 | `core/kernel_tree.py` | Fixed taxonomy: 14 subsystems, 112 leaf nodes. `EXTRA_NODE_SPECS` maps function names to tree nodes. |
 | `core/evidence.py` | Evidence store. `stable_id(prefix, payload)` → deterministic hash-based ID. |
 
 ### MCP & Skill
 
-`mcp_server.py` exposes 11 read-only tools for Claude Code: `search_candidates`, `deep_compare`, `attribution`, `unit_source`, `read_code`, `grep_repo`, `lsp_lookup`, `list_dir`, `node_taxonomy`, `declared_deps`, `exclude_rules`.
+`mcp_server.py` exposes 6 compute tools: `search_candidates`, `deep_compare`, `attribution`, `node_taxonomy`, `declared_deps`, `exclude_rules`. File ops (ls/cat/grep) use Claude Code's built-in bash.
 
 `SKILL.md` defines the Claude Code workflow: Phase 1 determine report type (incl. low-score declaration check) → Phase 2 attribution → Phase 3 sub-agent batch analysis → Phase 4 assemble three-color tree report.
 

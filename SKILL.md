@@ -6,18 +6,16 @@
 
 ## MCP 工具
 
-分析前调用这些工具获取确定性数据(全部只读):
+以下 6 个确定性计算工具通过 MCP 暴露。文件操作(读源码/grep/列目录)直接用 Claude Code 内置的 bash,不重复暴露。
 
 | 工具 | 用途 | 何时调用 |
 |---|---|---|
-| `search_candidates(target)` | 1-vs-N 查重(token+AST 双维度),找最相似作品 | 第一步 |
+| `search_candidates(target)` | 1-vs-N 查重(token+AST 双维度) | 第一步 |
 | `declared_deps(target)` | 选手声明的依赖/血缘(Cargo/gitmodules/README) | 第一步 |
 | `exclude_rules(target)` | 哪些代码被排除、为什么 | 第一步 |
+| `deep_compare(target, base)` | 函数级 COPIED/DISGUISE/MODIFIED/NOVEL vs base | 有候选时 |
+| `attribution(target, base)` | 每个节点的函数清单+出身(五分类) | 核心,决定分析深度 |
 | `node_taxonomy()` | 内核设计树骨架(14 子系统,112 叶子) | 组装报告前 |
-| `attribution(target, base)` | 每个节点的函数清单+出身(COPIED/NOVEL/MODIFIED) | 核心,决定分析深度 |
-| `unit_source(target, file, line)` | 读取源码片段(前后 N 行) | 写分析时按需调用 |
-| `grep_repo(target, pattern)` | 正则搜索代码(找符号/证据) | 写分析时定位符号 |
-| `list_dir(target, path)` | 浏览目录结构 | 探索项目结构时调用 |
 
 ## 流程
 

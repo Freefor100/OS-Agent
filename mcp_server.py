@@ -1,21 +1,16 @@
 #!/usr/bin/env python3
-"""MCP server — thin read-only layer over the deterministic pipeline.
+"""MCP server — exposes deterministic pipeline data for Claude Code + Skill.
 
-Exposes 11 tools so Claude Code (with the Skill) can produce judge-facing
-reports. Every tool is read-only; all the heavy computation lives in scripts/.
+6 compute-only tools. Claude Code has bash for file ops (ls/cat/grep) so
+those aren't exposed here — only what bash can't do.
 
 Tools:
-  search_candidates  1-vs-N rough search → top similar repos (token + AST)
+  search_candidates  1-vs-N similarity search (token + AST dual dimension)
   deep_compare       function-level COPIED/DISGUISE/MODIFIED/NOVEL vs base
-  attribution        per-function provenance + coarse node assignment
-  unit_source        read source code at file:line
-  read_code          read source file with line range (PDF/Docx support)
-  grep_repo          regex search across the repo (find symbols/patterns)
-  lsp_lookup         jump to symbol definition (clangd/rust-analyzer or grep)
-  list_dir           list directory contents (explore project structure)
-  node_taxonomy      kernel design tree skeleton (112 leaf nodes)
-  declared_deps      extracted declarations (Cargo/gitmodules/README)
-  exclude_rules      what was excluded and why
+  attribution        per-function provenance + node-level grouping
+  node_taxonomy      kernel design tree skeleton (14 subsystems / 112 leaves)
+  declared_deps      extracted declarations (Cargo/gitmodules/README refs)
+  exclude_rules      exclusion rules applied to this target
 """
 from __future__ import annotations
 
@@ -130,74 +125,6 @@ def attribution(target: str, base: str = "", top_k: int = 5) -> dict:
         "nodes": dict(nodes),
         "summary": {c: len(fns) for c, fns in classes.items()},
     }
-
-
-# ── tool: unit_source ────────────────────────────────────────────────
-
-@mcp.tool()
-def unit_source(target: str, file: str, line: int = 0, context: int = 40) -> dict:
-    """Read source code around file:line for a given target repo."""
-    p = Path(_target_path(target)) / file
-    if not p.exists():
-        # try without first segment (some atlas paths drop the repo dir)
-        for alt in Path(_target_path(target)).rglob(file.split("/")[-1]):
-            if "/.git/" not in str(alt):
-                p = alt
-                break
-    if not p.exists():
-        return {"error": f"file not found: {file}", "path": str(p)}
-    lines = p.read_text(errors="ignore").splitlines()
-    if line <= 0:
-        return {"file": file, "total_lines": len(lines), "content": "\n".join(lines[:context])}
-    start = max(0, line - 1 - context // 2)
-    end = min(len(lines), line + context // 2)
-    excerpt = []
-    for i in range(start, end):
-        prefix = ">>>" if i == line - 1 else "   "
-        excerpt.append(f"{i+1:5d} {prefix} {lines[i]}")
-    return {"file": file, "line": line, "total_lines": len(lines),
-            "excerpt": "\n".join(excerpt)}
-
-
-# ── tool: grep_repo ──────────────────────────────────────────────
-
-@mcp.tool()
-def grep_repo(target: str, pattern: str, max_results: int = 20) -> str:
-    """Search source code in a target repo with regex. Returns file:line matches.
-    Use to find symbols, patterns, or evidence when writing analysis."""
-    from tools.file_ops import grep_in_repo
-    return grep_in_repo(_target_path(target), pattern, max_results=max_results)
-
-
-# ── tool: list_dir ───────────────────────────────────────────────
-
-@mcp.tool()
-def list_dir(target: str, path: str = "") -> str:
-    """List a directory within the target repo. Use to explore project structure."""
-    from tools.file_ops import list_directory
-    return list_directory(_target_path(target), path)
-
-
-# ── tool: lsp_lookup ──────────────────────────────────────────────
-
-@mcp.tool()
-def lsp_lookup(target: str, symbol: str, file: str = "") -> str:
-    """Jump to a symbol's definition using regex grep.
-    Matches function defs, labels, .globl/.global/.macro directives."""
-    from tools.file_ops import grep_in_repo
-    repo = _target_path(target)
-    return grep_in_repo(repo, symbol, max_results=20,
-                        file_extensions=".c,.h,.rs,.cpp,.s,.S,.asm")
-
-
-# ── tool: read_code ───────────────────────────────────────────────
-
-@mcp.tool()
-def read_code(target: str, path: str, start_line: int = 1, end_line: int = 0) -> str:
-    """Read source code from a file in the target repo. For PDF/Docx, reads pages."""
-    from tools.file_ops import read_code_segment
-    return read_code_segment(f"{_target_path(target)}/{path}",
-                              start_line=start_line, end_line=end_line or None)
 
 
 # ── tool: node_taxonomy ──────────────────────────────────────────────
