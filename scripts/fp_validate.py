@@ -20,7 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from core.code_atlas.builder import build_code_atlas
 from tools.code_atlas.minhash import signature_from_tokens, jaccard_estimate
 
-# reuse the exact production fingerprint (now in fingerprint.py, extracted from agent_d)
+# reuse the exact production fingerprint
 from scripts.fingerprint import _fn_structure_fingerprint
 
 

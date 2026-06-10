@@ -45,7 +45,7 @@ def _semantic_fn_id(fn: dict) -> str:
 
 
 def _fn_structure_fingerprint(fn: dict) -> dict:
-    """Extracted from agent_d.py. Returns {normalized_token_fingerprint, ast_shape_hash, ...}."""
+    """Normalized-token fingerprint + AST shape hash for a code unit."""
     tokens = fn.get("tokens_normalized") or fn.get("normalized_tokens") or []
     token_text = " ".join(tokens[:400]) if isinstance(tokens, list) else str(tokens)[:2000]
     literals = fn.get("literal_set") or []

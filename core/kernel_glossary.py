@@ -7,7 +7,7 @@ from typing import Any
 
 
 def load_kernel_glossary(vocab: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    """Build the local concept glossary used by Agent D and judge pages.
+    """Build the local concept glossary for kernel design tree nodes."""
 
     Glossary entries are conceptual aids, not source evidence. Keys are both
     full claim tags (`Node.Id:tag`) and bare tags when unambiguous enough.

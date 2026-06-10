@@ -86,7 +86,7 @@ OS-Agent/
 │   ├── git_ops.py               Git 历史分析
 │   └── build_config_ops.py      构建配置解析
 │
-├── core/                        核心模块 (复用自旧 Agent D)
+├── core/                        核心模块
 │   ├── code_atlas/builder.py    code_atlas 编排
 │   ├── kernel_tree.py           内核设计树骨架 (14 子系统/112 叶子)
 │   ├── kernel_glossary.json     334 条机制定义 (中英 + 代码示例)

@@ -1,11 +1,4 @@
-"""产物 _lineage 字段统一构造。
-
-每份 code_atlas / Agent C compare 相关产物可带 `_lineage`，作为评委的验证清单。
-
-设计：
-- 算法侧版本（algo_versions）= pipeline_config.algo_versions_snapshot()
-- LLM 侧（llm.cache_keys_used / calls_total / miss_rate）由调用方累计后填入
-- input_hash = sha256(repo_commit + pipeline_config_serialized + corpus_commits)
+"""`_lineage` metadata field builder for code atlas records.
   → 同输入产同 hash，评委可以拿这个 hash 比对
 """
 
@@ -53,7 +46,7 @@ def compute_input_hash(
 ) -> str:
     """计算 input_hash = sha256(repo_commit + pipeline_versions + extra)。
 
-    extra_inputs 是给 Agent C 用的：corpus 的所有 commit hash 也要参与。
+    extra_inputs 的约定：语料库所有 commit hash 也要参与。
     """
     payload = {
         "pipeline_version": PIPELINE_VERSION,

@@ -1,18 +1,8 @@
-"""Code-atlas algorithm constants for KernelProject Agent D.
+"""Code-atlas algorithm constants.
 
-任何改动这里的常量都等于改底层代码结构指纹算法 → 旧 compare_index 需要重建。
-运行时参数（model 名 / 并发数 / 路径 / cache 开关）一律不放这里，走 .env。
-
-边界（plan v7 §10.3）:
-    .env                          pipeline_config.py
-    ─────────                     ───────────────────
-    运行时参数                     算法不可变常量
-    改了不影响 cache_key            改了等于换算法
-    允许覆盖默认值                  env 不允许覆盖（带 _OVERRIDE_FOR_ABLATION 字样的除外）
-
-旧多层图流水线已经下线；这里保留的是 Agent D 需要的 AST/Token/Call-edge
-结构化索引常量。
+任何改动这里的常量等于改底层代码结构指纹算法，旧缓存需重建。
 """
+
 
 from __future__ import annotations
 
@@ -63,11 +53,11 @@ PAGERANK_TOL = 1e-8
 PAGERANK_MAX_ITER = 100
 
 
-# ─── role 词表版本（保留给兼容代码结构实验，不参与 Agent D 主产物）──────
+# ─── role 词表版本（代码结构实验用）──────
 ROLE_VOCAB_VER = "v1"
 
 
-# ─── KernelProject 展示树版本提示（正式树定义在 core/kernel_tree.py）──
+# ─── 展示树版本提示（正式树定义在 core/kernel_tree.py）──
 KERNEL_PROJECT_HINT_VER = "v2"
 
 # 一级模块（设计书 §8.2）
