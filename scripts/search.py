@@ -82,15 +82,24 @@ def search(target: str, corpus: dict[str, set[str]] | None = None,
         # combined: max of both dimensions — either signal is sufficient evidence
         combined = max(tok_min, ast_min)
 
+        year = _extract_year(name)
         results.append({
             "repo": name,
             "token_min": round(tok_min, 3),
             "ast_min": round(ast_min, 3),
             "combined": round(combined, 3),
             "is_framework": name in FRAMEWORKS,
+            "year": year,
         })
     results.sort(key=lambda r: -r["combined"])
     return results[:top_k]
+
+
+def _extract_year(name: str) -> int:
+    """Extract contest year from repo name. T20241xxx → 2024, oskernel2023-xxx → 2023."""
+    import re
+    m = re.search(r"T20(2[0-9])", name) or re.search(r"20(19|2[0-5])", name)
+    return int(m.group(0)[1:]) if m and m.group(0).startswith("T") else (int(m.group(0)) if m else 0)
 
 
 if __name__ == "__main__":

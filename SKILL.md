@@ -6,13 +6,14 @@
 
 ## MCP 工具
 
-以下 8 个工具通过 MCP 暴露。文件操作(读源码/grep/列目录)直接用 Claude Code 内置的 bash。
+以下 10 个工具通过 MCP 暴露。文件操作(读源码/grep/列目录)直接用 Claude Code 内置的 bash。
 
 | 工具 | 用途 | 何时调用 |
 |---|---|---|
-| `search_candidates(target)` | 1-vs-N 查重(token+AST 双维度) | 第一步 |
+| `search_candidates(target)` | 1-vs-N 查重(token+AST+year,含同届标记) | 第一步 |
 | `declared_deps(target)` | 选手声明的依赖/血缘(Cargo/gitmodules/README) | 第一步 |
 | `exclude_rules(target)` | 哪些代码被排除、为什么 | 第一步 |
+| `build_fingerprint(target)` | 为仓库建指纹(克隆新依赖后调用) | 声明的依赖不在本地时 |
 | `compile_flags(target)` | 生成 clangd 编译标志(架构+include+宏,不需交叉编译器) | 第一步(自动) |
 | `deep_compare(target, base)` | 函数级 COPIED/DISGUISE/MODIFIED/NOVEL vs base | 有候选时 |
 | `attribution(target, base)` | 每个节点的函数清单+出身(五分类) | 核心,决定分析深度 |
@@ -27,21 +28,36 @@
 ```
 search_candidates(target) + declared_deps(target)
     │
-    ├─ combined ≥ 0.30 且有时间更早的候选
-    │      → 对比报告: base = 得分最高且时间更早的候选
+    ├─ 1a. 处理声明中缺失的参考仓库
+    │   declared_deps 的 readme_refs / git_deps 里,可能有 repos/ 中没有的引用
+    │   (如 README 写"参考了 xv6-loongson"但本地库里没有)
+    │   对每个缺失引用:
+    │     → 用 bash 克隆到 repos/ (git clone <url> repos/<name>)
+    │     → 调用 build_fingerprint(name) 建指纹
+    │     → 搜索自动包含新指纹
     │
-    ├─ combined < 0.30
-    │      → 读 README / 文档,检查选手是否声明了来源
-    │      ├─ 声明了具体来源("基于 xv6-k210 改编" / README 里的 gitlab 引用)
-    │      │      → 强制对比报告: base = 声明的来源(即使指纹分很低)
-    │      │         注:低分本身是有价值的信息——"声明说基于 X,指纹却说几乎无共享"
-    │      │         这正是声明核查要揭露的矛盾(rv6 案例: README 写"基于 xv6-k210")
-    │      │
-    │      └─ 无任何来源声明
-    │             → 描述报告(原创): base = ""
+    ├─ 1b. 判断同届互抄
+    │   search_candidates 返回的每个候选带的 "year" 和 "is_framework" 字段
+    │   同届 = year == target_year AND is_framework == false
+    │   同届高分对(combined ≥ 0.30)是人类评审员最该关注的互抄候选:
+    │     没有"先后"可解释,只有"相似度"说话
+    │     报告单独列出 + 标记为"⚠ 同届互抄复审重点"
     │
-    └─ 无任何候选
-           → 同上:读文档查声明 → 有声明则强制对比,否则描述报告
+    ├─ 1c. 判定报告类型
+    │   ├─ combined ≥ 0.30 且有时间更早的候选
+    │   │      → 对比报告: base = 得分最高且时间更早的候选(非 framework)
+    │   │
+    │   ├─ combined < 0.30
+    │   │      → 读 README / 文档,检查选手是否声明了来源
+    │   │      ├─ 声明了具体来源("基于 xv6-k210 改编" / README 里的 gitlab 引用)
+    │   │      │      → 强制对比报告: base = 声明的来源(即使指纹分很低)
+    │   │      │         (rv6 案例: README 写"基于 xv6-k210"但指纹 0.088)
+    │   │      │
+    │   │      └─ 无任何来源声明
+    │   │             → 描述报告(原创): base = ""
+    │   │
+    │   └─ 无任何候选
+    │          → 同上:读文档查声明 → 有声明则强制对比,否则描述报告
 ```
 
 调用 `exclude_rules(target)`,记录排除清单,供报告核查区使用。

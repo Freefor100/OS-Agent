@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 """MCP server — exposes deterministic pipeline data for Claude Code + Skill.
 
-8 tools: 6 compute-only (what bash can't do) + LSP definition lookup + PDF/Docx
-reader. File ops (ls/cat/grep) use Claude Code's built-in bash.
+10 tools. File ops (ls/cat/grep) use Claude Code's built-in bash.
 
 Tools:
-  search_candidates  1-vs-N similarity search (token + AST dual dimension)
+  search_candidates  1-vs-N similarity search (token + AST + year)
+  build_fingerprint  build fingerprints for a newly cloned repo
   deep_compare       function-level COPIED/DISGUISE/MODIFIED/NOVEL vs base
   attribution        per-function provenance + node-level grouping
   node_taxonomy      kernel design tree skeleton (14 subsystems / 112 leaves)
   declared_deps      extracted declarations (Cargo/gitmodules/README refs)
   exclude_rules      exclusion rules applied to this target
+  compile_flags      generate clangd compile_flags.txt (arch + includes)
   lsp_definition     LSP goto-def (clangd/rust-analyzer, tree-sitter fallback)
   read_doc           read PDF/Docx documents (bash can't do this)
 """
@@ -197,6 +198,21 @@ def exclude_rules(target: str) -> dict:
     """Exclusion rules applied to this target (what was removed and why)."""
     from scripts.exclude import load_rules as load_exclude_rules
     return {"target": target, "rules": load_exclude_rules(target)}
+
+
+# ── tool: build_fingerprint ─────────────────────────────────────────
+
+@mcp.tool()
+def build_fingerprint(target: str) -> dict:
+    """Build code fingerprints for a repo (c/cpp/rust + asm) and add to corpus cache.
+    Use this when a declared dependency is not in the local repos/ — clone it first,
+    then call this to index it."""
+    from scripts.fingerprint import build_units, fingerprint_set, ast_fingerprint_set, lang_summary
+    units = build_units(_target_path(target))
+    fps = fingerprint_set(_target_path(target))
+    ast = ast_fingerprint_set(_target_path(target))
+    return {"target": target, "units": len(units), "fingerprints": len(fps),
+            "ast_fingerprints": len(ast), "languages": lang_summary(units)}
 
 
 # ── tool: compile_flags ─────────────────────────────────────────────
