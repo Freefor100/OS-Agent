@@ -72,11 +72,12 @@ Claude Code 会：
 
 ---
 
-## MCP 工具（mcp_server.py 暴露的 9 个）
+## MCP 工具（mcp_server.py 暴露的 10 个）
 
 | 工具 | 做什么 |
 |---|---|
-| `search_candidates` | 1-vs-N 搜索（Token + AST） |
+| `search_candidates` | 1-vs-N 搜索（Token + AST + year） |
+| `build_fingerprint` | 为仓库建指纹（克隆新依赖后调用） |
 | `deep_compare` | 函数级 COPIED/DISGUISE/MODIFIED/NOVEL |
 | `attribution` | 每个设计树节点的函数出身 |
 | `node_taxonomy` | 14 子系统 / 112 叶子节点骨架 |
