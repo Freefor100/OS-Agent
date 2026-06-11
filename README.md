@@ -66,10 +66,11 @@ python scripts/run.py --build
 
 Claude Code 的 Agent 流程（详见 `SKILL.md`）：
 
-1. **Phase 1 认识作品** — `compile_flags` + `build_fingerprint`，读目录结构/Cargo.toml/README，判断哪些是外部依赖
-2. **Phase 2 搜索相似** — `search_similar(target, exclude_prefixes=[...])`，在学生代码上搜索，拿到 per-directory overlap
-3. **Phase 3 深度对比** — `compare_functions(target, base, exclude_prefixes=[...])`，拿到 per-file 的 COPIED/DISGUISE/MODIFIED/NOVEL 清单，读源码写分析
-4. **Phase 4 组装报告** — 用 `node_taxonomy()` 拿 14 子系统骨架，生成三色 HTML 报告
+1. **Phase 0 探索分支** — 用 bash 看仓库有哪些分支，判断分析哪个
+2. **Phase 1 认识作品** — `compile_flags` + `build_fingerprint`，读目录结构/Cargo.toml/README，判断哪些是外部依赖
+3. **Phase 2 搜索相似** — `search_similar(target, exclude_prefixes=[...])`，在学生代码上搜索相似候选，选 base
+4. **Phase 3 深度对比** — `compare_functions(target, base, exclude_prefixes=[...])`，拿到 COPIED/DISGUISE/MODIFIED/NOVEL 清单，Agent 读源码 + LSP 分析
+5. **Phase 4 组装报告** — 生成 112 节点骨架 JSON → Agent 按批次填值 → render 三色 HTML 报告
 
 两条分支：
 - 搜到高相似候选或有声明来源 → **对比报告**（相对 base 改了什么）
@@ -77,17 +78,22 @@ Claude Code 的 Agent 流程（详见 `SKILL.md`）：
 
 ---
 
-## MCP 工具（mcp_server.py 暴露的 7 个）
+## MCP 工具（mcp_server.py 暴露的 12 个）
 
 | 工具 | 做什么 |
 |---|---|
+| `repo_metadata` | xlsx 元数据（年份/学校/队伍） |
+| `build_fingerprint` | 为仓库建指纹（分支感知） |
 | `search_similar` | 1-vs-N 搜索（Token + AST + per-directory overlap） |
-| `compare_functions` | 函数级 COPIED/DISGUISE/MODIFIED/NOVEL + per-file 分组 |
-| `build_fingerprint` | 为仓库建指纹（克隆新依赖后调用） |
-| `compile_flags` | 跨架构 LSP 编译标志（RISC-V/LoongArch/ARM） |
-| `lsp_definition` | LSP 跳转定义（clangd→tree-sitter→grep） |
+| `compare_functions` | 函数级 COPIED/DISGUISE/MODIFIED/NOVEL |
+| `node_taxonomy` | 14 子系统 / 112 叶子节点骨架 + scope + vocab + 分析批次 |
+| `compile_flags` | 跨架构 LSP 编译标志 |
+| `lsp_definition` | LSP 跳转定义 |
+| `lsp_references` | LSP 查全项目引用 |
+| `lsp_document_outline` | LSP 文件结构大纲 |
+| `lsp_call_graph` | LSP 调用链图 |
+| `lsp_set_target_arch` | 覆盖 LSP 目标架构 |
 | `read_doc` | 读 PDF/Docx |
-| `node_taxonomy` | 14 子系统 / 112 叶子节点骨架 |
 
 排除外部依赖不是独立工具——Agent 读目录结构后自行决定哪些目录是外部依赖，通过 `exclude_prefixes` 参数传给 `search_similar` 和 `compare_functions`。
 
@@ -102,6 +108,7 @@ Claude Code 的 Agent 流程（详见 `SKILL.md`）：
 | `search.py` | 1-vs-N 搜索，支持 `exclude_prefixes` 过滤 |
 | `attribute.py` | 函数级 COPIED/DISGUISE/MODIFIED/NOVEL 对比 |
 | `compile_flags.py` | 生成 clangd 编译标志 |
+| `report.py` | 报告流水线：`skeleton` 生成 112 节点骨架 → Agent 填值 → `render` 出 HTML |
 
 ---
 
@@ -111,7 +118,8 @@ Claude Code 的 Agent 流程（详见 `SKILL.md`）：
 OS-Agent/
 ├── README.md                本文件
 ├── SKILL.md                 Claude Code 报告生成工作流
-├── mcp_server.py            MCP server（7 工具）
+├── DESIGN.md                设计文档
+├── mcp_server.py            MCP server（12 工具）
 ├── .mcp.json                MCP 配置（Claude Code 自动读取）
 │
 ├── scripts/                 确定性计算（无判断）
@@ -119,12 +127,13 @@ OS-Agent/
 │   ├── fingerprint.py       代码指纹（token hash + AST shape hash）
 │   ├── search.py            1-vs-N 双向包含搜索
 │   ├── attribute.py         函数级深度对比
+│   ├── report.py            报告流水线（骨架生成 + 渲染）
 │   └── compile_flags.py     LSP 编译标志生成
 ├── tools/                   工具层
 │   ├── code_atlas/          MinHash / AST shape / ASM tokenizer / extractor
 │   ├── lsp_ops.py           LSP 客户端
 │   └── file_ops.py          PDF/Docx 读取
-├── core/                    内核设计树 + code atlas builder + 证据存储
+├── core/                    内核设计树（14子系统/112叶子）+ code atlas builder + 证据存储
 ├── repos/                   语料库（~160 内核，gitignored）
 ├── .fp_cache/               指纹缓存（gitignored）
 └── output/                  报告产物（gitignored）

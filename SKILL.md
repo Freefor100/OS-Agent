@@ -113,12 +113,24 @@ candidates: [
 - **高相似度 + 集中在核心目录** → 可能抄了 → 选为 base
 - **低相似度** → 检查 README 声明的来源 → 强制对比
 
-**同届互抄检测**：
+**base 选择规则（关键）**：
+
+base = 指纹搜索里**最相似的已存在作品**，即选手的**真实起点**（通常是近一两届的参赛作品）。
+
+> ⚠ **不要选谱系根**（如 MIT xv6-riscv）。同谱系内核一届届迭代：2024 的作品基于 2023 某作品做增量，2023 又基于 2022。跟谱系根比，得到的 delta 里混着历届所有人的共同继承，量出来的"工作"根本不是这队做的。对**最相似的近届作品**做 compare，delta 才是这队的真实增量。
+
+**方向判定（用 xlsx 年份，不用 git 时间线）**：
+
 ```
-repo_metadata(target) → year
-search_similar 返回的候选中同届 (year == target_year) 且 is_framework == false
-同届高分对（combined ≥ 0.30）→ 报告单独列出，标记"⚠ 同届互抄复审重点"
+repo_metadata(target) → target_year
+对每个高分候选看 xlsx year：
+  候选 year < target_year   → base 是往届 → delta = 本队真增量（合法/跨届抄袭）
+  候选 year == target_year  → 同届高分对（combined ≥ 0.30）→ 互抄
+                              → 报告单独列出，标"⚠ 同届互抄复审重点"（年份无法定向，交人工）
+  跟谁都不像 + 无 README 声明 → 独立设计（描述报告模式）
 ```
+
+> 现在只分析最新一届作品，现实场景就两类：**同届互抄** 和 **抄前几届**。
 
 如有 README 声明的参考仓库不在本地：
 
@@ -155,39 +167,60 @@ Agent 利用这些数据 + LSP 新工具：
 ### Phase 4: 组装报告
 
 ```
-# 1. 聚合数据
-python scripts/report.py --data report_data.json --output output/<target>/
+# 1. 生成固定 112 节点的骨架 JSON（color/stats/analysis 留空槽，每节点带 scope）
+python scripts/report.py skeleton <target> output/<target>/report_data.json [branch]
 
-# 2. Agent 打开生成的 index.html，找到 <!-- AGENT_DESC: <node_id> --> 标记
-#    在每个标记处填入自然语言分析
+# 2. Agent 按批次顺序探索，将分析填入 report_data.json：
+#    - 每节点填 color (copied/modified/novel/external)、disguise (true/false)、
+#      stats ({copied,disguise,modified,novel})、size_tokens、analysis
+#    - 每完成一批回写 context（base_verdict / inherited_subsystems / findings），
+#      后续批次读回参考
 
-# 3. 替换 <!-- AGENT_MERMAID --> 为实际 Mermaid 架构图
+# 3. 渲染填好的 JSON → index.html
+python scripts/report.py render output/<target>/report_data.json output/<target>/
 ```
 
 报告结构（自上而下）：
 
 1. **作品元信息**：名称、届号、学校、队伍、范式（宏内核/组件化）、架构
-2. **贡献占比表**：自研 X% / 移植 Y% / 外部依赖 Z%
-3. **血缘总览**：最相似候选列表，标注是否声明
-4. **声明核查**：选手声称 vs 指纹事实
-5. **内核设计树**（主体）：14 子系统 × 三色标注 + 详细/简要描述
-   - 🟨 黄色 = COPIED（继承自 base，未改动）
-   - 🟥 红色 = MODIFIED（相对 base 改动）
-   - 🟦 蓝色 = NOVEL（自研）
+2. **分析上下文**（context 活文档）：base 判定、已继承子系统、跨批次关键发现
+3. **贡献占比表**：COPIED / DISGUISE / MODIFIED / NOVEL 计数与占比
+4. **血缘总览**：Top-10 最相似候选列表，标注是否声明
+5. **内核设计树**（主体）：14 子系统 × 112 叶子节点，三色标注 + 构成条 + 自然语言分析
+   - 🟦 蓝色 = 独创实现 (NOVEL)
+   - 🟥 红色 = 实现但修改 (MODIFIED)
+   - 🟨 黄色 = 实现照搬 (COPIED)
+   - 🟨 + ⚠ = 改名照搬 (DISGUISE)，突出作弊意图
    - ⬜ 灰色 = 未实现 / 外部依赖
+   - 每节点下方**构成条**显示各状态真实占比（不会因单一主色掩盖"部分实现"）
 6. **架构图**：Mermaid 三色染色
 7. **创新功能区**（如有）：超越标准子系统的自研模块
 8. **汇编覆盖声明**：汇编文件数、分析粒度、已知局限
 
 ---
 
+## 探索顺序：按批次走，前序喂后续
+
+Agent 调用 `node_taxonomy()`（无参）获取 `batches`（`ANALYSIS_BATCHES_V2`），**按批次顺序**探索——不是按模块，也不是拍平的 112 节点。
+
+批次是**跨模块依赖分组**（如 batch 5 = TaskStruct + ContextSwitch + Scheduler + SpinLock + WaitQueue，因调度依赖上下文切换和锁）。**每批完成 → 回写 context.findings → 后续批次读回参考。**
+
+每批开始时：
+1. 对批内每个节点调用 `node_taxonomy(node_id)` 拿 `scope`（工作范围边界）
+2. 结合 `compare_functions` 结果，读源码判断哪些函数属于该节点（这是 Agent 的判断，框架不强行路由）
+3. 根据指纹 diff 判颜色 + 写分析
+4. 本批完成后回写 `report_data.json` 的 context.findings
+
 ## 标注颜色说明
 
-| 节点内函数构成 | 分析深度 | 标注颜色 |
-|---|---|---|
-| 全是 COPIED | **简要**：标注"继承自 {base}，未改动" | 🟨 黄色 |
-| 含 MODIFIED 或 NOVEL | **详细**：读源码写分析 | 🟥（改为主）/ 🟦（新为主） |
-| 无函数 | **简要**：标注"未实现" | ⬜ 灰色 |
+| 节点内函数构成 | 分析深度 | 标注颜色 | 构成条体现 |
+|---|---|---|---|
+| 全 NOVEL | **详细**：描述实现和设计决策 | 🟦 蓝色 | 全蓝 |
+| 含 MODIFIED 或 NOVEL | **详细**：读源码 + LSP 追踪变化 | 🟥/🟦 按占比 | 红蓝 mix |
+| 全 COPIED | **简要**：标注"继承自 {base}，未改动" | 🟨 黄色 | 全黄 |
+| 含 DISGUISE | **重点**：改名照搬 = 作弊信号 → 用 lsp_references 查调用链 | 🟨 黄 + ⚠ 标记 | 黄底斜纹 |
+| 混合（部分实现） | **按占比定主色**，构成条显示真实比例 | 占比最多者 | 多色堆叠 |
+| 无函数 | **简要**：标注"未实现" | ⬜ 灰色 | 空 |
 
 ## 对比报告 vs 描述报告的差异
 
@@ -200,10 +233,12 @@ python scripts/report.py --data report_data.json --output output/<target>/
 | NOVEL | "相比 base 新增" + 详细描述 | "选手自研" + 详细描述 |
 | 报告主叙事 | "基于 {base} 的增量工作" | "独立设计的内核" |
 
-## 机制词汇表使用指引（VOCAB_BY_NODE）
+## 机制词汇表使用指引（VOCAB）
 
-`node_taxonomy(node_id)` 返回每个节点的机制标签（来自 `core/kernel_tree.py:VOCAB_BY_NODE`）：
-- **"primary" 标签** → 该节点的期望实现机制
-- **"display" 标签** → 辅助识别模式
-- **"weak_hint" 标签** → grep 搜索关键词
-- 用作读源码分析时的 checklist，帮助 Agent 将分析结果路由到正确节点
+`node_taxonomy(node_id)` 返回每个节点的 `vocab` 标签列表，来自 `core/kernel_tree.py:VOCAB_BY_NODE`：
+
+- **仅作命名建议**：帮 Agent 用统一术语表达机制（如"这是 MLFQ 多级反馈队列"而非自由发挥）。
+- **不分级，不判工作量**：tag 的存在性不代表选手做了工作。同谱系作品当然都有 sv39 页表、walk()、fork——但 walk() 可能 token 级逐字照搬（判 COPIED），调度器可能重写（判 NOVEL）。**真正的区分在指纹 diff + 规模，不在 tag 命中。**
+- **Agent 可动态扩充**：遇词汇表没有的机制，Agent 自行命名写入分析，框架不阻拦。
+
+> 反例：xv6-k210 与 oskernrl2022-rv6（同谱系，rv6 自述"基于 xv6-k210 改编"）——两个作品的 `walk()` 函数 token 级逐字相同（判 COPIED），"sv39 都有"这个 tag 命中毫无区分力。但 xv6-k210 用优先级多队列调度（`proc_runnable[priority]`）、rv6 用单就绪队列 `readyq_pop()`，指纹 diff 能区分出"调度器是 MODIFIED/NOVEL"。**judge by fingerprint diff, name by vocab。**

@@ -3,13 +3,20 @@
 
 Produces a structured HTML template with pre-computed data (contribution tables,
 lineage, kernel tree skeleton with colors). The Agent fills in natural-language
-analysis into <!-- AGENT_DESC --> markers.
+analysis and node colors into the report_data.json, then renders to HTML.
 
 Usage (by Agent via bash):
-  python scripts/report.py --data report_data.json --output output/<target>/
+  # 1. generate the fixed 112-node skeleton JSON (empty slots to fill)
+  python scripts/report.py skeleton <target> <report_data.json>
 
-The Agent reads the generated HTML, finds <!-- AGENT_DESC --> markers, and replaces
-them with natural-language analysis for each kernel tree node.
+  # 2. (Agent edits report_data.json: fills color/stats/size_tokens/analysis + context)
+
+  # 3. render the filled JSON to HTML
+  python scripts/report.py render <report_data.json> <output_dir>
+
+The skeleton's tree nodes carry title_zh + scope (fixed framework). The Agent
+judges color from the fingerprint diff and fills it in — the script never decides
+color or workload.
 """
 
 from __future__ import annotations
@@ -21,6 +28,7 @@ from pathlib import Path
 from typing import Optional
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 
 # ── CSS (embedded, consistent across all reports) ────────────────────
 
@@ -60,9 +68,15 @@ th { font-weight: 600; color: var(--color-muted); font-size: .8rem; text-transfo
 .node-external { border-left-color: var(--color-external); }
 .node-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: .5rem; }
 .node-title { font-weight: 600; }
+.node-scope { font-size: .8rem; color: var(--color-muted); margin: .2rem 0 .4rem; }
+.comp-bar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; margin: .3rem 0; background: #eceff1; }
+.comp-seg { height: 100%; }
+.disguise-flag { display: inline-block; background: #c62828; color: #fff; font-size: .72rem; font-weight: 600; padding: .15rem .5rem; border-radius: 4px; }
 .node-stats { font-size: .8rem; color: var(--color-muted); }
 .analysis { margin-top: .5rem; font-size: .9rem; }
 .analysis-placeholder { color: var(--color-muted); font-style: italic; }
+.context-list { list-style: none; padding: 0; }
+.context-list li { padding: .3rem 0; border-bottom: 1px dashed #e0e0e0; font-size: .9rem; }
 .warning-box { background: #fff3e0; border: 1px solid #ffcc02; border-radius: 6px; padding: 1rem; margin: 1rem 0; }
 .warning-box h4 { color: #e65100; margin-bottom: .3rem; }
 .legend { display: flex; gap: 1.5rem; flex-wrap: wrap; margin: 1rem 0; }
@@ -81,22 +95,79 @@ def _pct(n: int, total: int) -> str:
         return "0%"
     return f"{100 * n // total}%"
 
-def _color_class(node: dict) -> str:
-    """Determine the dominant color for a kernel tree node."""
-    c = node.get("color", "")
+
+# status → (css color-var suffix, label)
+_STATUS_META = {
+    "copied": ("copied", "照搬"),
+    "disguise": ("copied", "改名照搬"),  # disguise lives in the yellow family
+    "modified": ("modified", "修改"),
+    "novel": ("novel", "独创"),
+}
+
+
+def _dominant_color(node: dict) -> str:
+    """Main color = the status with the largest share (占比最多者).
+
+    Prefers an explicit `color` set by the Agent; otherwise derives from stats.
+    disguise counts fold into the copied (yellow) family for the main color.
+    Returns one of: copied / modified / novel / external.
+    """
+    c = (node.get("color") or "").strip().lower()
     if c in ("copied", "yellow"):
-        return "node-copied"
+        return "copied"
     if c in ("modified", "red"):
-        return "node-modified"
+        return "modified"
     if c in ("novel", "blue"):
-        return "node-novel"
-    return "node-external"
+        return "novel"
+    if c in ("external", "gray", "grey", ""):
+        # derive from stats if present
+        stats = node.get("stats") or {}
+        yellow = stats.get("copied", 0) + stats.get("disguise", 0)
+        buckets = {"copied": yellow, "modified": stats.get("modified", 0),
+                   "novel": stats.get("novel", 0)}
+        top = max(buckets, key=lambda k: buckets[k])
+        if buckets[top] > 0:
+            return top
+        return "external"
+    return "external"
+
+
+def _color_class(node: dict) -> str:
+    return {"copied": "node-copied", "modified": "node-modified",
+            "novel": "node-novel"}.get(_dominant_color(node), "node-external")
+
 
 def _badge_class(color: str) -> str:
     m = {"copied": "badge-copied", "yellow": "badge-copied",
          "modified": "badge-modified", "red": "badge-modified",
          "novel": "badge-novel", "blue": "badge-novel"}
     return m.get(color, "badge-external")
+
+
+def _composition_bar(stats: dict) -> str:
+    """Stacked bar showing copied/disguise/modified/novel proportions.
+
+    Shows the real mix so a 'partly implemented' node isn't hidden behind one color.
+    """
+    if not stats:
+        return ""
+    order = [("novel", "var(--color-novel)"), ("modified", "var(--color-modified)"),
+             ("copied", "var(--color-copied)"), ("disguise", "var(--color-copied)")]
+    total = sum(stats.get(k, 0) for k, _ in order)
+    if total <= 0:
+        return ""
+    segs = []
+    for key, col in order:
+        n = stats.get(key, 0)
+        if n <= 0:
+            continue
+        w = 100 * n / total
+        # disguise gets a hatch overlay to flag renamed copies
+        extra = ("background-image:repeating-linear-gradient(45deg,"
+                 "rgba(0,0,0,.25) 0 4px,transparent 4px 8px);" if key == "disguise" else "")
+        segs.append(f'<div class="comp-seg" style="width:{w:.1f}%;background:{col};{extra}" '
+                    f'title="{key}={n}"></div>')
+    return f'<div class="comp-bar">{"".join(segs)}</div>'
 
 
 # ── section renderers ────────────────────────────────────────────────
@@ -118,6 +189,27 @@ def _render_meta(report: dict) -> str:
         for label, value in items
     )
     return f'<div class="card"><h2>作品元信息</h2><div class="meta-grid">{rows}</div></div>'
+
+
+def _render_context(report: dict) -> str:
+    """Render the cross-node live document: base verdict, inherited subsystems, findings."""
+    ctx = report.get("context") or {}
+    verdict = (ctx.get("base_verdict") or "").strip()
+    inherited = ctx.get("inherited_subsystems") or []
+    findings = ctx.get("findings") or []
+    if not (verdict or inherited or findings):
+        return ""
+
+    parts = []
+    if verdict:
+        parts.append(f'<p><strong>血缘判定：</strong>{verdict}</p>')
+    if inherited:
+        parts.append('<p><strong>已继承子系统：</strong>' + "、".join(inherited) + '</p>')
+    if findings:
+        items = "\n".join(f"<li>{f}</li>" for f in findings)
+        parts.append(f'<p><strong>关键发现：</strong></p><ul class="context-list">{items}</ul>')
+
+    return f'<div class="card"><h2>分析上下文</h2>{"".join(parts)}</div>'
 
 
 def _render_contribution(report: dict) -> str:
@@ -178,16 +270,21 @@ def _render_lineage(report: dict) -> str:
 
 
 def _render_tree(report: dict) -> str:
-    """Render the 3-color kernel design tree with placeholders for Agent analysis."""
+    """Render the 3-color kernel design tree from Agent-filled node data.
+
+    Each node: main color = dominant status; a composition bar shows the real
+    copied/modified/novel mix; a ⚠ flag marks renamed copies (disguise).
+    """
     nodes = report.get("tree_nodes", [])
     if not nodes:
         return '<div class="card"><h2>内核设计树</h2><p>无节点数据</p></div>'
 
     legend = """\
 <div class="legend">
-  <div class="legend-item"><div class="legend-swatch" style="background:var(--color-copied)"></div> COPIED — 继承自base</div>
-  <div class="legend-item"><div class="legend-swatch" style="background:var(--color-modified)"></div> MODIFIED — 相对base改动</div>
-  <div class="legend-item"><div class="legend-swatch" style="background:var(--color-novel)"></div> NOVEL — 自研</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:var(--color-novel)"></div> 独创实现 (NOVEL)</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:var(--color-modified)"></div> 实现但修改 (MODIFIED)</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:var(--color-copied)"></div> 实现照搬 (COPIED)</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:var(--color-copied);background-image:repeating-linear-gradient(45deg,rgba(0,0,0,.25) 0 4px,transparent 4px 8px)"></div> ⚠ 改名照搬 (DISGUISE)</div>
   <div class="legend-item"><div class="legend-swatch" style="background:var(--color-external)"></div> 未实现 / 外部依赖</div>
 </div>"""
 
@@ -195,22 +292,38 @@ def _render_tree(report: dict) -> str:
     for node in nodes:
         node_id = node.get("id", "")
         title = node.get("title_zh", node_id)
-        color = node.get("color", "external")
-        stats = node.get("stats", {})
+        scope = node.get("scope", "")
+        stats = node.get("stats") or {}
+        dom = _dominant_color(node)
+        analysis = (node.get("analysis") or "").strip()
+        size = node.get("size_tokens", 0)
+
+        # disguise flag: explicit field OR any disguise count in stats
+        disguised = bool(node.get("disguise")) or stats.get("disguise", 0) > 0
+        warn = ' <span class="disguise-flag" title="含改名照搬，疑似作弊">⚠ 改名照搬</span>' if disguised else ""
+
+        badge = dom.upper() if dom != "external" else "—"
+        comp = _composition_bar(stats)
         stat_text = ", ".join(f"{k}={v}" for k, v in stats.items() if v)
+        size_text = f" · {size} tok" if size else ""
+        scope_html = f'<div class="node-scope">{scope}</div>' if scope else ""
+
+        if analysis:
+            analysis_html = f'<div class="analysis">{analysis}</div>'
+        else:
+            analysis_html = ('<div class="analysis"><span class="analysis-placeholder">'
+                             f'[待 Agent 填写 {title} 的分析]</span></div>')
 
         node_html_parts.append(f"""\
 <div class="node {_color_class(node)}" data-node-id="{node_id}">
   <div class="node-header">
     <span class="node-title">{title} <code style="font-size:.75rem;color:var(--color-muted)">{node_id}</code></span>
-    <span class="badge {_badge_class(color)}">{color.upper()}</span>
+    <span class="badge {_badge_class(dom)}">{badge}</span>{warn}
   </div>
-  <div class="node-stats">{stat_text}</div>
-  <div class="analysis">
-<!-- AGENT_DESC: {node_id} -->
-    <span class="analysis-placeholder">[Agent fills in natural-language analysis for {title}]</span>
-<!-- /AGENT_DESC -->
-  </div>
+  {scope_html}
+  {comp}
+  <div class="node-stats">{stat_text}{size_text}</div>
+  {analysis_html}
 </div>""")
 
     return f"""\
@@ -222,25 +335,27 @@ def _render_tree(report: dict) -> str:
 
 
 def _render_mermaid_stub(report: dict) -> str:
-    return """\
-<div class="card">
-  <h2>架构图</h2>
-  <div class="mermaid">
-<!-- AGENT_MERMAID -->
-    <pre>graph TD
-  %% Agent: replace this with actual Mermaid diagram
-  %% showing 14 subsystems with color-coded nodes
-  subgraph Legend
-    yellow[COPIED]:::copied
-    red[MODIFIED]:::modified
-    blue[NOVEL]:::novel
-  end
-  classDef copied fill:#f9a825,color:#fff
-  classDef modified fill:#c62828,color:#fff
-  classDef novel fill:#1565c0,color:#fff</pre>
-<!-- /AGENT_MERMAID -->
-  </div>
-</div>"""
+    """Render the Mermaid architecture diagram.
+
+    The Agent sets report.meta.mermaid with the actual Mermaid source.
+    Falls back to a stub asking the Agent to provide one.
+    """
+    mermaid = (report.get("meta", {}).get("mermaid") or "").strip()
+    if not mermaid:
+        mermaid = (
+            "graph TD\n"
+            "  %% Agent: fill meta.mermaid in report_data.json with the actual\n"
+            "  %% Mermaid diagram showing 14 subsystems with color-coded nodes\n"
+            "  subgraph Legend\n"
+            "    yellow[COPIED]:::copied\n"
+            "    red[MODIFIED]:::modified\n"
+            "    blue[NOVEL]:::novel\n"
+            "  end\n"
+            "  classDef copied fill:#f9a825,color:#fff\n"
+            "  classDef modified fill:#c62828,color:#fff\n"
+            "  classDef novel fill:#1565c0,color:#fff"
+        )
+    return f'<div class="card"><h2>架构图</h2><div class="mermaid"><pre>{mermaid}</pre></div></div>'
 
 
 def _render_innovation(report: dict) -> str:
@@ -289,6 +404,7 @@ def render_html(report: dict) -> str:
     title = report.get("meta", {}).get("repo_name", "OS Analysis Report")
     sections = [
         _render_meta(report),
+        _render_context(report),
         _render_contribution(report),
         _render_lineage(report),
         _render_tree(report),
@@ -328,12 +444,25 @@ def compute_report_data(target: str, base: str | None = None,
                         search_candidates: list[dict] | None = None,
                         metadata: dict | None = None,
                         branch: str = "",
-                        taxonomy: dict | None = None) -> dict:
-    """Aggregate computed data into a structured report payload.
+                        context: dict | None = None) -> dict:
+    """Build the report skeleton — a fixed 112-node JSON the Agent fills in.
 
-    This is the bridge between raw tool outputs and the HTML template.
-    The Agent calls this to prepare data, then passes the result to render_html().
+    This is the SKELETON GENERATOR. It produces the report structure with empty
+    slots; the Agent fills color/stats/size_tokens/analysis after judging the
+    fingerprint diff. The script never decides color or workload.
+
+    Each tree node carries:
+      - title_zh, scope  (from the taxonomy — fixed framework)
+      - color: ""        (Agent fills: copied/modified/novel/external, +disguise flag)
+      - stats: {}        (Agent fills: {copied, disguise, modified, novel} counts)
+      - size_tokens: 0   (Agent fills: total tokens of functions on this node)
+      - analysis: ""     (Agent fills: natural-language description)
+
+    `context` is the cross-node live document (base verdict, inherited subsystems,
+    key findings) that the Agent updates batch-by-batch.
     """
+    from core.kernel_tree import ANALYSIS_ORDER_V2, node_title_zh, node_scope
+
     report = {
         "meta": {
             "repo_name": target,
@@ -343,6 +472,11 @@ def compute_report_data(target: str, base: str | None = None,
             "competition": metadata.get("competition", "") if metadata else "",
             "branch": branch,
             "base": base or "",
+        },
+        "context": context or {
+            "base_verdict": "",        # 往届base→真增量 / 同届→互抄⚠ / 无→独立设计
+            "inherited_subsystems": [],  # 已判定为继承自 base 的子系统
+            "findings": [],            # 跨节点关键发现，前序批次喂后续
         },
         "summary": {},
         "lineage": [],
@@ -362,50 +496,90 @@ def compute_report_data(target: str, base: str | None = None,
             for c in (search_candidates or [])[:10]
         ]
 
-    # Build tree nodes with color inference from compare_result
-    if taxonomy and compare_result:
-        by_file = compare_result.get("by_file", {})
-        # Infer per-node color from function status distribution
-        # (Agent can override after calling this)
-        for node_id in taxonomy.get("order", []):
-            stats = {"copied": 0, "disguise": 0, "modified": 0, "novel": 0}
-            # Simple: mark all nodes as external by default
-            # Agent fills in actual analysis
-            color = "external"
-            report["tree_nodes"].append({
-                "id": node_id,
-                "title_zh": taxonomy.get("roots", {}).get(
-                    node_id.split(".")[0], {}
-                ).get("title_zh", node_id) if "." not in node_id else "",
-                "color": color,
-                "stats": stats,
-            })
+    # Fixed 112-node skeleton with empty slots — Agent fills color/stats/analysis.
+    for node_id in ANALYSIS_ORDER_V2:
+        report["tree_nodes"].append({
+            "id": node_id,
+            "title_zh": node_title_zh(node_id),
+            "scope": node_scope(node_id),
+            "color": "",          # Agent fills after judging fingerprint diff
+            "disguise": False,    # Agent sets True if node contains renamed copies
+            "stats": {},          # Agent fills {copied, disguise, modified, novel}
+            "size_tokens": 0,     # Agent fills total token size
+            "analysis": "",       # Agent fills natural-language description
+        })
 
     return report
 
 
 # ── CLI ──────────────────────────────────────────────────────────────
 
+def _usage() -> None:
+    print("Usage:")
+    print("  python scripts/report.py skeleton <target> <report_data.json> [branch]")
+    print("      generate the fixed 112-node skeleton JSON (empty slots to fill)")
+    print("  python scripts/report.py render <report_data.json> <output_dir>")
+    print("      render a filled report_data.json to <output_dir>/index.html")
+
+
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: python scripts/report.py <report_data.json> [output_dir]")
-        print()
-        print("  report_data.json — structured report payload")
-        print("  output_dir       — where to write index.html (default: stdout)")
+        _usage()
         sys.exit(1)
 
-    data_path = sys.argv[1]
-    output_dir = sys.argv[2] if len(sys.argv) > 2 else ""
+    mode = sys.argv[1]
 
-    with open(data_path) as f:
-        data = json.load(f)
+    if mode == "skeleton":
+        if len(sys.argv) < 4:
+            _usage()
+            sys.exit(1)
+        target = sys.argv[2]
+        out_path = sys.argv[3]
+        branch = sys.argv[4] if len(sys.argv) > 4 else ""
+        # try to enrich meta from xlsx metadata if available
+        meta = None
+        try:
+            from core.metadata import MetadataManager
+            mm = MetadataManager()
+            m = mm.lookup_by_repo_name(target)
+            if m:
+                meta = {"year": m["year"], "school": m["school"],
+                        "team": m["team_name"], "competition": m["competition"]}
+        except Exception:
+            pass
+        data = compute_report_data(target, metadata=meta, branch=branch)
+        Path(out_path).parent.mkdir(parents=True, exist_ok=True)
+        Path(out_path).write_text(json.dumps(data, ensure_ascii=False, indent=2))
+        print(f"Skeleton written to {out_path} ({len(data['tree_nodes'])} nodes)")
 
-    html = render_html(data)
+    elif mode == "render":
+        if len(sys.argv) < 3:
+            _usage()
+            sys.exit(1)
+        data_path = sys.argv[2]
+        output_dir = sys.argv[3] if len(sys.argv) > 3 else ""
+        with open(data_path) as f:
+            data = json.load(f)
+        html = render_html(data)
+        if output_dir:
+            out = Path(output_dir) / "index.html"
+            out.parent.mkdir(parents=True, exist_ok=True)
+            out.write_text(html)
+            print(f"Report written to {out}")
+        else:
+            print(html)
 
-    if output_dir:
-        out = Path(output_dir) / "index.html"
-        out.parent.mkdir(parents=True, exist_ok=True)
-        out.write_text(html)
-        print(f"Report written to {out}")
     else:
-        print(html)
+        # backward-compat: treat first arg as data path (old positional usage)
+        data_path = sys.argv[1]
+        output_dir = sys.argv[2] if len(sys.argv) > 2 else ""
+        with open(data_path) as f:
+            data = json.load(f)
+        html = render_html(data)
+        if output_dir:
+            out = Path(output_dir) / "index.html"
+            out.parent.mkdir(parents=True, exist_ok=True)
+            out.write_text(html)
+            print(f"Report written to {out}")
+        else:
+            print(html)

@@ -50,9 +50,8 @@ Agent 启动
 | `search.py` | 1-vs-N 搜索。`search(target, exclude_prefixes, branch, metadata)` → `[{repo, branch, combined, ...}]`。默认加载全部 branch cache，返回 per-branch 候选。metadata 驱动 year/is_framework |
 | `attribute.py` | 函数级对比。`compare_units(target, base, exclude_prefixes, branch, base_branch)` → `{summary, by_file}` |
 | `compile_flags.py` | 为 repo 生成 `compile_flags.txt`（架构+include+宏） |
-| `report.py` | HTML 报告模板引擎：预渲染表格+三色设计树，`<!-- AGENT_DESC -->` 标记供 Agent 填入分析 |
+| `report.py` | 报告流水线：`skeleton` 生成固定 112 节点骨架（空 color/stats/analysis 槽 + 每节点 scope），Agent 填值后 `render` 出三色 HTML（主色+构成条+⚠改名照搬标记+context 活文档） |
 | `batch.py` | 批量指纹构建 |
-| `git_history.py` | Git 时间线比较（辅助抄袭方向判定） |
 | `run.py` | 预建 corpus 指纹：`--build --all-branches` 覆盖全部 repo×分支 |
 
 ### 工具层 (`tools/`)
@@ -73,7 +72,7 @@ Agent 启动
 |---|---|
 | `metadata.py` | MetadataManager：加载 xlsx，URL↔repo_name 双向索引，替代硬编码 FRAMEWORKS |
 | `code_atlas/builder.py` | Code atlas 构建器：tree-sitter 扫描 → 函数/类型/边 → PageRank → 归一化token |
-| `kernel_tree.py` | 固定骨架：14 子系统 / 112 叶子节点 + `VOCAB_BY_NODE` 机制词汇表 |
+| `kernel_tree.py` | 固定骨架：14 子系统 / 112 叶子节点 + 每节点 `NODE_SCOPE`（工作范围边界）+ `VOCAB_BY_NODE` 命名建议词汇表 + `ANALYSIS_BATCHES_V2` 跨模块分析批次 |
 | `evidence.py` | 证据存储 + 确定性 hash ID |
 
 ### 交付层
@@ -144,7 +143,7 @@ README 声明"基于 xv6-k210"但指纹极低（0.088），Agent 仍须强制 de
 | `build_fingerprint` | target, branch?, all_branches? | {units, fingerprints, ast_fingerprints, languages} |
 | `search_similar` | target, exclude_prefixes?, top_k?, branch? | [{repo, branch, combined, token_min, ast_min, is_framework, year, school, overlap_by_dir}] |
 | `compare_functions` | target, base, exclude_prefixes?, branch?, base_branch? | {summary: {copied,disguise,modified,novel}, by_file} |
-| `node_taxonomy` | node_id? | 14 子系统 / 112 叶子节点 + 机制词汇表 |
+| `node_taxonomy` | node_id? | 14 子系统 / 112 叶子节点 + 每节点 scope + vocab 命名建议 + 跨模块分析批次 |
 | `compile_flags` | target | {arch, flags} |
 | `lsp_definition` | target, symbol, file? | 文件:行号 位置（含回退链信息） |
 | `lsp_references` | target, symbol, file? | 全项目 file:line 引用列表 |
@@ -162,9 +161,8 @@ README 声明"基于 xv6-k210"但指纹极低（0.088），Agent 仍须强制 de
 | 文件 | 功能 |
 |---|---|
 | `core/metadata.py` | MetadataManager：加载 `collected-data.xlsx`（168 条），构建 URL↔repo_name 双向索引。155 repos 匹配 xlsx，8 frameworks。替代 `search.py` 中硬编码 FRAMEWORKS 和脆弱的正则 `_extract_year()` |
-| `scripts/report.py` | HTML 报告模板引擎：预渲染贡献占比表、血缘总览、三色内核设计树。`<!-- AGENT_DESC -->` 标记供 Agent 填入自然语言分析 |
+| `scripts/report.py` | 报告流水线：`skeleton` 生成固定 112 节点骨架（空 color/stats/analysis 槽 + 每节点 scope），Agent 填值后 `render` 出三色 HTML（主色+构成条+⚠改名照搬标记+context 活文档） |
 | `scripts/batch.py` | 批量指纹构建 |
-| `scripts/git_history.py` | Git 时间线比较（辅助抄袭方向判定） |
 
 ## 分支处理
 
@@ -175,7 +173,7 @@ Agent 用 bash 探索分支（`git branch -a`, `git log`, `git show <branch>:REA
 
 ## 内核设计树
 
-`core/kernel_tree.py` 定义固定骨架：14 子系统 / 112 叶子节点。`VOCAB_BY_NODE`（112 条）为每个节点提供机制标签（primary/display/weak_hint），`EXTRA_NODE_SPECS` 提供 symbols/patterns 映射（函数名→树节点），辅助 Agent 将分析结果路由到正确节点。
+`core/kernel_tree.py` 定义固定骨架：14 子系统 / 112 叶子节点。每节点有 `NODE_SCOPE`（一句工作范围边界，Agent 到节点先读 scope 明边界，再决定哪些函数挂进来）。`VOCAB_BY_NODE`（112 条）为每个节点提供机制标签，**仅作命名建议**——帮 Agent 用统一术语表达（如"MLFQ 调度"），Agent 可动态扩充，不分级、不判工作量。`ANALYSIS_BATCHES_V2` 定义跨模块依赖分析批次（前序批次结论喂后续）。**判断靠指纹 diff，命名靠 vocab**：函数→节点归属由 Agent 判断，不要求穷举所有函数。
 
 ## 组装依赖
 

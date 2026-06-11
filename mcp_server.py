@@ -181,15 +181,36 @@ def compare_functions(target: str, base: str,
 
 @mcp.tool()
 def node_taxonomy(node_id: str = "") -> dict:
-    """Kernel design tree skeleton. 14 subsystems, 112 leaf nodes.
-    Pass node_id to get one node's details; empty = full tree."""
-    from core.kernel_tree import ROOT_NODES_V2, ANALYSIS_ORDER_V2, node_title_zh, node_title_en
+    """Kernel design tree skeleton — the report framework. 14 subsystems, 112 leaf nodes.
+
+    Pass node_id to get one node's detail (title + scope + vocab terms).
+    Empty = full tree + analysis batches.
+
+    The tree ORGANIZES the report; it does NOT judge plagiarism or workload.
+    - scope: one-line boundary — what work counts as this node. Read it before
+      deciding which functions belong here. Function→node assignment is YOUR call.
+    - vocab: naming SUGGESTIONS so you describe mechanisms in standard terms
+      (e.g. "MLFQ scheduler"). NOT a checklist, NOT graded, NOT evidence of work.
+      You may name mechanisms not listed here. Judge by fingerprint diff; name by vocab.
+    - batches: explore in this cross-module dependency order. Earlier batches feed
+      later judgement (e.g. context-switch + lock are analyzed alongside scheduler).
+    """
+    from core.kernel_tree import (
+        ROOT_NODES_V2, ANALYSIS_ORDER_V2, ANALYSIS_BATCHES_V2,
+        VOCAB_BY_NODE, node_title_zh, node_title_en, node_scope,
+    )
+
+    def _vocab_terms(nid: str) -> list[str]:
+        v = VOCAB_BY_NODE.get(nid, {})
+        return [m["tag"] for m in v.get("mechanisms", [])]
 
     if node_id:
         return {
             "node_id": node_id,
             "title_zh": node_title_zh(node_id),
             "title_en": node_title_en(node_id),
+            "scope": node_scope(node_id),
+            "vocab": _vocab_terms(node_id),
         }
 
     tree = {}
@@ -197,11 +218,20 @@ def node_taxonomy(node_id: str = "") -> dict:
         tree[root] = {
             "title_zh": node_title_zh(root),
             "title_en": node_title_en(root),
-            "children": [{"id": c, "title_zh": node_title_zh(c), "title_en": node_title_en(c)}
-                         for c in children],
+            "children": [
+                {"id": c, "title_zh": node_title_zh(c), "scope": node_scope(c),
+                 "vocab": _vocab_terms(c)}
+                for c in children
+            ],
         }
-    return {"roots": tree, "leaf_count": len(ANALYSIS_ORDER_V2),
-            "order": ANALYSIS_ORDER_V2}
+    return {
+        "roots": tree,
+        "leaf_count": len(ANALYSIS_ORDER_V2),
+        "order": ANALYSIS_ORDER_V2,
+        "batches": ANALYSIS_BATCHES_V2,
+        "batch_note": "Explore batch-by-batch in this cross-module dependency order; "
+                      "write findings back to report_data.json context after each batch.",
+    }
 
 
 # ── tool: compile_flags ──────────────────────────────────────────────
