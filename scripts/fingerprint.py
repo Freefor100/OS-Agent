@@ -1,13 +1,9 @@
 #!/usr/bin/env python3
-"""Stage-1 fingerprint building — pure, deterministic, no similarity, no LLM.
-
-This module ONLY builds fingerprints for one repo. It does NOT compare anything.
-Similarity/classification lives in provenance.py (which now consumes this).
+"""Fingerprint building — pure computation, no judgment, no similarity.
 
 Two fingerprint sources, unified output schema:
-  - c / cpp / rust  -> code_atlas (tree-sitter) functions -> _fn_structure_fingerprint
+  - c / cpp / rust  -> code_atlas (tree-sitter) functions -> token hash + AST shape hash
   - asm (.S/.s)     -> asm_tokenize label-blocks -> minhash exact-token hash
-                       (code_atlas can't parse asm; was v1's blind spot, DESIGN 5.4)
 
 Unit schema (one dict per code unit, function or asm label-block):
   {
@@ -170,4 +166,4 @@ if __name__ == "__main__":  # build only; proves no similarity is computed
     units = build_units(f"repos/{repo}" if "/" not in repo else repo)
     summ = lang_summary(units)
     print(f"{repo}: {len(units)} units  {summ}")
-    print(f"  asm units: {summ.get('asm', 0)}  (v1 dropped all of these)")
+    print(f"  asm units: {summ.get('asm', 0)}")

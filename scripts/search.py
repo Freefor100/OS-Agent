@@ -1,27 +1,27 @@
 #!/usr/bin/env python3
-"""Stage-3 1-vs-N rough search — single target against the corpus.
+"""1-vs-N similarity search — single target against the corpus.
 
-Replaces v1's all-pairs N×N approach. Takes one target repo, scans all cached
-fingerprint sets in .fp_cache/, computes bidirectional containment, and returns
-top-K candidates ranked by min(A in B, B in A). Pure deterministic — no LLM.
+Computes bidirectional containment (token + AST) and returns top-K candidates.
+Accepts an optional exclude_prefixes list so the caller (Agent) can filter out
+external dependencies before searching — without this, shared vendored code
+dominates the ranking and hides real student-code similarity.
 
-Corpus fingerprints are built lazily on first scan and cached; subsequent
-searches are instant.
-
-Output: list of {repo, containment_a_in_b, containment_b_in_a, min} sorted by min.
+Output: [{repo, token_min, ast_min, combined, is_framework, year, overlap_by_dir}]
+sorted by combined descending.
 """
 from __future__ import annotations
 
+import os
 import pickle
+import re
 import sys
+from collections import defaultdict
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from scripts.fingerprint import fingerprint_set, ast_fingerprint_set
+from scripts.fingerprint import build_units, fingerprint_set, ast_fingerprint_set
 
 CACHE = Path(".fp_cache")
-# repos that are frameworks/baselines, not competition submissions — they appear
-# in search results but are tagged so the caller can distinguish
 FRAMEWORKS = {"_baseline_oscomp-arceos", "arceos", "rCore-Tutorial-v3", "ucore_os_lab",
               "ucore-smp", "Starry", "starry-mix", "zCore", "xv6-riscv", "xv6-public",
               "xv6-k210"}
@@ -50,63 +50,121 @@ def corpus_fingerprints(build_missing: bool = False) -> dict[str, set[str]]:
     return fpsets
 
 
+def _filtered_sets(target: str, exclude_prefixes: list[str] | None):
+    """Build filtered fingerprint + AST sets for target, skipping excluded paths.
+
+    Returns (fp_set, ast_set, fp_to_dir) where fp_to_dir maps each fingerprint
+    to its source directory (for overlap_by_dir breakdown).
+    """
+    units = build_units(f"repos/{target}" if "/" not in target else target, use_cache=True)
+
+    fp_set: set[str] = set()
+    ast_set: set[str] = set()
+    fp_to_dir: dict[str, str] = {}
+
+    prefixes = exclude_prefixes or []
+    for u in units:
+        f = u["file"]
+        if any(f == p or f.startswith(p + "/") or f.startswith(p) for p in prefixes):
+            continue
+        fp_set.add(u["fp"])
+        if u.get("ast") and u["lang"] != "asm":
+            ast_set.add(u["ast"])
+        d = os.path.dirname(f) or "(root)"
+        fp_to_dir[u["fp"]] = d
+
+    return fp_set, ast_set, fp_to_dir
+
+
+def _overlap_breakdown(fp_set: set[str], candidate_fps: set[str],
+                       fp_to_dir: dict[str, str]) -> dict[str, dict]:
+    """Compute per-directory overlap between target and candidate."""
+    inter = fp_set & candidate_fps
+    dir_shared: dict[str, int] = defaultdict(int)
+    dir_target: dict[str, int] = defaultdict(int)
+
+    for fp, d in fp_to_dir.items():
+        dir_target[d] += 1
+        if fp in inter:
+            dir_shared[d] += 1
+
+    result = {}
+    for d in sorted(dir_shared, key=lambda k: -dir_shared[k]):
+        result[d] = {"shared": dir_shared[d], "target": dir_target[d]}
+    return result
+
+
 def search(target: str, corpus: dict[str, set[str]] | None = None,
-           top_k: int = 20) -> list[dict]:
+           top_k: int = 20,
+           exclude_prefixes: list[str] | None = None) -> list[dict]:
     """1-vs-N bidirectional containment search (token + AST).
 
-    Returns [{repo, token_min, ast_min, combined, a_in_b, b_in_a, is_framework}]
-    sorted by combined descending. AST similarity catches structural reuse even
-    when identifiers/directories/formatting differ (restructured forks).
+    exclude_prefixes: dir/file prefixes to skip in target (e.g. ["vendor/", "dependency/"]).
+    These are the Agent's judgment about which code is not the student's.
+
+    Returns [{repo, token_min, ast_min, combined, is_framework, year, overlap_by_dir}]
+    sorted by combined descending.
     """
-    t_fps = fingerprint_set(f"repos/{target}" if "/" not in target else target)
-    t_ast = ast_fingerprint_set(f"repos/{target}" if "/" not in target else target)
+    t_fps, t_ast, fp_to_dir = _filtered_sets(target, exclude_prefixes)
+
     if corpus is None:
         corpus = corpus_fingerprints()
+
     results = []
     for name in corpus:
         if name == target or not corpus[name]:
             continue
-        # token containment
+
         c_fps = corpus[name]
         inter_tok = len(t_fps & c_fps)
-        tok_min = min(inter_tok / len(t_fps), inter_tok / len(c_fps)) if t_fps and c_fps else 0.0
+        tok_min = (min(inter_tok / len(t_fps), inter_tok / len(c_fps))
+                   if t_fps and c_fps else 0.0)
 
-        # AST containment (build on demand, cached)
         try:
             c_ast = ast_fingerprint_set(f"repos/{name}")
         except Exception:
             c_ast = set()
         inter_ast = len(t_ast & c_ast)
-        ast_min = min(inter_ast / len(t_ast), inter_ast / len(c_ast)) if t_ast and c_ast else 0.0
+        ast_min = (min(inter_ast / len(t_ast), inter_ast / len(c_ast))
+                   if t_ast and c_ast else 0.0)
 
-        # combined: max of both dimensions — either signal is sufficient evidence
         combined = max(tok_min, ast_min)
 
-        year = _extract_year(name)
+        overlap = _overlap_breakdown(t_fps, c_fps, fp_to_dir) if t_fps else {}
+
         results.append({
             "repo": name,
             "token_min": round(tok_min, 3),
             "ast_min": round(ast_min, 3),
             "combined": round(combined, 3),
             "is_framework": name in FRAMEWORKS,
-            "year": year,
+            "year": _extract_year(name),
+            "overlap_by_dir": overlap,
         })
+
     results.sort(key=lambda r: -r["combined"])
     return results[:top_k]
 
 
 def _extract_year(name: str) -> int:
     """Extract contest year from repo name. T20241xxx → 2024, oskernel2023-xxx → 2023."""
-    import re
     m = re.search(r"T20(2[0-9])", name) or re.search(r"20(19|2[0-5])", name)
-    return int(m.group(0)[1:]) if m and m.group(0).startswith("T") else (int(m.group(0)) if m else 0)
+    if m and m.group(0).startswith("T"):
+        return int(m.group(0)[1:])
+    return int(m.group(0)) if m else 0
 
 
 if __name__ == "__main__":
     target = sys.argv[1]
     top = int(sys.argv[2]) if len(sys.argv) > 2 else 15
-    candidates = search(target, top_k=top)
-    print(f"{target}  vs  corpus ({len(corpus_fingerprints())} members):\n")
+    prefixes = sys.argv[3:] if len(sys.argv) > 3 else None
+    candidates = search(target, top_k=top, exclude_prefixes=prefixes)
+    filt = " (filtered)" if prefixes else ""
+    print(f"{target}{filt}  vs  corpus ({len(corpus_fingerprints())} members):\n")
     for r in candidates:
-        tag = " [base]" if r["is_framework"] else ""
-        print(f"  comb={r['combined']:.3f}  tok={r['token_min']:.3f}  ast={r['ast_min']:.3f}  {r['repo'][:36]}{tag}")
+        tag = " [fw]" if r["is_framework"] else ""
+        print(f"  combined={r['combined']:.3f}  tok={r['token_min']:.3f}  ast={r['ast_min']:.3f}  "
+              f"{r['repo'][:36]}{tag}")
+        if r.get("overlap_by_dir"):
+            for d, st in list(r["overlap_by_dir"].items())[:5]:
+                print(f"    {d:40s} shared={st['shared']:4d}/{st['target']:4d}")

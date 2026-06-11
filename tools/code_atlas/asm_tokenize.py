@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 """Lightweight assembly tokenizer for fingerprinting (.S/.s).
 
-code_atlas/tree-sitter does NOT parse assembly, so 1699 asm files (boot/entry/
-swtch/trap — copy-prone kernel cores) were silently dropped from v1's similarity
-analysis. The minhash layer (minhash.signature_from_tokens) only needs a token
-list, not an AST — so we tokenize assembly directly. See DESIGN.md §5.4.
+code_atlas/tree-sitter does not parse assembly. The minhash layer only needs a token
+list, not an AST — so we tokenize assembly directly.
 
 Normalization (so renamed labels / reallocated registers / changed comments still
 match copied code):
@@ -16,18 +14,12 @@ match copied code):
 
 Unit = one label block (label def to next label, the natural routine boundary in
 asm). Files with no labels become one unit. Returns [(unit_name, tokens)].
-
-Caveat (same as C boilerplate): standard routines (swtch, save/restore-all) are
-near-identical across all kernels by necessity — low discriminative power, like
-short C functions. A size floor on units is applied by the caller, not here.
 """
 from __future__ import annotations
 
 import re
 
 # register name patterns across the arches in this corpus (RISC-V, LoongArch, ARM64).
-# best-effort — consistent normalization matters more than completeness, since
-# copied code still matches copied code under any deterministic mapping.
 _REG_RE = re.compile(
     r"^\$?("
     r"zero|ra|sp|gp|tp|fp|pc|lr|"                 # named (RISC-V / common)
@@ -50,7 +42,6 @@ def _strip_comments(text: str) -> str:
     text = _COMMENT_BLOCK_RE.sub(" ", text)
     out = []
     for line in text.splitlines():
-        # line comments: # (GAS), // (some), ; (some assemblers)
         for marker in ("#", "//", ";"):
             idx = line.find(marker)
             if idx != -1:
@@ -61,7 +52,6 @@ def _strip_comments(text: str) -> str:
 
 def _tokenize_line(line: str) -> list[str]:
     """One asm line -> normalized tokens. First word = mnemonic/directive (kept)."""
-    # split operands on commas and whitespace, but keep ( ) as structure
     line = line.replace("(", " ( ").replace(")", " ) ").replace(",", " , ")
     words = line.split()
     if not words:
@@ -69,7 +59,6 @@ def _tokenize_line(line: str) -> list[str]:
     toks: list[str] = []
     for i, w in enumerate(words):
         if i == 0:
-            # mnemonic or directive keyword — keep verbatim (lowercased)
             toks.append(w.lower())
             continue
         if w in ("(", ")", ","):
@@ -77,9 +66,9 @@ def _tokenize_line(line: str) -> list[str]:
         elif _REG_RE.match(w):
             toks.append("REG")
         elif _NUM_RE.match(w):
-            toks.append(w)            # keep immediate/offset value
+            toks.append(w)
         else:
-            toks.append("LBL")        # label ref / symbol / unknown operand
+            toks.append("LBL")
     return toks
 
 

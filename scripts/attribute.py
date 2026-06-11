@@ -1,16 +1,14 @@
 #!/usr/bin/env python3
-"""Stage-4 function-level deep comparison — COPIED / DISGUISE / MODIFIED / NOVEL.
+"""Function-level comparison — COPIED / DISGUISE / MODIFIED / NOVEL.
 
-Takes a target repo and a base (from search.py or explicit), classifies every
-non-excluded target function against the base:
-
+Takes a target repo and a base, classifies every non-excluded function:
   COPIED    exact fp in base, same name    — carried over unchanged
-  DISGUISE  exact fp in base, name differs — renamed copy (plagiarism signal)
-  MODIFIED  same name, fp differs          — changed (most interesting to read)
+  DISGUISE  exact fp in base, name differs — renamed copy
+  MODIFIED  same name, fp differs          — changed
   NOVEL     neither name nor fp in base    — new code
 
-Uses fingerprint.build_units (code + asm) and exclude.load_rules (EXTERNAL skip).
-Outputs a JSON work-list (MODIFIED + NOVEL by module) for the LLM / report stage.
+The caller (Agent) provides exclude_prefixes based on its own understanding
+of which directories are external dependencies. No exclude rules engine needed.
 """
 from __future__ import annotations
 
@@ -21,115 +19,114 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from scripts.fingerprint import build_units, fingerprint_set
-from scripts.exclude import load_rules
-
-PEER_TOKEN_FLOOR = 100
 
 
-def deep_compare(target: str, base: str) -> dict:
-    """Classify every target unit against base. Returns {COPIED/DISGUISE/MODIFIED/NOVEL: [unit]}."""
-    units = build_units(f"repos/{target}")
-    rules = load_rules(target)
-    if base:
-        base_fps = fingerprint_set(f"repos/{base}")
-    else:
-        base_fps = set()
+def _is_excluded(file_path: str, prefixes: list[str]) -> bool:
+    for p in prefixes:
+        if file_path == p or file_path.startswith(p + "/") or file_path.startswith(p):
+            return True
+    return False
 
-    # index base functions by name for MODIFIED detection
-    base_units = build_units(f"repos/{base}") if base else []
-    base_names: dict[str, list[dict]] = defaultdict(list)
-    base_hash_to_names: dict[str, set[str]] = defaultdict(set)
-    for u in base_units:
-        base_names[u["name"].lower()].append(u)
-        base_hash_to_names[u["fp"]].add(u["name"])
 
-    classes = {"COPIED": [], "DISGUISE": [], "MODIFIED": [], "NOVEL": []}
+def compare_units(target: str, base: str,
+                  exclude_prefixes: list[str] | None = None) -> dict:
+    """Classify target units against base.
 
-    for u in units:
-        # skip excluded units (EXTERNAL — not the student's code anyway)
-        from scripts.exclude import apply_exclude
-        excluded, _ = apply_exclude(rules, u["file"])
-        if excluded:
+    Returns {summary: {copied, disguise, modified, novel}, by_file: {...}}.
+    """
+    prefixes = exclude_prefixes or []
+
+    t_units = build_units(f"repos/{target}" if "/" not in target else target)
+    b_units = build_units(f"repos/{base}" if "/" not in base else base) if base else []
+    b_fps = fingerprint_set(f"repos/{base}" if "/" not in base else base) if base else set()
+
+    # index base functions
+    base_by_name: dict[str, list[dict]] = defaultdict(list)
+    for u in b_units:
+        base_by_name[u["name"].lower()].append(u)
+
+    # classify
+    classified: dict[str, list[dict]] = {"copied": [], "disguise": [], "modified": [], "novel": []}
+
+    for u in t_units:
+        if _is_excluded(u["file"], prefixes):
             continue
 
         name = u["name"].lower()
         fp = u["fp"]
-        if fp and fp in base_fps:
-            if name in base_names and any(b["fp"] == fp for b in base_names[name]):
-                classes["COPIED"].append(u)
+
+        if fp and fp in b_fps:
+            if name in base_by_name and any(b["fp"] == fp for b in base_by_name[name]):
+                classified["copied"].append(u)
             else:
-                classes["DISGUISE"].append(u)
-        elif name in base_names:
-            classes["MODIFIED"].append(u)
+                classified["disguise"].append(u)
+        elif name in base_by_name:
+            classified["modified"].append(u)
         else:
-            classes["NOVEL"].append(u)
+            classified["novel"].append(u)
 
-    return classes
+    # summary
+    summary = {k: len(v) for k, v in classified.items()}
+
+    # group by file
+    by_file: dict[str, dict] = defaultdict(lambda: {"functions": []})
+    for status, fns in classified.items():
+        for f in fns:
+            by_file[f["file"]]["functions"].append({
+                "name": f["name"],
+                "status": status,
+                "tokens": f["sz"],
+                "line": f.get("line", 0),
+                "lang": f.get("lang", ""),
+            })
+
+    # sort functions within each file by status priority: modified > novel > disguise > copied
+    _order = {"modified": 0, "novel": 1, "disguise": 2, "copied": 3}
+    for fi in by_file.values():
+        fi["functions"].sort(key=lambda x: _order.get(x["status"], 9))
+
+    return {
+        "target": target,
+        "base": base,
+        "summary": summary,
+        "by_file": dict(by_file),
+    }
 
 
-def module_of(path: str) -> str:
-    parts = [p for p in path.split("/") if p not in ("", ".", "src", "kernel", "os")]
-    return parts[0] if parts else "(root)"
-
-
-def main():
+if __name__ == "__main__":
     target = sys.argv[1]
     base = sys.argv[2] if len(sys.argv) > 2 else ""
+    prefixes = sys.argv[3:] if len(sys.argv) > 3 else None
 
-    # auto-resolve base from search if not given (cached-only — fast)
+    # auto-resolve base from search if not given
     if not base:
         from scripts.search import search, corpus_fingerprints
-        corpus = corpus_fingerprints(build_missing=False)  # only cached, fast
+        corpus = corpus_fingerprints(build_missing=False)
         candidates = search(target, corpus=corpus, top_k=3)
         peers = [c for c in candidates if not c.get("is_framework")]
         base = peers[0]["repo"] if peers else ""
         print(f"[auto] base = {base} (from {len(corpus)} cached members)")
 
-    print(f"TARGET: {target}  BASE: {base}\n")
-    classes = deep_compare(target, base)
+    print(f"TARGET: {target}  BASE: {base}  exclude: {prefixes or 'none'}\n")
+    result = compare_units(target, base, exclude_prefixes=prefixes)
 
-    total = sum(len(v) for v in classes.values()) or 1
-    print("=" * 72)
-    print("DEEP COMPARISON")
-    print("=" * 72)
-    for c in ("COPIED", "DISGUISE", "MODIFIED", "NOVEL"):
-        n = len(classes[c])
-        print(f"  {c:9s}: {n:5d}  ({100*n/total:.0f}%)")
+    total = sum(result["summary"].values()) or 1
+    s = result["summary"]
+    print(f"  COPIED:   {s['copied']:5d}  ({100*s['copied']/total:.0f}%)")
+    print(f"  DISGUISE: {s['disguise']:5d}  ({100*s['disguise']/total:.0f}%)")
+    print(f"  MODIFIED: {s['modified']:5d}  ({100*s['modified']/total:.0f}%)")
+    print(f"  NOVEL:    {s['novel']:5d}  ({100*s['novel']/total:.0f}%)")
+    print(f"  real work (M+N): {s['modified']+s['novel']} "
+          f"({100*(s['modified']+s['novel'])/total:.0f}%)")
 
-    inherited = len(classes["COPIED"]) + len(classes["DISGUISE"])
-    realwork = len(classes["MODIFIED"]) + len(classes["NOVEL"])
-    print(f"  {'-'*40}")
-    print(f"  inherited: {100*inherited/total:.0f}%   real work: {100*realwork/total:.0f}%")
-
-    # per-module breakdown
-    print("\n" + "=" * 72)
-    print("PER-MODULE")
-    print("=" * 72)
-    modst = defaultdict(lambda: defaultdict(int))
-    for cls, fns in classes.items():
-        for f in fns:
-            modst[module_of(f["file"])][cls] += max(1, f["sz"])
-    for mod, st in sorted(modst.items(), key=lambda kv: -sum(kv[1].values())):
-        inh = st["COPIED"] + st["DISGUISE"]
-        rw = st["MODIFIED"] + st["NOVEL"]
-        tot = inh + rw
-        if tot < 50:
+    # top files by modified count
+    print(f"\n  files: {len(result['by_file'])}")
+    top_files = sorted(result["by_file"].items(),
+                       key=lambda kv: sum(1 for f in kv[1]["functions"] if f["status"] in ("modified", "novel")),
+                       reverse=True)[:12]
+    for path, fi in top_files:
+        ms = sum(1 for f in fi["functions"] if f["status"] == "modified")
+        ns = sum(1 for f in fi["functions"] if f["status"] == "novel")
+        if ms + ns == 0:
             continue
-        print(f"  {mod[:28]:28s} {tot:6d}tok  inh={100*inh/tot:3.0f}%  rw={100*rw/tot:3.0f}%  "
-              f"(N={st['NOVEL']} M={st['MODIFIED']} C={st['COPIED']} D={st['DISGUISE']})")
-
-    # work-list for LLM
-    worklist = {
-        "target": target, "base": base,
-        "modified": [{"name": f["name"], "file": f["file"], "line": f.get("line", 0), "lang": f.get("lang", "")}
-                     for f in classes["MODIFIED"]],
-        "novel": [{"name": f["name"], "file": f["file"], "line": f.get("line", 0), "lang": f.get("lang", "")}
-                  for f in classes["NOVEL"]],
-    }
-    out = Path(f"/tmp/worklist_{target}.json")
-    out.write_text(json.dumps(worklist, ensure_ascii=False, indent=2))
-    print(f"\nwork-list ({len(worklist['modified'])}M + {len(worklist['novel'])}N) -> {out}")
-
-
-if __name__ == "__main__":
-    main()
+        print(f"  {path:50s}  M={ms:3d}  N={ns:3d}")
