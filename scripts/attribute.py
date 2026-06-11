@@ -29,16 +29,19 @@ def _is_excluded(file_path: str, prefixes: list[str]) -> bool:
 
 
 def compare_units(target: str, base: str,
-                  exclude_prefixes: list[str] | None = None) -> dict:
+                  exclude_prefixes: list[str] | None = None,
+                  branch: str = "", base_branch: str = "") -> dict:
     """Classify target units against base.
 
+    branch: target repo's cache namespace.
+    base_branch: base repo's cache namespace.
     Returns {summary: {copied, disguise, modified, novel}, by_file: {...}}.
     """
     prefixes = exclude_prefixes or []
 
-    t_units = build_units(f"repos/{target}" if "/" not in target else target)
-    b_units = build_units(f"repos/{base}" if "/" not in base else base) if base else []
-    b_fps = fingerprint_set(f"repos/{base}" if "/" not in base else base) if base else set()
+    t_units = build_units(f"repos/{target}" if "/" not in target else target, branch=branch)
+    b_units = build_units(f"repos/{base}" if "/" not in base else base, branch=base_branch) if base else []
+    b_fps = fingerprint_set(f"repos/{base}" if "/" not in base else base, branch=base_branch) if base else set()
 
     # index base functions
     base_by_name: dict[str, list[dict]] = defaultdict(list)

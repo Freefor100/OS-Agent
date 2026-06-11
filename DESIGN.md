@@ -15,25 +15,27 @@
 ```
 Agent 启动
   │
-  ├─ compile_flags(target)            # LSP 环境
-  ├─ build_fingerprint(target)        # 建全量指纹
-  ├─ 读 repo 结构 + README + 文档      # Agent 判断外部/自研
+  ├─ Phase 0: git branch -a / git log / git show  # Agent bash 探索分支
+  │     git checkout <selected_branch>
+  │
+  ├─ Phase 1: repo_metadata(target)             # xlsx 权威元数据
+  │     compile_flags(target)                   # LSP 环境
+  │     build_fingerprint(target, branch=...)   # 分支感知指纹
+  │     读 repo 结构 + README + 文档
   │
   ▼
-search_similar(target, exclude_prefixes=[...])
-  │  token + AST 双向包含
-  │  per-directory overlap 分布
+  search_similar(target, exclude_prefixes=[...], branch=...)
+  │  token + AST 双向包含, metadata 驱动 year/is_framework
   │
   ▼
-Agent 选 base（搜到高分候选 or README 声明的来源）
+  Agent 选 base
   │
   ▼
-compare_functions(target, base, exclude_prefixes=[...])
-  │  summary: COPIED/DISGUISE/MODIFIED/NOVEL 计数
-  │  by_file: 每个文件的函数级状态
+  compare_functions(target, base, exclude_prefixes=[...], branch=..., base_branch=...)
+  │  summary: COPIED/DISGUISE/MODIFIED/NOVEL
   │
   ▼
-Agent 读源码写分析 → 组装三色 HTML 报告
+  Agent 读源码写分析 → 用 report.py 出 HTML shell → 填分析
 ```
 
 ---
@@ -44,11 +46,14 @@ Agent 读源码写分析 → 组装三色 HTML 报告
 
 | 文件 | 功能 |
 |---|---|
-| `fingerprint.py` | 建指纹。c/cpp/rust 走 tree-sitter → token hash + AST shape hash；汇编走 tokenizer → MinHash。产出 `build_units(repo)` → 统一 unit 列表，缓存到 `.fp_cache/` |
-| `search.py` | 1-vs-N 搜索。`search(target, exclude_prefixes)` → `[{combined, token_min, ast_min, overlap_by_dir, is_framework, year}]`。`overlap_by_dir` 显示相似度集中在哪些目录 |
-| `attribute.py` | 函数级对比。`compare_units(target, base, exclude_prefixes)` → `{summary, by_file}`。四分类：COPIED / DISGUISE / MODIFIED / NOVEL |
-| `compile_flags.py` | 为 repo 生成 `compile_flags.txt`（架构+include+宏），clangd 读取后正确解析 RISC-V/LoongArch 代码。**强烈建议安装纯正的 ELF 交叉编译器**（如 `loongarch64-unknown-elf`），LSP 会自动探测并调用以获取系统头文件，达到 100% 解析精度并避免 Linux 宏污染。 |
-| `run.py` | 预建 corpus 指纹：`python scripts/run.py --build` |
+| `fingerprint.py` | 建指纹。`build_units(repo, branch)` → token hash + AST shape hash + asm MinHash。分支感知缓存到 `.fp_cache/`。`run.py --all-branches` 离线预建全部 |
+| `search.py` | 1-vs-N 搜索。`search(target, exclude_prefixes, branch, metadata)` → `[{repo, branch, combined, ...}]`。默认加载全部 branch cache，返回 per-branch 候选。metadata 驱动 year/is_framework |
+| `attribute.py` | 函数级对比。`compare_units(target, base, exclude_prefixes, branch, base_branch)` → `{summary, by_file}` |
+| `compile_flags.py` | 为 repo 生成 `compile_flags.txt`（架构+include+宏） |
+| `report.py` | HTML 报告模板引擎：预渲染表格+三色设计树，`<!-- AGENT_DESC -->` 标记供 Agent 填入分析 |
+| `batch.py` | 批量指纹构建 |
+| `git_history.py` | Git 时间线比较（辅助抄袭方向判定） |
+| `run.py` | 预建 corpus 指纹：`--build --all-branches` 覆盖全部 repo×分支 |
 
 ### 工具层 (`tools/`)
 
@@ -66,16 +71,17 @@ Agent 读源码写分析 → 组装三色 HTML 报告
 
 | 文件 | 功能 |
 |---|---|
+| `metadata.py` | MetadataManager：加载 xlsx，URL↔repo_name 双向索引，替代硬编码 FRAMEWORKS |
 | `code_atlas/builder.py` | Code atlas 构建器：tree-sitter 扫描 → 函数/类型/边 → PageRank → 归一化token |
-| `kernel_tree.py` | 固定骨架：14 子系统 / 112 叶子节点 |
+| `kernel_tree.py` | 固定骨架：14 子系统 / 112 叶子节点 + `VOCAB_BY_NODE` 机制词汇表 |
 | `evidence.py` | 证据存储 + 确定性 hash ID |
 
 ### 交付层
 
 | 文件 | 功能 |
 |---|---|
-| `mcp_server.py` | MCP server：7 个工具 |
-| `SKILL.md` | Agent 工作流：认识作品 → 搜索 → 对比 → 报告 |
+| `mcp_server.py` | MCP server：12 个工具（含 4 LSP + metadata） |
+| `SKILL.md` | Agent 工作流：Phase 0 分支探索 → Phase 1 认识 → Phase 2 搜索 → Phase 3 对比 → Phase 4 报告 |
 | `.mcp.json` | MCP 配置 |
 
 ---
@@ -130,32 +136,55 @@ README 声明"基于 xv6-k210"但指纹极低（0.088），Agent 仍须强制 de
 
 ---
 
-## MCP 工具（7 个）
+## MCP 工具（12 个）
 
 | 工具 | 输入 | 输出 |
 |---|---|---|
-| `search_similar` | target, exclude_prefixes?, top_k? | [{repo, combined, token_min, ast_min, is_framework, year, overlap_by_dir}] |
-| `compare_functions` | target, base, exclude_prefixes? | {summary: {copied,disguise,modified,novel}, by_file} |
-| `build_fingerprint` | target | {units, fingerprints, ast_fingerprints, languages} |
+| `repo_metadata` | target | {year, school, team, competition, is_framework} |
+| `build_fingerprint` | target, branch?, all_branches? | {units, fingerprints, ast_fingerprints, languages} |
+| `search_similar` | target, exclude_prefixes?, top_k?, branch? | [{repo, branch, combined, token_min, ast_min, is_framework, year, school, overlap_by_dir}] |
+| `compare_functions` | target, base, exclude_prefixes?, branch?, base_branch? | {summary: {copied,disguise,modified,novel}, by_file} |
+| `node_taxonomy` | node_id? | 14 子系统 / 112 叶子节点 + 机制词汇表 |
 | `compile_flags` | target | {arch, flags} |
 | `lsp_definition` | target, symbol, file? | 文件:行号 位置（含回退链信息） |
+| `lsp_references` | target, symbol, file? | 全项目 file:line 引用列表 |
+| `lsp_document_outline` | target, file | AST 结构大纲（函数/结构体+行号） |
+| `lsp_call_graph` | target, symbol, file, direction?, max_depth? | 递归调用链树（outgoing/incoming/both） |
+| `lsp_set_target_arch` | target, arch | 覆盖目标 triple + 重启 LSP |
 | `read_doc` | target, path, start_page?, end_page? | PDF/Docx 文本内容 |
-| `node_taxonomy` | node_id? | 14 子系统 / 112 叶子节点骨架 |
+
+分支选择全部由 Agent 用 bash 完成（`git branch -a`, `git log`, `git show <branch>:README.md`）。所有分支指纹离线预计算（`run.py --all-branches`），search 返回 per-branch 候选——偏好从数据自然浮现。
 
 ---
 
+## 新增模块
+
+| 文件 | 功能 |
+|---|---|
+| `core/metadata.py` | MetadataManager：加载 `collected-data.xlsx`（168 条），构建 URL↔repo_name 双向索引。155 repos 匹配 xlsx，8 frameworks。替代 `search.py` 中硬编码 FRAMEWORKS 和脆弱的正则 `_extract_year()` |
+| `scripts/report.py` | HTML 报告模板引擎：预渲染贡献占比表、血缘总览、三色内核设计树。`<!-- AGENT_DESC -->` 标记供 Agent 填入自然语言分析 |
+| `scripts/batch.py` | 批量指纹构建 |
+| `scripts/git_history.py` | Git 时间线比较（辅助抄袭方向判定） |
+
+## 分支处理
+
+**所有分支预建指纹**（`python scripts/run.py --build --all-branches`）。缓存命名：
+- `fpset_{name}__{branch}.pkl` — 分支名中的 `/` 替换为 `-`
+
+Agent 用 bash 探索分支（`git branch -a`, `git log`, `git show <branch>:README.md`），无需脚本替 Agent 做选择。`search_similar` 默认加载所有分支指纹，结果自然标出每个候选匹配的具体分支。偏好从数据浮现——比如 `qemu-final` 分支高分自然反映初赛方向。
+
 ## 内核设计树
 
-`core/kernel_tree.py` 定义固定骨架：14 子系统 / 112 叶子节点。`EXTRA_NODE_SPECS` 提供 symbols/patterns 映射（函数名→树节点），辅助 Agent 将分析结果路由到正确节点。
+`core/kernel_tree.py` 定义固定骨架：14 子系统 / 112 叶子节点。`VOCAB_BY_NODE`（112 条）为每个节点提供机制标签（primary/display/weak_hint），`EXTRA_NODE_SPECS` 提供 symbols/patterns 映射（函数名→树节点），辅助 Agent 将分析结果路由到正确节点。
 
 ## 组装依赖
 
-requirements.txt: `mcp`, `networkx`, `numpy`, `tree-sitter-c/cpp/rust`, `pypdf`, `python-docx`。Python 3.10+。
+requirements.txt: `mcp`, `networkx`, `numpy`, `openpyxl`, `tree-sitter-c/cpp/rust`, `pypdf`, `python-docx`。Python 3.10+。
 
 ## .fp_cache
 
-指纹缓存（gitignored）：`units_*.pkl`（全量 unit 列表）、`fpset_*.pkl`（token hash 集合）、`astset_*.pkl`（AST hash 集合）。删 `.fp_cache/` 即强制重建。
+指纹缓存（gitignored）：`units_{name}__{branch}.pkl`、`fpset_{name}__{branch}.pkl`、`astset_{name}__{branch}.pkl`。分支名中的 `/` 替换为 `-`。`branch=""` 时加载所有旧格式文件（向后兼容）。删 `.fp_cache/` 即强制重建。
 
 ## Corpus
 
-`repos/`（gitignored）含 ~160 参赛内核 + 教学原型。`repos/_baseline_oscomp-arceos/` 是 ArceOS 大赛 fork。
+`repos/`（gitignored）含 ~160 参赛内核 + 教学原型。`collected-data.xlsx` 通过 git remote URL 桥接到本地 repo 目录。`repos/_baseline_oscomp-arceos/` 是 ArceOS 大赛 fork。

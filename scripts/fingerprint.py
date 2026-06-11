@@ -59,6 +59,16 @@ ASM_MIN_TOK = 12          # asm blocks below this are too generic (save/restore 
 CACHE = Path(".fp_cache")
 
 
+def _cache_path(prefix: str, repo_path: str, branch: str = "") -> Path:
+    """Branch-aware cache key: prefix_name.pkl or prefix_name__branch.pkl.
+    / in branch names (e.g. feat/vf2-boot) → - for filesystem safety."""
+    name = Path(repo_path).name
+    if branch:
+        safe = branch.replace("/", "-")
+        return CACHE / f"{prefix}_{name}__{safe}.pkl"
+    return CACHE / f"{prefix}_{name}.pkl"
+
+
 def _asm_fp(tokens: list[str]) -> str:
     """Exact hash of normalized asm token stream (mirrors the code ntok hash)."""
     return "ntok_" + hashlib.sha256(" ".join(tokens).encode()).hexdigest()[:16]
@@ -79,10 +89,10 @@ def _iter_asm_units(repo: Path):
                 yield rel, label, toks
 
 
-def build_units(repo_path: str, *, use_cache: bool = True) -> list[dict]:
-    """Build the unified unit list for one repo (code + asm). Cached."""
+def build_units(repo_path: str, *, branch: str = "", use_cache: bool = True) -> list[dict]:
+    """Build the unified unit list for one repo (code + asm). Cached with branch key."""
     name = Path(repo_path).name
-    cf = CACHE / f"units_{name}.pkl"
+    cf = _cache_path("units", repo_path, branch)
     if use_cache and cf.exists():
         return pickle.loads(cf.read_bytes())
 
@@ -123,29 +133,27 @@ def build_units(repo_path: str, *, use_cache: bool = True) -> list[dict]:
     return units
 
 
-def fingerprint_set(repo_path: str, *, use_cache: bool = True) -> set[str]:
-    """Just the set of exact fingerprints (1-vs-N peer membership). Cached."""
-    name = Path(repo_path).name
-    cf = CACHE / f"fpset_{name}.pkl"
+def fingerprint_set(repo_path: str, *, branch: str = "", use_cache: bool = True) -> set[str]:
+    """Just the set of exact fingerprints (1-vs-N peer membership). Cached with branch key."""
+    cf = _cache_path("fpset", repo_path, branch)
     if use_cache and cf.exists():
         return pickle.loads(cf.read_bytes())
-    s = {u["fp"] for u in build_units(repo_path, use_cache=use_cache)}
+    s = {u["fp"] for u in build_units(repo_path, branch=branch, use_cache=use_cache)}
     CACHE.mkdir(exist_ok=True)
     cf.write_bytes(pickle.dumps(s))
     return s
 
 
-def ast_fingerprint_set(repo_path: str, *, use_cache: bool = True) -> set[str]:
+def ast_fingerprint_set(repo_path: str, *, branch: str = "", use_cache: bool = True) -> set[str]:
     """AST shape hash set for a repo (code-only; asm has no tree-sitter AST).
 
-    Always reads from units but caches the final set. If the units cache is
-    stale (from before ast was added), rebuilds once.
+    Always reads from units but caches the final set. Branch-aware key.
+    If the units cache is stale (from before ast was added), rebuilds once.
     """
-    name = Path(repo_path).name
-    cf = CACHE / f"astset_{name}.pkl"
+    cf = _cache_path("astset", repo_path, branch)
     if use_cache and cf.exists():
         return pickle.loads(cf.read_bytes())
-    units = build_units(repo_path, use_cache=use_cache)
+    units = build_units(repo_path, branch=branch, use_cache=use_cache)
     s = {u["ast"] for u in units if u.get("ast") and u["lang"] != "asm"}
     if s:
         CACHE.mkdir(exist_ok=True)
