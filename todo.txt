@@ -2,14 +2,22 @@
 
 ## 短期（实现）
 
-- [ ] 产品化验证：Claude Code 加载 MCP (9 工具) + SKILL.md，真实跑一次报告生成（对比报告 + 描述报告）
+- [ ] 产品化验证：Claude Code 加载 MCP (10 工具) + SKILL.md，真实跑一次报告生成（对比报告 + 描述报告）
 - [ ] 报告收尾：
   - 创新工作区：指纹全库 NOVEL 簇（GUI/Wayland 等超出标准子系统的自研模块）单列展示
   - 汇编覆盖声明：报告显式声明汇编文件数/分析粒度/局限
   - 排除清单展示：排除规则与原因在报告中可见
-- [ ] SKILL 低分-声明自动化：Phase 1 中 combined < 0.30 时自动读 declarations 查来源并强制对比（rv6 案例：README 写「基于 xv6-k210」但指纹 0.088）
 
 ## 中期（完善）
 
 - [ ] overview.py 降级为语料库维护工具（当前是 v1 全库产物，适配 1-vs-N）
 - [ ] 旧测试文件 tests/test_agent_d_langgraph.py 引用已删除的模块，需清理或替换
+
+## 已完成
+
+- [x] SKILL 低分-声明自动化：Phase 1 中 combined < 0.30 时自动读 declarations 查来源并强制对比
+- [x] SKILL 声明引用缺失仓库处理：Phase 1a — clone missing deps → build_fingerprint → search
+- [x] SKILL 同届互抄判定：Phase 1b — year 字段 + same-cohort 复审标记
+- [x] search.py 加 year 字段（仓库名提取年份）
+- [x] MCP 加 build_fingerprint 工具（Agent 克隆新依赖后建指纹）
+- [x] compile_flags.py 跨架构 LSP 支持（163 个 repo，x86 riscv/loongarch/arm）
