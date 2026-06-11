@@ -23,6 +23,10 @@
 | `lsp_set_target_arch(target, arch)` | 覆盖 LSP 目标架构 | cfg 代码灰化时 |
 | `read_doc(target, path)` | 读 PDF/Docx 文档 | 读选手报告/设计文档 |
 
+## 环境要求
+
+在执行任何 Python 脚本（如 `scripts/report.py`）之前，**Agent 必须确保当前处于正确的 Python 运行环境**（通常是已执行 `conda activate os_agent` 或已激活 `.venv` 的 bash 会话）。
+
 ## 流程
 
 ### Phase 0: 探索分支

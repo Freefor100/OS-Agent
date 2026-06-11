@@ -25,8 +25,18 @@
 
 ### 第一步：装依赖
 
+建议使用 Conda 或 venv 虚拟环境（Python 3.10+）：
+
 ```bash
-pip install -r requirements.txt    # Python 3.10+
+# 使用 Conda
+conda create -n os_agent python=3.10
+conda activate os_agent
+pip install -r requirements.txt
+
+# 或使用 venv
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
 ```
 > **提示 (全语言 LSP 支持)**：本项目内置了对多种语言语言服务器的调用。如果需要对相关语言的内核实现进行 100% 完整解析（防止降级为正则搜索）：
 > - **C/C++**: `sudo apt-get install clangd`

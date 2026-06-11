@@ -19,13 +19,13 @@ import atexit
 import platform
 from typing import Dict, Any, Optional, List, Tuple
 
-# langchain @tool decorator — stub (Agent D deleted, not needed here)
+# langchain @tool decorator — stub
 def tool(func=None, *args, **kwargs):
     if func is not None and callable(func):
         return func
     return lambda f: f
 
-# compile_context — stub (compile_flags.txt generation was deleted with Agent D)
+# compile_context — stub
 def build_compile_flag_lines(repo, *args, **kwargs):
     return []
 
