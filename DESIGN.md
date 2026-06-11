@@ -4,13 +4,25 @@
 
 ## 流程总览
 
+**确定性计算**由 `scripts/run.py` 完成，产出缓存数据供 MCP 消费。**报告**由 Claude Code 通过 MCP 工具 + SKILL.md 产出。
+
 ```
-python scripts/run.py <作品名>
-    │
-    ├─ [A] declarations       读 Cargo.toml /.gitmodules / README
-    ├─ [B] fingerprint        建指纹 (c/cpp/rust + 汇编, 缓存)
-    ├─ [C] search             1-vs-N 搜索 (token + AST 双维度)
-    └─ [D] report             组装 HTML: 贡献表 + 设计树 + 架构图
+python scripts/run.py <作品名>           Claude Code + MCP + SKILL.md
+    │                                        │
+    ├─ [0] compile_flags   LSP 编译标志       │
+    ├─ [A] declarations    声明提取           │
+    ├─ [B] fingerprint     建指纹 (缓存)      │
+    ├─ [C] search           1-vs-N 搜索       │
+    └─ [D] deep compare     深度对比          │
+                                              │
+        所有数据已缓存 ──────────────────→  search_candidates()
+                                           deep_compare()
+                                           attribution()
+                                           lsp_definition()
+                                           ...
+                                              │
+                                          产出 查重报告 / 描述报告
+                                          (内核设计树 + 自然语言 + 声明核查)
 ```
 
 ## 文件清单

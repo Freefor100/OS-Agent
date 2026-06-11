@@ -1,81 +1,50 @@
 #!/usr/bin/env python3
-"""One-button 1-vs-N pipeline driver.
+"""Deterministic pipeline: build fingerprints + search + deep compare.
 
-Per-repo flow:
-  [A] declarations.py   extract Cargo structure + submodules + lineage refs
-  [B] fingerprint.py    build unified fingerprints (code + asm), cached
-  [C] search.py         1-vs-N search -> top-K similar corpus members
-  [D] report.py          provenance + report (peers = search candidates)
-
-Framework baseline is auto-detected from search results: if a known framework
-appears among top candidates, use it. Otherwise macrokernel -> framework=none.
+This stage produces all the data that the MCP server exposes to Claude Code.
+The report (HTML + natural-language analysis) is produced by Claude Code
+via MCP + SKILL.md — NOT by this script.
 
 Usage:
-  python scripts/run.py <target>            # single repo
+  python scripts/run.py <target>            # single repo: build + search + compare
   python scripts/run.py --build             # pre-build corpus fingerprints (once)
 """
 from __future__ import annotations
 
-import json
 import subprocess
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-# frameworks whose presence in search results signals a component-based paradigm
-FRAMEWORKS = {
-    "_baseline_oscomp-arceos": "repos/_baseline_oscomp-arceos",
-    "arceos": "repos/_baseline_oscomp-arceos",
-    "rCore-Tutorial-v3": "repos/rCore-Tutorial-v3",
-    "ucore_os_lab": "repos/ucore_os_lab",
-}
-
-
-def pick_framework(candidates: list[dict], threshold: float = 0.10) -> str:
-    """If a known framework appears among top candidates above threshold,
-    it's the component baseline. Otherwise macrokernel."""
-    for c in candidates:
-        if c["repo"] in FRAMEWORKS and c["combined"] >= threshold:
-            return FRAMEWORKS[c["repo"]]
-    return "none"
-
 
 def run_one(target: str):
     print(f"\n=== {target} ===")
 
-    # [0] compile_flags for LSP (clangd needs --target=riscv64 etc.)
+    # [0] compile_flags for LSP (clangd reads compile_flags.txt)
     subprocess.run([sys.executable, "scripts/compile_flags.py", f"repos/{target}"], check=False)
 
-    # [A] declarations
+    # [A] declarations → Cargo structure + git deps + lineage refs
     print("  [A] declarations...")
     subprocess.run([sys.executable, "scripts/declarations.py", target], check=False)
 
-    # [B] build fingerprint (cached — instant if already built)
+    # [B] fingerprint → units cached to .fp_cache/ (c/cpp/rust + asm)
     print("  [B] fingerprint...")
     subprocess.run([sys.executable, "-c",
-                    f"from scripts.fingerprint import build_units; u=build_units('repos/{target}'); print('  units='+str(len(u)))"],
+                    f"from scripts.fingerprint import build_units; u=build_units('repos/{target}'); print(f'  units={len(u)}')"],
                    check=False)
 
-    # [C] 1-vs-N search (cached corpus — instant if pre-built with --build)
+    # [C] 1-vs-N search → top-K similar corpus members
     print("  [C] search...")
     subprocess.run([sys.executable, "scripts/search.py", target, "10"], check=False)
 
-    # auto-detect paradigm from search results
-    from scripts.search import search as do_search
-    candidates = do_search(target, top_k=20)
-    fw = pick_framework(candidates)
-
-    # [D] deep comparison vs best candidate
+    # [D] deep compare vs best candidate (COPIED/DISGUISE/MODIFIED/NOVEL)
     print("  [D] deep compare...")
     subprocess.run([sys.executable, "scripts/attribute.py", target], check=False)
 
-    # [E] report — pass top candidates as peers
-    peers = [c["repo"] for c in candidates[:10] if not c["is_framework"]]
-    paradigm = "组件化" if fw != "none" else "宏内核"
-    print(f"  [{paradigm}] framework={fw}  peers={len(peers)}")
-    cmd = [sys.executable, "scripts/report.py", target, fw] + peers
-    subprocess.run(cmd, check=False)
+    # Done — all MCP tools now have cached data. Claude Code + Skill produces the report.
+    print(f"\n  pipeline complete. MCP tools now have cached data for {target}.")
+    print(f"  Run Claude Code with .mcp.json + SKILL.md to produce the report.")
 
 
 def main():
