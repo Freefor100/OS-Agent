@@ -28,6 +28,11 @@
 ```bash
 pip install -r requirements.txt    # Python 3.10+
 ```
+> **提示 (提升 LSP 精度)**：本项目的 LSP 工具 (`clangd`) 默认已支持跨架构基础分析。但为了达到 **100% 的高精度分析**（消除宏污染，并正确解析 `<stdarg.h>` 等系统头文件），强烈建议在系统中安装**纯正的裸机（Bare-Metal）交叉编译器**：
+> - **RISC-V**: `sudo apt-get install gcc-riscv64-unknown-elf`
+> - **LoongArch**: 请从 [picolibc-ci-tools](https://github.com/picolibc/picolibc-ci-tools/releases) 下载纯净的 `loongarch64-unknown-elf`（不要用 apt 里的 `loongarch64-linux-gnu`，会导致宏污染）。
+> - **ARM**: 请从 [xpack-dev-tools](https://github.com/xpack-dev-tools/aarch64-none-elf-gcc-xpack/releases) 下载 `aarch64-none-elf-gcc`。
+> 将它们解压并添加到 `PATH` 后，`lsp_ops.py` 会自动探测并调用它们。
 
 ### 第二步：预建语料库指纹（一次性）
 

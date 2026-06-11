@@ -47,7 +47,7 @@ Agent 读源码写分析 → 组装三色 HTML 报告
 | `fingerprint.py` | 建指纹。c/cpp/rust 走 tree-sitter → token hash + AST shape hash；汇编走 tokenizer → MinHash。产出 `build_units(repo)` → 统一 unit 列表，缓存到 `.fp_cache/` |
 | `search.py` | 1-vs-N 搜索。`search(target, exclude_prefixes)` → `[{combined, token_min, ast_min, overlap_by_dir, is_framework, year}]`。`overlap_by_dir` 显示相似度集中在哪些目录 |
 | `attribute.py` | 函数级对比。`compare_units(target, base, exclude_prefixes)` → `{summary, by_file}`。四分类：COPIED / DISGUISE / MODIFIED / NOVEL |
-| `compile_flags.py` | 为 repo 生成 `compile_flags.txt`（架构+include+宏），clangd 读取后正确解析 RISC-V/LoongArch 代码 |
+| `compile_flags.py` | 为 repo 生成 `compile_flags.txt`（架构+include+宏），clangd 读取后正确解析 RISC-V/LoongArch 代码。**强烈建议安装纯正的 ELF 交叉编译器**（如 `loongarch64-unknown-elf`），LSP 会自动探测并调用以获取系统头文件，达到 100% 解析精度并避免 Linux 宏污染。 |
 | `run.py` | 预建 corpus 指纹：`python scripts/run.py --build` |
 
 ### 工具层 (`tools/`)

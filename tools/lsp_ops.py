@@ -369,7 +369,7 @@ class LSPClient:
         arch_to_cc = {
             "riscv64": "riscv64-unknown-elf-gcc",
             "riscv32": "riscv32-unknown-elf-gcc",
-            "aarch64": "aarch64-unknown-elf-gcc",
+            "aarch64": "aarch64-none-elf-gcc",
             "arm": "arm-none-eabi-gcc",
             "loongarch64": "loongarch64-unknown-elf-gcc",
         }
@@ -625,45 +625,30 @@ def _resolve_lsp_binary(base_name: str, cwd: Optional[str] = None) -> str:
     
     # 别名映射：允许一个工具对应多个可能的名称（比如在不同系统或分发版下）
     aliases = {
-        # OS 比赛内核优先裸机工具链；Linux 发行版常只有 riscv64-linux-gnu-gcc，作为可用 fallback。
+        # OS 比赛内核优先裸机工具链，不再 fallback 到 linux-gnu 以防止宏污染
         "riscv64-linux-musl-cc": [
             "riscv-none-elf-gcc",
             "riscv64-unknown-elf-gcc",
-            "riscv64-linux-musl-cc",
-            "riscv64-linux-gnu-gcc",
         ],
         "riscv64-linux-musl-ld": [
             "riscv-none-elf-ld",
             "riscv64-unknown-elf-ld",
-            "riscv64-linux-musl-ld",
-            "riscv64-linux-gnu-ld",
         ],
         "arm-none-eabi-gcc": [
             "arm-none-eabi-gcc",
-            "aarch64-linux-gnu-gcc",
-            "arm-linux-gnueabi-gcc",
-            "arm-linux-gnueabihf-gcc",
-            "arm-none-linux-gnueabihf-gcc",
         ],
         "arm-none-eabi-ld": [
             "arm-none-eabi-ld",
-            "aarch64-linux-gnu-ld",
-            "arm-linux-gnueabi-ld",
-            "arm-linux-gnueabihf-ld",
         ],
-        "loongarch64-unknown-elf-gcc": ["loongarch64-unknown-elf-gcc", "loongarch64-linux-gnu-gcc", "loongarch64-unknown-linux-gnu-gcc"],
-        # xpack RISC-V 工具链别名（Windows 安装的实际可执行文件名）
+        "loongarch64-unknown-elf-gcc": ["loongarch64-unknown-elf-gcc"],
+        # xpack RISC-V 工具链别名
         "riscv-none-elf-gcc": [
             "riscv-none-elf-gcc",
             "riscv64-unknown-elf-gcc",
-            "riscv64-linux-musl-cc",
-            "riscv64-linux-gnu-gcc",
         ],
         "riscv-none-elf-ld": [
             "riscv-none-elf-ld",
             "riscv64-unknown-elf-ld",
-            "riscv64-linux-musl-ld",
-            "riscv64-linux-gnu-ld",
         ],
     }
     
@@ -814,9 +799,9 @@ class MultiplexingLSPGateway:
                 # 注入 query-driver 允许 clangd 调用交叉编译器提取系统头文件路径
                 # 这是一个逗号分隔的通配符/路径列表。我们把探测到的所有已知交叉编译器都加进去。
                 drivers = [
-                    "riscv64-unknown-elf-gcc", "riscv64-linux-musl-cc", "riscv-none-elf-gcc",
-                    "loongarch64-unknown-elf-gcc", "loongarch64-linux-gnu-gcc",
-                    "arm-none-eabi-gcc", "arm-linux-gnueabi-gcc"
+                    "riscv64-unknown-elf-gcc", "riscv-none-elf-gcc",
+                    "loongarch64-unknown-elf-gcc",
+                    "aarch64-none-elf-gcc", "arm-none-eabi-gcc"
                 ]
                 resolved_drivers = []
                 for d in drivers:
