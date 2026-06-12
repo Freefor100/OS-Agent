@@ -17,6 +17,7 @@ import logging
 import threading
 import atexit
 import platform
+from pathlib import Path
 from typing import Dict, Any, Optional, List, Tuple
 
 # langchain @tool decorator — stub
@@ -25,12 +26,15 @@ def tool(func=None, *args, **kwargs):
         return func
     return lambda f: f
 
-# compile_context — stub
 def build_compile_flag_lines(repo, *args, **kwargs):
-    return []
+    """Build managed clangd flags lazily to avoid importing project code at module load."""
+    from scripts.compile_flags import generate
+    return generate(repo).splitlines()
+
 
 def detect_target_arch(repo, *args, **kwargs):
-    return ""
+    from scripts.compile_flags import _detect_arch
+    return _detect_arch(Path(repo))
 
 logger = logging.getLogger("lsp_ops")
 logger.setLevel(logging.INFO)
@@ -927,9 +931,17 @@ def _cancel_future_safely(future):
         pass
 
 def _cleanup_lsp():
-    # 退出前清理子进程
-    if _lsp_loop.is_running():
-        asyncio.run_coroutine_threadsafe(_gateway.stop_all(), _lsp_loop).result(timeout=5.0)
+    """Stop clients and always remove managed repository-root helper files."""
+    try:
+        if _lsp_loop.is_running() and _gateway.clients:
+            asyncio.run_coroutine_threadsafe(_gateway.stop_all(), _lsp_loop).result(timeout=5.0)
+    except Exception as exc:
+        logger.debug("LSP shutdown cleanup did not finish: %s", exc)
+    finally:
+        for repo in list(_repos_agent_wrote_compile_flags):
+            _remove_managed_compile_flags(repo)
+        for repo in list(_rust_analyzer_ref_by_repo):
+            _remove_managed_rust_root_artifacts(repo)
 atexit.register(_cleanup_lsp)
 
 

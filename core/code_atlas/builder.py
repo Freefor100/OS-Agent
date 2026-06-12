@@ -147,9 +147,10 @@ def _compute_pagerank(
                 max_iter=PAGERANK_MAX_ITER,
             )
         except Exception as exc:
-            logger.warning("[D-1] pagerank 失败 (%s)，用均匀分布兜底", exc)
-            n = max(1, G.number_of_nodes())
-            pr = {fn_id: 1.0 / n for fn_id in fn_ids}
+            logger.warning("[D-1] pagerank 失败 (%s)，用确定性度数中心性兜底", exc)
+            weights = {fn_id: 1.0 + float(G.in_degree(fn_id)) + 0.25 * float(G.out_degree(fn_id)) for fn_id in fn_ids}
+            total = sum(weights.values()) or 1.0
+            pr = {fn_id: weight / total for fn_id, weight in weights.items()}
 
     return {
         fn_id: {

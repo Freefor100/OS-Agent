@@ -1,108 +1,59 @@
 #!/usr/bin/env python3
-"""Pre-build corpus fingerprints — one-time, then cached.
+"""Prepare immutable fingerprints and auditable search inputs.
 
-Usage:
-  python scripts/run.py --build                   # all repos, current branch
-  python scripts/run.py --build --branch main     # all repos, specific branch
-  python scripts/run.py --build --all-branches    # ALL repos × ALL branches
-
-After this, the MCP server (mcp_server.py) reads from .fp_cache/. The Agent
-drives the analysis workflow via MCP tools — build_fingerprint for new repos,
-search_similar for 1-vs-N search, compare_functions for deep comparison.
+The host Agent chooses scopes and the Base. This driver only materializes commits,
+builds deterministic fingerprints, creates default manifests, and runs scoped search.
 """
 from __future__ import annotations
 
 import argparse
-import subprocess
+import json
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 
-def _git_branches(repo_path: str) -> list[str]:
-    """List all branch names (local + remote, deduplicated)."""
-    try:
-        r = subprocess.run(
-            ["git", "-C", repo_path, "branch", "-a", "--format=%(refname:short)"],
-            capture_output=True, text=True, timeout=10,
-        )
-        if r.returncode != 0:
-            return []
-        branches = []
-        for line in r.stdout.strip().split("\n"):
-            line = line.strip()
-            if not line or "->" in line:
-                continue
-            # origin/main → main (prefer short name)
-            short = line.replace("origin/", "")
-            if short not in branches:
-                branches.append(short)
-        return branches
-    except Exception:
-        return []
+def build_snapshot(snapshot) -> dict:
+    from core.scope import build_scope_manifest
+    from scripts.fingerprint import ast_fingerprint_set, build_units, fingerprint_set, lang_summary
+    units = build_units(snapshot.repo_path, snapshot=snapshot)
+    scope = build_scope_manifest(snapshot, status="draft")
+    return {"snapshot": snapshot.to_dict(), "scope_suggestion": scope.to_dict(), "units": len(units), "languages": lang_summary(units),
+            "fingerprints": len(fingerprint_set(snapshot.repo_path, snapshot=snapshot)),
+            "ast_fingerprints": len(ast_fingerprint_set(snapshot.repo_path, snapshot=snapshot))}
 
 
-def build_all(repos_dir: str = "repos", branch: str = "",
-              all_branches: bool = False):
-    """Pre-build fingerprints for all repos."""
-    from scripts.fingerprint import build_units, fingerprint_set, ast_fingerprint_set, lang_summary
-
-    repos = Path(repos_dir)
-    if not repos.is_dir():
-        print(f"repos dir not found: {repos}")
-        return
-
-    entries = sorted(d for d in repos.iterdir() if d.is_dir() and not d.name.startswith("."))
-    total_units = 0
-    total_fps = 0
-
-    for i, d in enumerate(entries):
-        print(f"[{i+1}/{len(entries)}] {d.name}", end="", flush=True)
-
-        branches_to_build = []
-        if all_branches:
-            branches_to_build = _git_branches(str(d))
-            print(f" ({len(branches_to_build)} branches)", end="", flush=True)
-        else:
-            branches_to_build = [branch] if branch else [""]
-
-        for br in branches_to_build:
-            try:
-                units = build_units(str(d), branch=br, use_cache=not all_branches or False)
-                fps = fingerprint_set(str(d), branch=br)
-                ast = ast_fingerprint_set(str(d), branch=br)
-                langs = lang_summary(units)
-                if all_branches and len(branches_to_build) > 1:
-                    print(f"\n    {br}: {len(units)} units, {langs}")
-                total_units += len(units)
-                total_fps += len(fps)
-            except Exception as e:
-                print(f"\n    {br}: ERROR — {e}")
-
-        if all_branches and len(branches_to_build) <= 1:
-            print()
-        elif not all_branches:
-            print()
-
-    print(f"\nDone: {len(entries)} repos, {total_units} units, {total_fps} fingerprints")
+def build_all(repos_dir: str = "repos", ref: str = "HEAD", all_branches: bool = False) -> list[dict]:
+    from core.snapshot import discover_commit_snapshots, resolve_snapshot
+    results=[]; entries=sorted(x for x in Path(repos_dir).iterdir() if x.is_dir() and not x.name.startswith("."))
+    for i, repo in enumerate(entries,1):
+        try:
+            snapshots=discover_commit_snapshots(str(repo), materialize=True) if all_branches else [resolve_snapshot(str(repo), ref)]
+            for snap in snapshots:
+                result=build_snapshot(snap); results.append(result); print(f"[{i}/{len(entries)}] {repo.name} {snap.commit[:12]} {result['units']} units")
+        except Exception as exc:
+            print(f"[{i}/{len(entries)}] {repo.name}: ERROR {exc}", file=sys.stderr)
+    return results
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Pre-build corpus fingerprints")
-    parser.add_argument("--build", action="store_true", help="Build fingerprints for all repos")
-    parser.add_argument("--branch", type=str, default="",
-                        help="Specific branch to build (default: current branch)")
-    parser.add_argument("--all-branches", action="store_true",
-                        help="Build fingerprints for ALL branches of ALL repos")
-    args = parser.parse_args()
-
-    if not args.build:
-        parser.print_help()
-        sys.exit(1)
-
-    build_all(branch=args.branch, all_branches=args.all_branches)
+def prepare_target(target: str, ref: str, top_k: int) -> dict:
+    from core.scope import load_scope_manifest
+    from core.scoped_search import cached_candidate_snapshots, search_scoped
+    from core.snapshot import resolve_snapshot
+    path = str(Path("repos") / target) if "/" not in target else target
+    snapshot = resolve_snapshot(path, ref); built = build_snapshot(snapshot); scope=load_scope_manifest(snapshot.repo,snapshot.commit)
+    candidates=search_scoped(snapshot, scope, cached_candidate_snapshots(), top_k=top_k, formal_only=False)
+    return {"prepared":built,"rough_and_formal_candidates":candidates,
+            "next":"Agent reviews candidates_requiring_scope, creates their ScopeManifest, then reruns formal search"}
 
 
-if __name__ == "__main__":
-    main()
+def main() -> None:
+    parser=argparse.ArgumentParser(); parser.add_argument("target",nargs="?"); parser.add_argument("--build",action="store_true")
+    parser.add_argument("--ref",default="HEAD"); parser.add_argument("--all-branches",action="store_true",help="build each unique branch-tip commit"); parser.add_argument("--top-k",type=int,default=20)
+    args=parser.parse_args()
+    if args.build: build_all(ref=args.ref,all_branches=args.all_branches); return
+    if not args.target: parser.error("target is required unless --build is used")
+    print(json.dumps(prepare_target(args.target,args.ref,args.top_k),ensure_ascii=False,indent=2))
+
+if __name__ == "__main__": main()

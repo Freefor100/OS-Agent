@@ -22,13 +22,16 @@ Caching: per-repo unit list -> .fp_cache/units_<name>.pkl; fingerprint-only set
 from __future__ import annotations
 
 import hashlib
+import json
 import pickle
 import sys
 from pathlib import Path
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from core.code_atlas.builder import build_code_atlas
 from core.evidence import stable_id
+from core.snapshot import RepoSnapshot, resolve_snapshot
 from tools.code_atlas.asm_tokenize import tokenize_asm
 from tools.code_atlas.minhash import signature_from_tokens
 
@@ -36,42 +39,42 @@ from tools.code_atlas.minhash import signature_from_tokens
 def _semantic_fn_id(fn: dict) -> str:
     """Stable id from normalized tokens + AST shape — same inputs, same id."""
     tokens = fn.get("tokens_normalized") or fn.get("normalized_tokens") or fn.get("signature") or fn.get("name", "")
-    text = " ".join(tokens[:200]) if isinstance(tokens, list) else str(tokens)[:1000]
+    text = " ".join(tokens) if isinstance(tokens, list) else str(tokens)
     return stable_id("sfn", {"tokens": text, "ast": fn.get("ast_shape_hash", "")}, 16)
 
 
 def _fn_structure_fingerprint(fn: dict) -> dict:
     """Normalized-token fingerprint + AST shape hash for a code unit."""
     tokens = fn.get("tokens_normalized") or fn.get("normalized_tokens") or []
-    token_text = " ".join(tokens[:400]) if isinstance(tokens, list) else str(tokens)[:2000]
+    token_text = " ".join(tokens) if isinstance(tokens, list) else str(tokens)
     literals = fn.get("literal_set") or []
     return {
         "semantic_fn_id": _semantic_fn_id(fn),
         "path": str(fn.get("file", "")).replace("\\", "/"),
         "symbol": fn.get("name", ""),
         "ast_shape_hash": fn.get("ast_shape_hash"),
-        "normalized_token_fingerprint": stable_id("ntok", {"tokens": token_text}, 16),
+        "normalized_token_fingerprint": stable_id("ntok", {"tokens": token_text}, 64),
         "literal_fingerprint": stable_id("lit", {"literals": sorted(map(str, literals))}, 16) if literals else "",
     }
 
 CODE_LANGS = ("c", "cpp", "rust")
 ASM_MIN_TOK = 12          # asm blocks below this are too generic (save/restore stubs)
 CACHE = Path(".fp_cache")
+FINGERPRINT_SCHEMA = "fingerprint_v4_sha256_full_token_commit_snapshot"
 
 
-def _cache_path(prefix: str, repo_path: str, branch: str = "") -> Path:
-    """Branch-aware cache key: prefix_name.pkl or prefix_name__branch.pkl.
-    / in branch names (e.g. feat/vf2-boot) → - for filesystem safety."""
+def _cache_path(prefix: str, repo_path: str, commit: str = "", tree_hash: str = "") -> Path:
+    """Commit-aware cache key. Branch aliases that point to one commit share a cache."""
     name = Path(repo_path).name
-    if branch:
-        safe = branch.replace("/", "-")
-        return CACHE / f"{prefix}_{name}__{safe}.pkl"
+    if commit:
+        schema_tag = FINGERPRINT_SCHEMA.replace("fingerprint_", "fp-").replace("_", "-")
+        return CACHE / f"{prefix}_{name}__{commit[:16]}__{tree_hash[:12] or 'tree-unknown'}__{schema_tag}.pkl"
     return CACHE / f"{prefix}_{name}.pkl"
 
 
 def _asm_fp(tokens: list[str]) -> str:
     """Exact hash of normalized asm token stream (mirrors the code ntok hash)."""
-    return "ntok_" + hashlib.sha256(" ".join(tokens).encode()).hexdigest()[:16]
+    return "ntok_" + hashlib.sha256(" ".join(tokens).encode()).hexdigest()
 
 
 def _iter_asm_units(repo: Path):
@@ -89,76 +92,114 @@ def _iter_asm_units(repo: Path):
                 yield rel, label, toks
 
 
-def build_units(repo_path: str, *, branch: str = "", use_cache: bool = True) -> list[dict]:
-    """Build the unified unit list for one repo (code + asm). Cached with branch key."""
-    name = Path(repo_path).name
-    cf = _cache_path("units", repo_path, branch)
+def build_units(repo_path: str, *, branch: str = "", ref: str = "", snapshot: RepoSnapshot | None = None,
+                use_cache: bool = True) -> list[dict]:
+    """Build units from an immutable Git commit snapshot.
+
+    `branch` remains a compatibility alias for `ref`. It is resolved to a commit
+    before source is read, so dirty working-tree files never affect fingerprints.
+    """
+    snap = snapshot or resolve_snapshot(repo_path, ref or branch or "HEAD")
+    cf = _cache_path("units", repo_path, snap.commit, snap.tree_hash)
     if use_cache and cf.exists():
         return pickle.loads(cf.read_bytes())
 
     units: list[dict] = []
+    atlas = code_atlas(repo_path, snapshot=snap, use_cache=use_cache)
+    functions = atlas.get("functions", {})
+    outgoing: dict[str, set[str]] = {}
+    incoming: dict[str, set[str]] = {}
+    for edge in atlas.get("edges", []):
+        src = str(edge.get("src_fn_id") or "")
+        dst = str(edge.get("dst_fn_id") or "")
+        callee = str(edge.get("callee_name") or "")
+        if src and callee:
+            outgoing.setdefault(src, set()).add(callee)
+        if dst and src:
+            incoming.setdefault(dst, set()).add(str(functions.get(src, {}).get("name") or src))
 
-    atlas = build_code_atlas(repo_path=repo_path, repo_name=name)
-    for fn_id, fn in atlas.get("functions", {}).items():
+    for fn_id, fn in functions.items():
         lang = fn.get("lang")
         if lang not in CODE_LANGS:
             continue
         fp = _fn_structure_fingerprint(fn)
+        tokens = fn.get("tokens_normalized") or []
         units.append({
-            "lang": lang,
-            "file": str(fn.get("file", "")).replace("\\", "/"),
-            "name": fn.get("name", ""),
-            "line": fn.get("line", 0),
-            "fp": fp["normalized_token_fingerprint"],
-            "ast": fp.get("ast_shape_hash", ""),  # AST structure hash (ignores names/literals)
-            "sz": len(fn.get("tokens_normalized") or []),
-            "sig": None,
-            "fn_id": fn_id,
+            "unit_id": stable_id("unit", {"snapshot": snap.snapshot_id, "fn": fn_id}, 16),
+            "lang": lang, "file": str(fn.get("file", "")).replace("\\", "/"),
+            "name": fn.get("name", ""), "line": fn.get("line", 0), "end_line": fn.get("end_line", 0),
+            "fp": fp["normalized_token_fingerprint"], "ast": fp.get("ast_shape_hash", ""),
+            "sz": len(tokens), "sig": signature_from_tokens(tokens), "fn_id": fn_id,
+            "snapshot_id": snap.snapshot_id, "commit": snap.commit,
+            "outgoing_names": sorted(outgoing.get(fn_id, set())),
+            "incoming_names": sorted(incoming.get(fn_id, set())),
         })
 
-    repo = Path(repo_path)
+    repo = Path(snap.materialized_path)
     for rel, label, toks in _iter_asm_units(repo):
         units.append({
-            "lang": "asm",
-            "file": rel,
-            "name": label,
-            "line": 0,
-            "fp": _asm_fp(toks),
-            "sz": len(toks),
-            "sig": signature_from_tokens(toks),
+            "unit_id": stable_id("unit", {"snapshot": snap.snapshot_id, "file": rel, "label": label}, 16),
+            "lang": "asm", "file": rel, "name": label, "line": 0, "end_line": 0,
+            "fp": _asm_fp(toks), "ast": "", "sz": len(toks), "sig": signature_from_tokens(toks),
+            "snapshot_id": snap.snapshot_id, "commit": snap.commit,
+            "outgoing_names": [], "incoming_names": [],
         })
 
     CACHE.mkdir(exist_ok=True)
     cf.write_bytes(pickle.dumps(units))
+    _write_cache_meta(repo_path, snap)
     return units
 
 
-def fingerprint_set(repo_path: str, *, branch: str = "", use_cache: bool = True) -> set[str]:
-    """Just the set of exact fingerprints (1-vs-N peer membership). Cached with branch key."""
-    cf = _cache_path("fpset", repo_path, branch)
+def code_atlas(repo_path: str, *, branch: str = "", ref: str = "", snapshot: RepoSnapshot | None = None,
+               use_cache: bool = True) -> dict:
+    """Build or load the immutable commit's full structural atlas for Agent navigation."""
+    snap = snapshot or resolve_snapshot(repo_path, ref or branch or "HEAD")
+    cf = _cache_path("atlas2", repo_path, snap.commit, snap.tree_hash)
     if use_cache and cf.exists():
         return pickle.loads(cf.read_bytes())
-    s = {u["fp"] for u in build_units(repo_path, branch=branch, use_cache=use_cache)}
+    atlas = build_code_atlas(repo_path=snap.materialized_path, repo_name=snap.repo)
     CACHE.mkdir(exist_ok=True)
-    cf.write_bytes(pickle.dumps(s))
-    return s
+    cf.write_bytes(pickle.dumps(atlas))
+    _write_cache_meta(repo_path, snap)
+    return atlas
 
 
-def ast_fingerprint_set(repo_path: str, *, branch: str = "", use_cache: bool = True) -> set[str]:
-    """AST shape hash set for a repo (code-only; asm has no tree-sitter AST).
-
-    Always reads from units but caches the final set. Branch-aware key.
-    If the units cache is stale (from before ast was added), rebuilds once.
-    """
-    cf = _cache_path("astset", repo_path, branch)
+def fingerprint_set(repo_path: str, *, branch: str = "", ref: str = "", snapshot: RepoSnapshot | None = None,
+                    use_cache: bool = True) -> set[str]:
+    snap = snapshot or resolve_snapshot(repo_path, ref or branch or "HEAD")
+    cf = _cache_path("fpset", repo_path, snap.commit, snap.tree_hash)
     if use_cache and cf.exists():
         return pickle.loads(cf.read_bytes())
-    units = build_units(repo_path, branch=branch, use_cache=use_cache)
-    s = {u["ast"] for u in units if u.get("ast") and u["lang"] != "asm"}
-    if s:
-        CACHE.mkdir(exist_ok=True)
-        cf.write_bytes(pickle.dumps(s))
-    return s
+    result = {u["fp"] for u in build_units(repo_path, snapshot=snap, use_cache=use_cache)}
+    CACHE.mkdir(exist_ok=True); cf.write_bytes(pickle.dumps(result))
+    return result
+
+
+def ast_fingerprint_set(repo_path: str, *, branch: str = "", ref: str = "", snapshot: RepoSnapshot | None = None,
+                        use_cache: bool = True) -> set[str]:
+    snap = snapshot or resolve_snapshot(repo_path, ref or branch or "HEAD")
+    cf = _cache_path("astset", repo_path, snap.commit, snap.tree_hash)
+    if use_cache and cf.exists():
+        return pickle.loads(cf.read_bytes())
+    units = build_units(repo_path, snapshot=snap, use_cache=use_cache)
+    result = {u["ast"] for u in units if u.get("ast") and u["lang"] != "asm"}
+    CACHE.mkdir(exist_ok=True); cf.write_bytes(pickle.dumps(result))
+    return result
+
+
+def cache_metadata(repo_path: str, ref: str = "HEAD") -> dict[str, Any]:
+    snap = resolve_snapshot(repo_path, ref, materialize=False)
+    path = _cache_path("meta", repo_path, snap.commit, snap.tree_hash).with_suffix(".json")
+    if path.is_file():
+        return json.loads(path.read_text(encoding="utf-8"))
+    return snap.to_dict() | {"fingerprint_schema": FINGERPRINT_SCHEMA}
+
+
+def _write_cache_meta(repo_path: str, snapshot: RepoSnapshot) -> None:
+    path = _cache_path("meta", repo_path, snapshot.commit, snapshot.tree_hash).with_suffix(".json")
+    path.write_text(json.dumps(snapshot.to_dict() | {"fingerprint_schema": FINGERPRINT_SCHEMA},
+                               ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
 
 
 def lang_summary(units: list[dict]) -> dict[str, int]:

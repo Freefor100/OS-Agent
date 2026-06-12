@@ -1,188 +1,119 @@
-# OS-Agent 查重流水线 — 设计文档
+# OS-Agent 可审计 Base 发现与差异报告设计
 
-> 技术实现参考。使用方法见 [README.md](README.md)。
+## 职责边界
 
-## 核心设计原则
+宿主 Agent 负责确认作品版本、识别代码范围、选择参考作品，并为完整内核框架编写 Claim、NodeReview、ModuleReview 和 OverallAssessment。本地程序负责将 `作品@分支` 锁定为 commit、确定性指纹、双侧 Scope 搜索、双向函数匹配、Comparison 数据库、Evidence 校验、完整性校验和双报告投影。
 
-**Python 脚本只做确定性计算，Agent（Claude Code）做所有判断。**
+声明、glossary、vocab 与 Node Scope 都只能帮助判断，不能单独支撑实现或抄袭结论。
 
-- 脚本产出的数据：hash、集合交运算、per-directory overlap —— 这些都是 Agent 无法手工计算的
-- Agent 的判断：哪些是外部依赖、谁是谁的 base、某个函数是否真的抄袭 —— 需要读文档+源码+理解上下文
-- Agent 通过 `exclude_prefixes` 参数把判断结果传给脚本，脚本只在过滤后的数据上计算
+## 主流程
 
-## 流程总览
-
-```
-Agent 启动
-  │
-  ├─ Phase 0: git branch -a / git log / git show  # Agent bash 探索分支
-  │     git checkout <selected_branch>
-  │
-  ├─ Phase 1: repo_metadata(target)             # xlsx 权威元数据
-  │     compile_flags(target)                   # LSP 环境
-  │     build_fingerprint(target, branch=...)   # 分支感知指纹
-  │     读 repo 结构 + README + 文档
-  │
-  ▼
-  search_similar(target, exclude_prefixes=[...], branch=...)
-  │  token + AST 双向包含, metadata 驱动 year/is_framework
-  │
-  ▼
-  Agent 选 base
-  │
-  ▼
-  compare_functions(target, base, exclude_prefixes=[...], branch=..., base_branch=...)
-  │  summary: COPIED/DISGUISE/MODIFIED/NOVEL
-  │
-  ▼
-  Agent 读源码写分析 → 用 report.py 出 HTML shell → 填分析
+```text
+默认检出分支尖端 → 必要时分页检查其他分支尖端 → 按 commit 合并别名并锁定
+→ Git archive 内部源码快照
+→ Agent 审核目标 ScopeManifest → 粗召回 Top-K
+→ 审核候选 ScopeManifest → 双侧正式重排
+→ BaseEvidencePacket → Agent BaseDecision → 程序准入
+→ 双向函数比较 → Comparison SQLite + JSONL 审计导出
+→ Agent 按 112 节点提交 Claim 与评审 → Evidence/负向搜索 → 完整性校验
+→ report.json/report.html 评委主报告 + provenance.json/provenance.html 技术附录
 ```
 
----
+粗召回结果标记为 `score_kind=rough`，禁止进入 BaseDecision 和报告排名。正式结果要求目标与候选均有 `status=verified` 的 ScopeManifest。
 
-## 文件清单
+## 核心模块
 
-### 确定性计算 (`scripts/`)
-
-| 文件 | 功能 |
+| 模块 | 责任 |
 |---|---|
-| `fingerprint.py` | 建指纹。`build_units(repo, branch)` → token hash + AST shape hash + asm MinHash。分支感知缓存到 `.fp_cache/`。`run.py --all-branches` 离线预建全部 |
-| `search.py` | 1-vs-N 搜索。`search(target, exclude_prefixes, branch, metadata)` → `[{repo, branch, combined, ...}]`。默认加载全部 branch cache，返回 per-branch 候选。metadata 驱动 year/is_framework |
-| `attribute.py` | 函数级对比。`compare_units(target, base, exclude_prefixes, branch, base_branch)` → `{summary, by_file}` |
-| `compile_flags.py` | 为 repo 生成 `compile_flags.txt`（架构+include+宏） |
-| `report.py` | 报告流水线：`skeleton` 生成固定 112 节点骨架（空 color/stats/analysis 槽 + 每节点 scope），Agent 填值后 `render` 出三色 HTML（主色+构成条+⚠改名照搬标记+context 活文档） |
-| `batch.py` | 批量指纹构建 |
-| `run.py` | 预建 corpus 指纹：`--build --all-branches` 覆盖全部 repo×分支 |
+| `core/snapshot.py` | 默认选择当前检出分支尖端，解析 commit/tree hash、合并 ref aliases，并用 `git archive` 生成内部源码快照 |
+| `core/scope.py` | 构建和验证双侧 ScopeManifest，自动识别声明的 submodule |
+| `scripts/fingerprint.py` | 全归一化 token SHA-256、AST shape、调用邻居；缓存绑定 commit 和 schema |
+| `core/scoped_search.py` | 双侧 Scope 的 token/AST containment 搜索，区分 rough/formal |
+| `core/base_decision.py` | 声明来源提取、BaseEvidencePacket、BaseDecision 程序准入 |
+| `core/comparison.py` | 双向函数匹配、确定性 ComparisonRecord 与候选 MatchEdge |
+| `core/comparison_db.py` | SQLite 查询主库、JSONL 审计交接、分页聚合与 RelationshipHint |
+| `core/evidence.py` | EvidenceCandidate 校验、稳定 EvidenceRecord、完整覆盖负向搜索 |
+| `core/judge_report.py` | Claim、NodeReview、ModuleReview、OverallAssessment 与完整框架/Evidence 强校验 |
+| `core/provenance_report.py` | 从 Comparison 数据库导出完整确定性函数溯源数据 |
+| `scripts/judge_report.py` | 固定左侧框架目录、节点详情、静态架构图与集中 Evidence 的评委主报告 |
+| `scripts/provenance_report.py` | 独立文件树、函数列表、来源候选与源码对照技术附录 |
+| `mcp_server.py` | 向宿主 Agent 暴露结构化阶段接口 |
 
-### 工具层 (`tools/`)
+## 确定性函数状态
 
-| 文件 | 功能 |
+匹配顺序为：精确 token 指纹；精确 AST 与路径角色；名称、MinHash token、AST、相对路径和调用邻居联合评分；最后输出剩余项。
+
+| 状态 | 含义 |
 |---|---|
-| `code_atlas/minhash.py` | MinHash 签名 + jaccard 估计（底层指纹原语） |
-| `code_atlas/ast_shape.py` | AST 形状哈希，只 hash 节点类型，不要变量名/字面量。同结构→同hash |
-| `code_atlas/asm_tokenize.py` | 汇编 tokenizer：寄存器→REG，标号→LBL，保留助记符/偏移。按 label 块切分 |
-| `code_atlas/extractor.py` | tree-sitter 全仓库扫描器 |
-| `code_atlas/normalize.py` | token 归一化 |
-| `lsp_ops.py` | LSP 客户端（clangd/rust-analyzer，含退化链） |
-| `file_ops.py` | PDF/Docx 读取 |
+| `exact_copied` | 同名且完整归一化 token SHA-256 相同 |
+| `renamed_exact` | 名称不同但完整归一化 token SHA-256 相同 |
+| `modified_candidate` | 多信号形成唯一候选对，等待 Agent 解释语义变化 |
+| `target_only` | 目标新增 Unit |
+| `base_only` | Base 中存在、目标没有匹配 Unit |
+| `ambiguous` | 存在多个近似或精确候选，等待复核 |
 
-### 核心层 (`core/`)
+同名本身永远不足以产生 `modified_candidate`。`raw_status` 是工具事实，不允许被 Agent 覆盖。
 
-| 文件 | 功能 |
-|---|---|
-| `metadata.py` | MetadataManager：加载 xlsx，URL↔repo_name 双向索引，替代硬编码 FRAMEWORKS |
-| `code_atlas/builder.py` | Code atlas 构建器：tree-sitter 扫描 → 函数/类型/边 → PageRank → 归一化token |
-| `kernel_tree.py` | 固定骨架：14 子系统 / 112 叶子节点 + 每节点 `NODE_SCOPE`（工作范围边界）+ `VOCAB_BY_NODE` 命名建议词汇表 + `ANALYSIS_BATCHES_V2` 跨模块分析批次 |
-| `evidence.py` | 证据存储 + 确定性 hash ID |
+## Comparison 数据库、Agent 消费与 Evidence
 
-### 交付层
+主 Base 确定后，程序建立完整 ComparisonRun：SQLite 保存 Units、确定性 ComparisonRecords、多对多 MatchEdges 与 RelationshipHints；JSONL 保留可审计导出。主 Base 产生完整双向状态，Agent 选择的次级来源只增加局部 MatchEdge，不改变主 Base 全局统计。
 
-| 文件 | 功能 |
-|---|---|
-| `mcp_server.py` | MCP server：12 个工具（含 4 LSP + metadata） |
-| `SKILL.md` | Agent 工作流：Phase 0 分支探索 → Phase 1 认识 → Phase 2 搜索 → Phase 3 对比 → Phase 4 报告 |
-| `.mcp.json` | MCP 配置 |
+Agent 不一次读取全部函数，严格按概要、热点、目录、文件、函数候选和源码组逐层查询。程序自动生成全局/目录/文件数量、目标文件的多个来源文件、来源文件的反向拆分视图和可分页函数名列表。
+`base_only` 由程序按 Base 文件单独分页展示，只证明具体 Base Unit 没有确定性目标匹配；要断言整个机制被删除，仍必须有覆盖完整的负向搜索证据。
 
----
+Agent 写回的是 Claim 和框架评审，不是函数分类。每个 Claim 挂到一个语义节点，可引用多个 comparison 和 EvidenceRecord；文件、函数与 comparison 均不强制归属设计树。每个节点必须有 Claim、实现度判断、原创度判断和理由，14 个模块必须有模块总结。
+宿主 Agent 通过 `evidence_formal_search`、`evidence_source` 和带项目路径的 `negative_search` 请求证据；只有 EvidenceStore 验证后生成的稳定 ID 才能进入 Claim。比较型 Claim 要求双侧证据，独立新增与未实现结论还要满足额外的正式搜索或负向搜索约束。
 
-## 核心方法
+所有批次共享一个 `report.json` 与一个 `evidence_store.jsonl`。EvidenceStore 按持久化路径共享追加锁；JudgeReport 按报告路径共享读改写锁。节点工作者使用 `node_review_bundle_submit` 原子写入 Claims 与 NodeReview，避免并发 sub-agent 覆盖彼此结果。批次按依赖顺序串行推进，批内仅对强耦合节点组进行有限并行。
 
-### 指纹维度
+CodeAtlas 仍是指纹、AST shape、调用邻居和结构中心度的来源，不是废弃模块。Comparison 数据库负责跨作品匹配查询；`code_atlas_overview/search` 负责不可变单作品的全局结构导航和入口候选发现；关键定义、引用和调用链优先由针对指定不可变 commit 执行的 `lsp_*` 语义确认。`code_atlas_call_neighbors` 用于低成本导航、分页、交叉检查或 LSP 不可用时补充，不得单独支撑关键调用链 Claim。
 
-**Token 指纹**：tree-sitter 解析 → normalize（alpha-rename 变量，保留函数名/类型名）→ SHA256 前 16 位。汇编：保留助记符，寄存器/标号归一化，保留偏移值。
+作品版本面向 Agent 和评委使用 `作品@分支` 表述。默认版本是 clone 当前检出分支的尖端；只有存在明确理由时才分页检查并选择其他分支尖端。接口不遍历历史 commit，且多个分支指向同一 commit 时只返回一次。程序将选定分支解析为 commit 并在整个分析中锁定，避免 ref 移动或工作树改动污染结果。内部 materialized snapshot 路径仅是缓存实现细节，不进入报告。
 
-**AST 形状哈希**：`ast_shape.py` 只 hash AST 节点类型，不要变量名/字面量。同结构→同 hash。**抗重构改编**：骨架相同但目录/函数名/变量名全变也能识别。
+LSP 同样分析锁定 commit 的内部源码快照。缺少编译数据库时，LSP 层会临时生成带 OS-Agent 管理标记的 `compile_flags.txt`；最后一个 clangd 客户端退出、MCP 退出或下次分析启动前必须自动删除。该辅助文件不参与指纹、Scope、Comparison 或 Evidence，也不得写入 `repos/` 中的作品工作树。
 
-### 双向 containment
+## 操作与产物约定
 
-`min(|A ∩ B| / |A|, |A ∩ B| / |B|)` —— 设计上是抑制大库偏置的（小库说"我 40% 在你里"，大库说"你只占我 2%"，取 min 自动过滤）。但在包含大量外部依赖时失效——两个都 vendored 了同一版 arceos 的作品会因为外部代码拿到虚高的 combined。
+项目只提供一个 Claude Code Skill：`.claude/skills/os-agent/SKILL.md`。它设置 `disable-model-invocation: true`，因此开发 OS-Agent 时不会自动触发；执行作品审计时由用户显式调用 `/os-agent`。
 
-**解决方案**：Agent 通过 `exclude_prefixes` 过滤外部代码后再搜索，双向 min 在学生代码上重新生效。
+项目级 `.mcp.json` 通过 `scripts/start_mcp.sh` 启动 MCP。启动脚本优先使用 `OS_AGENT_PYTHON`，其次寻找常见位置下的 `os_agent` Conda 环境，最后尝试 `conda run -n os_agent`。首次使用需要在 Claude Code 中批准项目 MCP；服务代码或工具签名变化后需要重新连接 MCP。
 
-### 双维度 combined
+每次分析使用独立输出目录，目录内只共享一份 `report.json` 和一份 `evidence_store.jsonl`。标准产物为：
 
-`combined = max(token_min, ast_min)` —— 任一维度有信号即采纳。AST 维度处理 token 维度的假阴性（重构/改名），token 维度处理 AST 维度的假阴性（简单函数 AST 相似但代码不同）。
-
-### 四分类（compare_functions）
-
-```
-COPIED:    target代码 fp == base全量中某fp 且同名   → 照搬
-DISGUISE:  target代码 fp == base全量中某fp 但改名    → 抄袭信号
-MODIFIED:  target代码 同名 但 fp不同                → 改动了（重点分析）
-NOVEL:     target代码 fp和name都不在base中           → 自研
+```text
+report.json / report.html
+provenance.json / provenance.html
+evidence_store.jsonl
+comparison.sqlite / comparisons.jsonl
 ```
 
----
+`repos/`、`.fp_cache/`、`output/` 和 `.claude/settings.local.json` 都是本地状态，不进入 Git；Skill、MCP 配置、启动脚本、模型、渲染器和测试进入 Git。
 
-## 关键设计约束
+具体指纹链路：
 
-### 排除外部依赖：Agent 判断，脚本接受
+```text
+CodeAtlas tree-sitter extractor
+→ normalize_function_tokens
+→ ast_shape_hash
+→ scripts/fingerprint.py 生成完整归一化 token SHA-256 与 MinHash signature
+→ Comparison/Search 消费 Unit 指纹
+```
 
-Agent 读目标 repo 的目录结构 + Cargo.toml + README + 设计文档后，自行判断哪些是外部依赖。判断结果通过 `exclude_prefixes` 列表传给 `search_similar` 和 `compare_functions`。
+汇编不经过 tree-sitter，使用 `asm_tokenize.py` 归一化 label block 后生成 token 指纹。
 
-### 基准库版本敏感
+负向搜索固定 commit、搜索计划、实际路径、查询、扩展名和扫描文件数。只有零匹配且 `coverage_complete=true` 才支持 `not_found`；否则只能是 `unknown`。
 
-ArceOS 系必须用 `oscomp/arceos`（大赛 fork），非上游 `arceos-org/arceos`。
+## 双报告边界
 
-### 方向依赖时间证据
+`report.html` 面向评委，使用作品名而不是内部“目标/Base”术语，完整展示框架节点的实现度、原创度、差异与 Claim。Evidence 在页面底部集中折叠展示，正文只引用易读编号。
+正文 Evidence 链接会标记为源码证据、文档证据、链路证据或审计证据；底部卡片进一步展示具体类型标签，如函数定义、调用链、正式检索和负向搜索。
 
-指纹本身无向。届号/git 时间用于定向（老←新）。同届高相似无法断言谁抄谁——只能标记为"同届互抄复审重点"。
+`provenance.html` 面向技术复核，独立展示确定性函数状态、文件多来源、参考作品未匹配函数与源码对照。它不生成原创度、实现度或 Agent Claim。旧混合 `AuditProject/Finding/index.html` 流程已删除。
 
-### 低分 + 声明来源 → 强制对比（rv6 案例）
+## 方向与报告模式
 
-README 声明"基于 xv6-k210"但指纹极低（0.088），Agent 仍须强制 deep compare。因为骨架相同+实现全重写会击穿两种指纹。
+指纹相似度无方向。方向来自年份、声明和 Git 证据。同届候选进入人工复审区，不能作为有方向性的主 Base。默认生成目标与主 Base 的差异报告；独立描述报告仅在无正式可靠 Base、声明来源已强制对比且程序准入后允许。
 
+## 真实回归
 
----
-
-## MCP 工具（12 个）
-
-| 工具 | 输入 | 输出 |
-|---|---|---|
-| `repo_metadata` | target | {year, school, team, competition, is_framework} |
-| `build_fingerprint` | target, branch?, all_branches? | {units, fingerprints, ast_fingerprints, languages} |
-| `search_similar` | target, exclude_prefixes?, top_k?, branch? | [{repo, branch, combined, token_min, ast_min, is_framework, year, school, overlap_by_dir}] |
-| `compare_functions` | target, base, exclude_prefixes?, branch?, base_branch? | {summary: {copied,disguise,modified,novel}, by_file} |
-| `node_taxonomy` | node_id? | 14 子系统 / 112 叶子节点 + 每节点 scope + vocab 命名建议 + 跨模块分析批次 |
-| `compile_flags` | target | {arch, flags} |
-| `lsp_definition` | target, symbol, file? | 文件:行号 位置（含回退链信息） |
-| `lsp_references` | target, symbol, file? | 全项目 file:line 引用列表 |
-| `lsp_document_outline` | target, file | AST 结构大纲（函数/结构体+行号） |
-| `lsp_call_graph` | target, symbol, file, direction?, max_depth? | 递归调用链树（outgoing/incoming/both） |
-| `lsp_set_target_arch` | target, arch | 覆盖目标 triple + 重启 LSP |
-| `read_doc` | target, path, start_page?, end_page? | PDF/Docx 文本内容 |
-
-分支选择全部由 Agent 用 bash 完成（`git branch -a`, `git log`, `git show <branch>:README.md`）。所有分支指纹离线预计算（`run.py --all-branches`），search 返回 per-branch 候选——偏好从数据自然浮现。
-
----
-
-## 新增模块
-
-| 文件 | 功能 |
-|---|---|
-| `core/metadata.py` | MetadataManager：加载 `collected-data.xlsx`（168 条），构建 URL↔repo_name 双向索引。155 repos 匹配 xlsx，8 frameworks。替代 `search.py` 中硬编码 FRAMEWORKS 和脆弱的正则 `_extract_year()` |
-| `scripts/report.py` | 报告流水线：`skeleton` 生成固定 112 节点骨架（空 color/stats/analysis 槽 + 每节点 scope），Agent 填值后 `render` 出三色 HTML（主色+构成条+⚠改名照搬标记+context 活文档） |
-| `scripts/batch.py` | 批量指纹构建 |
-
-## 分支处理
-
-**所有分支预建指纹**（`python scripts/run.py --build --all-branches`）。缓存命名：
-- `fpset_{name}__{branch}.pkl` — 分支名中的 `/` 替换为 `-`
-
-Agent 用 bash 探索分支（`git branch -a`, `git log`, `git show <branch>:README.md`），无需脚本替 Agent 做选择。`search_similar` 默认加载所有分支指纹，结果自然标出每个候选匹配的具体分支。偏好从数据浮现——比如 `qemu-final` 分支高分自然反映初赛方向。
-
-## 内核设计树
-
-`core/kernel_tree.py` 定义固定骨架：14 子系统 / 112 叶子节点。每节点有 `NODE_SCOPE`（一句工作范围边界，Agent 到节点先读 scope 明边界，再决定哪些函数挂进来）。`VOCAB_BY_NODE`（112 条）为每个节点提供机制标签，**仅作命名建议**——帮 Agent 用统一术语表达（如"MLFQ 调度"），Agent 可动态扩充，不分级、不判工作量。`ANALYSIS_BATCHES_V2` 定义跨模块依赖分析批次（前序批次结论喂后续）。**判断靠指纹 diff，命名靠 vocab**：函数→节点归属由 Agent 判断，不要求穷举所有函数。
-
-## 组装依赖
-
-requirements.txt: `mcp`, `networkx`, `numpy`, `openpyxl`, `tree-sitter-c/cpp/rust`, `pypdf`, `python-docx`。Python 3.10+。
-
-## .fp_cache
-
-指纹缓存（gitignored）：`units_{name}__{branch}.pkl`、`fpset_{name}__{branch}.pkl`、`astset_{name}__{branch}.pkl`。分支名中的 `/` 替换为 `-`。`branch=""` 时加载所有旧格式文件（向后兼容）。删 `.fp_cache/` 即强制重建。
-
-## Corpus
-
-`repos/`（gitignored）含 ~160 参赛内核 + 教学原型。`collected-data.xlsx` 通过 git remote URL 桥接到本地 repo 目录。`repos/_baseline_oscomp-arceos/` 是 ArceOS 大赛 fork。
+`oskernel2023-zmz@837b6a9` 的双侧正式搜索应将 `xv6-k210@d7f3e5e` 排名第一，方向为 `2021 → 2023`。验收按 commit，不按分支字符串；隐藏 README 声明后仍须得到同一主 Base。

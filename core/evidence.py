@@ -15,11 +15,81 @@ from typing import Any
 
 SOURCE_EXTS = {".c", ".h", ".S", ".s", ".rs", ".cpp", ".cc", ".hpp", ".ld", ".lds", ".toml", ".mk", ".cmake", ".txt", ".md", ".pdf", ".docx"}
 TEXT_NAMES = {"Makefile", "makefile", "justfile", ".gitignore", ".os_agent_lsp_target"}
+_PERSIST_LOCKS: dict[str, Lock] = {}
+_PERSIST_LOCKS_GUARD = Lock()
 
 
 def stable_id(prefix: str, payload: Any, length: int = 12) -> str:
     text = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return f"{prefix}_{hashlib.sha256(text.encode('utf-8')).hexdigest()[:length]}"
+
+
+@dataclass
+class NegativeSearchPlan:
+    snapshot_commit: str
+    subject: str
+    queries: list[str] = field(default_factory=list)
+    symbols: list[str] = field(default_factory=list)
+    paths: list[str] = field(default_factory=list)
+    extensions: list[str] = field(default_factory=list)
+    required_checks: list[str] = field(default_factory=lambda: ["keyword_search", "symbol_search", "entry_call_search"])
+    plan_id: str = ""
+
+    def finalize(self) -> "NegativeSearchPlan":
+        if not self.plan_id:
+            self.plan_id = stable_id("negplan", {
+                "commit": self.snapshot_commit, "subject": self.subject, "queries": sorted(self.queries),
+                "symbols": sorted(self.symbols), "paths": sorted(self.paths), "extensions": sorted(self.extensions),
+                "required_checks": sorted(self.required_checks),
+            }, 16)
+        return self
+
+
+def execute_negative_search(repo_path: str, plan: NegativeSearchPlan, store: "EvidenceStore") -> dict[str, Any]:
+    plan.finalize()
+    root = Path(repo_path).resolve()
+    search_roots = [(root / p).resolve() for p in (plan.paths or ["."])]
+    valid_roots = [p for p in search_roots if p.exists() and (p == root or root in p.parents)]
+    extensions = set(plan.extensions or [".c", ".h", ".S", ".s", ".rs", ".cpp", ".cc", ".hpp", ".ld", ".toml", ".mk"])
+    patterns: list[tuple[str, str]] = []
+    patterns.extend(("keyword_search", query) for query in plan.queries)
+    patterns.extend(("symbol_search", symbol) for symbol in plan.symbols)
+    patterns.extend(("entry_call_search", rf"\b{re.escape(symbol)}\s*\(") for symbol in plan.symbols)
+    executed_checks = sorted({kind for kind, _ in patterns})
+    hits: list[dict[str, Any]] = []
+    scanned_files = 0
+    for base in valid_roots:
+        files = [base] if base.is_file() else base.rglob("*")
+        for path in files:
+            if not path.is_file() or (path.suffix not in extensions and path.name not in TEXT_NAMES):
+                continue
+            if not _is_text_file(path):
+                continue
+            scanned_files += 1
+            text = path.read_text(encoding="utf-8", errors="ignore")
+            for check, query in patterns:
+                try:
+                    match = re.search(query, text, re.IGNORECASE)
+                except re.error:
+                    match = re.search(re.escape(query), text, re.IGNORECASE)
+                if match:
+                    line = text[:match.start()].count("\n") + 1
+                    hits.append({"path": path.relative_to(root).as_posix(), "line": line, "query": query, "check": check})
+                    if len(hits) >= 200:
+                        break
+            if len(hits) >= 200:
+                break
+    coverage_complete = bool(valid_roots and patterns and scanned_files > 0 and set(plan.required_checks).issubset(executed_checks))
+    candidate = EvidenceCandidate(
+        tool="negative_search", kind="negative_search", query=plan.subject, label=plan.subject, strength="strong" if coverage_complete else "weak",
+        metadata={"plan_id": plan.plan_id, "snapshot_commit": plan.snapshot_commit, "searched_paths": [str(p.relative_to(root)) for p in valid_roots],
+                  "executed_queries": [query for _, query in patterns], "executed_checks": executed_checks, "extensions": sorted(extensions),
+                  "scanned_files": scanned_files, "matches": len(hits), "coverage_complete": coverage_complete,
+                  "required_checks": plan.required_checks, "hits": hits[:50]},
+    )
+    evidence_id = store.add(candidate)
+    return {"plan": asdict(plan), "evidence_id": evidence_id, "coverage_complete": coverage_complete, "executed_checks": executed_checks,
+            "scanned_files": scanned_files, "matches": hits}
 
 
 @dataclass
@@ -99,8 +169,13 @@ class EvidenceStore:
         self.cache: OrderedDict[str, EvidenceRecord] = OrderedDict()
         self.cache_limit = max(8, int(os.environ.get("AGENT_D_EVIDENCE_CACHE_RECORDS", "128")))
         self.lock = Lock()
-        self.persist_lock = Lock()
         self.persist_path = Path(persist_path) if persist_path else None
+        if self.persist_path:
+            key = str(self.persist_path.resolve())
+            with _PERSIST_LOCKS_GUARD:
+                self.persist_lock = _PERSIST_LOCKS.setdefault(key, Lock())
+        else:
+            self.persist_lock = Lock()
         if self.persist_path and self.persist_path.is_file():
             self._load_jsonl(self.persist_path)
 
@@ -118,12 +193,13 @@ class EvidenceStore:
                 self._append_record(record)
         return record.evidence_id
 
-    def add_source(self, *, kind: str, path: str, line: int, symbol: str = "", label: str = "", strength: str = "strong", metadata: dict[str, Any] | None = None) -> str:
+    def add_source(self, *, kind: str, path: str, line: int, line_end: int | None = None, symbol: str = "", label: str = "", strength: str = "strong", metadata: dict[str, Any] | None = None) -> str:
         return self.add(EvidenceCandidate(
             tool="source_reader",
             kind=kind,
             path=path,
             line_start=line,
+            line_end=line_end,
             symbol=symbol,
             label=label or symbol,
             strength=strength,
@@ -249,7 +325,7 @@ class EvidenceStore:
         line_end = cand.line_end
 
         if cand.kind == "negative_search":
-            verified = cand.tool == "negative_search" and cand.metadata.get("matches", 1) == 0
+            verified = (cand.tool == "negative_search" and cand.metadata.get("matches", 1) == 0 and bool(cand.metadata.get("coverage_complete")))
             notes.append("negative search verified by tool result" if verified else "negative search missing zero-match proof")
         elif cand.kind == "documentation":
             root = Path(self.repo_path).resolve()
@@ -262,7 +338,7 @@ class EvidenceStore:
                     start_page=cand.metadata.get("start_page"),
                     end_page=cand.metadata.get("end_page"),
                 )
-                if content:
+                if content and not content.startswith("Error reading "):
 
                     excerpt = content[:5000]  # documentation gets a larger excerpt
                     verified = True
@@ -290,9 +366,24 @@ class EvidenceStore:
         elif cand.kind == "git_history":
             verified = bool(cand.content or cand.metadata.get("commit"))
             notes.append("git history evidence from git tool")
+        elif cand.kind == "formal_search":
+            verified = bool(cand.tool == "formal_search" and cand.metadata.get("score_kind") == "formal" and cand.metadata.get("target_scope_id") and cand.metadata.get("candidate_scope_id") and cand.metadata.get("candidate_commit"))
+            notes.append("formal search verified by dual ScopeManifest metadata" if verified else "formal search metadata incomplete")
+        elif cand.kind == "scope_manifest":
+            verified = bool(cand.metadata.get("scope_id") and cand.metadata.get("snapshot_id") and cand.metadata.get("status") == "verified")
+            notes.append("verified ScopeManifest metadata" if verified else "ScopeManifest metadata incomplete")
+        elif cand.tool == "source_reader" and cand.path and cand.line_start:
+            lines = _safe_read_lines(self.repo_path, cand.path)
+            if lines and 1 <= cand.line_start <= len(lines):
+                start = max(1, cand.line_start - 2); end = min(len(lines), (cand.line_end or cand.line_start) + 8)
+                excerpt = "\n".join(f"{i}: {lines[i - 1]}" for i in range(start, end + 1)); line_end = cand.line_end or min(len(lines), cand.line_start + 3); verified = True
+                notes.append("custom source evidence path and line verified by source reader")
+                if cand.symbol and cand.symbol not in excerpt: notes.append("symbol not found in local excerpt; evidence remains location-based")
+            else:
+                notes.append("custom source evidence path/line could not be verified")
         else:
-            verified = bool(cand.content or cand.path)
-            notes.append("generic evidence accepted as weak/medium")
+            verified = False
+            notes.append(f"unrecognized evidence kind '{cand.kind}' — add explicit verifier logic or use a known kind")
 
         strength = cand.strength if verified else "weak"
         payload = {
@@ -347,7 +438,9 @@ def _compact_record(record: EvidenceRecord) -> EvidenceRecord:
             if key in {
                 "root_symbol", "src", "dst", "matches", "searched_paths",
                 "semantic_fn_id", "signature", "type_kind", "phase", "node_id",
-                "navigation_only", "tool", "result_count", "commit",
+                "navigation_only", "tool", "result_count", "commit", "plan_id", "snapshot_commit",
+                "executed_queries", "executed_checks", "extensions", "scanned_files", "coverage_complete", "required_checks",
+                "score_kind", "target_scope_id", "candidate_scope_id", "candidate_commit", "scope_id", "snapshot_id", "status",
             }
         },
         verifier_notes=record.verifier_notes,
@@ -440,8 +533,8 @@ def _read_doc_content(
             for i in range(sp - 1, ep):
                 text += reader.pages[i].extract_text() + "\n"
             return text
-        except Exception as exc:
-            return f"Error reading PDF: {exc}"
+        except Exception:
+            return ""
     elif suffix == ".docx":
         try:
             import docx
@@ -450,8 +543,8 @@ def _read_doc_content(
             start = max(0, (start_line or 1) - 1)
             end = end_line if end_line else len(all_text)
             return "\n".join(all_text[start:end])
-        except Exception as exc:
-            return f"Error reading DOCX: {exc}"
+        except Exception:
+            return ""
     try:
         text = path.read_text(encoding="utf-8", errors="ignore")
         if start_line or end_line:
