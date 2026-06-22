@@ -138,40 +138,66 @@ def build_fingerprint(target: str, ref: str = "", branch: str = "", all_branches
 @mcp.tool()
 def search_similar(target: str, exclude_prefixes: list[str] | None = None,
                    top_k: int = 10, ref: str = "", branch: str = "") -> dict:
-    """1-vs-N similarity search. Pass exclude_prefixes (e.g. ["vendor/", "dependency/"])
-    to filter out external code before computing similarity — the Agent decides these
-    after reading the repo structure.
+    """Rough 1-vs-N similarity recall using immutable snapshots and draft scope.
 
-    Returns per-candidate combined score + overlap_by_dir showing which directories
-    contributed to the similarity. is_framework and year are driven by xlsx metadata.
-
-    ref: commit/branch/tag to fingerprint (preferred over deprecated branch parameter)."""
-    from scripts.search import search, corpus_fingerprints
+    This is navigation only. It cannot be used for BaseDecision or report ranking;
+    call create_scope_manifest for reviewed candidates and then search_formal."""
+    from core.scope import ScopeExclusion, build_scope_manifest
+    from core.scoped_search import cached_candidate_snapshots, search_scoped
+    from core.snapshot import resolve_snapshot
     mm = _get_metadata()
-    commit_ref = ref or branch or ""
-    corpus = corpus_fingerprints(branch=commit_ref, build_missing=True)
-    results = search(target, corpus=corpus, top_k=top_k,
-                     exclude_prefixes=exclude_prefixes, branch=commit_ref,
-                     metadata=mm)
+    commit_ref = ref or branch or "HEAD"
+    snap = resolve_snapshot(_target_path(target), commit_ref)
+    excluded = [ScopeExclusion(prefix, "agent_excluded", "rough recall exclude_prefixes")
+                for prefix in (exclude_prefixes or [])]
+    target_scope = build_scope_manifest(snap, excluded=excluded, status="draft")
+    results = search_scoped(snap, target_scope, cached_candidate_snapshots(), top_k=top_k,
+                            metadata=mm, formal_only=False)
     for row in results:
         row["score_kind"] = "rough"
     return {"target": target, "ref": commit_ref or "(default)", "score_kind": "rough",
             "warning": "rough recall only; cannot be used for BaseDecision or report ranking",
-            "corpus_size": len(corpus), "candidates": results}
+            "target_scope_suggestion": target_scope.to_dict(),
+            "candidate_snapshot_count": len(cached_candidate_snapshots()),
+            "candidates": results}
 
 
 # ── tools: immutable scope + formal search ────────────────────────────
 
 @mcp.tool()
+def audit_manifest_create(target: str, output_dir: str, ref: str = "HEAD",
+                          artifacts: dict | None = None) -> dict:
+    """Create the auditable run manifest that fixes standard artifact paths."""
+    from core.audit_manifest import create_audit_manifest
+    from core.snapshot import resolve_snapshot
+    snap = resolve_snapshot(_target_path(target), ref, materialize=False)
+    return create_audit_manifest(snap.to_public_dict(), output_dir, artifacts=artifacts)
+
+
+@mcp.tool()
 def create_scope_manifest(target: str, ref: str = "HEAD", included_prefixes: list[str] | None = None,
                           excluded: list[dict] | None = None, generated_prefixes: list[str] | None = None,
-                          documentation_prefixes: list[str] | None = None) -> dict:
+                          documentation_prefixes: list[str] | None = None, status: str = "verified",
+                          evidence_store: str = "") -> dict:
     """Validate and persist the Agent-selected code scope for one immutable commit."""
+    from core.evidence import EvidenceStore
     from core.snapshot import resolve_snapshot
-    from core.scope import build_scope_manifest, save_scope_manifest
+    from core.scope import build_scope_manifest, save_scope_manifest, verified_exclusion_errors
     snap = resolve_snapshot(_target_path(target), ref)
     scope = build_scope_manifest(snap, included_prefixes=included_prefixes, excluded=excluded,
-                                 generated_prefixes=generated_prefixes, documentation_prefixes=documentation_prefixes)
+                                 generated_prefixes=generated_prefixes, documentation_prefixes=documentation_prefixes,
+                                 status=status)
+    evidence_records = None
+    if evidence_store:
+        evidence_records = {row.evidence_id: row.__dict__ for row in EvidenceStore("", evidence_store).iter_full()}
+    errors = verified_exclusion_errors(scope, evidence_records)
+    if status == "verified" and excluded and not evidence_store:
+        non_auto = [row for row in scope.excluded
+                    if not (row.category == "external_submodule" and row.reason == "declared git submodule")]
+        if non_auto:
+            errors.append("verified Agent exclusions require evidence_store so evidence_ids can be verified")
+    if errors:
+        raise ValueError("; ".join(errors))
     return {"snapshot": snap.to_dict(), "scope": scope.to_dict(), "path": save_scope_manifest(scope)}
 
 
@@ -187,7 +213,11 @@ def search_formal(target: str, ref: str = "HEAD", top_k: int = 20, formal_only: 
         raise ValueError("target has no ScopeManifest; call create_scope_manifest first")
     all_rows = search_scoped(snap, scope, cached_candidate_snapshots(), top_k=top_k, metadata=_get_metadata(), formal_only=False)
     rough = [x for x in all_rows if x.get("score_kind") == "rough"]
-    coverage = {"coverage_complete": not rough, "requested_top_k": top_k, "reviewed_in_top_k": len(all_rows)-len(rough),
+    coverage = {"coverage_complete": not rough, "requested_top_k": top_k,
+                "cached_candidate_count": len(cached_candidate_snapshots()),
+                "reviewed_scope_count": len(all_rows) - len(rough),
+                "unreviewed_rough_count": len(rough),
+                "reviewed_in_top_k": len(all_rows)-len(rough),
                 "returned_in_top_k": len(all_rows), "unreviewed_commits": [x.get("commit") for x in rough]}
     rows = [x for x in all_rows if x.get("score_kind") == "formal"] if formal_only else all_rows
     return {"target_snapshot": snap.to_dict(), "target_scope": scope.to_dict(), "formal_only": formal_only,
@@ -212,6 +242,28 @@ def validate_base_decision(decision: dict, packet: dict) -> dict:
     return {"valid": not errors, "errors": errors}
 
 
+@mcp.tool()
+def base_decision_submit(decision: dict, packet: dict, output_path: str) -> dict:
+    """Validate and persist the Agent's BaseDecision packet for the audit run."""
+    import json, os
+    from core.audit_manifest import find_manifest_for, update_manifest
+    from core.base_decision import validate_base_decision as validate
+    errors = validate(decision, packet)
+    result = {"valid": not errors, "errors": errors, "packet": packet, "decision": decision}
+    if errors:
+        return result
+    output = Path(output_path); output.parent.mkdir(parents=True, exist_ok=True)
+    tmp = output.with_name(f".{output.name}.{os.getpid()}.tmp")
+    tmp.write_text(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
+    os.replace(tmp, output)
+    manifest, manifest_path = find_manifest_for(str(output))
+    if manifest:
+        update_manifest(manifest_path, artifacts={"base_decision": str(output)},
+                        stages={"base_decision_validated": True}, status="base_decision_validated")
+    result["path"] = str(output)
+    return result
+
+
 # ── tool: compare_functions ──────────────────────────────────────────
 
 @mcp.tool()
@@ -225,7 +277,17 @@ def compare_functions(target: str, base: str, ref: str = "", base_ref: str = "",
     target_scope = load_scope_manifest(ts.repo, ts.commit); base_scope = load_scope_manifest(bs.repo, bs.commit)
     if target_scope is None or base_scope is None:
         raise ValueError("both target and base require verified ScopeManifest records")
-    return compare_units(target, base, target_snapshot=ts, base_snapshot=bs, target_scope=target_scope, base_scope=base_scope, output_dir=output_dir)
+    result = compare_units(target, base, target_snapshot=ts, base_snapshot=bs, target_scope=target_scope, base_scope=base_scope, output_dir=output_dir)
+    if output_dir and result.get("artifacts"):
+        from core.audit_manifest import find_manifest_for, update_manifest
+        manifest, manifest_path = find_manifest_for(output_dir)
+        if manifest:
+            artifacts = result["artifacts"]
+            update_manifest(manifest_path, artifacts={
+                "comparison_database": artifacts.get("database"),
+                "comparisons_jsonl": artifacts.get("comparisons"),
+            }, stages={"comparison_built": True}, status="comparison_built")
+    return result
 
 
 @mcp.tool()
@@ -394,6 +456,12 @@ def judge_report_create(comparison_run_id: str, evidence_store: str, output_path
     report = create_judge_report(comparison_database=comparison_run_id, evidence_store=evidence_store,
                                  work_display_name=work_display_name, reference_display_name=reference_display_name)
     write_judge_report(report, output_path)
+    from core.audit_manifest import find_manifest_for, update_manifest
+    manifest, manifest_path = find_manifest_for(output_path)
+    if manifest:
+        update_manifest(manifest_path, artifacts={"report_json": output_path, "evidence_store": evidence_store,
+                                                  "comparison_database": comparison_run_id},
+                        stages={"judge_report_created": True}, status="judge_report_created")
     return {"path": output_path, "comparison_run_id": report["comparison_run_id"], "required_nodes": len(report["taxonomy"]["nodes"]),
             "required_modules": len(report["taxonomy"]["modules"])}
 
@@ -474,9 +542,18 @@ def judge_report_validate(report_path: str) -> dict:
 @mcp.tool()
 def judge_report_render(report_path: str, output_path: str) -> dict:
     import json
+    from core.audit_manifest import artifact_status, find_manifest_for, update_manifest
     from scripts.judge_report import render
     report = json.loads(Path(report_path).read_text(encoding="utf-8"))
+    manifest, manifest_path = find_manifest_for(report_path)
+    artifacts = artifact_status(manifest, str(Path(report_path).parent))
+    missing_before_render = [x for x in artifacts["missing_artifacts"] if x != "report_html"]
+    if missing_before_render:
+        raise ValueError("cannot render judge report before audit artifacts exist: " + ", ".join(missing_before_render))
     output = Path(output_path); output.parent.mkdir(parents=True, exist_ok=True); output.write_text(render(report), encoding="utf-8")
+    if manifest:
+        update_manifest(manifest_path, artifacts={"report_html": output_path},
+                        stages={"judge_report_rendered": True}, status="judge_report_rendered")
     return {"report_path": report_path, "output_path": output_path, "bytes": output.stat().st_size}
 
 
@@ -484,17 +561,28 @@ def judge_report_render(report_path: str, output_path: str) -> dict:
 def provenance_export(comparison_run_id: str, output_path: str, work_display_name: str = "",
                       reference_display_name: str = "") -> dict:
     """Export the complete deterministic function-provenance appendix without Agent originality conclusions."""
+    from core.audit_manifest import find_manifest_for, update_manifest
     from core.provenance_report import export_provenance
-    return export_provenance(comparison_run_id, output_path, work_display_name=work_display_name,
-                             reference_display_name=reference_display_name)
+    result = export_provenance(comparison_run_id, output_path, work_display_name=work_display_name,
+                               reference_display_name=reference_display_name)
+    manifest, manifest_path = find_manifest_for(output_path)
+    if manifest:
+        update_manifest(manifest_path, artifacts={"provenance_json": output_path},
+                        stages={"provenance_exported": True}, status="provenance_exported")
+    return result
 
 
 @mcp.tool()
 def provenance_render(provenance_path: str, output_path: str) -> dict:
     import json
+    from core.audit_manifest import find_manifest_for, update_manifest
     from scripts.provenance_report import render
     report = json.loads(Path(provenance_path).read_text(encoding="utf-8"))
     output = Path(output_path); output.parent.mkdir(parents=True, exist_ok=True); output.write_text(render(report), encoding="utf-8")
+    manifest, manifest_path = find_manifest_for(output_path)
+    if manifest:
+        update_manifest(manifest_path, artifacts={"provenance_html": output_path},
+                        stages={"provenance_rendered": True}, status="provenance_rendered")
     return {"provenance_path": provenance_path, "output_path": output_path, "bytes": output.stat().st_size}
 
 
@@ -626,9 +714,18 @@ def node_taxonomy(node_id: str = "") -> dict:
         VOCAB_BY_NODE, node_title_zh, node_title_en, node_scope,
     )
 
-    def _vocab_terms(nid: str) -> list[str]:
+    def _vocab_terms(nid: str) -> list[dict]:
         v = VOCAB_BY_NODE.get(nid, {})
-        return [m["tag"] for m in v.get("mechanisms", [])]
+        return [
+            {
+                "tag": m.get("tag"),
+                "compare_role": m.get("compare_role", "primary"),
+                "aliases": m.get("aliases") or [],
+                "title_zh": m.get("title_zh", ""),
+                "title_en": m.get("title_en", ""),
+            }
+            for m in v.get("mechanisms", [])
+        ]
 
     if node_id:
         return {

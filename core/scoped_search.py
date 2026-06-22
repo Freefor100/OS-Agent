@@ -30,7 +30,12 @@ def search_scoped(target_snapshot: RepoSnapshot, target_scope: ScopeManifest, ca
         meta = metadata.lookup_by_repo_name(snapshot.repo) if metadata else None
         rows.append({
             "repo": snapshot.repo, "commit": snapshot.commit, "canonical_branch": snapshot.canonical_branch,
-            "ref_aliases": snapshot.ref_aliases, "scope_id": scope.scope_id if scope else "", "candidate_scope_id": scope.scope_id if scope else "", "scope_status": scope.status if scope else "unreviewed",
+            "ref_aliases": snapshot.ref_aliases,
+            "candidate_snapshot": snapshot.to_public_dict(),
+            "target_scope_id": target_scope.scope_id if target_scope else "",
+            "scope_id": scope.scope_id if scope else "",
+            "candidate_scope_id": scope.scope_id if scope else "",
+            "scope_status": scope.status if scope else "unreviewed",
             "score_kind": "formal" if scope and scope.status == "verified" else "rough", "combined": round(combined, 3),
             "token": token, "ast": ast, "target_unit_count": len(target_units), "candidate_unit_count": len(candidate_units),
             "overlap_by_dir": _overlap_by_dir(target_units, candidate_token), "year": meta["year"] if meta else 0,

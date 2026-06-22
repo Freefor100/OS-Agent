@@ -7,6 +7,7 @@ import re
 import threading
 import time
 from collections import OrderedDict
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from threading import Lock
@@ -254,8 +255,9 @@ class EvidenceStore:
         for attempt in range(6):
             tmp = target.with_name(f".{target.name}.{os.getpid()}.{threading.get_ident()}.tmp")
             try:
-                tmp.write_text(content, encoding="utf-8")
-                os.replace(tmp, target)
+                with _file_lock(str(target)):
+                    tmp.write_text(content, encoding="utf-8")
+                    os.replace(tmp, target)
                 return
             except OSError as exc:
                 last_error = exc
@@ -311,10 +313,15 @@ class EvidenceStore:
             return
         self.persist_path.parent.mkdir(parents=True, exist_ok=True)
         payload = (json.dumps(asdict(record), ensure_ascii=False, sort_keys=True) + "\n").encode("utf-8")
-        with self.persist_path.open("ab") as handle:
-            offset = handle.tell()
-            handle.write(payload)
-            handle.flush()
+        with _file_lock(str(self.persist_path)):
+            with self.persist_path.open("ab") as handle:
+                offset = handle.tell()
+                handle.write(payload)
+                handle.flush()
+                try:
+                    os.fsync(handle.fileno())
+                except OSError:
+                    pass
         with self.lock:
             self.offsets[record.evidence_id] = offset
 
@@ -445,6 +452,27 @@ def _compact_record(record: EvidenceRecord) -> EvidenceRecord:
         },
         verifier_notes=record.verifier_notes,
     )
+
+
+@contextmanager
+def _file_lock(path: str):
+    lock_path = Path(path).with_suffix(Path(path).suffix + ".lock")
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    handle = lock_path.open("a+")
+    try:
+        try:
+            import fcntl
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        except (ImportError, OSError):
+            pass
+        yield
+    finally:
+        try:
+            import fcntl
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+        except (ImportError, OSError):
+            pass
+        handle.close()
 
 
 def read_text_head(repo_path: str, rel_path: str, limit: int = 20000) -> str:

@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from core.scope import build_scope_manifest, path_in_scope
+from core.scope import build_scope_manifest, path_in_scope, verified_exclusion_errors
 from core.snapshot import branch_tip_snapshots, default_snapshot, discover_commit_snapshots, resolve_snapshot
 
 
@@ -46,3 +46,12 @@ class SnapshotScopeTests(unittest.TestCase):
         subprocess.run(["git", "-C", str(self.repo), "add", "."], check=True); subprocess.run(["git", "-C", str(self.repo), "commit", "-qm", "submodule declaration"], check=True)
         snap=resolve_snapshot(str(self.repo)); scope=build_scope_manifest(snap,excluded=[{"prefix":"vendor/","category":"external_submodule","reason":"Agent verified","evidence_ids":["ev_1"]}])
         self.assertEqual(["ev_1"],next(x for x in scope.excluded if x.prefix=="vendor/").evidence_ids)
+    def test_verified_scope_requires_evidence_for_agent_exclusions_and_draft_allows(self):
+        snap = resolve_snapshot(str(self.repo))
+        verified = build_scope_manifest(snap, excluded=[{"prefix":"kernel/","category":"agent_excluded","reason":"reviewed"}])
+        self.assertIn("requires evidence_ids", "; ".join(verified_exclusion_errors(verified)))
+        draft = build_scope_manifest(snap, excluded=[{"prefix":"kernel/","category":"agent_excluded","reason":"reviewed"}], status="draft")
+        self.assertEqual([], verified_exclusion_errors(draft))
+        with_evidence = build_scope_manifest(snap, excluded=[{"prefix":"kernel/","category":"agent_excluded","reason":"reviewed","evidence_ids":["ev_ok"]}])
+        self.assertEqual([], verified_exclusion_errors(with_evidence, {"ev_ok": {"verified": True}}))
+        self.assertIn("unverified", "; ".join(verified_exclusion_errors(with_evidence, {"ev_ok": {"verified": False}})))

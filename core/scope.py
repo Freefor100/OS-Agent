@@ -90,6 +90,36 @@ def save_scope_manifest(manifest: ScopeManifest) -> str:
     return str(path)
 
 
+def verified_exclusion_errors(manifest: ScopeManifest, evidence_records: dict[str, dict[str, Any]] | None = None) -> list[str]:
+    """Validate Agent-selected exclusions for a verified ScopeManifest.
+
+    Automatically detected submodules are accepted without Agent evidence because
+    the `.gitmodules` declaration is verified by the scope builder itself. Any
+    other verified exclusion needs at least one EvidenceRecord id; when records
+    are supplied, every referenced id must exist and be verified.
+    """
+    if manifest.status != "verified":
+        return []
+    errors: list[str] = []
+    records = evidence_records or {}
+    for row in manifest.excluded:
+        auto_submodule = row.category == "external_submodule" and row.reason == "declared git submodule"
+        if auto_submodule:
+            continue
+        if not row.evidence_ids:
+            errors.append(f"verified scope exclusion {row.prefix} requires evidence_ids")
+            continue
+        if evidence_records is None:
+            continue
+        for evidence_id in row.evidence_ids:
+            record = records.get(evidence_id)
+            if not record:
+                errors.append(f"verified scope exclusion {row.prefix} references missing evidence {evidence_id}")
+            elif not record.get("verified"):
+                errors.append(f"verified scope exclusion {row.prefix} references unverified evidence {evidence_id}")
+    return errors
+
+
 def load_scope_manifest(repo: str, commit: str) -> ScopeManifest | None:
     path = SCOPE_ROOT / f"{repo}__{commit[:16]}.json"
     if not path.is_file():

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import threading
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -67,12 +68,13 @@ def write_judge_report(report: dict[str, Any], path: str, *, require_complete: b
     errors = validate_judge_report(report, require_complete=require_complete)
     if errors:
         raise ValueError("invalid judge report: " + "; ".join(errors))
-    _atomic_write(Path(path), report)
+    with _file_lock(path):
+        _atomic_write(Path(path), report)
     return path
 
 
 def claim_submit(report_path: str, claim: dict[str, Any]) -> dict[str, Any]:
-    with _report_lock(report_path):
+    with _report_lock(report_path), _file_lock(report_path):
         report = _load(report_path)
         row = _prepare_claim(report, claim)
         report["claims"] = [x for x in report["claims"] if x.get("claim_id") != row["claim_id"]] + [row]
@@ -88,7 +90,7 @@ def claim_list(report_path: str, node_id: str = "") -> dict[str, Any]:
 
 
 def node_review_submit(report_path: str, review: dict[str, Any]) -> dict[str, Any]:
-    with _report_lock(report_path):
+    with _report_lock(report_path), _file_lock(report_path):
         report = _load(report_path)
         node_id = str(review.get("node_id") or "")
         report["node_reviews"] = [x for x in report["node_reviews"] if x.get("node_id") != node_id] + [dict(review)]
@@ -98,7 +100,7 @@ def node_review_submit(report_path: str, review: dict[str, Any]) -> dict[str, An
 
 def node_review_bundle_submit(report_path: str, node_id: str, claims: list[dict[str, Any]], review: dict[str, Any]) -> dict[str, Any]:
     """Atomically register all Claims and the NodeReview produced by one analysis worker."""
-    with _report_lock(report_path):
+    with _report_lock(report_path), _file_lock(report_path):
         report = _load(report_path)
         prepared = [_prepare_claim(report, {**claim, "node_id": node_id}) for claim in claims]
         incoming_ids = {x["claim_id"] for x in prepared}
@@ -110,7 +112,7 @@ def node_review_bundle_submit(report_path: str, node_id: str, claims: list[dict[
 
 
 def module_review_submit(report_path: str, review: dict[str, Any]) -> dict[str, Any]:
-    with _report_lock(report_path):
+    with _report_lock(report_path), _file_lock(report_path):
         report = _load(report_path)
         module_id = str(review.get("module_id") or "")
         report["module_reviews"] = [x for x in report["module_reviews"] if x.get("module_id") != module_id] + [dict(review)]
@@ -119,7 +121,7 @@ def module_review_submit(report_path: str, review: dict[str, Any]) -> dict[str, 
 
 
 def overall_assessment_submit(report_path: str, assessment: dict[str, Any]) -> dict[str, Any]:
-    with _report_lock(report_path):
+    with _report_lock(report_path), _file_lock(report_path):
         report = _load(report_path)
         report["overall_assessment"] = dict(assessment)
         _validate_write(report_path, report)
@@ -127,7 +129,7 @@ def overall_assessment_submit(report_path: str, assessment: dict[str, Any]) -> d
 
 
 def report_highlights_submit(report_path: str, highlights: dict[str, Any]) -> dict[str, Any]:
-    with _report_lock(report_path):
+    with _report_lock(report_path), _file_lock(report_path):
         report = _load(report_path)
         report["report_highlights"] = {
             "expanded_module_ids": sorted(set(highlights.get("expanded_module_ids") or [])),
@@ -138,6 +140,7 @@ def report_highlights_submit(report_path: str, highlights: dict[str, Any]) -> di
 
 
 def judge_report_status(report_path: str) -> dict[str, Any]:
+    from core.audit_manifest import artifact_status, find_manifest_for
     report = _load(report_path)
     errors = validate_judge_report(report, require_complete=True)
     node_ids = {x.get("node_id") for x in report.get("node_reviews") or []}
@@ -149,6 +152,8 @@ def judge_report_status(report_path: str) -> dict[str, Any]:
         missing = [node_id for node_id in batch if node_id not in node_ids or node_id not in claimed_nodes]
         if missing:
             missing_by_batch.append({"batch": index, "missing_nodes": missing})
+    manifest, _ = find_manifest_for(report_path)
+    artifacts = artifact_status(manifest, str(Path(report_path).parent))
     return {
         "valid": not errors,
         "errors": errors,
@@ -161,6 +166,9 @@ def judge_report_status(report_path: str) -> dict[str, Any]:
         "module_key_chains": key_chains,
         "architecture_edges": len((report.get("overall_assessment") or {}).get("architecture_edges") or []),
         "missing_by_batch": missing_by_batch,
+        "audit_manifest": manifest,
+        "artifact_status": artifacts,
+        "product_ready": not errors and not artifacts["missing_artifacts"],
     }
 
 
@@ -443,3 +451,24 @@ def _atomic_write(path: Path, value: dict[str, Any]) -> None:
     tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
     tmp.write_text(json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
     os.replace(tmp, path)
+
+
+@contextmanager
+def _file_lock(path: str):
+    lock_path = Path(path).with_suffix(Path(path).suffix + ".lock")
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    handle = lock_path.open("a+")
+    try:
+        try:
+            import fcntl
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        except (ImportError, OSError):
+            pass
+        yield
+    finally:
+        try:
+            import fcntl
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+        except (ImportError, OSError):
+            pass
+        handle.close()

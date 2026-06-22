@@ -13,7 +13,10 @@ class ScopedSearchTests(unittest.TestCase):
         t=snap('target','t'); c=snap('candidate','c'); units={'/target':[u('kernel/a.c','shared'),u('vendor/v.c','vendored')],'/candidate':[u('kernel/a.c','shared'),u('vendor/v.c','vendored')]}
         with patch('core.scoped_search.build_units',side_effect=lambda path,snapshot: units[path]):
             formal=search_scoped(t,scope('target','t',['vendor/']),[(c,scope('candidate','c',['vendor/']))],formal_only=True)
-            self.assertEqual(1.0,formal[0]['combined']); self.assertEqual('formal',formal[0]['score_kind']); self.assertEqual(formal[0]['scope_id'],formal[0]['candidate_scope_id'])
+            self.assertEqual(1.0,formal[0]['combined']); self.assertEqual('formal',formal[0]['score_kind'])
+            self.assertEqual('scope_target', formal[0]['target_scope_id'])
+            self.assertEqual('scope_candidate', formal[0]['candidate_scope_id'])
+            self.assertEqual('candidate', formal[0]['candidate_snapshot']['repo'])
             rough=search_scoped(t,scope('target','t',['vendor/']),[(c,None)],formal_only=False)
             self.assertEqual('rough',rough[0]['score_kind']); self.assertEqual([],search_scoped(t,scope('target','t'),[(c,None)],formal_only=True))
 
