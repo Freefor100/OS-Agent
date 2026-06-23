@@ -42,7 +42,7 @@ body{display:grid;grid-template-columns:310px minmax(0,1fr);overflow:hidden}.sid
 .nav-home,.module-button,.node-button{width:100%;border:0;text-align:left;cursor:pointer;color:inherit;background:transparent}.nav-home{padding:11px;border-radius:9px;font-weight:700;margin-bottom:9px}.nav-home:hover,.nav-home.active,.module-button:hover,.module-button.active,.node-button:hover,.node-button.active{background:#ffffff12}
 .module{border-top:1px solid #ffffff12;padding:7px 0}.module-button{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:10px 9px;border-radius:8px;font-weight:700}.module-count{font-size:11px;color:#92a9c4}.nodes{display:none;padding:2px 0 7px 8px}.module.open .nodes{display:block}.node-button{padding:8px 8px;border-radius:7px;margin:2px 0}.node-name{display:block;font-size:13px;margin-bottom:5px}.mini-badges{display:flex;gap:4px;flex-wrap:wrap}.mini{font-size:10px;padding:2px 5px;border-radius:5px;background:#ffffff10;color:#c8d5e6}.mini.impl{border-left:2px solid #55a7ff}.mini.orig{border-left:2px solid #d29cff}.mini.absent{opacity:.58}
 .appendix-link{display:block;color:#d9e9ff;text-decoration:none;margin:18px 4px;padding:11px;border:1px solid #ffffff20;border-radius:9px;text-align:center}.content{height:100vh;overflow:auto;padding:28px 34px 70px}.topbar{display:none}.panel{display:none;max-width:1240px;margin:auto}.panel.active{display:block}.eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#607089;font-weight:800}.page-title{font-size:32px;line-height:1.25;margin:7px 0 10px}.lead{font-size:16px;color:#536278;line-height:1.8;max-width:900px}.card{background:#fff;border:1px solid #dfe6ef;border-radius:15px;padding:20px;margin:17px 0;box-shadow:0 8px 24px #24364b0a}.card h2,.card h3{margin-top:0}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.matrix{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.matrix-card{background:#fff;border:1px solid #dfe6ef;border-radius:12px;padding:15px;cursor:pointer}.matrix-card:hover{border-color:#7ea7d5;box-shadow:0 8px 20px #3d649414}.badges{display:flex;gap:8px;flex-wrap:wrap}.badge{display:inline-flex;align-items:center;border-radius:999px;padding:5px 9px;font-weight:700;font-size:12px}.badge.impl{background:#e8f3ff;color:#17588f}.badge.orig{background:#f2ebff;color:#6935a5}.badge.confidence{background:#eef2f6;color:#4a596c}.claim{border-left:4px solid #517fbd;padding:14px 16px;margin:12px 0;background:#f8fafd;border-radius:0 10px 10px 0}.claim p{line-height:1.75;margin:8px 0}.evidence-link{display:inline-block;text-decoration:none;color:#245f9e;background:#e8f2fd;border-radius:6px;padding:3px 7px;font-size:12px;font-weight:700;margin:2px}.evidence-link:hover{background:#cfe6fb}.muted{color:#65758b}.section-list{padding-left:18px;line-height:1.85}.scope{padding:12px 14px;background:#edf3f8;border-radius:9px;color:#40536a;line-height:1.7}.risk{padding:12px 14px;background:#fff5ed;border-left:4px solid #e8904f;border-radius:8px;margin:8px 0}.absent-list{display:flex;gap:7px;flex-wrap:wrap}.absent-chip{background:#edf0f3;color:#697685;border-radius:7px;padding:5px 8px;font-size:12px}
-.architecture{width:100%;height:auto;display:block;background:#f8fbfe;border-radius:12px}.evidence-section{max-width:1240px;margin:55px auto 0;padding-top:25px;border-top:2px solid #dce5ef}.evidence-card{background:#fff;border:1px solid #dfe6ef;border-radius:11px;margin:10px 0}.evidence-card summary{cursor:pointer;padding:15px 17px;font-weight:700}.evidence-body{padding:0 17px 17px}.evidence-body pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#111c2a;color:#d9e7f5;padding:14px;border-radius:8px;line-height:1.55}.crumb{color:#6d7c90;font-size:13px}.provenance-action{display:inline-block;background:#183b64;color:#fff;text-decoration:none;padding:10px 14px;border-radius:8px;font-weight:700;margin-top:9px}.drawer-button{display:none}
+.architecture-text{background:#f8fbfe;border:1px solid #d8e5f1;border-radius:10px;padding:16px;line-height:1.85;white-space:pre-wrap}.architecture-diagram{background:#111c2a;color:#d9e7f5;border-radius:10px;padding:16px;line-height:1.65;white-space:pre-wrap;overflow:auto}.edge-list{display:grid;gap:10px}.edge-card{border-left:4px solid #6f98c4;background:#f8fbfe;border-radius:0 9px 9px 0;padding:12px 14px}.evidence-section{max-width:1240px;margin:55px auto 0;padding-top:25px;border-top:2px solid #dce5ef}.evidence-card{background:#fff;border:1px solid #dfe6ef;border-radius:11px;margin:10px 0}.evidence-card summary{cursor:pointer;padding:15px 17px;font-weight:700}.evidence-body{padding:0 17px 17px}.evidence-body pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#111c2a;color:#d9e7f5;padding:14px;border-radius:8px;line-height:1.55}.crumb{color:#6d7c90;font-size:13px}.provenance-action{display:inline-block;background:#183b64;color:#fff;text-decoration:none;padding:10px 14px;border-radius:8px;font-weight:700;margin-top:9px}.drawer-button{display:none}
 @media(max-width:1050px){body{grid-template-columns:270px minmax(0,1fr)}.content{padding:24px}.matrix{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:760px){body{display:block;overflow:auto}.sidebar{position:fixed;left:-320px;width:300px;transition:left .2s}.sidebar.open{left:0}.content{height:auto;overflow:visible;padding:68px 16px 45px}.topbar{display:flex;position:fixed;top:0;left:0;right:0;height:54px;align-items:center;padding:0 15px;background:#101c2c;color:#fff;z-index:4}.drawer-button{display:block;border:0;background:#ffffff18;color:#fff;padding:7px 10px;border-radius:7px}.grid,.matrix{grid-template-columns:1fr}.page-title{font-size:25px}}
 """
@@ -150,8 +150,7 @@ def _overview_panel(report: dict[str, Any], reviews: dict[str, dict[str, Any]], 
 <article class="card"><h3>实质性修改部分</h3>{_list(assessment['main_modified'])}</article>
 <article class="card"><h3>相对独立实现部分</h3>{_list(assessment['main_independent'])}</article>
 <article class="card"><h3>缺失、退化与风险</h3>{_list(assessment['incomplete_or_risks'])}</article></div>
-<article class="card"><h2>静态内核架构图</h2>{_architecture_svg(assessment.get('architecture_edges') or [])}
-{_architecture_edge_list(assessment.get('architecture_edges') or [])}</article>
+<article class="card"><h2>内核架构说明</h2>{_architecture_view(assessment)}</article>
 <h2>框架实现度与原创度总览</h2><div class="matrix">{''.join(matrix)}</div></section>"""
 
 
@@ -281,28 +280,25 @@ def _list(value: Any) -> str:
     return '<ul class="section-list">' + "".join(f"<li>{esc(x)}</li>" for x in rows) + "</ul>"
 
 
-def _architecture_svg(edges: list[dict[str, Any]]) -> str:
-    modules = [node_title_zh(module_id) for module_id in MODULE_IDS]
-    boxes = []
-    centers = {}
-    for i, name in enumerate(modules):
-        col, row = i % 4, i // 4
-        x, y = 32 + col * 205, 48 + row * 102
-        centers[MODULE_IDS[i]] = (x + 84, y + 28)
-        boxes.append(f'<rect x="{x}" y="{y}" width="168" height="56" rx="11" fill="#ffffff" stroke="#7da1c8"/><text x="{x+84}" y="{y+33}" text-anchor="middle" font-size="13" fill="#233c58">{esc(name)}</text>')
-    arrows = []
-    for edge in edges:
-        start, end = centers.get(edge.get("from_module")), centers.get(edge.get("to_module"))
-        if start and end:
-            arrows.append(f'<path d="M{start[0]} {start[1]} L{end[0]} {end[1]}" stroke="#7894b3" stroke-width="1.8" fill="none" marker-end="url(#a)"/>')
-    return f"""<svg class="architecture" viewBox="0 0 850 480" role="img" aria-label="静态内核架构图"><defs><marker id="a" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 z" fill="#7894b3"/></marker></defs>
-<rect x="14" y="16" width="822" height="438" rx="18" fill="#eef5fb" stroke="#c9d8e7"/>{''.join(arrows)}{''.join(boxes)}
-<text x="32" y="438" font-size="12" fill="#60758c">模块边界：圆角框　调用/依赖关系：箭头　外部依赖：不进入作品实现度与原创度统计</text></svg>"""
+def _architecture_view(assessment: dict[str, Any]) -> str:
+    overview = assessment.get("architecture_overview") or ""
+    diagram = assessment.get("architecture_diagram") or ""
+    edges = assessment.get("architecture_edges") or []
+    chunks = []
+    if overview:
+        chunks.append(f'<div class="architecture-text">{esc(overview)}</div>')
+    if diagram:
+        chunks.append(f'<h3>Agent 架构图草案</h3><pre class="architecture-diagram">{esc(diagram)}</pre>')
+    chunks.append(_architecture_edge_list(edges))
+    return "".join(chunks)
 
 
 def _architecture_edge_list(edges: list[dict[str, Any]]) -> str:
-    rows = [f"{node_title_zh(edge['from_module'])} → {node_title_zh(edge['to_module'])}：{edge['label']}" for edge in edges]
-    return "<h3>架构关系说明</h3>" + _list(rows)
+    cards = []
+    for edge in edges:
+        cards.append(f"""<article class="edge-card"><strong>{esc(node_title_zh(edge['from_module']))} → {esc(node_title_zh(edge['to_module']))}</strong>
+<p>{esc(edge.get('label') or '')}</p></article>""")
+    return "<h3>关键架构关系</h3>" + (f'<div class="edge-list">{"".join(cards)}</div>' if cards else '<p class="muted">缺少 Agent 根据代码阅读提交的架构关系。</p>')
 
 
 def main() -> None:

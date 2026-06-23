@@ -1,6 +1,6 @@
 ---
 name: os-agent
-description: Analyze an OS competition submission for lineage, implementation completeness, originality, and differences using the os-agent MCP. Use when asked to analyze, compare, audit, check duplication, or generate a judge report for a repository under repos/.
+description: 使用 os-agent MCP 分析 repos/ 下操作系统竞赛作品的来源关系、实现完整度、原创度和实现差异，并生成中文评审报告。
 disable-model-invocation: true
 ---
 
@@ -8,7 +8,7 @@ disable-model-invocation: true
 
 ## 原则
 
-宿主 Agent 负责判断；本地工具只做不可变快照、范围校验、确定性搜索/比较、Evidence 校验和报告投影。正式结论必须引用 commit、ScopeManifest、comparison 和 EvidenceRecord。
+宿主 Agent 负责判断；本地工具只做不可变快照、范围校验、确定性搜索/比较、关键证据锚定和报告投影。最终 `report.html` 必须是中文报告；必要机制名可在中文后用括号补充解释，例如“多级反馈队列（MLFQ）”“写时复制（copy-on-write）”。
 
 - 开始分析前确定独立输出目录；若用户未指定，自动使用 `output/<repo-name>/audit-YYYYMMDD-HHMMSS/`，并在开始时告知用户。随后调用 `audit_manifest_create` 创建本次分析唯一的 `audit_manifest.json`，该目录固定保存 `base_decision.json`、`report.json`、`evidence_store.jsonl`、Comparison 数据库和双报告。
 - 不扫描工作树，只分析 Git commit 快照。
@@ -19,6 +19,7 @@ disable-model-invocation: true
 - 同届候选只进入复审区，不能作为有方向性的主 Base。
 - Node Scope 是语义边界，不是函数路由规则，也不能单独作为查重证据。旧机制标签和词表已从产品态工具输出移除，不参与导航、证据或报告内容。
 - Agent 可解释 `modified_candidate`，但不得覆盖 `raw_status`。
+- 报告优先面向评委阅读，避免堆砌工具术语；所有概述、模块总结、节点说明和架构边标签必须使用中文。
 
 ## 结构化阶段
 
@@ -63,28 +64,26 @@ disable-model-invocation: true
 6. `MatchEdge` 和 `RelationshipHint` 只是候选关系，不等于整合、拆分、挪用或抄袭结论。
 7. 主 Base 的 `raw_status` 只能由程序生成；次级来源通过 `comparison_add_secondary_source` 增加局部候选边，不改变主 Base 统计。
 
-### 6. Claim 驱动的完整框架评审
+### 6. 按模块形成中文抽象评审
 
 1. 调 `judge_report_create` 创建 `report.json` 骨架；它引用 ComparisonRun 和 EvidenceStore，但不内嵌全部函数对比。该工具默认不覆盖已有报告；切换 Base/Comparison 时使用 `judge_report_fork_for_comparison` 新建待重绑草稿，不在原报告上清空。
 2. 整个项目只使用一个全局 `evidence_store.jsonl` 和一个全局 `report.json`。不得给不同批次创建私有 EvidenceStore。
-3. 严格按 `ANALYSIS_BATCHES_V2` 的先后顺序处理全部 112 个节点。跨批次存在依赖，不并行启动所有批次。
-4. 一个批次内按“关键链路/强耦合节点组”分配 1–3 个 sub-agent；不要把整个批次塞给一个上下文，也不要机械地为每个节点创建一个 sub-agent。每个 sub-agent 必须覆盖获分配组内全部节点，并返回结构化草稿。
-5. 每个节点先调 `node_analysis_packet`，记录返回的 `report_generation`，再用 Comparison 与 `code_atlas_search` 定位候选文件、符号和入口。关键调用链优先使用带目标 `ref` 的 `lsp_call_graph`、`lsp_definition` 和 `lsp_references` 做语义确认；检查返回中的 fallback/confidence 信息。`code_atlas_call_neighbors` 用于全仓库低成本导航、分页、交叉检查或 LSP 不可用时的补充。`code_atlas_overview` 默认只返回少量中心函数，只用于首次架构初探，不得在每个节点重复调用，也不得单独支撑调用链 Claim。sub-agent 可以注册 Evidence，但不得直接写共享 `report.json`。
-6. Agent 读完源码后，调用 `evidence_list` 复用已有证据；缺少时用 `evidence_source_batch` 注册源码范围，调用链/历史/Scope 等结构化事实用 `evidence_structured` 注册。工具返回的 `evidence_id` 才能写入 Claim。
-7. 宿主 Agent 汇总并检查批内 sub-agent 草稿后，为每个节点调用一次 `node_review_bundle_submit(..., expected_generation=<node_analysis_packet 返回值>)` 原子提交 Claims 与 NodeReview。该工具会生成 claim_id 并回填到 review/degree。sub-agent 不得直接写共享 `report.json`；单条修订才由宿主使用 `claim_update` 或 `node_review_submit`，并同样传入 expected_generation。
-8. 每个 NodeReview 必须说明实际实现、与参考作品差异、实现度、原创度、风险和技术附录定位。函数、文件和 comparison 不要求归属节点。
-9. 完成一个模块后，由宿主 Agent综合节点结果提交 `ModuleReview`，其中必须包含模块总结和有 Claim/Evidence 支撑的 `key_chains`。
-10. 14 个模块完成后，宿主 Agent 提交 `OverallAssessment` 和由实际分析得到的 `architecture_edges`，用于生成总体总结与静态架构图。
-11. 比较型 Claim 必须具有作品与参考作品双侧证据；独立新增必须同时有作品源码、正式候选覆盖和完整负向搜索证据。
+3. `ANALYSIS_BATCHES_V2` 只作为依赖调度参考；实际产物按模块组织。优先调用 `module_analysis_packet(report_path, module_id)`，一次获取模块内全部节点的标题、功能范围、scope、候选函数、已有写入和 `report_generation`。
+4. 按模块或强相关模块组开少量 sub-agent。每个 sub-agent 负责读代码、理解功能范围、形成中文草稿；不得直接写共享 `report.json`。
+5. 分析任何节点前必须先读 scope。scope 是功能边界，不是证据；它告诉 Agent 该节点应该解释哪类内核功能。
+6. 关键调用链优先用带目标 `ref` 的 LSP/CodeAtlas/Comparison 工具确认。普通源码定位可以写入 Claim 文本、文件路径或函数名；只有关键锚点才注册 Evidence。
+7. 宿主 Agent 汇总草稿后，为每个节点调用一次 `node_review_bundle_submit(..., expected_generation=<module_analysis_packet 返回值>)` 原子提交 Claims 与 NodeReview。该工具会生成 claim_id 并回填到 review/degree。
+8. 每个 NodeReview 必须用中文说明“代码如何实现该功能范围”、与参考作品差异、完整度、原创度和风险。函数、文件和 comparison 不要求机械归属节点。
+9. 完成一个模块后，宿主 Agent 提交 `ModuleReview`。模块页是核心阅读单位，必须把节点事实抽象成模块能力、关键机制链路和实现差异。
+10. 14 个模块完成后，宿主 Agent 提交 `OverallAssessment`。架构部分必须体现该作品的独特设计：用中文填写 `architecture_overview`，必要时用 `architecture_diagram` 提供自由文本草图或 Mermaid 风格草案；`architecture_edges` 只作为结构化索引，每条边用中文说明控制流、数据流、依赖或调用关系，并绑定相关 Claim。MCP 不会替 Agent 自动绘制架构图。
 
-### 7. Evidence 注册与共享
+### 7. 关键 Evidence 锚定
 
-1. EvidenceStore 固定为当前报告目录下的 `evidence_store.jsonl`。它是所有批次、sub-agent、Claim、关键链路和总评共享的证据注册表。
-2. Agent 用内置读文件、LSP 或 Comparison 源码组理解代码；“读过代码”本身不会产生 Evidence。必须显式调用 Evidence MCP 注册。
-3. 源码证据使用 `evidence_source` 或 `evidence_source_batch`，参数必须包含作品、不可变 ref、路径和准确行号范围。`binary_artifact/file_artifact` 只需路径，工具校验文件存在、大小和 sha256。
-4. `evidence_source` 返回稳定 `evidence_id`；相同 commit、位置、类型和元数据重复注册会得到相同 ID。
-5. 调用链、Git 历史和 ScopeManifest 使用 `evidence_structured`；PDF/DOCX/Markdown 文档使用 `evidence_document`；机制未实现使用 `negative_search`。
-6. Claim 只引用 `evidence_id`，不得内嵌源码或自行编造 ID。写 Claim 前可用 `evidence_get/evidence_list` 检查与复用。
+1. EvidenceStore 固定为当前报告目录下的 `evidence_store.jsonl`，但 Evidence 只作为关键审计锚点，不再要求普通节点每个 Claim 都注册。
+2. 必须注册 Evidence 的场景：BaseDecision、Scope 排除、负向搜索、关键继承/独立结论、架构边支撑、模块置顶 Claim。
+3. 普通实现说明、普通差异说明和风险提示可以直接写中文 Claim，并附文件/函数/源码位置文字；不要为了填表反复调用 Evidence 工具。
+4. 需要注册时优先批量：源码用 `evidence_source_batch`，文件工件用 `binary_artifact/file_artifact`，文档用 `evidence_document`，负向结论用 `negative_search`。
+5. Claim 不得编造 evidence_id；只有 MCP 返回的 `evidence_id` 才能作为关键证据锚点。
 
 ### 8. 负向搜索
 
@@ -94,11 +93,11 @@ disable-model-invocation: true
 
 ### 9. 校验与渲染
 
-1. 每完成一个批次都调 `judge_report_status`；检查 `missing_by_batch`，当前批次未清零不得进入下一批。
-2. 最终再次调用 `judge_report_status`，确认 112 个 NodeReview、112 个节点均有 Claim、14 个 ModuleReview、各模块关键链路、OverallAssessment、架构边、BaseDecision、Evidence 和产物约束全部完成。
+1. 每完成一个模块都调 `judge_report_status`；检查缺失模块、缺失节点、缺失关键 Evidence、缺失中文总评和缺失真实架构说明。
+2. 最终再次调用 `judge_report_status`，确认 112 个 NodeReview、112 个节点均有 Claim、14 个 ModuleReview、各模块关键链路、OverallAssessment、架构边、BaseDecision 和产物约束全部完成。
 3. 调 `provenance_export` 生成确定性函数溯源数据 `provenance.json`，再调 `provenance_render` 生成独立技术附录 `provenance.html`。
 4. 只有 `judge_report_validate` 通过且 `base_decision.json`、Comparison、EvidenceStore、provenance 双产物存在后，才调用 `judge_report_render` 生成评委主报告 `report.html`。
-5. `report.html` 只展示完整框架评审、Claim 和每个节点绑定的 Evidence，不展示函数状态内部术语、完整函数列表或全局 Evidence 池。
+5. `report.html` 只展示中文总概述、模块概述、关键链路、完整度/原创度矩阵、节点细节和少量关键证据锚点；不展示函数状态内部术语、完整函数列表或全局 Evidence 池。
 6. `provenance.html` 只展示程序计算的函数匹配、来源候选与源码对照，不生成原创度、实现度或 Agent Claim。
 7. 旧混合 `AuditProject/Finding/index.html` 流程已废弃，不得生成或复用。
 

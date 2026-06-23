@@ -502,6 +502,13 @@ def node_analysis_packet(report_path: str, node_id: str) -> dict:
 
 
 @mcp.tool()
+def module_analysis_packet(report_path: str, module_id: str) -> dict:
+    """Return one module's nodes, scope boundaries, compact comparison representatives, and existing writeback."""
+    from core.judge_report import module_analysis_packet as packet
+    return packet(report_path, module_id)
+
+
+@mcp.tool()
 def claim_submit(report_path: str, claim: dict, expected_generation: str = "") -> dict:
     """Submit one atomic Agent conclusion. Function states and numeric statistics cannot be written here."""
     from core.judge_report import claim_submit as submit

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import threading
 from contextlib import contextmanager
 from pathlib import Path
@@ -20,6 +21,7 @@ from core.kernel_tree import (
 )
 
 JUDGE_REPORT_SCHEMA = "judge_report_v1"
+_CJK_RE = re.compile(r"[\u4e00-\u9fff]")
 CLAIM_TYPES = {"lineage", "difference", "independent_work", "implementation", "absence", "risk"}
 VERDICTS = {
     "inherited", "inherited_modified", "independently_added", "implemented", "partial",
@@ -37,11 +39,11 @@ CLAIM_CONTRACT = {
     "originality_levels": sorted(ORIGINALITY_LEVELS),
     "recommended_pairs": [
         {"claim_type": "lineage", "verdicts": ["inherited", "inherited_modified", "uncertain"], "evidence": "双侧源码证据"},
-        {"claim_type": "difference", "verdicts": ["inherited_modified", "independently_added", "partial", "uncertain"], "evidence": "双侧源码证据；新增结论还需要 formal_search 与 negative_search"},
+        {"claim_type": "difference", "verdicts": ["partial", "uncertain"], "evidence": "普通差异可用中文说明和源码定位；继承/新增方向结论需要关键 Evidence"},
         {"claim_type": "independent_work", "verdicts": ["independently_added"], "evidence": "目标源码证据、formal_search、完整 negative_search"},
-        {"claim_type": "implementation", "verdicts": ["implemented", "partial", "absent", "not_applicable", "uncertain"], "evidence": "目标源码或可验证文件/结构证据"},
+        {"claim_type": "implementation", "verdicts": ["implemented", "partial", "not_applicable", "uncertain"], "evidence": "普通实现说明可无 evidence；写清中文代码事实和功能抽象"},
         {"claim_type": "absence", "verdicts": ["absent", "not_applicable"], "evidence": "完整 negative_search 或架构不适用证据"},
-        {"claim_type": "risk", "verdicts": ["uncertain", "partial"], "evidence": "导致风险判断的源码、文档或审计证据"},
+        {"claim_type": "risk", "verdicts": ["uncertain", "partial"], "evidence": "普通风险可无 evidence；关键风险再锚定源码、文档或审计证据"},
     ],
 }
 _REPORT_LOCKS: dict[str, threading.RLock] = {}
@@ -230,6 +232,16 @@ def judge_report_status(report_path: str) -> dict[str, Any]:
             missing_by_batch.append({"batch": index, "missing_nodes": missing})
     manifest, _ = find_manifest_for(report_path)
     artifacts = artifact_status(manifest, str(Path(report_path).parent))
+    assessment = report.get("overall_assessment") if isinstance(report.get("overall_assessment"), dict) else {}
+    missing_modules = [module_id for module_id in MODULE_IDS if module_id not in modules]
+    missing_nodes = [node_id for node_id in ANALYSIS_ORDER_V2 if node_id not in node_ids]
+    missing_claim_nodes = [node_id for node_id in ANALYSIS_ORDER_V2 if node_id not in claimed_nodes]
+    missing_overall = [
+        field for field in ("summary", "source_relation", "main_inherited", "main_modified", "main_independent", "incomplete_or_risks", "review_focus")
+        if not assessment.get(field)
+    ]
+    missing_architecture_description = not bool(str(assessment.get("architecture_overview") or assessment.get("architecture_diagram") or "").strip())
+    missing_key_evidence = [error for error in errors if "requires verified evidence" in error or "requires key evidence" in error or "requires complete negative search evidence" in error or "requires work source" in error or "requires bilateral source evidence" in error]
     return {
         "valid": not errors,
         "errors": errors,
@@ -241,8 +253,16 @@ def judge_report_status(report_path: str) -> dict[str, Any]:
         "module_reviews": len(modules),
         "module_reviews_required": len(MODULE_IDS),
         "module_key_chains": key_chains,
-        "architecture_edges": len((report.get("overall_assessment") or {}).get("architecture_edges") or []),
+        "architecture_edges": len(assessment.get("architecture_edges") or []),
         "missing_by_batch": missing_by_batch,
+        "missing_summary": {
+            "modules": missing_modules,
+            "node_reviews": missing_nodes,
+            "nodes_with_claims": missing_claim_nodes,
+            "overall_fields": missing_overall,
+            "architecture_description": missing_architecture_description,
+            "key_evidence_errors": missing_key_evidence,
+        },
         "audit_manifest": manifest,
         "artifact_status": artifacts,
         "product_ready": not errors and not artifacts["missing_artifacts"],
@@ -288,6 +308,51 @@ def node_analysis_packet(report_path: str, node_id: str) -> dict[str, Any]:
         "batch": {"index": batch_index, "nodes": ANALYSIS_BATCHES_V2[batch_index - 1]},
         "existing_claims": [x for x in report.get("claims") or [] if isinstance(x, dict) and x.get("node_id") == node_id],
         "existing_review": next((x for x in report.get("node_reviews") or [] if isinstance(x, dict) and x.get("node_id") == node_id), None),
+    }
+
+
+def module_analysis_packet(report_path: str, module_id: str) -> dict[str, Any]:
+    if module_id not in MODULE_IDS:
+        raise ValueError(f"unknown module: {module_id}")
+    report = _load(report_path)
+    database = resolve_database(report["comparison_database"])
+    children = ROOT_NODES_V2[module_id]
+    node_ids = [module_id] if not children else [f"{module_id}.{child}" for child in children]
+    nodes = []
+    located_work: dict[str, dict[str, Any]] = {}
+    located_reference: dict[str, dict[str, Any]] = {}
+    for node_id in node_ids:
+        spec = EXTRA_NODE_SPECS.get(node_id, {})
+        for query in (spec.get("symbols") or [])[:8]:
+            for row in search_units(database, query=query, side="target", limit=8)["rows"]:
+                located_work[row["unit_id"]] = row
+            for row in search_units(database, query=query, side="primary_base", limit=8)["rows"]:
+                located_reference[row["unit_id"]] = row
+        nodes.append({
+            "node_id": node_id,
+            "title_zh": node_title_zh(node_id),
+            "title_en": node_title_en(node_id),
+            "scope": node_scope(node_id),
+            "existing_claims": [x for x in report.get("claims") or [] if isinstance(x, dict) and x.get("node_id") == node_id],
+            "existing_review": next((x for x in report.get("node_reviews") or [] if isinstance(x, dict) and x.get("node_id") == node_id), None),
+        })
+    return {
+        "module": {
+            "module_id": module_id,
+            "title_zh": node_title_zh(module_id),
+            "title_en": node_title_en(module_id),
+            "scope": node_scope(module_id),
+        },
+        "report_generation": report.get("report_generation"),
+        "workflow_note": "按模块形成中文抽象描述；节点 scope 是功能边界，不是证据。",
+        "nodes": nodes,
+        "comparison_summary": directory_summary(database, "", "target"),
+        "comparison_representatives": representatives(database, "global", "", 20),
+        "located_work_units": list(located_work.values())[:120],
+        "located_reference_units": list(located_reference.values())[:120],
+        "located_comparison_ids": sorted({row.get("comparison_id") for row in [*located_work.values(), *located_reference.values()] if row.get("comparison_id")})[:200],
+        "located_work_files": sorted({row.get("file") for row in located_work.values() if row.get("file")})[:80],
+        "existing_module_review": next((x for x in report.get("module_reviews") or [] if isinstance(x, dict) and x.get("module_id") == module_id), None),
     }
 
 
@@ -385,6 +450,8 @@ def validate_judge_report(report: dict[str, Any], *, require_complete: bool = Tr
             errors.append(f"claim {claim_id} has invalid confidence {claim.get('confidence')!r}; allowed={sorted(CONFIDENCE_LEVELS)}")
         if not str(claim.get("statement") or "").strip():
             errors.append(f"claim {claim_id} requires statement")
+        elif require_complete and not _contains_cjk(claim.get("statement")):
+            errors.append(f"claim {claim_id} statement must be Chinese")
         comparison_ids = _as_list(claim.get("comparison_ids"), f"claim {claim_id} comparison_ids", errors)
         for comparison_id in comparison_ids:
             if comparison_id not in refs["comparison_ids"]:
@@ -392,7 +459,8 @@ def validate_judge_report(report: dict[str, Any], *, require_complete: bool = Tr
         evidence_ids = _as_list(claim.get("evidence_ids"), f"claim {claim_id} evidence_ids", errors)
         if claim.get("migration_status") == "needs_rebind" and not require_complete:
             continue
-        if not evidence_ids:
+        requires_evidence = _claim_requires_evidence(claim)
+        if requires_evidence and not evidence_ids:
             errors.append(f"claim {claim_id} requires verified evidence")
         records = []
         for evidence_id in evidence_ids:
@@ -403,7 +471,8 @@ def validate_judge_report(report: dict[str, Any], *, require_complete: bool = Tr
                 errors.append(f"claim {claim_id} references unverified evidence {evidence_id}")
             else:
                 records.append(record)
-        _validate_claim_evidence(claim_id, claim, records, meta, errors)
+        if requires_evidence or records:
+            _validate_claim_evidence(claim_id, claim, records, meta, errors)
 
     node_reviews: dict[str, dict[str, Any]] = {}
     for review in _as_dict_rows(report.get("node_reviews"), "node_reviews", errors):
@@ -415,8 +484,12 @@ def validate_judge_report(report: dict[str, Any], *, require_complete: bool = Tr
         node_reviews[node_id] = review
         if not str(review.get("overview") or "").strip():
             errors.append(f"node review {node_id} requires overview")
+        elif require_complete and not _contains_cjk(review.get("overview")):
+            errors.append(f"node review {node_id} overview must be Chinese")
         if not str(review.get("difference_from_reference") or "").strip():
             errors.append(f"node review {node_id} requires difference_from_reference")
+        elif require_complete and not _contains_cjk(review.get("difference_from_reference")):
+            errors.append(f"node review {node_id} difference_from_reference must be Chinese")
         _validate_degree(node_id, "implementation_degree", review.get("implementation_degree"), IMPLEMENTATION_LEVELS, claims, errors)
         _validate_degree(node_id, "originality", review.get("originality"), ORIGINALITY_LEVELS, claims, errors)
         for claim_id in _as_list(review.get("claim_ids"), f"node review {node_id} claim_ids", errors):
@@ -439,9 +512,13 @@ def validate_judge_report(report: dict[str, Any], *, require_complete: bool = Tr
         for field in ("overview", "difference_summary", "original_work_summary", "implementation_summary"):
             if not str(review.get(field) or "").strip():
                 errors.append(f"module review {module_id} requires {field}")
+            elif require_complete and not _contains_cjk(review.get(field)):
+                errors.append(f"module review {module_id} {field} must be Chinese")
         for claim_id in _as_list(review.get("featured_claim_ids"), f"module review {module_id} featured_claim_ids", errors):
             if claim_id not in claims:
                 errors.append(f"module review {module_id} references missing claim {claim_id}")
+            elif require_complete and not _claim_has_verified_evidence(claims[claim_id], evidence):
+                errors.append(f"module review {module_id} featured claim {claim_id} requires key evidence")
         chains = _as_dict_rows(review.get("key_chains"), f"module review {module_id} key_chains", errors)
         if require_complete and not chains:
             errors.append(f"module review {module_id} requires key_chains")
@@ -489,6 +566,15 @@ def validate_judge_report(report: dict[str, Any], *, require_complete: bool = Tr
             value = assessment.get(field)
             if not value or (isinstance(value, str) and not value.strip()):
                 errors.append(f"overall assessment requires {field}")
+            elif isinstance(value, str) and not _contains_cjk(value):
+                errors.append(f"overall assessment {field} must be Chinese")
+            elif isinstance(value, list) and not any(_contains_cjk(x) for x in value):
+                errors.append(f"overall assessment {field} must be Chinese")
+        architecture_text = str(assessment.get("architecture_overview") or assessment.get("architecture_diagram") or "").strip()
+        if not architecture_text:
+            errors.append("overall assessment requires architecture_overview or architecture_diagram")
+        elif not _contains_cjk(architecture_text):
+            errors.append("overall assessment architecture description must be Chinese")
         edges = _as_dict_rows(assessment.get("architecture_edges"), "overall assessment architecture_edges", errors)
         if not edges:
             errors.append("overall assessment requires architecture_edges")
@@ -497,9 +583,13 @@ def validate_judge_report(report: dict[str, Any], *, require_complete: bool = Tr
                 errors.append("architecture edge references unknown module")
             if not str(edge.get("label") or "").strip():
                 errors.append("architecture edge requires label")
+            elif not _contains_cjk(edge.get("label")):
+                errors.append("architecture edge label must be Chinese")
             for claim_id in _as_list(edge.get("claim_ids"), "architecture edge claim_ids", errors):
                 if claim_id not in claims:
                     errors.append(f"architecture edge references missing claim {claim_id}")
+                elif not _claim_has_verified_evidence(claims[claim_id], evidence):
+                    errors.append(f"architecture edge claim {claim_id} requires key evidence")
     return errors
 
 
@@ -523,6 +613,29 @@ def _validate_claim_evidence(claim_id: str, claim: dict[str, Any], records: list
         architecture_evidence = verdict == "not_applicable" and any(x.get("kind") in {"config_entry", "documentation", "source_span"} for x in records)
         if not complete and not architecture_evidence:
             errors.append(f"absence claim {claim_id} requires complete negative search evidence")
+
+
+def _claim_requires_evidence(claim: dict[str, Any]) -> bool:
+    claim_type = claim.get("claim_type")
+    verdict = claim.get("verdict")
+    return (
+        claim_type in {"lineage", "independent_work", "absence"}
+        or verdict in {"inherited", "inherited_modified", "independently_added", "absent"}
+    )
+
+
+def _claim_has_verified_evidence(claim: dict[str, Any], evidence: dict[str, dict[str, Any]]) -> bool:
+    for evidence_id in claim.get("evidence_ids") or []:
+        record = evidence.get(evidence_id)
+        if record and record.get("verified"):
+            return True
+    return False
+
+
+def _contains_cjk(value: Any) -> bool:
+    if isinstance(value, list):
+        return any(_contains_cjk(x) for x in value)
+    return bool(_CJK_RE.search(str(value or "")))
 
 
 def _validate_degree(node_id: str, label: str, value: Any, allowed: set[str],

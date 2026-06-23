@@ -10,7 +10,7 @@
 
 OS-Agent 是一套以 **Claude Code Skill + MCP** 形式运行的内核作品查重和差异评审系统。
 
-- 本地程序负责 Git 版本锁定、代码范围校验、指纹、1-vs-N 搜索、函数匹配、Evidence 校验、完整性校验和 HTML 渲染。
+- 本地程序负责 Git 版本锁定、代码范围校验、指纹、1-vs-N 搜索、函数匹配、关键证据锚定、完整性校验和 HTML 渲染。
 - Claude Code 负责阅读源码和文档，判断外部依赖、参考作品、实现度、原创度与关键差异。
 
 它不是“运行一个 Python 脚本就自动得到评委结论”。脚本提供可复现的事实底座；Agent 完成完整框架评审后，程序才允许渲染最终报告。
@@ -18,7 +18,7 @@ OS-Agent 是一套以 **Claude Code Skill + MCP** 形式运行的内核作品查
 最终生成两份职责独立的报告：
 
 ```text
-report.json      → report.html       面向评委的完整框架评审
+report.json      → report.html       面向评委的中文完整框架评审
 provenance.json  → provenance.html   面向技术复核的函数溯源附录
 ```
 
@@ -95,7 +95,7 @@ Claude Code 自动发现的唯一项目 Skill 是 [.claude/skills/os-agent/SKILL
 完整分析 repos/oskernel2023-zmz。
 默认使用当前检出分支作为作品版本；如有明确证据表明其他分支才是最终作品，再分页检查其他分支尖端。
 未指定输出目录时，自动写入 output/oskernel2023-zmz/audit-YYYYMMDD-HHMMSS/。
-完成正式 1-vs-N 搜索、参考作品判断、112 节点完整评审、Evidence 校验，并渲染两份报告。
+完成正式 1-vs-N 搜索、参考作品判断、按模块形成 112 节点中文评审、关键 Evidence 校验，并渲染两份报告。
 ```
 
 也可以显式固定输出目录：
@@ -139,11 +139,11 @@ output/oskernel2023-zmz/audit-001/
 
 旧 `_agent_*`、`_audit_v*`、`_report` 目录结构已废弃；新流程只认 `output/<repo>/audit-YYYYMMDD-HHMMSS/` 这种独立审计目录。
 
-- 首先打开 `report.html`：查看总体结论、架构图、14 个模块、112 个节点、实现度、原创度与 Claim。
+- 首先打开 `report.html`：查看中文总体结论、Agent 阅读代码后给出的架构说明、14 个模块、112 个节点、完整度、原创度与关键 Claim。
 - 需要核对函数匹配和源码对照时，再打开 `provenance.html`。
-- `report.html` 中每个节点只展示该节点 Claim 绑定的 Evidence。Evidence 是 MCP 校验后注册的记录，不是 Agent 自行填写的源码文本。
+- `report.html` 以中文呈现，必要机制名可用括号补充解释，例如“写时复制（copy-on-write）”。Evidence 只作为关键锚点展示，不要求普通节点堆砌证据。
 
-只有 `judge_report_validate` 验证全部节点、模块、Claim 和 Evidence 后，程序才允许生成最终主报告。
+只有 `judge_report_validate` 验证全部节点、模块、关键 Claim、中文架构说明和产物链后，程序才允许生成最终主报告。
 
 ## 版本与分析范围
 
@@ -176,7 +176,7 @@ Claude Code 的完整约束见 [.claude/skills/os-agent/SKILL.md](.claude/skills
 4. **粗召回与正式重排**：粗搜索只发现候选；审核 Top-K 候选范围后，执行双侧排除的正式 1-vs-N 排名。
 5. **选择参考作品**：Agent 综合声明、年份、正式排名和差异解释能力判断；程序执行准入校验并写入 `base_decision.json`。
 6. **建立 Comparison 数据库**：程序完整保存函数匹配事实；Agent 从概要、热点、目录、文件到函数逐层查询，不一次加载全部函数。
-7. **完整框架评审**：Agent 按依赖顺序覆盖 112 个节点，编写 Claim、实现度、原创度、模块关键链路和总体结论。
+7. **完整框架评审**：Agent 以模块为核心阅读单位，覆盖 112 个节点，编写中文 Claim、完整度、原创度、模块关键链路和总体结论。
 8. **校验并生成双报告**：先导出/渲染 `provenance` 技术附录，再在完整性校验通过后渲染 `report.html`。
 
 声明是强线索但不会自动成为参考作品；同届高相似候选进入人工复审区，不能作为有方向性的继承来源。
@@ -194,25 +194,25 @@ Claude Code 的完整约束见 [.claude/skills/os-agent/SKILL.md](.claude/skills
 
 跨架构 C/C++ 项目建议安装对应裸机交叉编译器，例如 `riscv64-unknown-elf-gcc`。LSP 在内部 commit 源码快照中临时生成受管理的 `compile_flags.txt`，clangd 结束、MCP 退出或下次启动前会自动清除，不写入作品工作树。
 
-PDF 和 DOCX 文档证据分别通过 `pypdf` 与 `python-docx` 读取。Agent 必须调用 `evidence_document` 注册后才能在 Claim 中引用；单纯读过文档不等于形成 Evidence。
+PDF 和 DOCX 文档证据分别通过 `pypdf` 与 `python-docx` 读取。Evidence 主要用于 BaseDecision、Scope 排除、负向搜索、关键继承/独立结论、架构边支撑和模块置顶 Claim；普通实现说明可直接写中文分析，不必为每个节点反复注册 Evidence。
 
 ## Claude Code 开发态与产品态
 
-- **开发 OS-Agent 本身**：正常向 Claude Code 提出代码修改、测试或评审请求。`/os-agent` 不会自动触发；项目 MCP 即使连接，也只是可选工具。
+- **开发 OS-Agent 本身**：正常向 Claude Code 提出代码修改或评审请求。`/os-agent` 不会自动触发；项目 MCP 即使连接，也只是可选工具。
 - **使用 OS-Agent 分析作品**：显式执行 `/os-agent` 并指定作品和输出目录，Skill 会要求执行完整 MCP 审计流程。
-- **临时不启动 MCP**：可在本机 `/mcp` 中禁用 `os-agent`，或使用被 Git 忽略的 `.claude/settings.local.json`。此时不能做 MCP 集成测试或作品审计。
+- **临时不启动 MCP**：可在本机 `/mcp` 中禁用 `os-agent`，或使用被 Git 忽略的 `.claude/settings.local.json`。此时不能做 MCP 集成验证或作品审计。
 - **首次克隆 OS-Agent**：Claude Code 会要求批准项目级 `.mcp.json`，批准后才会启动本地 stdio MCP。
 
 Git 跟踪边界：
 
-- 跟踪：`.claude/skills/os-agent/SKILL.md`、`.mcp.json`、`scripts/start_mcp.sh`、MCP/模型/渲染代码和测试。
+- 跟踪：`.claude/skills/os-agent/SKILL.md`、`.mcp.json`、`scripts/start_mcp.sh`、MCP/模型/渲染代码。
 - 不跟踪：`.claude/settings.local.json`、`repos/`、`output/`、`.fp_cache/` 和个人权限配置。
 
 ## 常见问题
 
 ### 为什么运行 `scripts/run.py <作品>` 没有直接生成最终报告？
 
-它只准备确定性数据和候选搜索输入。最终报告需要 Agent 阅读源码、提交 Claim，并通过完整性与 Evidence 校验。
+它只准备确定性数据和候选搜索输入。最终报告需要 Agent 阅读源码、提交中文 Claim，并通过完整性与关键 Evidence 校验。
 
 ### 为什么报告展示分支名，内部又保存 commit？
 
@@ -242,8 +242,9 @@ Git 跟踪边界：
 | `compare_functions` / `comparison_*` | 建立并分层查询函数 Comparison 数据库 |
 | `code_atlas_overview` / `code_atlas_search` | 少量全局结构候选与入口定位；不直接作为调用链证据 |
 | `lsp_definition` / `lsp_references` / `lsp_call_graph` | 对锁定 commit 做关键符号和调用链语义确认 |
-| `evidence_*` / `negative_search` | 注册源码、文档、调用链、正式搜索与负向搜索证据 |
-| `node_analysis_packet` / `node_review_bundle_submit` | 获取带 report_generation 的节点分析包并原子写回 Claim 与 NodeReview |
+| `evidence_*` / `negative_search` | 注册关键源码、文档、调用链、正式搜索与负向搜索证据锚点 |
+| `module_analysis_packet` / `node_analysis_packet` | 获取带 report_generation 的模块/节点分析包，模块包是主入口 |
+| `node_review_bundle_submit` | 原子写回 Claim 与 NodeReview |
 | `claim_contract` / `node_review_draft_batch` | 查看 Claim 合法契约并生成不写入报告的批量草稿 |
 | `judge_report_fork_for_comparison` | 切换 Base/Comparison 时保留文字草稿并标记证据重绑 |
 | `judge_report_status` / `judge_report_validate` / `judge_report_render` | 检查完整框架覆盖并生成评委主报告 |

@@ -87,7 +87,7 @@ evidence_store.jsonl
 comparison.sqlite / comparisons.jsonl
 ```
 
-`repos/`、`.fp_cache/`、`output/` 和 `.claude/settings.local.json` 都是本地状态，不进入 Git；Skill、MCP 配置、启动脚本、模型、渲染器和测试进入 Git。
+`repos/`、`.fp_cache/`、`output/` 和 `.claude/settings.local.json` 都是本地状态，不进入 Git；Skill、MCP 配置、启动脚本、模型和渲染器进入 Git。测试属于本地开发行为，不作为产品交付内容。
 
 具体指纹链路：
 
