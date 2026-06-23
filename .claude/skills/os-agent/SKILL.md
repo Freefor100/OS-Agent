@@ -10,14 +10,14 @@ disable-model-invocation: true
 
 宿主 Agent 负责判断；本地工具只做不可变快照、范围校验、确定性搜索/比较、Evidence 校验和报告投影。正式结论必须引用 commit、ScopeManifest、comparison 和 EvidenceRecord。
 
-- 开始分析前确认用户指定了独立输出目录；先调用 `audit_manifest_create` 创建本次分析唯一的 `audit_manifest.json`，该目录固定保存 `base_decision.json`、`report.json`、`evidence_store.jsonl`、Comparison 数据库和双报告。
+- 开始分析前确定独立输出目录；若用户未指定，自动使用 `output/<repo-name>/audit-YYYYMMDD-HHMMSS/`，并在开始时告知用户。随后调用 `audit_manifest_create` 创建本次分析唯一的 `audit_manifest.json`，该目录固定保存 `base_decision.json`、`report.json`、`evidence_store.jsonl`、Comparison 数据库和双报告。
 - 不扫描工作树，只分析 Git commit 快照。
 - 分支只是入口；多个别名指向同一 commit 时只分析一次。
 - `search_similar` 是内部粗召回，禁止用于报告排名或 BaseDecision。
 - 正式搜索必须使用目标和候选各自的 verified ScopeManifest。
 - 声明是强线索，不自动成为 Base；声明来源必须正式对比。
 - 同届候选只进入复审区，不能作为有方向性的主 Base。
-- Node Scope 和 tag 是语义边界、导航提示、能力画像和负向搜索词，不是函数路由规则，也不能单独作为查重证据。
+- Node Scope 是语义边界，不是函数路由规则，也不能单独作为查重证据。旧机制标签和词表已从产品态工具输出移除，不参与导航、证据或报告内容。
 - Agent 可解释 `modified_candidate`，但不得覆盖 `raw_status`。
 
 ## 结构化阶段
@@ -27,7 +27,7 @@ disable-model-invocation: true
 1. 调 `repo_snapshots(target)`。默认作品版本是 clone 当前检出分支的尖端，面向用户表述为 `作品@分支`；程序同时记录其 commit 作为整个流程的审计锁。默认响应不返回其他分支，避免占用上下文。
 2. 仅当 README、分支命名或内容表明默认分支可能不是最终作品时，才使用 `include_other_branches=true` 分页检查其他唯一分支尖端并改变选择。该接口不遍历历史 commit，并按 commit 合并等价分支别名。
 3. 后续 MCP 调用传入选定分支解析出的固定 commit，防止长流程中 ref 移动；报告正文使用 `作品@分支`，commit 仅放入版本与证据详情。
-4. 调 `audit_manifest_create(target, ref=<固定 commit>, output_dir=<独立输出目录>)`，固定本次审计的标准产物路径和阶段状态。
+4. 调 `audit_manifest_create(target, ref=<固定 commit>, output_dir=<独立输出目录>)`，固定本次审计的标准产物路径和阶段状态；若用户没有提供目录，使用 `output/<repo-name>/audit-YYYYMMDD-HHMMSS/`。
 5. 调 `build_fingerprint(target, ref=<固定 commit>)`。缓存绑定 commit 与指纹 schema，脏工作树不参与；该工具返回的 Scope 只作为 draft suggestion，不是正式 ScopeManifest。
 
 ### 2. 确认目标 ScopeManifest
@@ -65,13 +65,13 @@ disable-model-invocation: true
 
 ### 6. Claim 驱动的完整框架评审
 
-1. 调 `judge_report_create` 创建 `report.json` 骨架；它引用 ComparisonRun 和 EvidenceStore，但不内嵌全部函数对比。
+1. 调 `judge_report_create` 创建 `report.json` 骨架；它引用 ComparisonRun 和 EvidenceStore，但不内嵌全部函数对比。该工具默认不覆盖已有报告；切换 Base/Comparison 时使用 `judge_report_fork_for_comparison` 新建待重绑草稿，不在原报告上清空。
 2. 整个项目只使用一个全局 `evidence_store.jsonl` 和一个全局 `report.json`。不得给不同批次创建私有 EvidenceStore。
 3. 严格按 `ANALYSIS_BATCHES_V2` 的先后顺序处理全部 112 个节点。跨批次存在依赖，不并行启动所有批次。
 4. 一个批次内按“关键链路/强耦合节点组”分配 1–3 个 sub-agent；不要把整个批次塞给一个上下文，也不要机械地为每个节点创建一个 sub-agent。每个 sub-agent 必须覆盖获分配组内全部节点，并返回结构化草稿。
-5. 每个节点先调 `node_analysis_packet`，再用 Comparison 与 `code_atlas_search` 定位候选文件、符号和入口。关键调用链优先使用带目标 `ref` 的 `lsp_call_graph`、`lsp_definition` 和 `lsp_references` 做语义确认；检查返回中的 fallback/confidence 信息。`code_atlas_call_neighbors` 用于全仓库低成本导航、分页、交叉检查或 LSP 不可用时的补充。`code_atlas_overview` 默认只返回少量中心函数，只用于首次架构初探，不得在每个节点重复调用，也不得单独支撑调用链 Claim。sub-agent 可以注册 Evidence，但不得直接写共享 `report.json`。
+5. 每个节点先调 `node_analysis_packet`，记录返回的 `report_generation`，再用 Comparison 与 `code_atlas_search` 定位候选文件、符号和入口。关键调用链优先使用带目标 `ref` 的 `lsp_call_graph`、`lsp_definition` 和 `lsp_references` 做语义确认；检查返回中的 fallback/confidence 信息。`code_atlas_call_neighbors` 用于全仓库低成本导航、分页、交叉检查或 LSP 不可用时的补充。`code_atlas_overview` 默认只返回少量中心函数，只用于首次架构初探，不得在每个节点重复调用，也不得单独支撑调用链 Claim。sub-agent 可以注册 Evidence，但不得直接写共享 `report.json`。
 6. Agent 读完源码后，调用 `evidence_list` 复用已有证据；缺少时用 `evidence_source_batch` 注册源码范围，调用链/历史/Scope 等结构化事实用 `evidence_structured` 注册。工具返回的 `evidence_id` 才能写入 Claim。
-7. 宿主 Agent 汇总并检查批内 sub-agent 草稿后，为每个节点调用一次 `node_review_bundle_submit` 原子提交 Claims 与 NodeReview。sub-agent 不得直接写共享 `report.json`；单条修订才由宿主使用 `claim_update` 或 `node_review_submit`。
+7. 宿主 Agent 汇总并检查批内 sub-agent 草稿后，为每个节点调用一次 `node_review_bundle_submit(..., expected_generation=<node_analysis_packet 返回值>)` 原子提交 Claims 与 NodeReview。该工具会生成 claim_id 并回填到 review/degree。sub-agent 不得直接写共享 `report.json`；单条修订才由宿主使用 `claim_update` 或 `node_review_submit`，并同样传入 expected_generation。
 8. 每个 NodeReview 必须说明实际实现、与参考作品差异、实现度、原创度、风险和技术附录定位。函数、文件和 comparison 不要求归属节点。
 9. 完成一个模块后，由宿主 Agent综合节点结果提交 `ModuleReview`，其中必须包含模块总结和有 Claim/Evidence 支撑的 `key_chains`。
 10. 14 个模块完成后，宿主 Agent 提交 `OverallAssessment` 和由实际分析得到的 `architecture_edges`，用于生成总体总结与静态架构图。
@@ -81,7 +81,7 @@ disable-model-invocation: true
 
 1. EvidenceStore 固定为当前报告目录下的 `evidence_store.jsonl`。它是所有批次、sub-agent、Claim、关键链路和总评共享的证据注册表。
 2. Agent 用内置读文件、LSP 或 Comparison 源码组理解代码；“读过代码”本身不会产生 Evidence。必须显式调用 Evidence MCP 注册。
-3. 源码证据使用 `evidence_source` 或 `evidence_source_batch`，参数必须包含作品、不可变 ref、路径和准确行号范围。
+3. 源码证据使用 `evidence_source` 或 `evidence_source_batch`，参数必须包含作品、不可变 ref、路径和准确行号范围。`binary_artifact/file_artifact` 只需路径，工具校验文件存在、大小和 sha256。
 4. `evidence_source` 返回稳定 `evidence_id`；相同 commit、位置、类型和元数据重复注册会得到相同 ID。
 5. 调用链、Git 历史和 ScopeManifest 使用 `evidence_structured`；PDF/DOCX/Markdown 文档使用 `evidence_document`；机制未实现使用 `negative_search`。
 6. Claim 只引用 `evidence_id`，不得内嵌源码或自行编造 ID。写 Claim 前可用 `evidence_get/evidence_list` 检查与复用。
@@ -90,7 +90,7 @@ disable-model-invocation: true
 
 1. 根据 glossary、Base 符号、目标命名风格和已发现入口构造查询。
 2. 调 `negative_search(..., evidence_store=<本项目路径>)` 固定 commit、搜索计划、路径、扩展名、实际查询和扫描文件数。
-3. 只有 `coverage_complete=true` 且零匹配才能支撑 `not_found`；否则结论为 `unknown`。
+3. 只有 `coverage_complete=true` 且零匹配才能支撑 `absent`；否则结论为 `uncertain`。
 
 ### 9. 校验与渲染
 
@@ -98,7 +98,7 @@ disable-model-invocation: true
 2. 最终再次调用 `judge_report_status`，确认 112 个 NodeReview、112 个节点均有 Claim、14 个 ModuleReview、各模块关键链路、OverallAssessment、架构边、BaseDecision、Evidence 和产物约束全部完成。
 3. 调 `provenance_export` 生成确定性函数溯源数据 `provenance.json`，再调 `provenance_render` 生成独立技术附录 `provenance.html`。
 4. 只有 `judge_report_validate` 通过且 `base_decision.json`、Comparison、EvidenceStore、provenance 双产物存在后，才调用 `judge_report_render` 生成评委主报告 `report.html`。
-5. `report.html` 只展示完整框架评审、Claim 和底部 Evidence，不展示函数状态内部术语或完整函数列表。
+5. `report.html` 只展示完整框架评审、Claim 和每个节点绑定的 Evidence，不展示函数状态内部术语、完整函数列表或全局 Evidence 池。
 6. `provenance.html` 只展示程序计算的函数匹配、来源候选与源码对照，不生成原创度、实现度或 Agent Claim。
 7. 旧混合 `AuditProject/Finding/index.html` 流程已废弃，不得生成或复用。
 

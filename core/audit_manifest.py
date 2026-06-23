@@ -103,6 +103,12 @@ def artifact_status(manifest: dict[str, Any] | None, fallback_dir: str) -> dict[
     artifacts = default_artifact_paths(fallback_dir)
     if manifest:
         artifacts.update(manifest.get("artifacts") or {})
+    if artifacts.get("comparison_database") and not Path(artifacts["comparison_database"]).is_file():
+        try:
+            from core.comparison_db import resolve_database
+            artifacts["comparison_database"] = resolve_database(str(artifacts["comparison_database"]))
+        except Exception:
+            pass
     required = ["base_decision", "comparison_database", "comparisons_jsonl", "evidence_store", "report_json",
                 "report_html", "provenance_json", "provenance_html"]
     rows = {name: {"path": path, "exists": Path(path).is_file()} for name, path in artifacts.items()}

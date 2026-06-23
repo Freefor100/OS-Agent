@@ -24,7 +24,7 @@ def build_snapshot(snapshot) -> dict:
             "ast_fingerprints": len(ast_fingerprint_set(snapshot.repo_path, snapshot=snapshot))}
 
 
-def build_all(repos_dir: str = "repos", ref: str = "HEAD", all_branches: bool = False) -> list[dict]:
+def build_all(repos_dir: str = "repos", ref: str = "HEAD", all_branches: bool = True) -> list[dict]:
     from core.snapshot import discover_commit_snapshots, resolve_snapshot
     results=[]; entries=sorted(x for x in Path(repos_dir).iterdir() if x.is_dir() and not x.name.startswith("."))
     for i, repo in enumerate(entries,1):
@@ -50,9 +50,12 @@ def prepare_target(target: str, ref: str, top_k: int) -> dict:
 
 def main() -> None:
     parser=argparse.ArgumentParser(); parser.add_argument("target",nargs="?"); parser.add_argument("--build",action="store_true")
-    parser.add_argument("--ref",default="HEAD"); parser.add_argument("--all-branches",action="store_true",help="build each unique branch-tip commit"); parser.add_argument("--top-k",type=int,default=20)
+    parser.add_argument("--ref",default="HEAD")
+    parser.add_argument("--all-branches",action="store_true",help="compatibility no-op: --build already builds each unique branch-tip commit")
+    parser.add_argument("--current-only",action="store_true",help="build only the selected ref, usually the checked-out HEAD")
+    parser.add_argument("--top-k",type=int,default=20)
     args=parser.parse_args()
-    if args.build: build_all(ref=args.ref,all_branches=args.all_branches); return
+    if args.build: build_all(ref=args.ref,all_branches=not args.current_only); return
     if not args.target: parser.error("target is required unless --build is used")
     print(json.dumps(prepare_target(args.target,args.ref,args.top_k),ensure_ascii=False,indent=2))
 

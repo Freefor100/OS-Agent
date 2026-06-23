@@ -32,6 +32,7 @@ EVIDENCE_KIND_LABELS = {
     "lsp_definition": "定义定位", "lsp_reference": "引用关系", "call_edge": "调用关系",
     "lsp_call_graph": "调用链", "git_history": "Git 历史", "formal_search": "正式检索",
     "scope_manifest": "代码范围", "negative_search": "负向搜索",
+    "binary_artifact": "二进制文件", "file_artifact": "文件证据",
 }
 
 CSS = r"""
@@ -66,7 +67,7 @@ document.querySelector('.search').addEventListener('input',e=>{
   document.querySelectorAll('.node-button').forEach(x=>x.style.display=!q||x.dataset.search.includes(q)?'block':'none');
   document.querySelectorAll('.module').forEach(x=>{const hit=!q||x.dataset.search.includes(q)||[...x.querySelectorAll('.node-button')].some(n=>n.style.display!=='none');x.style.display=hit?'block':'none';if(q&&hit)x.classList.add('open')});
 });
-document.querySelectorAll('.evidence-link').forEach(x=>x.addEventListener('click',e=>{e.preventDefault();const card=document.getElementById(x.dataset.evidence);card.open=true;card.scrollIntoView({behavior:'smooth',block:'start'});}));
+document.querySelectorAll('.evidence-link').forEach(x=>x.addEventListener('click',e=>{e.preventDefault();const card=document.getElementById(x.dataset.evidence);if(card){card.open=true;card.scrollIntoView({behavior:'smooth',block:'start'});}}));
 document.querySelector('.drawer-button').addEventListener('click',()=>document.querySelector('.sidebar').classList.toggle('open'));
 const hash=decodeURIComponent(location.hash.slice(1)); if(hash.startsWith('node='))openView('node:'+hash.slice(5),false); else if(hash.startsWith('module='))openView('module:'+hash.slice(7),false); else openView('overview',false);
 """
@@ -83,7 +84,7 @@ def render(report: dict[str, Any]) -> str:
     evidence = _read_evidence(report["evidence_store"])
     used = sorted({eid for claim in report["claims"] for eid in claim.get("evidence_ids") or []})
     evidence_labels = {eid: f"E{index:03d}" for index, eid in enumerate(used, 1)}
-    evidence_tags = {eid: _evidence_short_tag(evidence[eid]) for eid in used}
+    evidence_categories = {eid: _evidence_category(evidence[eid]) for eid in used}
     claims = {x["claim_id"]: x for x in report["claims"]}
     node_reviews = {x["node_id"]: x for x in report["node_reviews"]}
     modules = {x["module_id"]: x for x in report["module_reviews"]}
@@ -91,13 +92,12 @@ def render(report: dict[str, Any]) -> str:
     reference = report["reference"]["display_name"]
     sidebar = _sidebar(report, node_reviews, claims, modules)
     panels = [_overview_panel(report, node_reviews, modules, claims, evidence_labels)]
-    panels += [_module_panel(module_id, modules[module_id], node_reviews, claims, evidence_labels, evidence_tags) for module_id in MODULE_IDS]
-    panels += [_node_panel(report, node_id, node_reviews[node_id], claims, evidence_labels, evidence_tags) for node_id in ANALYSIS_ORDER_V2]
-    evidence_html = _evidence_section(used, evidence, evidence_labels, work, reference, report)
+    panels += [_module_panel(module_id, modules[module_id], node_reviews, claims, evidence_labels, evidence_categories) for module_id in MODULE_IDS]
+    panels += [_node_panel(report, node_id, node_reviews[node_id], claims, evidence, evidence_labels, evidence_categories) for node_id in ANALYSIS_ORDER_V2]
     return f"""<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{esc(work)} 内核实现评审报告</title><style>{CSS}</style></head><body>
 <aside class="sidebar">{sidebar}</aside><div class="topbar"><button class="drawer-button">目录</button><strong style="margin-left:12px">{esc(work)} 评审报告</strong></div>
-<main class="content">{''.join(panels)}{evidence_html}</main><script>{JS}</script></body></html>"""
+<main class="content">{''.join(panels)}</main><script>{JS}</script></body></html>"""
 
 
 def _sidebar(report: dict[str, Any], reviews: dict[str, dict[str, Any]], claims: dict[str, dict[str, Any]],
@@ -119,13 +119,13 @@ def _sidebar(report: dict[str, Any], reviews: dict[str, dict[str, Any]], claims:
             orig = review["originality"]["level"]
             absent = " absent" if impl in {"absent", "not_applicable"} else ""
             node_html.append(f"""<button class="node-button{absent}" data-view="node:{esc(node_id)}" data-search="{esc(search_text)}">
-<span class="node-name">{esc(node_title_zh(node_id))}</span><span class="mini-badges"><span class="mini impl">实现：{esc(IMPLEMENTATION_LABELS[impl])}</span><span class="mini orig">原创：{esc(ORIGINALITY_LABELS[orig])}</span></span></button>""")
+<span class="node-name">{esc(node_title_zh(node_id))}</span><span class="mini-badges"><span class="mini impl">完整度：{esc(IMPLEMENTATION_LABELS[impl])}</span><span class="mini orig">原创度：{esc(ORIGINALITY_LABELS[orig])}</span></span></button>""")
             search_parts.append(search_text)
         view = f"node:{module_id}" if module_id == "Metadata" else f"module:{module_id}"
         complete = sum(reviews[x]["implementation_degree"]["level"] == "complete" for x in nodes)
         original = sum(reviews[x]["originality"]["level"] in {"independent", "substantial_rework"} for x in nodes)
         chunks.append(f"""<section class="module{' open' if module_id in expanded else ''}" data-search="{esc(' '.join(search_parts).lower())}">
-<button class="module-button" data-view="{esc(view)}"><span>{esc(node_title_zh(module_id))}</span><span class="module-count">完整 {complete}/{len(nodes)} · 独立/重写 {original}</span></button>
+<button class="module-button" data-view="{esc(view)}"><span>{esc(node_title_zh(module_id))}</span><span class="module-count">完整度：完整 {complete}/{len(nodes)} · 原创度：独立/重写 {original}</span></button>
 <div class="nodes">{''.join(node_html)}</div></section>""")
     chunks.append(f'<a class="appendix-link" href="{esc(report.get("provenance_href") or "provenance.html")}" target="_blank">打开函数级技术溯源附录</a>')
     return "".join(chunks)
@@ -141,8 +141,8 @@ def _overview_panel(report: dict[str, Any], reviews: dict[str, dict[str, Any]], 
         complete = sum(reviews[x]["implementation_degree"]["level"] == "complete" for x in nodes)
         independent = sum(reviews[x]["originality"]["level"] in {"independent", "substantial_rework"} for x in nodes)
         matrix.append(f"""<article class="matrix-card" data-view="module:{esc(module_id)}"><strong>{esc(node_title_zh(module_id))}</strong>
-<p class="muted">{len(nodes)} 个节点 · 完整 {complete} · 独立/实质重写 {independent}</p></article>""")
-    return f"""<section class="panel" data-panel="overview"><div class="eyebrow">Judge-facing assessment</div>
+<p class="muted">{len(nodes)} 个节点 · 完整度：完整 {complete} · 原创度：独立/实质重写 {independent}</p></article>""")
+    return f"""<section class="panel" data-panel="overview"><div class="eyebrow">评委评审</div>
 <h1 class="page-title">{esc(report['work']['display_name'])} 内核实现评审报告</h1><p class="lead">{esc(assessment['summary'])}</p>
 <div class="grid"><article class="card"><h2>来源与演进结论</h2><p>{esc(assessment['source_relation'])}</p></article>
 <article class="card"><h2>评委重点复核</h2>{_list(assessment['review_focus'])}</article></div>
@@ -156,7 +156,7 @@ def _overview_panel(report: dict[str, Any], reviews: dict[str, dict[str, Any]], 
 
 
 def _module_panel(module_id: str, review: dict[str, Any], node_reviews: dict[str, dict[str, Any]],
-                  claims: dict[str, dict[str, Any]], labels: dict[str, str], tags: dict[str, str]) -> str:
+                  claims: dict[str, dict[str, Any]], labels: dict[str, str], categories: dict[str, str]) -> str:
     children = ROOT_NODES_V2[module_id]
     nodes = [module_id] if not children else [f"{module_id}.{child}" for child in children]
     cards, absent = [], []
@@ -166,9 +166,9 @@ def _module_panel(module_id: str, review: dict[str, Any], node_reviews: dict[str
         if impl in {"absent", "not_applicable"}:
             absent.append(node_title_zh(node_id))
         cards.append(f"""<article class="matrix-card" data-view="node:{esc(node_id)}"><strong>{esc(node_title_zh(node_id))}</strong>
-<div class="badges" style="margin-top:8px"><span class="badge impl">实现：{esc(IMPLEMENTATION_LABELS[impl])}</span><span class="badge orig">原创：{esc(ORIGINALITY_LABELS[orig])}</span></div></article>""")
+<div class="badges" style="margin-top:8px"><span class="badge impl">完整度：{esc(IMPLEMENTATION_LABELS[impl])}</span><span class="badge orig">原创度：{esc(ORIGINALITY_LABELS[orig])}</span></div></article>""")
     featured = [claims[x] for x in review.get("featured_claim_ids") or [] if x in claims]
-    chains = "".join(_key_chain(chain, labels, tags) for chain in review.get("key_chains") or [])
+    chains = "".join(_key_chain(chain, labels, categories) for chain in review.get("key_chains") or [])
     return f"""<section class="panel" data-panel="module:{esc(module_id)}"><div class="crumb">总体结果 / {esc(node_title_zh(module_id))}</div>
 <h1 class="page-title">{esc(node_title_zh(module_id))}</h1><p class="lead">{esc(review['overview'])}</p>
 <div class="grid"><article class="card"><h3>相比参考作品的主要变化</h3><p>{esc(review['difference_summary'])}</p></article>
@@ -176,47 +176,63 @@ def _module_panel(module_id: str, review: dict[str, Any], node_reviews: dict[str
 <article class="card"><h3>实现完整程度与缺失能力</h3><p>{esc(review['implementation_summary'])}</p></article>
 <article class="card"><h3>未实现或不适用节点</h3><div class="absent-list">{''.join(f'<span class="absent-chip">{esc(x)}</span>' for x in absent) or '<span class="muted">无</span>'}</div></article></div>
 <h2>关键链路</h2>{chains}
-<h2>重点结论</h2>{''.join(_claim_card(x, labels, tags) for x in featured) or '<p class="muted">本模块未单独置顶结论，节点页仍保留完整评审。</p>'}
+<h2>重点结论</h2>{''.join(_claim_card(x, labels, categories, link_evidence=False) for x in featured) or '<p class="muted">本模块未单独置顶结论，节点页仍保留完整评审。</p>'}
 <h2>节点评价矩阵</h2><div class="matrix">{''.join(cards)}</div></section>"""
 
 
 def _node_panel(report: dict[str, Any], node_id: str, review: dict[str, Any], claims: dict[str, dict[str, Any]],
-                labels: dict[str, str], tags: dict[str, str]) -> str:
+                evidence: dict[str, dict[str, Any]], labels: dict[str, str], categories: dict[str, str]) -> str:
     impl, orig = review["implementation_degree"], review["originality"]
-    node_claims = [claims[x] for x in review.get("claim_ids") or [] if x in claims]
+    claim_ids = [x for x in review.get("claim_ids") or [] if x in claims]
+    node_claims = [claims[x] for x in claim_ids]
+    for claim in claims.values():
+        if claim.get("node_id") == node_id and claim.get("claim_id") not in claim_ids:
+            node_claims.append(claim)
     risks = "".join(f'<div class="risk">{esc(x)}</div>' for x in review.get("risks") or []) or '<p class="muted">当前没有额外风险项。</p>'
     href = report.get("provenance_href") or "provenance.html"
     refs = review.get("provenance_refs") or []
     if refs and refs[0].get("target_file"):
         href += "#file:" + refs[0]["target_file"]
     return f"""<section class="panel" data-panel="node:{esc(node_id)}"><div class="crumb">{esc(node_title_zh(node_id.split(".",1)[0]))} / {esc(node_title_zh(node_id))}</div>
-<h1 class="page-title">{esc(node_title_zh(node_id))}</h1><div class="scope"><strong>Scope：</strong>{esc(node_scope(node_id))}</div>
-<div class="grid"><article class="card"><div class="badges"><span class="badge impl">实现：{esc(IMPLEMENTATION_LABELS[impl['level']])}</span></div><h3>实现度判断</h3><p>{esc(impl['rationale'])}</p></article>
-<article class="card"><div class="badges"><span class="badge orig">原创：{esc(ORIGINALITY_LABELS[orig['level']])}</span></div><h3>原创度判断</h3><p>{esc(orig['rationale'])}</p></article></div>
+<h1 class="page-title">{esc(node_title_zh(node_id))}</h1><div class="scope"><strong>范围：</strong>{esc(node_scope(node_id))}</div>
+<div class="grid"><article class="card"><div class="badges"><span class="badge impl">完整度：{esc(IMPLEMENTATION_LABELS[impl['level']])}</span></div><h3>完整度判断</h3><p>{esc(impl['rationale'])}</p></article>
+<article class="card"><div class="badges"><span class="badge orig">原创度：{esc(ORIGINALITY_LABELS[orig['level']])}</span></div><h3>原创度判断</h3><p>{esc(orig['rationale'])}</p></article></div>
 <article class="card"><h2>{esc(report['work']['display_name'])} 中如何实现</h2><p>{esc(review['overview'])}</p></article>
 <article class="card"><h2>与 {esc(report['reference']['display_name'])} 的差异</h2><p>{esc(review['difference_from_reference'])}</p></article>
-<h2>Agent Claims</h2>{''.join(_claim_card(x, labels, tags) for x in node_claims)}
+<h2>节点结论</h2>{''.join(_claim_card(x, labels, categories, anchor_suffix='-'+node_id.replace('.', '-')) for x in node_claims)}
+{_node_evidence_section(node_id, node_claims, evidence, labels, report)}
 <article class="card"><h2>风险、缺失与不确定项</h2>{risks}<a class="provenance-action" href="{esc(href)}#search={esc(node_title_zh(node_id))}" target="_blank">打开函数级技术溯源</a></article></section>"""
 
 
-def _claim_card(claim: dict[str, Any], labels: dict[str, str], tags: dict[str, str]) -> str:
-    links = "".join(f'<a class="evidence-link" href="#{esc(labels[eid])}" data-evidence="evidence-{esc(labels[eid])}">{esc(tags[eid])} {esc(labels[eid])}</a>' for eid in claim.get("evidence_ids") or [])
+def _claim_card(claim: dict[str, Any], labels: dict[str, str], categories: dict[str, str], *, link_evidence: bool = True,
+                anchor_suffix: str = "") -> str:
+    if link_evidence:
+        links = "".join(f'<a class="evidence-link" href="#{esc(labels[eid])}" data-evidence="evidence-{esc(labels[eid])}{esc(anchor_suffix)}">{esc(categories[eid])} {esc(labels[eid])}</a>' for eid in claim.get("evidence_ids") or [])
+    else:
+        links = "".join(f'<span class="evidence-link">{esc(categories[eid])} {esc(labels[eid])}</span>' for eid in claim.get("evidence_ids") or [] if eid in labels)
     return f"""<article class="claim"><div class="badges"><span class="badge confidence">{esc(CLAIM_LABELS[claim['claim_type']])}</span>
 <span class="badge confidence">置信度：{esc(claim['confidence'])}</span></div><p>{esc(claim['statement'])}</p><div>{links}</div></article>"""
 
 
-def _key_chain(chain: dict[str, Any], labels: dict[str, str], tags: dict[str, str]) -> str:
-    links = "".join(f'<a class="evidence-link" href="#{esc(labels[eid])}" data-evidence="evidence-{esc(labels[eid])}">{esc(tags[eid])} {esc(labels[eid])}</a>'
+def _key_chain(chain: dict[str, Any], labels: dict[str, str], categories: dict[str, str]) -> str:
+    links = "".join(f'<span class="evidence-link">{esc(categories[eid])} {esc(labels[eid])}</span>'
                     for eid in chain.get("evidence_ids") or [] if eid in labels)
     nodes = " → ".join(node_title_zh(node_id) for node_id in chain.get("node_ids") or [])
     return f"""<article class="card"><h3>{esc(chain.get('title'))}</h3><p class="muted">{esc(nodes)}</p>
 <p>{esc(chain.get('explanation'))}</p><div>{links}</div></article>"""
 
 
-def _evidence_section(used: list[str], records: dict[str, dict[str, Any]], labels: dict[str, str], work: str,
-                      reference: str, report: dict[str, Any]) -> str:
+def _node_evidence_section(node_id: str, claims: list[dict[str, Any]], records: dict[str, dict[str, Any]],
+                           labels: dict[str, str], report: dict[str, Any]) -> str:
+    used = []
+    for claim in claims:
+        for evidence_id in claim.get("evidence_ids") or []:
+            if evidence_id in records and evidence_id not in used:
+                used.append(evidence_id)
     target_commit = (report["work"].get("snapshot") or {}).get("commit")
     reference_commit = (report["reference"].get("snapshot") or {}).get("commit")
+    work = report["work"]["display_name"]
+    reference = report["reference"]["display_name"]
     cards = []
     for eid in used:
         row = records[eid]
@@ -224,12 +240,12 @@ def _evidence_section(used: list[str], records: dict[str, dict[str, Any]], label
         owner = work if commit == target_commit else reference if commit == reference_commit else "检索与审计流程"
         location = f"{row.get('path') or ''}:{row.get('line_start') or ''}".rstrip(":")
         kind_label = EVIDENCE_KIND_LABELS.get(row.get("kind"), row.get("kind"))
-        source_tag = "文档" if row.get("kind") == "documentation" else "程序事实" if row.get("kind") in {"formal_search", "negative_search", "scope_manifest"} else "源码/结构"
-        cards.append(f"""<details class="evidence-card" id="evidence-{esc(labels[eid])}"><summary>{esc(labels[eid])} · [{esc(source_tag)}] [{esc(kind_label)}] · {esc(owner)} · {esc(row.get('label') or '')}</summary>
+        source_category = "文档" if row.get("kind") == "documentation" else "程序事实" if row.get("kind") in {"formal_search", "negative_search", "scope_manifest"} else "源码/结构"
+        cards.append(f"""<details class="evidence-card" id="evidence-{esc(labels[eid])}-{esc(node_id.replace('.', '-'))}"><summary>证据 {esc(labels[eid])} · [{esc(source_category)}] [{esc(kind_label)}] · {esc(owner)} · {esc(row.get('label') or '')}</summary>
 <div class="evidence-body"><p><strong>作品/来源：</strong>{esc(owner)}　<strong>commit：</strong><code>{esc(commit or '')}</code><br>
-<strong>位置：</strong>{esc(location or '结构化审计记录')}　<strong>类型：</strong>{esc(kind_label)}　<strong>标签：</strong>{esc(source_tag)}　<strong>验证：</strong>{'已验证' if row.get('verified') else '未验证'}</p>
+<strong>位置：</strong>{esc(location or '结构化审计记录')}　<strong>类型：</strong>{esc(kind_label)}　<strong>证据类别：</strong>{esc(source_category)}　<strong>验证：</strong>{'已验证' if row.get('verified') else '未验证'}</p>
 <pre>{esc(row.get('excerpt') or _evidence_summary(row))}</pre></div></details>""")
-    return f'<section class="evidence-section"><h2>Evidence 源码与审计记录</h2><p class="muted">正文仅引用证据编号。展开后查看已验证源码片段或结构化检索结果。</p>{"".join(cards)}</section>'
+    return f'<section class="evidence-section"><h2>本节点证据</h2><p class="muted">这里只展示当前节点结论绑定的证据。</p>{"".join(cards)}</section>'
 
 
 def _evidence_summary(row: dict[str, Any]) -> str:
@@ -241,7 +257,7 @@ def _evidence_summary(row: dict[str, Any]) -> str:
     return str(row.get("query") or row.get("label") or "已验证结构化证据")
 
 
-def _evidence_short_tag(row: dict[str, Any]) -> str:
+def _evidence_category(row: dict[str, Any]) -> str:
     kind = row.get("kind")
     if kind == "documentation":
         return "文档证据"

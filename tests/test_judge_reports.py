@@ -5,7 +5,14 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from core.comparison import compare_unit_sets, write_comparison
-from core.judge_report import MODULE_IDS, create_judge_report, node_review_bundle_submit, validate_judge_report, write_judge_report
+from core.judge_report import (
+    MODULE_IDS,
+    create_judge_report,
+    fork_judge_report_for_comparison,
+    node_review_bundle_submit,
+    validate_judge_report,
+    write_judge_report,
+)
 from core.evidence import EvidenceCandidate, EvidenceStore
 from core.kernel_tree import ANALYSIS_ORDER_V2
 from core.provenance_report import export_provenance
@@ -93,6 +100,9 @@ class JudgeReportTests(unittest.TestCase):
             self.assertIn("证据 E001", page)
             self.assertIn("1: int walk", page)
             self.assertIn("函数级技术溯源附录", page)
+            self.assertNotIn("Agent Claims", page)
+            self.assertNotIn("Judge-facing assessment", page)
+            self.assertNotIn("Scope：", page)
             for forbidden in ("target_only", "base_only", "MatchEdge", "RelationshipHint", "primary_base"):
                 self.assertNotIn(forbidden, page)
             provenance_path = str(Path(root, "provenance.json"))
@@ -138,6 +148,71 @@ class JudgeReportTests(unittest.TestCase):
                 list(pool.map(submit, [0, 1]))
             saved = json.loads(Path(report_path).read_text(encoding="utf-8"))
             self.assertEqual(2, len(saved["claims"])); self.assertEqual(2, len(saved["node_reviews"]))
+
+    def test_node_bundle_auto_binds_generated_claims_and_rejects_stale_generation(self):
+        with tempfile.TemporaryDirectory() as root:
+            report, _ = self.complete_report(root)
+            report["claims"] = []; report["node_reviews"] = []; report["module_reviews"] = []; report["overall_assessment"] = {}
+            report_path = str(Path(root, "report.json")); write_judge_report(report, report_path)
+            node_id = ANALYSIS_ORDER_V2[0]
+            claim = {"claim_type": "implementation", "verdict": "implemented", "statement": "已有源码支撑。",
+                     "comparison_ids": [], "evidence_ids": ["ev_work"], "confidence": "medium"}
+            review = {"overview": "已有实现。", "difference_from_reference": "差异已审阅。",
+                      "implementation_degree": {"level": "partial", "rationale": "有源码。"},
+                      "originality": {"level": "unknown", "rationale": "证据不足。"},
+                      "claim_ids": ["missing"], "risks": []}
+            with self.assertRaisesRegex(ValueError, "stale report generation"):
+                node_review_bundle_submit(report_path, node_id, [claim], review, expected_generation="old")
+            result = node_review_bundle_submit(report_path, node_id, [claim], review,
+                                               expected_generation=report["report_generation"])
+            claim_id = result["claims"][0]["claim_id"]
+            self.assertEqual([claim_id], result["review"]["claim_ids"])
+            self.assertEqual([claim_id], result["review"]["implementation_degree"]["claim_ids"])
+            self.assertEqual([claim_id], result["review"]["originality"]["claim_ids"])
+
+    def test_validate_reports_schema_errors_instead_of_attribute_crash(self):
+        with tempfile.TemporaryDirectory() as root:
+            report, _ = self.complete_report(root)
+            report["claims"].append("bad")
+            report["node_reviews"].append("bad")
+            report["module_reviews"].append({"module_id": MODULE_IDS[0], "overview": "x", "difference_summary": "x",
+                                             "original_work_summary": "x", "implementation_summary": "x",
+                                             "key_chains": ["bad"]})
+            report["overall_assessment"] = "bad"
+            errors = validate_judge_report(report, require_complete=True)
+            self.assertTrue(any("claims" in error and "object" in error for error in errors))
+            self.assertTrue(any("overall_assessment must be object" in error for error in errors))
+
+    def test_render_keeps_evidence_inside_bound_node_only(self):
+        with tempfile.TemporaryDirectory() as root:
+            report, _ = self.complete_report(root)
+            other = {
+                "evidence_id": "ev_other", "verified": True, "strength": "strong", "tool": "source_reader",
+                "kind": "source_span", "path": "other.c", "line_start": 1, "line_end": 2, "symbol": "other",
+                "label": "另一处源码", "query": "", "excerpt": "1: int other(void) {}", "metadata": {"snapshot_commit": "target-commit"},
+                "verifier_notes": ["verified"],
+            }
+            with Path(report["evidence_store"]).open("a", encoding="utf-8") as handle:
+                handle.write(json.dumps(other, ensure_ascii=False) + "\n")
+            report["claims"][1]["evidence_ids"] = ["ev_other"]
+            page = render_judge(report)
+            first = page.index(f'data-panel="node:{ANALYSIS_ORDER_V2[0]}"')
+            second = page.index(f'data-panel="node:{ANALYSIS_ORDER_V2[1]}"')
+            first_panel = page[first:second]
+            self.assertNotIn("另一处源码", first_panel)
+            self.assertNotIn("Evidence 源码与审计记录", page)
+
+    def test_forked_report_preserves_text_but_blocks_complete_render_until_rebound(self):
+        with tempfile.TemporaryDirectory() as root:
+            report, artifacts = self.complete_report(root)
+            report_path = Path(root, "old_report.json")
+            write_judge_report(report, str(report_path))
+            forked = fork_judge_report_for_comparison(str(report_path), comparison_database=artifacts["database"],
+                                                      evidence_store=report["evidence_store"])
+            self.assertEqual(report["node_reviews"][0]["overview"], forked["node_reviews"][0]["overview"])
+            self.assertEqual("needs_rebind", forked["claims"][0]["migration_status"])
+            errors = validate_judge_report(forked, require_complete=True)
+            self.assertTrue(any("requires evidence/comparison rebind" in error for error in errors))
 
     def test_evidence_jsonl_is_shared_across_snapshot_roots(self):
         with tempfile.TemporaryDirectory() as root:

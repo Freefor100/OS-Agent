@@ -156,6 +156,14 @@ def _safe_read_lines(repo_path: str, rel_path: str) -> list[str]:
         return []
 
 
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 class EvidenceStore:
     """Tool-owned evidence registry.
 
@@ -194,7 +202,7 @@ class EvidenceStore:
                 self._append_record(record)
         return record.evidence_id
 
-    def add_source(self, *, kind: str, path: str, line: int, line_end: int | None = None, symbol: str = "", label: str = "", strength: str = "strong", metadata: dict[str, Any] | None = None) -> str:
+    def add_source(self, *, kind: str, path: str, line: int = 0, line_end: int | None = None, symbol: str = "", label: str = "", strength: str = "strong", metadata: dict[str, Any] | None = None) -> str:
         return self.add(EvidenceCandidate(
             tool="source_reader",
             kind=kind,
@@ -367,6 +375,19 @@ class EvidenceStore:
                     notes.append("symbol not found in local excerpt; evidence remains location-based")
             else:
                 notes.append("path/line could not be verified")
+        elif cand.kind in {"binary_artifact", "file_artifact"}:
+            root = Path(self.repo_path).resolve()
+            path = (root / cand.path).resolve()
+            if (path == root or root in path.parents) and path.is_file():
+                stat = path.stat()
+                digest = _sha256_file(path)
+                cand.metadata = {**cand.metadata, "file_size": stat.st_size, "sha256": digest}
+                excerpt = f"file: {cand.path}\nsize: {stat.st_size}\nsha256: {digest}"
+                line_end = None
+                verified = True
+                notes.append("file existence verified by source reader")
+            else:
+                notes.append("file artifact path missing or outside workspace")
         elif cand.kind in {"call_edge", "lsp_call_graph"}:
             verified = bool(cand.metadata.get("src") and cand.metadata.get("dst") or cand.metadata.get("root_symbol"))
             notes.append("call graph verified by structured tool metadata" if verified else "call graph metadata incomplete")
@@ -448,6 +469,7 @@ def _compact_record(record: EvidenceRecord) -> EvidenceRecord:
                 "navigation_only", "tool", "result_count", "commit", "plan_id", "snapshot_commit",
                 "executed_queries", "executed_checks", "extensions", "scanned_files", "coverage_complete", "required_checks",
                 "score_kind", "target_scope_id", "candidate_scope_id", "candidate_commit", "scope_id", "snapshot_id", "status",
+                "file_size", "sha256",
             }
         },
         verifier_notes=record.verifier_notes,

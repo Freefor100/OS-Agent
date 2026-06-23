@@ -247,9 +247,10 @@ def base_decision_submit(decision: dict, packet: dict, output_path: str) -> dict
     """Validate and persist the Agent's BaseDecision packet for the audit run."""
     import json, os
     from core.audit_manifest import find_manifest_for, update_manifest
-    from core.base_decision import validate_base_decision as validate
+    from core.base_decision import resolve_primary_candidate, validate_base_decision as validate
     errors = validate(decision, packet)
-    result = {"valid": not errors, "errors": errors, "packet": packet, "decision": decision}
+    result = {"valid": not errors, "errors": errors, "packet": packet, "decision": decision,
+              "selected_candidate": resolve_primary_candidate(decision, packet)}
     if errors:
         return result
     output = Path(output_path); output.parent.mkdir(parents=True, exist_ok=True)
@@ -450,9 +451,20 @@ def comparison_add_secondary_source(run_id: str, source: str, ref: str = "HEAD",
 
 @mcp.tool()
 def judge_report_create(comparison_run_id: str, evidence_store: str, output_path: str,
-                        work_display_name: str = "", reference_display_name: str = "") -> dict:
+                        work_display_name: str = "", reference_display_name: str = "", overwrite: bool = False) -> dict:
     """Create the incomplete Claim-driven judge report skeleton. It becomes renderable only after all 112 nodes are reviewed."""
+    import json
     from core.judge_report import create_judge_report, write_judge_report
+    output = Path(output_path)
+    if output.is_file() and not overwrite:
+        existing = json.loads(output.read_text(encoding="utf-8"))
+        candidate = create_judge_report(comparison_database=comparison_run_id, evidence_store=evidence_store,
+                                        work_display_name=work_display_name, reference_display_name=reference_display_name)
+        if existing.get("comparison_run_id") == candidate["comparison_run_id"]:
+            return {"path": output_path, "existing": True, "comparison_run_id": existing.get("comparison_run_id"),
+                    "report_generation": existing.get("report_generation"), "required_nodes": len((existing.get("taxonomy") or {}).get("nodes") or []),
+                    "required_modules": len((existing.get("taxonomy") or {}).get("modules") or [])}
+        raise ValueError("judge_report_create refused to overwrite existing report with a different comparison_run_id; use judge_report_fork_for_comparison or overwrite=true")
     report = create_judge_report(comparison_database=comparison_run_id, evidence_store=evidence_store,
                                  work_display_name=work_display_name, reference_display_name=reference_display_name)
     write_judge_report(report, output_path)
@@ -460,10 +472,26 @@ def judge_report_create(comparison_run_id: str, evidence_store: str, output_path
     manifest, manifest_path = find_manifest_for(output_path)
     if manifest:
         update_manifest(manifest_path, artifacts={"report_json": output_path, "evidence_store": evidence_store,
-                                                  "comparison_database": comparison_run_id},
+                                                  "comparison_database": report["comparison_database"]},
                         stages={"judge_report_created": True}, status="judge_report_created")
     return {"path": output_path, "comparison_run_id": report["comparison_run_id"], "required_nodes": len(report["taxonomy"]["nodes"]),
-            "required_modules": len(report["taxonomy"]["modules"])}
+            "required_modules": len(report["taxonomy"]["modules"]), "report_generation": report["report_generation"]}
+
+
+@mcp.tool()
+def judge_report_fork_for_comparison(old_report_path: str, comparison_run_id: str, output_path: str, evidence_store: str,
+                                     work_display_name: str = "", reference_display_name: str = "", overwrite: bool = False) -> dict:
+    """Fork an existing report after Base/Comparison changes. Migrated claims require rebind before render."""
+    from core.judge_report import fork_judge_report_for_comparison, write_judge_report
+    output = Path(output_path)
+    if output.is_file() and not overwrite:
+        raise ValueError("output_path already exists; pass overwrite=true or choose a new audit directory")
+    report = fork_judge_report_for_comparison(old_report_path, comparison_database=comparison_run_id,
+                                             evidence_store=evidence_store, work_display_name=work_display_name,
+                                             reference_display_name=reference_display_name)
+    write_judge_report(report, output_path)
+    return {"path": output_path, "comparison_run_id": report["comparison_run_id"], "report_generation": report["report_generation"],
+            "migration": report.get("migration"), "claims_requiring_rebind": sum(1 for x in report.get("claims") or [] if x.get("migration_status") == "needs_rebind")}
 
 
 @mcp.tool()
@@ -474,18 +502,18 @@ def node_analysis_packet(report_path: str, node_id: str) -> dict:
 
 
 @mcp.tool()
-def claim_submit(report_path: str, claim: dict) -> dict:
+def claim_submit(report_path: str, claim: dict, expected_generation: str = "") -> dict:
     """Submit one atomic Agent conclusion. Function states and numeric statistics cannot be written here."""
     from core.judge_report import claim_submit as submit
-    return submit(report_path, claim)
+    return submit(report_path, claim, expected_generation=expected_generation)
 
 
 @mcp.tool()
-def claim_update(report_path: str, claim: dict) -> dict:
+def claim_update(report_path: str, claim: dict, expected_generation: str = "") -> dict:
     from core.judge_report import claim_submit as submit
     if not claim.get("claim_id"):
         raise ValueError("claim_update requires claim_id")
-    return submit(report_path, claim)
+    return submit(report_path, claim, expected_generation=expected_generation)
 
 
 @mcp.tool()
@@ -495,34 +523,48 @@ def claim_list(report_path: str, node_id: str = "") -> dict:
 
 
 @mcp.tool()
-def node_review_submit(report_path: str, review: dict) -> dict:
+def node_review_submit(report_path: str, review: dict, expected_generation: str = "") -> dict:
     from core.judge_report import node_review_submit as submit
-    return submit(report_path, review)
+    return submit(report_path, review, expected_generation=expected_generation)
 
 
 @mcp.tool()
-def node_review_bundle_submit(report_path: str, node_id: str, claims: list[dict], review: dict) -> dict:
+def node_review_bundle_submit(report_path: str, node_id: str, claims: list[dict], review: dict, expected_generation: str = "") -> dict:
     """Atomically submit one node worker's Claims and NodeReview; safe for concurrent sub-agent completion."""
     from core.judge_report import node_review_bundle_submit as submit
-    return submit(report_path, node_id, claims, review)
+    return submit(report_path, node_id, claims, review, expected_generation=expected_generation)
 
 
 @mcp.tool()
-def module_review_submit(report_path: str, review: dict) -> dict:
+def module_review_submit(report_path: str, review: dict, expected_generation: str = "") -> dict:
     from core.judge_report import module_review_submit as submit
-    return submit(report_path, review)
+    return submit(report_path, review, expected_generation=expected_generation)
 
 
 @mcp.tool()
-def overall_assessment_submit(report_path: str, assessment: dict) -> dict:
+def overall_assessment_submit(report_path: str, assessment: dict, expected_generation: str = "") -> dict:
     from core.judge_report import overall_assessment_submit as submit
-    return submit(report_path, assessment)
+    return submit(report_path, assessment, expected_generation=expected_generation)
 
 
 @mcp.tool()
-def judge_report_highlights_submit(report_path: str, highlights: dict) -> dict:
+def judge_report_highlights_submit(report_path: str, highlights: dict, expected_generation: str = "") -> dict:
     from core.judge_report import report_highlights_submit as submit
-    return submit(report_path, highlights)
+    return submit(report_path, highlights, expected_generation=expected_generation)
+
+
+@mcp.tool()
+def claim_contract() -> dict:
+    """Return legal Claim/NodeReview enum values and evidence requirements."""
+    from core.judge_report import claim_contract as contract
+    return contract()
+
+
+@mcp.tool()
+def node_review_draft_batch(report_path: str, node_ids: list[str], mode: str = "candidate_absent") -> dict:
+    """Return draft-only NodeReview/Claim suggestions. This never writes report.json."""
+    from core.judge_report import node_review_draft_batch as draft
+    return draft(report_path, node_ids, mode)
 
 
 @mcp.tool()
@@ -587,7 +629,7 @@ def provenance_render(provenance_path: str, output_path: str) -> dict:
 
 
 @mcp.tool()
-def evidence_source(target: str, ref: str, evidence_store: str, kind: str, path: str, line: int, line_end: int = 0,
+def evidence_source(target: str, ref: str, evidence_store: str, kind: str, path: str, line: int = 0, line_end: int = 0,
                     symbol: str = "", label: str = "", strength: str = "strong", metadata: dict | None = None) -> dict:
     """Verify an immutable source location and persist a stable EvidenceRecord."""
     from core.snapshot import resolve_snapshot
@@ -605,7 +647,7 @@ def evidence_source_batch(target: str, ref: str, evidence_store: str, sources: l
     rows = []
     for source in sources:
         metadata = {"snapshot_commit": snap.commit, **(source.get("metadata") or {})}
-        evidence_id = store.add_source(kind=source.get("kind") or "source_span", path=source["path"], line=int(source["line"]),
+        evidence_id = store.add_source(kind=source.get("kind") or "source_span", path=source["path"], line=int(source.get("line") or 0),
                                        line_end=int(source.get("line_end") or 0) or None, symbol=source.get("symbol") or "",
                                        label=source.get("label") or "", strength=source.get("strength") or "strong", metadata=metadata)
         rows.append({"evidence_id": evidence_id, "record": store.by_id(evidence_id).compact()})
@@ -697,35 +739,19 @@ def negative_search(target: str, ref: str, subject: str, queries: list[str], sym
 def node_taxonomy(node_id: str = "") -> dict:
     """Kernel design tree skeleton — the report framework. 14 subsystems, 112 leaf nodes.
 
-    Pass node_id to get one node's detail (title + scope + vocab terms).
+    Pass node_id to get one node's detail (title + scope).
     Empty = full tree + analysis batches.
 
     The tree ORGANIZES the report; it does NOT judge plagiarism or workload.
     - scope: one-line boundary — what work counts as this node. Read it before
       deciding which functions belong here. Function→node assignment is YOUR call.
-    - vocab: naming SUGGESTIONS so you describe mechanisms in standard terms
-      (e.g. "MLFQ scheduler"). NOT a checklist, NOT graded, NOT evidence of work.
-      You may name mechanisms not listed here. Judge by fingerprint diff; name by vocab.
     - batches: explore in this cross-module dependency order. Earlier batches feed
       later judgement (e.g. context-switch + lock are analyzed alongside scheduler).
     """
     from core.kernel_tree import (
         ROOT_NODES_V2, ANALYSIS_ORDER_V2, ANALYSIS_BATCHES_V2,
-        VOCAB_BY_NODE, node_title_zh, node_title_en, node_scope,
+        node_title_zh, node_title_en, node_scope,
     )
-
-    def _vocab_terms(nid: str) -> list[dict]:
-        v = VOCAB_BY_NODE.get(nid, {})
-        return [
-            {
-                "tag": m.get("tag"),
-                "compare_role": m.get("compare_role", "primary"),
-                "aliases": m.get("aliases") or [],
-                "title_zh": m.get("title_zh", ""),
-                "title_en": m.get("title_en", ""),
-            }
-            for m in v.get("mechanisms", [])
-        ]
 
     if node_id:
         return {
@@ -733,7 +759,6 @@ def node_taxonomy(node_id: str = "") -> dict:
             "title_zh": node_title_zh(node_id),
             "title_en": node_title_en(node_id),
             "scope": node_scope(node_id),
-            "vocab": _vocab_terms(node_id),
         }
 
     tree = {}
@@ -742,8 +767,7 @@ def node_taxonomy(node_id: str = "") -> dict:
             "title_zh": node_title_zh(root),
             "title_en": node_title_en(root),
             "children": [
-                {"id": c, "title_zh": node_title_zh(c), "scope": node_scope(c),
-                 "vocab": _vocab_terms(c)}
+                {"id": c, "title_zh": node_title_zh(c), "scope": node_scope(c)}
                 for c in children
             ],
         }

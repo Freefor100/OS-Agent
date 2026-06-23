@@ -47,7 +47,8 @@ def validate_base_decision(decision: dict[str, Any], packet: dict[str, Any]) -> 
     if not (packet.get("candidate_coverage") or {}).get("coverage_complete"):
         errors.append("BaseDecision rejected: rough-recall Top-K candidate coverage is incomplete")
     no_base = bool(decision.get("no_reliable_base"))
-    matches = [c for c in packet.get("formal_candidates", []) if c.get("repo") == primary.get("repo") and c.get("commit") == primary.get("commit")]
+    matches, match_errors = _candidate_matches(primary, packet.get("formal_candidates", []))
+    errors.extend(match_errors)
     if no_base:
         if primary:
             errors.append("no_reliable_base cannot coexist with primary_base")
@@ -59,11 +60,16 @@ def validate_base_decision(decision: dict[str, Any], packet: dict[str, Any]) -> 
     if not primary:
         return ["primary_base is required unless no_reliable_base is true"]
     if not matches:
-        errors.append("primary_base must reference a formal candidate by repo and commit")
+        errors.append("primary_base must reference a formal candidate by repo and commit; candidates=" + _candidate_summary(packet.get("formal_candidates", [])))
     else:
         candidate = matches[0]
         if candidate.get("score_kind") != "formal" or candidate.get("scope_status") != "verified":
-            errors.append("primary_base candidate is not a verified formal result")
+            errors.append(
+                "primary_base candidate is not a verified formal result; "
+                f"required score_kind=formal scope_status=verified; selected rank={candidate.get('rank')} "
+                f"repo={candidate.get('repo')} commit={candidate.get('commit')} "
+                f"score_kind={candidate.get('score_kind')} scope_status={candidate.get('scope_status')}"
+            )
         if candidate.get("year_direction") == "same_year":
             errors.append("same-year candidate cannot be a directional primary Base")
         rank = (decision.get("decision_factors") or {}).get("formal_rank")
@@ -72,3 +78,38 @@ def validate_base_decision(decision: dict[str, Any], packet: dict[str, Any]) -> 
     if not decision.get("evidence_ids"):
         errors.append("BaseDecision requires evidence_ids")
     return errors
+
+
+def resolve_primary_candidate(decision: dict[str, Any], packet: dict[str, Any]) -> dict[str, Any] | None:
+    """Return the formal candidate selected by primary_base after prefix matching."""
+    primary = decision.get("primary_base") or {}
+    matches, errors = _candidate_matches(primary, packet.get("formal_candidates", []))
+    return None if errors or not matches else matches[0]
+
+
+def _candidate_matches(primary: dict[str, Any], candidates: Iterable[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[str]]:
+    repo = str(primary.get("repo") or "")
+    commit = str(primary.get("commit") or "")
+    if not repo or not commit:
+        return [], []
+    rows = [c for c in candidates if str(c.get("repo") or "") == repo]
+    matches = [c for c in rows if _commit_matches(commit, str(c.get("commit") or ""))]
+    if len(matches) > 1:
+        return [], [f"primary_base commit prefix is ambiguous for repo {repo}: {', '.join(str(c.get('commit')) for c in matches)}"]
+    return matches, []
+
+
+def _commit_matches(requested: str, candidate: str) -> bool:
+    if not requested or not candidate:
+        return False
+    return candidate == requested or candidate.startswith(requested) or requested.startswith(candidate)
+
+
+def _candidate_summary(candidates: Iterable[dict[str, Any]]) -> str:
+    parts = []
+    for row in candidates:
+        parts.append(
+            f"rank={row.get('rank')} repo={row.get('repo')} commit={row.get('commit')} "
+            f"score_kind={row.get('score_kind')} scope_status={row.get('scope_status')}"
+        )
+    return "[" + "; ".join(parts[:20]) + (f"; ... total={len(parts)}" if len(parts) > 20 else "") + "]"

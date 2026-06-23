@@ -63,7 +63,7 @@ conda run -n os_agent python scripts/run.py --build
 ```
 
 指纹和内部 Git 源码快照写入 `.fp_cache/`，不会修改 `repos/` 中的作品仓库。
-默认只构建每个仓库当前检出分支；确实需要预建其他分支尖端时使用 `--all-branches`。该选项不会遍历历史 commit。
+默认构建每个仓库的所有唯一分支尖端 commit，供后续粗召回和正式 Scope 搜索消费；多个分支指向同一 commit 时只构建一次。该流程不会遍历历史 commit。只想快速预建当前检出版本时使用 `--current-only`。
 
 ### 3. 启动 Claude Code 和 MCP
 
@@ -87,15 +87,23 @@ timeout 3 scripts/start_mcp.sh
 
 Claude Code 自动发现的唯一项目 Skill 是 [.claude/skills/os-agent/SKILL.md](.claude/skills/os-agent/SKILL.md)。它不会自动触发，必须显式执行 `/os-agent`。
 
-推荐同时指定作品和输出目录：
+推荐直接指定作品；如果不写输出目录，Agent 会自动使用 `output/<repo-name>/audit-YYYYMMDD-HHMMSS/`。需要固定目录名时再显式指定。
 
 ```text
 /os-agent
 
 完整分析 repos/oskernel2023-zmz。
 默认使用当前检出分支作为作品版本；如有明确证据表明其他分支才是最终作品，再分页检查其他分支尖端。
-所有新产物写入 output/oskernel2023-zmz/audit-001/。
+未指定输出目录时，自动写入 output/oskernel2023-zmz/audit-YYYYMMDD-HHMMSS/。
 完成正式 1-vs-N 搜索、参考作品判断、112 节点完整评审、Evidence 校验，并渲染两份报告。
+```
+
+也可以显式固定输出目录：
+
+```text
+/os-agent
+
+完整分析 repos/oskernel2023-zmz，输出到 output/oskernel2023-zmz/audit-001/。
 ```
 
 Agent 会先将当前分支解析并锁定为固定 commit。例如评委看到的是：
@@ -129,9 +137,11 @@ output/oskernel2023-zmz/audit-001/
 └── comparisons.jsonl        Comparison 审计导出
 ```
 
+旧 `_agent_*`、`_audit_v*`、`_report` 目录结构已废弃；新流程只认 `output/<repo>/audit-YYYYMMDD-HHMMSS/` 这种独立审计目录。
+
 - 首先打开 `report.html`：查看总体结论、架构图、14 个模块、112 个节点、实现度、原创度与 Claim。
 - 需要核对函数匹配和源码对照时，再打开 `provenance.html`。
-- `report.html` 中的 Evidence 编号会跳转到底部证据卡片。Evidence 是 MCP 校验后注册的记录，不是 Agent 自行填写的源码文本。
+- `report.html` 中每个节点只展示该节点 Claim 绑定的 Evidence。Evidence 是 MCP 校验后注册的记录，不是 Agent 自行填写的源码文本。
 
 只有 `judge_report_validate` 验证全部节点、模块、Claim 和 Evidence 后，程序才允许生成最终主报告。
 
@@ -170,6 +180,8 @@ Claude Code 的完整约束见 [.claude/skills/os-agent/SKILL.md](.claude/skills
 8. **校验并生成双报告**：先导出/渲染 `provenance` 技术附录，再在完整性校验通过后渲染 `report.html`。
 
 声明是强线索但不会自动成为参考作品；同届高相似候选进入人工复审区，不能作为有方向性的继承来源。
+旧机制标签和词表不再作为产品态工具输出，不参与导航、证据或报告内容。
+`judge_report_create` 默认不覆盖已有报告；切换 Base/Comparison 时使用 `judge_report_fork_for_comparison` 生成待重绑草稿。
 
 ## LSP 与文档支持
 
@@ -231,7 +243,9 @@ Git 跟踪边界：
 | `code_atlas_overview` / `code_atlas_search` | 少量全局结构候选与入口定位；不直接作为调用链证据 |
 | `lsp_definition` / `lsp_references` / `lsp_call_graph` | 对锁定 commit 做关键符号和调用链语义确认 |
 | `evidence_*` / `negative_search` | 注册源码、文档、调用链、正式搜索与负向搜索证据 |
-| `node_analysis_packet` / `node_review_bundle_submit` | 获取节点分析包并原子写回 Claim 与 NodeReview |
+| `node_analysis_packet` / `node_review_bundle_submit` | 获取带 report_generation 的节点分析包并原子写回 Claim 与 NodeReview |
+| `claim_contract` / `node_review_draft_batch` | 查看 Claim 合法契约并生成不写入报告的批量草稿 |
+| `judge_report_fork_for_comparison` | 切换 Base/Comparison 时保留文字草稿并标记证据重绑 |
 | `judge_report_status` / `judge_report_validate` / `judge_report_render` | 检查完整框架覆盖并生成评委主报告 |
 | `provenance_export` / `provenance_render` | 生成独立函数级技术溯源附录 |
 

@@ -140,5 +140,8 @@ def walk_source_files(repo_path: str, *, skip_dirs: frozenset = DEFAULT_SKIP_DIR
             if ext not in _EXT_TO_LANG:
                 continue
             abs_path = os.path.join(dirpath, fname)
+            if os.path.islink(abs_path):
+                logger.info("[walk_source_files] skip symlink %s", abs_path)
+                continue
             rel_path = os.path.relpath(abs_path, repo_path)
             yield abs_path, rel_path, _EXT_TO_LANG[ext]
