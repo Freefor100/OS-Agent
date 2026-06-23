@@ -6,6 +6,16 @@ disable-model-invocation: true
 
 # OS-Agent Skill：可审计 Base 发现与差异报告
 
+## 触发方式
+
+用户显式执行 `/os-agent <作品名>` 时启动本 Skill。若用户只说“分析某作品”但没有给输出目录，自动使用：
+
+```text
+output/<repo-name>/audit-YYYYMMDD-HHMMSS/
+```
+
+开始时只向用户确认三件事：目标作品、锁定版本、输出目录。不要要求用户理解 BaseDecision、Comparison、EvidenceStore、report_generation 等内部概念。
+
 ## 原则
 
 宿主 Agent 负责判断；本地工具只做不可变快照、范围校验、确定性搜索/比较、关键证据锚定和报告投影。最终 `report.html` 必须是中文报告；必要机制名可在中文后用括号补充解释，例如“多级反馈队列（MLFQ）”“写时复制（copy-on-write）”。
@@ -20,6 +30,30 @@ disable-model-invocation: true
 - Node Scope 是语义边界，不是函数路由规则，也不能单独作为查重证据。旧机制标签和词表已从产品态工具输出移除，不参与导航、证据或报告内容。
 - Agent 可解释 `modified_candidate`，但不得覆盖 `raw_status`。
 - 报告优先面向评委阅读，避免堆砌工具术语；所有概述、模块总结、节点说明和架构边标签必须使用中文。
+
+## MCP 主路径工具
+
+默认只沿下面主路径调用工具。其他 MCP 工具只能用于补查、定位或故障恢复，不作为主流程入口。
+
+| 阶段 | 主路径工具 | 目的 |
+|---|---|---|
+| 启动审计 | `repo_snapshots`、`audit_manifest_create`、`build_fingerprint` | 锁定作品 commit、创建独立审计目录、准备指纹 |
+| 确认范围 | `create_scope_manifest` | 固定学生代码范围和外部依赖排除 |
+| 参考发现 | `search_formal` | 完成双侧 verified scope 的正式 1-vs-N 搜索 |
+| Base 固化 | `base_evidence_packet`、`evidence_formal_search`、`base_decision_submit` | 让 Agent 判断参考来源，并由程序校验写入 `base_decision.json` |
+| 函数事实 | `compare_functions`、`comparison_overview`、`comparison_hotspots`、`comparison_*` | 建立并按需查询 Comparison 数据库 |
+| 模块阅读 | `judge_report_create`、`module_analysis_packet` | 以模块为单位读代码，获取节点功能范围和候选函数摘要 |
+| 报告写入 | `node_review_bundle_submit`、`module_review_submit`、`overall_assessment_submit` | 宿主 Agent 统一写入中文节点、模块和总体评审 |
+| 完成产物 | `judge_report_status`、`provenance_export`、`provenance_render`、`judge_report_validate`、`judge_report_render` | 校验完整性并生成主报告和技术附录 |
+
+补查工具使用边界：
+
+- `node_analysis_packet`：只在模块包信息不足或单节点返工时使用。
+- `node_review_draft_batch`：只生成草稿，不写报告；必须由宿主 Agent 审核后再用 `node_review_bundle_submit` 写入。
+- `lsp_*`、`code_atlas_*`：只用于确认关键符号、调用链和入口定位。
+- `evidence_*`、`negative_search`：只注册关键锚点，不为普通 Claim 反复注册。
+- `search_similar`：只作临时粗召回，禁止进入 BaseDecision 或报告排名。
+- `judge_report_fork_for_comparison`：只在切换 Base/Comparison 时使用，不得用 `judge_report_create` 覆盖旧报告。
 
 ## 结构化阶段
 
