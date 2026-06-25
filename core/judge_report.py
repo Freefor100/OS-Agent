@@ -237,10 +237,12 @@ def judge_report_status(report_path: str) -> dict[str, Any]:
     missing_nodes = [node_id for node_id in ANALYSIS_ORDER_V2 if node_id not in node_ids]
     missing_claim_nodes = [node_id for node_id in ANALYSIS_ORDER_V2 if node_id not in claimed_nodes]
     missing_overall = [
-        field for field in ("summary", "source_relation", "main_inherited", "main_modified", "main_independent", "incomplete_or_risks", "review_focus")
+        field for field in ("summary", "source_relation", "main_inherited", "main_modified", "main_independent", "incomplete_or_risks", "review_focus", "directory_overview")
         if not assessment.get(field)
     ]
-    missing_architecture_description = not bool(str(assessment.get("architecture_overview") or assessment.get("architecture_diagram") or "").strip())
+    missing_architecture_description = not (
+        _text_present(assessment.get("architecture_overview")) or _text_present(assessment.get("architecture_diagram"))
+    )
     missing_key_evidence = [error for error in errors if "requires verified evidence" in error or "requires key evidence" in error or "requires complete negative search evidence" in error or "requires work source" in error or "requires bilateral source evidence" in error]
     return {
         "valid": not errors,
@@ -482,11 +484,11 @@ def validate_judge_report(report: dict[str, Any], *, require_complete: bool = Tr
         if node_id in node_reviews:
             errors.append(f"duplicate node review for {node_id}")
         node_reviews[node_id] = review
-        if not str(review.get("overview") or "").strip():
+        if not _text_present(review.get("overview")):
             errors.append(f"node review {node_id} requires overview")
         elif require_complete and not _contains_cjk(review.get("overview")):
             errors.append(f"node review {node_id} overview must be Chinese")
-        if not str(review.get("difference_from_reference") or "").strip():
+        if not _text_present(review.get("difference_from_reference")):
             errors.append(f"node review {node_id} requires difference_from_reference")
         elif require_complete and not _contains_cjk(review.get("difference_from_reference")):
             errors.append(f"node review {node_id} difference_from_reference must be Chinese")
@@ -510,7 +512,7 @@ def validate_judge_report(report: dict[str, Any], *, require_complete: bool = Tr
             errors.append(f"duplicate module review for {module_id}")
         modules[module_id] = review
         for field in ("overview", "difference_summary", "original_work_summary", "implementation_summary"):
-            if not str(review.get(field) or "").strip():
+            if not _text_present(review.get(field)):
                 errors.append(f"module review {module_id} requires {field}")
             elif require_complete and not _contains_cjk(review.get(field)):
                 errors.append(f"module review {module_id} {field} must be Chinese")
@@ -562,7 +564,7 @@ def validate_judge_report(report: dict[str, Any], *, require_complete: bool = Tr
         assessment = report.get("overall_assessment") if isinstance(report.get("overall_assessment"), dict) else {}
         if report.get("overall_assessment") and not isinstance(report.get("overall_assessment"), dict):
             errors.append("overall_assessment must be object")
-        for field in ("summary", "source_relation", "main_inherited", "main_modified", "main_independent", "incomplete_or_risks", "review_focus"):
+        for field in ("summary", "source_relation", "main_inherited", "main_modified", "main_independent", "incomplete_or_risks", "review_focus", "directory_overview"):
             value = assessment.get(field)
             if not value or (isinstance(value, str) and not value.strip()):
                 errors.append(f"overall assessment requires {field}")
@@ -570,27 +572,109 @@ def validate_judge_report(report: dict[str, Any], *, require_complete: bool = Tr
                 errors.append(f"overall assessment {field} must be Chinese")
             elif isinstance(value, list) and not any(_contains_cjk(x) for x in value):
                 errors.append(f"overall assessment {field} must be Chinese")
-        architecture_text = str(assessment.get("architecture_overview") or assessment.get("architecture_diagram") or "").strip()
-        if not architecture_text:
+        architecture_value = assessment.get("architecture_overview") or assessment.get("architecture_diagram")
+        if not _text_present(architecture_value):
             errors.append("overall assessment requires architecture_overview or architecture_diagram")
-        elif not _contains_cjk(architecture_text):
+        elif not _contains_cjk(architecture_value):
             errors.append("overall assessment architecture description must be Chinese")
+        diagram = str(assessment.get("architecture_diagram") or "").strip()
+        if diagram:
+            errors.extend(_validate_mermaid_diagram(diagram))
         edges = _as_dict_rows(assessment.get("architecture_edges"), "overall assessment architecture_edges", errors)
         if not edges:
             errors.append("overall assessment requires architecture_edges")
-        for edge in edges:
-            if edge.get("from_module") not in MODULE_IDS or edge.get("to_module") not in MODULE_IDS:
-                errors.append("architecture edge references unknown module")
+        for index, edge in enumerate(edges, 1):
+            _validate_architecture_edge_refs(index, edge, standard_nodes, errors)
             if not str(edge.get("label") or "").strip():
-                errors.append("architecture edge requires label")
+                errors.append(f"architecture edge {index} requires label")
             elif not _contains_cjk(edge.get("label")):
-                errors.append("architecture edge label must be Chinese")
-            for claim_id in _as_list(edge.get("claim_ids"), "architecture edge claim_ids", errors):
+                errors.append(f"architecture edge {index} label must be Chinese")
+            claim_refs = _as_list(edge.get("claim_ids"), f"architecture edge {index} claim_ids", errors)
+            if not claim_refs:
+                errors.append(f"architecture edge {index} requires claim_ids")
+            for claim_id in claim_refs:
                 if claim_id not in claims:
-                    errors.append(f"architecture edge references missing claim {claim_id}")
+                    errors.append(f"architecture edge {index} references missing claim {claim_id}")
                 elif not _claim_has_verified_evidence(claims[claim_id], evidence):
-                    errors.append(f"architecture edge claim {claim_id} requires key evidence")
+                    errors.append(f"architecture edge {index} claim {claim_id} requires key evidence")
     return errors
+
+
+def _validate_architecture_edge_refs(index: int, edge: dict[str, Any], standard_nodes: set[str], errors: list[str]) -> None:
+    """Validate explicit structured refs while allowing free-form diagram endpoints.
+
+    Agent-authored architecture is intentionally not limited to module-to-module
+    edges. Generic keys such as source/target/from/to are display labels unless
+    the Agent chooses explicit *_module, *_node, module_ids, or node_ids fields.
+    """
+    module_fields = ("from_module", "to_module", "source_module", "target_module", "module_id")
+    node_fields = ("from_node", "to_node", "source_node", "target_node", "node_id")
+    for field in module_fields:
+        value = edge.get(field)
+        if value and value not in MODULE_IDS:
+            errors.append(f"architecture edge {index} references unknown module {value!r}; allowed={MODULE_IDS}")
+    for value in _as_list(edge.get("module_ids"), f"architecture edge {index} module_ids", errors):
+        if value not in MODULE_IDS:
+            errors.append(f"architecture edge {index} references unknown module {value!r}; allowed={MODULE_IDS}")
+    for field in node_fields:
+        value = edge.get(field)
+        if value and value not in standard_nodes:
+            errors.append(f"architecture edge {index} references unknown node {value!r}")
+    for value in _as_list(edge.get("node_ids"), f"architecture edge {index} node_ids", errors):
+        if value not in standard_nodes:
+            errors.append(f"architecture edge {index} references unknown node {value!r}")
+
+
+def _validate_mermaid_diagram(value: str) -> list[str]:
+    source = _strip_mermaid_fence(value)
+    errors: list[str] = []
+    if not _looks_like_mermaid(source):
+        return ["overall assessment architecture_diagram must be pure Mermaid starting with graph/flowchart/sequenceDiagram/etc.; put prose in architecture_overview"]
+    for line_no, line in enumerate(source.splitlines(), 1):
+        if _is_mermaid_line(line):
+            continue
+        errors.append(
+            f"overall assessment architecture_diagram line {line_no} is not valid Mermaid syntax: {line.strip()!r}; "
+            "put explanatory prose in architecture_overview"
+        )
+    return errors
+
+
+def _strip_mermaid_fence(value: str) -> str:
+    text = value.strip()
+    if text.startswith("```"):
+        lines = text.splitlines()
+        if lines and lines[0].strip().lower() in {"```mermaid", "```mmd", "```"}:
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        text = "\n".join(lines).strip()
+    return text
+
+
+def _looks_like_mermaid(value: str) -> bool:
+    first = value.lstrip().split(None, 1)[0].lower() if value.strip() else ""
+    return first in {
+        "graph", "flowchart", "sequencediagram", "classdiagram", "statediagram",
+        "erdiagram", "gantt", "journey", "gitgraph", "pie", "mindmap", "timeline",
+    }
+
+
+def _is_mermaid_line(line: str) -> bool:
+    stripped = line.strip()
+    if not stripped:
+        return True
+    lowered = stripped.lower()
+    if lowered.startswith((
+        "graph ", "flowchart ", "sequencediagram", "classdiagram", "statediagram",
+        "erdiagram", "gantt", "journey", "gitgraph", "pie", "mindmap", "timeline",
+        "subgraph ", "end", "%%", "classdef ", "class ", "style ", "linkstyle ",
+        "direction ", "accdescr", "acctitle", "title ",
+    )):
+        return True
+    if "-->" in stripped or "---" in stripped or "-.->" in stripped or "==>" in stripped:
+        return True
+    return bool(re.match(r"^[A-Za-z][A-Za-z0-9_]*\s*(\[|\(|\{|>)", stripped))
 
 
 def _validate_claim_evidence(claim_id: str, claim: dict[str, Any], records: list[dict[str, Any]],
@@ -638,12 +722,18 @@ def _contains_cjk(value: Any) -> bool:
     return bool(_CJK_RE.search(str(value or "")))
 
 
+def _text_present(value: Any) -> bool:
+    if isinstance(value, list):
+        return any(_text_present(x) for x in value)
+    return bool(str(value or "").strip())
+
+
 def _validate_degree(node_id: str, label: str, value: Any, allowed: set[str],
                      claims: dict[str, dict[str, Any]], errors: list[str]) -> None:
     row = value if isinstance(value, dict) else {}
     if row.get("level") not in allowed:
         errors.append(f"node review {node_id} has invalid {label} level {row.get('level')!r}; allowed={sorted(allowed)}")
-    if not str(row.get("rationale") or "").strip():
+    if not _text_present(row.get("rationale")):
         errors.append(f"node review {node_id} requires {label} rationale")
     claim_ids = _as_list(row.get("claim_ids"), f"node review {node_id} {label} claim_ids", errors)
     if not claim_ids:

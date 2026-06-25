@@ -144,9 +144,38 @@ output/oskernel2023-zmz/audit-001/
 
 - 首先打开 `report.html`：查看中文总体结论、Agent 阅读代码后给出的架构说明、14 个模块、112 个节点、完整度、原创度与关键 Claim。
 - 需要核对函数匹配和源码对照时，再打开 `provenance.html`。
-- `report.html` 以中文呈现，必要机制名可用括号补充解释，例如“写时复制（copy-on-write）”。Evidence 只作为关键锚点展示，不要求普通节点堆砌证据。
+- `report.html` 由 `web_report/` 的 React + Vite + TypeScript 静态前端投影 `report.json` 生成。Python 只负责校验、整理 view-model、注入数据，并复制 `web_report/dist/assets/`，不再拼接复杂页面结构。
+- `report.html` 以中文呈现，必要机制名可用括号补充解释，例如“写时复制（copy-on-write）”。Evidence 只作为关键锚点展示在相关模块/节点页面底部，不要求普通节点堆砌证据。
+- 内核架构图来自 Agent 提交的 Mermaid 图；页面只提供放大、缩小、拖拽平移和重置交互，不自动生成或改写图内容。
 
 只有 `judge_report_validate` 验证全部节点、模块、关键 Claim、中文架构说明和产物链后，程序才允许生成最终主报告。
+
+### 前端报告构建
+
+`report.html` 依赖 `web_report/dist/` 中的 Vite 构建产物。第一次使用或修改前端后，在本机执行：
+
+```bash
+cd web_report
+npm install
+npm run build
+```
+
+然后再调用：
+
+```bash
+python3 scripts/judge_report.py <report.json> <report.html>
+```
+
+渲染脚本会把 `web_report/dist/index.html` 注入当前报告数据，并把 `web_report/dist/assets/` 复制到报告输出目录。服务器仅展示最终静态文件时不需要安装 Node、React 或 OS-Agent。
+
+本地预览请通过 HTTP 打开报告目录，不要直接用 `file://` 打开 Vite 产物：
+
+```bash
+cd output/<repo>/audit-YYYYMMDD-HHMMSS
+python3 -m http.server 8765 --bind 127.0.0.1
+```
+
+然后访问 `http://127.0.0.1:8765/report.html`。如果你的环境没有 `python3` 命令，可换成当前虚拟环境或 conda 环境里的 Python 解释器路径。
 
 ## 版本与分析范围
 
@@ -186,6 +215,10 @@ Claude Code 的完整约束见 [.claude/skills/os-agent/SKILL.md](.claude/skills
 声明是强线索但不会自动成为参考作品；同届高相似候选进入人工复审区，不能作为有方向性的继承来源。
 旧机制标签和词表不再作为产品态工具输出，不参与导航、证据或报告内容。
 `judge_report_create` 默认不覆盖已有报告；切换 Base/Comparison 时使用 `judge_report_fork_for_comparison` 生成待重绑草稿。
+
+报告中的中文说明字段支持两种形态：连续解释用字符串，并列机制、分阶段结论、第一/第二/第三类判断用字符串数组。渲染器只按 Agent 显式提交的数组分条展示，不会按标点、序号或句长自动拆句。建议 `module_reviews[].overview`、`implementation_summary`、`difference_summary`、`original_work_summary`、`overall_assessment.summary`、`source_relation`、`directory_overview` 和 `architecture_overview` 在包含多个并列点时提交数组。
+
+`overall_assessment.directory_overview` 承载 Agent 对完整目录树的整体解释，`overall_assessment.directory_notes` 可按目录相对路径提供逐项说明，前端把说明紧跟在对应目录项后面，不替 Agent 编写目录解释。`overall_assessment.architecture_overview` 承载中文内核架构补充说明，展示在架构图下方。`overall_assessment.architecture_diagram` 若存在，必须是纯 Mermaid 内核架构图源码，不得混入说明段落；校验失败时 Agent 需要修改 JSON 后重新提交。页面对该图提供缩放、拖拽平移和重置交互，但不自动生成或修复图内容。`overall_assessment.architecture_edges` 用来索引 Agent 阅读代码后总结出的真实架构关系，不是固定模块摆盘图。每条边至少需要中文 `label` 和非空 `claim_ids`；端点可以用 `source/target` 或 `from/to` 写自由文字，也可以用 `from_module/to_module`、`module_ids`、`from_node/to_node`、`node_ids` 绑定结构化模块或节点。结构化引用会校验 ID，普通端点文字不会被当成模块强校验，MCP 不会替 Agent 自动绘图或拆句。
 
 ## LSP 与文档支持
 
@@ -275,6 +308,7 @@ OS-Agent/
 ├── .claude/skills/os-agent/
 │   └── SKILL.md             唯一的 Claude Code 审计工作流
 ├── scripts/                 确定性计算与报告渲染
+├── web_report/              report.html 的 React 静态前端模板、样式和交互
 ├── tools/                   CodeAtlas、LSP 和文档读取工具
 ├── core/                    快照、Scope、Comparison、Evidence 和报告模型
 ├── repos/                   作品与候选语料库，Git 忽略

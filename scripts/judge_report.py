@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-import html
 import json
+import shutil
 import sys
 from pathlib import Path
 from typing import Any
@@ -13,238 +13,156 @@ sys.path.insert(0, str(ROOT))
 from core.judge_report import MODULE_IDS, validate_judge_report
 from core.kernel_tree import ANALYSIS_ORDER_V2, ROOT_NODES_V2, node_scope, node_title_zh
 
+try:
+    from core.metadata import MetadataManager
+except Exception:
+    MetadataManager = None
+
+
 IMPLEMENTATION_LABELS = {
-    "complete": "完整", "partial": "部分", "minimal": "最低限度", "absent": "未发现实现",
-    "not_applicable": "不适用", "unknown": "待确认",
+    "complete": "完整",
+    "partial": "部分",
+    "minimal": "最低限度",
+    "absent": "未发现实现",
+    "not_applicable": "不适用",
+    "unknown": "待确认",
 }
 ORIGINALITY_LABELS = {
-    "independent": "独立实现", "substantial_rework": "实质重写", "incremental": "增量修改",
-    "inherited": "主体继承", "not_applicable": "不适用", "unknown": "待确认",
+    "independent": "独立实现",
+    "substantial_rework": "实质重写",
+    "incremental": "增量修改",
+    "inherited": "主体继承",
+    "not_applicable": "不适用",
+    "unknown": "待确认",
 }
 CLAIM_LABELS = {
-    "lineage": "来源关系", "difference": "实现差异", "independent_work": "独立工作",
-    "implementation": "实现判断", "absence": "缺失判断", "risk": "复核风险",
+    "lineage": "来源关系",
+    "difference": "实现差异",
+    "independent_work": "独立工作",
+    "implementation": "实现判断",
+    "absence": "缺失判断",
+    "risk": "复核风险",
 }
 EVIDENCE_KIND_LABELS = {
-    "documentation": "文档说明", "function_definition": "函数定义", "type_definition": "数据结构",
-    "macro_definition": "宏定义", "constant_definition": "常量定义", "config_entry": "配置项",
-    "linker_symbol": "链接脚本", "assembly_label": "汇编入口", "source_span": "源码片段",
-    "lsp_definition": "定义定位", "lsp_reference": "引用关系", "call_edge": "调用关系",
-    "lsp_call_graph": "调用链", "git_history": "Git 历史", "formal_search": "正式检索",
-    "scope_manifest": "代码范围", "negative_search": "负向搜索",
-    "binary_artifact": "二进制文件", "file_artifact": "文件证据",
+    "source": "源码证据",
+    "documentation": "文档说明",
+    "function_definition": "函数定义",
+    "type_definition": "数据结构",
+    "macro_definition": "宏定义",
+    "constant_definition": "常量定义",
+    "config_entry": "配置项",
+    "linker_symbol": "链接脚本",
+    "assembly_label": "汇编入口",
+    "source_span": "源码片段",
+    "lsp_definition": "定义定位",
+    "lsp_reference": "引用关系",
+    "call_edge": "调用关系",
+    "lsp_call_graph": "调用链",
+    "git_history": "Git 历史",
+    "formal_search": "正式检索",
+    "scope_manifest": "代码范围",
+    "negative_search": "负向搜索",
+    "binary_artifact": "二进制文件",
+    "file_artifact": "文件证据",
 }
-
-CSS = r"""
-*{box-sizing:border-box}html,body{margin:0;height:100%;font-family:Inter,"Noto Sans SC","Microsoft YaHei",system-ui,sans-serif;color:#18212f;background:#f3f6fa}
-body{display:grid;grid-template-columns:310px minmax(0,1fr);overflow:hidden}.sidebar{height:100vh;background:#101c2c;color:#dce7f5;padding:22px 16px;overflow:auto;box-shadow:8px 0 28px #10203520;z-index:5}
-.brand{padding:0 8px 18px;border-bottom:1px solid #ffffff18}.brand h1{font-size:20px;margin:0 0 7px}.brand p{margin:0;color:#9eb1c9;font-size:13px;line-height:1.6}.search{width:100%;margin:18px 0 12px;border:1px solid #ffffff20;background:#ffffff10;color:#fff;padding:11px 12px;border-radius:10px;outline:none}.search::placeholder{color:#9eb1c9}
-.nav-home,.module-button,.node-button{width:100%;border:0;text-align:left;cursor:pointer;color:inherit;background:transparent}.nav-home{padding:11px;border-radius:9px;font-weight:700;margin-bottom:9px}.nav-home:hover,.nav-home.active,.module-button:hover,.module-button.active,.node-button:hover,.node-button.active{background:#ffffff12}
-.module{border-top:1px solid #ffffff12;padding:7px 0}.module-button{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:10px 9px;border-radius:8px;font-weight:700}.module-count{font-size:11px;color:#92a9c4}.nodes{display:none;padding:2px 0 7px 8px}.module.open .nodes{display:block}.node-button{padding:8px 8px;border-radius:7px;margin:2px 0}.node-name{display:block;font-size:13px;margin-bottom:5px}.mini-badges{display:flex;gap:4px;flex-wrap:wrap}.mini{font-size:10px;padding:2px 5px;border-radius:5px;background:#ffffff10;color:#c8d5e6}.mini.impl{border-left:2px solid #55a7ff}.mini.orig{border-left:2px solid #d29cff}.mini.absent{opacity:.58}
-.appendix-link{display:block;color:#d9e9ff;text-decoration:none;margin:18px 4px;padding:11px;border:1px solid #ffffff20;border-radius:9px;text-align:center}.content{height:100vh;overflow:auto;padding:28px 34px 70px}.topbar{display:none}.panel{display:none;max-width:1240px;margin:auto}.panel.active{display:block}.eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#607089;font-weight:800}.page-title{font-size:32px;line-height:1.25;margin:7px 0 10px}.lead{font-size:16px;color:#536278;line-height:1.8;max-width:900px}.card{background:#fff;border:1px solid #dfe6ef;border-radius:15px;padding:20px;margin:17px 0;box-shadow:0 8px 24px #24364b0a}.card h2,.card h3{margin-top:0}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.matrix{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.matrix-card{background:#fff;border:1px solid #dfe6ef;border-radius:12px;padding:15px;cursor:pointer}.matrix-card:hover{border-color:#7ea7d5;box-shadow:0 8px 20px #3d649414}.badges{display:flex;gap:8px;flex-wrap:wrap}.badge{display:inline-flex;align-items:center;border-radius:999px;padding:5px 9px;font-weight:700;font-size:12px}.badge.impl{background:#e8f3ff;color:#17588f}.badge.orig{background:#f2ebff;color:#6935a5}.badge.confidence{background:#eef2f6;color:#4a596c}.claim{border-left:4px solid #517fbd;padding:14px 16px;margin:12px 0;background:#f8fafd;border-radius:0 10px 10px 0}.claim p{line-height:1.75;margin:8px 0}.evidence-link{display:inline-block;text-decoration:none;color:#245f9e;background:#e8f2fd;border-radius:6px;padding:3px 7px;font-size:12px;font-weight:700;margin:2px}.evidence-link:hover{background:#cfe6fb}.muted{color:#65758b}.section-list{padding-left:18px;line-height:1.85}.scope{padding:12px 14px;background:#edf3f8;border-radius:9px;color:#40536a;line-height:1.7}.risk{padding:12px 14px;background:#fff5ed;border-left:4px solid #e8904f;border-radius:8px;margin:8px 0}.absent-list{display:flex;gap:7px;flex-wrap:wrap}.absent-chip{background:#edf0f3;color:#697685;border-radius:7px;padding:5px 8px;font-size:12px}
-.architecture-text{background:#f8fbfe;border:1px solid #d8e5f1;border-radius:10px;padding:16px;line-height:1.85;white-space:pre-wrap}.architecture-diagram{background:#111c2a;color:#d9e7f5;border-radius:10px;padding:16px;line-height:1.65;white-space:pre-wrap;overflow:auto}.edge-list{display:grid;gap:10px}.edge-card{border-left:4px solid #6f98c4;background:#f8fbfe;border-radius:0 9px 9px 0;padding:12px 14px}.evidence-section{max-width:1240px;margin:55px auto 0;padding-top:25px;border-top:2px solid #dce5ef}.evidence-card{background:#fff;border:1px solid #dfe6ef;border-radius:11px;margin:10px 0}.evidence-card summary{cursor:pointer;padding:15px 17px;font-weight:700}.evidence-body{padding:0 17px 17px}.evidence-body pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#111c2a;color:#d9e7f5;padding:14px;border-radius:8px;line-height:1.55}.crumb{color:#6d7c90;font-size:13px}.provenance-action{display:inline-block;background:#183b64;color:#fff;text-decoration:none;padding:10px 14px;border-radius:8px;font-weight:700;margin-top:9px}.drawer-button{display:none}
-@media(max-width:1050px){body{grid-template-columns:270px minmax(0,1fr)}.content{padding:24px}.matrix{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:760px){body{display:block;overflow:auto}.sidebar{position:fixed;left:-320px;width:300px;transition:left .2s}.sidebar.open{left:0}.content{height:auto;overflow:visible;padding:68px 16px 45px}.topbar{display:flex;position:fixed;top:0;left:0;right:0;height:54px;align-items:center;padding:0 15px;background:#101c2c;color:#fff;z-index:4}.drawer-button{display:block;border:0;background:#ffffff18;color:#fff;padding:7px 10px;border-radius:7px}.grid,.matrix{grid-template-columns:1fr}.page-title{font-size:25px}}
-"""
-
-JS = r"""
-const panels=[...document.querySelectorAll('.panel')], nav=[...document.querySelectorAll('[data-view]')];
-function openView(view, push=true){
-  panels.forEach(x=>x.classList.toggle('active',x.dataset.panel===view));
-  nav.forEach(x=>x.classList.toggle('active',x.dataset.view===view));
-  if(view.startsWith('node:')||view.startsWith('module:')){
-    const id=view.split(':')[1], btn=document.querySelector(`[data-view="${CSS.escape(view)}"]`);
-    if(btn){const module=btn.closest('.module'); if(module)module.classList.add('open'); btn.scrollIntoView({block:'nearest'});}
-    if(push)history.replaceState(null,'','#'+(view.startsWith('node:')?'node=':'module=')+encodeURIComponent(id));
-  }else if(push)history.replaceState(null,'','#overview');
-  document.querySelector('.content').scrollTo({top:0,behavior:'smooth'});
-  document.querySelector('.sidebar').classList.remove('open');
-}
-nav.forEach(x=>x.addEventListener('click',()=>openView(x.dataset.view)));
-document.querySelectorAll('.module-button').forEach(x=>x.addEventListener('dblclick',()=>x.closest('.module').classList.toggle('open')));
-document.querySelector('.search').addEventListener('input',e=>{
-  const q=e.target.value.trim().toLowerCase();
-  document.querySelectorAll('.node-button').forEach(x=>x.style.display=!q||x.dataset.search.includes(q)?'block':'none');
-  document.querySelectorAll('.module').forEach(x=>{const hit=!q||x.dataset.search.includes(q)||[...x.querySelectorAll('.node-button')].some(n=>n.style.display!=='none');x.style.display=hit?'block':'none';if(q&&hit)x.classList.add('open')});
-});
-document.querySelectorAll('.evidence-link').forEach(x=>x.addEventListener('click',e=>{e.preventDefault();const card=document.getElementById(x.dataset.evidence);if(card){card.open=true;card.scrollIntoView({behavior:'smooth',block:'start'});}}));
-document.querySelector('.drawer-button').addEventListener('click',()=>document.querySelector('.sidebar').classList.toggle('open'));
-const hash=decodeURIComponent(location.hash.slice(1)); if(hash.startsWith('node='))openView('node:'+hash.slice(5),false); else if(hash.startsWith('module='))openView('module:'+hash.slice(7),false); else openView('overview',false);
-"""
-
-
-def esc(value: Any) -> str:
-    return html.escape(str(value if value is not None else ""), quote=True)
 
 
 def render(report: dict[str, Any]) -> str:
     errors = validate_judge_report(report, require_complete=True)
     if errors:
         raise ValueError("judge report validation failed: " + "; ".join(errors))
+    data = _build_view_model(report)
+    return _dist_index().replace("__REPORT_DATA__", _json_for_script(data))
+
+
+def render_to_file(report: dict[str, Any], output: Path) -> None:
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(render(report), encoding="utf-8")
+    _copy_dist_assets(output.parent)
+
+
+def _build_view_model(report: dict[str, Any]) -> dict[str, Any]:
     evidence = _read_evidence(report["evidence_store"])
-    used = sorted({eid for claim in report["claims"] for eid in claim.get("evidence_ids") or []})
-    evidence_labels = {eid: f"E{index:03d}" for index, eid in enumerate(used, 1)}
-    evidence_categories = {eid: _evidence_category(evidence[eid]) for eid in used}
-    claims = {x["claim_id"]: x for x in report["claims"]}
-    node_reviews = {x["node_id"]: x for x in report["node_reviews"]}
-    modules = {x["module_id"]: x for x in report["module_reviews"]}
-    work = report["work"]["display_name"]
-    reference = report["reference"]["display_name"]
-    sidebar = _sidebar(report, node_reviews, claims, modules)
-    panels = [_overview_panel(report, node_reviews, modules, claims, evidence_labels)]
-    panels += [_module_panel(module_id, modules[module_id], node_reviews, claims, evidence_labels, evidence_categories) for module_id in MODULE_IDS]
-    panels += [_node_panel(report, node_id, node_reviews[node_id], claims, evidence, evidence_labels, evidence_categories) for node_id in ANALYSIS_ORDER_V2]
-    return f"""<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{esc(work)} 内核实现评审报告</title><style>{CSS}</style></head><body>
-<aside class="sidebar">{sidebar}</aside><div class="topbar"><button class="drawer-button">目录</button><strong style="margin-left:12px">{esc(work)} 评审报告</strong></div>
-<main class="content">{''.join(panels)}</main><script>{JS}</script></body></html>"""
+    claims = report.get("claims") or []
+    module_reviews = report.get("module_reviews") or []
+    used_evidence_ids = _used_evidence_ids(claims, module_reviews)
+    evidence_labels = {eid: f"E{index:03d}" for index, eid in enumerate(used_evidence_ids, 1)}
+    evidence_rows = {
+        eid: _evidence_view(evidence[eid], evidence_labels[eid], report)
+        for eid in used_evidence_ids
+        if eid in evidence
+    }
+    return {
+        "report": report,
+        "taxonomy": _taxonomy_view(),
+        "labels": {
+            "implementation": IMPLEMENTATION_LABELS,
+            "originality": ORIGINALITY_LABELS,
+            "claim": CLAIM_LABELS,
+            "evidenceKind": EVIDENCE_KIND_LABELS,
+        },
+        "projectMeta": _project_meta(report),
+        "projectProfile": _project_profile(report),
+        "evidenceLabels": evidence_labels,
+        "evidence": evidence_rows,
+    }
 
 
-def _sidebar(report: dict[str, Any], reviews: dict[str, dict[str, Any]], claims: dict[str, dict[str, Any]],
-             modules: dict[str, dict[str, Any]]) -> str:
-    expanded = set((report.get("report_highlights") or {}).get("expanded_module_ids") or [])
-    chunks = [f"""<div class="brand"><h1>{esc(report['work']['display_name'])} 评审报告</h1>
-<p>与 {esc(report['reference']['display_name'])} 的来源关系、实现差异与独立工作评审</p></div>
-<input class="search" placeholder="搜索模块、节点或结论"><button class="nav-home" data-view="overview">总体结果与架构</button>"""]
-    for module_id, children in ROOT_NODES_V2.items():
-        nodes = [module_id] if not children else [f"{module_id}.{child}" for child in children]
-        node_html = []
-        module_review = modules.get(module_id) or {}
-        search_parts = [module_id, node_title_zh(module_id), module_review.get("overview", "")]
-        for node_id in nodes:
-            review = reviews[node_id]
-            node_claims = [claims[x] for x in review.get("claim_ids") or [] if x in claims]
-            search_text = " ".join([node_id, node_title_zh(node_id), review.get("overview", ""), *[x.get("statement", "") for x in node_claims]]).lower()
-            impl = review["implementation_degree"]["level"]
-            orig = review["originality"]["level"]
-            absent = " absent" if impl in {"absent", "not_applicable"} else ""
-            node_html.append(f"""<button class="node-button{absent}" data-view="node:{esc(node_id)}" data-search="{esc(search_text)}">
-<span class="node-name">{esc(node_title_zh(node_id))}</span><span class="mini-badges"><span class="mini impl">完整度：{esc(IMPLEMENTATION_LABELS[impl])}</span><span class="mini orig">原创度：{esc(ORIGINALITY_LABELS[orig])}</span></span></button>""")
-            search_parts.append(search_text)
-        view = f"node:{module_id}" if module_id == "Metadata" else f"module:{module_id}"
-        complete = sum(reviews[x]["implementation_degree"]["level"] == "complete" for x in nodes)
-        original = sum(reviews[x]["originality"]["level"] in {"independent", "substantial_rework"} for x in nodes)
-        chunks.append(f"""<section class="module{' open' if module_id in expanded else ''}" data-search="{esc(' '.join(search_parts).lower())}">
-<button class="module-button" data-view="{esc(view)}"><span>{esc(node_title_zh(module_id))}</span><span class="module-count">完整度：完整 {complete}/{len(nodes)} · 原创度：独立/重写 {original}</span></button>
-<div class="nodes">{''.join(node_html)}</div></section>""")
-    chunks.append(f'<a class="appendix-link" href="{esc(report.get("provenance_href") or "provenance.html")}" target="_blank">打开函数级技术溯源附录</a>')
-    return "".join(chunks)
-
-
-def _overview_panel(report: dict[str, Any], reviews: dict[str, dict[str, Any]], modules: dict[str, dict[str, Any]],
-                    claims: dict[str, dict[str, Any]], labels: dict[str, str]) -> str:
-    assessment = report["overall_assessment"]
-    matrix = []
+def _taxonomy_view() -> dict[str, Any]:
+    nodes = {}
+    for node_id in ANALYSIS_ORDER_V2:
+        nodes[node_id] = {"id": node_id, "title": node_title_zh(node_id), "scope": node_scope(node_id)}
+    modules = []
     for module_id in MODULE_IDS:
         children = ROOT_NODES_V2[module_id]
-        nodes = [module_id] if not children else [f"{module_id}.{child}" for child in children]
-        complete = sum(reviews[x]["implementation_degree"]["level"] == "complete" for x in nodes)
-        independent = sum(reviews[x]["originality"]["level"] in {"independent", "substantial_rework"} for x in nodes)
-        matrix.append(f"""<article class="matrix-card" data-view="module:{esc(module_id)}"><strong>{esc(node_title_zh(module_id))}</strong>
-<p class="muted">{len(nodes)} 个节点 · 完整度：完整 {complete} · 原创度：独立/实质重写 {independent}</p></article>""")
-    return f"""<section class="panel" data-panel="overview"><div class="eyebrow">评委评审</div>
-<h1 class="page-title">{esc(report['work']['display_name'])} 内核实现评审报告</h1><p class="lead">{esc(assessment['summary'])}</p>
-<div class="grid"><article class="card"><h2>来源与演进结论</h2><p>{esc(assessment['source_relation'])}</p></article>
-<article class="card"><h2>评委重点复核</h2>{_list(assessment['review_focus'])}</article></div>
-<div class="grid"><article class="card"><h3>主要继承部分</h3>{_list(assessment['main_inherited'])}</article>
-<article class="card"><h3>实质性修改部分</h3>{_list(assessment['main_modified'])}</article>
-<article class="card"><h3>相对独立实现部分</h3>{_list(assessment['main_independent'])}</article>
-<article class="card"><h3>缺失、退化与风险</h3>{_list(assessment['incomplete_or_risks'])}</article></div>
-<article class="card"><h2>内核架构说明</h2>{_architecture_view(assessment)}</article>
-<h2>框架实现度与原创度总览</h2><div class="matrix">{''.join(matrix)}</div></section>"""
+        node_ids = [module_id] if not children else [f"{module_id}.{child}" for child in children]
+        modules.append({
+            "id": module_id,
+            "title": node_title_zh(module_id),
+            "nodeIds": node_ids,
+            "scope": node_scope(module_id),
+        })
+    return {"modules": modules, "nodes": nodes}
 
 
-def _module_panel(module_id: str, review: dict[str, Any], node_reviews: dict[str, dict[str, Any]],
-                  claims: dict[str, dict[str, Any]], labels: dict[str, str], categories: dict[str, str]) -> str:
-    children = ROOT_NODES_V2[module_id]
-    nodes = [module_id] if not children else [f"{module_id}.{child}" for child in children]
-    cards, absent = [], []
-    for node_id in nodes:
-        row = node_reviews[node_id]
-        impl, orig = row["implementation_degree"]["level"], row["originality"]["level"]
-        if impl in {"absent", "not_applicable"}:
-            absent.append(node_title_zh(node_id))
-        cards.append(f"""<article class="matrix-card" data-view="node:{esc(node_id)}"><strong>{esc(node_title_zh(node_id))}</strong>
-<div class="badges" style="margin-top:8px"><span class="badge impl">完整度：{esc(IMPLEMENTATION_LABELS[impl])}</span><span class="badge orig">原创度：{esc(ORIGINALITY_LABELS[orig])}</span></div></article>""")
-    featured = [claims[x] for x in review.get("featured_claim_ids") or [] if x in claims]
-    chains = "".join(_key_chain(chain, labels, categories) for chain in review.get("key_chains") or [])
-    return f"""<section class="panel" data-panel="module:{esc(module_id)}"><div class="crumb">总体结果 / {esc(node_title_zh(module_id))}</div>
-<h1 class="page-title">{esc(node_title_zh(module_id))}</h1><p class="lead">{esc(review['overview'])}</p>
-<div class="grid"><article class="card"><h3>相比参考作品的主要变化</h3><p>{esc(review['difference_summary'])}</p></article>
-<article class="card"><h3>原创工作集中位置</h3><p>{esc(review['original_work_summary'])}</p></article>
-<article class="card"><h3>实现完整程度与缺失能力</h3><p>{esc(review['implementation_summary'])}</p></article>
-<article class="card"><h3>未实现或不适用节点</h3><div class="absent-list">{''.join(f'<span class="absent-chip">{esc(x)}</span>' for x in absent) or '<span class="muted">无</span>'}</div></article></div>
-<h2>关键链路</h2>{chains}
-<h2>重点结论</h2>{''.join(_claim_card(x, labels, categories, link_evidence=False) for x in featured) or '<p class="muted">本模块未单独置顶结论，节点页仍保留完整评审。</p>'}
-<h2>节点评价矩阵</h2><div class="matrix">{''.join(cards)}</div></section>"""
-
-
-def _node_panel(report: dict[str, Any], node_id: str, review: dict[str, Any], claims: dict[str, dict[str, Any]],
-                evidence: dict[str, dict[str, Any]], labels: dict[str, str], categories: dict[str, str]) -> str:
-    impl, orig = review["implementation_degree"], review["originality"]
-    claim_ids = [x for x in review.get("claim_ids") or [] if x in claims]
-    node_claims = [claims[x] for x in claim_ids]
-    for claim in claims.values():
-        if claim.get("node_id") == node_id and claim.get("claim_id") not in claim_ids:
-            node_claims.append(claim)
-    risks = "".join(f'<div class="risk">{esc(x)}</div>' for x in review.get("risks") or []) or '<p class="muted">当前没有额外风险项。</p>'
-    href = report.get("provenance_href") or "provenance.html"
-    refs = review.get("provenance_refs") or []
-    if refs and refs[0].get("target_file"):
-        href += "#file:" + refs[0]["target_file"]
-    return f"""<section class="panel" data-panel="node:{esc(node_id)}"><div class="crumb">{esc(node_title_zh(node_id.split(".",1)[0]))} / {esc(node_title_zh(node_id))}</div>
-<h1 class="page-title">{esc(node_title_zh(node_id))}</h1><div class="scope"><strong>范围：</strong>{esc(node_scope(node_id))}</div>
-<div class="grid"><article class="card"><div class="badges"><span class="badge impl">完整度：{esc(IMPLEMENTATION_LABELS[impl['level']])}</span></div><h3>完整度判断</h3><p>{esc(impl['rationale'])}</p></article>
-<article class="card"><div class="badges"><span class="badge orig">原创度：{esc(ORIGINALITY_LABELS[orig['level']])}</span></div><h3>原创度判断</h3><p>{esc(orig['rationale'])}</p></article></div>
-<article class="card"><h2>{esc(report['work']['display_name'])} 中如何实现</h2><p>{esc(review['overview'])}</p></article>
-<article class="card"><h2>与 {esc(report['reference']['display_name'])} 的差异</h2><p>{esc(review['difference_from_reference'])}</p></article>
-<h2>节点结论</h2>{''.join(_claim_card(x, labels, categories, anchor_suffix='-'+node_id.replace('.', '-')) for x in node_claims)}
-{_node_evidence_section(node_id, node_claims, evidence, labels, report)}
-<article class="card"><h2>风险、缺失与不确定项</h2>{risks}<a class="provenance-action" href="{esc(href)}#search={esc(node_title_zh(node_id))}" target="_blank">打开函数级技术溯源</a></article></section>"""
-
-
-def _claim_card(claim: dict[str, Any], labels: dict[str, str], categories: dict[str, str], *, link_evidence: bool = True,
-                anchor_suffix: str = "") -> str:
-    if link_evidence:
-        links = "".join(f'<a class="evidence-link" href="#{esc(labels[eid])}" data-evidence="evidence-{esc(labels[eid])}{esc(anchor_suffix)}">{esc(categories[eid])} {esc(labels[eid])}</a>' for eid in claim.get("evidence_ids") or [])
-    else:
-        links = "".join(f'<span class="evidence-link">{esc(categories[eid])} {esc(labels[eid])}</span>' for eid in claim.get("evidence_ids") or [] if eid in labels)
-    return f"""<article class="claim"><div class="badges"><span class="badge confidence">{esc(CLAIM_LABELS[claim['claim_type']])}</span>
-<span class="badge confidence">置信度：{esc(claim['confidence'])}</span></div><p>{esc(claim['statement'])}</p><div>{links}</div></article>"""
-
-
-def _key_chain(chain: dict[str, Any], labels: dict[str, str], categories: dict[str, str]) -> str:
-    links = "".join(f'<span class="evidence-link">{esc(categories[eid])} {esc(labels[eid])}</span>'
-                    for eid in chain.get("evidence_ids") or [] if eid in labels)
-    nodes = " → ".join(node_title_zh(node_id) for node_id in chain.get("node_ids") or [])
-    return f"""<article class="card"><h3>{esc(chain.get('title'))}</h3><p class="muted">{esc(nodes)}</p>
-<p>{esc(chain.get('explanation'))}</p><div>{links}</div></article>"""
-
-
-def _node_evidence_section(node_id: str, claims: list[dict[str, Any]], records: dict[str, dict[str, Any]],
-                           labels: dict[str, str], report: dict[str, Any]) -> str:
-    used = []
+def _used_evidence_ids(claims: list[dict[str, Any]], module_reviews: list[dict[str, Any]]) -> list[str]:
+    used: list[str] = []
     for claim in claims:
         for evidence_id in claim.get("evidence_ids") or []:
-            if evidence_id in records and evidence_id not in used:
+            if evidence_id not in used:
                 used.append(evidence_id)
-    target_commit = (report["work"].get("snapshot") or {}).get("commit")
-    reference_commit = (report["reference"].get("snapshot") or {}).get("commit")
-    work = report["work"]["display_name"]
-    reference = report["reference"]["display_name"]
-    cards = []
-    for eid in used:
-        row = records[eid]
-        commit = (row.get("metadata") or {}).get("snapshot_commit")
-        owner = work if commit == target_commit else reference if commit == reference_commit else "检索与审计流程"
-        location = f"{row.get('path') or ''}:{row.get('line_start') or ''}".rstrip(":")
-        kind_label = EVIDENCE_KIND_LABELS.get(row.get("kind"), row.get("kind"))
-        source_category = "文档" if row.get("kind") == "documentation" else "程序事实" if row.get("kind") in {"formal_search", "negative_search", "scope_manifest"} else "源码/结构"
-        cards.append(f"""<details class="evidence-card" id="evidence-{esc(labels[eid])}-{esc(node_id.replace('.', '-'))}"><summary>证据 {esc(labels[eid])} · [{esc(source_category)}] [{esc(kind_label)}] · {esc(owner)} · {esc(row.get('label') or '')}</summary>
-<div class="evidence-body"><p><strong>作品/来源：</strong>{esc(owner)}　<strong>commit：</strong><code>{esc(commit or '')}</code><br>
-<strong>位置：</strong>{esc(location or '结构化审计记录')}　<strong>类型：</strong>{esc(kind_label)}　<strong>证据类别：</strong>{esc(source_category)}　<strong>验证：</strong>{'已验证' if row.get('verified') else '未验证'}</p>
-<pre>{esc(row.get('excerpt') or _evidence_summary(row))}</pre></div></details>""")
-    return f'<section class="evidence-section"><h2>本节点证据</h2><p class="muted">这里只展示当前节点结论绑定的证据。</p>{"".join(cards)}</section>'
+    for review in module_reviews:
+        for chain in review.get("key_chains") or []:
+            for evidence_id in chain.get("evidence_ids") or []:
+                if evidence_id not in used:
+                    used.append(evidence_id)
+    return used
+
+
+def _evidence_view(row: dict[str, Any], label: str, report: dict[str, Any]) -> dict[str, Any]:
+    target_commit = ((report.get("work") or {}).get("snapshot") or {}).get("commit")
+    reference_commit = ((report.get("reference") or {}).get("snapshot") or {}).get("commit")
+    commit = (row.get("metadata") or {}).get("snapshot_commit")
+    if commit == target_commit:
+        owner = report["work"]["display_name"]
+    elif commit == reference_commit:
+        owner = report["reference"]["display_name"]
+    else:
+        owner = "检索与审计流程"
+    return {
+        "id": row.get("evidence_id"),
+        "label": label,
+        "category": _evidence_category(row),
+        "kindLabel": EVIDENCE_KIND_LABELS.get(row.get("kind"), row.get("kind")),
+        "owner": owner,
+        "commit": commit,
+        "path": row.get("path"),
+        "lineStart": row.get("line_start"),
+        "lineEnd": row.get("line_end"),
+        "title": row.get("label") or row.get("path") or row.get("query") or "结构化证据",
+        "excerpt": row.get("excerpt") or _evidence_summary(row),
+        "verified": bool(row.get("verified")),
+    }
 
 
 def _evidence_summary(row: dict[str, Any]) -> str:
@@ -269,36 +187,196 @@ def _evidence_category(row: dict[str, Any]) -> str:
 
 def _read_evidence(path: str) -> dict[str, dict[str, Any]]:
     out = {}
-    for line in Path(path).read_text(encoding="utf-8", errors="ignore").splitlines():
-        row = json.loads(line)
-        out[row["evidence_id"]] = row
+    evidence_path = Path(path)
+    if not evidence_path.is_file():
+        return out
+    for line in evidence_path.read_text(encoding="utf-8", errors="ignore").splitlines():
+        try:
+            row = json.loads(line)
+            out[row["evidence_id"]] = row
+        except (json.JSONDecodeError, KeyError, TypeError):
+            continue
     return out
 
 
-def _list(value: Any) -> str:
-    rows = value if isinstance(value, list) else [value]
-    return '<ul class="section-list">' + "".join(f"<li>{esc(x)}</li>" for x in rows) + "</ul>"
+def _project_meta(report: dict[str, Any]) -> list[dict[str, str]]:
+    work = report.get("work") or {}
+    reference = report.get("reference") or {}
+    work_snapshot = work.get("snapshot") or {}
+    reference_snapshot = reference.get("snapshot") or {}
+    work_meta = _repo_metadata(str(work_snapshot.get("repo") or ""))
+    ref_meta = _repo_metadata(str(reference_snapshot.get("repo") or ""))
+    base = f"{reference_snapshot.get('repo') or '无'}@{_display_ref(reference_snapshot)}" if reference_snapshot else "无可靠 Base"
+    rows = [
+        {"label": "作品队伍", "value": _team_label(work_meta, work.get("display_name") or work_snapshot.get("repo") or "")},
+        {"label": "年份", "value": str(work_meta.get("year") or _year_from_display(work.get("display_name") or ""))},
+        {"label": "分析分支", "value": _display_ref(work_snapshot)},
+        {"label": "推测 Base", "value": base},
+    ]
+    if ref_meta:
+        rows.append({"label": "Base 队伍", "value": _team_label(ref_meta, reference.get("display_name") or reference_snapshot.get("repo") or "")})
+    return rows
 
 
-def _architecture_view(assessment: dict[str, Any]) -> str:
-    overview = assessment.get("architecture_overview") or ""
-    diagram = assessment.get("architecture_diagram") or ""
-    edges = assessment.get("architecture_edges") or []
-    chunks = []
-    if overview:
-        chunks.append(f'<div class="architecture-text">{esc(overview)}</div>')
-    if diagram:
-        chunks.append(f'<h3>Agent 架构图草案</h3><pre class="architecture-diagram">{esc(diagram)}</pre>')
-    chunks.append(_architecture_edge_list(edges))
-    return "".join(chunks)
+def _repo_metadata(repo: str) -> dict[str, Any]:
+    if not repo or MetadataManager is None:
+        return {}
+    try:
+        return MetadataManager().lookup_by_repo_name(repo) or {}
+    except Exception:
+        return {}
 
 
-def _architecture_edge_list(edges: list[dict[str, Any]]) -> str:
-    cards = []
-    for edge in edges:
-        cards.append(f"""<article class="edge-card"><strong>{esc(node_title_zh(edge['from_module']))} → {esc(node_title_zh(edge['to_module']))}</strong>
-<p>{esc(edge.get('label') or '')}</p></article>""")
-    return "<h3>关键架构关系</h3>" + (f'<div class="edge-list">{"".join(cards)}</div>' if cards else '<p class="muted">缺少 Agent 根据代码阅读提交的架构关系。</p>')
+def _team_label(meta: dict[str, Any], fallback: str) -> str:
+    team = meta.get("team") or ""
+    school = meta.get("school") or ""
+    if team and school:
+        return f"{team}（{school}）"
+    return team or fallback
+
+
+def _display_ref(snapshot: dict[str, Any]) -> str:
+    aliases = [str(x) for x in snapshot.get("ref_aliases") or [] if x and x != "origin/HEAD"]
+    local = [x for x in aliases if "/" not in x]
+    if local:
+        return local[0]
+    if aliases:
+        return aliases[0].removeprefix("origin/")
+    return str(snapshot.get("canonical_branch") or snapshot.get("display_ref") or snapshot.get("commit") or "")[:12]
+
+
+def _year_from_display(value: str) -> str:
+    import re
+    match = re.search(r"(20\d{2})", value)
+    return match.group(1) if match else ""
+
+
+def _project_profile(report: dict[str, Any]) -> dict[str, Any]:
+    snapshot = ((report.get("work") or {}).get("snapshot") or {})
+    root = Path(str(snapshot.get("materialized_path") or ""))
+    if not root.is_dir():
+        return {"languages": [], "directories": [], "totalFiles": 0, "totalBytes": 0}
+    language_stats: dict[str, dict[str, int]] = {}
+    directory_stats: dict[str, dict[str, int]] = {}
+    directory_tree: dict[str, Any] = {"name": ".", "path": ".", "files": 0, "bytes": 0, "children": {}}
+    total_bytes = 0
+    for path in root.rglob("*"):
+        if not path.is_file():
+            continue
+        rel = path.relative_to(root).as_posix()
+        if rel.startswith(".git/"):
+            continue
+        try:
+            size = path.stat().st_size
+        except OSError:
+            continue
+        total_bytes += size
+        lang = _language_for(path.name)
+        language_stats.setdefault(lang, {"files": 0, "bytes": 0})
+        language_stats[lang]["files"] += 1
+        language_stats[lang]["bytes"] += size
+        top = rel.split("/", 1)[0] if "/" in rel else "根目录文件"
+        directory_stats.setdefault(top, {"files": 0, "bytes": 0})
+        directory_stats[top]["files"] += 1
+        directory_stats[top]["bytes"] += size
+        _add_tree_file(directory_tree, rel, size)
+    total_files = sum(row["files"] for row in language_stats.values())
+    languages = sorted(
+        [{"name": name, **stats, "percent": stats["files"] / total_files * 100 if total_files else 0}
+         for name, stats in language_stats.items()],
+        key=lambda row: (-row["files"], -row["bytes"]),
+    )
+    directories = sorted(
+        [{"path": path, **stats, "percent": stats["bytes"] / total_bytes * 100 if total_bytes else 0}
+         for path, stats in directory_stats.items()],
+        key=lambda row: -row["bytes"],
+    )
+    return {
+        "languages": languages[:8],
+        "directories": directories[:12],
+        "directoryTree": _finalize_tree(directory_tree),
+        "totalFiles": total_files,
+        "totalBytes": total_bytes,
+    }
+
+
+def _add_tree_file(root: dict[str, Any], rel: str, size: int) -> None:
+    parts = rel.split("/")
+    node = root
+    node["files"] += 1
+    node["bytes"] += size
+    current = []
+    for part in parts[:-1]:
+        current.append(part)
+        children = node.setdefault("children", {})
+        child = children.setdefault(part, {
+            "name": part,
+            "path": "/".join(current),
+            "files": 0,
+            "bytes": 0,
+            "children": {},
+        })
+        child["files"] += 1
+        child["bytes"] += size
+        node = child
+
+
+def _finalize_tree(node: dict[str, Any]) -> dict[str, Any]:
+    children = [_finalize_tree(child) for child in (node.get("children") or {}).values()]
+    children.sort(key=lambda row: (-int(row.get("bytes") or 0), str(row.get("name") or "")))
+    return {
+        "name": node.get("name"),
+        "path": node.get("path"),
+        "files": node.get("files") or 0,
+        "bytes": node.get("bytes") or 0,
+        "children": children,
+    }
+
+
+def _language_for(filename: str) -> str:
+    suffix = Path(filename).suffix.lower()
+    if suffix in {".c", ".h"}:
+        return "C/C 头文件"
+    if suffix in {".s", ".asm"}:
+        return "汇编"
+    if suffix == ".ld":
+        return "链接脚本"
+    if suffix == ".mk" or filename == "Makefile":
+        return "Makefile"
+    if suffix == ".rs":
+        return "Rust"
+    if suffix == ".py":
+        return "Python"
+    if suffix in {".md", ".txt"}:
+        return "文档"
+    if suffix in {".pdf", ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".bin", ".elf", ".img", ".o", ".a"}:
+        return "工件/资源"
+    if suffix in {".json", ".toml", ".yaml", ".yml"}:
+        return "配置"
+    return "其他"
+
+
+def _dist_index() -> str:
+    index = ROOT / "web_report" / "dist" / "index.html"
+    if not index.is_file():
+        raise FileNotFoundError(
+            "web_report/dist/index.html not found. Run `cd web_report && npm install && npm run build` first."
+        )
+    return index.read_text(encoding="utf-8")
+
+
+def _copy_dist_assets(output_dir: Path) -> None:
+    src = ROOT / "web_report" / "dist" / "assets"
+    if not src.is_dir():
+        return
+    dst = output_dir / "assets"
+    if dst.exists():
+        shutil.rmtree(dst)
+    shutil.copytree(src, dst)
+
+
+def _json_for_script(value: Any) -> str:
+    return json.dumps(value, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
 
 
 def main() -> None:
@@ -306,8 +384,7 @@ def main() -> None:
         raise SystemExit("usage: judge_report.py <report.json> <report.html>")
     report = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
     output = Path(sys.argv[2])
-    output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(render(report), encoding="utf-8")
+    render_to_file(report, output)
 
 
 if __name__ == "__main__":

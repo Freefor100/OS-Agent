@@ -35,7 +35,8 @@
 | `core/evidence.py` | EvidenceCandidate 校验、稳定 EvidenceRecord、完整覆盖负向搜索 |
 | `core/judge_report.py` | Claim、NodeReview、ModuleReview、OverallAssessment 与完整框架/Evidence 强校验 |
 | `core/provenance_report.py` | 从 Comparison 数据库导出完整确定性函数溯源数据 |
-| `scripts/judge_report.py` | 固定左侧框架目录、节点详情、静态架构图与集中 Evidence 的评委主报告 |
+| `scripts/judge_report.py` | 校验 `report.json`，整理 React 前端 view-model，注入 `web_report/dist` 并复制静态 assets |
+| `web_report/` | React + Vite + TypeScript 的评委主报告前端，负责模块/节点导航、架构图交互、目录树和相关 Evidence 展示 |
 | `scripts/provenance_report.py` | 独立文件树、函数列表、来源候选与源码对照技术附录 |
 | `mcp_server.py` | 向宿主 Agent 暴露结构化阶段接口 |
 
@@ -105,7 +106,7 @@ CodeAtlas tree-sitter extractor
 
 ## 双报告边界
 
-`report.html` 面向评委，使用作品名而不是内部“目标/Base”术语，完整展示框架节点的实现度、原创度、差异与 Claim。Evidence 在页面底部集中折叠展示，正文只引用易读编号。
+`report.html` 面向评委，使用作品名而不是内部“目标/Base”术语，完整展示框架节点的实现度、原创度、差异与 Claim。主报告按总体、模块、节点组织；语言占比和完整目录树来自快照事实，目录说明由 Agent 通过 `directory_notes` 绑定到目录项。内核架构图来自 Agent 提交的 Mermaid，前端只提供缩放、拖拽平移和重置交互。Evidence 只在相关模块/节点页面底部以彩色证据卡展示，正文只引用易读编号。
 正文 Evidence 链接会标记为源码证据、文档证据、链路证据或审计证据；底部卡片进一步展示具体类型标签，如函数定义、调用链、正式检索和负向搜索。
 
 `provenance.html` 面向技术复核，独立展示确定性函数状态、文件多来源、参考作品未匹配函数与源码对照。它不生成原创度、实现度或 Agent Claim。旧混合 `AuditProject/Finding/index.html` 流程已删除。

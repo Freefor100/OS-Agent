@@ -34,9 +34,10 @@ def build_base_evidence_packet(target_snapshot: RepoSnapshot, formal_candidates:
         item["year_direction"] = "older_to_target" if year and target_year and year < target_year else "same_year" if year == target_year and year else "newer_or_unknown"
         item["eligible_primary_base"] = item.get("score_kind") == "formal" and item["year_direction"] == "older_to_target"
         candidates.append(item)
+    coverage = candidate_coverage or _infer_candidate_coverage(candidates)
     payload = {"target_snapshot": target_snapshot.to_dict(), "target_year": target_year, "formal_candidates": candidates,
                "declared_sources": declared_sources(target_snapshot) if include_declarations else [], "declarations_hidden": not include_declarations,
-               "candidate_coverage": candidate_coverage or {"coverage_complete": False, "reason": "candidate coverage not supplied"}}
+               "candidate_coverage": coverage}
     payload["packet_id"] = stable_id("basepkt", payload, 16)
     return payload
 
@@ -52,7 +53,7 @@ def validate_base_decision(decision: dict[str, Any], packet: dict[str, Any]) -> 
     if no_base:
         if primary:
             errors.append("no_reliable_base cannot coexist with primary_base")
-        if any(c.get("eligible_primary_base") and float(c.get("combined") or 0) >= 0.3 for c in packet.get("formal_candidates", [])):
+        if any(c.get("eligible_primary_base") and _score_value(c.get("combined")) >= 0.3 for c in packet.get("formal_candidates", [])):
             errors.append("independent mode rejected: a reliable formal older candidate exists")
         if packet.get("declared_sources") and not decision.get("declared_sources_checked"):
             errors.append("independent mode rejected: declared sources were not checked")
@@ -97,6 +98,26 @@ def _candidate_matches(primary: dict[str, Any], candidates: Iterable[dict[str, A
     if len(matches) > 1:
         return [], [f"primary_base commit prefix is ambiguous for repo {repo}: {', '.join(str(c.get('commit')) for c in matches)}"]
     return matches, []
+
+
+def _infer_candidate_coverage(candidates: list[dict[str, Any]]) -> dict[str, Any]:
+    verified_formal = [c for c in candidates if c.get("score_kind") == "formal" and c.get("scope_status") == "verified"]
+    return {
+        "coverage_complete": bool(candidates) and len(verified_formal) == len(candidates),
+        "source": "formal_candidates",
+        "reason": "inferred from supplied formal_candidates",
+        "returned_candidate_count": len(candidates),
+        "verified_formal_count": len(verified_formal),
+    }
+
+
+def _score_value(value: Any) -> float:
+    if isinstance(value, dict):
+        value = value.get("score") if "score" in value else value.get("combined")
+    try:
+        return float(value or 0)
+    except (TypeError, ValueError):
+        return 0.0
 
 
 def _commit_matches(requested: str, candidate: str) -> bool:

@@ -108,8 +108,10 @@ output/<repo-name>/audit-YYYYMMDD-HHMMSS/
 6. 关键调用链优先用带目标 `ref` 的 LSP/CodeAtlas/Comparison 工具确认。普通源码定位可以写入 Claim 文本、文件路径或函数名；只有关键锚点才注册 Evidence。
 7. 宿主 Agent 汇总草稿后，为每个节点调用一次 `node_review_bundle_submit(..., expected_generation=<module_analysis_packet 返回值>)` 原子提交 Claims 与 NodeReview。该工具会生成 claim_id 并回填到 review/degree。
 8. 每个 NodeReview 必须用中文说明“代码如何实现该功能范围”、与参考作品差异、完整度、原创度和风险。函数、文件和 comparison 不要求机械归属节点。
-9. 完成一个模块后，宿主 Agent 提交 `ModuleReview`。模块页是核心阅读单位，必须把节点事实抽象成模块能力、关键机制链路和实现差异。
-10. 14 个模块完成后，宿主 Agent 提交 `OverallAssessment`。架构部分必须体现该作品的独特设计：用中文填写 `architecture_overview`，必要时用 `architecture_diagram` 提供自由文本草图或 Mermaid 风格草案；`architecture_edges` 只作为结构化索引，每条边用中文说明控制流、数据流、依赖或调用关系，并绑定相关 Claim。MCP 不会替 Agent 自动绘制架构图。
+9. 完成一个模块后，宿主 Agent 提交 `ModuleReview`。模块页是核心阅读单位，必须把节点事实抽象成模块能力、关键机制链路和实现差异。`overview`、`implementation_summary`、`difference_summary`、`original_work_summary` 可以是中文字符串，也可以是中文字符串数组；当内容包含多个并列机制、多个阶段、第一/第二/第三类结论时，必须提交数组，不要把所有机制堆成一个长段落。
+10. 14 个模块完成后，宿主 Agent 提交 `OverallAssessment`。总体摘要、来源关系、目录结构解释和架构说明同样遵守上一条：并列条目用数组表达，长解释才用段落字符串。渲染器只按显式数组分条显示，不会根据“第一、第二”、标点或句长自动拆分。
+11. `directory_overview` 必须解释该作品真实目录组织；`directory_notes` 应按目录相对路径写中文说明，例如 `{"kernel": "内核主体，包含调度、内存、文件系统和驱动实现", "xv6-user": "用户态程序与系统调用测试"}`。前端会把说明紧跟在对应目录项后面，不会替 Agent 解释目录含义。
+12. 架构部分必须体现该作品的内核独特设计：用中文填写 `architecture_overview`。如提交 `architecture_diagram`，该字段必须是纯 Mermaid 内核架构图源码，不得混入中文解释、段落说明或列表；解释文字必须放回 `architecture_overview` 并在图下方展示。`judge_report_validate/render` 会校验 Mermaid 行级语法，失败时 Agent 必须修改 `overall_assessment` 后重新提交。`architecture_edges` 只作为结构化索引，不是自动绘图输入。每条边至少包含中文 `label` 和非空 `claim_ids`；可选填写 `type`、`source/target` 或 `from/to` 作为自由端点文字，也可选填写 `from_module/to_module`、`module_ids`、`from_node/to_node`、`node_ids` 作为结构化引用。结构化模块必须是 14 个模块 ID，结构化节点必须是 112 个节点 ID。MCP 不会替 Agent 自动绘制、拆句或修复架构图。
 
 ### 7. 关键 Evidence 锚定
 
@@ -131,9 +133,10 @@ output/<repo-name>/audit-YYYYMMDD-HHMMSS/
 2. 最终再次调用 `judge_report_status`，确认 112 个 NodeReview、112 个节点均有 Claim、14 个 ModuleReview、各模块关键链路、OverallAssessment、架构边、BaseDecision 和产物约束全部完成。
 3. 调 `provenance_export` 生成确定性函数溯源数据 `provenance.json`，再调 `provenance_render` 生成独立技术附录 `provenance.html`。
 4. 只有 `judge_report_validate` 通过且 `base_decision.json`、Comparison、EvidenceStore、provenance 双产物存在后，才调用 `judge_report_render` 生成评委主报告 `report.html`。
-5. `report.html` 只展示中文总概述、模块概述、关键链路、完整度/原创度矩阵、节点细节和少量关键证据锚点；不展示函数状态内部术语、完整函数列表或全局 Evidence 池。
-6. `provenance.html` 只展示程序计算的函数匹配、来源候选与源码对照，不生成原创度、实现度或 Agent Claim。
-7. 旧混合 `AuditProject/Finding/index.html` 流程已废弃，不得生成或复用。
+5. `report.html` 由 `web_report/` 的 React + Vite + TypeScript 静态前端投影 `report.json` 生成，不由 Python 拼接业务页面。渲染前必须已存在 `web_report/dist/index.html`；本机首次使用或修改前端后执行 `cd web_report && npm install && npm run build`。页面只展示中文总概述、模块概述、关键链路、完整度/原创度矩阵、节点细节、语言占比、完整目录树和少量关键证据锚点；不展示函数状态内部术语、完整函数列表或全局 Evidence 池。架构图在页面中支持按钮缩放、拖拽平移和重置，但图内容必须仍由 Agent 提交的 Mermaid 内核架构图决定。
+6. Evidence 在主报告中放在相关模块/节点页面底部，以彩色证据卡展示。Claim 上的证据按钮只跳转到本页对应证据卡；正文不得平铺全局 Evidence 池。节点没有关键证据时必须由 Agent 在 Claim/Review 中明确说明原因，渲染器不会替 Agent 补证据。
+7. `provenance.html` 只展示程序计算的函数匹配、来源候选与源码对照，不生成原创度、实现度或 Agent Claim。
+8. 旧混合 `AuditProject/Finding/index.html` 流程已废弃，不得生成或复用。
 
 标准产物目录必须包含：
 

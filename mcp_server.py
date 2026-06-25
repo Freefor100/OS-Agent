@@ -592,14 +592,15 @@ def judge_report_validate(report_path: str) -> dict:
 def judge_report_render(report_path: str, output_path: str) -> dict:
     import json
     from core.audit_manifest import artifact_status, find_manifest_for, update_manifest
-    from scripts.judge_report import render
+    from scripts.judge_report import render_to_file
     report = json.loads(Path(report_path).read_text(encoding="utf-8"))
     manifest, manifest_path = find_manifest_for(report_path)
     artifacts = artifact_status(manifest, str(Path(report_path).parent))
     missing_before_render = [x for x in artifacts["missing_artifacts"] if x != "report_html"]
     if missing_before_render:
         raise ValueError("cannot render judge report before audit artifacts exist: " + ", ".join(missing_before_render))
-    output = Path(output_path); output.parent.mkdir(parents=True, exist_ok=True); output.write_text(render(report), encoding="utf-8")
+    output = Path(output_path)
+    render_to_file(report, output)
     if manifest:
         update_manifest(manifest_path, artifacts={"report_html": output_path},
                         stages={"judge_report_rendered": True}, status="judge_report_rendered")
