@@ -29,6 +29,7 @@ output/<repo-name>/audit-YYYYMMDD-HHMMSS/
 - 同届候选只进入复审区，不能作为有方向性的主 Base。
 - Node Scope 是语义边界，不是函数路由规则，也不能单独作为查重证据。旧机制标签和词表已从产品态工具输出移除，不参与导航、证据或报告内容。
 - Agent 可解释 `modified_candidate`，但不得覆盖 `raw_status`。
+- 阅读内核实现时必须主动留意面向平台评测或公开测例的硬编码、旁路和刷分式实现，例如按固定路径、固定参数、固定测试程序名或固定设备名特判返回结果。发现后应在对应节点/模块中用中文说明其适用范围、对真实内核机制完整度的影响和评审风险；不得把这类过测旁路等同于完整通用机制。
 - 报告优先面向评委阅读，避免堆砌工具术语；所有概述、模块总结、节点说明和架构边标签必须使用中文。
 
 ## MCP 主路径工具
@@ -108,10 +109,11 @@ output/<repo-name>/audit-YYYYMMDD-HHMMSS/
 6. 关键调用链优先用带目标 `ref` 的 LSP/CodeAtlas/Comparison 工具确认。普通源码定位可以写入 Claim 文本、文件路径或函数名；只有关键锚点才注册 Evidence。
 7. 宿主 Agent 汇总草稿后，为每个节点调用一次 `node_review_bundle_submit(..., expected_generation=<module_analysis_packet 返回值>)` 原子提交 Claims 与 NodeReview。该工具会生成 claim_id 并回填到 review/degree。
 8. 每个 NodeReview 必须用中文说明“代码如何实现该功能范围”、与参考作品差异、完整度、原创度和风险。函数、文件和 comparison 不要求机械归属节点。
-9. 完成一个模块后，宿主 Agent 提交 `ModuleReview`。模块页是核心阅读单位，必须把节点事实抽象成模块能力、关键机制链路和实现差异。`overview`、`implementation_summary`、`difference_summary`、`original_work_summary` 可以是中文字符串，也可以是中文字符串数组；当内容包含多个并列机制、多个阶段、第一/第二/第三类结论时，必须提交数组，不要把所有机制堆成一个长段落。
-10. 14 个模块完成后，宿主 Agent 提交 `OverallAssessment`。总体摘要、来源关系、目录结构解释和架构说明同样遵守上一条：并列条目用数组表达，长解释才用段落字符串。渲染器只按显式数组分条显示，不会根据“第一、第二”、标点或句长自动拆分。
-11. `directory_overview` 必须解释该作品真实目录组织；`directory_notes` 应按目录相对路径写中文说明，例如 `{"kernel": "内核主体，包含调度、内存、文件系统和驱动实现", "xv6-user": "用户态程序与系统调用测试"}`。前端会把说明紧跟在对应目录项后面，不会替 Agent 解释目录含义。
-12. 架构部分必须体现该作品的内核独特设计：用中文填写 `architecture_overview`。如提交 `architecture_diagram`，该字段必须是纯 Mermaid 内核架构图源码，不得混入中文解释、段落说明或列表；解释文字必须放回 `architecture_overview` 并在图下方展示。`judge_report_validate/render` 会校验 Mermaid 行级语法，失败时 Agent 必须修改 `overall_assessment` 后重新提交。`architecture_edges` 只作为结构化索引，不是自动绘图输入。每条边至少包含中文 `label` 和非空 `claim_ids`；可选填写 `type`、`source/target` 或 `from/to` 作为自由端点文字，也可选填写 `from_module/to_module`、`module_ids`、`from_node/to_node`、`node_ids` 作为结构化引用。结构化模块必须是 14 个模块 ID，结构化节点必须是 112 个节点 ID。MCP 不会替 Agent 自动绘制、拆句或修复架构图。
+9. 若节点或模块中发现过测旁路、平台评测特判、公开测例特判或其他硬编码刷分行为，必须在 NodeReview 或 ModuleReview 的风险/差异/完整度说明中明确指出，并尽量锚定到具体文件、函数、条件判断或字符串常量；只有关键结论才注册 Evidence。
+10. 完成一个模块后，宿主 Agent 提交 `ModuleReview`。模块页是核心阅读单位，必须把节点事实抽象成模块能力、关键机制链路和实现差异。`overview`、`implementation_summary`、`difference_summary`、`original_work_summary` 可以是中文字符串，也可以是中文字符串数组；当内容包含多个并列机制、多个阶段、第一/第二/第三类结论时，必须提交数组，不要把所有机制堆成一个长段落。
+11. 14 个模块完成后，宿主 Agent 提交 `OverallAssessment`。总体摘要、来源关系、目录结构解释和架构说明同样遵守上一条：并列条目用数组表达，长解释才用段落字符串。渲染器只按显式数组分条显示，不会根据“第一、第二”、标点或句长自动拆分。
+12. `directory_overview` 必须解释该作品真实目录组织；`directory_notes` 应按目录相对路径写中文说明，例如 `{"kernel": "内核主体，包含调度、内存、文件系统和驱动实现", "xv6-user": "用户态程序与系统调用测试"}`。前端会把说明紧跟在对应目录项后面，不会替 Agent 解释目录含义。
+13. 架构部分必须体现该作品的内核独特设计：用中文填写 `architecture_overview`。如提交 `architecture_diagram`，该字段必须是纯 Mermaid 内核架构图源码，不得混入中文解释、段落说明或列表；解释文字必须放回 `architecture_overview` 并在图下方展示。`judge_report_validate/render` 会校验 Mermaid 行级语法，失败时 Agent 必须修改 `overall_assessment` 后重新提交。`architecture_edges` 只作为结构化索引，不是自动绘图输入。每条边至少包含中文 `label` 和非空 `claim_ids`；可选填写 `type`、`source/target` 或 `from/to` 作为自由端点文字，也可选填写 `from_module/to_module`、`module_ids`、`from_node/to_node`、`node_ids` 作为结构化引用。结构化模块必须是 14 个模块 ID，结构化节点必须是 112 个节点 ID。MCP 不会替 Agent 自动绘制、拆句或修复架构图。
 
 ### 7. 关键 Evidence 锚定
 
@@ -123,7 +125,7 @@ output/<repo-name>/audit-YYYYMMDD-HHMMSS/
 
 ### 8. 负向搜索
 
-1. 根据 glossary、Base 符号、目标命名风格和已发现入口构造查询。
+1. 根据节点 scope、MCP 返回的导航提示、Base 符号、目标命名风格和已发现入口构造查询。
 2. 调 `negative_search(..., evidence_store=<本项目路径>)` 固定 commit、搜索计划、路径、扩展名、实际查询和扫描文件数。
 3. 只有 `coverage_complete=true` 且零匹配才能支撑 `absent`；否则结论为 `uncertain`。
 
