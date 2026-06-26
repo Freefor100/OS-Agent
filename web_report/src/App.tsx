@@ -257,6 +257,10 @@ function OverviewPage({ openView }: AnyRecord) {
         <article className="card"><h2>来源与演进结论</h2><TextBlock value={assessment.source_relation} /></article>
         <article className="card"><h2>风险、缺失与不确定项</h2><TextBlock value={assessment.incomplete_or_risks} /></article>
       </div>
+      <div className="grid">
+        <article className="card"><h2>Base 选择依据</h2><TextBlock value={assessment.base_selection_reason} /></article>
+        <article className="card"><h2>范围排除过程</h2><TextBlock value={assessment.scope_exclusion_process} /></article>
+      </div>
       <div className="summary-list">
         <SummaryCard title="主要继承部分" value={assessment.main_inherited} />
         <SummaryCard title="实质性修改部分" value={assessment.main_modified} />

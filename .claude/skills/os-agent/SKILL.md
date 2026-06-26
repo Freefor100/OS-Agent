@@ -22,6 +22,7 @@ output/<repo-name>/audit-YYYYMMDD-HHMMSS/
 
 - 开始分析前确定独立输出目录；若用户未指定，自动使用 `output/<repo-name>/audit-YYYYMMDD-HHMMSS/`，并在开始时告知用户。随后调用 `audit_manifest_create` 创建本次分析唯一的 `audit_manifest.json`，该目录固定保存 `base_decision.json`、`report.json`、`evidence_store.jsonl`、Comparison 数据库和双报告。
 - 不扫描工作树，只分析 Git commit 快照。
+- 预建指纹阶段不得仅凭目录名硬排除 Git tracked 的支持语言源码；看起来像依赖、生成物或外部代码的路径只能作为 Scope 审核线索，不能替代证据裁决。
 - 分支只是入口；多个别名指向同一 commit 时只分析一次。
 - `search_similar` 是内部粗召回，禁止用于报告排名或 BaseDecision。
 - 正式搜索必须使用目标和候选各自的 verified ScopeManifest。
@@ -69,10 +70,11 @@ output/<repo-name>/audit-YYYYMMDD-HHMMSS/
 ### 2. 确认目标 ScopeManifest
 
 1. 阅读 `.gitmodules`、Cargo workspace、Makefile、README 和目录结构。
-2. 判断学生代码、外部依赖、生成物和文档范围。
-3. 先为排除理由注册 EvidenceRecord：源码/配置用 `evidence_source`，文档用 `evidence_document`，结构化范围说明用 `evidence_structured(kind="scope_manifest", ...)`。
-4. 调 `create_scope_manifest(target, ref=<commit>, evidence_store=<本项目 evidence_store.jsonl>, ...)`；程序验证路径、submodule 声明和 Agent 排除项引用的 Evidence。
-5. 除自动 `.gitmodules` 子模块外，verified ScopeManifest 的排除项必须引用已验证 EvidenceRecord。没有证据的范围只能保存为 draft，不得进入正式搜索。
+2. 判断学生代码、外部依赖、生成物和文档范围；不得只因路径名是 `vendor/`、`third_party/`、`target/`、`build/`、`out/`、`dist/`、`node_modules/` 就排除源码。
+3. 对看起来像第三方、依赖或生成代码的目录，必须检查它是否被项目实际引用、是否有依赖声明或生成声明、是否存在学生修改痕迹；可使用 `git log`、`git blame`、`git diff`、`.gitmodules`、Cargo/CMake/Makefile/包管理配置和源码引用关系辅助判断。
+4. 先为排除理由注册 EvidenceRecord：源码/配置用 `evidence_source`，文档用 `evidence_document`，结构化范围说明用 `evidence_structured(kind="scope_manifest", ...)`。
+5. 调 `create_scope_manifest(target, ref=<commit>, evidence_store=<本项目 evidence_store.jsonl>, ...)`；程序验证路径、submodule 声明和 Agent 排除项引用的 Evidence。
+6. 除自动 `.gitmodules` 子模块外，verified ScopeManifest 的排除项必须引用已验证 EvidenceRecord。没有证据的范围只能保存为 draft，不得进入正式搜索。
 
 ### 3. 粗召回、候选审核、正式重排
 
@@ -86,8 +88,10 @@ output/<repo-name>/audit-YYYYMMDD-HHMMSS/
 1. 调 `base_evidence_packet(target, ref, formal_candidates, target_year, include_declarations=true)`。
 2. Agent 综合正式排名、年份方向、声明验证、核心目录覆盖和差异解释能力选择候选，并调 `evidence_formal_search` 将正式搜索结果写入本项目 EvidenceStore。
 3. 提交引用该 evidence ID 的 BaseDecision，调用 `base_decision_submit(decision, packet, output_path=<输出目录>/base_decision.json)`。主 Base 必须按 repo+commit 引用正式候选；校验通过后程序固化 `base_decision.json`。
-4. 对去声明回归，再以 `include_declarations=false` 组包并验证同一决定。
-5. 仅当无可靠正式 Base、声明来源均已强制对比且程序准入时，才允许独立报告。
+4. BaseDecision 保持简洁：必须能指向 formal verified 候选并引用正式搜索 Evidence；可写 `selection_reason` 作为 Agent 备注，但主报告中的选择依据仍以后续 `overall_assessment.base_selection_reason` 的中文说明为准。
+5. 年份方向是强线索，不是程序硬门槛。xlsx 中有明确更早年份的候选方向性最强；同年候选仍可能存在互抄、共同上游或协作传播，不能仅因同年排除，但必须在主报告中说明方向不确定或给出额外方向依据。对不在 xlsx 的开源教学项目、框架或公开上游，若有声明、公开来源、git 历史或项目关系证据，也可以选择为 Base，但必须在主报告中说明年份表无法校验及替代方向依据。明确更晚年份的候选若被选作主要参考，也必须说明为什么时间表不能直接否定该关系。
+6. 对去声明回归，再以 `include_declarations=false` 组包并验证同一决定。
+7. 仅当无可靠正式 Base、声明来源均已强制对比且程序准入时，才允许独立报告。
 
 ### 5. Comparison 数据库与按需消费
 
@@ -112,7 +116,9 @@ output/<repo-name>/audit-YYYYMMDD-HHMMSS/
 8. 每个 NodeReview 必须用中文说明“代码如何实现该功能范围”、与参考作品差异、完整度、原创度和风险。函数、文件和 comparison 不要求机械归属节点。
 9. 若节点或模块中发现过测旁路、平台评测特判、公开测例特判或其他硬编码刷分行为，必须在 NodeReview 或 ModuleReview 的风险/差异/完整度说明中明确指出，并尽量锚定到具体文件、函数、条件判断或字符串常量；只有关键结论才注册 Evidence。
 10. 完成一个模块后，宿主 Agent 提交 `ModuleReview`。模块页是核心阅读单位，必须把节点事实抽象成模块能力、关键机制链路和实现差异。`overview`、`implementation_summary`、`difference_summary`、`original_work_summary` 可以是中文字符串，也可以是中文字符串数组；当内容包含多个并列机制、多个阶段、第一/第二/第三类结论时，必须提交数组，不要把所有机制堆成一个长段落。
-11. 14 个模块完成后，宿主 Agent 提交 `OverallAssessment`。总体摘要、来源关系、目录结构解释和架构说明同样遵守上一条：并列条目用数组表达，长解释才用段落字符串。渲染器只按显式数组分条显示，不会根据“第一、第二”、标点或句长自动拆分。
+11. 14 个模块完成后，宿主 Agent 提交 `OverallAssessment`。总体摘要、来源关系、Base 选择依据、Scope 排除过程、目录结构解释和架构说明同样遵守上一条：并列条目用数组表达，长解释才用段落字符串。渲染器只按显式数组分条显示，不会根据“第一、第二”、标点或句长自动拆分。
+    - `base_selection_reason` 必须用评委能读懂的中文说明为什么选中当前 Base 或为什么没有可靠 Base；应覆盖正式排名/相似度、核心目录覆盖、声明来源、年份或替代方向依据、同年/未知年份候选的方向不确定性、未选择主要候选的原因。不要求写复杂结构。
+    - `scope_exclusion_process` 必须用中文概述 Scope 审核和排除过程；应说明排除了哪些主要路径、证据来源、是否检查疑似第三方/生成代码是否被修改或实际引用，以及仍不确定的范围风险。不要求列出全部函数或全部 Evidence。
 12. `directory_overview` 必须解释该作品真实目录组织；`directory_notes` 应按目录相对路径写中文说明，例如 `{"kernel": "内核主体，包含调度、内存、文件系统和驱动实现", "xv6-user": "用户态程序与系统调用测试"}`。前端会把说明紧跟在对应目录项后面，不会替 Agent 解释目录含义。
 13. 架构部分必须体现该作品的内核独特设计：用中文填写 `architecture_overview`。如提交 `architecture_diagram`，该字段必须是纯 Mermaid 内核架构图源码，不得混入中文解释、段落说明或列表；解释文字必须放回 `architecture_overview` 并在图下方展示。`judge_report_validate/render` 会校验 Mermaid 行级语法，失败时 Agent 必须修改 `overall_assessment` 后重新提交。`architecture_edges` 只作为结构化索引，不是自动绘图输入。每条边至少包含中文 `label` 和非空 `claim_ids`；可选填写 `type`、`source/target` 或 `from/to` 作为自由端点文字，也可选填写 `from_module/to_module`、`module_ids`、`from_node/to_node`、`node_ids` 作为结构化引用。结构化模块必须是 14 个模块 ID，结构化节点必须是 112 个节点 ID。MCP 不会替 Agent 自动绘制、拆句或修复架构图。
 

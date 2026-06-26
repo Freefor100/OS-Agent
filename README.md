@@ -142,7 +142,7 @@ output/oskernel2023-zmz/audit-001/
 
 旧 `_agent_*`、`_audit_v*`、`_report` 目录结构已废弃；新流程只认 `output/<repo>/audit-YYYYMMDD-HHMMSS/` 这种独立审计目录。
 
-- 首先打开 `report.html`：查看中文总体结论、Agent 阅读代码后给出的架构说明、14 个模块、112 个节点、完整度、原创度与关键 Claim。
+- 首先打开 `report.html`：查看中文总体结论、Base 选择依据、Scope 排除过程、Agent 阅读代码后给出的架构说明、14 个模块、112 个节点、完整度、原创度与关键 Claim。
 - 需要核对函数匹配和源码对照时，再打开 `provenance.html`。
 - `report.html` 由 `web_report/` 的 React + Vite + TypeScript 静态前端投影 `report.json` 生成。Python 只负责校验、整理 view-model、注入数据，并复制 `web_report/dist/assets/`，不再拼接复杂页面结构。
 - `report.html` 以中文呈现，必要机制名可用括号补充解释，例如“写时复制（copy-on-write）”。Evidence 只作为关键锚点展示在相关模块/节点页面底部，不要求普通节点堆砌证据。
@@ -191,9 +191,9 @@ python3 -m http.server 8765 --bind 127.0.0.1
 
 OS-Agent 不分析未提交工作树。指纹、搜索和 Comparison 绑定选定 commit 的预建缓存；LSP、bash 阅读和关键证据注册前，Claude Code 必须把对应 `repos/<作品>/` checkout 到锁定 commit。
 
-### 外部依赖如何排除
+### 外部依赖和范围如何排除
 
-程序不维护预设外部依赖名单。Agent 阅读 `.gitmodules`、Cargo workspace、Makefile、README 和目录结构后提交 `ScopeManifest`；程序验证路径和 submodule 声明。
+程序不维护预设外部依赖名单，也不只凭目录名排除 Git tracked 源码。`vendor/`、`third_party/`、`target/`、`build/`、`out/`、`dist/`、`node_modules/` 只能作为审核线索；Agent 需要阅读 `.gitmodules`、Cargo workspace、Makefile/CMake、README、源码引用关系和必要的 git history，判断这些代码是否实际参与项目、是否有声明来源、是否有学生修改痕迹，然后提交 `ScopeManifest`；程序验证路径和 submodule 声明。
 
 正式 1-vs-N 搜索必须同时使用作品与候选各自验证过的 ScopeManifest。排除范围确定前的搜索只能用于内部粗召回，不能进入参考作品判断或报告排名。
 除自动识别的 `.gitmodules` 子模块外，verified ScopeManifest 中的排除项必须引用已注册并验证的 EvidenceRecord；没有证据的范围建议只能作为 draft。
@@ -213,11 +213,11 @@ Claude Code 的完整约束见 [.claude/skills/os-agent/SKILL.md](.claude/skills
 7. **模块评审**：Agent 以模块为阅读单位，覆盖 112 个节点，写中文 Claim、完整度、原创度、模块关键链路和总体结论。
 8. **双报告生成**：先生成 `provenance` 技术附录，再在完整性校验通过后渲染中文 `report.html`。
 
-声明是强线索但不会自动成为参考作品；同届高相似候选进入人工复审区，不能作为有方向性的继承来源。
+声明是强线索但不会自动成为参考作品；年份方向只是强线索，不是硬门槛。同年高相似候选仍可能存在互抄、共同上游或协作传播，不能仅因同年排除；如果选择同年、未知年份或不在 xlsx 的开源教学项目作为 Base，主报告必须用中文说明方向不确定性、替代方向依据和未选其他候选的原因。
 旧机制标签和词表不再作为产品态工具输出，不参与导航、证据或报告内容。
 `judge_report_create` 默认不覆盖已有报告；切换 Base/Comparison 时使用 `judge_report_fork_for_comparison` 生成待重绑草稿。
 
-报告中的中文说明字段支持两种形态：连续解释用字符串，并列机制、分阶段结论、第一/第二/第三类判断用字符串数组。渲染器只按 Agent 显式提交的数组分条展示，不会按标点、序号或句长自动拆句。建议 `module_reviews[].overview`、`implementation_summary`、`difference_summary`、`original_work_summary`、`overall_assessment.summary`、`source_relation`、`directory_overview` 和 `architecture_overview` 在包含多个并列点时提交数组。
+报告中的中文说明字段支持两种形态：连续解释用字符串，并列机制、分阶段结论、第一/第二/第三类判断用字符串数组。渲染器只按 Agent 显式提交的数组分条展示，不会按标点、序号或句长自动拆句。建议 `module_reviews[].overview`、`implementation_summary`、`difference_summary`、`original_work_summary`、`overall_assessment.summary`、`source_relation`、`base_selection_reason`、`scope_exclusion_process`、`directory_overview` 和 `architecture_overview` 在包含多个并列点时提交数组。`base_selection_reason` 面向评委说明为什么选中或未选中 Base；`scope_exclusion_process` 说明排除路径、证据来源、疑似第三方/生成代码是否检查过修改和实际引用。
 
 `overall_assessment.directory_overview` 承载 Agent 对完整目录树的整体解释，`overall_assessment.directory_notes` 可按目录相对路径提供逐项说明，前端把说明紧跟在对应目录项后面，不替 Agent 编写目录解释。`overall_assessment.architecture_overview` 承载中文内核架构补充说明，展示在架构图下方。`overall_assessment.architecture_diagram` 若存在，必须是纯 Mermaid 内核架构图源码，不得混入说明段落；校验失败时 Agent 需要修改 JSON 后重新提交。页面对该图提供缩放、拖拽平移和重置交互，但不自动生成或修复图内容。`overall_assessment.architecture_edges` 用来索引 Agent 阅读代码后总结出的真实架构关系，不是固定模块摆盘图。每条边至少需要中文 `label` 和非空 `claim_ids`；端点可以用 `source/target` 或 `from/to` 写自由文字，也可以用 `from_module/to_module`、`module_ids`、`from_node/to_node`、`node_ids` 绑定结构化模块或节点。结构化引用会校验 ID，普通端点文字不会被当成模块强校验，MCP 不会替 Agent 自动绘图或拆句。
 

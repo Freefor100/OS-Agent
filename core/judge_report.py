@@ -237,7 +237,7 @@ def judge_report_status(report_path: str) -> dict[str, Any]:
     missing_nodes = [node_id for node_id in ANALYSIS_ORDER_V2 if node_id not in node_ids]
     missing_claim_nodes = [node_id for node_id in ANALYSIS_ORDER_V2 if node_id not in claimed_nodes]
     missing_overall = [
-        field for field in ("summary", "source_relation", "main_inherited", "main_modified", "main_independent", "incomplete_or_risks", "review_focus", "directory_overview")
+        field for field in ("summary", "source_relation", "base_selection_reason", "scope_exclusion_process", "main_inherited", "main_modified", "main_independent", "incomplete_or_risks", "review_focus", "directory_overview")
         if not assessment.get(field)
     ]
     missing_architecture_description = not (
@@ -564,7 +564,7 @@ def validate_judge_report(report: dict[str, Any], *, require_complete: bool = Tr
         assessment = report.get("overall_assessment") if isinstance(report.get("overall_assessment"), dict) else {}
         if report.get("overall_assessment") and not isinstance(report.get("overall_assessment"), dict):
             errors.append("overall_assessment must be object")
-        for field in ("summary", "source_relation", "main_inherited", "main_modified", "main_independent", "incomplete_or_risks", "review_focus", "directory_overview"):
+        for field in ("summary", "source_relation", "base_selection_reason", "scope_exclusion_process", "main_inherited", "main_modified", "main_independent", "incomplete_or_risks", "review_focus", "directory_overview"):
             value = assessment.get(field)
             if not value or (isinstance(value, str) and not value.strip()):
                 errors.append(f"overall assessment requires {field}")

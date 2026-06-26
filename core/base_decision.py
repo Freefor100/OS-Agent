@@ -35,7 +35,18 @@ def build_base_evidence_packet(target_snapshot: RepoSnapshot, formal_candidates:
     for row in formal_candidates:
         item = dict(row)
         year = int(item.get("year") or 0)
-        item["year_direction"] = "older_to_target" if year and target_year and year < target_year else "same_year" if year == target_year and year else "newer_or_unknown"
+        if year and target_year:
+            if year < target_year:
+                direction = "older_to_target"
+            elif year == target_year:
+                direction = "same_year"
+            else:
+                direction = "newer_to_target"
+        elif item.get("is_framework"):
+            direction = "external_reference_unknown_year"
+        else:
+            direction = "unknown_year"
+        item["year_direction"] = direction
         item["eligible_primary_base"] = item.get("score_kind") == "formal" and item["year_direction"] == "older_to_target"
         candidates.append(item)
     coverage = candidate_coverage or _infer_candidate_coverage(candidates)
@@ -75,8 +86,6 @@ def validate_base_decision(decision: dict[str, Any], packet: dict[str, Any]) -> 
                 f"repo={candidate.get('repo')} commit={candidate.get('commit')} "
                 f"score_kind={candidate.get('score_kind')} scope_status={candidate.get('scope_status')}"
             )
-        if candidate.get("year_direction") == "same_year":
-            errors.append("same-year candidate cannot be a directional primary Base")
         rank = (decision.get("decision_factors") or {}).get("formal_rank")
         if rank is not None and rank != candidate.get("rank"):
             errors.append("decision formal_rank does not match candidate rank")
