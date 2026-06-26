@@ -28,6 +28,7 @@ output/<repo-name>/audit-YYYYMMDD-HHMMSS/
 - 正式搜索必须使用目标和候选各自的 verified ScopeManifest。
 - 声明是强线索，不自动成为 Base；声明来源必须正式对比。
 - 同届候选只进入复审区，不能作为有方向性的主 Base。
+- 参赛年份、学校、队伍和是否在参赛表内，统一通过 MCP `repo_metadata`、`search_formal`、`base_evidence_packet` 等工具返回的元数据消费；不要直接读取或解析 `collected-data.xlsx`。xlsx 的地址列和表头是 MCP 内部索引实现细节，Agent 只使用工具返回的行级队伍信息。
 - Node Scope 是语义边界，不是函数路由规则，也不能单独作为查重证据。旧机制标签和词表已从产品态工具输出移除，不参与导航、证据或报告内容。
 - Agent 可解释 `modified_candidate`，但不得覆盖 `raw_status`。
 - 阅读内核实现时必须主动留意面向平台评测或公开测例的硬编码、旁路和刷分式实现，例如按固定路径、固定参数、固定测试程序名或固定设备名特判返回结果。发现后应在对应节点/模块中用中文说明其适用范围、对真实内核机制完整度的影响和评审风险；不得把这类过测旁路等同于完整通用机制。

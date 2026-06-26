@@ -29,6 +29,9 @@ ROOT = Path(__file__).resolve().parents[1]
 def _normalize_url(url: str) -> str:
     """Strip .git suffix, trailing slash, normalize to https://, lowercase."""
     url = url.strip().rstrip("/")
+    if url.startswith("git@") and ":" in url:
+        host, path = url[4:].split(":", 1)
+        url = f"https://{host}/{path}"
     if url.endswith(".git"):
         url = url[:-4]
     for prefix in ("git://", "git+https://", "git+http://"):
@@ -42,14 +45,25 @@ def _normalize_url(url: str) -> str:
 class MetadataManager:
     """Load xlsx, scan repo git remotes, build URL↔repo_name index."""
 
+    URL_COLUMNS = (
+        ("初赛fork版", "初赛fork版访问情况"),
+        ("源地址", "源地址访问情况"),
+        ("决赛fork版", "决赛fork版访问情况"),
+        # Backward compatibility for the old one-URL workbook.
+        ("仓库地址", ""),
+    )
+
     def __init__(self, xlsx_path: str = "", repos_dir: str = ""):
         self._xlsx_path = str(ROOT / xlsx_path) if xlsx_path else str(ROOT / "collected-data.xlsx")
         self._repos_dir = str(ROOT / repos_dir) if repos_dir else str(ROOT / "repos")
 
-        # xlsx entry by normalized URL
+        # xlsx row by normalized URL. One workbook row can expose initial fork,
+        # source, and final fork addresses, but consumers get row metadata only.
         self._by_url: dict[str, dict] = {}
         # repo_name → xlsx entry
         self._by_name: dict[str, dict] = {}
+        # stable work key → xlsx base row
+        self._works: dict[str, dict] = {}
         # repo_name → git remote URL (for repos not in xlsx)
         self._repo_urls: dict[str, str] = {}
         # set of repo names NOT in xlsx (frameworks/baselines)
@@ -71,20 +85,88 @@ class MetadataManager:
 
         wb = openpyxl.load_workbook(self._xlsx_path, read_only=True)
         ws = wb.active
-        # Columns: 年份, 赛事, 子赛事, 学校, 队伍名称, 仓库地址
-        for row in ws.iter_rows(min_row=2, values_only=True):
-            year, competition, sub_event, school, team, url = row[:6]
-            if not url:
+        header_row = next(ws.iter_rows(min_row=1, max_row=1, values_only=True), ())
+        headers = {str(value).strip(): idx for idx, value in enumerate(header_row) if value}
+
+        def get(row: tuple, name: str, default: str = ""):
+            idx = headers.get(name)
+            if idx is None or idx >= len(row):
+                return default
+            value = row[idx]
+            return default if value is None else value
+
+        for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+            year = get(row, "年份")
+            competition = get(row, "赛事")
+            sub_event = get(row, "子赛事")
+            school = get(row, "学校")
+            team = get(row, "队伍名称")
+            if not any((year, competition, sub_event, school, team)):
                 continue
-            norm = _normalize_url(str(url))
-            self._by_url[norm] = {
-                "year": int(year) if year else 0,
+            year_int = int(year) if str(year or "").strip().isdigit() else 0
+            work_key = "|".join([
+                str(year_int),
+                str(sub_event or "").strip(),
+                str(school or "").strip(),
+                str(team or "").strip(),
+            ])
+            base = {
+                "year": year_int,
                 "competition": str(competition or ""),
                 "sub_event": str(sub_event or ""),
                 "school": str(school or ""),
                 "team": str(team or ""),
-                "repo_url": str(url).strip(),
+                "work_key": work_key,
+                "xlsx_row": row_idx,
+                "address_note": str(get(row, "地址备注") or ""),
+                "official_source": str(get(row, "官网来源") or ""),
+                "competition_id": str(get(row, "比赛ID") or ""),
             }
+            self._works[work_key] = base
+
+            for url_col, access_col in self.URL_COLUMNS:
+                url = get(row, url_col)
+                if not url:
+                    continue
+                url = str(url).strip()
+                if not url or url in {"空", "-", "无", "None", "none"}:
+                    continue
+                access = str(get(row, access_col) or "").strip() if access_col else ""
+                norm = _normalize_url(url)
+                self._by_url[norm] = {
+                    **base,
+                    "repo_url": url,
+                    "access_status": access,
+                }
+
+    def _copy_entry(self, entry: dict, *, repo_name: str = "") -> dict:
+        out = dict(entry)
+        if repo_name:
+            out["repo_name"] = repo_name
+            out["local_repo"] = repo_name
+        return out
+
+    def _work_entries(self, work_key: str) -> list[dict]:
+        return [entry for entry in self._by_url.values() if entry.get("work_key") == work_key]
+
+    def _preferred_entry_for_work(self, work_key: str) -> Optional[dict]:
+        entries = self._work_entries(work_key)
+        return entries[0] if entries else None
+
+    def _base_work_entry(self, work_key: str) -> dict:
+        preferred = self._preferred_entry_for_work(work_key) or self._works.get(work_key, {})
+        return {
+            "year": preferred.get("year", 0),
+            "competition": preferred.get("competition", ""),
+            "sub_event": preferred.get("sub_event", ""),
+            "school": preferred.get("school", ""),
+            "team": preferred.get("team", ""),
+            "work_key": work_key,
+            "xlsx_row": preferred.get("xlsx_row", 0),
+            "address_note": preferred.get("address_note", ""),
+            "official_source": preferred.get("official_source", ""),
+            "competition_id": preferred.get("competition_id", ""),
+        }
 
     def _scan_repos(self) -> None:
         """Scan repos/*/ for git remotes, match to xlsx entries."""
@@ -103,7 +185,7 @@ class MetadataManager:
 
             entry = self._by_url.get(norm)
             if entry:
-                self._by_name[d.name] = entry
+                self._by_name[d.name] = self._copy_entry(entry, repo_name=d.name)
             else:
                 self._framework_names.add(d.name)
 
@@ -123,7 +205,8 @@ class MetadataManager:
 
     def lookup_by_url(self, git_url: str) -> Optional[dict]:
         """Look up xlsx metadata by git remote URL. Returns None if not found."""
-        return self._by_url.get(_normalize_url(git_url))
+        entry = self._by_url.get(_normalize_url(git_url))
+        return dict(entry) if entry else None
 
     def lookup_by_repo_name(self, repo_name: str) -> Optional[dict]:
         """Look up xlsx metadata by local repos/<name> directory name."""
@@ -144,7 +227,8 @@ class MetadataManager:
         # Try git remote lookup
         url = self._get_remote_url(str(ROOT / repo_path) if "/" not in repo_path else repo_path)
         if url:
-            return self._by_url.get(_normalize_url(url))
+            entry = self._by_url.get(_normalize_url(url))
+            return self._copy_entry(entry, repo_name=name) if entry else None
         return None
 
     def is_framework(self, repo_name: str) -> bool:
@@ -184,12 +268,33 @@ class MetadataManager:
         return self._framework_names.copy()
 
     def unmatched_xlsx_entries(self) -> list[dict]:
-        """xlsx entries that have no matching local repo."""
+        """Workbook rows that have no matching local repo through any address."""
+        return self.unmatched_works()
+
+    def unmatched_url_entries(self) -> list[dict]:
+        """Address cells in xlsx that have no matching local repo."""
         matched_urls = {_normalize_url(u) for u in self._repo_urls.values()}
         return [
             entry for url, entry in self._by_url.items()
             if url not in matched_urls
         ]
+
+    def all_works(self) -> list[dict]:
+        """All workbook rows, independent of how many URL variants each has."""
+        return [
+            self._base_work_entry(work_key)
+            for work_key in sorted(self._works)
+        ]
+
+    def unmatched_works(self) -> list[dict]:
+        """Workbook rows with none of their URL variants cloned locally."""
+        matched_urls = {_normalize_url(u) for u in self._repo_urls.values()}
+        rows: list[dict] = []
+        for work_key in sorted(self._works):
+            entries = self._work_entries(work_key)
+            if entries and not any(_normalize_url(e["repo_url"]) in matched_urls for e in entries):
+                rows.append(self._base_work_entry(work_key))
+        return rows
 
     def get_all_branch_prefs(self, repo_name: str = "") -> dict:
         """Return relevant metadata for branch scoring context.
@@ -214,10 +319,12 @@ class MetadataManager:
             schools[entry["school"]] += 1
 
         return {
-            "xlsx_entries": len(self._by_url),
+            "xlsx_entries": len(self._works),
+            "xlsx_address_entries": len(self._by_url),
             "matched_repos": len(self._by_name),
             "frameworks": len(self._framework_names),
             "unmatched_xlsx": len(self.unmatched_xlsx_entries()),
+            "unmatched_address_entries": len(self.unmatched_url_entries()),
             "years": dict(sorted(years.items())),
             "school_count": len(schools),
             "repos_scanned": len(self._repo_urls),
@@ -230,9 +337,11 @@ if __name__ == "__main__":
     mm = MetadataManager()
     s = mm.stats()
     print(f"xlsx entries:      {s['xlsx_entries']}")
+    print(f"xlsx addresses:    {s['xlsx_address_entries']}")
     print(f"matched repos:     {s['matched_repos']}")
     print(f"frameworks:        {s['frameworks']}")
     print(f"unmatched xlsx:    {s['unmatched_xlsx']}")
+    print(f"unmatched address: {s['unmatched_address_entries']}")
     print(f"years:             {s['years']}")
     print(f"schools:           {s['school_count']}")
     print()
@@ -243,4 +352,4 @@ if __name__ == "__main__":
     if unmatched:
         print(f"\nUnmatched xlsx entries ({len(unmatched)}):")
         for e in unmatched[:5]:
-            print(f"  {e['year']} {e['school']} {e['team']} → {e['repo_url']}")
+            print(f"  {e['year']} {e['school']} {e['team']}")
