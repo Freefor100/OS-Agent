@@ -1,27 +1,31 @@
 from __future__ import annotations
 
 import re
-from pathlib import Path
 from typing import Any, Iterable
 
 from core.evidence import stable_id
+from core.git_source import list_tree, read_text
 from core.snapshot import RepoSnapshot
 
 URL_RE = re.compile(r"https?://(?:github\.com|gitlab\.eduxiji\.net)/[^\s)\]>]+", re.I)
 
 
 def declared_sources(snapshot: RepoSnapshot) -> list[dict[str, Any]]:
-    root = Path(snapshot.materialized_path)
     rows: dict[str, dict[str, Any]] = {}
-    for path in sorted(root.rglob("*")):
-        if not path.is_file() or not (path.name.lower().startswith("readme") or path.suffix.lower() in {".md", ".txt"}):
+    for entry in list_tree(snapshot.repo_path, snapshot.commit):
+        name = entry.path.rsplit("/", 1)[-1]
+        suffix = "." + name.rsplit(".", 1)[-1].lower() if "." in name else ""
+        if entry.kind != "blob" or not (name.lower().startswith("readme") or suffix in {".md", ".txt"}):
             continue
-        text = path.read_text(encoding="utf-8", errors="ignore")
+        try:
+            text = read_text(snapshot.repo_path, snapshot.commit, entry.path)
+        except Exception:
+            continue
         for match in URL_RE.finditer(text):
             url = match.group(0).rstrip(".,;，。；")
             line = text[:match.start()].count("\n") + 1
             rows.setdefault(url, {"url": url, "repo_hint": url.rstrip("/").split("/")[-1].removesuffix(".git"),
-                                  "path": path.relative_to(root).as_posix(), "line": line})
+                                  "path": entry.path, "line": line})
     return list(rows.values())
 
 

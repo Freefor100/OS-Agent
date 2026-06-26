@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from core.evidence import stable_id
+from core.git_source import read_text
 from tools.code_atlas.minhash import jaccard_estimate, signature_from_set
 
 COMPARISON_SCHEMA = "function_comparison_v4_joint_match"
@@ -122,11 +123,10 @@ def read_source_pair(comparisons_path: str, comparison_id: str, context_lines: i
         unit = rec.get(f"{side}_unit"); snapshot = metadata.get(f"{side}_snapshot") or {}
         if not unit:
             continue
-        root = Path(snapshot.get("materialized_path") or "").resolve()
-        path = (root / str(unit.get("file") or "")).resolve()
-        if not path.is_file() or (path != root and root not in path.parents):
+        try:
+            lines = read_text(str(snapshot.get("repo_path") or ""), str(snapshot.get("commit") or ""), str(unit.get("file") or "")).splitlines()
+        except Exception:
             out[f"{side}_source"] = {"status": "not_found", "file": unit.get("file")}; continue
-        lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()
         line = max(1, int(unit.get("line") or 1)); end_line = max(line, int(unit.get("end_line") or line))
         lo = max(1, line-context_lines); hi = min(len(lines), end_line+context_lines)
         out[f"{side}_source"] = {"snapshot_commit": snapshot.get("commit"), "file": unit.get("file"), "line_start": lo, "line_end": hi,

@@ -10,7 +10,7 @@
 
 ```text
 默认检出分支尖端 → 必要时分页检查其他分支尖端 → 按 commit 合并别名并锁定
-→ Git archive 内部源码快照
+→ Git blob 内存解析并生成最小指纹缓存
 → Agent 审核目标 ScopeManifest → 粗召回 Top-K
 → 审核候选 ScopeManifest → 双侧正式重排
 → BaseEvidencePacket → Agent BaseDecision → 程序准入
@@ -25,7 +25,8 @@
 
 | 模块 | 责任 |
 |---|---|
-| `core/snapshot.py` | 默认选择当前检出分支尖端，解析 commit/tree hash、合并 ref aliases，并用 `git archive` 生成内部源码快照 |
+| `core/snapshot.py` | 默认选择当前检出分支尖端，解析 commit/tree hash、合并 ref aliases；不复制源码树 |
+| `core/git_source.py` | 从 Git commit 直接枚举 tree、批量读取 blob 和源码片段，不 checkout、不 archive、不写临时源码 |
 | `core/scope.py` | 构建和验证双侧 ScopeManifest，自动识别声明的 submodule |
 | `scripts/fingerprint.py` | 全归一化 token SHA-256、AST shape、调用邻居；缓存绑定 commit 和 schema |
 | `core/scoped_search.py` | 双侧 Scope 的 token/AST containment 搜索，区分 rough/formal |
@@ -39,6 +40,12 @@
 | `web_report/` | React + Vite + TypeScript 的评委主报告前端，负责模块/节点导航、架构图交互、目录树和相关 Evidence 展示 |
 | `scripts/provenance_report.py` | 独立文件树、函数列表、来源候选与源码对照技术附录 |
 | `mcp_server.py` | 向宿主 Agent 暴露结构化阶段接口 |
+
+## Claude Code 与源码工作树
+
+Claude Code 是分析主体，可以用 bash、rg、sed、LSP 和 MCP 查询代码。BaseDecision 由 Claude Code 判断；`base_decision_submit` 只负责程序准入和审计落盘。校验通过后，Claude Code 直接用当前 decision/packet 中的 target commit 与 selected base commit 强制 checkout `repos/<target>` 和 `repos/<base>` 到 detached HEAD，再开始源码阅读。提交仓库是外部 clone，工作树残留不作为用户代码保护对象；正式分析不得继续读取 Base 仓库默认分支。
+
+`compare_functions` 也应使用同一组 target/base commits，使函数级 Comparison、Claude Code 的源码阅读和最终报告全部绑定一致。
 
 ## 确定性函数状态
 
@@ -67,11 +74,11 @@ Agent 写回的是 Claim 和框架评审，不是函数分类。每个 Claim 挂
 
 所有批次共享一个 `report.json` 与一个 `evidence_store.jsonl`。EvidenceStore 按持久化路径共享追加锁；JudgeReport 按报告路径共享读改写锁。节点工作者使用 `node_review_bundle_submit` 原子写入 Claims 与 NodeReview，避免并发 sub-agent 覆盖彼此结果。批次按依赖顺序串行推进，批内仅对强耦合节点组进行有限并行。
 
-CodeAtlas 仍是指纹、AST shape、调用邻居和结构中心度的来源，不是废弃模块。Comparison 数据库负责跨作品匹配查询；`code_atlas_overview/search` 负责不可变单作品的全局结构导航和入口候选发现；关键定义、引用和调用链优先由针对指定不可变 commit 执行的 `lsp_*` 语义确认。`code_atlas_call_neighbors` 用于低成本导航、分页、交叉检查或 LSP 不可用时补充，不得单独支撑关键调用链 Claim。
+指纹预建从 Git commit blob 直接在内存中解析源码，只持久化 `units/fpset/astset/meta/scopes`。完整 CodeAtlas 和源码 snapshots 不再是产品态缓存；`code_atlas_*` MCP 工具仅保留 deprecated 响应。Comparison 数据库负责跨作品匹配查询；关键定义、引用和调用链优先由 checkout 到锁定 commit 后的 `lsp_*`、bash/rg/sed 和 Comparison 数据确认。
 
-作品版本面向 Agent 和评委使用 `作品@分支` 表述。默认版本是 clone 当前检出分支的尖端；只有存在明确理由时才分页检查并选择其他分支尖端。接口不遍历历史 commit，且多个分支指向同一 commit 时只返回一次。程序将选定分支解析为 commit 并在整个分析中锁定，避免 ref 移动或工作树改动污染结果。内部 materialized snapshot 路径仅是缓存实现细节，不进入报告。
+作品版本面向 Agent 和评委使用 `作品@分支` 表述。默认版本是 clone 当前检出分支的尖端；只有存在明确理由时才分页检查并选择其他分支尖端。接口不遍历历史 commit，且多个分支指向同一 commit 时只返回一次。程序将选定分支解析为 commit 并在整个分析中锁定，避免 ref 移动或工作树改动污染结果。
 
-LSP 同样分析锁定 commit 的内部源码快照。缺少编译数据库时，LSP 层会临时生成带 OS-Agent 管理标记的 `compile_flags.txt`；最后一个 clangd 客户端退出、MCP 退出或下次分析启动前必须自动删除。该辅助文件不参与指纹、Scope、Comparison 或 Evidence，也不得写入 `repos/` 中的作品工作树。
+LSP 分析前要求 Claude Code 将对应 `repos/<name>` checkout 到锁定 commit；MCP 会校验 HEAD 是否匹配。缺少编译数据库时，LSP 层会临时生成带 OS-Agent 管理标记的 `compile_flags.txt`；最后一个 clangd 客户端退出、MCP 退出或下次分析启动前必须自动删除。该辅助文件不参与指纹、Scope、Comparison 或 Evidence。
 
 ## 操作与产物约定
 
@@ -93,7 +100,8 @@ comparison.sqlite / comparisons.jsonl
 具体指纹链路：
 
 ```text
-CodeAtlas tree-sitter extractor
+Git commit blob reader
+→ tree-sitter extractor
 → normalize_function_tokens
 → ast_shape_hash
 → scripts/fingerprint.py 生成完整归一化 token SHA-256 与 MinHash signature

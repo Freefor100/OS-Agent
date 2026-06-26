@@ -16,7 +16,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from core.metadata import MetadataManager
-from scripts.fingerprint import build_units, fingerprint_set, ast_fingerprint_set, lang_summary
+from core.snapshot import resolve_snapshot
+from scripts.fingerprint import build_units_from_git_commit, fingerprint_set, ast_fingerprint_set, lang_summary
 
 
 def batch_fingerprint(repos_dir: str = "repos", branch: str = "",
@@ -37,13 +38,15 @@ def batch_fingerprint(repos_dir: str = "repos", branch: str = "",
         try:
             if skip_existing:
                 from scripts.fingerprint import _cache_path
-                if _cache_path("fpset", str(d), branch).exists():
+                snap = resolve_snapshot(str(d), branch or "HEAD", materialize=False)
+                if _cache_path("fpset", str(d), snap.commit, snap.tree_hash).exists():
                     print(f"  [{i+1}/{len(entries)}] {d.name} — cached, skip")
                     continue
 
-            units = build_units(str(d), branch=branch)
-            fps = fingerprint_set(str(d), branch=branch)
-            ast = ast_fingerprint_set(str(d), branch=branch)
+            snap = resolve_snapshot(str(d), branch or "HEAD", materialize=False)
+            units = build_units_from_git_commit(str(d), snapshot=snap)
+            fps = fingerprint_set(str(d), snapshot=snap)
+            ast = ast_fingerprint_set(str(d), snapshot=snap)
             langs = lang_summary(units)
             results[d.name] = {"units": len(units), "fps": len(fps),
                                "ast_fps": len(ast), "langs": langs}

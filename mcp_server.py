@@ -49,10 +49,14 @@ def _get_evidence_store(repo_path: str, evidence_store: str):
 
 
 def _lsp_snapshot_path(target: str, ref: str) -> str:
-    """Materialize an immutable commit for LSP analysis."""
+    """Return the repo worktree path after verifying its checked-out commit."""
     from core.snapshot import resolve_snapshot
-    snap = resolve_snapshot(_target_path(target), ref)
-    return snap.materialized_path
+    from core.git_source import git_text
+    snap = resolve_snapshot(_target_path(target), ref, materialize=False)
+    head = git_text(snap.repo_path, "rev-parse", "HEAD").strip()
+    if head != snap.commit:
+        raise ValueError(f"repo worktree is not checked out to requested commit; run git -C {snap.repo_path} checkout --detach -f {snap.commit}")
+    return snap.repo_path
 
 
 # ── tool: repo_metadata ──────────────────────────────────────────────
@@ -119,12 +123,12 @@ def build_fingerprint(target: str, ref: str = "", branch: str = "", all_branches
     """Build fingerprints from immutable commits. Branch aliases sharing a commit are deduplicated."""
     from core.snapshot import discover_commit_snapshots, resolve_snapshot
     from core.scope import build_scope_manifest
-    from scripts.fingerprint import build_units, fingerprint_set, ast_fingerprint_set, lang_summary
+    from scripts.fingerprint import build_units_from_git_commit, fingerprint_set, ast_fingerprint_set, lang_summary
     commit_ref = ref or branch or "HEAD"
-    snapshots = discover_commit_snapshots(_target_path(target), materialize=True) if all_branches else [resolve_snapshot(_target_path(target), commit_ref)]
+    snapshots = discover_commit_snapshots(_target_path(target), materialize=False) if all_branches else [resolve_snapshot(_target_path(target), commit_ref, materialize=False)]
     results = {}
     for snap in snapshots:
-        units = build_units(_target_path(target), snapshot=snap)
+        units = build_units_from_git_commit(_target_path(target), snapshot=snap)
         fps = fingerprint_set(_target_path(target), snapshot=snap)
         ast = ast_fingerprint_set(_target_path(target), snapshot=snap)
         scope = build_scope_manifest(snap, status="draft")
@@ -641,7 +645,7 @@ def evidence_source(target: str, ref: str, evidence_store: str, kind: str, path:
                     symbol: str = "", label: str = "", strength: str = "strong", metadata: dict | None = None) -> dict:
     """Verify an immutable source location and persist a stable EvidenceRecord."""
     from core.snapshot import resolve_snapshot
-    snap = resolve_snapshot(_target_path(target), ref); store = _get_evidence_store(snap.materialized_path, evidence_store)
+    snap = resolve_snapshot(_target_path(target), ref); store = _get_evidence_store(snap.repo_path, evidence_store)
     meta = {"snapshot_commit": snap.commit, **(metadata or {})}
     evidence_id = store.add_source(kind=kind, path=path, line=line, line_end=line_end or None, symbol=symbol, label=label, strength=strength, metadata=meta)
     return {"evidence_id": evidence_id, "record": store.by_id(evidence_id).compact(), "evidence_store": evidence_store}
@@ -651,7 +655,7 @@ def evidence_source(target: str, ref: str, evidence_store: str, kind: str, path:
 def evidence_source_batch(target: str, ref: str, evidence_store: str, sources: list[dict]) -> dict:
     """Register several source spans from one immutable snapshot in one call."""
     from core.snapshot import resolve_snapshot
-    snap = resolve_snapshot(_target_path(target), ref); store = _get_evidence_store(snap.materialized_path, evidence_store)
+    snap = resolve_snapshot(_target_path(target), ref); store = _get_evidence_store(snap.repo_path, evidence_store)
     rows = []
     for source in sources:
         metadata = {"snapshot_commit": snap.commit, **(source.get("metadata") or {})}
@@ -691,7 +695,7 @@ def evidence_structured(target: str, ref: str, evidence_store: str, kind: str, l
     allowed = {"call_edge", "lsp_call_graph", "git_history", "scope_manifest", "documentation"}
     if kind not in allowed:
         raise ValueError(f"unsupported structured evidence kind: {kind}")
-    snap = resolve_snapshot(_target_path(target), ref); store = _get_evidence_store(snap.materialized_path, evidence_store)
+    snap = resolve_snapshot(_target_path(target), ref); store = _get_evidence_store(snap.repo_path, evidence_store)
     candidate = EvidenceCandidate(tool="lsp_call_graph" if kind in {"call_edge", "lsp_call_graph"} else kind, kind=kind,
                                   label=label, content=content, path=path, line_start=line or None, line_end=line_end or None, strength=strength,
                                   metadata={"snapshot_commit": snap.commit, **metadata})
@@ -706,7 +710,7 @@ def evidence_document(target: str, ref: str, evidence_store: str, path: str, lab
     """Read and register a PDF, DOCX, Markdown, or text document from an immutable snapshot."""
     from core.evidence import EvidenceCandidate
     from core.snapshot import resolve_snapshot
-    snap = resolve_snapshot(_target_path(target), ref); store = _get_evidence_store(snap.materialized_path, evidence_store)
+    snap = resolve_snapshot(_target_path(target), ref); store = _get_evidence_store(snap.repo_path, evidence_store)
     metadata = {"snapshot_commit": snap.commit, "start_page": start_page or None, "end_page": end_page or None}
     candidate = EvidenceCandidate(tool="documentation", kind="documentation", path=path, line_start=start_line or None,
                                   line_end=end_line or None, label=label, strength=strength, metadata=metadata)
@@ -724,7 +728,7 @@ def evidence_formal_search(target: str, ref: str, candidate: dict, evidence_stor
     snap = resolve_snapshot(_target_path(target), ref); scope = load_scope_manifest(snap.repo, snap.commit)
     if scope is None or scope.status != "verified": raise ValueError("target requires a verified ScopeManifest")
     metadata = {"target_scope_id": scope.scope_id, "candidate_scope_id": candidate.get("candidate_scope_id") or candidate.get("scope_id"), "candidate_commit": candidate.get("commit"), "candidate_repo": candidate.get("repo"), "score_kind": candidate.get("score_kind"), "rank": candidate.get("rank"), "combined": candidate.get("combined")}
-    store = _get_evidence_store(snap.materialized_path, evidence_store)
+    store = _get_evidence_store(snap.repo_path, evidence_store)
     evidence_id = store.add(EvidenceCandidate(tool="formal_search", kind="formal_search", label=label or f"formal rank {candidate.get('rank')}", strength="strong", metadata=metadata))
     return {"evidence_id": evidence_id, "record": store.by_id(evidence_id).compact(), "evidence_store": evidence_store}
 
@@ -736,9 +740,9 @@ def negative_search(target: str, ref: str, subject: str, queries: list[str], sym
     from core.snapshot import resolve_snapshot
     snap = resolve_snapshot(_target_path(target), ref)
     evidence_path = Path(evidence_store) if evidence_store else Path("output") / target / "_audit" / "evidence_store.jsonl"
-    store = _get_evidence_store(snap.materialized_path, str(evidence_path))
+    store = _get_evidence_store(snap.repo_path, str(evidence_path))
     plan = NegativeSearchPlan(snapshot_commit=snap.commit, subject=subject, queries=queries, symbols=symbols, paths=paths, extensions=extensions)
-    result = execute_negative_search(snap.materialized_path, plan, store); result["evidence_store"] = str(evidence_path); return result
+    result = execute_negative_search(snap.repo_path, plan, store); result["evidence_store"] = str(evidence_path); return result
 
 
 # ── tool: node_taxonomy ──────────────────────────────────────────────
@@ -812,34 +816,14 @@ def code_atlas_overview(target: str, ref: str = "HEAD", limit: int = 8) -> dict:
     """Return immutable whole-repository structural statistics and high-centrality
     function candidates. Use this for inexpensive architecture reconnaissance and
     entry-point discovery, not as semantic call-chain evidence."""
-    from core.snapshot import resolve_snapshot
-    from scripts.fingerprint import code_atlas
-    snap = resolve_snapshot(_target_path(target), ref)
-    atlas = code_atlas(snap.repo_path, snapshot=snap)
-    limit = max(0, min(int(limit), 20))
-    functions = sorted(atlas.get("functions", {}).items(), key=lambda x: -float(x[1].get("pagerank") or 0))[:limit]
-    return {"snapshot": {"snapshot_id": snap.snapshot_id, "repo": snap.repo, "commit": snap.commit,
-                         "tree_hash": snap.tree_hash, "ref_aliases": snap.ref_aliases},
-            "stats": atlas.get("stats") or {}, "central_function_limit": limit,
-            "note": "Central functions are reconnaissance candidates, not semantic call-chain evidence.",
-            "central_functions": [{"fn_id": fn_id, "name": row.get("name"), "file": row.get("file"), "line": row.get("line"),
-                                   "pagerank": row.get("pagerank"), "in_degree": row.get("in_degree"), "out_degree": row.get("out_degree")}
-                                  for fn_id, row in functions]}
+    return {"status": "deprecated", "message": "code_atlas_* tools no longer build or read atlas2 caches; use comparison DB, LSP, or bash/rg on a checked-out commit"}
 
 
 @mcp.tool()
 def code_atlas_search(target: str, ref: str = "HEAD", query: str = "", path: str = "", kind: str = "function",
                       offset: int = 0, limit: int = 50) -> dict:
     """Search immutable CodeAtlas functions or types by name/path."""
-    from core.snapshot import resolve_snapshot
-    from scripts.fingerprint import code_atlas
-    snap = resolve_snapshot(_target_path(target), ref); atlas = code_atlas(snap.repo_path, snapshot=snap)
-    source = atlas.get("types" if kind == "type" else "functions", {})
-    rows = [{"id": item_id, **{k: row.get(k) for k in ("name", "kind", "file", "line", "end_line", "lang", "signature", "pagerank", "in_degree", "out_degree", "fields")}}
-            for item_id, row in source.items()
-            if (not query or query.lower() in str(row.get("name") or "").lower()) and (not path or str(row.get("file") or "").startswith(path))]
-    rows.sort(key=lambda x: (x.get("file") or "", x.get("line") or 0, x.get("name") or ""))
-    return {"snapshot_commit": snap.commit, "kind": kind, "total": len(rows), "offset": offset, "limit": limit, "rows": rows[offset:offset+limit]}
+    return {"status": "deprecated", "message": "code_atlas_* tools no longer build or read atlas2 caches; use comparison_search_units, LSP, or bash/rg"}
 
 
 @mcp.tool()
@@ -848,22 +832,7 @@ def code_atlas_call_neighbors(target: str, ref: str, symbol: str, file: str = ""
     """Return deterministic tree-sitter call-edge candidates around a symbol.
     Prefer lsp_call_graph for semantic confirmation of key chains; use this for
     broad navigation, pagination, cross-checking, or when LSP is unavailable."""
-    from core.snapshot import resolve_snapshot
-    from scripts.fingerprint import code_atlas
-    snap = resolve_snapshot(_target_path(target), ref); atlas = code_atlas(snap.repo_path, snapshot=snap)
-    functions = atlas.get("functions") or {}
-    selected = {fn_id for fn_id, row in functions.items() if row.get("name") == symbol and (not file or row.get("file") == file)}
-    rows = []
-    for edge in atlas.get("edges") or []:
-        outgoing = edge.get("src_fn_id") in selected
-        incoming = edge.get("dst_fn_id") in selected
-        if (direction in {"both", "outgoing"} and outgoing) or (direction in {"both", "incoming"} and incoming):
-            src = functions.get(edge.get("src_fn_id")) or {}; dst = functions.get(edge.get("dst_fn_id")) or {}
-            rows.append({"src": {"fn_id": edge.get("src_fn_id"), "name": src.get("name"), "file": src.get("file"), "line": src.get("line")},
-                         "dst": {"fn_id": edge.get("dst_fn_id"), "name": dst.get("name") or edge.get("callee_name"), "file": dst.get("file"), "line": dst.get("line")},
-                         "resolution": edge.get("resolution"), "callsite_line": edge.get("callsite_line")})
-    return {"snapshot_commit": snap.commit, "symbol": symbol, "matched_functions": len(selected), "total": len(rows),
-            "offset": offset, "limit": limit, "rows": rows[offset:offset+limit]}
+    return {"status": "deprecated", "message": "code_atlas_* tools no longer build or read atlas2 caches; use comparison_call_context, LSP, or bash/rg"}
 
 
 # ── tools: LSP (exposing 5 lsp_ops.py @tool functions) ──────────────

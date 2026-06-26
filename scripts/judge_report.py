@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from core.judge_report import MODULE_IDS, validate_judge_report
+from core.git_source import blob_sizes, list_tree
 from core.kernel_tree import ANALYSIS_ORDER_V2, ROOT_NODES_V2, node_scope, node_title_zh
 
 try:
@@ -253,25 +254,26 @@ def _year_from_display(value: str) -> str:
 
 def _project_profile(report: dict[str, Any]) -> dict[str, Any]:
     snapshot = ((report.get("work") or {}).get("snapshot") or {})
-    root = Path(str(snapshot.get("materialized_path") or ""))
-    if not root.is_dir():
+    repo_path = str(snapshot.get("repo_path") or "")
+    commit = str(snapshot.get("commit") or "")
+    if not repo_path or not commit:
         return {"languages": [], "directories": [], "totalFiles": 0, "totalBytes": 0}
     language_stats: dict[str, dict[str, int]] = {}
     directory_stats: dict[str, dict[str, int]] = {}
     directory_tree: dict[str, Any] = {"name": ".", "path": ".", "files": 0, "bytes": 0, "children": {}}
     total_bytes = 0
-    for path in root.rglob("*"):
-        if not path.is_file():
+    try:
+        entries = list_tree(repo_path, commit)
+    except Exception:
+        return {"languages": [], "directories": [], "totalFiles": 0, "totalBytes": 0}
+    sizes = blob_sizes(repo_path, [entry for entry in entries if entry.kind == "blob"])
+    for entry in entries:
+        if entry.kind != "blob":
             continue
-        rel = path.relative_to(root).as_posix()
-        if rel.startswith(".git/"):
-            continue
-        try:
-            size = path.stat().st_size
-        except OSError:
-            continue
+        rel = entry.path
+        size = sizes.get(entry.object_id, 0)
         total_bytes += size
-        lang = _language_for(path.name)
+        lang = _language_for(Path(rel).name)
         language_stats.setdefault(lang, {"files": 0, "bytes": 0})
         language_stats[lang]["files"] += 1
         language_stats[lang]["bytes"] += size

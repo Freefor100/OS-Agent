@@ -51,7 +51,7 @@ output/<repo-name>/audit-YYYYMMDD-HHMMSS/
 
 - `node_analysis_packet`：只在模块包信息不足或单节点返工时使用。
 - `node_review_draft_batch`：只生成草稿，不写报告；必须由宿主 Agent 审核后再用 `node_review_bundle_submit` 写入。
-- `lsp_*`、`code_atlas_*`：只用于确认关键符号、调用链和入口定位。
+- `lsp_*`、bash/rg/sed 和 Comparison 查询：用于确认关键符号、调用链和入口定位；`code_atlas_*` 已废弃。
 - `evidence_*`、`negative_search`：只注册关键锚点，不为普通 Claim 反复注册。
 - `search_similar`：只作临时粗召回，禁止进入 BaseDecision 或报告排名。
 - `judge_report_fork_for_comparison`：只在切换 Base/Comparison 时使用，不得用 `judge_report_create` 覆盖旧报告。
@@ -91,7 +91,8 @@ output/<repo-name>/audit-YYYYMMDD-HHMMSS/
 
 ### 5. Comparison 数据库与按需消费
 
-1. 调 `compare_functions(..., output_dir=...)` 建立主 Base 的完整 ComparisonRun；SQLite 是查询主库，JSONL 是审计导出。
+0. `base_decision_submit` 返回 valid 后，Claude Code 立即使用当前上下文里的 `packet.target_snapshot.commit`、`decision.primary_base.repo` 和 `decision.primary_base.commit` 切换源码工作树；`base_decision.json` 只是审计落盘，不是让 Agent 再读一遍的流程输入。执行 `git -C repos/<target> checkout --detach -f <target_commit>` 和 `git -C repos/<base> checkout --detach -f <selected_base_commit>`，必要时清理 clone 中未跟踪垃圾文件后再开始 bash/rg 读代码。不得继续读取未切换的 `repos/<base>` 默认分支。
+1. 调 `compare_functions(target=<target>, base=<selected_repo>, ref=<target_commit>, base_ref=<selected_base_commit>, output_dir=...)` 建立主 Base 的完整 ComparisonRun；SQLite 是查询主库，JSONL 是审计导出。
 2. Agent 不一次加载全部函数。先调 `comparison_overview` 和 `comparison_hotspots` 获取概要与热点。
 3. 用 `comparison_search_units` 按符号/路径定位节点入口，用 `comparison_by_status` 按确定性状态分页抽样。
 4. 按需调用 `comparison_directory_summary`、`comparison_directory_sources`、`comparison_file_summary`、`comparison_file_functions` 和 `comparison_base_only_files`。所有列表必须分页；文件可对应多个来源文件。
@@ -106,7 +107,7 @@ output/<repo-name>/audit-YYYYMMDD-HHMMSS/
 3. `ANALYSIS_BATCHES_V2` 只作为依赖调度参考；实际产物按模块组织。优先调用 `module_analysis_packet(report_path, module_id)`，一次获取模块内全部节点的标题、功能范围、scope、候选函数、已有写入和 `report_generation`。
 4. 按模块或强相关模块组开少量 sub-agent。每个 sub-agent 负责读代码、理解功能范围、形成中文草稿；不得直接写共享 `report.json`。
 5. 分析任何节点前必须先读 scope。scope 是功能边界，不是证据；它告诉 Agent 该节点应该解释哪类内核功能。
-6. 关键调用链优先用带目标 `ref` 的 LSP/CodeAtlas/Comparison 工具确认。普通源码定位可以写入 Claim 文本、文件路径或函数名；只有关键锚点才注册 Evidence。
+6. 关键调用链优先用带目标 `ref` 的 LSP、Comparison 工具或 bash/rg/sed/cat 确认；直接读源码前必须确认 `repos/<target>` 和 `repos/<base>` 已处于 BaseDecision 刚判断出的 detached commit。普通源码定位可以写入 Claim 文本、文件路径或函数名；只有关键锚点才注册 Evidence。
 7. 宿主 Agent 汇总草稿后，为每个节点调用一次 `node_review_bundle_submit(..., expected_generation=<module_analysis_packet 返回值>)` 原子提交 Claims 与 NodeReview。该工具会生成 claim_id 并回填到 review/degree。
 8. 每个 NodeReview 必须用中文说明“代码如何实现该功能范围”、与参考作品差异、完整度、原创度和风险。函数、文件和 comparison 不要求机械归属节点。
 9. 若节点或模块中发现过测旁路、平台评测特判、公开测例特判或其他硬编码刷分行为，必须在 NodeReview 或 ModuleReview 的风险/差异/完整度说明中明确指出，并尽量锚定到具体文件、函数、条件判断或字符串常量；只有关键结论才注册 Evidence。

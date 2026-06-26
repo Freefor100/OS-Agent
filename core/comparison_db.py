@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from core.evidence import stable_id
+from core.git_source import read_text
 
 DB_SCHEMA = "comparison_db_v1"
 STATUSES = ("exact_copied", "renamed_exact", "modified_candidate", "target_only", "base_only", "ambiguous")
@@ -287,9 +288,11 @@ def unit_source(database_path: str, unit_id: str, context_lines: int=5) -> dict[
     if not unit: con.close(); return {'status':'not_found','unit_id':unit_id}
     snap_row=con.execute('SELECT snapshot_json FROM source_snapshots WHERE snapshot_id=?',(unit[0],)).fetchone(); con.close(); snap=json.loads(snap_row[0]) if snap_row else None
     if not snap: return {'status':'source_unavailable','unit_id':unit_id,'reason':'snapshot metadata is not stored in run'}
-    root=Path(snap.get('materialized_path') or '').resolve(); path=(root/unit[2]).resolve()
-    if not path.is_file() or (path!=root and root not in path.parents): return {'status':'not_found','unit_id':unit_id,'file':unit[2]}
-    lines=path.read_text(encoding='utf-8',errors='ignore').splitlines(); line=max(1,int(unit[3] or 1)); end=max(line,int(unit[4] or line)); lo=max(1,line-context_lines); hi=min(len(lines),end+context_lines)
+    try:
+        lines=read_text(str(snap.get('repo_path') or ''),str(snap.get('commit') or ''),unit[2]).splitlines()
+    except Exception:
+        return {'status':'not_found','unit_id':unit_id,'file':unit[2]}
+    line=max(1,int(unit[3] or 1)); end=max(line,int(unit[4] or line)); lo=max(1,line-context_lines); hi=min(len(lines),end+context_lines)
     return {'status':'ok','unit_id':unit_id,'snapshot_commit':snap.get('commit'),'file':unit[2],'line_start':lo,'line_end':hi,'content':'\n'.join(f'{n}: {lines[n-1]}' for n in range(lo,hi+1))}
 
 def reference_sets(database_path: str) -> dict[str,set[str]]:

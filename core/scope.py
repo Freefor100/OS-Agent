@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from core.evidence import stable_id
+from core.git_source import path_exists, read_text, top_level_dirs
 from core.snapshot import RepoSnapshot
 
 
@@ -53,14 +54,13 @@ def build_scope_manifest(
     documentation_prefixes: Iterable[str] | None = None,
     status: str = "verified",
 ) -> ScopeManifest:
-    root = Path(snapshot.materialized_path)
-    auto_excluded = _submodule_exclusions(root)
+    auto_excluded = _submodule_exclusions(snapshot)
     supplied = [_coerce_exclusion(x) for x in (excluded or [])]
     exclusions = _dedupe_exclusions([*auto_excluded, *supplied])
     generated = _normalize_prefixes(generated_prefixes or ["target/", "build/", "dist/"])
     documentation = _normalize_prefixes(documentation_prefixes or ["doc/", "docs/"])
-    included = _normalize_prefixes(included_prefixes or _default_includes(root, exclusions, generated, documentation))
-    _validate_paths(root, included, exclusions)
+    included = _normalize_prefixes(included_prefixes or _default_includes(snapshot, exclusions, generated, documentation))
+    _validate_paths(snapshot, included, exclusions)
     payload = {
         "snapshot_id": snapshot.snapshot_id,
         "included": included,
@@ -153,12 +153,13 @@ def filter_units(units: Iterable[dict[str, Any]], manifest: ScopeManifest | None
     return [unit for unit in units if path_in_scope(str(unit.get("file") or ""), manifest)]
 
 
-def _submodule_exclusions(root: Path) -> list[ScopeExclusion]:
-    path = root / ".gitmodules"
-    if not path.is_file():
+def _submodule_exclusions(snapshot: RepoSnapshot) -> list[ScopeExclusion]:
+    try:
+        text = read_text(snapshot.repo_path, snapshot.commit, ".gitmodules")
+    except Exception:
         return []
     rows: list[ScopeExclusion] = []
-    for line in path.read_text(encoding="utf-8", errors="ignore").splitlines():
+    for line in text.splitlines():
         key, sep, value = line.strip().partition("=")
         if sep and key.strip() == "path":
             rows.append(ScopeExclusion(
@@ -170,26 +171,26 @@ def _submodule_exclusions(root: Path) -> list[ScopeExclusion]:
 
 
 def _default_includes(
-    root: Path,
+    snapshot: RepoSnapshot,
     excluded: list[ScopeExclusion],
     generated: list[str],
     documentation: list[str],
 ) -> list[str]:
     blocked = [x.prefix for x in excluded] + generated + documentation
     rows = []
-    for path in sorted(root.iterdir()):
-        if path.name.startswith(".") or not path.is_dir():
+    for name in top_level_dirs(snapshot.repo_path, snapshot.commit):
+        if name.startswith("."):
             continue
-        prefix = _normalize_prefix(path.name)
+        prefix = _normalize_prefix(name)
         if not any(_matches(prefix, x) for x in blocked):
             rows.append(prefix)
     return rows
 
 
-def _validate_paths(root: Path, included: list[str], excluded: list[ScopeExclusion]) -> None:
-    missing = [p for p in included if not (root / p.rstrip("/")).exists()]
+def _validate_paths(snapshot: RepoSnapshot, included: list[str], excluded: list[ScopeExclusion]) -> None:
+    missing = [p for p in included if not path_exists(snapshot.repo_path, snapshot.commit, p)]
     if missing:
-        raise ValueError(f"scope paths do not exist in snapshot: {sorted(set(missing))}")
+        raise ValueError(f"scope paths do not exist in commit: {sorted(set(missing))}")
 
 
 def _coerce_exclusion(row: dict[str, Any] | ScopeExclusion) -> ScopeExclusion:

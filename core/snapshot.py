@@ -1,10 +1,6 @@
 from __future__ import annotations
 
-import io
-import json
-import shutil
 import subprocess
-import tarfile
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
@@ -13,7 +9,6 @@ from core.evidence import stable_id
 
 
 CACHE_ROOT = Path(".fp_cache")
-SNAPSHOT_ROOT = CACHE_ROOT / "snapshots"
 SNAPSHOT_SCHEMA = "git_snapshot_v1"
 
 
@@ -44,6 +39,11 @@ class RepoSnapshot:
 
 
 def resolve_snapshot(repo_path: str, ref: str = "HEAD", *, materialize: bool = True) -> RepoSnapshot:
+    """Resolve a Git ref to immutable version metadata.
+
+    `materialize` is kept for API compatibility and intentionally has no side
+    effect. Source duplication into .fp_cache/snapshots has been removed.
+    """
     root = Path(repo_path).resolve()
     if not (root / ".git").exists():
         raise ValueError(f"not a git repository: {repo_path}")
@@ -58,9 +58,6 @@ def resolve_snapshot(repo_path: str, ref: str = "HEAD", *, materialize: bool = T
         {"repo": repo, "commit": commit, "tree": tree_hash, "schema": SNAPSHOT_SCHEMA},
         16,
     )
-    target = SNAPSHOT_ROOT / f"{repo}__{commit[:16]}"
-    if materialize:
-        _materialize(root, commit, target, snapshot_id, tree_hash)
     return RepoSnapshot(
         snapshot_id=snapshot_id,
         repo=repo,
@@ -69,7 +66,7 @@ def resolve_snapshot(repo_path: str, ref: str = "HEAD", *, materialize: bool = T
         tree_hash=tree_hash,
         canonical_branch=canonical,
         ref_aliases=aliases,
-        materialized_path=str(target.resolve()),
+        materialized_path=str(root),
     )
 
 
@@ -80,8 +77,7 @@ def discover_commit_snapshots(repo_path: str, *, materialize: bool = False) -> l
         root,
         "for-each-ref",
         "--format=%(refname)",
-        "refs/heads",
-        "refs/remotes",
+        *_snapshot_ref_roots(root),
     )
     for full_ref in refs:
         ref = _display_ref(full_ref)
@@ -120,66 +116,8 @@ def snapshot_manifest_path(snapshot: RepoSnapshot) -> Path:
     return Path(snapshot.materialized_path) / ".os_agent_snapshot.json"
 
 
-def _materialize(root: Path, commit: str, target: Path, snapshot_id: str, tree_hash: str) -> None:
-    manifest = target / ".os_agent_snapshot.json"
-    if manifest.is_file():
-        try:
-            current = json.loads(manifest.read_text(encoding="utf-8"))
-            if current.get("commit") == commit and current.get("tree_hash") == tree_hash:
-                return
-        except (OSError, json.JSONDecodeError):
-            pass
-
-    tmp = target.with_name(f".{target.name}.tmp")
-    shutil.rmtree(tmp, ignore_errors=True)
-    tmp.mkdir(parents=True, exist_ok=True)
-    archive = subprocess.run(
-        ["git", "-C", str(root), "archive", "--format=tar", commit],
-        check=True,
-        stdout=subprocess.PIPE,
-    ).stdout
-    with tarfile.open(fileobj=io.BytesIO(archive), mode="r:") as tar:
-        _safe_extract(tar, tmp)
-    (tmp / ".os_agent_snapshot.json").write_text(
-        json.dumps(
-            {
-                "schema_version": SNAPSHOT_SCHEMA,
-                "snapshot_id": snapshot_id,
-                "repo": root.name,
-                "commit": commit,
-                "tree_hash": tree_hash,
-            },
-            ensure_ascii=False,
-            indent=2,
-            sort_keys=True,
-        ),
-        encoding="utf-8",
-    )
-    backup = target.with_name(f".{target.name}.backup")
-    if target.exists():
-        target.rename(backup)
-    try:
-        tmp.rename(target)
-    except OSError:
-        if backup.exists():
-            backup.rename(target)
-        raise
-    finally:
-        shutil.rmtree(backup, ignore_errors=True)
-        shutil.rmtree(tmp, ignore_errors=True)
-
-
-def _safe_extract(tar: tarfile.TarFile, target: Path) -> None:
-    root = target.resolve()
-    for member in tar.getmembers():
-        out = (target / member.name).resolve()
-        if root not in out.parents and out != root:
-            raise ValueError(f"unsafe archive path: {member.name}")
-    tar.extractall(target, filter='data')
-
-
 def _aliases_for_commit(root: Path, commit: str) -> list[str]:
-    refs = _git_lines(root, "for-each-ref", "--format=%(refname)|%(objectname)", "refs/heads", "refs/remotes")
+    refs = _git_lines(root, "for-each-ref", "--format=%(refname)|%(objectname)", *_snapshot_ref_roots(root))
     aliases = sorted(
         _display_ref(ref) for row in refs
         if "|" in row
@@ -187,6 +125,21 @@ def _aliases_for_commit(root: Path, commit: str) -> list[str]:
         if obj == commit
     )
     return aliases
+
+
+def _snapshot_ref_roots(root: Path) -> list[str]:
+    """Refs that belong to this local clone's own branch set.
+
+    We include local branches plus one primary remote. Analysis sometimes adds an
+    upstream remote temporarily for lineage checks; those refs must not become
+    candidate branch tips for this repo's fingerprint cache.
+    """
+    remotes = _git_lines(root, "remote")
+    remote = "origin" if "origin" in remotes else (remotes[0] if remotes else "")
+    roots = ["refs/heads"]
+    if remote:
+        roots.append(f"refs/remotes/{remote}")
+    return roots
 
 
 def _display_ref(ref: str) -> str:

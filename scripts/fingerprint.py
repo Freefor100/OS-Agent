@@ -2,7 +2,7 @@
 """Fingerprint building — pure computation, no judgment, no similarity.
 
 Two fingerprint sources, unified output schema:
-  - c / cpp / rust  -> code_atlas (tree-sitter) functions -> token hash + AST shape hash
+  - c / cpp / rust  -> in-memory Git blob tree-sitter parse -> token hash + AST shape hash
   - asm (.S/.s)     -> asm_tokenize label-blocks -> minhash exact-token hash
 
 Unit schema (one dict per code unit, function or asm label-block):
@@ -16,8 +16,8 @@ Unit schema (one dict per code unit, function or asm label-block):
     "sig":   minhash signature (list[int]) | None  # graded similarity (asm uses it)
   }
 
-Caching: per-repo unit list -> .fp_cache/units_<name>.pkl; fingerprint-only set
--> .fp_cache/fpset_<name>.pkl (for 1-vs-N peer reuse).
+Caching: per-repo commit unit list -> .fp_cache/units_*.pkl; fingerprint-only
+sets -> .fp_cache/fpset_*.pkl and .fp_cache/astset_*.pkl.
 """
 from __future__ import annotations
 
@@ -29,11 +29,15 @@ from pathlib import Path
 from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from core.code_atlas.builder import build_code_atlas
 from core.evidence import stable_id
+from core.git_source import iter_source_blobs
 from core.snapshot import RepoSnapshot, resolve_snapshot
+from tools.code_atlas.ast_shape import ast_shape_hash
 from tools.code_atlas.asm_tokenize import tokenize_asm
+from tools.code_atlas.extractor import CallEdge, FileExtraction, extract_file
 from tools.code_atlas.minhash import signature_from_tokens
+from tools.code_atlas.normalize import normalize_function_tokens
+from tools.code_atlas.ts_loader import TSLoader, lang_for_path
 
 
 def _semantic_fn_id(fn: dict) -> str:
@@ -63,6 +67,10 @@ CACHE = Path(".fp_cache")
 FINGERPRINT_SCHEMA = "fingerprint_v4_sha256_full_token_commit_snapshot"
 
 
+class FingerprintCacheMissing(RuntimeError):
+    pass
+
+
 def _cache_path(prefix: str, repo_path: str, commit: str = "", tree_hash: str = "") -> Path:
     """Commit-aware cache key. Branch aliases that point to one commit share a cache."""
     name = Path(repo_path).name
@@ -77,39 +85,81 @@ def _asm_fp(tokens: list[str]) -> str:
     return "ntok_" + hashlib.sha256(" ".join(tokens).encode()).hexdigest()
 
 
-def _iter_asm_units(repo: Path):
-    """Yield (rel_path, label, tokens) for every asm label-block >= ASM_MIN_TOK."""
-    for f in list(repo.rglob("*.S")) + list(repo.rglob("*.s")):
-        if "/.git/" in str(f):
-            continue
-        try:
-            txt = f.read_text(errors="ignore")
-        except OSError:
-            continue
-        rel = str(f.relative_to(repo)).replace("\\", "/")
-        for label, toks in tokenize_asm(txt):
-            if len(toks) >= ASM_MIN_TOK:
-                yield rel, label, toks
-
-
 def build_units(repo_path: str, *, branch: str = "", ref: str = "", snapshot: RepoSnapshot | None = None,
                 use_cache: bool = True) -> list[dict]:
-    """Build units from an immutable Git commit snapshot.
+    """Load prebuilt units for an immutable Git commit snapshot.
 
-    `branch` remains a compatibility alias for `ref`. It is resolved to a commit
-    before source is read, so dirty working-tree files never affect fingerprints.
+    MCP search and comparison must not rebuild fingerprints implicitly. Run
+    scripts/run.py --build, or call build_units_from_git_commit explicitly.
     """
     snap = snapshot or resolve_snapshot(repo_path, ref or branch or "HEAD")
     cf = _cache_path("units", repo_path, snap.commit, snap.tree_hash)
     if use_cache and cf.exists():
         return pickle.loads(cf.read_bytes())
+    raise FingerprintCacheMissing(
+        f"fingerprint cache missing; run scripts/run.py --build first: {Path(repo_path).name}@{snap.commit[:12]}"
+    )
+
+
+def build_units_from_git_commit(repo_path: str, *, snapshot: RepoSnapshot | None = None,
+                                ref: str = "HEAD", use_cache: bool = True) -> list[dict]:
+    """Build units from Git blobs without checkout, archive, or source-tree writes."""
+    snap = snapshot or resolve_snapshot(repo_path, ref, materialize=False)
+    cf = _cache_path("units", repo_path, snap.commit, snap.tree_hash)
+    if use_cache and cf.exists():
+        return pickle.loads(cf.read_bytes())
 
     units: list[dict] = []
-    atlas = code_atlas(repo_path, snapshot=snap, use_cache=use_cache)
-    functions = atlas.get("functions", {})
+    extractions: list[FileExtraction] = []
+    function_nodes: dict[str, tuple[object, bytes]] = {}
+    function_records: dict[str, dict[str, Any]] = {}
+    name_to_fn_ids: dict[str, list[str]] = {}
+    all_edges: list[CallEdge] = []
+
+    for blob in iter_source_blobs(repo_path, snap.commit):
+        rel = blob.path.replace("\\", "/")
+        if blob.suffix in {".S", ".s"}:
+            for label, toks in tokenize_asm(blob.data.decode("utf-8", errors="ignore")):
+                if len(toks) >= ASM_MIN_TOK:
+                    units.append({
+                        "unit_id": stable_id("unit", {"snapshot": snap.snapshot_id, "file": rel, "label": label}, 16),
+                        "lang": "asm", "file": rel, "name": label, "line": 0, "end_line": 0,
+                        "fp": _asm_fp(toks), "ast": "", "sz": len(toks), "sig": signature_from_tokens(toks),
+                        "snapshot_id": snap.snapshot_id, "commit": snap.commit,
+                        "outgoing_names": [], "incoming_names": [],
+                    })
+            continue
+        lang = lang_for_path(rel)
+        if lang not in CODE_LANGS:
+            continue
+        parser = TSLoader.parser(lang)
+        if parser is None:
+            continue
+        try:
+            tree = parser.parse(blob.data)
+        except Exception:
+            continue
+        ext, _ = extract_file(abs_path=rel, rel_path=rel, lang=lang, code_bytes=blob.data, root_node=tree.root_node)
+        extractions.append(ext)
+        for fn in ext.functions:
+            row = {
+                "name": fn.name,
+                "file": fn.file,
+                "line": fn.line,
+                "end_line": fn.end_line,
+                "lang": fn.lang,
+                "signature": fn.signature,
+            }
+            function_records[fn.fn_id] = row
+            function_nodes[fn.fn_id] = (ext.fn_nodes_by_id[fn.fn_id], blob.data)
+            name_to_fn_ids.setdefault(fn.name, []).append(fn.fn_id)
+        all_edges.extend(ext.edges)
+
+    functions = _functions_with_features(function_records, function_nodes, name_to_fn_ids)
+    edges = _resolve_edges(all_edges, name_to_fn_ids)
     outgoing: dict[str, set[str]] = {}
     incoming: dict[str, set[str]] = {}
-    for edge in atlas.get("edges", []):
+    for edge in edges:
         src = str(edge.get("src_fn_id") or "")
         dst = str(edge.get("dst_fn_id") or "")
         callee = str(edge.get("callee_name") or "")
@@ -135,16 +185,6 @@ def build_units(repo_path: str, *, branch: str = "", ref: str = "", snapshot: Re
             "incoming_names": sorted(incoming.get(fn_id, set())),
         })
 
-    repo = Path(snap.materialized_path)
-    for rel, label, toks in _iter_asm_units(repo):
-        units.append({
-            "unit_id": stable_id("unit", {"snapshot": snap.snapshot_id, "file": rel, "label": label}, 16),
-            "lang": "asm", "file": rel, "name": label, "line": 0, "end_line": 0,
-            "fp": _asm_fp(toks), "ast": "", "sz": len(toks), "sig": signature_from_tokens(toks),
-            "snapshot_id": snap.snapshot_id, "commit": snap.commit,
-            "outgoing_names": [], "incoming_names": [],
-        })
-
     CACHE.mkdir(exist_ok=True)
     cf.write_bytes(pickle.dumps(units))
     _write_cache_meta(repo_path, snap)
@@ -153,16 +193,7 @@ def build_units(repo_path: str, *, branch: str = "", ref: str = "", snapshot: Re
 
 def code_atlas(repo_path: str, *, branch: str = "", ref: str = "", snapshot: RepoSnapshot | None = None,
                use_cache: bool = True) -> dict:
-    """Build or load the immutable commit's full structural atlas for Agent navigation."""
-    snap = snapshot or resolve_snapshot(repo_path, ref or branch or "HEAD")
-    cf = _cache_path("atlas2", repo_path, snap.commit, snap.tree_hash)
-    if use_cache and cf.exists():
-        return pickle.loads(cf.read_bytes())
-    atlas = build_code_atlas(repo_path=snap.materialized_path, repo_name=snap.repo)
-    CACHE.mkdir(exist_ok=True)
-    cf.write_bytes(pickle.dumps(atlas))
-    _write_cache_meta(repo_path, snap)
-    return atlas
+    raise RuntimeError("code_atlas cache/tooling is deprecated; use prebuilt fingerprints, comparison DB, LSP, or bash")
 
 
 def fingerprint_set(repo_path: str, *, branch: str = "", ref: str = "", snapshot: RepoSnapshot | None = None,
@@ -171,7 +202,7 @@ def fingerprint_set(repo_path: str, *, branch: str = "", ref: str = "", snapshot
     cf = _cache_path("fpset", repo_path, snap.commit, snap.tree_hash)
     if use_cache and cf.exists():
         return pickle.loads(cf.read_bytes())
-    result = {u["fp"] for u in build_units(repo_path, snapshot=snap, use_cache=use_cache)}
+    result = {u["fp"] for u in build_units_from_git_commit(repo_path, snapshot=snap, use_cache=use_cache)}
     CACHE.mkdir(exist_ok=True); cf.write_bytes(pickle.dumps(result))
     return result
 
@@ -182,7 +213,7 @@ def ast_fingerprint_set(repo_path: str, *, branch: str = "", ref: str = "", snap
     cf = _cache_path("astset", repo_path, snap.commit, snap.tree_hash)
     if use_cache and cf.exists():
         return pickle.loads(cf.read_bytes())
-    units = build_units(repo_path, snapshot=snap, use_cache=use_cache)
+    units = build_units_from_git_commit(repo_path, snapshot=snap, use_cache=use_cache)
     result = {u["ast"] for u in units if u.get("ast") and u["lang"] != "asm"}
     CACHE.mkdir(exist_ok=True); cf.write_bytes(pickle.dumps(result))
     return result
@@ -202,6 +233,75 @@ def _write_cache_meta(repo_path: str, snapshot: RepoSnapshot) -> None:
                                ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
 
 
+def _functions_with_features(functions: dict[str, dict[str, Any]], nodes: dict[str, tuple[object, bytes]],
+                             name_to_fn_ids: dict[str, list[str]]) -> dict[str, dict[str, Any]]:
+    keep_names = set(name_to_fn_ids)
+    out: dict[str, dict[str, Any]] = {}
+    for fn_id, row in functions.items():
+        node, code_bytes = nodes[fn_id]
+        try:
+            tokens = normalize_function_tokens(node, code_bytes, keep_text_identifiers=keep_names)
+        except Exception:
+            tokens = []
+        try:
+            shape = ast_shape_hash(node)
+        except Exception:
+            shape = "ERROR"
+        out[fn_id] = {
+            **row,
+            "tokens_normalized": tokens,
+            "ast_shape_hash": shape,
+            "literal_set": _extract_literal_set(node, code_bytes),
+        }
+    return out
+
+
+def _resolve_edges(edges: list[CallEdge], name_to_fn_ids: dict[str, list[str]]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for edge in edges:
+        candidates = name_to_fn_ids.get(edge.callee_name, [])
+        row: dict[str, Any] = {
+            "src_fn_id": edge.src_fn_id,
+            "callee_name": edge.callee_name,
+            "callsite_file": edge.callsite_file,
+            "callsite_line": edge.callsite_line,
+        }
+        if len(candidates) == 1:
+            row["dst_fn_id"] = candidates[0]
+        else:
+            row["dst_fn_id"] = None
+            if candidates:
+                row["dst_candidates"] = candidates
+        rows.append(row)
+    return rows
+
+
+_LITERAL_NODE_TYPES = frozenset({
+    "number_literal", "integer_literal", "float_literal",
+    "string_literal", "raw_string_literal", "concatenated_string",
+    "char_literal", "boolean_literal", "interpreted_string_literal",
+})
+
+
+def _extract_literal_set(fn_node, code_bytes: bytes) -> list[str]:
+    literals: set[str] = set()
+
+    def visit(node):
+        if node.type in _LITERAL_NODE_TYPES:
+            text = code_bytes[node.start_byte:node.end_byte].decode("utf-8", errors="ignore").strip()
+            if text and len(text) <= 200:
+                literals.add(text)
+            return
+        for child in node.children:
+            visit(child)
+
+    try:
+        visit(fn_node)
+    except Exception:
+        return []
+    return sorted(literals)
+
+
 def lang_summary(units: list[dict]) -> dict[str, int]:
     """Unit count per language — for the report's explicit coverage statement."""
     out: dict[str, int] = {}
@@ -212,7 +312,7 @@ def lang_summary(units: list[dict]) -> dict[str, int]:
 
 if __name__ == "__main__":  # build only; proves no similarity is computed
     repo = sys.argv[1]
-    units = build_units(f"repos/{repo}" if "/" not in repo else repo)
+    units = build_units_from_git_commit(f"repos/{repo}" if "/" not in repo else repo)
     summ = lang_summary(units)
     print(f"{repo}: {len(units)} units  {summ}")
     print(f"  asm units: {summ.get('asm', 0)}")

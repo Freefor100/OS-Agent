@@ -16,8 +16,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 def build_snapshot(snapshot) -> dict:
     from core.scope import build_scope_manifest
-    from scripts.fingerprint import ast_fingerprint_set, build_units, fingerprint_set, lang_summary
-    units = build_units(snapshot.repo_path, snapshot=snapshot)
+    from scripts.fingerprint import ast_fingerprint_set, build_units_from_git_commit, fingerprint_set, lang_summary
+    units = build_units_from_git_commit(snapshot.repo_path, snapshot=snapshot)
     scope = build_scope_manifest(snapshot, status="draft")
     return {"snapshot": snapshot.to_dict(), "scope_suggestion": scope.to_dict(), "units": len(units), "languages": lang_summary(units),
             "fingerprints": len(fingerprint_set(snapshot.repo_path, snapshot=snapshot)),
@@ -29,7 +29,7 @@ def build_all(repos_dir: str = "repos", ref: str = "HEAD", all_branches: bool = 
     results=[]; entries=sorted(x for x in Path(repos_dir).iterdir() if x.is_dir() and not x.name.startswith("."))
     for i, repo in enumerate(entries,1):
         try:
-            snapshots=discover_commit_snapshots(str(repo), materialize=True) if all_branches else [resolve_snapshot(str(repo), ref)]
+            snapshots=discover_commit_snapshots(str(repo), materialize=False) if all_branches else [resolve_snapshot(str(repo), ref, materialize=False)]
             for snap in snapshots:
                 result=build_snapshot(snap); results.append(result); print(f"[{i}/{len(entries)}] {repo.name} {snap.commit[:12]} {result['units']} units")
         except Exception as exc:

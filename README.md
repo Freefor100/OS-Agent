@@ -62,7 +62,7 @@ repos/
 conda run -n os_agent python scripts/run.py --build
 ```
 
-指纹和内部 Git 源码快照写入 `.fp_cache/`，不会修改 `repos/` 中的作品仓库。
+预建阶段直接读取 Git commit blob，在内存中解析源码，只把 `units/fpset/astset/meta/scopes` 等指纹与审计缓存写入 `.fp_cache/`；不会生成源码快照或完整 CodeAtlas 缓存。
 默认构建每个仓库的所有唯一分支尖端 commit，供后续粗召回和正式 Scope 搜索消费；多个分支指向同一 commit 时只构建一次。该流程不会遍历历史 commit。只想快速预建当前检出版本时使用 `--current-only`。
 
 ### 3. 启动 Claude Code 和 MCP
@@ -189,7 +189,7 @@ python3 -m http.server 8765 --bind 127.0.0.1
 
 `repo_snapshots` 默认只返回这个版本，避免将大量分支信息塞入 Agent 上下文。需要检查其他分支时，Agent 分页读取其他唯一分支尖端。多个分支名指向同一 commit 时只分析一次。
 
-OS-Agent 不分析未提交工作树。即使 `repos/<作品>/` 中存在本地修改，指纹、搜索、LSP、Comparison 和 Evidence 都读取选定 commit 的内部源码快照。
+OS-Agent 不分析未提交工作树。指纹、搜索和 Comparison 绑定选定 commit 的预建缓存；LSP、bash 阅读和关键证据注册前，Claude Code 必须把对应 `repos/<作品>/` checkout 到锁定 commit。
 
 ### 外部依赖如何排除
 
@@ -208,9 +208,10 @@ Claude Code 的完整约束见 [.claude/skills/os-agent/SKILL.md](.claude/skills
 2. **确认范围**：Agent 判断学生代码、外部依赖、生成物和文档边界，MCP 验证 ScopeManifest。
 3. **参考发现**：用 verified scope 做正式 1-vs-N 搜索，粗召回只作为内部候选发现。
 4. **Base 固化**：Agent 选择参考来源，MCP 校验 `repo + commit + formal score + verified scope` 后写入 `base_decision.json`。
-5. **函数事实**：建立 `comparison.sqlite`，Agent 只按模块需要分页查询概要、热点、目录、文件和关键函数。
-6. **模块评审**：Agent 以模块为阅读单位，覆盖 112 个节点，写中文 Claim、完整度、原创度、模块关键链路和总体结论。
-7. **双报告生成**：先生成 `provenance` 技术附录，再在完整性校验通过后渲染中文 `report.html`。
+5. **切换源码工作树**：`base_decision_submit` 校验通过后，Claude Code 直接使用刚刚判断出的 `target_commit` 和 `selected_base_commit`，把 `repos/<target>` 和 `repos/<base>` 强制 checkout 到对应 detached commits。`base_decision.json` 是审计记录，不是下一步重新读取的控制输入。
+6. **函数事实**：用同一组 target/base commits 建立 `comparison.sqlite`，Agent 只按模块需要分页查询概要、热点、目录、文件和关键函数。
+7. **模块评审**：Agent 以模块为阅读单位，覆盖 112 个节点，写中文 Claim、完整度、原创度、模块关键链路和总体结论。
+8. **双报告生成**：先生成 `provenance` 技术附录，再在完整性校验通过后渲染中文 `report.html`。
 
 声明是强线索但不会自动成为参考作品；同届高相似候选进入人工复审区，不能作为有方向性的继承来源。
 旧机制标签和词表不再作为产品态工具输出，不参与导航、证据或报告内容。
@@ -229,7 +230,7 @@ Claude Code 的完整约束见 [.claude/skills/os-agent/SKILL.md](.claude/skills
 - Go：`gopls`
 - Zig：`zls`
 
-跨架构 C/C++ 项目建议安装对应裸机交叉编译器，例如 `riscv64-unknown-elf-gcc`。LSP 在内部 commit 源码快照中临时生成受管理的 `compile_flags.txt`，clangd 结束、MCP 退出或下次启动前会自动清除，不写入作品工作树。
+跨架构 C/C++ 项目建议安装对应裸机交叉编译器，例如 `riscv64-unknown-elf-gcc`。LSP 使用已 checkout 到锁定 commit 的作品工作树；clangd 结束、MCP 退出或下次启动前会自动清除受管理的临时配置。
 
 PDF 和 DOCX 文档证据分别通过 `pypdf` 与 `python-docx` 读取。Evidence 主要用于 BaseDecision、Scope 排除、负向搜索、关键继承/独立结论、架构边支撑和模块置顶 Claim；普通实现说明可直接写中文分析，不必为每个节点反复注册 Evidence。
 
@@ -291,7 +292,7 @@ Git 跟踪边界：
 | `node_analysis_packet` | 只在单节点返工或模块包信息不足时使用 |
 | `node_review_draft_batch` | 只生成草稿，不正式写入报告 |
 | `claim_contract` | 不确定 Claim 枚举或证据要求时查看 |
-| `code_atlas_overview` / `code_atlas_search` | 少量全局结构候选和入口定位 |
+| `code_atlas_overview` / `code_atlas_search` | 已废弃；使用 Comparison、LSP 或 bash/rg 定位 |
 | `lsp_definition` / `lsp_references` / `lsp_call_graph` | 确认关键符号、引用和调用链 |
 | `evidence_*` / `negative_search` | 注册关键锚点；普通节点说明不需要反复注册 Evidence |
 | `search_similar` | 临时粗召回，不能进入 BaseDecision 或报告排名 |
@@ -309,10 +310,10 @@ OS-Agent/
 │   └── SKILL.md             唯一的 Claude Code 审计工作流
 ├── scripts/                 确定性计算与报告渲染
 ├── web_report/              report.html 的 React 静态前端模板、样式和交互
-├── tools/                   CodeAtlas、LSP 和文档读取工具
-├── core/                    快照、Scope、Comparison、Evidence 和报告模型
+├── tools/                   tree-sitter、LSP 和文档读取工具
+├── core/                    Git commit、Scope、Comparison、Evidence 和报告模型
 ├── repos/                   作品与候选语料库，Git 忽略
-├── .fp_cache/               指纹与内部源码快照，Git 忽略
+├── .fp_cache/               指纹、Scope 与审计缓存，Git 忽略
 └── output/                  分析产物，Git 忽略
 ```
 
