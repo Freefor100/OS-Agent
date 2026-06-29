@@ -21,7 +21,6 @@ output/<repo-name>/audit-YYYYMMDD-HHMMSS/
 宿主 Agent 负责判断；本地工具只做不可变快照、范围校验、确定性搜索/比较、关键证据锚定和报告投影。最终 `report.html` 必须是中文报告；必要机制名可在中文后用括号补充解释，例如“多级反馈队列（MLFQ）”“写时复制（copy-on-write）”。
 
 - 开始分析前确定独立输出目录；若用户未指定，自动使用 `output/<repo-name>/audit-YYYYMMDD-HHMMSS/`，并在开始时告知用户。随后调用 `audit_manifest_create` 创建本次分析唯一的 `audit_manifest.json`，该目录固定保存 `base_decision.json`、`report.json`、`evidence_store.jsonl`、Comparison 数据库和双报告。
-- 不扫描工作树，只分析 Git commit 快照。
 - 预建指纹阶段不得仅凭目录名硬排除 Git tracked 的支持语言源码；看起来像依赖、生成物或外部代码的路径只能作为 Scope 审核线索，不能替代证据裁决。
 - 分支只是入口；多个别名指向同一 commit 时只分析一次。
 - `search_similar` 是内部粗召回，禁止用于报告排名或 BaseDecision。
@@ -32,7 +31,7 @@ output/<repo-name>/audit-YYYYMMDD-HHMMSS/
 - Node Scope 是语义边界，不是函数路由规则，也不能单独作为查重证据。旧机制标签和词表已从产品态工具输出移除，不参与导航、证据或报告内容。
 - Agent 可解释 `modified_candidate`，但不得覆盖 `raw_status`。
 - 阅读内核实现时必须主动留意面向平台评测或公开测例的硬编码、旁路和刷分式实现，例如按固定路径、固定参数、固定测试程序名或固定设备名特判返回结果。发现后应在对应节点/模块中用中文说明其适用范围、对真实内核机制完整度的影响和评审风险；不得把这类过测旁路等同于完整通用机制。
-- 报告优先面向评委阅读，避免堆砌工具术语；所有概述、模块总结、节点说明和架构边标签必须使用中文。
+- 报告优先面向评委阅读，避免堆砌工具术语，使用行业常见专业用语；所有概述、模块总结、节点说明和架构边标签必须使用中文。
 
 ## MCP 主路径工具
 
@@ -73,7 +72,7 @@ output/<repo-name>/audit-YYYYMMDD-HHMMSS/
 1. 阅读 `.gitmodules`、Cargo workspace、Makefile、README 和目录结构。
 2. 判断学生代码、外部依赖、生成物和文档范围；不得只因路径名是 `vendor/`、`third_party/`、`target/`、`build/`、`out/`、`dist/`、`node_modules/` 就排除源码。
 3. 对看起来像第三方、依赖或生成代码的目录，必须检查它是否被项目实际引用、是否有依赖声明或生成声明、是否存在学生修改痕迹；可使用 `git log`、`git blame`、`git diff`、`.gitmodules`、Cargo/CMake/Makefile/包管理配置和源码引用关系辅助判断。
-4. 先为排除理由注册 EvidenceRecord：源码/配置用 `evidence_source`，文档用 `evidence_document`，结构化范围说明用 `evidence_structured(kind="scope_manifest", ...)`。
+4. 先为排除理由注册 EvidenceRecord：源码/配置用 `evidence_source`，文档用 `evidence_document`，没有单一源码位置的范围判断用 `evidence_structured(kind="scope_exclusion_decision", metadata={prefix, category, reason, basis})`。`scope_manifest` 只作为 Scope 创建后的审计记录，不作为创建 Scope 前的排除依据。
 5. 调 `create_scope_manifest(target, ref=<commit>, evidence_store=<本项目 evidence_store.jsonl>, ...)`；程序验证路径、submodule 声明和 Agent 排除项引用的 Evidence。
 6. 除自动 `.gitmodules` 子模块外，verified ScopeManifest 的排除项必须引用已验证 EvidenceRecord。没有证据的范围只能保存为 draft，不得进入正式搜索。
 
@@ -81,14 +80,14 @@ output/<repo-name>/audit-YYYYMMDD-HHMMSS/
 
 1. `search_similar(...)` 或 `search_formal(..., formal_only=false)` 仅用于粗召回。
 2. 审核 Top-20 中缺少 ScopeManifest 的候选，并逐个调用 `create_scope_manifest`。
-3. 调 `search_formal(..., formal_only=true)` 正式重排。
+3. 调 `search_formal(..., formal_only=true)` 正式重排；`candidate_coverage.returned_top_k_scope_complete=true` 表示返回的 Top-K 内已无 rough 候选，旧 `coverage_complete` 仅兼容同一含义。
 4. 报告只展示 `score_kind=formal` 且双方 scope verified 的结果。
 
 ### 4. Base 决策
 
 1. 调 `base_evidence_packet(target, ref, formal_candidates, target_year, include_declarations=true)`。
 2. Agent 综合正式排名、年份方向、声明验证、核心目录覆盖和差异解释能力选择候选，并调 `evidence_formal_search` 将正式搜索结果写入本项目 EvidenceStore。
-3. 提交引用该 evidence ID 的 BaseDecision，调用 `base_decision_submit(decision, packet, output_path=<输出目录>/base_decision.json)`。主 Base 必须按 repo+commit 引用正式候选；校验通过后程序固化 `base_decision.json`。
+3. 提交引用该 evidence ID 的 BaseDecision，调用 `base_decision_submit(decision, packet, output_path=<输出目录>/base_decision.json)`。主 Base 必须按 repo+commit 引用正式候选；程序会从审计目录的 EvidenceStore 校验 evidence 存在、verified 且 formal_search 与所选候选匹配，校验通过后固化 `base_decision.json`。
 4. BaseDecision 保持简洁：必须能指向 formal verified 候选并引用正式搜索 Evidence；可写 `selection_reason` 作为 Agent 备注，但主报告中的选择依据仍以后续 `overall_assessment.base_selection_reason` 的中文说明为准。
 5. 年份方向是强线索，不是程序硬门槛。xlsx 中有明确更早年份的候选方向性最强；同年候选仍可能存在互抄、共同上游或协作传播，不能仅因同年排除，但必须在主报告中说明方向不确定或给出额外方向依据。对不在 xlsx 的开源教学项目、框架或公开上游，若有声明、公开来源、git 历史或项目关系证据，也可以选择为 Base，但必须在主报告中说明年份表无法校验及替代方向依据。明确更晚年份的候选若被选作主要参考，也必须说明为什么时间表不能直接否定该关系。
 6. 对去声明回归，再以 `include_declarations=false` 组包并验证同一决定。
@@ -113,7 +112,7 @@ output/<repo-name>/audit-YYYYMMDD-HHMMSS/
 4. 按模块或强相关模块组开少量 sub-agent。每个 sub-agent 负责读代码、理解功能范围、形成中文草稿；不得直接写共享 `report.json`。
 5. 分析任何节点前必须先读 scope。scope 是功能边界，不是证据；它告诉 Agent 该节点应该解释哪类内核功能。
 6. 关键调用链优先用带目标 `ref` 的 LSP、Comparison 工具或 bash/rg/sed/cat 确认；直接读源码前必须确认 `repos/<target>` 和 `repos/<base>` 已处于 BaseDecision 刚判断出的 detached commit。普通源码定位可以写入 Claim 文本、文件路径或函数名；只有关键锚点才注册 Evidence。
-7. 宿主 Agent 汇总草稿后，为每个节点调用一次 `node_review_bundle_submit(..., expected_generation=<module_analysis_packet 返回值>)` 原子提交 Claims 与 NodeReview。该工具会生成 claim_id 并回填到 review/degree。
+7. 宿主 Agent 汇总草稿后，为每个节点调用一次 `node_review_bundle_submit(..., expected_generation=<module_analysis_packet 返回值>)` 原子提交 Claims 与 NodeReview。该工具会生成 claim_id 并回填到 review/degree；同一节点返工时会替换该节点旧 Claims 与旧 NodeReview，避免残留过时结论。`claim_submit`、`claim_update`、`node_review_submit` 仅作调试或局部修补入口，不作为主流程。
 8. 每个 NodeReview 必须用中文说明“代码如何实现该功能范围”、与参考作品差异、完整度、原创度和风险。函数、文件和 comparison 不要求机械归属节点。
 9. 若节点或模块中发现过测旁路、平台评测特判、公开测例特判或其他硬编码刷分行为，必须在 NodeReview 或 ModuleReview 的风险/差异/完整度说明中明确指出，并尽量锚定到具体文件、函数、条件判断或字符串常量；只有关键结论才注册 Evidence。
 10. 完成一个模块后，宿主 Agent 提交 `ModuleReview`。模块页是核心阅读单位，必须把节点事实抽象成模块能力、关键机制链路和实现差异。`overview`、`implementation_summary`、`difference_summary`、`original_work_summary` 可以是中文字符串，也可以是中文字符串数组；当内容包含多个并列机制、多个阶段、第一/第二/第三类结论时，必须提交数组，不要把所有机制堆成一个长段落。
@@ -125,7 +124,7 @@ output/<repo-name>/audit-YYYYMMDD-HHMMSS/
 
 ### 7. 关键 Evidence 锚定
 
-1. EvidenceStore 固定为当前报告目录下的 `evidence_store.jsonl`，但 Evidence 只作为关键审计锚点，不再要求普通节点每个 Claim 都注册。
+1. EvidenceStore 固定为当前报告目录下的 `evidence_store.jsonl`，但 Evidence 只作为关键审计锚点，不再要求普通节点每个 Claim 都注册。Evidence 工具直接读取当前工作树；调用前 Agent 必须把对应 repo checkout 到锁定 commit 并保持 `git status --porcelain` 干净，MCP 会强制校验 HEAD 与工作树状态。
 2. 必须注册 Evidence 的场景：BaseDecision、Scope 排除、负向搜索、关键继承/独立结论、架构边支撑、模块置顶 Claim。
 3. 普通实现说明、普通差异说明和风险提示可以直接写中文 Claim，并附文件/函数/源码位置文字；不要为了填表反复调用 Evidence 工具。
 4. 需要注册时优先批量：源码用 `evidence_source_batch`，文件工件用 `binary_artifact/file_artifact`，文档用 `evidence_document`，负向结论用 `negative_search`。
@@ -134,8 +133,8 @@ output/<repo-name>/audit-YYYYMMDD-HHMMSS/
 ### 8. 负向搜索
 
 1. 根据节点 scope、MCP 返回的导航提示、Base 符号、目标命名风格和已发现入口构造查询。
-2. 调 `negative_search(..., evidence_store=<本项目路径>)` 固定 commit、搜索计划、路径、扩展名、实际查询和扫描文件数。
-3. 只有 `coverage_complete=true` 且零匹配才能支撑 `absent`；否则结论为 `uncertain`。
+2. 调 `negative_search(..., evidence_store=<本项目路径>)` 固定 commit、搜索计划、路径、扩展名、实际查询、路径存在性、eligible 文件数、扫描文件数、读错误和逐查询命中数。
+3. 只有路径存在、有 eligible 文件、无读错误、`coverage_complete=true` 且零匹配才能支撑 `absent`；否则结论为 `uncertain`。
 
 ### 9. 校验与渲染
 
@@ -157,7 +156,3 @@ evidence_store.jsonl
 audit_manifest.json / base_decision.json
 comparison.sqlite / comparisons.jsonl
 ```
-
-## 真实回归
-
-目标 `oskernel2023-zmz` 应选择 commit `837b6a9...`，并合并 `recover/k210/display/remote HEAD` 等价别名；正式双侧 Scope 搜索应将 `xv6-k210` commit `d7f3e5e...` 排名第一，方向为 `2021 → 2023`。验收按 commit，不按分支字符串。正常模式和隐藏 README 声明模式都必须通过，禁止仓库名硬编码。

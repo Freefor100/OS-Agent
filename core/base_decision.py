@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 import re
+from pathlib import Path
 from typing import Any, Iterable
 
 from core.evidence import stable_id
@@ -57,11 +59,12 @@ def build_base_evidence_packet(target_snapshot: RepoSnapshot, formal_candidates:
     return payload
 
 
-def validate_base_decision(decision: dict[str, Any], packet: dict[str, Any]) -> list[str]:
+def validate_base_decision(decision: dict[str, Any], packet: dict[str, Any], evidence_store: str = "") -> list[str]:
     errors: list[str] = []
     primary = decision.get("primary_base") or {}
-    if not (packet.get("candidate_coverage") or {}).get("coverage_complete"):
-        errors.append("BaseDecision rejected: rough-recall Top-K candidate coverage is incomplete")
+    coverage = packet.get("candidate_coverage") or {}
+    if not (coverage.get("returned_top_k_scope_complete") or coverage.get("coverage_complete")):
+        errors.append("BaseDecision rejected: returned Top-K candidate scope coverage is incomplete")
     no_base = bool(decision.get("no_reliable_base"))
     matches, match_errors = _candidate_matches(primary, packet.get("formal_candidates", []))
     errors.extend(match_errors)
@@ -91,6 +94,8 @@ def validate_base_decision(decision: dict[str, Any], packet: dict[str, Any]) -> 
             errors.append("decision formal_rank does not match candidate rank")
     if not decision.get("evidence_ids"):
         errors.append("BaseDecision requires evidence_ids")
+    if evidence_store:
+        errors.extend(_validate_decision_evidence(decision, packet, matches[0] if matches else None, evidence_store))
     return errors
 
 
@@ -122,6 +127,68 @@ def _infer_candidate_coverage(candidates: list[dict[str, Any]]) -> dict[str, Any
         "returned_candidate_count": len(candidates),
         "verified_formal_count": len(verified_formal),
     }
+
+
+def _validate_decision_evidence(
+    decision: dict[str, Any],
+    packet: dict[str, Any],
+    selected_candidate: dict[str, Any] | None,
+    evidence_store: str,
+) -> list[str]:
+    errors: list[str] = []
+    evidence = _load_evidence_records(evidence_store)
+    evidence_ids = decision.get("evidence_ids") or []
+    if not isinstance(evidence_ids, list):
+        return ["BaseDecision evidence_ids must be list"]
+    records = []
+    for evidence_id in evidence_ids:
+        record = evidence.get(str(evidence_id))
+        if not record:
+            errors.append(f"BaseDecision references missing evidence {evidence_id}")
+            continue
+        if not record.get("verified"):
+            errors.append(f"BaseDecision references unverified evidence {evidence_id}")
+            continue
+        records.append(record)
+    formal_records = [record for record in records if record.get("kind") == "formal_search"]
+    if not formal_records:
+        errors.append("BaseDecision requires verified formal_search evidence")
+        return errors
+    if selected_candidate is None:
+        return errors
+    target_scope_id = selected_candidate.get("target_scope_id") or ((packet.get("target_scope") or {}).get("scope_id"))
+    candidate_scope_id = selected_candidate.get("candidate_scope_id") or selected_candidate.get("scope_id")
+    candidate_commit = str(selected_candidate.get("commit") or "")
+    candidate_repo = str(selected_candidate.get("repo") or "")
+    for record in formal_records:
+        metadata = record.get("metadata") if isinstance(record.get("metadata"), dict) else {}
+        if metadata.get("score_kind") != "formal":
+            errors.append(f"formal_search evidence {record.get('evidence_id')} is not formal")
+        if candidate_repo and metadata.get("candidate_repo") != candidate_repo:
+            errors.append(f"formal_search evidence {record.get('evidence_id')} candidate_repo does not match selected Base")
+        if candidate_commit and not _commit_matches(str(metadata.get("candidate_commit") or ""), candidate_commit):
+            errors.append(f"formal_search evidence {record.get('evidence_id')} candidate_commit does not match selected Base")
+        if target_scope_id and metadata.get("target_scope_id") != target_scope_id:
+            errors.append(f"formal_search evidence {record.get('evidence_id')} target_scope_id does not match selected Base")
+        if candidate_scope_id and metadata.get("candidate_scope_id") != candidate_scope_id:
+            errors.append(f"formal_search evidence {record.get('evidence_id')} candidate_scope_id does not match selected Base")
+    return errors
+
+
+def _load_evidence_records(path: str) -> dict[str, dict[str, Any]]:
+    rows: dict[str, dict[str, Any]] = {}
+    p = Path(path)
+    if not p.is_file():
+        return rows
+    for line in p.read_text(encoding="utf-8", errors="ignore").splitlines():
+        if not line.strip():
+            continue
+        try:
+            row = json.loads(line)
+            rows[str(row["evidence_id"])] = row
+        except (json.JSONDecodeError, KeyError, TypeError):
+            continue
+    return rows
 
 
 def _score_value(value: Any) -> float:

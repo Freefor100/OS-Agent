@@ -13,13 +13,24 @@ from pathlib import Path
 from threading import Lock
 from typing import Any
 
-from core.git_source import list_tree, read_text
+from core.git_source import git_text, read_text
 
 
 SOURCE_EXTS = {".c", ".h", ".S", ".s", ".rs", ".cpp", ".cc", ".hpp", ".ld", ".lds", ".toml", ".mk", ".cmake", ".txt", ".md", ".pdf", ".docx"}
 TEXT_NAMES = {"Makefile", "makefile", "justfile", ".gitignore", ".os_agent_lsp_target"}
 _PERSIST_LOCKS: dict[str, Lock] = {}
 _PERSIST_LOCKS_GUARD = Lock()
+
+
+def assert_clean_worktree(repo_path: str, expected_commit: str) -> None:
+    """Evidence reads the live worktree; require it to match the locked commit."""
+    head = git_text(repo_path, "rev-parse", "HEAD").strip()
+    if head != expected_commit:
+        raise ValueError(f"repo worktree is not checked out to requested commit; run git -C {repo_path} checkout --detach -f {expected_commit}")
+    status = git_text(repo_path, "status", "--porcelain", "--untracked-files=all").strip()
+    if status:
+        preview = "; ".join(status.splitlines()[:8])
+        raise ValueError(f"repo worktree must be clean before registering evidence; git status --porcelain: {preview}")
 
 
 def stable_id(prefix: str, payload: Any, length: int = 12) -> str:
@@ -50,6 +61,7 @@ class NegativeSearchPlan:
 
 def execute_negative_search(repo_path: str, plan: NegativeSearchPlan, store: "EvidenceStore") -> dict[str, Any]:
     plan.finalize()
+    root = Path(repo_path).resolve()
     prefixes = []
     for raw_path in plan.paths or []:
         prefix = str(raw_path).replace("\\", "/").strip().strip("/").rstrip("/")
@@ -63,47 +75,75 @@ def execute_negative_search(repo_path: str, plan: NegativeSearchPlan, store: "Ev
     patterns.extend(("entry_call_search", rf"\b{re.escape(symbol)}\s*\(") for symbol in plan.symbols)
     executed_checks = sorted({kind for kind, _ in patterns})
     hits: list[dict[str, Any]] = []
+    per_query_hits: dict[str, int] = {query: 0 for _, query in patterns}
+    path_exists = {}
+    for prefix in prefixes:
+        candidate = (root / prefix).resolve()
+        path_exists[prefix] = (candidate == root or root in candidate.parents) and candidate.exists()
     scanned_files = 0
-    entries = list_tree(repo_path, plan.snapshot_commit)
-    for entry in entries:
-        if entry.kind != "blob":
-            continue
-        path = Path(entry.path)
-        rel = entry.path.replace("\\", "/")
-        if prefixes and not any(not prefix or rel == prefix or rel.startswith(prefix + "/") for prefix in prefixes):
-            continue
-        if path.suffix not in extensions and path.name not in TEXT_NAMES:
-            continue
-        try:
-            text = read_text(repo_path, plan.snapshot_commit, rel)
-        except Exception:
-            continue
-        if "\0" in text[:4096]:
-            continue
-        scanned_files += 1
-        for check, query in patterns:
+    eligible_files = 0
+    read_errors = 0
+    for dirpath, dirs, files in os.walk(root):
+        dirs[:] = [d for d in dirs if d not in {".git", "target", "build", "dist", "node_modules", "__pycache__", ".pytest_cache"}]
+        for name in files:
+            path = Path(dirpath) / name
             try:
-                match = re.search(query, text, re.IGNORECASE)
-            except re.error:
-                match = re.search(re.escape(query), text, re.IGNORECASE)
-            if match:
-                line = text[:match.start()].count("\n") + 1
-                hits.append({"path": rel, "line": line, "query": query, "check": check})
+                rel = path.relative_to(root).as_posix()
+            except ValueError:
+                continue
+            if prefixes and not any(not prefix or rel == prefix or rel.startswith(prefix + "/") for prefix in prefixes):
+                continue
+            if path.suffix not in extensions and path.name not in TEXT_NAMES:
+                continue
+            eligible_files += 1
+            try:
+                text = _clean_text(path.read_text(encoding="utf-8", errors="ignore"))
+            except Exception:
+                read_errors += 1
+                continue
+            if "\0" in text[:4096]:
+                continue
+            scanned_files += 1
+            for check, query in patterns:
+                try:
+                    match = re.search(query, text, re.IGNORECASE)
+                except re.error:
+                    match = re.search(re.escape(query), text, re.IGNORECASE)
+                if match:
+                    line = text[:match.start()].count("\n") + 1
+                    per_query_hits[query] = per_query_hits.get(query, 0) + 1
+                    hits.append({"path": rel, "line": line, "query": query, "check": check})
+                    if len(hits) >= 200:
+                        break
                 if len(hits) >= 200:
                     break
+            if len(hits) >= 200:
+                break
         if len(hits) >= 200:
             break
-    coverage_complete = bool(patterns and scanned_files > 0 and set(plan.required_checks).issubset(executed_checks))
+    paths_ok = all(path_exists.values()) if prefixes else True
+    coverage_complete = bool(
+        patterns
+        and paths_ok
+        and eligible_files > 0
+        and scanned_files > 0
+        and read_errors == 0
+        and not hits
+        and set(plan.required_checks).issubset(executed_checks)
+    )
     candidate = EvidenceCandidate(
         tool="negative_search", kind="negative_search", query=plan.subject, label=plan.subject, strength="strong" if coverage_complete else "weak",
         metadata={"plan_id": plan.plan_id, "snapshot_commit": plan.snapshot_commit, "searched_paths": prefixes or ["."],
                   "executed_queries": [query for _, query in patterns], "executed_checks": executed_checks, "extensions": sorted(extensions),
                   "scanned_files": scanned_files, "matches": len(hits), "coverage_complete": coverage_complete,
-                  "required_checks": plan.required_checks, "hits": hits[:50]},
+                  "required_checks": plan.required_checks, "hits": hits[:50], "path_exists": path_exists or {".": True},
+                  "eligible_files": eligible_files, "read_errors": read_errors, "per_query_hits": per_query_hits},
     )
     evidence_id = store.add(candidate)
     return {"plan": asdict(plan), "evidence_id": evidence_id, "coverage_complete": coverage_complete, "executed_checks": executed_checks,
-            "scanned_files": scanned_files, "matches": hits}
+            "searched_paths": prefixes or ["."], "path_exists": path_exists or {".": True},
+            "eligible_files": eligible_files, "scanned_files": scanned_files, "read_errors": read_errors,
+            "per_query_hits": per_query_hits, "matches": hits}
 
 
 @dataclass
@@ -381,7 +421,7 @@ class EvidenceStore:
             else:
                 notes.append("documentation path outside workspace")
         elif cand.kind in {"function_definition", "type_definition", "macro_definition", "constant_definition", "config_entry", "linker_symbol", "assembly_label", "source_span", "lsp_definition", "lsp_reference"}:
-            lines = _safe_read_lines(self.repo_path, cand.path, str(cand.metadata.get("snapshot_commit") or cand.metadata.get("commit") or ""))
+            lines = _safe_read_lines(self.repo_path, cand.path)
             if lines and cand.line_start and 1 <= cand.line_start <= len(lines):
                 start = max(1, cand.line_start - 2)
                 end = min(len(lines), (cand.line_end or cand.line_start) + 8)
@@ -418,8 +458,24 @@ class EvidenceStore:
         elif cand.kind == "scope_manifest":
             verified = bool(cand.metadata.get("scope_id") and cand.metadata.get("snapshot_id") and cand.metadata.get("status") == "verified")
             notes.append("verified ScopeManifest metadata" if verified else "ScopeManifest metadata incomplete")
+        elif cand.kind == "scope_exclusion_decision":
+            metadata = cand.metadata or {}
+            verified = bool(
+                metadata.get("snapshot_commit")
+                and metadata.get("prefix")
+                and metadata.get("category")
+                and metadata.get("reason")
+                and metadata.get("basis")
+            )
+            excerpt = cand.content or (
+                f"prefix: {metadata.get('prefix')}\n"
+                f"category: {metadata.get('category')}\n"
+                f"reason: {metadata.get('reason')}\n"
+                f"basis: {metadata.get('basis')}"
+            )
+            notes.append("scope exclusion decision metadata verified" if verified else "scope exclusion decision metadata incomplete")
         elif cand.tool == "source_reader" and cand.path and cand.line_start:
-            lines = _safe_read_lines(self.repo_path, cand.path, str(cand.metadata.get("snapshot_commit") or cand.metadata.get("commit") or ""))
+            lines = _safe_read_lines(self.repo_path, cand.path)
             if lines and 1 <= cand.line_start <= len(lines):
                 start = max(1, cand.line_start - 2); end = min(len(lines), (cand.line_end or cand.line_start) + 8)
                 excerpt = "\n".join(f"{i}: {lines[i - 1]}" for i in range(start, end + 1)); line_end = cand.line_end or min(len(lines), cand.line_start + 3); verified = True
@@ -491,7 +547,8 @@ def _compact_record(record: EvidenceRecord) -> EvidenceRecord:
                 "navigation_only", "tool", "result_count", "commit", "plan_id", "snapshot_commit",
                 "executed_queries", "executed_checks", "extensions", "scanned_files", "coverage_complete", "required_checks",
                 "score_kind", "target_scope_id", "candidate_scope_id", "candidate_commit", "scope_id", "snapshot_id", "status",
-                "file_size", "sha256",
+                "file_size", "sha256", "prefix", "category", "reason", "basis", "candidate_repo",
+                "path_exists", "eligible_files", "read_errors", "per_query_hits",
             }
         },
         verifier_notes=record.verifier_notes,

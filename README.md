@@ -189,14 +189,14 @@ python3 -m http.server 8765 --bind 127.0.0.1
 
 `repo_snapshots` 默认只返回这个版本，避免将大量分支信息塞入 Agent 上下文。需要检查其他分支时，Agent 分页读取其他唯一分支尖端。多个分支名指向同一 commit 时只分析一次。
 
-OS-Agent 不分析未提交工作树。指纹、搜索和 Comparison 绑定选定 commit 的预建缓存；LSP、bash 阅读和关键证据注册前，Claude Code 必须把对应 `repos/<作品>/` checkout 到锁定 commit。
+OS-Agent 不分析未提交工作树。指纹、搜索和 Comparison 绑定选定 commit 的预建缓存；LSP、bash 阅读和关键证据注册前，Claude Code 必须把对应 `repos/<作品>/` checkout 到锁定 commit，并保持 `git status --porcelain` 干净。Evidence 工具直接读取当前工作树，MCP 会强制校验 HEAD 等于传入 ref 且工作树干净。
 
 ### 外部依赖和范围如何排除
 
 程序不维护预设外部依赖名单，也不只凭目录名排除 Git tracked 源码。`vendor/`、`third_party/`、`target/`、`build/`、`out/`、`dist/`、`node_modules/` 只能作为审核线索；Agent 需要阅读 `.gitmodules`、Cargo workspace、Makefile/CMake、README、源码引用关系和必要的 git history，判断这些代码是否实际参与项目、是否有声明来源、是否有学生修改痕迹，然后提交 `ScopeManifest`；程序验证路径和 submodule 声明。
 
 正式 1-vs-N 搜索必须同时使用作品与候选各自验证过的 ScopeManifest。排除范围确定前的搜索只能用于内部粗召回，不能进入参考作品判断或报告排名。
-除自动识别的 `.gitmodules` 子模块外，verified ScopeManifest 中的排除项必须引用已注册并验证的 EvidenceRecord；没有证据的范围建议只能作为 draft。
+除自动识别的 `.gitmodules` 子模块外，verified ScopeManifest 中的排除项必须引用已注册并验证的 EvidenceRecord；没有证据的范围建议只能作为 draft。排除依据优先引用源码/配置/文档证据；没有单一源码位置时使用 `evidence_structured(kind="scope_exclusion_decision", metadata={prefix, category, reason, basis})`。`scope_manifest` 证据只记录已创建的 Scope 清单，不作为创建前的排除依据。
 
 ## Agent 实际执行流程
 
@@ -232,7 +232,7 @@ Claude Code 的完整约束见 [.claude/skills/os-agent/SKILL.md](.claude/skills
 
 跨架构 C/C++ 项目建议安装对应裸机交叉编译器，例如 `riscv64-unknown-elf-gcc`。LSP 使用已 checkout 到锁定 commit 的作品工作树；clangd 结束、MCP 退出或下次启动前会自动清除受管理的临时配置。
 
-PDF 和 DOCX 文档证据分别通过 `pypdf` 与 `python-docx` 读取。Evidence 主要用于 BaseDecision、Scope 排除、负向搜索、关键继承/独立结论、架构边支撑和模块置顶 Claim；普通实现说明可直接写中文分析，不必为每个节点反复注册 Evidence。
+PDF 和 DOCX 文档证据分别通过 `pypdf` 与 `python-docx` 从已 checkout 的工作树读取。Evidence 主要用于 BaseDecision、Scope 排除、负向搜索、关键继承/独立结论、架构边支撑和模块置顶 Claim；普通实现说明可直接写中文分析，不必为每个节点反复注册 Evidence。
 
 ## Claude Code 开发态与产品态
 

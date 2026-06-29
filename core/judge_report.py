@@ -170,13 +170,12 @@ def node_review_submit(report_path: str, review: dict[str, Any], expected_genera
 
 def node_review_bundle_submit(report_path: str, node_id: str, claims: list[dict[str, Any]], review: dict[str, Any],
                               expected_generation: str = "") -> dict[str, Any]:
-    """Atomically register all Claims and the NodeReview produced by one analysis worker."""
+    """Atomically replace one node's Claims and NodeReview with one worker result."""
     with _report_lock(report_path), _file_lock(report_path):
         report = _load(report_path)
         _assert_generation(report, expected_generation)
         prepared = [_prepare_claim(report, {**claim, "node_id": node_id}) for claim in claims]
-        incoming_ids = {x["claim_id"] for x in prepared}
-        report["claims"] = [x for x in report["claims"] if x.get("claim_id") not in incoming_ids] + prepared
+        report["claims"] = [x for x in report["claims"] if x.get("node_id") != node_id] + prepared
         row = _bind_review_claims({**review, "node_id": node_id}, [x["claim_id"] for x in prepared])
         report["node_reviews"] = [x for x in report["node_reviews"] if x.get("node_id") != node_id] + [row]
         _validate_write(report_path, report)

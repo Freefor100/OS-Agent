@@ -59,6 +59,22 @@ def _lsp_snapshot_path(target: str, ref: str) -> str:
     return snap.repo_path
 
 
+def _assert_clean_worktree(repo_path: str, expected_commit: str) -> None:
+    from core.evidence import assert_clean_worktree
+    assert_clean_worktree(repo_path, expected_commit)
+
+
+def _base_decision_evidence_store(output_path: str) -> str:
+    from core.audit_manifest import find_manifest_for
+    output = Path(output_path)
+    manifest, _ = find_manifest_for(str(output))
+    if manifest:
+        evidence_store = (manifest.get("artifacts") or {}).get("evidence_store")
+        if evidence_store:
+            return str(evidence_store)
+    return str(output.parent / "evidence_store.jsonl")
+
+
 # ── tool: repo_metadata ──────────────────────────────────────────────
 
 @mcp.tool()
@@ -217,7 +233,11 @@ def search_formal(target: str, ref: str = "HEAD", top_k: int = 20, formal_only: 
         raise ValueError("target has no ScopeManifest; call create_scope_manifest first")
     all_rows = search_scoped(snap, scope, cached_candidate_snapshots(), top_k=top_k, metadata=_get_metadata(), formal_only=False)
     rough = [x for x in all_rows if x.get("score_kind") == "rough"]
-    coverage = {"coverage_complete": not rough, "requested_top_k": top_k,
+    returned_top_k_scope_complete = not rough
+    coverage = {"coverage_complete": returned_top_k_scope_complete,
+                "returned_top_k_scope_complete": returned_top_k_scope_complete,
+                "coverage_scope": "returned_top_k",
+                "requested_top_k": top_k,
                 "cached_candidate_count": len(cached_candidate_snapshots()),
                 "reviewed_scope_count": len(all_rows) - len(rough),
                 "unreviewed_rough_count": len(rough),
@@ -239,10 +259,10 @@ def base_evidence_packet(target: str, ref: str, formal_candidates: list[dict], t
 
 
 @mcp.tool()
-def validate_base_decision(decision: dict, packet: dict) -> dict:
+def validate_base_decision(decision: dict, packet: dict, evidence_store: str = "") -> dict:
     """Program admission check: Base must reference a verified formal candidate by commit."""
     from core.base_decision import validate_base_decision as validate
-    errors = validate(decision, packet)
+    errors = validate(decision, packet, evidence_store=evidence_store)
     return {"valid": not errors, "errors": errors}
 
 
@@ -252,9 +272,10 @@ def base_decision_submit(decision: dict, packet: dict, output_path: str) -> dict
     import json, os
     from core.audit_manifest import find_manifest_for, update_manifest
     from core.base_decision import resolve_primary_candidate, validate_base_decision as validate
-    errors = validate(decision, packet)
+    evidence_store = _base_decision_evidence_store(output_path)
+    errors = validate(decision, packet, evidence_store=evidence_store)
     result = {"valid": not errors, "errors": errors, "packet": packet, "decision": decision,
-              "selected_candidate": resolve_primary_candidate(decision, packet)}
+              "selected_candidate": resolve_primary_candidate(decision, packet), "evidence_store": evidence_store}
     if errors:
         return result
     output = Path(output_path); output.parent.mkdir(parents=True, exist_ok=True)
@@ -646,6 +667,7 @@ def evidence_source(target: str, ref: str, evidence_store: str, kind: str, path:
     """Verify an immutable source location and persist a stable EvidenceRecord."""
     from core.snapshot import resolve_snapshot
     snap = resolve_snapshot(_target_path(target), ref); store = _get_evidence_store(snap.repo_path, evidence_store)
+    _assert_clean_worktree(snap.repo_path, snap.commit)
     meta = {"snapshot_commit": snap.commit, **(metadata or {})}
     evidence_id = store.add_source(kind=kind, path=path, line=line, line_end=line_end or None, symbol=symbol, label=label, strength=strength, metadata=meta)
     return {"evidence_id": evidence_id, "record": store.by_id(evidence_id).compact(), "evidence_store": evidence_store}
@@ -656,6 +678,7 @@ def evidence_source_batch(target: str, ref: str, evidence_store: str, sources: l
     """Register several source spans from one immutable snapshot in one call."""
     from core.snapshot import resolve_snapshot
     snap = resolve_snapshot(_target_path(target), ref); store = _get_evidence_store(snap.repo_path, evidence_store)
+    _assert_clean_worktree(snap.repo_path, snap.commit)
     rows = []
     for source in sources:
         metadata = {"snapshot_commit": snap.commit, **(source.get("metadata") or {})}
@@ -692,10 +715,11 @@ def evidence_structured(target: str, ref: str, evidence_store: str, kind: str, l
     """Register verified structured evidence such as call graph, git history, scope manifest, or documentation."""
     from core.evidence import EvidenceCandidate
     from core.snapshot import resolve_snapshot
-    allowed = {"call_edge", "lsp_call_graph", "git_history", "scope_manifest", "documentation"}
+    allowed = {"call_edge", "lsp_call_graph", "git_history", "scope_manifest", "scope_exclusion_decision", "documentation"}
     if kind not in allowed:
         raise ValueError(f"unsupported structured evidence kind: {kind}")
     snap = resolve_snapshot(_target_path(target), ref); store = _get_evidence_store(snap.repo_path, evidence_store)
+    _assert_clean_worktree(snap.repo_path, snap.commit)
     candidate = EvidenceCandidate(tool="lsp_call_graph" if kind in {"call_edge", "lsp_call_graph"} else kind, kind=kind,
                                   label=label, content=content, path=path, line_start=line or None, line_end=line_end or None, strength=strength,
                                   metadata={"snapshot_commit": snap.commit, **metadata})
@@ -711,6 +735,7 @@ def evidence_document(target: str, ref: str, evidence_store: str, path: str, lab
     from core.evidence import EvidenceCandidate
     from core.snapshot import resolve_snapshot
     snap = resolve_snapshot(_target_path(target), ref); store = _get_evidence_store(snap.repo_path, evidence_store)
+    _assert_clean_worktree(snap.repo_path, snap.commit)
     metadata = {"snapshot_commit": snap.commit, "start_page": start_page or None, "end_page": end_page or None}
     candidate = EvidenceCandidate(tool="documentation", kind="documentation", path=path, line_start=start_line or None,
                                   line_end=end_line or None, label=label, strength=strength, metadata=metadata)
@@ -739,6 +764,7 @@ def negative_search(target: str, ref: str, subject: str, queries: list[str], sym
     from core.evidence import NegativeSearchPlan, execute_negative_search
     from core.snapshot import resolve_snapshot
     snap = resolve_snapshot(_target_path(target), ref)
+    _assert_clean_worktree(snap.repo_path, snap.commit)
     evidence_path = Path(evidence_store) if evidence_store else Path("output") / target / "_audit" / "evidence_store.jsonl"
     store = _get_evidence_store(snap.repo_path, str(evidence_path))
     plan = NegativeSearchPlan(snapshot_commit=snap.commit, subject=subject, queries=queries, symbols=symbols, paths=paths, extensions=extensions)
