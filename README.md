@@ -160,7 +160,7 @@ npm install
 npm run build
 ```
 
-然后再调用：
+然后再调用（这里由Claude Code已经完成）：
 
 ```bash
 python3 scripts/judge_report.py <report.json> <report.html>
