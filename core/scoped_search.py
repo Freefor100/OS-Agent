@@ -9,6 +9,9 @@ from core.snapshot import RepoSnapshot, resolve_snapshot
 from scripts.fingerprint import build_units
 
 
+FORMAL_SCOPE_STATUSES = {"verified", "auto_candidate", "candidate_reviewed"}
+
+
 def search_scoped(target_snapshot: RepoSnapshot, target_scope: ScopeManifest, candidates: Iterable[tuple[RepoSnapshot, ScopeManifest | None]],
                   *, top_k: int = 20, metadata=None, formal_only: bool = False) -> list[dict[str, Any]]:
     target_units = filter_units(build_units(target_snapshot.repo_path, snapshot=target_snapshot), target_scope)
@@ -20,7 +23,8 @@ def search_scoped(target_snapshot: RepoSnapshot, target_scope: ScopeManifest, ca
         if key in seen or snapshot.commit == target_snapshot.commit and snapshot.repo == target_snapshot.repo:
             continue
         seen.add(key)
-        if formal_only and (scope is None or scope.status != "verified"):
+        formal_scope = scope is not None and scope.status in FORMAL_SCOPE_STATUSES
+        if formal_only and not formal_scope:
             continue
         candidate_units = filter_units(build_units(snapshot.repo_path, snapshot=snapshot), scope)
         candidate_token, candidate_ast = _sets(candidate_units)
@@ -36,7 +40,7 @@ def search_scoped(target_snapshot: RepoSnapshot, target_scope: ScopeManifest, ca
             "scope_id": scope.scope_id if scope else "",
             "candidate_scope_id": scope.scope_id if scope else "",
             "scope_status": scope.status if scope else "unreviewed",
-            "score_kind": "formal" if scope and scope.status == "verified" else "rough", "combined": round(combined, 3),
+            "score_kind": "formal" if formal_scope else "rough", "combined": round(combined, 3),
             "token": token, "ast": ast, "target_unit_count": len(target_units), "candidate_unit_count": len(candidate_units),
             "overlap_by_dir": _overlap_by_dir(target_units, candidate_token), "year": meta["year"] if meta else 0,
             "school": meta["school"] if meta else "", "is_framework": metadata.is_framework(snapshot.repo) if metadata else False,

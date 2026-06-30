@@ -41,8 +41,8 @@ output/<repo-name>/audit-YYYYMMDD-HHMMSS/
 |---|---|---|
 | 启动审计 | `repo_snapshots`、`audit_manifest_create`、`build_fingerprint` | 锁定作品 commit、创建独立审计目录、准备指纹 |
 | 确认范围 | `create_scope_manifest` | 固定学生代码范围和外部依赖排除 |
-| 参考发现 | `search_formal` | 完成双侧 verified scope 的正式 1-vs-N 搜索 |
-| Base 固化 | `base_evidence_packet`、`evidence_formal_search`、`base_decision_submit` | 让 Agent 判断参考来源，并由程序校验写入 `base_decision.json` |
+| 参考发现 | `search_formal` | 用目标 verified scope 和候选自动轻量 scope 做正式 1-vs-N 搜索 |
+| Base 固化 | `base_evidence_packet`、`base_decision_submit` | 让 Agent 判断参考来源，并由程序校验写入 `base_decision.json` |
 | 函数事实 | `compare_functions`、`comparison_overview`、`comparison_hotspots`、`comparison_*` | 建立并按需查询 Comparison 数据库 |
 | 模块阅读 | `judge_report_create`、`module_analysis_packet` | 以模块为单位读代码，获取节点功能范围和候选函数摘要 |
 | 报告写入 | `node_review_bundle_submit`、`module_review_submit`、`overall_assessment_submit` | 宿主 Agent 统一写入中文节点、模块和总体评审 |
@@ -79,16 +79,16 @@ output/<repo-name>/audit-YYYYMMDD-HHMMSS/
 ### 3. 粗召回、候选审核、正式重排
 
 1. `search_similar(...)` 或 `search_formal(..., formal_only=false)` 仅用于粗召回。
-2. 审核 Top-20 中缺少 ScopeManifest 的候选，并逐个调用 `create_scope_manifest`。
-3. 调 `search_formal(..., formal_only=true)` 正式重排；`candidate_coverage.returned_top_k_scope_complete=true` 表示返回的 Top-K 内已无 rough 候选，旧 `coverage_complete` 仅兼容同一含义。
-4. 报告只展示 `score_kind=formal` 且双方 scope verified 的结果。
+2. 不要为了 Top-K 候选逐个补 Scope 证据；`search_formal` 会对缺少 ScopeManifest 的候选生成确定性的 `auto_candidate` 轻量范围。
+3. 调 `search_formal(..., formal_only=true)` 正式重排；`candidate_coverage.candidate_scope_mode=auto_candidate_when_missing` 表示缺失候选 Scope 已由程序自动补足。
+4. 报告只展示 `score_kind=formal` 的结果。只有最终选中 Base 后，如果候选范围明显需要排除大量第三方/生成代码，才补充候选 `ScopeManifest` 与对应证据并重跑搜索。
 
 ### 4. Base 决策
 
 1. 调 `base_evidence_packet(target, ref, formal_candidates, target_year, include_declarations=true)`。
-2. Agent 综合正式排名、年份方向、声明验证、核心目录覆盖和差异解释能力选择候选，并调 `evidence_formal_search` 将正式搜索结果写入本项目 EvidenceStore。
-3. 提交引用该 evidence ID 的 BaseDecision，调用 `base_decision_submit(decision, packet, output_path=<输出目录>/base_decision.json)`。主 Base 必须按 repo+commit 引用正式候选；程序会从审计目录的 EvidenceStore 校验 evidence 存在、verified 且 formal_search 与所选候选匹配，校验通过后固化 `base_decision.json`。
-4. BaseDecision 保持简洁：必须能指向 formal verified 候选并引用正式搜索 Evidence；可写 `selection_reason` 作为 Agent 备注，但主报告中的选择依据仍以后续 `overall_assessment.base_selection_reason` 的中文说明为准。
+2. Agent 综合正式排名、年份方向、声明验证、核心目录覆盖和差异解释能力选择候选。
+3. 调用 `base_decision_submit(decision, packet, output_path=<输出目录>/base_decision.json)`。主 Base 必须按 repo+commit 引用 formal 候选；程序校验它来自 packet 并固化 `base_decision.json`。
+4. BaseDecision 保持简洁：只写选择对象和必要备注，不要求手工注册或回填 formal_search evidence。主报告中的选择依据仍以后续 `overall_assessment.base_selection_reason` 的中文说明为准。
 5. 年份方向是强线索，不是程序硬门槛。xlsx 中有明确更早年份的候选方向性最强；同年候选仍可能存在互抄、共同上游或协作传播，不能仅因同年排除，但必须在主报告中说明方向不确定或给出额外方向依据。对不在 xlsx 的开源教学项目、框架或公开上游，若有声明、公开来源、git 历史或项目关系证据，也可以选择为 Base，但必须在主报告中说明年份表无法校验及替代方向依据。明确更晚年份的候选若被选作主要参考，也必须说明为什么时间表不能直接否定该关系。
 6. 对去声明回归，再以 `include_declarations=false` 组包并验证同一决定。
 7. 仅当无可靠正式 Base、声明来源均已强制对比且程序准入时，才允许独立报告。

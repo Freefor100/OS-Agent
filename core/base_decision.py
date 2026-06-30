@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import json
 import re
-from pathlib import Path
 from typing import Any, Iterable
 
 from core.evidence import stable_id
@@ -10,6 +8,7 @@ from core.git_source import list_tree, read_text
 from core.snapshot import RepoSnapshot
 
 URL_RE = re.compile(r"https?://(?:github\.com|gitlab\.eduxiji\.net)/[^\s)\]>]+", re.I)
+FORMAL_SCOPE_STATUSES = {"verified", "auto_candidate", "candidate_reviewed"}
 
 
 def declared_sources(snapshot: RepoSnapshot) -> list[dict[str, Any]]:
@@ -60,6 +59,7 @@ def build_base_evidence_packet(target_snapshot: RepoSnapshot, formal_candidates:
 
 
 def validate_base_decision(decision: dict[str, Any], packet: dict[str, Any], evidence_store: str = "") -> list[str]:
+    del evidence_store  # Backward-compatible parameter; BaseDecision no longer validates EvidenceStore IDs.
     errors: list[str] = []
     primary = decision.get("primary_base") or {}
     coverage = packet.get("candidate_coverage") or {}
@@ -82,20 +82,16 @@ def validate_base_decision(decision: dict[str, Any], packet: dict[str, Any], evi
         errors.append("primary_base must reference a formal candidate by repo and commit; candidates=" + _candidate_summary(packet.get("formal_candidates", [])))
     else:
         candidate = matches[0]
-        if candidate.get("score_kind") != "formal" or candidate.get("scope_status") != "verified":
+        if candidate.get("score_kind") != "formal" or candidate.get("scope_status") not in FORMAL_SCOPE_STATUSES:
             errors.append(
                 "primary_base candidate is not a verified formal result; "
-                f"required score_kind=formal scope_status=verified; selected rank={candidate.get('rank')} "
+                f"required score_kind=formal scope_status in {sorted(FORMAL_SCOPE_STATUSES)}; selected rank={candidate.get('rank')} "
                 f"repo={candidate.get('repo')} commit={candidate.get('commit')} "
                 f"score_kind={candidate.get('score_kind')} scope_status={candidate.get('scope_status')}"
             )
         rank = (decision.get("decision_factors") or {}).get("formal_rank")
         if rank is not None and rank != candidate.get("rank"):
             errors.append("decision formal_rank does not match candidate rank")
-    if not decision.get("evidence_ids"):
-        errors.append("BaseDecision requires evidence_ids")
-    if evidence_store:
-        errors.extend(_validate_decision_evidence(decision, packet, matches[0] if matches else None, evidence_store))
     return errors
 
 
@@ -119,76 +115,15 @@ def _candidate_matches(primary: dict[str, Any], candidates: Iterable[dict[str, A
 
 
 def _infer_candidate_coverage(candidates: list[dict[str, Any]]) -> dict[str, Any]:
-    verified_formal = [c for c in candidates if c.get("score_kind") == "formal" and c.get("scope_status") == "verified"]
+    verified_formal = [c for c in candidates if c.get("score_kind") == "formal" and c.get("scope_status") in FORMAL_SCOPE_STATUSES]
     return {
         "coverage_complete": bool(candidates) and len(verified_formal) == len(candidates),
+        "returned_top_k_scope_complete": bool(candidates) and len(verified_formal) == len(candidates),
         "source": "formal_candidates",
         "reason": "inferred from supplied formal_candidates",
         "returned_candidate_count": len(candidates),
         "verified_formal_count": len(verified_formal),
     }
-
-
-def _validate_decision_evidence(
-    decision: dict[str, Any],
-    packet: dict[str, Any],
-    selected_candidate: dict[str, Any] | None,
-    evidence_store: str,
-) -> list[str]:
-    errors: list[str] = []
-    evidence = _load_evidence_records(evidence_store)
-    evidence_ids = decision.get("evidence_ids") or []
-    if not isinstance(evidence_ids, list):
-        return ["BaseDecision evidence_ids must be list"]
-    records = []
-    for evidence_id in evidence_ids:
-        record = evidence.get(str(evidence_id))
-        if not record:
-            errors.append(f"BaseDecision references missing evidence {evidence_id}")
-            continue
-        if not record.get("verified"):
-            errors.append(f"BaseDecision references unverified evidence {evidence_id}")
-            continue
-        records.append(record)
-    formal_records = [record for record in records if record.get("kind") == "formal_search"]
-    if not formal_records:
-        errors.append("BaseDecision requires verified formal_search evidence")
-        return errors
-    if selected_candidate is None:
-        return errors
-    target_scope_id = selected_candidate.get("target_scope_id") or ((packet.get("target_scope") or {}).get("scope_id"))
-    candidate_scope_id = selected_candidate.get("candidate_scope_id") or selected_candidate.get("scope_id")
-    candidate_commit = str(selected_candidate.get("commit") or "")
-    candidate_repo = str(selected_candidate.get("repo") or "")
-    for record in formal_records:
-        metadata = record.get("metadata") if isinstance(record.get("metadata"), dict) else {}
-        if metadata.get("score_kind") != "formal":
-            errors.append(f"formal_search evidence {record.get('evidence_id')} is not formal")
-        if candidate_repo and metadata.get("candidate_repo") != candidate_repo:
-            errors.append(f"formal_search evidence {record.get('evidence_id')} candidate_repo does not match selected Base")
-        if candidate_commit and not _commit_matches(str(metadata.get("candidate_commit") or ""), candidate_commit):
-            errors.append(f"formal_search evidence {record.get('evidence_id')} candidate_commit does not match selected Base")
-        if target_scope_id and metadata.get("target_scope_id") != target_scope_id:
-            errors.append(f"formal_search evidence {record.get('evidence_id')} target_scope_id does not match selected Base")
-        if candidate_scope_id and metadata.get("candidate_scope_id") != candidate_scope_id:
-            errors.append(f"formal_search evidence {record.get('evidence_id')} candidate_scope_id does not match selected Base")
-    return errors
-
-
-def _load_evidence_records(path: str) -> dict[str, dict[str, Any]]:
-    rows: dict[str, dict[str, Any]] = {}
-    p = Path(path)
-    if not p.is_file():
-        return rows
-    for line in p.read_text(encoding="utf-8", errors="ignore").splitlines():
-        if not line.strip():
-            continue
-        try:
-            row = json.loads(line)
-            rows[str(row["evidence_id"])] = row
-        except (json.JSONDecodeError, KeyError, TypeError):
-            continue
-    return rows
 
 
 def _score_value(value: Any) -> float:

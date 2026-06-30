@@ -64,17 +64,6 @@ def _assert_clean_worktree(repo_path: str, expected_commit: str) -> None:
     assert_clean_worktree(repo_path, expected_commit)
 
 
-def _base_decision_evidence_store(output_path: str) -> str:
-    from core.audit_manifest import find_manifest_for
-    output = Path(output_path)
-    manifest, _ = find_manifest_for(str(output))
-    if manifest:
-        evidence_store = (manifest.get("artifacts") or {}).get("evidence_store")
-        if evidence_store:
-            return str(evidence_store)
-    return str(output.parent / "evidence_store.jsonl")
-
-
 # ── tool: repo_metadata ──────────────────────────────────────────────
 
 @mcp.tool()
@@ -163,7 +152,7 @@ def search_similar(target: str, exclude_prefixes: list[str] | None = None,
     This is navigation only. It cannot be used for BaseDecision or report ranking;
     call create_scope_manifest for reviewed candidates and then search_formal."""
     from core.scope import ScopeExclusion, build_scope_manifest
-    from core.scoped_search import cached_candidate_snapshots, search_scoped
+    from core.scoped_search import FORMAL_SCOPE_STATUSES, cached_candidate_snapshots, search_scoped
     from core.snapshot import resolve_snapshot
     mm = _get_metadata()
     commit_ref = ref or branch or "HEAD"
@@ -223,22 +212,35 @@ def create_scope_manifest(target: str, ref: str = "HEAD", included_prefixes: lis
 
 @mcp.tool()
 def search_formal(target: str, ref: str = "HEAD", top_k: int = 20, formal_only: bool = True) -> dict:
-    """Formal 1-vs-N search using each side's own ScopeManifest. Only formal results may select a Base."""
+    """Formal 1-vs-N search using verified target scope and lightweight candidate scopes.
+
+    Missing candidate ScopeManifest records are replaced with deterministic auto_candidate
+    scopes, so the Agent does not need to submit scope evidence for every Top-K candidate.
+    """
     from core.snapshot import resolve_snapshot
-    from core.scope import load_scope_manifest
+    from core.scope import build_scope_manifest, load_scope_manifest
     from core.scoped_search import cached_candidate_snapshots, search_scoped
     snap = resolve_snapshot(_target_path(target), ref)
     scope = load_scope_manifest(snap.repo, snap.commit)
-    if scope is None:
-        raise ValueError("target has no ScopeManifest; call create_scope_manifest first")
-    all_rows = search_scoped(snap, scope, cached_candidate_snapshots(), top_k=top_k, metadata=_get_metadata(), formal_only=False)
+    if scope is None or scope.status != "verified":
+        raise ValueError("target requires a verified ScopeManifest; call create_scope_manifest for the target first")
+    candidate_rows = []
+    auto_candidate_count = 0
+    for candidate_snap, candidate_scope in cached_candidate_snapshots():
+        if candidate_scope is None or candidate_scope.status not in FORMAL_SCOPE_STATUSES:
+            candidate_scope = build_scope_manifest(candidate_snap, status="auto_candidate")
+            auto_candidate_count += 1
+        candidate_rows.append((candidate_snap, candidate_scope))
+    all_rows = search_scoped(snap, scope, candidate_rows, top_k=top_k, metadata=_get_metadata(), formal_only=False)
     rough = [x for x in all_rows if x.get("score_kind") == "rough"]
     returned_top_k_scope_complete = not rough
     coverage = {"coverage_complete": returned_top_k_scope_complete,
                 "returned_top_k_scope_complete": returned_top_k_scope_complete,
                 "coverage_scope": "returned_top_k",
+                "candidate_scope_mode": "auto_candidate_when_missing",
                 "requested_top_k": top_k,
-                "cached_candidate_count": len(cached_candidate_snapshots()),
+                "cached_candidate_count": len(candidate_rows),
+                "auto_candidate_scope_count": auto_candidate_count,
                 "reviewed_scope_count": len(all_rows) - len(rough),
                 "unreviewed_rough_count": len(rough),
                 "reviewed_in_top_k": len(all_rows)-len(rough),
@@ -272,10 +274,9 @@ def base_decision_submit(decision: dict, packet: dict, output_path: str) -> dict
     import json, os
     from core.audit_manifest import find_manifest_for, update_manifest
     from core.base_decision import resolve_primary_candidate, validate_base_decision as validate
-    evidence_store = _base_decision_evidence_store(output_path)
-    errors = validate(decision, packet, evidence_store=evidence_store)
+    errors = validate(decision, packet)
     result = {"valid": not errors, "errors": errors, "packet": packet, "decision": decision,
-              "selected_candidate": resolve_primary_candidate(decision, packet), "evidence_store": evidence_store}
+              "selected_candidate": resolve_primary_candidate(decision, packet)}
     if errors:
         return result
     output = Path(output_path); output.parent.mkdir(parents=True, exist_ok=True)
