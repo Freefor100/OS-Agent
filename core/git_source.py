@@ -61,11 +61,14 @@ def list_tree(repo_path: str, commit: str) -> list[GitTreeEntry]:
 
 
 def iter_source_blobs(repo_path: str, commit: str, *, suffixes: set[str] | None = None,
-                      max_bytes: int = 4 * 1024 * 1024) -> Iterable[GitBlob]:
+                      max_bytes: int = 4 * 1024 * 1024,
+                      exclude_prefixes: list[str] | tuple[str, ...] | None = None) -> Iterable[GitBlob]:
     selected_suffixes = suffixes or SOURCE_SUFFIXES
+    excluded = tuple(_clean_rel(prefix).rstrip("/") + "/" for prefix in (exclude_prefixes or []) if _clean_rel(prefix))
     entries = [
         entry for entry in list_tree(repo_path, commit)
         if entry.kind == "blob" and Path(entry.path).suffix in selected_suffixes
+        and not any(entry.path == prefix[:-1] or entry.path.startswith(prefix) for prefix in excluded)
     ]
     yield from cat_file_blobs(repo_path, entries, max_bytes=max_bytes)
 

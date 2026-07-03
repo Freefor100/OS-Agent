@@ -65,7 +65,20 @@ claude
 
 ### 1. 安装 Python 依赖
 
-推荐使用名为 `os_agent` 的 Conda 环境，项目 MCP 启动脚本会自动寻找它：
+推荐使用名为 `os_agent` 的 Conda 环境，项目 `environment.yml` 包含完整 Python 及 LSP 依赖：
+
+```bash
+conda env create -f environment.yml
+conda activate os_agent
+```
+
+如果是已有环境的增量更新：
+
+```bash
+conda env update -f environment.yml
+```
+
+也可以手动创建：
 
 ```bash
 conda create -n os_agent python=3.11
@@ -73,13 +86,25 @@ conda activate os_agent
 pip install -r requirements.txt
 ```
 
-也可以使用其他环境，但需要在启动 Claude Code 前指定解释器：
+使用其他环境时，需要在启动 Claude Code 前指定解释器：
 
 ```bash
 export OS_AGENT_PYTHON=/absolute/path/to/python
 ```
 
-如果项目根目录存在 `.venv/` 或 `venv/`，MCP 启动脚本也会优先使用其中的 Python。Claude Code 通过 MCP 使用 OS-Agent 时不依赖系统存在 `python` 命令；手动运行 CLI 命令前需要激活对应环境，或显式使用该环境中的 Python。
+Claude Code 通过 MCP 使用 OS-Agent 时不依赖系统存在 `python` 命令；手动运行 CLI 命令前需要激活对应环境，或显式使用该环境中的 Python。
+
+`.claude/mcp.json` 是每个人的本地 Claude Code MCP 配置，不进入 Git。仓库提供 [.claude/mcp.json.example](.claude/mcp.json.example)，首次使用时复制为 `.claude/mcp.json`：
+
+```bash
+cp .claude/mcp.json.example .claude/mcp.json
+```
+
+这个 example 保持 Claude Code 生成的直接启动格式：`command` 是 Python 解释器，`args` 第一个参数是项目里的 `mcp_server.py`。复制后把 `<python-executable>` 替换为当前机器的 Python，例如 `/home/leo/miniconda3/envs/os_agent/bin/python3`；把 `<project-root>` 替换为当前 OS-Agent 绝对路径，例如 `/home/leo/OS-Agent`。这些路径是个人本地配置，不要提交到 Git。
+
+跨机器迁移时，不要复用别人填好的绝对路径；先用 `environment.yml` 创建同名环境，再用 `which python` 和 `pwd` 得到本机路径，填入 `.claude/mcp.json`。`scripts/start_mcp.sh` 仍保留为手动诊断入口；如果你想让本地配置自动找环境，也可以只在自己的 `.claude/mcp.json` 中把 `command` 改成 `bash`、`args` 改成 `["scripts/start_mcp.sh"]`，但仓库 example 默认保持 Claude Code 生成的直接启动格式。
+
+`scripts/start_mcp.sh` 不是 MCP 服务本体；真正的服务入口是 `mcp_server.py`。启动脚本只负责按顺序寻找可用 Python：`OS_AGENT_PYTHON`、项目 `.venv/` 或 `venv/`、常见 Conda/Mamba `os_agent` 环境，最后尝试 `conda run -n os_agent`，找到后再 `exec <python> mcp_server.py`。因此它适合排查环境或作为个人本地替代配置，但不要把它和 `mcp_server.py` 混为一谈。
 
 ### 2. 准备作品和候选语料库
 
@@ -99,20 +124,26 @@ repos/
 conda run -n os_agent python scripts/run.py --build
 ```
 
-预建阶段直接读取 Git commit blob，在内存中解析源码，只把 `units/fpset/astset/meta/scopes` 等指纹与审计缓存写入 `.fp_cache/`；不会生成源码快照或完整 CodeAtlas 缓存。
+也可以只预建指定作品和指定分支：
+
+```bash
+conda run -n os_agent python scripts/run.py --build oskernel2023-zmz@main
+```
+
+预建阶段直接读取 Git commit blob，在内存中解析源码，只把 `units/fpset/astset/meta/scopes` 等指纹与审计缓存写入 `.fp_cache/`。
 默认构建每个仓库的所有唯一分支尖端 commit，供后续粗召回和正式 Scope 搜索消费；多个分支指向同一 commit 时只构建一次。该流程不会遍历历史 commit。只想快速预建当前检出版本时使用 `--current-only`。
 
 ### 3. 启动 Claude Code 和 MCP
 
-在 OS-Agent 项目根目录启动 Claude Code。项目级 [.mcp.json](.mcp.json) 会通过 [scripts/start_mcp.sh](scripts/start_mcp.sh) 启动 `os-agent` MCP。
+在 OS-Agent 项目根目录启动 Claude Code。本地 `.claude/mcp.json` 会用配置中的 Python 解释器启动 `mcp_server.py`。
 
 首次进入项目时：
 
-1. 批准项目级 MCP 配置。
+1. 批准本地 `.claude/mcp.json` MCP 配置。
 2. 在 Claude Code 中执行 `/mcp`，确认 `os-agent` 已连接。
-3. 如果修改过 `mcp_server.py`、`.mcp.json` 或启动脚本，重新连接 MCP 或重启 Claude Code。
+3. 如果修改过 `mcp_server.py`、`.claude/mcp.json` 或启动脚本，重新连接 MCP 或重启 Claude Code。
 
-找不到环境时可单独检查启动脚本：
+找不到环境时可单独检查启动脚本；这只验证环境发现和 `mcp_server.py` 能否启动，不代表默认 example 必须使用该脚本：
 
 ```bash
 timeout 3 scripts/start_mcp.sh
@@ -127,12 +158,12 @@ Claude Code 自动发现的唯一项目 Skill 是 [.claude/skills/os-agent/SKILL
 推荐入口只有一个：
 
 ```text
-/os-agent oskernel2023-zmz
+/os-agent oskernel2023-zmz recover
 ```
 
 Agent 会自动完成：
 
-1. 锁定 `repos/oskernel2023-zmz` 当前检出分支尖端 commit。
+1. 检查 `repos/oskernel2023-zmz` 当前检出分支就是 `recover`，且工作树干净，然后锁定该分支尖端 commit。
 2. 创建 `output/oskernel2023-zmz/audit-YYYYMMDD-HHMMSS/`。
 3. 校验作品代码范围，排除外部依赖和生成物。
 4. 执行正式 1-vs-N 搜索并选择参考作品。
@@ -143,10 +174,10 @@ Agent 会自动完成：
 需要固定目录名时再显式指定：
 
 ```text
-/os-agent oskernel2023-zmz 输出到 output/oskernel2023-zmz/audit-001/
+/os-agent oskernel2023-zmz recover 输出到 output/oskernel2023-zmz/audit-001/
 ```
 
-Agent 会先将当前分支解析并锁定为固定 commit。例如评委看到的是：
+Agent 会先将指定分支解析并锁定为固定 commit。例如评委看到的是：
 
 ```text
 oskernel2023-zmz@recover
@@ -158,7 +189,7 @@ oskernel2023-zmz@recover
 recover → 837b6a9...
 ```
 
-这样长时间分析期间分支移动或工作树变化不会污染结果。只有存在明确理由时，Agent 才分页检查其他分支尖端；不会遍历整个 Git 历史。
+这样长时间分析期间分支移动或工作树变化不会污染结果。没有用户显式指定分支时，Skill 不会继续工作。
 
 ### 5. 查看结果
 
@@ -166,7 +197,7 @@ recover → 837b6a9...
 
 ```text
 output/oskernel2023-zmz/audit-001/
-├── audit_manifest.json      本次审计的快照、产物路径和阶段状态
+├── audit_manifest.json      本次审计的锁定版本、产物路径和阶段状态
 ├── base_decision.json       程序校验通过的参考作品判断
 ├── report.json              Agent Claim、节点/模块评审和总体结论
 ├── report.html              面向评委的主报告
@@ -177,11 +208,9 @@ output/oskernel2023-zmz/audit-001/
 └── comparisons.jsonl        Comparison 审计导出
 ```
 
-旧 `_agent_*`、`_audit_v*`、`_report` 目录结构已废弃；新流程只认 `output/<repo>/audit-YYYYMMDD-HHMMSS/` 这种独立审计目录。
-
 - 首先打开 `report.html`：查看中文总体结论、Base 选择依据、Scope 排除过程、Agent 阅读代码后给出的架构说明、14 个模块、112 个节点、完整度、原创度与关键 Claim。
 - 需要核对函数匹配和源码对照时，再打开 `provenance.html`。
-- `report.html` 由 `web_report/` 的 React + Vite + TypeScript 静态前端投影 `report.json` 生成。Python 只负责校验、整理 view-model、注入数据，并复制 `web_report/dist/assets/`，不再拼接复杂页面结构。
+- `report.html` 由 `web_report/` 的 React + Vite + TypeScript 静态前端投影 `report.json` 生成。Python 负责校验、整理 view-model、注入数据，并复制 `web_report/dist/assets/`。
 - `report.html` 以中文呈现，必要机制名可用括号补充解释，例如“写时复制（copy-on-write）”。Evidence 只作为关键锚点展示在相关模块/节点页面底部，不要求普通节点堆砌证据。
 - 内核架构图来自 Agent 提交的 Mermaid 图；页面只提供放大、缩小、拖拽平移和重置交互，不自动生成或改写图内容。
 
@@ -220,15 +249,15 @@ python3 -m http.server 8765 --bind 127.0.0.1
 
 ## 版本与分析范围
 
-### 默认分析哪个版本
+### 必须指定哪个分支
 
-默认版本是仓库当前检出分支的尖端提交，也就是 clone 后通常看到的作品最新状态：
+查重必须显式指定待查重分支；没有分支名时 `/os-agent` 不应继续工作。开始审计前，Agent 会用 bash 检查 `repos/<作品>/` 当前检出分支就是用户指定的分支，且 `git status --porcelain` 为空：
 
 ```text
-作品@当前分支 → 固定 commit
+作品@指定分支 → 固定 commit
 ```
 
-`repo_snapshots` 默认只返回这个版本，避免将大量分支信息塞入 Agent 上下文。需要检查其他分支时，Agent 分页读取其他唯一分支尖端。多个分支名指向同一 commit 时只分析一次。
+确认分支和干净工作树使用普通 `git -C repos/<作品> branch --show-current` 与 `git -C repos/<作品> status --porcelain`，不需要 MCP 工具。通过后，Agent 用 `git -C repos/<作品> rev-parse HEAD` 得到固定 commit，并把这个 commit 传给后续 MCP 工具。
 
 OS-Agent 不分析未提交工作树。指纹、搜索和 Comparison 绑定选定 commit 的预建缓存；LSP、bash 阅读和关键证据注册前，Claude Code 必须把对应 `repos/<作品>/` checkout 到锁定 commit，并保持 `git status --porcelain` 干净。Evidence 工具直接读取当前工作树，MCP 会强制校验 HEAD 等于传入 ref 且工作树干净。
 
@@ -245,7 +274,7 @@ Claude Code 的完整约束见 [.claude/skills/os-agent/SKILL.md](.claude/skills
 
 主流程按下面顺序执行，用户不需要手动调用这些工具：
 
-1. **启动审计**：锁定作品 commit，创建独立 `audit-*` 输出目录和 `audit_manifest.json`。
+1. **启动审计**：确认用户显式指定待查重分支；用 bash 检查 `repos/<作品>/` 当前检出分支就是该分支且工作树干净，锁定作品 commit，创建独立 `audit-*` 输出目录和 `audit_manifest.json`。
 2. **确认范围**：Agent 判断学生代码、外部依赖、生成物和文档边界，MCP 验证 ScopeManifest。
 3. **参考发现**：用目标 verified scope 和候选自动轻量 scope 做正式 1-vs-N 搜索，粗召回只作为内部候选发现。
 4. **Base 固化**：Agent 选择参考来源，MCP 校验 `repo + commit + formal score` 后写入 `base_decision.json`。
@@ -254,11 +283,10 @@ Claude Code 的完整约束见 [.claude/skills/os-agent/SKILL.md](.claude/skills
 7. **模块评审**：Agent 以模块为阅读单位，覆盖 112 个节点，写中文 Claim、完整度、原创度、模块关键链路和总体结论。
 8. **双报告生成**：先生成 `provenance` 技术附录，再在完整性校验通过后渲染中文 `report.html`。
 
-声明是强线索但不会自动成为参考作品；年份方向只是强线索，不是硬门槛。同年高相似候选仍可能存在互抄、共同上游或协作传播，不能仅因同年排除；如果选择同年、未知年份或不在 xlsx 的开源教学项目作为 Base，主报告必须用中文说明方向不确定性、替代方向依据和未选其他候选的原因。
-旧机制标签和词表不再作为产品态工具输出，不参与导航、证据或报告内容。
+声明是强线索但不会自动成为参考作品；年份方向只是强线索，不是硬门槛。同年高相似候选仍可能存在互抄、共同上游或协作传播，不能仅因同年排除。Agent 需要抽取高相似文件/函数，用 `git log --follow`、`git blame`、`git show`、`git diff` 检查双方相似片段的首次引入时间、提交形态、批量导入痕迹、文档声明和共同第三方来源线索，并在主报告中用中文说明当前更像互抄、共同外部来源、协作共享还是方向不明。如果选择同年、未知年份或不在 xlsx 的开源教学项目作为 Base，主报告必须说明方向不确定性、替代方向依据和未选其他候选的原因。
 `judge_report_create` 默认不覆盖已有报告；切换 Base/Comparison 时使用 `judge_report_fork_for_comparison` 生成待重绑草稿。
 
-报告中的中文说明字段支持两种形态：连续解释用字符串，并列机制、分阶段结论、第一/第二/第三类判断用字符串数组。渲染器只按 Agent 显式提交的数组分条展示，不会按标点、序号或句长自动拆句。建议 `module_reviews[].overview`、`implementation_summary`、`difference_summary`、`original_work_summary`、`overall_assessment.summary`、`source_relation`、`base_selection_reason`、`scope_exclusion_process`、`directory_overview` 和 `architecture_overview` 在包含多个并列点时提交数组。`base_selection_reason` 面向评委说明为什么选中或未选中 Base；`scope_exclusion_process` 说明排除路径、证据来源、疑似第三方/生成代码是否检查过修改和实际引用。
+报告中的中文说明字段支持两种形态：连续解释用字符串，并列机制、分阶段结论、第一/第二/第三类判断用字符串数组。渲染器只按 Agent 显式提交的数组分条展示，不会按标点、序号或句长自动拆句。建议 `module_reviews[].overview`、`implementation_summary`、`difference_summary`、`original_work_summary`、`overall_assessment.summary`、`source_relation`、`base_selection_reason`、`scope_exclusion_process`、`directory_overview` 和 `architecture_overview` 在包含多个并列点时提交数组。多来源作品不要把所有来源塞进 `BaseDecision`；`BaseDecision` 只固定主骨架参考，`source_relation` 和模块 `difference_summary/original_work_summary` 用中文数组逐条说明来源名称、关系类型、影响范围、确认程度和不确定点。`base_selection_reason` 面向评委说明为什么选中或未选中 Base；`scope_exclusion_process` 说明排除路径、证据来源、疑似第三方/生成代码是否检查过修改和实际引用。
 
 `overall_assessment.directory_overview` 承载 Agent 对完整目录树的整体解释，`overall_assessment.directory_notes` 可按目录相对路径提供逐项说明，前端把说明紧跟在对应目录项后面，不替 Agent 编写目录解释。`overall_assessment.architecture_overview` 承载中文内核架构补充说明，展示在架构图下方。`overall_assessment.architecture_diagram` 若存在，必须是纯 Mermaid 内核架构图源码，不得混入说明段落；校验失败时 Agent 需要修改 JSON 后重新提交。页面对该图提供缩放、拖拽平移和重置交互，但不自动生成或修复图内容。`overall_assessment.architecture_edges` 用来索引 Agent 阅读代码后总结出的真实架构关系，不是固定模块摆盘图。每条边至少需要中文 `label` 和非空 `claim_ids`；端点可以用 `source/target` 或 `from/to` 写自由文字，也可以用 `from_module/to_module`、`module_ids`、`from_node/to_node`、`node_ids` 绑定结构化模块或节点。结构化引用会校验 ID，普通端点文字不会被当成模块强校验，MCP 不会替 Agent 自动绘图或拆句。
 
@@ -278,14 +306,14 @@ PDF 和 DOCX 文档证据分别通过 `pypdf` 与 `python-docx` 从已 checkout 
 ## Claude Code 开发态与产品态
 
 - **开发 OS-Agent 本身**：正常向 Claude Code 提出代码修改或评审请求。`/os-agent` 不会自动触发；项目 MCP 即使连接，也只是可选工具。
-- **使用 OS-Agent 分析作品**：显式执行 `/os-agent <作品名>`，可选指定输出目录；Skill 会要求执行完整 MCP 审计流程。
+- **使用 OS-Agent 分析作品**：显式执行 `/os-agent <作品名> <待查重分支>`，可选指定输出目录；Skill 会要求执行完整 MCP 审计流程。
 - **临时不启动 MCP**：可在本机 `/mcp` 中禁用 `os-agent`，或使用被 Git 忽略的 `.claude/settings.local.json`。此时不能做 MCP 集成验证或作品审计。
-- **首次克隆 OS-Agent**：Claude Code 会要求批准项目级 `.mcp.json`，批准后才会启动本地 stdio MCP。
+- **首次克隆 OS-Agent**：先 `cp .claude/mcp.json.example .claude/mcp.json`，Claude Code 会要求批准本地 `.claude/mcp.json`，批准后才会启动 stdio MCP。
 
 Git 跟踪边界：
 
-- 跟踪：`.claude/skills/os-agent/SKILL.md`、`.mcp.json`、`scripts/start_mcp.sh`、MCP/模型/渲染代码。
-- 不跟踪：`.claude/settings.local.json`、`repos/`、`output/`、`.fp_cache/` 和个人权限配置。
+- 跟踪：`.claude/skills/os-agent/SKILL.md`、`.claude/mcp.json.example`、`scripts/start_mcp.sh`、MCP/模型/渲染代码。
+- 不跟踪：`.claude/mcp.json`、`.claude/settings.local.json`、`repos/`、`output/`、`.fp_cache/` 和个人权限配置。
 
 ## 常见问题
 
@@ -303,11 +331,28 @@ Git 跟踪边界：
 
 ### MCP 无法连接怎么办？
 
-1. 确认 `OS_AGENT_PYTHON` 指向的解释器、项目 `.venv/`，或 conda 环境 `os_agent` 中已经安装 `requirements.txt`。
+1. 确认 `.claude/mcp.json` 的 `command` 指向的解释器已安装 `requirements.txt`，或项目 `.venv/`、conda 环境 `os_agent` 可用。
 2. 执行 `conda run -n os_agent python -c "import mcp, tree_sitter, pypdf, docx"` 或使用你的实际解释器检查依赖。
 3. 执行 `timeout 3 scripts/start_mcp.sh` 检查启动脚本。
 4. 在 Claude Code 中执行 `/mcp`，重新连接或重新批准 `os-agent`。
 5. 修改 MCP 服务代码后重启 Claude Code，避免旧进程继续提供旧工具定义。
+
+### MCP 与子 Agent 的性能限制
+
+OS-Agent 的 MCP 工具通过 stdio JSON-RPC 与 Claude Code 通信。这不是高性能 IPC，每次调用都要走完整的序列化/反序列化往返。以下场景性能问题尤其明显：
+
+- **`compare_functions`**：O(N×M) 函数匹配，数万到数十万次 `_pair_score` 比对，在 MCP 中无法并行，只能单线程跑，大仓库可能需要 60 分钟以上。
+- **`build_fingerprint`**：C 代码的 tree-sitter 解析可能因文件深度触发 Python 递归栈限制。
+- **并发瓶颈**：MCP 工具在 Claude Code 主会话中运行。子 Agent（通过 `Agent` 工具启动）不继承 MCP 工具注册，只能通过 Bash 执行 `python3 scripts/run_mcp_tool.py <tool> <args>` 间接调用。这种方式虽然跳过了 JSON-RPC 协议层从而更快，但子 Agent 默认用的 `python3` 可能不是 conda 环境中的，导致 `mcp` 等模块找不到。
+- **MCP 卡死**：如果 `.claude/mcp.json` 中 `command` 写的是裸 `python3`，PATH 可能解析到其他环境（如 `.venv/`），依赖不完整则 MCP 服务启动失败或超时。
+
+**对策**：
+
+1. `.claude/mcp.json` 默认从 `.claude/mcp.json.example` 复制，按 Claude Code 生成格式填写 Python 解释器绝对路径和 `mcp_server.py` 绝对路径，不要把个人绝对路径提交到 Git。
+2. 需要检查环境自动发现时，可手动运行 `scripts/start_mcp.sh`；它会读取 `OS_AGENT_PYTHON` 并搜索 `.venv`、Conda/Mamba 环境。
+3. `compare_functions` 这类计算密集操作建议走子 Agent 的 `run_mcp_tool.py` 间接调用，避免阻塞主会话。子 Agent 调用 `run_mcp_tool.py` 时同样需用 conda 环境的绝对路径。
+4. `build_fingerprint` 的递归问题通过 `sys.setrecursionlimit(100000)` 规避，已在 `run_mcp_tool.py` 中内置。
+5. 批量查重场景建议用主会话的 `Agent` 工具并发 5-10 个子 Agent，每个子 Agent 各自执行完整流程；注意清理已被 kill 的 Agent 残留子进程，避免 CPU 被孤儿 `compare_functions` 占满。
 
 ## MCP 工具推荐路径
 
@@ -317,7 +362,7 @@ Git 跟踪边界：
 
 | 阶段 | 工具 | 做什么 |
 |---|---|---|
-| 启动审计 | `repo_snapshots`、`audit_manifest_create`、`build_fingerprint` | 锁定 commit、创建审计目录、准备指纹 |
+| 启动审计 | bash `git` 检查、`audit_manifest_create`、`build_fingerprint` | 确认指定分支和干净工作树、锁定 commit、创建审计目录、准备指纹 |
 | 确认范围 | `create_scope_manifest` | 固定正式搜索范围 |
 | 参考发现 | `search_formal` | 执行正式 1-vs-N 搜索 |
 | Base 固化 | `base_evidence_packet`、`base_decision_submit` | 组包、选择 formal 候选、写入 BaseDecision |
@@ -333,7 +378,6 @@ Git 跟踪边界：
 | `node_analysis_packet` | 只在单节点返工或模块包信息不足时使用 |
 | `node_review_draft_batch` | 只生成草稿，不正式写入报告 |
 | `claim_contract` | 不确定 Claim 枚举或证据要求时查看 |
-| `code_atlas_overview` / `code_atlas_search` | 已废弃；使用 Comparison、LSP 或 bash/rg 定位 |
 | `lsp_definition` / `lsp_references` / `lsp_call_graph` | 确认关键符号、引用和调用链 |
 | `evidence_*` / `negative_search` | 注册关键锚点；普通节点说明不需要反复注册 Evidence |
 | `search_similar` | 临时粗召回，不能进入 BaseDecision 或报告排名 |
@@ -346,7 +390,7 @@ OS-Agent/
 ├── README.md
 ├── DESIGN.md
 ├── mcp_server.py
-├── .mcp.json
+├── .claude/mcp.json.example
 ├── .claude/skills/os-agent/
 │   └── SKILL.md             唯一的 Claude Code 审计工作流
 ├── scripts/                 确定性计算与报告渲染

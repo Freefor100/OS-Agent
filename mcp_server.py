@@ -99,31 +99,6 @@ def repo_metadata(target: str) -> dict:
 # ── tool: build_fingerprint ──────────────────────────────────────────
 
 @mcp.tool()
-def repo_snapshots(target: str, materialize: bool = False, include_other_branches: bool = False,
-                   offset: int = 0, limit: int = 20) -> dict:
-    """Return the clone's default checked-out branch tip plus unique branch-tip
-    versions. This never walks historical commits. Branch aliases pointing to the
-    same commit are merged; commit SHA remains the internal audit lock. Other branch
-    tips are omitted by default and paginated when explicitly requested."""
-    from core.snapshot import branch_tip_snapshots, default_snapshot
-    path = _target_path(target)
-    default = default_snapshot(path, materialize=materialize)
-    rows = branch_tip_snapshots(path, materialize=materialize)
-    others = [row for row in rows if not row["is_default"]]
-    limit = max(1, min(int(limit), 50))
-    return {
-        "target": target,
-        "selection_policy": "default_checked_out_branch_tip; inspect other unique branch tips only when needed",
-        "default_snapshot": default.to_public_dict(),
-        "other_branch_tip_count": len(others),
-        "other_branch_tips_included": include_other_branches,
-        "offset": offset if include_other_branches else 0,
-        "limit": limit if include_other_branches else 0,
-        "other_branch_tips": others[offset:offset + limit] if include_other_branches else [],
-    }
-
-
-@mcp.tool()
 def build_fingerprint(target: str, ref: str = "", branch: str = "", all_branches: bool = False) -> dict:
     """Build fingerprints from immutable commits. Branch aliases sharing a commit are deduplicated."""
     from core.snapshot import discover_commit_snapshots, resolve_snapshot
@@ -160,14 +135,15 @@ def search_similar(target: str, exclude_prefixes: list[str] | None = None,
     excluded = [ScopeExclusion(prefix, "agent_excluded", "rough recall exclude_prefixes")
                 for prefix in (exclude_prefixes or [])]
     target_scope = build_scope_manifest(snap, excluded=excluded, status="draft")
-    results = search_scoped(snap, target_scope, cached_candidate_snapshots(), top_k=top_k,
+    candidates = cached_candidate_snapshots()
+    results = search_scoped(snap, target_scope, candidates, top_k=top_k,
                             metadata=mm, formal_only=False)
     for row in results:
         row["score_kind"] = "rough"
     return {"target": target, "ref": commit_ref or "(default)", "score_kind": "rough",
             "warning": "rough recall only; cannot be used for BaseDecision or report ranking",
             "target_scope_suggestion": target_scope.to_dict(),
-            "candidate_snapshot_count": len(cached_candidate_snapshots()),
+            "candidate_snapshot_count": len(candidates),
             "candidates": results}
 
 
@@ -219,7 +195,7 @@ def search_formal(target: str, ref: str = "HEAD", top_k: int = 20, formal_only: 
     """
     from core.snapshot import resolve_snapshot
     from core.scope import build_scope_manifest, load_scope_manifest
-    from core.scoped_search import cached_candidate_snapshots, search_scoped
+    from core.scoped_search import FORMAL_SCOPE_STATUSES, cached_candidate_snapshots, search_scoped
     snap = resolve_snapshot(_target_path(target), ref)
     scope = load_scope_manifest(snap.repo, snap.commit)
     if scope is None or scope.status != "verified":
@@ -834,32 +810,6 @@ def compile_flags(target: str, ref: str = "HEAD") -> dict:
     content = generate(repo)
     return {"target": target, "ref": ref, "snapshot_path": repo, "arch": _detect_arch(Path(repo)),
             "flags": content.splitlines()}
-
-
-# ── tools: immutable CodeAtlas navigation ────────────────────────────
-
-@mcp.tool()
-def code_atlas_overview(target: str, ref: str = "HEAD", limit: int = 8) -> dict:
-    """Return immutable whole-repository structural statistics and high-centrality
-    function candidates. Use this for inexpensive architecture reconnaissance and
-    entry-point discovery, not as semantic call-chain evidence."""
-    return {"status": "deprecated", "message": "code_atlas_* tools no longer build or read atlas2 caches; use comparison DB, LSP, or bash/rg on a checked-out commit"}
-
-
-@mcp.tool()
-def code_atlas_search(target: str, ref: str = "HEAD", query: str = "", path: str = "", kind: str = "function",
-                      offset: int = 0, limit: int = 50) -> dict:
-    """Search immutable CodeAtlas functions or types by name/path."""
-    return {"status": "deprecated", "message": "code_atlas_* tools no longer build or read atlas2 caches; use comparison_search_units, LSP, or bash/rg"}
-
-
-@mcp.tool()
-def code_atlas_call_neighbors(target: str, ref: str, symbol: str, file: str = "", direction: str = "both",
-                              offset: int = 0, limit: int = 100) -> dict:
-    """Return deterministic tree-sitter call-edge candidates around a symbol.
-    Prefer lsp_call_graph for semantic confirmation of key chains; use this for
-    broad navigation, pagination, cross-checking, or when LSP is unavailable."""
-    return {"status": "deprecated", "message": "code_atlas_* tools no longer build or read atlas2 caches; use comparison_call_context, LSP, or bash/rg"}
 
 
 # ── tools: LSP (exposing 5 lsp_ops.py @tool functions) ──────────────

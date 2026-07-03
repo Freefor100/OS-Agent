@@ -8,27 +8,29 @@ disable-model-invocation: true
 
 ## 触发方式
 
-用户显式执行 `/os-agent <作品名>` 时启动本 Skill。若用户只说“分析某作品”但没有给输出目录，自动使用：
+用户显式执行 `/os-agent <作品名> <待查重分支>` 时启动本 Skill。分支必须显式给出；若用户没有给待查重分支，停止并询问分支，不得默认使用当前分支。若用户只说“分析某作品”但没有给输出目录，自动使用：
 
 ```text
 output/<repo-name>/audit-YYYYMMDD-HHMMSS/
 ```
 
-开始时只向用户确认三件事：目标作品、锁定版本、输出目录。不要要求用户理解 BaseDecision、Comparison、EvidenceStore、report_generation 等内部概念。
+开始时只向用户确认三件事：目标作品、待查重分支、输出目录。不要要求用户理解 BaseDecision、Comparison、EvidenceStore、report_generation 等内部概念。
 
 ## 原则
 
-宿主 Agent 负责判断；本地工具只做不可变快照、范围校验、确定性搜索/比较、关键证据锚定和报告投影。最终 `report.html` 必须是中文报告；必要机制名可在中文后用括号补充解释，例如“多级反馈队列（MLFQ）”“写时复制（copy-on-write）”。
+宿主 Agent 负责判断；本地工具只做版本锁定、范围校验、确定性搜索/比较、关键证据锚定和报告投影。最终 `report.html` 必须是中文报告；必要机制名可在中文后用括号补充解释，例如“多级反馈队列（MLFQ）”“写时复制（copy-on-write）”。
 
-- 开始分析前确定独立输出目录；若用户未指定，自动使用 `output/<repo-name>/audit-YYYYMMDD-HHMMSS/`，并在开始时告知用户。随后调用 `audit_manifest_create` 创建本次分析唯一的 `audit_manifest.json`，该目录固定保存 `base_decision.json`、`report.json`、`evidence_store.jsonl`、Comparison 数据库和双报告。
+- 开始分析前确定独立输出目录；若用户未指定，自动使用 `output/<repo-name>/audit-YYYYMMDD-HHMMSS/`，并在开始时告知用户。随后先用 bash 确认 `repos/<target>` 当前检出分支就是待查重分支且工作树干净，再调用 `audit_manifest_create` 创建本次分析唯一的 `audit_manifest.json`，该目录固定保存 `base_decision.json`、`report.json`、`evidence_store.jsonl`、Comparison 数据库和双报告。
 - 预建指纹阶段不得仅凭目录名硬排除 Git tracked 的支持语言源码；看起来像依赖、生成物或外部代码的路径只能作为 Scope 审核线索，不能替代证据裁决。
 - 分支只是入口；多个别名指向同一 commit 时只分析一次。
 - `search_similar` 是内部粗召回，禁止用于报告排名或 BaseDecision。
-- 正式搜索必须使用目标和候选各自的 verified ScopeManifest。
+- 正式搜索必须使用目标作品 verified ScopeManifest；候选缺少 ScopeManifest 时由程序生成确定性的 `auto_candidate` 轻量范围，不要求 Agent 为 Top-K 候选逐个补 Scope 证据。
 - 声明是强线索，不自动成为 Base；声明来源必须正式对比。
-- 同届候选只进入复审区，不能作为有方向性的主 Base。
+- Base 是解释主要公共骨架的参考锚点，不等于作品全部来源。参赛作品可能是在某个系统上演进，也可能同时参考多个开源内核、往届作品、Linux ABI/man-pages、Zircon/Fuchsia object model、论文方案、测试脚本或 AI 生成片段；Agent 必须在阅读文档和代码时判断多来源组成、各模块参考关系和真实工作量。
+- 同届候选只进入复审区，不能仅凭年份作为有方向性的主 Base；若同届候选与目标存在高相似核心代码，Agent 必须结合相似片段的 Git 历史、文档声明和第三方来源线索，推测互抄、共同外部参考、协作传播或方向不明的可能性。
+- AI/LLM/Agent 使用声明是重要线索，但不能直接等同于工作量结论。Agent 必须结合 AI 使用说明文档、仓库中的 agent/prompt/skills 配置、提交历史、代码实现深度、测试日志和模块一致性，判断 AI 参与了哪些部分、参与深度如何、哪些关键设计仍体现人工审查与整合。
 - 参赛年份、学校、队伍和是否在参赛表内，统一通过 MCP `repo_metadata`、`search_formal`、`base_evidence_packet` 等工具返回的元数据消费；不要直接读取或解析 `collected-data.xlsx`。xlsx 的地址列和表头是 MCP 内部索引实现细节，Agent 只使用工具返回的行级队伍信息。
-- Node Scope 是语义边界，不是函数路由规则，也不能单独作为查重证据。旧机制标签和词表已从产品态工具输出移除，不参与导航、证据或报告内容。
+- Node Scope 是语义边界，不是函数路由规则，也不能单独作为查重证据。
 - Agent 可解释 `modified_candidate`，但不得覆盖 `raw_status`。
 - 阅读内核实现时必须主动留意面向平台评测或公开测例的硬编码、旁路和刷分式实现，例如按固定路径、固定参数、固定测试程序名或固定设备名特判返回结果。发现后应在对应节点/模块中用中文说明其适用范围、对真实内核机制完整度的影响和评审风险；不得把这类过测旁路等同于完整通用机制。
 - 报告优先面向评委阅读，避免堆砌工具术语，使用行业常见专业用语；所有概述、模块总结、节点说明和架构边标签必须使用中文。
@@ -39,7 +41,7 @@ output/<repo-name>/audit-YYYYMMDD-HHMMSS/
 
 | 阶段 | 主路径工具 | 目的 |
 |---|---|---|
-| 启动审计 | `repo_snapshots`、`audit_manifest_create`、`build_fingerprint` | 锁定作品 commit、创建独立审计目录、准备指纹 |
+| 启动审计 | bash `git` 检查、`audit_manifest_create`、`build_fingerprint` | 确认指定分支和干净工作树、锁定 commit、创建独立审计目录、准备指纹 |
 | 确认范围 | `create_scope_manifest` | 固定学生代码范围和外部依赖排除 |
 | 参考发现 | `search_formal` | 用目标 verified scope 和候选自动轻量 scope 做正式 1-vs-N 搜索 |
 | Base 固化 | `base_evidence_packet`、`base_decision_submit` | 让 Agent 判断参考来源，并由程序校验写入 `base_decision.json` |
@@ -52,20 +54,20 @@ output/<repo-name>/audit-YYYYMMDD-HHMMSS/
 
 - `node_analysis_packet`：只在模块包信息不足或单节点返工时使用。
 - `node_review_draft_batch`：只生成草稿，不写报告；必须由宿主 Agent 审核后再用 `node_review_bundle_submit` 写入。
-- `lsp_*`、bash/rg/sed 和 Comparison 查询：用于确认关键符号、调用链和入口定位；`code_atlas_*` 已废弃。
+- `lsp_*`、bash/rg/sed 和 Comparison 查询：用于确认关键符号、调用链和入口定位。
 - `evidence_*`、`negative_search`：只注册关键锚点，不为普通 Claim 反复注册。
 - `search_similar`：只作临时粗召回，禁止进入 BaseDecision 或报告排名。
-- `judge_report_fork_for_comparison`：只在切换 Base/Comparison 时使用，不得用 `judge_report_create` 覆盖旧报告。
+- `judge_report_fork_for_comparison`：只在切换 Base/Comparison 时使用，不得用 `judge_report_create` 覆盖已有报告。
 
 ## 结构化阶段
 
-### 1. 发现目标不可变快照
+### 1. 确认工作树并锁定目标版本
 
-1. 调 `repo_snapshots(target)`。默认作品版本是 clone 当前检出分支的尖端，面向用户表述为 `作品@分支`；程序同时记录其 commit 作为整个流程的审计锁。默认响应不返回其他分支，避免占用上下文。
-2. 仅当 README、分支命名或内容表明默认分支可能不是最终作品时，才使用 `include_other_branches=true` 分页检查其他唯一分支尖端并改变选择。该接口不遍历历史 commit，并按 commit 合并等价分支别名。
-3. 后续 MCP 调用传入选定分支解析出的固定 commit，防止长流程中 ref 移动；报告正文使用 `作品@分支`，commit 仅放入版本与证据详情。
+1. 先确认用户已经显式指定待查重分支；没有分支就停止询问，不得继续。
+2. 用 bash 检查工作树，不要为这一步调用 MCP：`git -C repos/<target> branch --show-current` 必须等于待查重分支，`git -C repos/<target> status --porcelain` 必须为空。若分支不对或工作树不干净，立即停止，让用户切换分支、提交或清理后再继续。
+3. 用 bash 锁定 commit：`git -C repos/<target> rev-parse HEAD`。后续所有 MCP 调用都传入这个固定 commit，防止长流程中分支移动；报告正文使用 `作品@分支`，commit 仅放入版本与证据详情。
 4. 调 `audit_manifest_create(target, ref=<固定 commit>, output_dir=<独立输出目录>)`，固定本次审计的标准产物路径和阶段状态；若用户没有提供目录，使用 `output/<repo-name>/audit-YYYYMMDD-HHMMSS/`。
-5. 调 `build_fingerprint(target, ref=<固定 commit>)`。缓存绑定 commit 与指纹 schema，脏工作树不参与；该工具返回的 Scope 只作为 draft suggestion，不是正式 ScopeManifest。
+5. 调 `build_fingerprint(target, ref=<固定 commit>)`。它从 Git commit blob 在内存中计算指纹，缓存绑定 commit 与指纹 schema，脏工作树不参与；该工具返回的 Scope 只作为 draft suggestion，不是正式 ScopeManifest。
 
 ### 2. 确认目标 ScopeManifest
 
@@ -88,10 +90,13 @@ output/<repo-name>/audit-YYYYMMDD-HHMMSS/
 1. 调 `base_evidence_packet(target, ref, formal_candidates, target_year, include_declarations=true)`。
 2. Agent 综合正式排名、年份方向、声明验证、核心目录覆盖和差异解释能力选择候选。
 3. 调用 `base_decision_submit(decision, packet, output_path=<输出目录>/base_decision.json)`。主 Base 必须按 repo+commit 引用 formal 候选；程序校验它来自 packet 并固化 `base_decision.json`。
-4. BaseDecision 保持简洁：只写选择对象和必要备注，不要求手工注册或回填 formal_search evidence。主报告中的选择依据仍以后续 `overall_assessment.base_selection_reason` 的中文说明为准。
-5. 年份方向是强线索，不是程序硬门槛。xlsx 中有明确更早年份的候选方向性最强；同年候选仍可能存在互抄、共同上游或协作传播，不能仅因同年排除，但必须在主报告中说明方向不确定或给出额外方向依据。对不在 xlsx 的开源教学项目、框架或公开上游，若有声明、公开来源、git 历史或项目关系证据，也可以选择为 Base，但必须在主报告中说明年份表无法校验及替代方向依据。明确更晚年份的候选若被选作主要参考，也必须说明为什么时间表不能直接否定该关系。
-6. 对去声明回归，再以 `include_declarations=false` 组包并验证同一决定。
-7. 仅当无可靠正式 Base、声明来源均已强制对比且程序准入时，才允许独立报告。
+4. BaseDecision 保持简洁：只写选择对象和必要备注，不要求手工注册或回填 formal_search evidence，也不要把多来源表塞进 BaseDecision。主报告中的选择依据仍以后续 `overall_assessment.base_selection_reason` 的中文说明为准。
+5. 如果作品声明或代码显示多来源组合，不要试图把所有来源塞进主 Base。选择能解释最大公共骨架或最关键继承链路的主 Base；其他重要来源作为模块级次级来源、公开方案参考、局部借鉴、同届传播疑点或 AI 辅助片段，在后续 ModuleReview/OverallAssessment 中说明，必要时用 `comparison_add_secondary_source` 补局部候选边。
+6. 年份方向是强线索，不是程序硬门槛。xlsx 中有明确更早年份的候选方向性最强；同年候选仍可能存在互抄、共同上游或协作传播，不能仅因同年排除。对同届高相似候选，必须抽取若干相似度最高、最有区分度的文件/函数，用 bash `git log --follow`、`git blame`、`git show`、`git diff` 检查双方相似片段的首次引入时间、提交形态、作者/提交信息、是否批量导入、是否逐步演化、是否同时指向同一个外部目录/文档/上游仓库；必要时对疑似共同上游运行正式搜索或补充 `comparison_add_secondary_source`。
+7. 同届传播判断必须写成概率性、证据化结论，不得只凭 commit 时间断言。可用分类包括：目标更可能吸收候选、候选更可能吸收目标、双方共同参考第三方、协作/共享代码传播、当前证据不足。若仓库历史很浅、经过 squash、批量导入或时间戳不可信，必须说明这一限制。
+8. 对不在 xlsx 的开源教学项目、框架或公开上游，若有声明、公开来源、git 历史或项目关系证据，也可以选择为 Base，但必须在主报告中说明年份表无法校验及替代方向依据。明确更晚年份的候选若被选作主要参考，也必须说明为什么时间表不能直接否定该关系。
+9. 对去声明回归，再以 `include_declarations=false` 组包并验证同一决定。
+10. 仅当无可靠正式 Base、声明来源均已强制对比且程序准入时，才允许独立报告。
 
 ### 5. Comparison 数据库与按需消费
 
@@ -112,22 +117,28 @@ output/<repo-name>/audit-YYYYMMDD-HHMMSS/
 4. 按模块或强相关模块组开少量 sub-agent。每个 sub-agent 负责读代码、理解功能范围、形成中文草稿；不得直接写共享 `report.json`。
 5. 分析任何节点前必须先读 scope。scope 是功能边界，不是证据；它告诉 Agent 该节点应该解释哪类内核功能。
 6. 关键调用链优先用带目标 `ref` 的 LSP、Comparison 工具或 bash/rg/sed/cat 确认；直接读源码前必须确认 `repos/<target>` 和 `repos/<base>` 已处于 BaseDecision 刚判断出的 detached commit。普通源码定位可以写入 Claim 文本、文件路径或函数名；只有关键锚点才注册 Evidence。
-7. 宿主 Agent 汇总草稿后，为每个节点调用一次 `node_review_bundle_submit(..., expected_generation=<module_analysis_packet 返回值>)` 原子提交 Claims 与 NodeReview。该工具会生成 claim_id 并回填到 review/degree；同一节点返工时会替换该节点旧 Claims 与旧 NodeReview，避免残留过时结论。`claim_submit`、`claim_update`、`node_review_submit` 仅作调试或局部修补入口，不作为主流程。
-8. 每个 NodeReview 必须用中文说明“代码如何实现该功能范围”、与参考作品差异、完整度、原创度和风险。函数、文件和 comparison 不要求机械归属节点。
-9. 若节点或模块中发现过测旁路、平台评测特判、公开测例特判或其他硬编码刷分行为，必须在 NodeReview 或 ModuleReview 的风险/差异/完整度说明中明确指出，并尽量锚定到具体文件、函数、条件判断或字符串常量；只有关键结论才注册 Evidence。
-10. 完成一个模块后，宿主 Agent 提交 `ModuleReview`。模块页是核心阅读单位，必须把节点事实抽象成模块能力、关键机制链路和实现差异。`overview`、`implementation_summary`、`difference_summary`、`original_work_summary` 可以是中文字符串，也可以是中文字符串数组；当内容包含多个并列机制、多个阶段、第一/第二/第三类结论时，必须提交数组，不要把所有机制堆成一个长段落。
-11. 14 个模块完成后，宿主 Agent 提交 `OverallAssessment`。总体摘要、来源关系、Base 选择依据、Scope 排除过程、目录结构解释和架构说明同样遵守上一条：并列条目用数组表达，长解释才用段落字符串。渲染器只按显式数组分条显示，不会根据“第一、第二”、标点或句长自动拆分。
-    - `base_selection_reason` 必须用评委能读懂的中文说明为什么选中当前 Base 或为什么没有可靠 Base；应覆盖正式排名/相似度、核心目录覆盖、声明来源、年份或替代方向依据、同年/未知年份候选的方向不确定性、未选择主要候选的原因。不要求写复杂结构。
+7. 了解作品时必须先读 README、设计文档、比赛说明、NOTICE/LICENSE、依赖配置和主要脚本，再用代码确认文档声明。若仓库存在 source-attribution、RFC/ADR、decision records、devlog、register/current-limitations、book/meta/sources、测试覆盖说明、AI usage、agent workflow、prompt、skills 或 `.agents/` / `.claude/` 配置文档，必须优先读取它们，形成内部“来源假设表”：每条假设至少包含来源名称、影响模块/机制、声明位置、需要代码确认的路径、确认方式和不确定点。对同届高相似候选，还要补一组“传播假设”：相似片段、双方引入提交、可能方向、共同上游候选和历史可信度。不要把这些表另存文件，最终把结论写入模块评审和总体评审。
+8. 对 AI 参与形成单独的内部判断：先记录作者声明使用的工具/模型/流程和覆盖范围，再用代码与历史确认。检查点包括：是否存在 AI usage 或 prompt/agent 配置；提交是否呈现大批量生成、机械式跨模块改写或长间隔单次导入；不同模块代码风格、错误处理、注释、测试和文档是否一致；关键内核机制是否只有表层包装或测试驱动补丁；复杂设计是否有 RFC/ADR、审查记录、日志和验证闭环支撑；AI 生成材料是否与代码事实一致。不得因为声明使用 AI 就降低评价，也不得因为未声明就默认无 AI 参与。
+9. 重点识别六类来源关系：整体框架继承、模块级实现借鉴、Linux/POSIX ABI 或 man-pages 语义参考、非 Linux 系统设计参考、论文/教材/算法方案参考、生成代码或 AI 辅助片段。文档只给假设，结论必须用 Comparison、源码结构、调用链、依赖配置、关键 Evidence 或负向搜索校验；如果只是概念参考而没有可直接对比的代码，应明确写成“设计参考/语义对齐”，不要写成代码继承。
+10. 判断工作量不能只看相似度或函数数量。每个模块都要结合代码确认：哪些是直接继承，哪些是适配移植，哪些是新增机制，哪些只是测试开关或过测脚本；哪些可能主要由 AI 生成、哪些体现人工设计/审查/集成；重点看跨模块集成、架构移植、系统调用兼容、文件系统/网络/进程/内存语义补全、错误处理和真实通用性。若声明“基于 StarryOS/ArceOS 演进”“参考多个实例系统”“AI 辅助生成”，或像复杂 RFC 项目一样列出 Linux、Zircon/Fuchsia、Rust/OS 设计等多类外部材料，必须分别确认对应代码路径和实际贡献边界。
+11. 宿主 Agent 汇总草稿后，为每个节点调用一次 `node_review_bundle_submit(..., expected_generation=<module_analysis_packet 返回值>)` 原子提交 Claims 与 NodeReview。该工具会生成 claim_id 并回填到 review/degree；同一节点返工时按本次提交内容重写该节点 Claims 与 NodeReview。`claim_submit`、`claim_update`、`node_review_submit` 仅作调试或局部修补入口，不作为主流程。
+12. 每个 NodeReview 必须用中文说明“代码如何实现该功能范围”、与主 Base 和已发现次级来源的差异、完整度、原创度、实际工作量、AI 参与迹象和风险。函数、文件和 comparison 不要求机械归属节点。
+13. 若节点或模块中发现过测旁路、平台评测特判、公开测例特判或其他硬编码刷分行为，必须在 NodeReview 或 ModuleReview 的风险/差异/完整度说明中明确指出，并尽量锚定到具体文件、函数、条件判断或字符串常量；只有关键结论才注册 Evidence。
+14. 完成一个模块后，宿主 Agent 提交 `ModuleReview`。模块页是核心阅读单位，必须把节点事实抽象成模块能力、关键机制链路、来源关系、工作量和实现差异。`difference_summary` 应区分主 Base 差异、模块级次级代码来源、设计/ABI/算法参考和无法确认的相似点；`original_work_summary` 应说明代码层新增、语义层补全、跨子系统集成、测试/材料工程、AI 辅助生成和人工整合审查分别占什么位置。存在多来源时，模块字段必须用中文数组逐条写清“来源/关系类型/影响范围/确认程度/不确定点”，例如“文件系统 cache 层与 B 的 inode-cache 路径高度接近，属于模块级代码参考，已由 Comparison 与源码证据确认；目录遍历错误处理为本作品重写”。`overview`、`implementation_summary`、`difference_summary`、`original_work_summary` 可以是中文字符串，也可以是中文字符串数组；当内容包含多个并列机制、多个阶段、第一/第二/第三类结论时，必须提交数组，不要把所有机制堆成一个长段落。
+15. 14 个模块完成后，宿主 Agent 提交 `OverallAssessment`。总体摘要、来源关系、Base 选择依据、Scope 排除过程、目录结构解释和架构说明同样遵守上一条：并列条目用数组表达，长解释才用段落字符串。渲染器只按显式数组分条显示，不会根据“第一、第二”、标点或句长自动拆分。
+    - `base_selection_reason` 必须用评委能读懂的中文说明为什么选中当前 Base 或为什么没有可靠 Base；应覆盖正式排名/相似度、核心目录覆盖、声明来源、年份或替代方向依据、同年/未知年份候选的方向不确定性、相似片段 Git 历史推断、未选择主要候选的原因，以及主 Base 无法覆盖的其他重要参考来源。不要求写复杂结构。多来源作品中，这里只解释“为什么主 Base 只能代表主骨架”，并说明其他来源为什么不是主 Base。
+    - `source_relation` 必须说明作品的整体来源形态：单一前代演进、多来源模块组合、公开教学内核框架加自研模块、测试驱动适配、AI 辅助实现、同届传播疑点或无可靠来源。若存在多个来源，必须用中文数组按模块或机制逐条概述：每条包含来源名称、关系类型、影响范围、代码确认程度、关键证据或确认方式、剩余不确定点；若存在同届高相似，应明确写出当前更像互抄、共同外部来源、协作共享还是方向不明；若存在 AI 参与，应说明 AI 更像参与了代码生成、测试补丁、文档材料、方案设计还是局部重构。不要新增前端不展示的隐藏 `source_map` 字段来代替中文结论。
+    - `original_work_summary` 必须评估实际工作量，而不是只给原创度形容词；应说明哪些工作属于移植/适配/补全/重写/集成，哪些只是配置、测试脚本或声明层面的变化，哪些可能主要由 AI 生成，哪些体现人工选择、验证、审查和系统集成。
     - `scope_exclusion_process` 必须用中文概述 Scope 审核和排除过程；应说明排除了哪些主要路径、证据来源、是否检查疑似第三方/生成代码是否被修改或实际引用，以及仍不确定的范围风险。不要求列出全部函数或全部 Evidence。
-12. `directory_overview` 必须解释该作品真实目录组织；`directory_notes` 应按目录相对路径写中文说明，例如 `{"kernel": "内核主体，包含调度、内存、文件系统和驱动实现", "xv6-user": "用户态程序与系统调用测试"}`。前端会把说明紧跟在对应目录项后面，不会替 Agent 解释目录含义。
-13. 架构部分必须体现该作品的内核独特设计：用中文填写 `architecture_overview`。如提交 `architecture_diagram`，该字段必须是纯 Mermaid 内核架构图源码，不得混入中文解释、段落说明或列表；解释文字必须放回 `architecture_overview` 并在图下方展示。`judge_report_validate/render` 会校验 Mermaid 行级语法，失败时 Agent 必须修改 `overall_assessment` 后重新提交。`architecture_edges` 只作为结构化索引，不是自动绘图输入。每条边至少包含中文 `label` 和非空 `claim_ids`；可选填写 `type`、`source/target` 或 `from/to` 作为自由端点文字，也可选填写 `from_module/to_module`、`module_ids`、`from_node/to_node`、`node_ids` 作为结构化引用。结构化模块必须是 14 个模块 ID，结构化节点必须是 112 个节点 ID。MCP 不会替 Agent 自动绘制、拆句或修复架构图。
+16. `directory_overview` 必须解释该作品真实目录组织；`directory_notes` 应按目录相对路径写中文说明，例如 `{"kernel": "内核主体，包含调度、内存、文件系统和驱动实现", "xv6-user": "用户态程序与系统调用测试"}`。前端会把说明紧跟在对应目录项后面，不会替 Agent 解释目录含义。
+17. 架构部分必须体现该作品的内核独特设计：用中文填写 `architecture_overview`。如果作品使用 RFC/ADR/decision-record 风格维护设计，架构说明必须反映其稳定不变量和被拒绝方案，例如所有权边界、状态机、等待/唤醒协议、VFS/设备/内存对象模型，而不是只复述目录结构；如果这些设计文档或图表明显由 AI 辅助生成，也要结合代码确认哪些架构关系真实落地。如提交 `architecture_diagram`，该字段必须是纯 Mermaid 内核架构图源码，不得混入中文解释、段落说明或列表；解释文字必须放回 `architecture_overview` 并在图下方展示。`judge_report_validate/render` 会校验 Mermaid 行级语法，失败时 Agent 必须修改 `overall_assessment` 后重新提交。`architecture_edges` 只作为结构化索引，不是自动绘图输入。每条边至少包含中文 `label` 和非空 `claim_ids`；可选填写 `type`、`source/target` 或 `from/to` 作为自由端点文字，也可选填写 `from_module/to_module`、`module_ids`、`from_node/to_node`、`node_ids` 作为结构化引用。结构化模块必须是 14 个模块 ID，结构化节点必须是 112 个节点 ID。MCP 不会替 Agent 自动绘制、拆句或修复架构图。
 
 ### 7. 关键 Evidence 锚定
 
-1. EvidenceStore 固定为当前报告目录下的 `evidence_store.jsonl`，但 Evidence 只作为关键审计锚点，不再要求普通节点每个 Claim 都注册。Evidence 工具直接读取当前工作树；调用前 Agent 必须把对应 repo checkout 到锁定 commit 并保持 `git status --porcelain` 干净，MCP 会强制校验 HEAD 与工作树状态。
-2. 必须注册 Evidence 的场景：BaseDecision、Scope 排除、负向搜索、关键继承/独立结论、架构边支撑、模块置顶 Claim。
+1. EvidenceStore 固定为当前报告目录下的 `evidence_store.jsonl`。Evidence 作为关键审计锚点使用，普通节点 Claim 可直接写中文分析。Evidence 工具直接读取当前工作树；调用前 Agent 必须把对应 repo checkout 到锁定 commit 并保持 `git status --porcelain` 干净，MCP 会强制校验 HEAD 与工作树状态。
+2. 必须注册 Evidence 的场景：BaseDecision、Scope 排除、负向搜索、关键继承/独立结论、同届高相似传播判断、关键 AI 参与判断、架构边支撑、模块置顶 Claim。
 3. 普通实现说明、普通差异说明和风险提示可以直接写中文 Claim，并附文件/函数/源码位置文字；不要为了填表反复调用 Evidence 工具。
-4. 需要注册时优先批量：源码用 `evidence_source_batch`，文件工件用 `binary_artifact/file_artifact`，文档用 `evidence_document`，负向结论用 `negative_search`。
+4. 需要注册时优先批量：源码用 `evidence_source_batch`，文件工件用 `binary_artifact/file_artifact`，文档或 AI 使用说明用 `evidence_document`，负向结论用 `negative_search`，提交历史判断用 `evidence_structured(kind="git_history", metadata={...})` 记录双方 repo、相似路径/函数、关键 commits、时间顺序、传播假设和限制。AI 参与判断应同时锚定 AI usage/prompt/agent 配置文档和能体现实现深度或生成痕迹的代码/提交历史证据。
 5. Claim 不得编造 evidence_id；只有 MCP 返回的 `evidence_id` 才能作为关键证据锚点。
 
 ### 8. 负向搜索
@@ -145,7 +156,6 @@ output/<repo-name>/audit-YYYYMMDD-HHMMSS/
 5. `report.html` 由 `web_report/` 的 React + Vite + TypeScript 静态前端投影 `report.json` 生成，不由 Python 拼接业务页面。渲染前必须已存在 `web_report/dist/index.html`；本机首次使用或修改前端后执行 `cd web_report && npm install && npm run build`。页面只展示中文总概述、模块概述、关键链路、完整度/原创度矩阵、节点细节、语言占比、完整目录树和少量关键证据锚点；不展示函数状态内部术语、完整函数列表或全局 Evidence 池。架构图在页面中支持按钮缩放、拖拽平移和重置，但图内容必须仍由 Agent 提交的 Mermaid 内核架构图决定。
 6. Evidence 在主报告中放在相关模块/节点页面底部，以彩色证据卡展示。Claim 上的证据按钮只跳转到本页对应证据卡；正文不得平铺全局 Evidence 池。节点没有关键证据时必须由 Agent 在 Claim/Review 中明确说明原因，渲染器不会替 Agent 补证据。
 7. `provenance.html` 只展示程序计算的函数匹配、来源候选与源码对照，不生成原创度、实现度或 Agent Claim。
-8. 旧混合 `AuditProject/Finding/index.html` 流程已废弃，不得生成或复用。
 
 标准产物目录必须包含：
 

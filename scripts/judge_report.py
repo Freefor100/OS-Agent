@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import sys
 from pathlib import Path
@@ -68,21 +69,31 @@ EVIDENCE_KIND_LABELS = {
 }
 
 
-def render(report: dict[str, Any]) -> str:
+def render(report: dict[str, Any], base_decision: dict[str, Any] | None = None) -> str:
     errors = validate_judge_report(report, require_complete=True)
     if errors:
         raise ValueError("judge report validation failed: " + "; ".join(errors))
-    data = _build_view_model(report)
+    data = _build_view_model(report, base_decision or {})
     return _dist_index().replace("__REPORT_DATA__", _json_for_script(data))
 
 
 def render_to_file(report: dict[str, Any], output: Path) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(render(report), encoding="utf-8")
+    output.write_text(render(report, _read_base_decision(output.parent)), encoding="utf-8")
     _copy_dist_assets(output.parent)
 
 
-def _build_view_model(report: dict[str, Any]) -> dict[str, Any]:
+def _read_base_decision(report_dir: Path) -> dict[str, Any]:
+    path = report_dir / "base_decision.json"
+    if not path.is_file():
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def _build_view_model(report: dict[str, Any], base_decision: dict[str, Any]) -> dict[str, Any]:
     evidence = _read_evidence(report["evidence_store"])
     claims = report.get("claims") or []
     module_reviews = report.get("module_reviews") or []
@@ -102,7 +113,7 @@ def _build_view_model(report: dict[str, Any]) -> dict[str, Any]:
             "claim": CLAIM_LABELS,
             "evidenceKind": EVIDENCE_KIND_LABELS,
         },
-        "projectMeta": _project_meta(report),
+        "projectMeta": _project_meta(report, base_decision),
         "projectProfile": _project_profile(report),
         "evidenceLabels": evidence_labels,
         "evidence": evidence_rows,
@@ -200,7 +211,7 @@ def _read_evidence(path: str) -> dict[str, dict[str, Any]]:
     return out
 
 
-def _project_meta(report: dict[str, Any]) -> list[dict[str, str]]:
+def _project_meta(report: dict[str, Any], base_decision: dict[str, Any]) -> list[dict[str, str]]:
     work = report.get("work") or {}
     reference = report.get("reference") or {}
     work_snapshot = work.get("snapshot") or {}
@@ -208,15 +219,81 @@ def _project_meta(report: dict[str, Any]) -> list[dict[str, str]]:
     work_meta = _repo_metadata(str(work_snapshot.get("repo") or ""))
     ref_meta = _repo_metadata(str(reference_snapshot.get("repo") or ""))
     base = f"{reference_snapshot.get('repo') or '无'}@{_display_ref(reference_snapshot)}" if reference_snapshot else "无可靠 Base"
+    base_year = _base_year(report, base_decision, ref_meta)
     rows = [
         {"label": "作品队伍", "value": _team_label(work_meta, work.get("display_name") or work_snapshot.get("repo") or "")},
         {"label": "年份", "value": str(work_meta.get("year") or _year_from_display(work.get("display_name") or ""))},
         {"label": "分析分支", "value": _display_ref(work_snapshot)},
         {"label": "推测 Base", "value": base},
+        {"label": "Base 年份", "value": base_year},
     ]
     if ref_meta:
         rows.append({"label": "Base 队伍", "value": _team_label(ref_meta, reference.get("display_name") or reference_snapshot.get("repo") or "")})
     return rows
+
+
+def _base_year(report: dict[str, Any], base_decision: dict[str, Any], ref_meta: dict[str, Any]) -> str:
+    if ref_meta.get("year"):
+        return str(ref_meta["year"])
+
+    decision = base_decision.get("decision") if isinstance(base_decision.get("decision"), dict) else {}
+    candidates = [
+        decision.get("base_year"),
+        (decision.get("decision_factors") or {}).get("base_year") if isinstance(decision.get("decision_factors"), dict) else None,
+        (decision.get("primary_base") or {}).get("year") if isinstance(decision.get("primary_base"), dict) else None,
+        (decision.get("selected_formal_candidate") or {}).get("year") if isinstance(decision.get("selected_formal_candidate"), dict) else None,
+        (decision.get("evidence") or {}).get("original_year") if isinstance(decision.get("evidence"), dict) else None,
+    ]
+    for value in candidates:
+        year = _coerce_year(value)
+        if year:
+            return year
+
+    text_fields = [
+        decision.get("base_selection_reason"),
+        decision.get("year_direction_note"),
+        decision.get("year_relation"),
+        (decision.get("decision_factors") or {}).get("reason") if isinstance(decision.get("decision_factors"), dict) else None,
+        (report.get("overall_assessment") or {}).get("base_selection_reason") if isinstance(report.get("overall_assessment"), dict) else None,
+        (report.get("overall_assessment") or {}).get("source_relation") if isinstance(report.get("overall_assessment"), dict) else None,
+    ]
+    for value in text_fields:
+        year = _year_from_base_text(str(value or ""))
+        if year:
+            return year
+
+    reference = report.get("reference") or {}
+    reference_snapshot = reference.get("snapshot") or {}
+    for value in (reference_snapshot.get("repo"), reference.get("display_name")):
+        year = _coerce_year(value)
+        if year:
+            return year
+    return "未知"
+
+
+def _coerce_year(value: Any) -> str:
+    if isinstance(value, int) and 2000 <= value <= 2099:
+        return str(value)
+    return _year_from_display(str(value or ""))
+
+
+def _year_from_base_text(text: str) -> str:
+    if not text:
+        return ""
+    explicit = re.search(r"(?:Base|base|基准|参考|来源|上游|原始|选择)[^。；;，,\n]{0,40}?(20\d{2})", text)
+    if explicit:
+        return explicit.group(1)
+    relation = re.search(r"(20\d{2})\s*(?:_to_|至|到|->|→)\s*20\d{2}", text)
+    if relation:
+        return relation.group(1)
+    years = re.findall(r"20\d{2}", text)
+    unique = []
+    for year in years:
+        if year not in unique:
+            unique.append(year)
+    if len(unique) == 1:
+        return unique[0]
+    return ""
 
 
 def _repo_metadata(repo: str) -> dict[str, Any]:

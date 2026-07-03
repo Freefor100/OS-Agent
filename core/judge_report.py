@@ -419,14 +419,27 @@ def validate_judge_report(report: dict[str, Any], *, require_complete: bool = Tr
     errors: list[str] = []
     if report.get("schema_version") != JUDGE_REPORT_SCHEMA:
         errors.append(f"schema_version must be {JUDGE_REPORT_SCHEMA}")
-    try:
-        database = resolve_database(str(report.get("comparison_database") or report.get("comparison_run_id") or ""))
-        meta = run_metadata(database)
-    except (ValueError, OSError) as exc:
-        return errors + [str(exc)]
-    if report.get("comparison_run_id") != meta["run_id"]:
-        errors.append("comparison_run_id does not match database")
-    refs = reference_sets(database)
+
+    base_decision = report.get("base_decision_summary") or {}
+    no_reliable = bool(base_decision.get("no_reliable_base", False))
+    comp_db = str(report.get("comparison_database") or "")
+    comp_run = str(report.get("comparison_run_id") or "")
+    has_no_comparison = not comp_db and not comp_run
+
+    if no_reliable and has_no_comparison:
+        # no_reliable_base with empty comparison: no database to validate against
+        database = ""
+        meta = {"run_id": "", "schema_version": "", "target_snapshot": {}, "base_snapshot": {}, "target_scope": {}, "base_scope": {}}
+        refs = {"comparison_ids": set(), "edge_ids": set(), "hint_ids": set(), "target_files": set()}
+    else:
+        try:
+            database = resolve_database(comp_db or comp_run)
+            meta = run_metadata(database)
+        except (ValueError, OSError) as exc:
+            return errors + [str(exc)]
+        if report.get("comparison_run_id") != meta["run_id"]:
+            errors.append("comparison_run_id does not match database")
+        refs = reference_sets(database)
     evidence = _evidence_records(str(report.get("evidence_store") or ""))
     claims: dict[str, dict[str, Any]] = {}
     standard_nodes = set(ANALYSIS_ORDER_V2)
@@ -551,7 +564,7 @@ def validate_judge_report(report: dict[str, Any], *, require_complete: bool = Tr
         if claim_id not in claims:
             errors.append(f"highlight references missing claim {claim_id}")
 
-    if require_complete:
+    if require_complete and not (no_reliable and has_no_comparison):
         for node_id in ANALYSIS_ORDER_V2:
             if node_id not in node_reviews:
                 errors.append(f"missing node review {node_id}")

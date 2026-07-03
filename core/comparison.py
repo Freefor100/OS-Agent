@@ -12,10 +12,14 @@ from tools.code_atlas.minhash import jaccard_estimate, signature_from_set
 COMPARISON_SCHEMA = "function_comparison_v4_joint_match"
 EDGE_THRESHOLD = 0.45
 STATUSES = ("exact_copied", "renamed_exact", "modified_candidate", "target_only", "base_only", "ambiguous")
+WEAK_CANDIDATE_BUCKET_LIMIT = 96
 
 
 def compare_unit_sets(target_units: list[dict[str, Any]], base_units: list[dict[str, Any]], *, target_snapshot: dict | None = None,
                       base_snapshot: dict | None = None) -> dict[str, Any]:
+    _NEIGHBOR_SIG_CACHE.clear()
+    _PAIR_SIGNALS_CACHE.clear()
+    _PAIR_SCORE_CACHE.clear()
     match_edges = build_match_edges(target_units, base_units, source_role="primary_base", source_repo=str((base_snapshot or {}).get("repo") or ""))
     edge_by_pair = {(row["target_unit_id"], row["source_unit_id"]): row["edge_id"] for row in match_edges}
     by_fp: dict[str, list[dict[str, Any]]] = defaultdict(list)
@@ -45,9 +49,27 @@ def compare_unit_sets(target_units: list[dict[str, Any]], base_units: list[dict[
         else:
             unresolved.append(target)
 
-    remaining_base = [x for x in base_units if str(x.get("unit_id")) not in used_base]
+    remaining_by_id = {str(x.get("unit_id")): x for x in base_units if str(x.get("unit_id")) not in used_base}
+
+    # Build a candidate index from existing match edges so the scoring loop
+    # only evaluates plausible pairs instead of O(n*m) on the full set.
+    # build_match_edges already found edges for units sharing FP/AST/name/leaf.
+    _candidates_by_target: dict[str, set[str]] = defaultdict(set)
+    for edge in match_edges:
+        tid = str(edge.get("target_unit_id") or "")
+        sid = str(edge.get("source_unit_id") or "")
+        if tid and sid:
+            _candidates_by_target[tid].add(sid)
+
     for target in unresolved:
-        ranked = sorted(((_pair_score(target, base), base) for base in remaining_base), key=lambda x: x[0], reverse=True)
+        tid = str(target.get("unit_id") or "")
+        candidate_ids = _candidates_by_target.get(tid, set())
+        if not candidate_ids:
+            comparisons.append(_record("target_only", target, None, {"reason": "no deterministic base match"}, edge_by_pair))
+            continue
+        candidates = [remaining_by_id[bid] for bid in candidate_ids if bid in remaining_by_id]
+
+        ranked = sorted(((_pair_score(target, base), base) for base in candidates), key=lambda x: x[0], reverse=True)
         viable = [(score, base) for score, base in ranked if _is_modified_candidate(target, base, score)]
         if not viable:
             comparisons.append(_record("target_only", target, None, {"reason": "no deterministic base match"}, edge_by_pair))
@@ -63,7 +85,7 @@ def compare_unit_sets(target_units: list[dict[str, Any]], base_units: list[dict[
         score, chosen = viable[0]
         comparisons.append(_record("modified_candidate", target, chosen, _signals(target, chosen) | {"pair_score": round(score, 3)}, edge_by_pair))
         used_base.add(str(chosen["unit_id"]))
-        remaining_base = [x for x in remaining_base if str(x.get("unit_id")) != str(chosen.get("unit_id"))]
+        remaining_by_id.pop(str(chosen.get("unit_id")), None)
 
     for base in base_units:
         if str(base.get("unit_id")) not in used_base and str(base.get("unit_id")) not in ambiguous_base:
@@ -147,12 +169,34 @@ def build_match_edges(target_units: list[dict[str, Any]], source_units: list[dic
     edges=[]; seen=set()
     for target in target_units:
         candidates={}
-        for rows in (by_fp.get(str(target.get("fp") or ""),[]), by_ast.get(str(target.get("ast") or ""),[]), by_name.get(_name(target),[]), by_leaf.get(Path(str(target.get("file") or "")).name.lower(),[])):
+        candidate_buckets = (
+            by_fp.get(str(target.get("fp") or ""), []),
+            by_ast.get(str(target.get("ast") or ""), []),
+            _bounded_bucket(by_name.get(_name(target), [])),
+            _bounded_bucket(by_leaf.get(Path(str(target.get("file") or "")).name.lower(), [])),
+        )
+        for rows in candidate_buckets:
             for source in rows: candidates[str(source.get("unit_id"))]=source
         for source in candidates.values():
             key=(str(target.get("unit_id")),str(source.get("unit_id")))
             if key in seen: continue
-            seen.add(key); signals=_signals(target,source); score=1.0 if signals["exact_token_fp"] else _pair_score(target,source)
+            seen.add(key)
+            if str(target.get("fp") or "") and str(target.get("fp")) == str(source.get("fp")):
+                # Exact fp match — skip expensive _signals / _pair_score
+                signals = {
+                    "same_name": _name(target) == _name(source),
+                    "exact_token_fp": True,
+                    "exact_ast_shape": bool(target.get("ast") and target.get("ast") == source.get("ast")),
+                    "token_similarity": 1.0,
+                    "path_role_similarity": _path_role_similarity(target, source),
+                    "call_neighbor_similarity": 0.0,
+                }
+                _PAIR_SIGNALS_CACHE[_pair_key(target, source)] = signals
+                _PAIR_SCORE_CACHE[_pair_key(target, source)] = 1.0
+                score = 1.0
+            else:
+                signals = _signals(target, source)
+                score = _pair_score(target, source)
             if score < EDGE_THRESHOLD: continue
             edges.append({"edge_id":stable_id("edge",{"target":key[0],"source":key[1],"role":source_role},16),"target_unit_id":key[0],"source_unit_id":key[1],"source_role":source_role,"source_repo":source_repo,"pair_score":round(score,3),"signals":signals})
     return sorted(edges,key=lambda row:(row["target_unit_id"],-row["pair_score"],row["source_unit_id"]))
@@ -171,12 +215,22 @@ def _compact(unit: dict | None) -> dict | None:
     return {key: unit.get(key) for key in ("unit_id", "file", "line", "end_line", "name", "lang", "sz", "fp", "ast", "commit")}
 
 
+def _bounded_bucket(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return rows if len(rows) <= WEAK_CANDIDATE_BUCKET_LIMIT else []
+
+
 def _signals(target: dict, base: dict) -> dict[str, Any]:
+    key = _pair_key(target, base)
+    cached = _PAIR_SIGNALS_CACHE.get(key)
+    if cached is not None:
+        return cached
     token = jaccard_estimate(target.get("sig") or [], base.get("sig") or []) if target.get("sig") and base.get("sig") else 0.0
     neighbors = _neighbor_similarity(target, base)
-    return {"same_name": _name(target) == _name(base), "exact_token_fp": bool(target.get("fp") and target.get("fp") == base.get("fp")),
-            "exact_ast_shape": bool(target.get("ast") and target.get("ast") == base.get("ast")), "token_similarity": round(token, 3),
-            "path_role_similarity": round(_path_role_similarity(target, base), 3), "call_neighbor_similarity": round(neighbors, 3)}
+    signals = {"same_name": _name(target) == _name(base), "exact_token_fp": bool(target.get("fp") and target.get("fp") == base.get("fp")),
+               "exact_ast_shape": bool(target.get("ast") and target.get("ast") == base.get("ast")), "token_similarity": round(token, 3),
+               "path_role_similarity": round(_path_role_similarity(target, base), 3), "call_neighbor_similarity": round(neighbors, 3)}
+    _PAIR_SIGNALS_CACHE[key] = signals
+    return signals
 
 
 def _is_modified_candidate(target: dict, base: dict, score: float) -> bool:
@@ -187,21 +241,44 @@ def _is_modified_candidate(target: dict, base: dict, score: float) -> bool:
 
 
 def _pair_score(target: dict, base: dict) -> float:
+    key = _pair_key(target, base)
+    cached = _PAIR_SCORE_CACHE.get(key)
+    if cached is not None:
+        return cached
     sig = _signals(target, base)
     name = 1.0 if sig["same_name"] else 0.0
     ast = 1.0 if sig["exact_ast_shape"] else 0.0
     score = 0.25 * name + 0.30 * sig["token_similarity"] + 0.20 * ast + 0.15 * sig["path_role_similarity"] + 0.10 * sig["call_neighbor_similarity"]
     # Same-name alone is deliberately insufficient.
     if name and not ast and sig["token_similarity"] < 0.25 and sig["path_role_similarity"] < 0.5:
-        return 0.0
+        score = 0.0
+    _PAIR_SCORE_CACHE[key] = score
     return score
 
 
+_NEIGHBOR_SIG_CACHE: dict[str, list[int]] = {}
+_PAIR_SIGNALS_CACHE: dict[tuple[str, str], dict[str, Any]] = {}
+_PAIR_SCORE_CACHE: dict[tuple[str, str], float] = {}
+
+
+def _pair_key(target: dict, base: dict) -> tuple[str, str]:
+    return str(target.get("unit_id") or ""), str(base.get("unit_id") or "")
+
+def _neighbor_sig(unit: dict) -> list[int]:
+    uid = str(unit.get("unit_id") or "")
+    cached = _NEIGHBOR_SIG_CACHE.get(uid)
+    if cached is not None:
+        return cached
+    names = set(unit.get("outgoing_names") or []) | set(unit.get("incoming_names") or [])
+    sig = signature_from_set(names) if names else []
+    _NEIGHBOR_SIG_CACHE[uid] = sig
+    return sig
+
 def _neighbor_similarity(a: dict, b: dict) -> float:
-    left = set(a.get("outgoing_names") or []) | set(a.get("incoming_names") or [])
-    right = set(b.get("outgoing_names") or []) | set(b.get("incoming_names") or [])
+    left = _neighbor_sig(a)
+    right = _neighbor_sig(b)
     if not left or not right: return 0.0
-    return jaccard_estimate(signature_from_set(left), signature_from_set(right))
+    return jaccard_estimate(left, right)
 
 
 def _path_role_similarity(a: dict, b: dict) -> float:

@@ -16,6 +16,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from core.metadata import MetadataManager
+from core.scope import build_scope_manifest
+from core.scoped_search import warm_scoped_index
 from core.snapshot import resolve_snapshot
 from scripts.fingerprint import build_units_from_git_commit, fingerprint_set, ast_fingerprint_set, lang_summary
 
@@ -47,9 +49,10 @@ def batch_fingerprint(repos_dir: str = "repos", branch: str = "",
             units = build_units_from_git_commit(str(d), snapshot=snap)
             fps = fingerprint_set(str(d), snapshot=snap)
             ast = ast_fingerprint_set(str(d), snapshot=snap)
+            scoped = warm_scoped_index(snap, build_scope_manifest(snap, status="auto_candidate"))
             langs = lang_summary(units)
             results[d.name] = {"units": len(units), "fps": len(fps),
-                               "ast_fps": len(ast), "langs": langs}
+                               "ast_fps": len(ast), "scoped_index_units": scoped["units"], "langs": langs}
             print(f"  [{i+1}/{len(entries)}] {d.name}: {len(units)} units, {langs}")
         except Exception as e:
             print(f"  [{i+1}/{len(entries)}] {d.name}: ERROR — {e}")

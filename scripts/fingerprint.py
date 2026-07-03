@@ -25,6 +25,7 @@ import hashlib
 import json
 import pickle
 import sys
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -95,19 +96,30 @@ def build_units(repo_path: str, *, branch: str = "", ref: str = "", snapshot: Re
     snap = snapshot or resolve_snapshot(repo_path, ref or branch or "HEAD")
     cf = _cache_path("units", repo_path, snap.commit, snap.tree_hash)
     if use_cache and cf.exists():
-        return pickle.loads(cf.read_bytes())
+        return _load_units_cache(str(cf.resolve()), *_cache_stat(cf))
     raise FingerprintCacheMissing(
         f"fingerprint cache missing; run scripts/run.py --build first: {Path(repo_path).name}@{snap.commit[:12]}"
     )
 
 
+def _clean_exclude_prefixes(prefixes: list[str] | tuple[str, ...] | None) -> list[str]:
+    out: list[str] = []
+    for prefix in prefixes or []:
+        clean = str(prefix).replace("\\", "/").strip().lstrip("./").strip("/")
+        if clean:
+            out.append(clean + "/")
+    return sorted(set(out))
+
+
 def build_units_from_git_commit(repo_path: str, *, snapshot: RepoSnapshot | None = None,
-                                ref: str = "HEAD", use_cache: bool = True) -> list[dict]:
+                                ref: str = "HEAD", use_cache: bool = True,
+                                exclude_prefixes: list[str] | tuple[str, ...] | None = None) -> list[dict]:
     """Build units from Git blobs without checkout, archive, or source-tree writes."""
     snap = snapshot or resolve_snapshot(repo_path, ref, materialize=False)
+    cleaned_excludes = _clean_exclude_prefixes(exclude_prefixes)
     cf = _cache_path("units", repo_path, snap.commit, snap.tree_hash)
     if use_cache and cf.exists():
-        return pickle.loads(cf.read_bytes())
+        return _load_units_cache(str(cf.resolve()), *_cache_stat(cf))
 
     units: list[dict] = []
     extractions: list[FileExtraction] = []
@@ -116,7 +128,7 @@ def build_units_from_git_commit(repo_path: str, *, snapshot: RepoSnapshot | None
     name_to_fn_ids: dict[str, list[str]] = {}
     all_edges: list[CallEdge] = []
 
-    for blob in iter_source_blobs(repo_path, snap.commit):
+    for blob in iter_source_blobs(repo_path, snap.commit, exclude_prefixes=cleaned_excludes):
         rel = blob.path.replace("\\", "/")
         if blob.suffix in {".S", ".s"}:
             for label, toks in tokenize_asm(blob.data.decode("utf-8", errors="ignore")):
@@ -187,13 +199,19 @@ def build_units_from_git_commit(repo_path: str, *, snapshot: RepoSnapshot | None
 
     CACHE.mkdir(exist_ok=True)
     cf.write_bytes(pickle.dumps(units))
-    _write_cache_meta(repo_path, snap)
+    _write_cache_meta(repo_path, snap, source_excluded_prefixes=cleaned_excludes)
     return units
 
 
-def code_atlas(repo_path: str, *, branch: str = "", ref: str = "", snapshot: RepoSnapshot | None = None,
-               use_cache: bool = True) -> dict:
-    raise RuntimeError("code_atlas cache/tooling is deprecated; use prebuilt fingerprints, comparison DB, LSP, or bash")
+def _cache_stat(path: Path) -> tuple[int, int]:
+    stat = path.stat()
+    return stat.st_mtime_ns, stat.st_size
+
+
+@lru_cache(maxsize=512)
+def _load_units_cache(path: str, mtime_ns: int, size: int) -> list[dict]:
+    del mtime_ns, size
+    return pickle.loads(Path(path).read_bytes())
 
 
 def fingerprint_set(repo_path: str, *, branch: str = "", ref: str = "", snapshot: RepoSnapshot | None = None,
@@ -227,9 +245,14 @@ def cache_metadata(repo_path: str, ref: str = "HEAD") -> dict[str, Any]:
     return snap.to_dict() | {"fingerprint_schema": FINGERPRINT_SCHEMA}
 
 
-def _write_cache_meta(repo_path: str, snapshot: RepoSnapshot) -> None:
+def _write_cache_meta(repo_path: str, snapshot: RepoSnapshot, *,
+                      source_excluded_prefixes: list[str] | tuple[str, ...] | None = None) -> None:
     path = _cache_path("meta", repo_path, snapshot.commit, snapshot.tree_hash).with_suffix(".json")
-    path.write_text(json.dumps(snapshot.to_dict() | {"fingerprint_schema": FINGERPRINT_SCHEMA},
+    meta = snapshot.to_dict() | {"fingerprint_schema": FINGERPRINT_SCHEMA}
+    cleaned_excludes = _clean_exclude_prefixes(source_excluded_prefixes)
+    if cleaned_excludes:
+        meta["source_excluded_prefixes"] = cleaned_excludes
+    path.write_text(json.dumps(meta,
                                ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
 
 
