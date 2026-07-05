@@ -27,7 +27,7 @@ def split_repo_ref(spec: str, default_ref: str = "HEAD") -> tuple[str, str]:
 def build_snapshot(snapshot, exclude_prefixes: list[str] | None = None) -> dict:
     from core.scope import build_scope_manifest
     from core.scoped_search import warm_scoped_index
-    from scripts.fingerprint import ast_fingerprint_set, build_units_from_git_commit, fingerprint_set, lang_summary
+    from scripts.fingerprint import build_units_from_git_commit, fingerprint_set, lang_summary
     excluded = [
         {"prefix": prefix, "category": "source_excluded", "reason": "excluded during fingerprint build"}
         for prefix in (exclude_prefixes or [])
@@ -38,7 +38,6 @@ def build_snapshot(snapshot, exclude_prefixes: list[str] | None = None) -> dict:
     scoped_index = warm_scoped_index(snapshot, candidate_scope)
     return {"snapshot": snapshot.to_dict(), "scope_suggestion": scope.to_dict(), "units": len(units), "languages": lang_summary(units),
             "fingerprints": len(fingerprint_set(snapshot.repo_path, snapshot=snapshot)),
-            "ast_fingerprints": len(ast_fingerprint_set(snapshot.repo_path, snapshot=snapshot)),
             "scoped_index": scoped_index}
 
 

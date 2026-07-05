@@ -54,7 +54,11 @@ def build_scope_manifest(
     documentation_prefixes: Iterable[str] | None = None,
     status: str = "verified",
 ) -> ScopeManifest:
-    auto_excluded = _submodule_exclusions(snapshot)
+    auto_excluded = [
+        *_submodule_exclusions(snapshot),
+        ScopeExclusion(prefix="vendor/", category="vendored_dependency", reason="vendored third-party crates/dependencies"),
+        *_nested_vendor_exclusions(snapshot),
+    ]
     supplied = [_coerce_exclusion(x) for x in (excluded or [])]
     exclusions = _dedupe_exclusions([*auto_excluded, *supplied])
     generated = _normalize_prefixes(generated_prefixes or ["target/", "build/", "dist/"])
@@ -151,6 +155,25 @@ def path_in_scope(path: str, manifest: ScopeManifest | None) -> bool:
 
 def filter_units(units: Iterable[dict[str, Any]], manifest: ScopeManifest | None) -> list[dict[str, Any]]:
     return [unit for unit in units if path_in_scope(str(unit.get("file") or ""), manifest)]
+
+
+def _nested_vendor_exclusions(snapshot: RepoSnapshot) -> list[ScopeExclusion]:
+    """Exclude vendor/ directories at any nesting depth (e.g. os/vendor/, kernel/vendor/)."""
+    rows: list[ScopeExclusion] = []
+    try:
+        for name in top_level_dirs(snapshot.repo_path, snapshot.commit):
+            if name.startswith("."):
+                continue
+            vendor_sub = f"{name}/vendor"
+            if path_exists(snapshot.repo_path, snapshot.commit, vendor_sub):
+                rows.append(ScopeExclusion(
+                    prefix=_normalize_prefix(vendor_sub),
+                    category="vendored_dependency",
+                    reason=f"vendored third-party crates at {vendor_sub}/",
+                ))
+    except Exception:
+        pass
+    return rows
 
 
 def _submodule_exclusions(snapshot: RepoSnapshot) -> list[ScopeExclusion]:

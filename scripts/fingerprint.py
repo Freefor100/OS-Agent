@@ -2,8 +2,8 @@
 """Fingerprint building — pure computation, no judgment, no similarity.
 
 Two fingerprint sources, unified output schema:
-  - c / cpp / rust  -> in-memory Git blob tree-sitter parse -> token hash + AST shape hash
-  - asm (.S/.s)     -> asm_tokenize label-blocks -> minhash exact-token hash
+  - c / cpp / rust  -> in-memory Git blob tree-sitter parse -> AST shape hash
+  - asm (.S/.s)     -> asm_tokenize label-blocks -> exact hash
 
 Unit schema (one dict per code unit, function or asm label-block):
   {
@@ -11,13 +11,16 @@ Unit schema (one dict per code unit, function or asm label-block):
     "file":  "rel/path",
     "name":  symbol / label,
     "line":  int,
-    "fp":    exact normalized-token hash (str)    # cross-repo identity key
-    "sz":    token count (int)                     # for the PEER floor
-    "sig":   minhash signature (list[int]) | None  # graded similarity (asm uses it)
+    "fp":    AST shape hash (str)                    # cross-repo identity key
+    "sz":    1 (reserved, was token count)
+    "sig":   None (reserved, was minhash signature)
   }
 
-Caching: per-repo commit unit list -> .fp_cache/units_*.pkl; fingerprint-only
-sets -> .fp_cache/fpset_*.pkl and .fp_cache/astset_*.pkl.
+Token fingerprint (ntok_) has been REMOVED — it was cross-repo non-reproducible.
+All cross-repo comparison now uses AST shape hash + blob hash (git ls-tree -r).
+
+Caching: per-repo commit unit list -> .fp_cache/units_*.pkl; fingerprint
+sets -> .fp_cache/fpset_*.pkl.
 """
 from __future__ import annotations
 
@@ -36,36 +39,13 @@ from core.snapshot import RepoSnapshot, resolve_snapshot
 from tools.code_atlas.ast_shape import ast_shape_hash
 from tools.code_atlas.asm_tokenize import tokenize_asm
 from tools.code_atlas.extractor import CallEdge, FileExtraction, extract_file
-from tools.code_atlas.minhash import signature_from_tokens
-from tools.code_atlas.normalize import normalize_function_tokens
 from tools.code_atlas.ts_loader import TSLoader, lang_for_path
 
-
-def _semantic_fn_id(fn: dict) -> str:
-    """Stable id from normalized tokens + AST shape — same inputs, same id."""
-    tokens = fn.get("tokens_normalized") or fn.get("normalized_tokens") or fn.get("signature") or fn.get("name", "")
-    text = " ".join(tokens) if isinstance(tokens, list) else str(tokens)
-    return stable_id("sfn", {"tokens": text, "ast": fn.get("ast_shape_hash", "")}, 16)
-
-
-def _fn_structure_fingerprint(fn: dict) -> dict:
-    """Normalized-token fingerprint + AST shape hash for a code unit."""
-    tokens = fn.get("tokens_normalized") or fn.get("normalized_tokens") or []
-    token_text = " ".join(tokens) if isinstance(tokens, list) else str(tokens)
-    literals = fn.get("literal_set") or []
-    return {
-        "semantic_fn_id": _semantic_fn_id(fn),
-        "path": str(fn.get("file", "")).replace("\\", "/"),
-        "symbol": fn.get("name", ""),
-        "ast_shape_hash": fn.get("ast_shape_hash"),
-        "normalized_token_fingerprint": stable_id("ntok", {"tokens": token_text}, 64),
-        "literal_fingerprint": stable_id("lit", {"literals": sorted(map(str, literals))}, 16) if literals else "",
-    }
 
 CODE_LANGS = ("c", "cpp", "rust")
 ASM_MIN_TOK = 12          # asm blocks below this are too generic (save/restore stubs)
 CACHE = Path(".fp_cache")
-FINGERPRINT_SCHEMA = "fingerprint_v4_sha256_full_token_commit_snapshot"
+FINGERPRINT_SCHEMA = "fingerprint_v5_ast_commit_snapshot"
 
 
 class FingerprintCacheMissing(RuntimeError):
@@ -82,8 +62,8 @@ def _cache_path(prefix: str, repo_path: str, commit: str = "", tree_hash: str = 
 
 
 def _asm_fp(tokens: list[str]) -> str:
-    """Exact hash of normalized asm token stream (mirrors the code ntok hash)."""
-    return "ntok_" + hashlib.sha256(" ".join(tokens).encode()).hexdigest()
+    """Exact hash of normalized asm token stream."""
+    return "ast_" + hashlib.sha256(" ".join(tokens).encode()).hexdigest()
 
 
 def build_units(repo_path: str, *, branch: str = "", ref: str = "", snapshot: RepoSnapshot | None = None,
@@ -136,7 +116,7 @@ def build_units_from_git_commit(repo_path: str, *, snapshot: RepoSnapshot | None
                     units.append({
                         "unit_id": stable_id("unit", {"snapshot": snap.snapshot_id, "file": rel, "label": label}, 16),
                         "lang": "asm", "file": rel, "name": label, "line": 0, "end_line": 0,
-                        "fp": _asm_fp(toks), "ast": "", "sz": len(toks), "sig": signature_from_tokens(toks),
+                        "fp": _asm_fp(toks), "fn_id": "",
                         "snapshot_id": snap.snapshot_id, "commit": snap.commit,
                         "outgoing_names": [], "incoming_names": [],
                     })
@@ -184,14 +164,12 @@ def build_units_from_git_commit(repo_path: str, *, snapshot: RepoSnapshot | None
         lang = fn.get("lang")
         if lang not in CODE_LANGS:
             continue
-        fp = _fn_structure_fingerprint(fn)
-        tokens = fn.get("tokens_normalized") or []
+        fp = fn.get("ast_shape_hash", "")
         units.append({
             "unit_id": stable_id("unit", {"snapshot": snap.snapshot_id, "fn": fn_id}, 16),
             "lang": lang, "file": str(fn.get("file", "")).replace("\\", "/"),
             "name": fn.get("name", ""), "line": fn.get("line", 0), "end_line": fn.get("end_line", 0),
-            "fp": fp["normalized_token_fingerprint"], "ast": fp.get("ast_shape_hash", ""),
-            "sz": len(tokens), "sig": signature_from_tokens(tokens), "fn_id": fn_id,
+            "fp": fp, "fn_id": fn_id,
             "snapshot_id": snap.snapshot_id, "commit": snap.commit,
             "outgoing_names": sorted(outgoing.get(fn_id, set())),
             "incoming_names": sorted(incoming.get(fn_id, set())),
@@ -216,23 +194,13 @@ def _load_units_cache(path: str, mtime_ns: int, size: int) -> list[dict]:
 
 def fingerprint_set(repo_path: str, *, branch: str = "", ref: str = "", snapshot: RepoSnapshot | None = None,
                     use_cache: bool = True) -> set[str]:
+    """AST-based fingerprint set for cross-repo comparison."""
     snap = snapshot or resolve_snapshot(repo_path, ref or branch or "HEAD")
     cf = _cache_path("fpset", repo_path, snap.commit, snap.tree_hash)
     if use_cache and cf.exists():
         return pickle.loads(cf.read_bytes())
-    result = {u["fp"] for u in build_units_from_git_commit(repo_path, snapshot=snap, use_cache=use_cache)}
-    CACHE.mkdir(exist_ok=True); cf.write_bytes(pickle.dumps(result))
-    return result
-
-
-def ast_fingerprint_set(repo_path: str, *, branch: str = "", ref: str = "", snapshot: RepoSnapshot | None = None,
-                        use_cache: bool = True) -> set[str]:
-    snap = snapshot or resolve_snapshot(repo_path, ref or branch or "HEAD")
-    cf = _cache_path("astset", repo_path, snap.commit, snap.tree_hash)
-    if use_cache and cf.exists():
-        return pickle.loads(cf.read_bytes())
     units = build_units_from_git_commit(repo_path, snapshot=snap, use_cache=use_cache)
-    result = {u["ast"] for u in units if u.get("ast") and u["lang"] != "asm"}
+    result = {u["fp"] for u in units if u.get("fp") and u["lang"] != "asm"}
     CACHE.mkdir(exist_ok=True); cf.write_bytes(pickle.dumps(result))
     return result
 
@@ -258,21 +226,16 @@ def _write_cache_meta(repo_path: str, snapshot: RepoSnapshot, *,
 
 def _functions_with_features(functions: dict[str, dict[str, Any]], nodes: dict[str, tuple[object, bytes]],
                              name_to_fn_ids: dict[str, list[str]]) -> dict[str, dict[str, Any]]:
-    keep_names = set(name_to_fn_ids)
+    del name_to_fn_ids  # unused (was for token normalization)
     out: dict[str, dict[str, Any]] = {}
     for fn_id, row in functions.items():
         node, code_bytes = nodes[fn_id]
-        try:
-            tokens = normalize_function_tokens(node, code_bytes, keep_text_identifiers=keep_names)
-        except Exception:
-            tokens = []
         try:
             shape = ast_shape_hash(node)
         except Exception:
             shape = "ERROR"
         out[fn_id] = {
             **row,
-            "tokens_normalized": tokens,
             "ast_shape_hash": shape,
             "literal_set": _extract_literal_set(node, code_bytes),
         }
@@ -323,6 +286,19 @@ def _extract_literal_set(fn_node, code_bytes: bytes) -> list[str]:
     except Exception:
         return []
     return sorted(literals)
+
+
+def ast_fingerprint_set(repo_path: str, *, branch: str = "", ref: str = "", snapshot: RepoSnapshot | None = None,
+                        use_cache: bool = True) -> set[str]:
+    """AST shape fingerprint set (v5: fp field IS the AST shape hash, same as fingerprint_set)."""
+    snap = snapshot or resolve_snapshot(repo_path, ref or branch or "HEAD")
+    cf = _cache_path("astset", repo_path, snap.commit, snap.tree_hash)
+    if use_cache and cf.exists():
+        return pickle.loads(cf.read_bytes())
+    units = build_units_from_git_commit(repo_path, snapshot=snap, use_cache=use_cache)
+    result = {u["fp"] for u in units if u.get("fp") and u["lang"] != "asm"}
+    CACHE.mkdir(exist_ok=True); cf.write_bytes(pickle.dumps(result))
+    return result
 
 
 def lang_summary(units: list[dict]) -> dict[str, int]:

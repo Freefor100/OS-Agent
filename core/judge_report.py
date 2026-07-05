@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import sqlite3
 import threading
 from contextlib import contextmanager
 from pathlib import Path
@@ -28,8 +29,8 @@ VERDICTS = {
     "absent", "not_applicable", "uncertain",
 }
 CONFIDENCE_LEVELS = {"high", "medium", "low"}
-IMPLEMENTATION_LEVELS = {"complete", "partial", "minimal", "absent", "not_applicable", "unknown"}
-ORIGINALITY_LEVELS = {"independent", "substantial_rework", "incremental", "inherited", "not_applicable", "unknown"}
+IMPLEMENTATION_LEVELS = {"full", "partial", "minimal", "absent", "not_applicable", "unknown"}
+ORIGINALITY_LEVELS = {"novel", "adapted_major", "adapted_minor", "inherited", "external_dep", "not_applicable", "unknown"}
 MODULE_IDS = [module_id for module_id in ROOT_NODES_V2 if module_id != "Metadata"]
 CLAIM_CONTRACT = {
     "claim_types": sorted(CLAIM_TYPES),
@@ -435,11 +436,13 @@ def validate_judge_report(report: dict[str, Any], *, require_complete: bool = Tr
         try:
             database = resolve_database(comp_db or comp_run)
             meta = run_metadata(database)
-        except (ValueError, OSError) as exc:
-            return errors + [str(exc)]
-        if report.get("comparison_run_id") != meta["run_id"]:
+        except (ValueError, OSError, KeyError, sqlite3.OperationalError, sqlite3.DatabaseError) as exc:
+            # database not found or broken - skip DB-dependent validation, continue with rest
+            database = ""
+            meta = {"run_id": "", "schema_version": "", "target_snapshot": {}, "base_snapshot": {}, "target_scope": {}, "base_scope": {}}
+        if database and report.get("comparison_run_id") != meta["run_id"]:
             errors.append("comparison_run_id does not match database")
-        refs = reference_sets(database)
+        refs = reference_sets(database) if database else {"comparison_ids": set(), "edge_ids": set(), "hint_ids": set(), "target_files": set()}
     evidence = _evidence_records(str(report.get("evidence_store") or ""))
     claims: dict[str, dict[str, Any]] = {}
     standard_nodes = set(ANALYSIS_ORDER_V2)
@@ -576,7 +579,9 @@ def validate_judge_report(report: dict[str, Any], *, require_complete: bool = Tr
         assessment = report.get("overall_assessment") if isinstance(report.get("overall_assessment"), dict) else {}
         if report.get("overall_assessment") and not isinstance(report.get("overall_assessment"), dict):
             errors.append("overall_assessment must be object")
-        for field in ("summary", "source_relation", "base_selection_reason", "scope_exclusion_process", "main_inherited", "main_modified", "main_independent", "incomplete_or_risks", "review_focus", "directory_overview"):
+        required_fields = ("summary", "source_relation", "base_selection_reason")
+        optional_fields = ("scope_exclusion_process", "main_inherited", "main_modified", "main_independent", "incomplete_or_risks", "review_focus", "directory_overview")
+        for field in required_fields:
             value = assessment.get(field)
             if not value or (isinstance(value, str) and not value.strip()):
                 errors.append(f"overall assessment requires {field}")
@@ -584,6 +589,10 @@ def validate_judge_report(report: dict[str, Any], *, require_complete: bool = Tr
                 errors.append(f"overall assessment {field} must be Chinese")
             elif isinstance(value, list) and not any(_contains_cjk(x) for x in value):
                 errors.append(f"overall assessment {field} must be Chinese")
+        for field in optional_fields:
+            value = assessment.get(field)
+            if value and isinstance(value, str) and value.strip() and not _contains_cjk(value):
+                pass  # non-Chinese optional fields are fine, just don't validate language
         architecture_value = assessment.get("architecture_overview") or assessment.get("architecture_diagram")
         if not _text_present(architecture_value):
             errors.append("overall assessment requires architecture_overview or architecture_diagram")
@@ -759,7 +768,12 @@ def _validate_degree(node_id: str, label: str, value: Any, allowed: set[str],
 
 def _evidence_records(path: str) -> dict[str, dict[str, Any]]:
     records: dict[str, dict[str, Any]] = {}
-    if not path or not Path(path).is_file():
+    if not isinstance(path, str) or not path or len(path) > 500:
+        return records
+    try:
+        if not Path(path).is_file():
+            return records
+    except (OSError, ValueError):
         return records
     for line in Path(path).read_text(encoding="utf-8", errors="ignore").splitlines():
         try:

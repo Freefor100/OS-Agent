@@ -16,7 +16,7 @@ SCHEMA = """
 PRAGMA foreign_keys=ON;
 CREATE TABLE runs(run_id TEXT PRIMARY KEY, schema_version TEXT NOT NULL, target_snapshot_json TEXT NOT NULL, base_snapshot_json TEXT NOT NULL, target_scope_json TEXT NOT NULL, base_scope_json TEXT NOT NULL);
 CREATE TABLE source_snapshots(run_id TEXT NOT NULL, snapshot_id TEXT NOT NULL, source_role TEXT NOT NULL, repo TEXT NOT NULL, snapshot_json TEXT NOT NULL, PRIMARY KEY(run_id,snapshot_id));
-CREATE TABLE units(unit_id TEXT PRIMARY KEY, run_id TEXT NOT NULL, snapshot_id TEXT, side TEXT NOT NULL, source_role TEXT NOT NULL, repo TEXT, file TEXT NOT NULL, directory TEXT NOT NULL, symbol TEXT, line INTEGER, end_line INTEGER, lang TEXT, token_size INTEGER, fp TEXT, ast TEXT, FOREIGN KEY(run_id) REFERENCES runs(run_id));
+CREATE TABLE units(unit_id TEXT PRIMARY KEY, run_id TEXT NOT NULL, snapshot_id TEXT, side TEXT NOT NULL, source_role TEXT NOT NULL, repo TEXT, file TEXT NOT NULL, directory TEXT NOT NULL, symbol TEXT, line INTEGER, end_line INTEGER, lang TEXT, sz INTEGER, fp TEXT, ast TEXT, FOREIGN KEY(run_id) REFERENCES runs(run_id));
 CREATE TABLE match_edges(edge_id TEXT PRIMARY KEY, run_id TEXT NOT NULL, target_unit_id TEXT NOT NULL, source_unit_id TEXT NOT NULL, source_role TEXT NOT NULL, source_repo TEXT, pair_score REAL NOT NULL, signals_json TEXT NOT NULL, FOREIGN KEY(run_id) REFERENCES runs(run_id));
 CREATE TABLE comparisons(comparison_id TEXT PRIMARY KEY, run_id TEXT NOT NULL, raw_status TEXT NOT NULL, target_unit_id TEXT, selected_base_unit_id TEXT, supporting_edge_ids_json TEXT NOT NULL, signals_json TEXT NOT NULL, FOREIGN KEY(run_id) REFERENCES runs(run_id));
 CREATE TABLE relationship_hints(hint_id TEXT PRIMARY KEY, run_id TEXT NOT NULL, hint_type TEXT NOT NULL, confidence TEXT NOT NULL, target_unit_ids_json TEXT NOT NULL, source_unit_ids_json TEXT NOT NULL, edge_ids_json TEXT NOT NULL, metadata_json TEXT NOT NULL, FOREIGN KEY(run_id) REFERENCES runs(run_id));
@@ -134,12 +134,12 @@ def search_units(database_path: str, query: str="", side: str="target", path: st
     if status:
         if status not in STATUSES: con.close(); raise ValueError(f"invalid comparison status: {status}")
         clauses.append("c.raw_status=?"); params.append(status)
-    sql=f"""SELECT u.unit_id,u.side,u.source_role,u.repo,u.file,u.symbol,u.line,u.end_line,u.lang,u.token_size,
+    sql=f"""SELECT u.unit_id,u.side,u.source_role,u.repo,u.file,u.symbol,u.line,u.end_line,u.lang,
                    c.comparison_id,c.raw_status
             FROM units u LEFT JOIN comparisons c ON c.target_unit_id=u.unit_id OR c.selected_base_unit_id=u.unit_id
             WHERE {' AND '.join(clauses)} ORDER BY u.file,u.line,u.symbol"""
     rows=[{"unit_id":r[0],"side":r[1],"source_role":r[2],"repo":r[3],"file":r[4],"symbol":r[5],"line":r[6],"end_line":r[7],
-           "lang":r[8],"token_size":r[9],"comparison_id":r[10],"raw_status":r[11]} for r in con.execute(sql,params)]
+           "lang":r[8],"comparison_id":r[9],"raw_status":r[10]} for r in con.execute(sql,params)]
     con.close(); return _page(rows,offset,limit)
 
 
@@ -193,10 +193,10 @@ def source_file_targets_all(database_path: str, path: str="") -> list[dict[str,A
 
 
 def function_detail(database_path: str, unit_id: str) -> dict[str, Any]:
-    con=_connect(database_path); unit=con.execute("SELECT unit_id,side,repo,file,symbol,line,end_line,lang,token_size FROM units WHERE unit_id=?",(unit_id,)).fetchone()
+    con=_connect(database_path); unit=con.execute("SELECT unit_id,side,repo,file,symbol,line,end_line,lang FROM units WHERE unit_id=?",(unit_id,)).fetchone()
     if not unit: con.close(); return {"status":"not_found","unit_id":unit_id}
     comparisons=[{"comparison_id":r[0],"raw_status":r[1]} for r in con.execute("SELECT comparison_id,raw_status FROM comparisons WHERE target_unit_id=? OR selected_base_unit_id=?",(unit_id,unit_id))]
-    con.close(); return {"unit":{"unit_id":unit[0],"side":unit[1],"repo":unit[2],"file":unit[3],"symbol":unit[4],"line":unit[5],"end_line":unit[6],"lang":unit[7],"token_size":unit[8]},"comparisons":comparisons}
+    con.close(); return {"unit":{"unit_id":unit[0],"side":unit[1],"repo":unit[2],"file":unit[3],"symbol":unit[4],"line":unit[5],"end_line":unit[6],"lang":unit[7]},"comparisons":comparisons}
 
 
 def function_candidates(database_path: str, unit_id: str, source_role: str="", offset: int=0, limit: int=50) -> dict[str, Any]:

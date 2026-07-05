@@ -24,9 +24,14 @@ for python_bin in \
   fi
 done
 
-if command -v conda >/dev/null 2>&1; then
-  exec conda run --no-capture-output -n os_agent python "${ROOT}/mcp_server.py"
-fi
+for env_runner in conda mamba micromamba; do
+  if command -v "${env_runner}" >/dev/null 2>&1; then
+    if [[ "${env_runner}" == "micromamba" ]]; then
+      exec "${env_runner}" run -n os_agent python "${ROOT}/mcp_server.py"
+    fi
+    exec "${env_runner}" run --no-capture-output -n os_agent python "${ROOT}/mcp_server.py"
+  fi
+done
 
-echo "OS-Agent MCP: cannot find a Python environment with requirements installed. Create conda env os_agent, create .venv, or set OS_AGENT_PYTHON to its Python executable. See README.md Quick Start." >&2
+echo "OS-Agent MCP: cannot find a Python environment with requirements installed. Create env os_agent, create .venv, or set OS_AGENT_PYTHON to its Python executable. See README.md Quick Start." >&2
 exit 1

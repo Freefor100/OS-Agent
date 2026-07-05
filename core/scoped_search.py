@@ -17,7 +17,7 @@ SCOPED_SET_ROOT = Path(".fp_cache") / "scoped_sets"
 
 def search_scoped(target_snapshot: RepoSnapshot, target_scope: ScopeManifest, candidates: Iterable[tuple[RepoSnapshot, ScopeManifest | None]],
                   *, top_k: int = 20, metadata=None, formal_only: bool = False) -> list[dict[str, Any]]:
-    target_token, target_ast, target_unit_count, target_fp_dirs = _scoped_index(target_snapshot, target_scope)
+    target_fp, target_unit_count, target_fp_dirs = _scoped_index(target_snapshot, target_scope)
     rows: list[dict[str, Any]] = []
     seen: set[tuple[str, str]] = set()
     for snapshot, scope in candidates:
@@ -28,10 +28,9 @@ def search_scoped(target_snapshot: RepoSnapshot, target_scope: ScopeManifest, ca
         formal_scope = scope is not None and scope.status in FORMAL_SCOPE_STATUSES
         if formal_only and not formal_scope:
             continue
-        candidate_token, candidate_ast, candidate_unit_count, _ = _scoped_index(snapshot, scope)
-        token = _containment(target_token, candidate_token)
-        ast = _containment(target_ast, candidate_ast)
-        combined = max(token["balanced"], ast["balanced"])
+        candidate_fp, candidate_unit_count, _ = _scoped_index(snapshot, scope)
+        fp_containment = _containment(target_fp, candidate_fp)
+        combined = fp_containment["balanced"]
         rows.append({
             "repo": snapshot.repo, "commit": snapshot.commit, "canonical_branch": snapshot.canonical_branch,
             "ref_aliases": snapshot.ref_aliases,
@@ -41,15 +40,16 @@ def search_scoped(target_snapshot: RepoSnapshot, target_scope: ScopeManifest, ca
             "candidate_scope_id": scope.scope_id if scope else "",
             "scope_status": scope.status if scope else "unreviewed",
             "score_kind": "formal" if formal_scope else "rough", "combined": round(combined, 3),
-            "token": token, "ast": ast, "target_unit_count": target_unit_count, "candidate_unit_count": candidate_unit_count,
+            "fp_containment": fp_containment,
+            "target_unit_count": target_unit_count, "candidate_unit_count": candidate_unit_count,
             "_snapshot": snapshot, "_scope": scope,
         })
     rows.sort(key=lambda row: (-row["combined"], row["repo"], row["commit"]))
     top_rows = rows[:top_k]
     for index, row in enumerate(top_rows, 1):
         row["rank"] = index
-        candidate_token, _, _, _ = _scoped_index(row["_snapshot"], row["_scope"])
-        row["overlap_by_dir"] = _overlap_by_dir(target_fp_dirs, candidate_token)
+        candidate_fp, _, _ = _scoped_index(row["_snapshot"], row["_scope"])
+        row["overlap_by_dir"] = _overlap_by_dir(target_fp_dirs, candidate_fp)
         meta = metadata.lookup_by_repo_name(row["repo"]) if metadata else None
         row["year"] = meta["year"] if meta else 0
         row["school"] = meta["school"] if meta else ""
@@ -92,8 +92,8 @@ def _snapshot_from_meta(raw: dict[str, Any]) -> RepoSnapshot:
     )
 
 
-def _sets(units: list[dict[str, Any]]) -> tuple[set[str], set[str]]:
-    return ({str(x['fp']) for x in units if x.get('fp')}, {str(x['ast']) for x in units if x.get('ast') and x.get('lang') != 'asm'})
+def _sets(units: list[dict[str, Any]]) -> set[str]:
+    return {str(x['fp']) for x in units if x.get('fp')}
 
 
 def _scoped_units(snapshot: RepoSnapshot, scope: ScopeManifest | None) -> list[dict[str, Any]]:
@@ -101,24 +101,24 @@ def _scoped_units(snapshot: RepoSnapshot, scope: ScopeManifest | None) -> list[d
 
 
 def warm_scoped_index(snapshot: RepoSnapshot, scope: ScopeManifest | None) -> dict[str, Any]:
-    token, ast, unit_count, _ = _scoped_index(snapshot, scope)
-    return {"repo": snapshot.repo, "commit": snapshot.commit, "scope_id": scope.scope_id if scope else "", "units": unit_count, "fingerprints": len(token), "ast_fingerprints": len(ast)}
+    fp_set, unit_count, _ = _scoped_index(snapshot, scope)
+    return {"repo": snapshot.repo, "commit": snapshot.commit, "scope_id": scope.scope_id if scope else "", "units": unit_count, "fingerprints": len(fp_set)}
 
 
-def _scoped_index(snapshot: RepoSnapshot, scope: ScopeManifest | None) -> tuple[set[str], set[str], int, list[tuple[str, str]]]:
+def _scoped_index(snapshot: RepoSnapshot, scope: ScopeManifest | None) -> tuple[set[str], int, list[tuple[str, str]]]:
     path = _scoped_set_path(snapshot, scope)
     if path.is_file():
         try:
             payload = pickle.loads(path.read_bytes())
-            return set(payload["token"]), set(payload["ast"]), int(payload["unit_count"]), list(payload["fp_dirs"])
+            return set(payload["fp"]), int(payload["unit_count"]), list(payload["fp_dirs"])
         except (OSError, KeyError, TypeError, pickle.PickleError, ValueError):
             pass
     units = _scoped_units(snapshot, scope)
-    token, ast = _sets(units)
+    fp_set = _sets(units)
     fp_dirs = _fp_dirs(units)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(pickle.dumps({"token": token, "ast": ast, "unit_count": len(units), "fp_dirs": fp_dirs}))
-    return token, ast, len(units), fp_dirs
+    path.write_bytes(pickle.dumps({"fp": fp_set, "unit_count": len(units), "fp_dirs": fp_dirs}))
+    return fp_set, len(units), fp_dirs
 
 
 def _scoped_set_path(snapshot: RepoSnapshot, scope: ScopeManifest | None) -> Path:

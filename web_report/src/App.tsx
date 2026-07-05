@@ -269,8 +269,6 @@ function OverviewPage({ openView }: AnyRecord) {
       </div>
       <h2 className="section-title">内核架构图</h2>
       <ArchitectureView assessment={assessment} />
-      <h2 className="section-title">代码语言与目录结构</h2>
-      <article className="card"><ProjectProfileView /></article>
       <h2 className="section-title">框架实现度与原创度总览</h2>
       <div className="matrix">
         {taxonomy.modules.filter((module) => module.id !== "Metadata").map((module) => {

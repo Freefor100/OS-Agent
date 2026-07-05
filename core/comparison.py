@@ -171,7 +171,7 @@ def build_match_edges(target_units: list[dict[str, Any]], source_units: list[dic
         candidates={}
         candidate_buckets = (
             by_fp.get(str(target.get("fp") or ""), []),
-            by_ast.get(str(target.get("ast") or ""), []),
+            by_ast.get(str(target.get("fp") or ""), []),
             _bounded_bucket(by_name.get(_name(target), [])),
             _bounded_bucket(by_leaf.get(Path(str(target.get("file") or "")).name.lower(), [])),
         )
@@ -185,8 +185,8 @@ def build_match_edges(target_units: list[dict[str, Any]], source_units: list[dic
                 # Exact fp match — skip expensive _signals / _pair_score
                 signals = {
                     "same_name": _name(target) == _name(source),
-                    "exact_token_fp": True,
-                    "exact_ast_shape": bool(target.get("ast") and target.get("ast") == source.get("ast")),
+                    "exact_fp": True,
+                    "exact_ast_shape": bool(target.get("fp") and target.get("fp") == source.get("fp")),
                     "token_similarity": 1.0,
                     "path_role_similarity": _path_role_similarity(target, source),
                     "call_neighbor_similarity": 0.0,
@@ -224,10 +224,10 @@ def _signals(target: dict, base: dict) -> dict[str, Any]:
     cached = _PAIR_SIGNALS_CACHE.get(key)
     if cached is not None:
         return cached
-    token = jaccard_estimate(target.get("sig") or [], base.get("sig") or []) if target.get("sig") and base.get("sig") else 0.0
+    ast_match = bool(target.get("fp") and target.get("fp") == base.get("fp"))
     neighbors = _neighbor_similarity(target, base)
-    signals = {"same_name": _name(target) == _name(base), "exact_token_fp": bool(target.get("fp") and target.get("fp") == base.get("fp")),
-               "exact_ast_shape": bool(target.get("ast") and target.get("ast") == base.get("ast")), "token_similarity": round(token, 3),
+    signals = {"same_name": _name(target) == _name(base), "exact_ast_fp": ast_match,
+               "ast_similarity": 1.0 if ast_match else 0.0,
                "path_role_similarity": round(_path_role_similarity(target, base), 3), "call_neighbor_similarity": round(neighbors, 3)}
     _PAIR_SIGNALS_CACHE[key] = signals
     return signals
@@ -247,10 +247,10 @@ def _pair_score(target: dict, base: dict) -> float:
         return cached
     sig = _signals(target, base)
     name = 1.0 if sig["same_name"] else 0.0
-    ast = 1.0 if sig["exact_ast_shape"] else 0.0
-    score = 0.25 * name + 0.30 * sig["token_similarity"] + 0.20 * ast + 0.15 * sig["path_role_similarity"] + 0.10 * sig["call_neighbor_similarity"]
+    ast = 1.0 if sig["exact_ast_fp"] else 0.0
+    score = 0.25 * name + 0.30 * sig["ast_similarity"] + 0.20 * ast + 0.15 * sig["path_role_similarity"] + 0.10 * sig["call_neighbor_similarity"]
     # Same-name alone is deliberately insufficient.
-    if name and not ast and sig["token_similarity"] < 0.25 and sig["path_role_similarity"] < 0.5:
+    if name and not ast and sig["ast_similarity"] < 0.25 and sig["path_role_similarity"] < 0.5:
         score = 0.0
     _PAIR_SCORE_CACHE[key] = score
     return score

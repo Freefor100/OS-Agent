@@ -50,8 +50,6 @@ from tools.code_atlas.extractor import (
     TypeRecord,
     extract_repo,
 )
-from tools.code_atlas.normalize import normalize_function_tokens
-
 logger = logging.getLogger(__name__)
 
 
@@ -223,27 +221,11 @@ def build_code_atlas(
             "edges": len(all_edges),
         })
 
-    # 3. 收集"全局保留名"（normalize 时不 alpha-rename）
-    #   - 函数名（任意函数）→ caller/callee 文本对齐用
-    #   - 类型名
-    keep_names: set[str] = set()
-    for fn in all_functions:
-        keep_names.add(fn.name)
-    for t in all_types:
-        keep_names.add(t.name)
-
-    # 4. 每函数算 normalize tokens + ast_shape_hash + literal_set
+    # 3. 算 ast_shape_hash + literal_set
     fn_features: dict[str, dict] = {}
     for fn in all_functions:
         fn_node = fn_id_to_node[fn.fn_id]
         cb = fn_id_to_code_bytes[fn.fn_id]
-        try:
-            tokens = normalize_function_tokens(
-                fn_node, cb, keep_text_identifiers=keep_names,
-            )
-        except Exception as exc:
-            logger.warning("[D-1] normalize fail %s: %s", fn.fn_id, exc)
-            tokens = []
         try:
             shape = ast_shape_hash(fn_node)
         except Exception as exc:
@@ -255,13 +237,12 @@ def build_code_atlas(
             logger.warning("[D-1] literal_set fail %s: %s", fn.fn_id, exc)
             literals = []
         fn_features[fn.fn_id] = {
-            "tokens_normalized": tokens,
             "ast_shape_hash": shape,
             "literal_set": literals,
         }
 
     if progress_cb:
-        progress_cb("features_done", {"fns_with_tokens": len(fn_features)})
+        progress_cb("features_done", {"fns_with_ast": len(fn_features)})
 
     # 5. 边解析（callee_name → dst_fn_id）
     edges_resolved = _resolve_edges(all_edges, name_to_fn_ids)

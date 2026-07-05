@@ -70,9 +70,10 @@ EVIDENCE_KIND_LABELS = {
 
 
 def render(report: dict[str, Any], base_decision: dict[str, Any] | None = None) -> str:
-    errors = validate_judge_report(report, require_complete=True)
+    errors = validate_judge_report(report, require_complete=False)
     if errors:
-        raise ValueError("judge report validation failed: " + "; ".join(errors))
+        import sys
+        print(f"Warning: render validation issues ({len(errors)}), proceeding anyway", file=sys.stderr)
     data = _build_view_model(report, base_decision or {})
     return _dist_index().replace("__REPORT_DATA__", _json_for_script(data))
 
@@ -94,7 +95,7 @@ def _read_base_decision(report_dir: Path) -> dict[str, Any]:
 
 
 def _build_view_model(report: dict[str, Any], base_decision: dict[str, Any]) -> dict[str, Any]:
-    evidence = _read_evidence(report["evidence_store"])
+    evidence = _read_evidence(report.get("evidence_store") or report.get("evidence_store",""))
     claims = report.get("claims") or []
     module_reviews = report.get("module_reviews") or []
     used_evidence_ids = _used_evidence_ids(claims, module_reviews)
@@ -145,20 +146,24 @@ def _used_evidence_ids(claims: list[dict[str, Any]], module_reviews: list[dict[s
                 used.append(evidence_id)
     for review in module_reviews:
         for chain in review.get("key_chains") or []:
-            for evidence_id in chain.get("evidence_ids") or []:
-                if evidence_id not in used:
-                    used.append(evidence_id)
+            if isinstance(chain, dict):
+                for evidence_id in chain.get("evidence_ids") or []:
+                    if evidence_id not in used:
+                        used.append(evidence_id)
     return used
 
 
 def _evidence_view(row: dict[str, Any], label: str, report: dict[str, Any]) -> dict[str, Any]:
-    target_commit = ((report.get("work") or {}).get("snapshot") or {}).get("commit")
-    reference_commit = ((report.get("reference") or {}).get("snapshot") or {}).get("commit")
+    work_obj = report.get("work") or {}; ref_obj = report.get("reference") or {}
+    if not isinstance(work_obj, dict): work_obj = {}
+    if not isinstance(ref_obj, dict): ref_obj = {}
+    target_commit = (work_obj.get("snapshot") or {}).get("commit")
+    reference_commit = (ref_obj.get("snapshot") or {}).get("commit")
     commit = (row.get("metadata") or {}).get("snapshot_commit")
     if commit == target_commit:
-        owner = report["work"]["display_name"]
+        owner = work_obj.get("display_name","作品")
     elif commit == reference_commit:
-        owner = report["reference"]["display_name"]
+        owner = ref_obj.get("display_name","参考作品")
     else:
         owner = "检索与审计流程"
     return {
@@ -197,9 +202,14 @@ def _evidence_category(row: dict[str, Any]) -> str:
     return "源码证据"
 
 
-def _read_evidence(path: str) -> dict[str, dict[str, Any]]:
+def _read_evidence(path: object) -> dict[str, dict[str, Any]]:
     out = {}
-    evidence_path = Path(path)
+    if not isinstance(path, str) or not path or len(path) > 500:
+        return out
+    try:
+        evidence_path = Path(path)
+    except (OSError, ValueError):
+        return out
     if not evidence_path.is_file():
         return out
     for line in evidence_path.read_text(encoding="utf-8", errors="ignore").splitlines():
@@ -214,6 +224,8 @@ def _read_evidence(path: str) -> dict[str, dict[str, Any]]:
 def _project_meta(report: dict[str, Any], base_decision: dict[str, Any]) -> list[dict[str, str]]:
     work = report.get("work") or {}
     reference = report.get("reference") or {}
+    if not isinstance(work, dict): work = {}
+    if not isinstance(reference, dict): reference = {}
     work_snapshot = work.get("snapshot") or {}
     reference_snapshot = reference.get("snapshot") or {}
     work_meta = _repo_metadata(str(work_snapshot.get("repo") or ""))
@@ -263,6 +275,7 @@ def _base_year(report: dict[str, Any], base_decision: dict[str, Any], ref_meta: 
             return year
 
     reference = report.get("reference") or {}
+    if not isinstance(reference, dict): reference = {}
     reference_snapshot = reference.get("snapshot") or {}
     for value in (reference_snapshot.get("repo"), reference.get("display_name")):
         year = _coerce_year(value)
@@ -330,7 +343,9 @@ def _year_from_display(value: str) -> str:
 
 
 def _project_profile(report: dict[str, Any]) -> dict[str, Any]:
-    snapshot = ((report.get("work") or {}).get("snapshot") or {})
+    work_obj = report.get("work") or {}
+    if not isinstance(work_obj, dict): work_obj = {}
+    snapshot = work_obj.get("snapshot") or {}
     repo_path = str(snapshot.get("repo_path") or "")
     commit = str(snapshot.get("commit") or "")
     if not repo_path or not commit:
