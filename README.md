@@ -416,3 +416,165 @@ OS-Agent/
 ## AI 辅助说明
 
 本项目在开发过程中使用 Claude Code、Codex、Cursor、Antigravity 的 AI 编程工具（模型GPT5.5、DeepSeek V4 pro、Sonnet 4.6、Gemini 3.5 Flash）辅助完成大部分代码实现、重复性工作、文档整理和流程设计讨论。AI 工具主要用于提升实现效率、生成候选方案和辅助检查，Skill的流程、经验由我起草，LLM进行结构整理，边界条件的确认。最终的职责边界、工作流设计、功能取舍、查重边界与结论确认仍由项目维护者定义。
+
+## 选手引用的外部 GitHub 库
+
+
+### 基础内核框架 / OS 框架
+
+| 仓库 | 说明 | 本地 |
+|---|---|:---:|
+| [rcore-os/rCore](https://github.com/rcore-os/rCore) | rCore 内核参考实现 | |
+| [rcore-os/zCore](https://github.com/rcore-os/zCore) | Zircon 兼容的 Rust OS | ✓ |
+| [arceos-org/arceos](https://github.com/arceos-org/arceos) | ArceOS 模块化 unikernel | ✓ |
+| [arceos-org/starry-next](https://github.com/arceos-org/starry-next) | Starry Next（官方版） | ✓ |
+| [Starry-OS/StarryOS](https://github.com/Starry-OS/StarryOS) | 基于ArceOS的 | ✓ |
+| [Starry-OS/arceos](https://github.com/Starry-OS/arceos) | StarryOS 使用的 arceos fork | ✓ |
+| [asterinas/asterinas](https://github.com/asterinas/asterinas) | Asterinas 安全 OS 框架（framekernel） | ✓ |
+| [Byte-OS/ByteOS](https://github.com/Byte-OS/ByteOS) | ByteOS 模块化 Rust OS | ✓ |
+| [sandyyyz/Re-XVapor](https://github.com/sandyyyz/Re-XVapor) | xv6 衍生内核-25年作品github版 | |
+| [aether-os-studio/naos](https://github.com/aether-os-studio/naos) | NaOS 操作系统 | ✓ |
+| [managarm/managarm](https://github.com/managarm/managarm) | 异步微内核 OS | ✓ |
+| [seL4/seL4](https://github.com/seL4/seL4) | seL4 形式化验证微内核 | ✓ |
+| [unikraft/unikraft](https://github.com/unikraft/unikraft) | Unikraft unikernel 框架 | ✓ |
+| [RT-Thread/rt-thread](https://github.com/RT-Thread/rt-thread) | RT-Thread RTOS | ✓ |
+| [mit-pdos/xv6-riscv](https://github.com/mit-pdos/xv6-riscv) | xv6 RISC-V 版（MIT 教学） | ✓ |
+| [mit-pdos/xv6-public](https://github.com/mit-pdos/xv6-public) | xv6 x86 版（MIT 教学） | ✓ |
+| [HUSTOS/xv6-k210](https://github.com/HUST-OS/xv6-k210)| 2021一等奖作品github版（gitlab版不可访问） |
+| [rcore-os/rCore-Tutorial-v3](https://github.com/rcore-os/rCore-Tutorial-v3) | rCore Tutorial v3 教学 OS | ✓ |
+| [chyyuu/ucore_os_lab](https://github.com/chyyuu/ucore_os_lab) | uCore OS 教学实验 | ✓ |
+| [hawkw/mycelium](https://github.com/hawkw/mycelium) | Rust 异步 OS 内核 | |
+| [cbiffle/lilos](https://github.com/cbiffle/lilos) | 最小化 async Rust RTOS | |
+| [equation314/nimbos](https://github.com/equation314/nimbos) | 教学用 OS（类 rCore） | |
+| [torvalds/linux](https://github.com/torvalds/linux) | Linux 内核（参考/ABI 兼容） | |
+| [Tencent/TencentOS-tiny](https://github.com/Tencent/TencentOS-tiny) | 腾讯物联网 OS | |
+
+### 内存分配器
+
+| 仓库 | 说明 |
+|---|---|
+| [rcore-os/buddy_system_allocator](https://github.com/rcore-os/buddy_system_allocator) | Buddy 伙伴系统分配器（Rust） |
+| [jasonwhite/buddy_system_allocator](https://github.com/jasonwhite/buddy_system_allocator) | 同上（原版） |
+| [rcore-os/bitmap-allocator](https://github.com/rcore-os/bitmap-allocator) | 位图帧分配器（Rust） |
+| [arceos-org/allocator](https://github.com/arceos-org/allocator) | ArceOS 通用分配器 crate |
+| [arceos-org/slab_allocator](https://github.com/arceos-org/slab_allocator) | Slab 分配器 |
+| [cloudwu/buddy](https://github.com/cloudwu/buddy) | C 语言 Buddy 分配器 |
+| [mattconte/tlsf](https://github.com/mattconte/tlsf) | TLSF 两级分离适应分配器 |
+| [OlegHahm/tlsf](https://github.com/OlegHahm/tlsf) | TLSF 另一实现 |
+| [blanham/liballoc](https://github.com/blanham/liballoc) | 轻量级 liballoc 分配器 |
+
+### 文件系统库
+
+| 仓库 | 说明 |
+|---|---|
+| [gkostka/lwext4](https://github.com/gkostka/lwext4) | C 语言轻量级 ext4 库 |
+| [elliott10/lwext4_rust](https://github.com/elliott10/lwext4_rust) | lwext4 的 Rust 绑定 |
+| [rafalh/rust-fatfs](https://github.com/rafalh/rust-fatfs) | Rust FAT 文件系统库 |
+| [rafalh/rust-fscommon](https://github.com/rafalh/rust-fscommon) | rust-fatfs 配套工具库 |
+| [yuoo655/ext4_rs](https://github.com/yuoo655/ext4_rs) | 纯 Rust ext4 实现 |
+| [Starry-OS/rsext4](https://github.com/Starry-OS/rsext4) | Starry 的 Rust ext4 库 |
+| [webdesus/fs_extra](https://github.com/webdesus/fs_extra) | Rust FS 扩展工具 |
+| [undefined-os/vfs](https://github.com/undefined-os/vfs) | VFS 虚拟文件系统抽象层 |
+
+### 网络协议栈
+
+| 仓库 | 说明 |
+|---|---|
+| [smoltcp-rs/smoltcp](https://github.com/smoltcp-rs/smoltcp) | 纯 Rust TCP/IP 协议栈 |
+| [rcore-os/smoltcp](https://github.com/rcore-os/smoltcp) | rCore 修改版 smoltcp |
+| [asterinas/smoltcp](https://github.com/asterinas/smoltcp) | Asterinas fork |
+
+### 硬件驱动 / HAL
+
+| 仓库 | 说明 |
+|---|---|
+| [rcore-os/virtio-drivers](https://github.com/rcore-os/virtio-drivers) | VirtIO 设备驱动（Rust） |
+| [arceos-org/axdriver_crates](https://github.com/arceos-org/axdriver_crates) | ArceOS 驱动 crates 集合 |
+| [arceos-org/axplat_crates](https://github.com/arceos-org/axplat_crates) | ArceOS 平台支持 crates |
+| [rcore-os/device_tree-rs](https://github.com/rcore-os/device_tree-rs) | 设备树（DTB）解析库 |
+| [repnop/fdt](https://github.com/repnop/fdt) | FDT/DTB 解析库 |
+| [rust-embedded/riscv](https://github.com/rust-embedded/riscv) | RISC-V 寄存器访问 crate |
+| [rcore-os/riscv](https://github.com/rcore-os/riscv) | rCore 修改版 riscv crate |
+| [wyfcyx/k210-hal](https://github.com/wyfcyx/k210-hal) | K210 HAL |
+| [wyfcyx/k210-pac](https://github.com/wyfcyx/k210-pac) | K210 PAC |
+| [wyfcyx/k210-soc](https://github.com/wyfcyx/k210-soc) | K210 SoC 支持 |
+| [riscv-rust/fu740-hal](https://github.com/riscv-rust/fu740-hal) | FU740 HAL |
+| [riscv-rust/fu740-pac](https://github.com/riscv-rust/fu740-pac) | FU740 PAC |
+| [T-head-Semi/openc906](https://github.com/T-head-Semi/openc906) | T-Head C906 开源实现 |
+| [QIUZHILEI/dw_sd](https://github.com/QIUZHILEI/dw_sd) | DesignWare SD 控制器驱动 |
+
+### SBI / 引导 / 固件
+
+| 仓库 | 说明 |
+|---|---|
+| [rustsbi/rustsbi](https://github.com/rustsbi/rustsbi) | RISC-V SBI 实现（Rust） |
+| [rustsbi/rustsbi-d1](https://github.com/rustsbi/rustsbi-d1) | D1 专用 RustSBI |
+| [luojia65/rustsbi](https://github.com/luojia65/rustsbi) | 早期 RustSBI |
+| [riscv-software-src/opensbi](https://github.com/riscv-software-src/opensbi) | OpenSBI 开源实现 |
+| [elliott10/opensbi](https://github.com/elliott10/opensbi) | 修改版 OpenSBI |
+| [sifive/freedom-u-sdk](https://github.com/sifive/freedom-u-sdk) | SiFive U 系列 SDK |
+
+### ELF / 二进制解析
+
+| 仓库 | 说明 |
+|---|---|
+| [nrc/xmas-elf](https://github.com/nrc/xmas-elf) | Rust ELF 解析库 |
+| [zlc-dev/xmas-elf](https://github.com/zlc-dev/xmas-elf) | xmas-elf 修改版 |
+| [m4b/goblin](https://github.com/m4b/goblin) | 多格式二进制解析（ELF/PE/Mach-O） |
+| [arceos-org/kernel-elf-parser](https://github.com/arceos-org/kernel-elf-parser) | 内核 ELF 加载解析器 |
+
+### 并发 / 数据结构 / 页表
+
+| 仓库 | 说明 |
+|---|---|
+| [Amanieu/intrusive-rs](https://github.com/Amanieu/intrusive-rs) | 侵入式数据结构（Rust） |
+| [greatbridf/intrusive-rs](https://github.com/greatbridf/intrusive-rs) | fork 版本 |
+| [arceos-org/linked_list](https://github.com/arceos-org/linked_list) | 侵入式链表 |
+| [arceos-org/scheduler](https://github.com/arceos-org/scheduler) | 调度器 crate（CFS/FIFO/Round-Robin） |
+| [arceos-org/page_table_multiarch](https://github.com/arceos-org/page_table_multiarch) | 多架构页表实现 |
+| [rcore-os/page_table_multiarch](https://github.com/rcore-os/page_table_multiarch) | rCore 版本多架构页表 |
+| [tokio-rs/tracing](https://github.com/tokio-rs/tracing) | Rust 结构化日志/追踪框架 |
+| [asterinas/inherit-methods-macro](https://github.com/asterinas/inherit-methods-macro) | 方法继承过程宏 |
+| [asterinas/inventory](https://github.com/asterinas/inventory) | 编译期静态注册表 |
+| [theseus-os/irq_safety](https://github.com/theseus-os/irq_safety) | 中断安全 Mutex 封装 |
+| [alacritty/vte](https://github.com/alacritty/vte) | VT100 终端转义序列解析（Rust） |
+
+### C/C++ 系统库
+
+| 仓库 | 说明 |
+|---|---|
+| [electronicarts/EASTL](https://github.com/electronicarts/EASTL) | EA STL C++ 标准库 |
+| [mendsley/tinystl](https://github.com/mendsley/tinystl) | 最小化 STL 实现 |
+| [martinmoene/expected-lite](https://github.com/martinmoene/expected-lite) | C++ `expected<T,E>` 实现 |
+| [bbqsrc/core2](https://github.com/bbqsrc/core2) | Rust no_std IO 封装 |
+| [jethrogb/rust-core_io](https://github.com/jethrogb/rust-core_io) | Rust `core::io` 扩展 |
+| [jasonwhite/syscalls](https://github.com/jasonwhite/syscalls) | Rust syscall 封装 crate |
+| [bminor/glibc](https://github.com/bminor/glibc) | GNU C 库（参考） |
+| [richfelker/musl-cross-make](https://github.com/richfelker/musl-cross-make) | musl 交叉编译工具链构建 |
+| [managarm/frigg](https://github.com/managarm/frigg) | 轻量级 C++ 工具库 |
+| [managarm/libasync](https://github.com/managarm/libasync) | C++ 协程/异步库 |
+| [managarm/bragi](https://github.com/managarm/bragi) | IDL 消息传递框架 |
+
+### 开发工具 / 构建
+
+| 仓库 | 说明 |
+|---|---|
+| [rust-embedded/cargo-binutils](https://github.com/rust-embedded/cargo-binutils) | Cargo LLVM 工具链封装 |
+| [matklad/cargo-xtask](https://github.com/matklad/cargo-xtask) | Cargo 任务扩展模式 |
+| [ninja-build/ninja](https://github.com/ninja-build/ninja) | Ninja 构建系统 |
+| [cyrus-and/gdb-dashboard](https://github.com/cyrus-and/gdb-dashboard) | GDB 调试增强界面 |
+| [rust-lang/mdbook](https://github.com/rust-lang/mdbook) | mdBook 文档工具 |
+| [managarm/xbstrap](https://github.com/managarm/xbstrap) | 交叉编译 bootstrap 工具 |
+
+### 规范文档 / 参考资料
+
+| 仓库 | 说明 |
+|---|---|
+| [riscv/riscv-isa-manual](https://github.com/riscv/riscv-isa-manual) | RISC-V ISA 官方手册 |
+| [riscv-non-isa/riscv-sbi-doc](https://github.com/riscv-non-isa/riscv-sbi-doc) | RISC-V SBI 规范 |
+| [riscv-non-isa/riscv-asm-manual](https://github.com/riscv-non-isa/riscv-asm-manual) | RISC-V 汇编手册 |
+| [riscv-non-isa/riscv-elf-psabi-doc](https://github.com/riscv-non-isa/riscv-elf-psabi-doc) | RISC-V ELF psABI 规范 |
+| [devicetree-org/devicetree-specification](https://github.com/devicetree-org/devicetree-specification) | 设备树规范 |
+| [loongson/LoongArch-Documentation](https://github.com/loongson/LoongArch-Documentation) | LoongArch 架构文档 |
+| [seL4/l4v](https://github.com/seL4/l4v) | seL4 形式化验证证明 |
+| [linux-test-project/ltp](https://github.com/linux-test-project/ltp) | Linux 测试项目（LTP） |
