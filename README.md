@@ -9,6 +9,12 @@
 - 队员：刘建博（kkkboxbili@qq.com）、李佳峻
 - 学校：华中科技大学
 
+## 26年作品初赛评审结果
+
+『来自123云盘用户的分享』2026-complete-reports-site.tar.gz
+链接：https://1860469204.share.123pan.cn/123pan/cvI5vd-ZpIth?pwd=0721#
+提取码：0721
+
 ## 这是什么
 
 OS-Agent 是一套以 **Claude Code Skill + MCP** 形式运行的内核作品查重和差异评审系统。
