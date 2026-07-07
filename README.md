@@ -287,13 +287,34 @@ Claude Code 的完整约束见 [.claude/skills/os-agent/SKILL.md](.claude/skills
 主流程按下面顺序执行，用户不需要手动调用这些工具：
 
 1. **启动审计**：确认用户显式指定待查重分支；用 bash 检查 `repos/<作品>/` 当前检出分支就是该分支且工作树干净，锁定作品 commit，创建独立输出目录和 `audit_manifest.json`。默认输出目录是 `output/<repo>/`，所有产物平铺在该目录下。
-2. **确认范围**：Agent 判断学生代码、外部依赖、生成物和文档边界，MCP 验证 ScopeManifest。
-3. **参考发现**：用目标 verified scope 和候选自动轻量 scope 做正式 1-vs-N 搜索，粗召回只作为内部候选发现。
-4. **Base 固化**：Agent 选择参考来源，MCP 校验 `repo + commit + formal score` 后写入 `base_decision.json`。
-5. **切换源码工作树**：`base_decision_submit` 校验通过后，Claude Code 直接使用刚刚判断出的 `target_commit` 和 `selected_base_commit`，把 `repos/<target>` 和 `repos/<base>` 强制 checkout 到对应 detached commits。`base_decision.json` 是审计记录，不是下一步重新读取的控制输入。
-6. **函数事实**：用同一组 target/base commits 建立 `comparison.sqlite`，Agent 只按模块需要分页查询概要、热点、目录、文件和关键函数。
-7. **模块评审**：Agent 以模块为阅读单位，覆盖 112 个节点，写中文 Claim、完整度、原创度、模块关键链路和总体结论。
-8. **双报告生成**：先生成 `provenance` 技术附录，再在完整性校验通过后渲染中文 `report.html`。
+2. **读文档与声明审核**：Agent 先读所有 PDF 设计文档、README、AI 使用声明。逐条核对文档声明与代码实现的一致性——基座声明是否如实、AI 声明是否与 commit 证据吻合、功能宣称是否夸大。
+3. **确认范围**：Agent 判断学生代码、外部依赖、生成物和文档边界，MCP 验证 ScopeManifest。
+4. **参考发现**：用目标 verified scope 和候选自动轻量 scope 做正式 1-vs-N 搜索，粗召回只作为内部候选发现。
+5. **Base 固化**：Agent 选择参考来源，MCP 校验 `repo + commit + formal score` 后写入 `base_decision.json`。
+6. **切换源码工作树**：`base_decision_submit` 校验通过后，Claude Code 直接使用刚刚判断出的 `target_commit` 和 `selected_base_commit`，把 `repos/<target>` 和 `repos/<base>` 强制 checkout 到对应 detached commits。`base_decision.json` 是审计记录，不是下一步重新读取的控制输入。
+7. **函数事实**：用同一组 target/base commits 建立 `comparison.sqlite`，Agent 只按模块需要分页查询概要、热点、目录、文件和关键函数。
+8. **模块评审 + 抄袭/造假检测**：Agent 在阅读模块代码时，必须同时检查测试运行器中有无硬编码虚假输出（`emit_ltp_pass`、`synthetic_pass`、`bridge_case` 等造假模式），以及提交历史和文档声明的矛盾。发现后必须在对应模块和 source_relation 中记录。
+9. **双报告生成**：先生成 `provenance` 技术附录，再在完整性校验通过后渲染中文 `report.html`。
+
+### 查重方法论
+
+本项目采用三层比对体系：
+
+- **blob hash（文件级）**：`git ls-tree -r HEAD` 取 SHA-1，识别逐字节一致的文件。适合判断"是否来自同一代码库"和量化框架继承比例。
+- **AST shape hash（函数级，核心指标）**：tree-sitter 解析函数语法树后 SHA-256，不关心变量名、函数名和文件路径。可穿透改标识符、拆文件、合文件等混淆手法。`search_formal` 的 `combined` 主要基于此。
+- **blob + AST 联合反混淆**：当 blob pairwise 明显低于抄袭阈值（如 40-70%）但 AST 远高于 blob（如 blob 60% vs AST 83%），说明存在系统性混淆。每多一层混淆，blob-AST 差距扩大一级。实际案例：T2026104869910069-16（武汉大学振兴三连）通过 384 对标识符重命名 + 文件拆分重组 + 虚假 REFERENCE 注释 + 包重命名 4 层混淆掩盖从 PulseOS 抄袭，blob 仅 60% 但 AST 达 82.8%。
+
+### 2026 初赛审计发现
+
+2026 年共审计 140 件内核实现赛道作品。关键发现：
+
+| 类别 | 数量 | 代表作品 |
+|---|---|---|
+| **同届抄袭** | 2 | 1379 缺页队（武汉大学，抄袭 1415 哈工大菜鸟队，85.7% blob 相同，15天时间差）；16 振兴三连队（武汉大学，抄袭 PulseOS，4层混淆掩盖，AST 82.8% 确认） |
+| **测试造假/刷分** | 6 | 2931 华中科技（emit_ltp_pass 全系统造假）；2137（hardcode "passed 185"）；797（append_synthetic_libctest_pass）；779（bridge_case 虚假桥接）；2679（硬编码测试旁路）；725（单点刷分） |
+| **零原创（直接 Fork）** | 5 | 1289（100% Chronix 2025，仅改 README）；671（99.7% ArceOS 副本 + LTP dump）；等 |
+| **隐匿AI** | 11 | 文档未声明但 commit/agent 配置有确凿 AI 证据 |
+| **基座声明不实** | 1 | 1415 哈工大菜鸟队（README 说基于 rCore，实际 80.2% 匹配 RocketOS） |
 
 声明是强线索但不会自动成为参考作品；年份方向只是强线索，不是硬门槛。同年高相似候选仍可能存在互抄、共同上游或协作传播，不能仅因同年排除。Agent 需要抽取高相似文件/函数，用 `git log --follow`、`git blame`、`git show`、`git diff` 检查双方相似片段的首次引入时间、提交形态、批量导入痕迹、文档声明和共同第三方来源线索，并在主报告中用中文说明当前更像互抄、共同外部来源、协作共享还是方向不明。如果选择同年、未知年份或不在 xlsx 的开源教学项目作为 Base，主报告必须说明方向不确定性、替代方向依据和未选其他候选的原因。
 `judge_report_create` 默认不覆盖已有报告；切换 Base/Comparison 时使用 `judge_report_fork_for_comparison` 生成待重绑草稿。
@@ -453,6 +474,7 @@ OS-Agent/
 | [cbiffle/lilos](https://github.com/cbiffle/lilos) | 最小化 async Rust RTOS | |
 | [equation314/nimbos](https://github.com/equation314/nimbos) | 教学用 OS（类 rCore） | |
 | [torvalds/linux](https://github.com/torvalds/linux) | Linux 内核（参考/ABI 兼容） | |
+| [ChenRuiwei/Phoenix](https://github.com/ChenRuiwei/Phoenix) | 2024年OS竞赛一等奖作品(纯Rust，ArceOS系，被多个2026队伍作为设计参考) | ✓ |
 | [Tencent/TencentOS-tiny](https://github.com/Tencent/TencentOS-tiny) | 腾讯物联网 OS | |
 
 ### 内存分配器

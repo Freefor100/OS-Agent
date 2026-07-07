@@ -127,11 +127,28 @@ function stripMermaidFence(value: unknown): string {
 
 function TextBlock({ value, className = "" }: { value: unknown; className?: string }) {
   if (Array.isArray(value)) {
-    const rows = value.filter((row) => String(row ?? "").trim());
+    const rows = value.filter((row) => {
+      const s = String(row ?? "").trim();
+      if (!s) return false;
+      if (s === "[object Object]") return false;
+      return true;
+    });
     if (!rows.length) return <p className="muted">未填写。</p>;
+    if (typeof rows[0] === "object" && rows[0] !== null) {
+      return <div className={`text-block ${className}`}>{rows.map((row, i) => {
+        const r = row as Record<string, unknown>;
+        return <div key={i} className="source-card"><strong>{r.source ? String(r.source) : r.type ? String(r.type) : ""}</strong>{r.description ? <p>{String(r.description)}</p> : null}{r.evidence ? <p className="muted">{String(r.evidence)}</p> : null}</div>;
+      })}</div>;
+    }
     return <ul className={`text-list ${className}`}>{rows.map((row, index) => <li key={index}>{String(row)}</li>)}</ul>;
   }
-  return <div className={`text-block ${className}`}><p>{String(value ?? "")}</p></div>;
+  const text = String(value ?? "");
+  if (!text.trim()) return <p className="muted">未填写。</p>;
+  const paragraphs = text.split(/\n\s*\n/);
+  if (paragraphs.length > 1) {
+    return <div className={`text-block ${className}`}>{paragraphs.map((p, i) => <p key={i}>{p.replace(/\n/g, "")}</p>)}</div>;
+  }
+  return <div className={`text-block ${className}`}><p>{text.replace(/\n/g, "")}</p></div>;
 }
 
 export default function App() {

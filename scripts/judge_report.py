@@ -22,7 +22,7 @@ except Exception:
 
 
 IMPLEMENTATION_LABELS = {
-    "complete": "完整",
+    "full": "完整",
     "partial": "部分",
     "minimal": "最低限度",
     "absent": "未发现实现",
@@ -30,10 +30,11 @@ IMPLEMENTATION_LABELS = {
     "unknown": "待确认",
 }
 ORIGINALITY_LABELS = {
-    "independent": "独立实现",
-    "substantial_rework": "实质重写",
-    "incremental": "增量修改",
+    "novel": "独立实现",
+    "adapted_major": "实质重写",
+    "adapted_minor": "增量修改",
     "inherited": "主体继承",
+    "external_dep": "外部依赖",
     "not_applicable": "不适用",
     "unknown": "待确认",
 }
