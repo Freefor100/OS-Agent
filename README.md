@@ -1,608 +1,186 @@
 # OS-Agent
 
-## 参赛信息
+OS-Agent 是面向“全国大学生计算机系统能力大赛-操作系统设计赛(全国)-OS功能挑战赛道”的小型操作系统源码分析比对智能体系统。它的目标不是输出一个相似度分数，而是还原参赛作品的真实工作量、Base 与来源关系、模块实现质量、文档声明可信度、开发历史与 AI 使用、作弊/刷分/prompt injection 风险。
 
-- 赛事：2026 全国大学生计算机系统能力大赛-操作系统设计赛
-- 赛道：OS 功能挑战赛道
-- 项目：proj18 · 面向小型操作系统的分析比对智能体系统设计
-- 队伍名称：OS照妖镜
-- 队员：刘建博（kkkboxbili@qq.com）、李佳峻
-- 学校：华中科技大学
+当前主线是 `review_case`。确定性脚本负责版本锁定、指纹缓存、证据整理、格式校验和前端数据；Agent 只写窄任务的评审片段。
 
-## 26年作品初赛评审结果
+## 人工前置
 
-『来自123云盘用户的分享』2026-complete-reports-site.tar.gz
-链接：https://1860469204.share.123pan.cn/123pan/cvI5vd-ZpIth?pwd=0721#
-提取码：0721
-
-## 这是什么
-
-OS-Agent 是一套以 **Claude Code Skill + MCP** 形式运行的内核作品查重和差异评审系统。
-
-- 本地程序负责 Git 版本锁定、代码范围校验、Git blob 与 AST shape 指纹、1-vs-N 搜索、函数匹配、关键证据锚定、完整性校验和 HTML 渲染。
-- Claude Code 负责阅读源码和文档，判断外部依赖、参考作品、实现度、原创度与关键差异。
-
-它不是“运行一个 Python 脚本就自动得到评委结论”。脚本提供可复现的事实底座；Agent 完成完整框架评审后，程序才允许渲染最终报告。
-
-最终生成两份职责独立的报告：
+作品身份和 clone 目录由人工维护，不自动挖作品名，不自动 rename clone。
 
 ```text
-report.json      → report.html       面向评委的中文完整框架评审
-provenance.json  → provenance.html   面向技术复核的函数溯源附录
+config/works.yaml
+repos/2026-<学校>-<队名>-<作品名>/
 ```
 
-## 快速开始
+`config/works.yaml` 是作品身份唯一来源：
 
-下面以分析 `oskernel2023-zmz` 为例。所有命令都在 OS-Agent 项目根目录执行。
-
-### 0. 安装 Claude Code / 配置 DeepSeek API
-
-OS-Agent 通过 Claude Code 调用项目 Skill 和 MCP。推荐在 Linux 或 WSL 中运行；不建议使用原生 Windows 环境，路径、shell、Git 和本地 MCP 进程管理更容易出现兼容性问题。若本机还没有 Claude Code，在 Linux/WSL 中执行：
-
-```bash
-curl -fsSL https://claude.ai/install.sh | bash
+```yaml
+- work_id: 2026-pku-shulijichu-workslug
+  year: 2026
+  school: 北京大学
+  team: 数理基础队
+  work_name: 手工挖出的作品名
+  display_name: 北京大学 数理基础队《手工挖出的作品名》
+  machine_repo: T2026100019911468-282
+  canonical_dir: repos/2026-北京大学-数理基础队-手工挖出的作品名
+  review_branch: main
+  urls:
+    prelim: https://...
+    final: ""
+    source: ""
 ```
 
-也可以使用 npm 安装方式：
+公开正文只能使用 `display_name`。机器 repo id、数字 fork 后缀、历史 clone 目录名进入公开正文会校验失败。
 
-```bash
-npm install -g @anthropic-ai/claude-code
-```
+## 分工顺序
 
-安装后确认命令可用：
-
-```bash
-claude --version
-```
-
-OS-Agent 的一次完整评审可能消耗 `60M+` tokens，建议使用 DeepSeek API 作为 Claude Code 后端；在长流程、多 Agent、重复读取证据的场景下，缓存命中率通常可达 `97%`-`98%`。先到 [DeepSeek Platform](https://platform.deepseek.com/) 创建 API Key，再把环境变量写入当前 shell 的启动文件。bash 用户写入 `~/.bashrc`，zsh 用户写入 `~/.zshrc`：
-
-```bash
-export ANTHROPIC_BASE_URL=https://api.deepseek.com/anthropic
-export ANTHROPIC_API_KEY=<你的 DeepSeek API Key>
-```
-
-写入后重新打开终端，或执行 `source ~/.bashrc` / `source ~/.zshrc` 让配置立即生效。`<你的 DeepSeek API Key>` 是占位符，替换为实际 key，不要把尖括号原样输入，也不要提交到 Git。DeepSeek 的 Anthropic 兼容接口 base URL 是 `https://api.deepseek.com/anthropic`；以上配置来自 DeepSeek 的 Claude Code 接入说明。配置完成后进入项目目录启动：
-
-```bash
-cd /path/to/OS-Agent
-claude
-```
-
-### 1. 安装 Python 依赖
-
-推荐使用名为 `os_agent` 的 Conda 环境，项目 `environment.yml` 包含完整 Python 及 LSP 依赖：
-
-```bash
-conda env create -f environment.yml
-conda activate os_agent
-```
-
-如果是已有环境的增量更新：
-
-```bash
-conda env update -f environment.yml
-```
-
-也可以手动创建：
-
-```bash
-conda create -n os_agent python=3.11
-conda activate os_agent
-pip install -r requirements.txt
-```
-
-环境创建完成后，先激活环境，再把当前解释器写入 `OS_AGENT_PYTHON`。后续命令和本地 MCP 配置都优先使用这个变量：
-
-```bash
-export OS_AGENT_PYTHON="$(command -v python)"
-```
-
-Claude Code 通过 MCP 使用 OS-Agent 时不依赖系统存在 `python` 命令；手动运行 CLI 命令前需要激活对应环境，或显式使用该环境中的 Python。
-
-`.claude/mcp.json` 是每个人的本地 Claude Code MCP 配置，不进入 Git。仓库提供 [.claude/mcp.json.example](.claude/mcp.json.example)，首次使用时复制为 `.claude/mcp.json`：
-
-```bash
-cp .claude/mcp.json.example .claude/mcp.json
-```
-
-这个 example 保持 Claude Code 生成的直接启动格式：`command` 是 Python 解释器，`args` 第一个参数是项目里的 `mcp_server.py`。复制后把 `<python-executable>` 替换为 `OS_AGENT_PYTHON` 指向的解释器；把 `<project-root>` 替换为当前 OS-Agent 目录的绝对路径。可以用 `printf '%s\n' "$OS_AGENT_PYTHON"` 和 `pwd` 查看这两个值。个人本地路径不要提交到 Git。
-
-跨机器迁移时，不要复用别人填好的绝对路径；先用 `environment.yml` 创建同名环境，再用 `printf '%s\n' "$OS_AGENT_PYTHON"` 和 `pwd` 得到本机路径，填入 `.claude/mcp.json`。`scripts/start_mcp.sh` 仍保留为手动诊断入口；如果你想让本地配置自动找环境，也可以只在自己的 `.claude/mcp.json` 中把 `command` 改成 `bash`、`args` 改成 `["scripts/start_mcp.sh"]`，但仓库 example 默认保持 Claude Code 生成的直接启动格式。
-
-`scripts/start_mcp.sh` 不是 MCP 服务本体；真正的服务入口是 `mcp_server.py`。启动脚本只负责按顺序寻找可用 Python：`OS_AGENT_PYTHON`、项目 `.venv/` 或 `venv/`、常见 Conda/Mamba `os_agent` 环境，以及 PATH 中可用的 Conda/Mamba/Micromamba 环境管理器，找到后再启动 `mcp_server.py`。因此它适合排查环境或作为个人本地替代配置，但不要把它和 `mcp_server.py` 混为一谈。
-
-### 2. 准备作品和候选语料库
-
-将每个 Git 仓库分别 clone 到 `repos/`，并保留 `.git`：
+`scope` 是源码归属划分：学生核心、共同框架、第三方库、生成物、测试包、文档和未知。它不是最终结论，只是防止共同框架、外部模块和测试代码污染 Base 选择、同届方向判断和模块工作量描述。
 
 ```text
-repos/
-├── oskernel2023-zmz/   本次待分析作品
-├── xv6-k210/           候选参考作品
-├── ...
-└── 其他竞赛作品/
+works.yaml + canonical clone
+-> identity-check
+-> init 锁定版本
+-> scope 划分评审边界
+-> fp_cache 批量指纹缓存
+-> search-base 生成候选
+-> base.md 确认 Base
+-> evidence.jsonl
+-> evidence_map.json 证据映射
+-> task_files/*.json 窄任务文件
+-> subagents 写评审片段 contracts
+-> contradictions 仲裁
+-> assemble 生成 report.md/tags.json
+-> compile 生成 site/report_data.json
+-> build-site/build-index 发布前端
 ```
 
-首次使用或语料库发生变化后，预建候选 AST 指纹：
+## CLI
 
 ```bash
-"$OS_AGENT_PYTHON" scripts/run.py --build
+python scripts/review.py identity-check --work-id <work_id>
+python scripts/review.py init --work-id <work_id>
+python scripts/review.py scope --case-dir output/<work_id>
+python scripts/review.py build-fp-cache --works config/works.yaml --cache-root fp_cache
+python scripts/review.py fingerprint --case-dir output/<work_id>
+python scripts/review.py search-base --case-dir output/<work_id>
+python scripts/review.py build-evidence --case-dir output/<work_id>
+python scripts/review.py build-evidence-map --case-dir output/<work_id>
+python scripts/review.py make-task-files --case-dir output/<work_id>
+python scripts/review.py validate --case-dir output/<work_id>
+python scripts/review.py assemble --case-dir output/<work_id>
+python scripts/review.py compile --case-dir output/<work_id>
+python scripts/review.py build-site --case-dir output/<work_id>
+python scripts/review.py check-all --case-dir output/<work_id>
+python scripts/review.py build-index --output output/site output/<work_id> ...
 ```
 
-也可以只预建指定作品和指定分支：
+## 产物
+
+```text
+fp_cache/
+  index.json
+  <work_id>/<commit>/
+    fingerprint_manifest.json
+    target_blob.json
+    target_ast.json
+
+output/<work_id>/
+  identity.md
+  base.md
+  evidence.jsonl
+  modules/*.md
+  findings/doc-claims.md
+  findings/history-ai.md
+  findings/cheat.md
+  issues/contradictions.md
+  report.md
+  tags.json
+  site/
+    report_data.json
+    report.html
+  case_state/
+    manifest.json
+    works.snapshot.yaml
+    repo_snapshot.json
+    scope.json
+    scope.md
+    fp_manifest.json
+    base_candidates.json
+    evidence_map.json
+    evidence_digest.md
+    task_files/*.json
+```
+
+`case_state/` 是内部评审元数据命名空间，用来隔离机器产物和公开报告。批量发布不复制 `case_state/`。
+
+公开阅读入口：
+
+```text
+report.md
+site/report.html
+tags.json
+site/report_data.json
+evidence.jsonl
+```
+
+`site/report_data.json` 不是报告正文，它是前端阅读器数据：章节、模块账本、evidence cards、Markdown 引用图和 evidence 证据映射图。
+
+## 同届抄袭方向
+
+同届抄袭方向不是相似度排序。必须同时看：
+
+- 结构指纹/AST 热点：改名、拆文件、合文件、路径搬移后仍相似的核心函数和类型。
+- git 时间线：核心代码首次出现时间、批量导入、后提交方的改写痕迹、提交说明和文件拆分轨迹。
+- Base 声明与 scope：先排除共同框架、第三方库、测试包和公开引入模块，再判断学生核心代码。
+- 外部模块适配：大规模引入代码不直接算原创，只有接口、平台、页表、调度、I/O 等适配工作单独计入。
+
+没有“结构指纹证据 + git 时间线证据”的同向支撑，只能写方向不确定，不能写谁抄谁。
+
+## Agent 角色
+
+- `base-lineage-reviewer`：Base、来源关系、同届抄袭方向、commit 先后、掩盖手法、外部模块引入/适配。
+- `module-*`：对应模块实现、真实工作量、相对 Base 差异、本模块文档声明复核。
+- `doc-claim-reviewer`：reducer，只汇总模块文档复核与 doc evidence，不全仓重读代码。
+- `history-ai-reviewer`：提交时间线、AI 使用声明、批量导入与生成痕迹。
+- `cheat-detector`：测试造假、runner 绕过、prompt injection。
+- `contradiction-arbiter`：唯一能解决冲突的角色。
+- `report-editor`：只组装已接受评审片段，不创造事实、不读源码、不解决矛盾。
+
+## 报告结构
+
+```text
+# <display_name> 评审报告
+## 整体结论
+## 重点结论
+## Base 与来源关系
+## 真实工作量账本
+## 内核架构图
+## 文档声明审查
+## 开发历史与 AI 使用
+## 作弊、刷分与提示注入风险
+## 模块实现与 Base 差异
+### <模块>
+## 证据索引
+```
+
+文档、历史、作弊风险章节只在存在公开 finding 时出现。没有 finding 时完全省略，不写“未发现”占位。
+
+## 前端
+
+新前端在 `review_viewer/`，输入是 `site/report_data.json`、`evidence.jsonl` 和 `tags.json`。它是评审阅读器，不复用旧报告组件。
 
 ```bash
-"$OS_AGENT_PYTHON" scripts/run.py --build oskernel2023-zmz@main
-```
-
-预建阶段直接读取 Git commit blob，在内存中解析源码，只把 `units/fpset/meta/scopes` 等审计缓存写入 `.fp_cache/`。其中 `fpset` 是函数 AST shape hash 集合。
-默认构建每个仓库的所有唯一分支尖端 commit，供后续粗召回和正式 Scope 搜索消费；多个分支指向同一 commit 时只构建一次。该流程不会遍历历史 commit。只想快速预建当前检出版本时使用 `--current-only`。
-
-当前查重底座是 **Git blob + AST shape**：
-
-- Git blob hash 来自 `git ls-tree -r HEAD`，用于识别逐字节完全一致的文件、框架 fork、路径搬移和同届共享文件。
-- AST shape hash 由 tree-sitter 提取函数语法结构后生成，是 `search_formal` 和函数 Comparison 的核心函数级指标，可穿透函数/变量改名、注释和格式修改、拆文件与合文件。
-- 报告使用 blob 与 AST 的差距解释混淆、搬移和真实工作量。
-
-### 3. 启动 Claude Code 和 MCP
-
-在 OS-Agent 项目根目录启动 Claude Code。本地 `.claude/mcp.json` 会用配置中的 Python 解释器启动 `mcp_server.py`。
-
-首次进入项目时：
-
-1. 批准本地 `.claude/mcp.json` MCP 配置。
-2. 在 Claude Code 中执行 `/mcp`，确认 `os-agent` 已连接。
-3. 如果修改过 `mcp_server.py`、`.claude/mcp.json` 或启动脚本，重新连接 MCP 或重启 Claude Code。
-
-找不到环境时可单独检查启动脚本；这只验证环境发现和 `mcp_server.py` 能否启动，不代表默认 example 必须使用该脚本：
-
-```bash
-timeout 3 scripts/start_mcp.sh
-```
-
-正常情况下服务会持续运行并被 `timeout` 结束；若立即退出，会打印缺少环境或依赖的原因。
-
-### 4. 发起一次完整分析
-
-Claude Code 自动发现的唯一项目 Skill 是 [.claude/skills/os-agent/SKILL.md](.claude/skills/os-agent/SKILL.md)。它不会自动触发，必须显式执行 `/os-agent`。
-
-推荐入口只有一个：
-
-```text
-/os-agent oskernel2023-zmz recover
-```
-
-Agent 会自动完成：
-
-1. 检查 `repos/oskernel2023-zmz` 当前检出分支就是 `recover`，且工作树干净，然后锁定该分支尖端 commit。
-2. 创建 `output/oskernel2023-zmz/`。
-3. 校验作品代码范围，排除外部依赖和生成物。
-4. 执行正式 1-vs-N 搜索并选择参考作品。
-5. 建立函数 Comparison 数据库。
-6. 按模块阅读代码，形成 112 节点中文评审。
-7. 生成 `report.html` 和 `provenance.html`。
-
-需要固定目录名时再显式指定：
-
-```text
-/os-agent oskernel2023-zmz recover 输出到 output/oskernel2023-zmz-custom/
-```
-
-Agent 会先将指定分支解析并锁定为固定 commit。例如评委看到的是：
-
-```text
-oskernel2023-zmz@recover
-```
-
-程序内部锁定：
-
-```text
-recover → 837b6a9...
-```
-
-这样长时间分析期间分支移动或工作树变化不会污染结果。没有用户显式指定分支时，Skill 不会继续工作。
-
-### 5. 查看结果
-
-一次完整分析目录包含：
-
-```text
-output/oskernel2023-zmz/
-├── audit_manifest.json      本次审计的锁定版本、产物路径和阶段状态
-├── base_decision.json       程序校验通过的参考作品判断
-├── report.json              Agent Claim、节点/模块评审和总体结论
-├── report.html              面向评委的主报告
-├── provenance.json          确定性函数溯源导出
-├── provenance.html          面向技术复核的函数溯源附录
-├── evidence_store.jsonl     全局共享、可验证的证据记录
-├── comparison.sqlite        函数 Comparison 查询数据库
-└── comparisons.jsonl        Comparison 审计导出
-```
-
-- 首先打开 `report.html`：查看中文总体结论、Base 选择依据、Scope 排除过程、Agent 阅读代码后给出的架构说明、14 个模块、112 个节点、完整度、原创度与关键 Claim。
-- 需要核对函数匹配和源码对照时，再打开 `provenance.html`。
-- `report.html` 由 `web_report/` 的 React + Vite + TypeScript 静态前端投影 `report.json` 生成。Python 负责校验、整理 view-model、注入数据，并复制 `web_report/dist/assets/`。
-- `report.html` 以中文呈现，必要机制名可用括号补充解释，例如“写时复制（copy-on-write）”。Evidence 只作为关键锚点展示在相关模块/节点页面底部，不要求普通节点堆砌证据。
-- 内核架构图来自 Agent 提交的 Mermaid 图；页面只提供放大、缩小、拖拽平移和重置交互，不自动生成或改写图内容。
-
-只有 `judge_report_validate` 验证全部节点、模块、关键 Claim、中文架构说明和产物链后，程序才允许生成最终主报告。
-
-### 报告生成与预览
-
-`report.html` 依赖仓库中已有的 `web_report/dist/` Vite 构建产物。正常 `/os-agent` 审计流程中，Claude Code 会在最终阶段调用 MCP `judge_report_render`，把 `report.json` 渲染成 `report.html`；用户不需要手动执行渲染脚本。
-
-只有首次使用时本地缺少 `web_report/dist/index.html`，或你修改了 `web_report/` 前端源码后，才需要重新构建前端：
-
-```bash
-cd web_report
+cd review_viewer
 npm install
+npm run typecheck
 npm run build
 ```
 
-`scripts/judge_report.py` 只是 `judge_report_render` 背后的手动离线入口；只有不通过 MCP、需要手工把某个 `report.json` 重渲染成 `report.html` 时才直接调用：
+## 校验
 
 ```bash
-python3 scripts/judge_report.py output/oskernel2023-zmz/report.json output/oskernel2023-zmz/report.html
+python -m unittest tests.test_pipeline
 ```
 
-这里的 `output/oskernel2023-zmz/` 要替换为本次实际审计目录；如果看到文档或报错中的 `<report.json>`、`<report.html>`，尖括号表示占位符，不要原样输入，例如应写成 `output/某作品/report.json` 和 `output/某作品/report.html`。
-
-渲染脚本会把 `web_report/dist/index.html` 注入当前报告数据，并把 `web_report/dist/assets/` 复制到报告输出目录。若审计目录中已经存在 `report.html`，仅查看报告时不需要重新构建前端，也不需要重新运行 `scripts/judge_report.py`。
-
-本地预览请通过 HTTP 打开报告目录，不要直接用 `file://` 打开 Vite 产物：
-
-```bash
-cd output/<repo>
-python3 -m http.server 8765 --bind 127.0.0.1
-```
-
-然后访问 `http://127.0.0.1:8765/report.html`。如果你的环境没有 `python3` 命令，可换成当前虚拟环境或 conda 环境里的 Python 解释器路径。
-
-## 版本与分析范围
-
-### 必须指定哪个分支
-
-查重必须显式指定待查重分支；没有分支名时 `/os-agent` 不应继续工作。开始审计前，Agent 会用 bash 检查 `repos/<作品>/` 当前检出分支就是用户指定的分支，且 `git status --porcelain` 为空：
-
-```text
-作品@指定分支 → 固定 commit
-```
-
-确认分支和干净工作树使用普通 `git -C repos/<作品> branch --show-current` 与 `git -C repos/<作品> status --porcelain`，不需要 MCP 工具。通过后，Agent 用 `git -C repos/<作品> rev-parse HEAD` 得到固定 commit，并把这个 commit 传给后续 MCP 工具。
-
-OS-Agent 不分析未提交工作树。指纹、搜索和 Comparison 绑定选定 commit 的预建缓存；LSP、bash 阅读和关键证据注册前，Claude Code 必须把对应 `repos/<作品>/` checkout 到锁定 commit，并保持 `git status --porcelain` 干净。Evidence 工具直接读取当前工作树，MCP 会强制校验 HEAD 等于传入 ref 且工作树干净。
-
-### 外部依赖和范围如何排除
-
-程序不维护预设外部依赖名单，也不只凭目录名排除 Git tracked 源码。`vendor/`、`third_party/`、`target/`、`build/`、`out/`、`dist/`、`node_modules/` 只能作为审核线索；Agent 需要阅读 `.gitmodules`、Cargo workspace、Makefile/CMake、README、源码引用关系和必要的 git history，判断这些代码是否实际参与项目、是否有声明来源、是否有学生修改痕迹，然后提交 `ScopeManifest`；程序验证路径和 submodule 声明。
-
-正式 1-vs-N 搜索必须使用目标作品验证过的 ScopeManifest；候选缺少 ScopeManifest 时，程序使用确定性的 `auto_candidate` 轻量范围参与重排，避免要求 Agent 为 Top-K 每个候选提交 Scope 证据。排除范围确定前的 `search_similar` 只能用于内部粗召回，不能进入参考作品判断或报告排名。
-除自动识别的 `.gitmodules` 子模块外，verified ScopeManifest 中的排除项必须引用已注册并验证的 EvidenceRecord；没有证据的范围建议只能作为 draft。排除依据优先引用源码/配置/文档证据；没有单一源码位置时使用 `evidence_structured(kind="scope_exclusion_decision", metadata={prefix, category, reason, basis})`。`scope_manifest` 证据只记录已创建的 Scope 清单，不作为创建前的排除依据。
-
-## Agent 实际执行流程
-
-Claude Code 的完整约束见 [.claude/skills/os-agent/SKILL.md](.claude/skills/os-agent/SKILL.md)：
-
-主流程按下面顺序执行，用户不需要手动调用这些工具：
-
-1. **启动审计**：确认用户显式指定待查重分支；用 bash 检查 `repos/<作品>/` 当前检出分支就是该分支且工作树干净，锁定作品 commit，创建独立输出目录和 `audit_manifest.json`。默认输出目录是 `output/<repo>/`，所有产物平铺在该目录下。
-2. **读文档与声明审核**：Agent 先读所有 PDF 设计文档、README、AI 使用声明。逐条核对文档声明与代码实现的一致性——基座声明是否如实、AI 声明是否与 commit 证据吻合、功能宣称是否夸大。
-3. **确认范围**：Agent 判断学生代码、外部依赖、生成物和文档边界，MCP 验证 ScopeManifest。
-4. **参考发现**：用目标 verified scope 和候选自动轻量 scope 做正式 1-vs-N 搜索，粗召回只作为内部候选发现。
-5. **Base 固化**：Agent 选择参考来源，MCP 校验 `repo + commit + formal score` 后写入 `base_decision.json`。
-6. **切换源码工作树**：`base_decision_submit` 校验通过后，Claude Code 直接使用刚刚判断出的 `target_commit` 和 `selected_base_commit`，把 `repos/<target>` 和 `repos/<base>` 强制 checkout 到对应 detached commits。`base_decision.json` 是审计记录，不是下一步重新读取的控制输入。
-7. **函数事实**：用同一组 target/base commits 建立 `comparison.sqlite`，Agent 只按模块需要分页查询概要、热点、目录、文件和关键函数。
-8. **模块评审 + 抄袭/造假检测**：Agent 在阅读模块代码时，必须同时检查测试运行器中有无硬编码虚假输出（`emit_ltp_pass`、`synthetic_pass`、`bridge_case` 等造假模式），以及提交历史和文档声明的矛盾。发现后必须在对应模块和 source_relation 中记录。
-9. **双报告生成**：先生成 `provenance` 技术附录，再在完整性校验通过后渲染中文 `report.html`。
-
-### 查重方法论
-
-本项目采用三层比对体系：
-
-- **blob hash（文件级）**：`git ls-tree -r HEAD` 取 SHA-1，识别逐字节一致的文件。适合判断"是否来自同一代码库"和量化框架继承比例。
-- **AST shape hash（函数级，核心指标）**：tree-sitter 解析函数语法树后 SHA-256，不关心变量名、函数名和文件路径。可穿透改标识符、拆文件、合文件等混淆手法。`search_formal` 的 `combined` 主要基于此。
-- **blob + AST 联合反混淆**：当 blob pairwise 明显低于抄袭阈值（如 40-70%）但 AST 远高于 blob（如 blob 60% vs AST 83%），说明存在系统性混淆。每多一层混淆，blob-AST 差距扩大一级。实际案例：T2026104869910069-16（武汉大学振兴三连）通过 384 对标识符重命名 + 文件拆分重组 + 虚假 REFERENCE 注释 + 包重命名 4 层混淆掩盖从 PulseOS 抄袭，blob 仅 60% 但 AST 达 82.8%。
-
-### 2026 初赛审计发现
-
-2026 年共审计 140 件内核实现赛道作品。关键发现：
-
-| 类别 | 数量 | 代表作品 |
-|---|---|---|
-| **同届抄袭** | 2 | 1379 缺页队（武汉大学，抄袭 1415 哈工大菜鸟队，85.7% blob 相同，15天时间差）；16 振兴三连队（武汉大学，抄袭 PulseOS，4层混淆掩盖，AST 82.8% 确认） |
-| **测试造假/刷分** | 6 | 2931 华中科技（emit_ltp_pass 全系统造假）；2137（hardcode "passed 185"）；797（append_synthetic_libctest_pass）；779（bridge_case 虚假桥接）；2679（硬编码测试旁路）；725（单点刷分） |
-| **零原创（直接 Fork）** | 5 | 1289（100% Chronix 2025，仅改 README）；671（99.7% ArceOS 副本 + LTP dump）；等 |
-| **隐匿AI** | 11 | 文档未声明但 commit/agent 配置有确凿 AI 证据 |
-| **基座声明不实** | 1 | 1415 哈工大菜鸟队（README 说基于 rCore，实际 80.2% 匹配 RocketOS） |
-
-声明是强线索但不会自动成为参考作品；年份方向只是强线索，不是硬门槛。同年高相似候选仍可能存在互抄、共同上游或协作传播，不能仅因同年排除。Agent 需要抽取高相似文件/函数，用 `git log --follow`、`git blame`、`git show`、`git diff` 检查双方相似片段的首次引入时间、提交形态、批量导入痕迹、文档声明和共同第三方来源线索，并在主报告中用中文说明当前更像互抄、共同外部来源、协作共享还是方向不明。如果选择同年、未知年份或不在 xlsx 的开源教学项目作为 Base，主报告必须说明方向不确定性、替代方向依据和未选其他候选的原因。
-`judge_report_create` 默认不覆盖已有报告；切换 Base/Comparison 时使用 `judge_report_fork_for_comparison` 生成待重绑草稿。
-
-报告中的中文说明字段支持两种形态：连续解释用字符串，并列机制、分阶段结论、第一/第二/第三类判断用字符串数组。渲染器只按 Agent 显式提交的数组分条展示，不会按标点、序号或句长自动拆句。建议 `module_reviews[].overview`、`implementation_summary`、`difference_summary`、`original_work_summary`、`overall_assessment.summary`、`source_relation`、`base_selection_reason`、`scope_exclusion_process`、`directory_overview` 和 `architecture_overview` 在包含多个并列点时提交数组。多来源作品不要把所有来源塞进 `BaseDecision`；`BaseDecision` 只固定主骨架参考，`source_relation` 和模块 `difference_summary/original_work_summary` 用中文数组逐条说明来源名称、关系类型、影响范围、确认程度和不确定点。`base_selection_reason` 面向评委说明为什么选中或未选中 Base；`scope_exclusion_process` 说明排除路径、证据来源、疑似第三方/生成代码是否检查过修改和实际引用。
-
-`overall_assessment.directory_overview` 承载 Agent 对完整目录树的整体解释，`overall_assessment.directory_notes` 可按目录相对路径提供逐项说明，前端把说明紧跟在对应目录项后面，不替 Agent 编写目录解释。`overall_assessment.architecture_overview` 承载中文内核架构补充说明，展示在架构图下方。`overall_assessment.architecture_diagram` 若存在，必须是纯 Mermaid 内核架构图源码，不得混入说明段落；校验失败时 Agent 需要修改 JSON 后重新提交。页面对该图提供缩放、拖拽平移和重置交互，但不自动生成或修复图内容。`overall_assessment.architecture_edges` 用来索引 Agent 阅读代码后总结出的真实架构关系，不是固定模块摆盘图。每条边至少需要中文 `label` 和非空 `claim_ids`；端点可以用 `source/target` 或 `from/to` 写自由文字，也可以用 `from_module/to_module`、`module_ids`、`from_node/to_node`、`node_ids` 绑定结构化模块或节点。结构化引用会校验 ID，普通端点文字不会被当成模块强校验，MCP 不会替 Agent 自动绘图或拆句。
-
-## LSP 与文档支持 (这点实际Agent不会优先采用LSP Tool来查调用链)
-
-关键调用链优先使用 LSP 语义确认。未安装对应语言服务器时，工具会降级到 tree-sitter、语言感知搜索或汇编解析，并在结果中标记 fallback/confidence：
-
-- C/C++：`clangd`
-- Rust：`rust-analyzer`
-- Go：`gopls`
-- Zig：`zls`
-
-跨架构 C/C++ 项目建议安装对应裸机交叉编译器，例如 `riscv64-unknown-elf-gcc`。LSP 使用已 checkout 到锁定 commit 的作品工作树；clangd 结束、MCP 退出或下次启动前会自动清除受管理的临时配置。
-
-PDF 和 DOCX 文档证据分别通过 `pypdf` 与 `python-docx` 从已 checkout 的工作树读取。Evidence 主要用于 BaseDecision、Scope 排除、负向搜索、关键继承/独立结论、架构边支撑和模块置顶 Claim；普通实现说明可直接写中文分析，不必为每个节点反复注册 Evidence。
-
-## Claude Code 开发态与产品态
-
-- **开发 OS-Agent 本身**：正常向 Claude Code 提出代码修改或评审请求。`/os-agent` 不会自动触发；项目 MCP 即使连接，也只是可选工具。
-- **使用 OS-Agent 分析作品**：显式执行 `/os-agent <作品名> <待查重分支>`，可选指定输出目录；Skill 会要求执行完整 MCP 审计流程。
-- **临时不启动 MCP**：可在本机 `/mcp` 中禁用 `os-agent`，或使用被 Git 忽略的 `.claude/settings.local.json`。此时不能做 MCP 集成验证或作品审计。
-- **首次克隆 OS-Agent**：先 `cp .claude/mcp.json.example .claude/mcp.json`，Claude Code 会要求批准本地 `.claude/mcp.json`，批准后才会启动 stdio MCP。
-
-Git 跟踪边界：
-
-- 跟踪：`.claude/skills/os-agent/SKILL.md`、`.claude/mcp.json.example`、`scripts/start_mcp.sh`、MCP/模型/渲染代码。
-- 不跟踪：`.claude/mcp.json`、`.claude/settings.local.json`、`repos/`、`output/`、`.fp_cache/`、`tmp/` 和个人权限配置。
-
-Agent 临时脚本和一次性中间文件默认不要创建；当 Claude Code 写大段 JSON 容易触发 Write tool error，或需要本地批量校验/整理草稿时，可以统一放在项目根 `tmp/`。`tmp/` 只用于生成、修复、格式化或校验待提交 JSON 草稿；最终写入仍必须通过 MCP 正式接口完成。临时脚本不得批量生成节点/模块正文，不得用模板套话填充评审内容。不要写入 `scripts/`、`core/`、`repos/`、`output/` 或系统 `/tmp`。`tmp/` 不作为 Evidence、Scope、BaseDecision、Comparison 或报告产物来源。
-
-## 常见问题
-
-### 为什么运行 `scripts/run.py <作品>` 没有直接生成最终报告？
-
-它只准备确定性数据和候选搜索输入。最终报告需要 Agent 阅读源码、提交中文 Claim，并通过完整性与关键 Evidence 校验。
-
-### 为什么报告展示分支名，内部又保存 commit？
-
-`作品@分支` 方便人理解；commit 用来保证一次长流程始终分析同一版本。分支移动不会改变已经锁定的结果。
-
-### 为什么看不到未提交修改？
-
-这是审计约束。正式分析只读取 Git commit，避免本地修改、生成文件或工具临时文件污染结果。需要分析新状态时，请先在作品仓库提交它。
-
-### MCP 无法连接怎么办？
-
-1. 确认 `.claude/mcp.json` 的 `command` 指向的解释器已安装 `requirements.txt`，或项目 `.venv/`、conda 环境 `os_agent` 可用。
-2. 执行 `"$OS_AGENT_PYTHON" -c "import mcp, tree_sitter, pypdf, docx"` 检查依赖。
-3. 执行 `timeout 3 scripts/start_mcp.sh` 检查启动脚本。
-4. 在 Claude Code 中执行 `/mcp`，重新连接或重新批准 `os-agent`。
-5. 修改 MCP 服务代码后重启 Claude Code，避免既有进程继续提供过期工具定义。
-
-### MCP 与子 Agent 的性能限制
-
-OS-Agent 的 MCP 工具通过 stdio JSON-RPC 与 Claude Code 通信。这不是高性能 IPC，每次调用都要走完整的序列化/反序列化往返。以下场景性能问题尤其明显：
-
-- **`compare_functions`**：O(N×M) 函数匹配，数万到数十万次 `_pair_score` 比对，在 MCP 中无法并行，只能单线程跑，大仓库可能需要 60 分钟以上。
-- **`build_fingerprint`**：C 代码的 tree-sitter AST 解析可能因文件深度触发 Python 递归栈限制。
-- **并发瓶颈**：MCP 工具在 Claude Code 主会话中运行，多个子 Agent 并行争用同一 MCP 连接会排队甚至卡死。正常 `/os-agent` 流程由主会话直接调用 MCP tool；子 Agent 应用 bash、rg、sed、git 等普通命令读代码并产出草稿，由主会话串行写入报告和证据。`scripts/run_mcp_tool.py` 只作为调试/应急的命令行单工具入口。
-- **MCP 卡死**：如果 `.claude/mcp.json` 中 `command` 写的是裸 `python3`，PATH 可能解析到其他环境（如 `.venv/`），依赖不完整则 MCP 服务启动失败或超时。
-
-**对策**：
-
-1. `.claude/mcp.json` 默认从 `.claude/mcp.json.example` 复制，按 Claude Code 生成格式填写 Python 解释器绝对路径和 `mcp_server.py` 绝对路径，不要把个人绝对路径提交到 Git。
-2. 需要检查环境自动发现时，可手动运行 `scripts/start_mcp.sh`；它会读取 `OS_AGENT_PYTHON` 并搜索 `.venv`、Conda/Mamba 环境。
-3. `compare_functions`、`build_fingerprint` 这类计算密集步骤由主会话按阶段启动，避免多个 MCP 调用同时抢占同一服务进程。
-4. 确需在 MCP 连接外调用单个工具时，使用 `scripts/run_mcp_tool.py <tool> '<json_args>'`。该脚本会按 `OS_AGENT_PYTHON`、项目 `.venv`、常见 Conda/Mamba `os_agent` 环境和 PATH 中的环境管理器自动寻找可用 Python，然后导入 `mcp_server.py` 并调用同名 Python 函数；它不经过 MCP/JSON-RPC，也不要把它作为常规并发方案。
-5. 批量查重场景可以用多个独立 Claude Code 会话分别处理不同作品；同一审计内的子 Agent 只做阅读和草稿，不直接调用 MCP。
-6. 注意清理已被 kill 的 Agent 残留子进程，避免 CPU 被孤儿 `compare_functions` 占满。
-
-## MCP 工具推荐路径
-
-完整分析时，Claude Code 应优先使用下面主路径工具。其他工具保留给补查、定位和故障恢复。
-
-### 主路径工具
-
-| 阶段 | 工具 | 做什么 |
-|---|---|---|
-| 启动审计 | bash `git` 检查、`audit_manifest_create`、`build_fingerprint` | 确认指定分支和干净工作树、锁定 commit、创建审计目录、准备 AST 指纹 |
-| 确认范围 | `create_scope_manifest` | 固定正式搜索范围 |
-| 参考发现 | `search_formal` | 执行正式 1-vs-N 搜索 |
-| Base 固化 | `base_evidence_packet`、`base_decision_submit` | 组包、选择 formal 候选、写入 BaseDecision |
-| 函数事实 | `compare_functions`、`comparison_overview`、`comparison_hotspots`、`comparison_*` | 建库并按需查询函数匹配事实 |
-| 模块阅读 | `judge_report_create`、`module_analysis_packet` | 创建报告骨架，以模块获取节点功能范围和候选摘要 |
-| 报告写入 | `node_review_bundle_submit`、`module_review_submit`、`overall_assessment_submit` | 原子写入中文节点、模块和总体评审 |
-| 完成产物 | `judge_report_status`、`provenance_export`、`provenance_render`、`judge_report_validate`、`judge_report_render` | 校验完整性并生成双报告 |
-
-### 补查与恢复工具
-
-| 工具 | 使用边界 |
-|---|---|
-| `node_analysis_packet` | 只在单节点返工或模块包信息不足时使用 |
-| `node_review_draft_batch` | 只生成草稿，不正式写入报告 |
-| `claim_contract` | 不确定 Claim 枚举或证据要求时查看 |
-| `lsp_definition` / `lsp_references` / `lsp_call_graph` | 确认关键符号、引用和调用链 |
-| `evidence_*` / `negative_search` | 注册关键锚点；普通节点说明不需要反复注册 Evidence |
-| `search_similar` | 临时粗召回，不能进入 BaseDecision 或报告排名 |
-| `judge_report_fork_for_comparison` | 切换 Base/Comparison 时使用，避免覆盖已有报告 |
-
-## 项目结构
-
-```text
-OS-Agent/
-├── README.md
-├── DESIGN.md
-├── mcp_server.py
-├── .claude/mcp.json.example
-├── .claude/skills/os-agent/
-│   └── SKILL.md             唯一的 Claude Code 审计工作流
-├── scripts/                 确定性计算与报告渲染
-├── web_report/              report.html 的 React 静态前端模板、样式和交互
-├── tools/                   tree-sitter、LSP 和文档读取工具
-├── core/                    Git commit、Scope、Comparison、Evidence 和报告模型
-├── repos/                   作品与候选语料库，Git 忽略
-├── .fp_cache/               AST 指纹、Scope 与审计缓存，Git 忽略
-└── output/                  分析产物，Git 忽略
-```
-
-更详细的数据模型和职责边界见 [DESIGN.md](DESIGN.md)。
-
-## AI 辅助说明
-
-本项目在开发过程中使用 Claude Code、Codex、Cursor、Antigravity 的 AI 编程工具（模型GPT5.5、DeepSeek V4 pro、Sonnet 4.6、Gemini 3.5 Flash）辅助完成大部分代码实现、重复性工作、文档整理和流程设计讨论。AI 工具主要用于提升实现效率、生成候选方案和辅助检查，Skill的流程、经验由我起草，LLM进行结构整理，边界条件的确认。最终的职责边界、工作流设计、功能取舍、查重边界与结论确认仍由项目维护者定义。
-
-## 选手引用的外部 GitHub 库
-
-
-### 基础内核框架 / OS 框架
-
-| 仓库 | 说明 | 本地 |
-|---|---|:---:|
-| [rcore-os/rCore](https://github.com/rcore-os/rCore) | rCore 内核参考实现 | |
-| [rcore-os/zCore](https://github.com/rcore-os/zCore) | Zircon 兼容的 Rust OS | ✓ |
-| [arceos-org/arceos](https://github.com/arceos-org/arceos) | ArceOS 模块化 unikernel | ✓ |
-| [arceos-org/starry-next](https://github.com/arceos-org/starry-next) | Starry Next（官方版） | ✓ |
-| [Starry-OS/StarryOS](https://github.com/Starry-OS/StarryOS) | 基于ArceOS的 | ✓ |
-| [Starry-OS/arceos](https://github.com/Starry-OS/arceos) | StarryOS 使用的 arceos fork | ✓ |
-| [asterinas/asterinas](https://github.com/asterinas/asterinas) | Asterinas 安全 OS 框架（framekernel） | ✓ |
-| [Byte-OS/ByteOS](https://github.com/Byte-OS/ByteOS) | ByteOS 模块化 Rust OS | ✓ |
-| [sandyyyz/Re-XVapor](https://github.com/sandyyyz/Re-XVapor) | xv6 衍生内核-25年作品github版 | |
-| [aether-os-studio/naos](https://github.com/aether-os-studio/naos) | NaOS 操作系统 | ✓ |
-| [managarm/managarm](https://github.com/managarm/managarm) | 异步微内核 OS | ✓ |
-| [seL4/seL4](https://github.com/seL4/seL4) | seL4 形式化验证微内核 | ✓ |
-| [unikraft/unikraft](https://github.com/unikraft/unikraft) | Unikraft unikernel 框架 | ✓ |
-| [RT-Thread/rt-thread](https://github.com/RT-Thread/rt-thread) | RT-Thread RTOS | ✓ |
-| [mit-pdos/xv6-riscv](https://github.com/mit-pdos/xv6-riscv) | xv6 RISC-V 版（MIT 教学） | ✓ |
-| [mit-pdos/xv6-public](https://github.com/mit-pdos/xv6-public) | xv6 x86 版（MIT 教学） | ✓ |
-| [HUSTOS/xv6-k210](https://github.com/HUST-OS/xv6-k210)| 2021一等奖作品github版（gitlab版不可访问） |
-| [rcore-os/rCore-Tutorial-v3](https://github.com/rcore-os/rCore-Tutorial-v3) | rCore Tutorial v3 教学 OS | ✓ |
-| [chyyuu/ucore_os_lab](https://github.com/chyyuu/ucore_os_lab) | uCore OS 教学实验 | ✓ |
-| [hawkw/mycelium](https://github.com/hawkw/mycelium) | Rust 异步 OS 内核 | |
-| [cbiffle/lilos](https://github.com/cbiffle/lilos) | 最小化 async Rust RTOS | |
-| [equation314/nimbos](https://github.com/equation314/nimbos) | 教学用 OS（类 rCore） | |
-| [torvalds/linux](https://github.com/torvalds/linux) | Linux 内核（参考/ABI 兼容） | |
-| [ChenRuiwei/Phoenix](https://github.com/ChenRuiwei/Phoenix) | 2024年OS竞赛一等奖作品(纯Rust，ArceOS系，被多个2026队伍作为设计参考) | ✓ |
-| [Tencent/TencentOS-tiny](https://github.com/Tencent/TencentOS-tiny) | 腾讯物联网 OS | |
-
-### 内存分配器
-
-| 仓库 | 说明 |
-|---|---|
-| [rcore-os/buddy_system_allocator](https://github.com/rcore-os/buddy_system_allocator) | Buddy 伙伴系统分配器（Rust） |
-| [jasonwhite/buddy_system_allocator](https://github.com/jasonwhite/buddy_system_allocator) | 同上（原版） |
-| [rcore-os/bitmap-allocator](https://github.com/rcore-os/bitmap-allocator) | 位图帧分配器（Rust） |
-| [arceos-org/allocator](https://github.com/arceos-org/allocator) | ArceOS 通用分配器 crate |
-| [arceos-org/slab_allocator](https://github.com/arceos-org/slab_allocator) | Slab 分配器 |
-| [cloudwu/buddy](https://github.com/cloudwu/buddy) | C 语言 Buddy 分配器 |
-| [mattconte/tlsf](https://github.com/mattconte/tlsf) | TLSF 两级分离适应分配器 |
-| [OlegHahm/tlsf](https://github.com/OlegHahm/tlsf) | TLSF 另一实现 |
-| [blanham/liballoc](https://github.com/blanham/liballoc) | 轻量级 liballoc 分配器 |
-
-### 文件系统库
-
-| 仓库 | 说明 |
-|---|---|
-| [gkostka/lwext4](https://github.com/gkostka/lwext4) | C 语言轻量级 ext4 库 |
-| [elliott10/lwext4_rust](https://github.com/elliott10/lwext4_rust) | lwext4 的 Rust 绑定 |
-| [rafalh/rust-fatfs](https://github.com/rafalh/rust-fatfs) | Rust FAT 文件系统库 |
-| [rafalh/rust-fscommon](https://github.com/rafalh/rust-fscommon) | rust-fatfs 配套工具库 |
-| [yuoo655/ext4_rs](https://github.com/yuoo655/ext4_rs) | 纯 Rust ext4 实现 |
-| [Starry-OS/rsext4](https://github.com/Starry-OS/rsext4) | Starry 的 Rust ext4 库 |
-| [webdesus/fs_extra](https://github.com/webdesus/fs_extra) | Rust FS 扩展工具 |
-| [undefined-os/vfs](https://github.com/undefined-os/vfs) | VFS 虚拟文件系统抽象层 |
-
-### 网络协议栈
-
-| 仓库 | 说明 |
-|---|---|
-| [smoltcp-rs/smoltcp](https://github.com/smoltcp-rs/smoltcp) | 纯 Rust TCP/IP 协议栈 |
-| [rcore-os/smoltcp](https://github.com/rcore-os/smoltcp) | rCore 修改版 smoltcp |
-| [asterinas/smoltcp](https://github.com/asterinas/smoltcp) | Asterinas fork |
-
-### 硬件驱动 / HAL
-
-| 仓库 | 说明 |
-|---|---|
-| [rcore-os/virtio-drivers](https://github.com/rcore-os/virtio-drivers) | VirtIO 设备驱动（Rust） |
-| [arceos-org/axdriver_crates](https://github.com/arceos-org/axdriver_crates) | ArceOS 驱动 crates 集合 |
-| [arceos-org/axplat_crates](https://github.com/arceos-org/axplat_crates) | ArceOS 平台支持 crates |
-| [rcore-os/device_tree-rs](https://github.com/rcore-os/device_tree-rs) | 设备树（DTB）解析库 |
-| [repnop/fdt](https://github.com/repnop/fdt) | FDT/DTB 解析库 |
-| [rust-embedded/riscv](https://github.com/rust-embedded/riscv) | RISC-V 寄存器访问 crate |
-| [rcore-os/riscv](https://github.com/rcore-os/riscv) | rCore 修改版 riscv crate |
-| [wyfcyx/k210-hal](https://github.com/wyfcyx/k210-hal) | K210 HAL |
-| [wyfcyx/k210-pac](https://github.com/wyfcyx/k210-pac) | K210 PAC |
-| [wyfcyx/k210-soc](https://github.com/wyfcyx/k210-soc) | K210 SoC 支持 |
-| [riscv-rust/fu740-hal](https://github.com/riscv-rust/fu740-hal) | FU740 HAL |
-| [riscv-rust/fu740-pac](https://github.com/riscv-rust/fu740-pac) | FU740 PAC |
-| [T-head-Semi/openc906](https://github.com/T-head-Semi/openc906) | T-Head C906 开源实现 |
-| [QIUZHILEI/dw_sd](https://github.com/QIUZHILEI/dw_sd) | DesignWare SD 控制器驱动 |
-
-### SBI / 引导 / 固件
-
-| 仓库 | 说明 |
-|---|---|
-| [rustsbi/rustsbi](https://github.com/rustsbi/rustsbi) | RISC-V SBI 实现（Rust） |
-| [rustsbi/rustsbi-d1](https://github.com/rustsbi/rustsbi-d1) | D1 专用 RustSBI |
-| [luojia65/rustsbi](https://github.com/luojia65/rustsbi) | 早期 RustSBI |
-| [riscv-software-src/opensbi](https://github.com/riscv-software-src/opensbi) | OpenSBI 开源实现 |
-| [elliott10/opensbi](https://github.com/elliott10/opensbi) | 修改版 OpenSBI |
-| [sifive/freedom-u-sdk](https://github.com/sifive/freedom-u-sdk) | SiFive U 系列 SDK |
-
-### ELF / 二进制解析
-
-| 仓库 | 说明 |
-|---|---|
-| [nrc/xmas-elf](https://github.com/nrc/xmas-elf) | Rust ELF 解析库 |
-| [zlc-dev/xmas-elf](https://github.com/zlc-dev/xmas-elf) | xmas-elf 修改版 |
-| [m4b/goblin](https://github.com/m4b/goblin) | 多格式二进制解析（ELF/PE/Mach-O） |
-| [arceos-org/kernel-elf-parser](https://github.com/arceos-org/kernel-elf-parser) | 内核 ELF 加载解析器 |
-
-### 并发 / 数据结构 / 页表
-
-| 仓库 | 说明 |
-|---|---|
-| [Amanieu/intrusive-rs](https://github.com/Amanieu/intrusive-rs) | 侵入式数据结构（Rust） |
-| [greatbridf/intrusive-rs](https://github.com/greatbridf/intrusive-rs) | fork 版本 |
-| [arceos-org/linked_list](https://github.com/arceos-org/linked_list) | 侵入式链表 |
-| [arceos-org/scheduler](https://github.com/arceos-org/scheduler) | 调度器 crate（CFS/FIFO/Round-Robin） |
-| [arceos-org/page_table_multiarch](https://github.com/arceos-org/page_table_multiarch) | 多架构页表实现 |
-| [rcore-os/page_table_multiarch](https://github.com/rcore-os/page_table_multiarch) | rCore 版本多架构页表 |
-| [tokio-rs/tracing](https://github.com/tokio-rs/tracing) | Rust 结构化日志/追踪框架 |
-| [asterinas/inherit-methods-macro](https://github.com/asterinas/inherit-methods-macro) | 方法继承过程宏 |
-| [asterinas/inventory](https://github.com/asterinas/inventory) | 编译期静态注册表 |
-| [theseus-os/irq_safety](https://github.com/theseus-os/irq_safety) | 中断安全 Mutex 封装 |
-| [alacritty/vte](https://github.com/alacritty/vte) | VT100 终端转义序列解析（Rust） |
-
-### C/C++ 系统库
-
-| 仓库 | 说明 |
-|---|---|
-| [electronicarts/EASTL](https://github.com/electronicarts/EASTL) | EA STL C++ 标准库 |
-| [mendsley/tinystl](https://github.com/mendsley/tinystl) | 最小化 STL 实现 |
-| [martinmoene/expected-lite](https://github.com/martinmoene/expected-lite) | C++ `expected<T,E>` 实现 |
-| [bbqsrc/core2](https://github.com/bbqsrc/core2) | Rust no_std IO 封装 |
-| [jethrogb/rust-core_io](https://github.com/jethrogb/rust-core_io) | Rust `core::io` 扩展 |
-| [jasonwhite/syscalls](https://github.com/jasonwhite/syscalls) | Rust syscall 封装 crate |
-| [bminor/glibc](https://github.com/bminor/glibc) | GNU C 库（参考） |
-| [richfelker/musl-cross-make](https://github.com/richfelker/musl-cross-make) | musl 交叉编译工具链构建 |
-| [managarm/frigg](https://github.com/managarm/frigg) | 轻量级 C++ 工具库 |
-| [managarm/libasync](https://github.com/managarm/libasync) | C++ 协程/异步库 |
-| [managarm/bragi](https://github.com/managarm/bragi) | IDL 消息传递框架 |
-
-### 开发工具 / 构建
-
-| 仓库 | 说明 |
-|---|---|
-| [rust-embedded/cargo-binutils](https://github.com/rust-embedded/cargo-binutils) | Cargo LLVM 工具链封装 |
-| [matklad/cargo-xtask](https://github.com/matklad/cargo-xtask) | Cargo 任务扩展模式 |
-| [ninja-build/ninja](https://github.com/ninja-build/ninja) | Ninja 构建系统 |
-| [cyrus-and/gdb-dashboard](https://github.com/cyrus-and/gdb-dashboard) | GDB 调试增强界面 |
-| [rust-lang/mdbook](https://github.com/rust-lang/mdbook) | mdBook 文档工具 |
-| [managarm/xbstrap](https://github.com/managarm/xbstrap) | 交叉编译 bootstrap 工具 |
-
-### 规范文档 / 参考资料
-
-| 仓库 | 说明 |
-|---|---|
-| [riscv/riscv-isa-manual](https://github.com/riscv/riscv-isa-manual) | RISC-V ISA 官方手册 |
-| [riscv-non-isa/riscv-sbi-doc](https://github.com/riscv-non-isa/riscv-sbi-doc) | RISC-V SBI 规范 |
-| [riscv-non-isa/riscv-asm-manual](https://github.com/riscv-non-isa/riscv-asm-manual) | RISC-V 汇编手册 |
-| [riscv-non-isa/riscv-elf-psabi-doc](https://github.com/riscv-non-isa/riscv-elf-psabi-doc) | RISC-V ELF psABI 规范 |
-| [devicetree-org/devicetree-specification](https://github.com/devicetree-org/devicetree-specification) | 设备树规范 |
-| [loongson/LoongArch-Documentation](https://github.com/loongson/LoongArch-Documentation) | LoongArch 架构文档 |
-| [seL4/l4v](https://github.com/seL4/l4v) | seL4 形式化验证证明 |
-| [linux-test-project/ltp](https://github.com/linux-test-project/ltp) | Linux 测试项目（LTP） |
+当前 acceptance tests 覆盖 identity、evidence、Base delta、机器名泄漏、未解决矛盾、deleted taxonomy、required taxonomy、fp_cache、report_data、evidence map、架构图和前端类型/build。
