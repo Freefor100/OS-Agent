@@ -57,48 +57,8 @@ PAGERANK_MAX_ITER = 100
 ROLE_VOCAB_VER = "v1"
 
 
-# ─── 展示树版本提示（正式树定义在 core/kernel_tree.py）──
-KERNEL_PROJECT_HINT_VER = "v2"
-
-# 一级模块（设计书 §8.2）
-L1_MODULES = [
-    "ArchitectureLayer",
-    "ProcessManagement",
-    "MemoryManagement",
-    "FileSystem",
-    "DeviceDriver",
-    "Network",
-    "Synchronization",
-    "SecurityAndIsolation",
-    "UserLibAndTests",
-    "BuildAndConfig",
-    "EvolutionHistory",
-]
-
-# 二级模块预定义（设计书 §8.2 二级名）
-L2_VOCAB = {
-    "ArchitectureLayer":     ["Boot", "TrapException", "SyscallEntry",
-                              "ContextSwitch", "InterruptTimer"],
-    "ProcessManagement":     ["TaskStruct", "Scheduler", "ForkClone",
-                              "Exec", "WaitExit", "IPCOrSignal"],
-    "MemoryManagement":      ["PhysicalAllocator", "KernelHeap", "PageTable",
-                              "AddressSpace", "Mmap", "PageFault", "CopyUser"],
-    "FileSystem":            ["VFS", "BlockCache", "FileDescriptorTable", "InodeDentry",
-                              "ConcreteFS", "PipeOrProcFS"],
-    "DeviceDriver":          ["BlockDevice", "VirtIO", "ConsoleUART",
-                              "GPUDisplay", "InputDevice", "InterruptHandler"],
-    "Network":               ["Socket", "TCPUDP", "NetDevice", "PacketBuffer"],
-    "Synchronization":       ["SpinLock", "Mutex", "Semaphore",
-                              "WaitQueue", "AtomicRefCount"],
-    "SecurityAndIsolation":  ["UserKernelBoundary", "PermissionCheck",
-                              "AddressValidation", "CapabilityOrNamespace"],
-    "UserLibAndTests":       ["LibcOrSyscallWrapper", "Shell",
-                              "InitProc", "TestPrograms"],
-    "BuildAndConfig":        ["CargoFeatures", "MakeTargets", "LinkerScript",
-                              "KernelConfig", "Toolchain"],
-    "EvolutionHistory":      ["CommitStages", "MajorMilestones",
-                              "ImportedCodeSuspects", "IncrementalModules"],
-}
+# 功能模块树由 core/review_case/taxonomy.py 唯一定义。
+KERNEL_PROJECT_HINT_VER = "v3"
 
 
 # ─── L3 路径剪枝（LSP 多分支图 → 5-7 步前的算法步骤）─────────────────

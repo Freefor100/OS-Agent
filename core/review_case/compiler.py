@@ -20,7 +20,10 @@ def compile_report(case_dir: str | Path) -> Path:
     report_doc = parse_markdown(root / "report.md")
     evidence, _ = load_evidence(root / "evidence.jsonl")
     modules = []
-    for path in sorted((root / "modules").glob("*.md")):
+    module_paths = list((root / "modules").glob("*.md"))
+    module_order = {module_id: index for index, module_id in enumerate(REQUIRED_MODULES)}
+    module_paths.sort(key=lambda path: module_order.get(path.stem, len(module_order)))
+    for path in module_paths:
         doc = parse_markdown(path)
         module_id = str(doc.frontmatter.get("module_id", ""))
         modules.append(

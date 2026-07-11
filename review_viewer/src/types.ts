@@ -60,6 +60,7 @@ export type ReviewReportData = {
       domains: Record<string, string[]>;
       agents: Record<string, string[]>;
       modules: Record<string, string[]>;
+      nodes: Record<string, string[]>;
     };
   };
   optional_sections: {

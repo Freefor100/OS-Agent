@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 from .evidence import EvidenceCard, load_evidence
-from .taxonomy import REQUIRED_MODULES
+from .taxonomy import NODE_INDEX, REQUIRED_MODULES, node_owner
 
 CONCLUSION_DOMAINS = {
     "base_identity",
@@ -58,10 +58,12 @@ def map_evidence(evidence: dict[str, EvidenceCard]) -> dict:
     by_domain: dict[str, list[str]] = {domain: [] for domain in sorted(CONCLUSION_DOMAINS)}
     by_agent: dict[str, list[str]] = {}
     by_module: dict[str, list[str]] = {module_id: [] for module_id in REQUIRED_MODULES}
+    by_node: dict[str, list[str]] = {}
     map_by_id: dict[str, dict] = {}
     for card in evidence.values():
         domains = sorted(_infer_domains(card))
-        modules = sorted(_infer_modules(card))
+        nodes = sorted(_infer_nodes(card))
+        modules = sorted(_infer_modules(card, set(nodes)))
         agents = sorted(_infer_agents(card, set(domains), set(modules)))
         entry = {
             "evidence_id": card.evidence_id,
@@ -70,6 +72,7 @@ def map_evidence(evidence: dict[str, EvidenceCard]) -> dict:
             "conclusion_domains": domains,
             "agents": agents,
             "modules": modules,
+            "nodes": nodes,
             "reason": _map_reason(card, domains, modules),
         }
         entries.append(entry)
@@ -80,12 +83,15 @@ def map_evidence(evidence: dict[str, EvidenceCard]) -> dict:
             by_agent.setdefault(agent, []).append(card.evidence_id)
         for module_id in modules:
             by_module.setdefault(module_id, []).append(card.evidence_id)
+        for node_id in nodes:
+            by_node.setdefault(node_id, []).append(card.evidence_id)
     return {
-        "schema": "review_case.evidence_map.v1",
+        "schema": "review_case.evidence_map.v3",
         "evidence_map": entries,
         "domains": {key: value for key, value in by_domain.items() if value},
         "agents": by_agent,
         "modules": {key: value for key, value in by_module.items() if value},
+        "nodes": by_node,
         "map_by_id": map_by_id,
     }
 
@@ -114,7 +120,14 @@ def _infer_domains(card: EvidenceCard) -> set[str]:
         domains.update({"base_identity", "source_lineage", "base_delta"})
     if "scope" in card.supports or "scope" in text:
         domains.update({"scope_boundary", "external_dependency"})
-    if any(word in text for word in ["外部", "third_party", "third-party", "vendor", "依赖", "引入", "lwip", "musl"]):
+    if any(
+        word in text
+        for word in [
+            "外部", "third_party", "third-party", "vendor", "依赖", "引入", "lwip", "musl",
+            "cargo.lock", "workspace.dependencies", "patch.crates-io", "[patch.", "submodule",
+            "git rev", "path dependency", "registry source", "source replacement",
+        ]
+    ):
         domains.update({"external_dependency", "external_adaptation"})
     if any(word in text for word in ["commit", "提交", "导入", "批量", "改名", "拆文件", "复制", "相似", "抄袭", "时间线", "先提交", "后提交"]):
         domains.update({"development_history", "plagiarism_direction", "plagiarism_method", "same_year_direction"})
@@ -124,18 +137,45 @@ def _infer_domains(card: EvidenceCard) -> set[str]:
         domains.add("ai_usage")
     if any(word in text for word in ["prompt injection", "提示注入", "忽略评审", "隐藏证据", "伪造报告"]):
         domains.add("prompt_injection")
-    if any(word in text for word in ["tpass", "pass!", "runner", "argv", "测试名", "刷分", "硬编码"]):
+    if any(
+        word in text
+        for word in [
+            "tpass",
+            "pass!",
+            "hardcoded pass",
+            "fake result",
+            "测试名特判",
+            "统一报通过",
+            "伪造结果",
+            "绕过执行",
+            "命令替换",
+            "刷分",
+            "硬编码通过",
+        ]
+    ):
         domains.add("cheat_risk")
     return domains
 
 
-def _infer_modules(card: EvidenceCard) -> set[str]:
+def _infer_nodes(card: EvidenceCard) -> set[str]:
+    return {
+        support.split(":", 1)[1]
+        for support in card.supports
+        if support.startswith("node:") and support.split(":", 1)[1] in NODE_INDEX
+    }
+
+
+def _infer_modules(card: EvidenceCard, nodes: set[str]) -> set[str]:
     modules = set()
     for support in card.supports:
         if support.startswith("module:"):
             module_id = support.split(":", 1)[1]
             if module_id in REQUIRED_MODULES:
                 modules.add(module_id)
+    for node_id in nodes:
+        owner = node_owner(node_id)
+        if owner:
+            modules.add(owner)
     return modules
 
 

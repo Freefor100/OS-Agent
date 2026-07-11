@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import json
-import re
 from pathlib import Path
 
 from .contracts import ValidationReport
 from .evidence_map import write_evidence_map
+from .fingerprint_search import search_fingerprint_cache
+from .fingerprints import write_fingerprint_cache
 from .identity import ROOT, find_work, git_text, init_case, load_works, validate_work_identity
 from .parser import parse_markdown
 from .taxonomy import make_task_files
@@ -40,16 +41,16 @@ def write_task_files(case_dir: str | Path) -> Path:
         base = {
             "work_id": base_doc.frontmatter.get("selected_base_work_id", ""),
             "display_name": base_doc.frontmatter.get("selected_base_display_name", ""),
+            "commit": base_doc.frontmatter.get("selected_base_commit", ""),
+            "target_introduction_commit": base_doc.frontmatter.get("target_introduction_commit", ""),
+            "target_introduction_kind": base_doc.frontmatter.get("target_introduction_kind", ""),
             "direction": base_doc.frontmatter.get("direction", ""),
             "confidence": base_doc.frontmatter.get("confidence", ""),
         }
-    evidence_map = _load_or_build_evidence_map(root)
-    base_context_evidence_ids = sorted(
-        set(evidence_map.get("domains", {}).get("base_delta", []))
-        | set(evidence_map.get("domains", {}).get("source_lineage", []))
-        | set(evidence_map.get("domains", {}).get("base_identity", []))
-        | set(evidence_map.get("domains", {}).get("same_year_direction", []))
-    )
+    # Task selection must reflect the current evidence file, never a stale map.
+    map_path = write_evidence_map(root)
+    evidence_map = json.loads(map_path.read_text(encoding="utf-8"))
+    base_context_evidence_ids = sorted(set(evidence_map.get("domains", {}).get("base_delta", [])))
     module_evidence = evidence_map.get("modules", {})
     map_by_id = evidence_map.get("map_by_id", {})
     module_doc_claim_evidence = {
@@ -66,6 +67,7 @@ def write_task_files(case_dir: str | Path) -> Path:
         base_context_evidence_ids=base_context_evidence_ids,
         module_evidence=module_evidence,
         module_doc_claim_evidence=module_doc_claim_evidence,
+        node_evidence=evidence_map.get("nodes", {}),
     )
     out_dir = root / "case_state" / "task_files"
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -118,7 +120,7 @@ def build_fingerprint(case_dir: str | Path) -> Path:
     if not repo.is_absolute():
         repo = ROOT / repo
     commit = manifest["repo"]["commit"]
-    cache_dir = _write_fingerprint_cache(
+    cache_dir = write_fingerprint_cache(
         repo=repo,
         commit=commit,
         work_id=str(manifest["work"]["work_id"]),
@@ -148,7 +150,7 @@ def build_fingerprint_cache(works_path: str | Path = "config/works.yaml", cache_
         report = validate_work_identity(work)
         report.raise_for_errors()
         commit = git_text(work.repo_path, "rev-parse", work.review_branch)
-        cache_dir = _write_fingerprint_cache(work.repo_path, commit, work.work_id, work.display_name, cache_root)
+        cache_dir = write_fingerprint_cache(work.repo_path, commit, work.work_id, work.display_name, cache_root)
         index.append(
             {
                 "work_id": work.work_id,
@@ -171,20 +173,11 @@ def search_base(case_dir: str | Path) -> Path:
     out_dir = root / "case_state"
     out_dir.mkdir(parents=True, exist_ok=True)
     out = out_dir / "base_candidates.json"
-    out.write_text(
-        json.dumps(
-            {
-                "schema": "review_case.search_candidates.v1",
-                "candidates": [],
-                "note": "Populate with deterministic candidate retrieval output. Candidates are evidence inputs, not report conclusions.",
-            },
-            ensure_ascii=False,
-            indent=2,
-        )
-        + "\n",
-        encoding="utf-8",
+    return search_fingerprint_cache(
+        out_dir / "fp_manifest.json",
+        ROOT / "fp_cache" / "index.json",
+        out,
     )
-    return out
 
 
 def build_evidence(case_dir: str | Path) -> Path:
@@ -268,13 +261,6 @@ def _load_manifest(case_dir: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def _load_or_build_evidence_map(root: Path) -> dict:
-    map_path = root / "case_state" / "evidence_map.json"
-    if not map_path.exists():
-        write_evidence_map(root)
-    return json.loads(map_path.read_text(encoding="utf-8"))
-
-
 def _role_task_files(work: dict, evidence_map: dict) -> list[dict]:
     agents = evidence_map.get("agents", {})
     return [
@@ -285,6 +271,7 @@ def _role_task_files(work: dict, evidence_map: dict) -> list[dict]:
             "evidence_ids": agents.get("base-lineage-reviewer", []),
             "conclusion_domains": ["base_identity", "source_lineage", "same_year_direction", "plagiarism_direction", "plagiarism_method", "external_dependency", "external_adaptation", "development_history", "scope_boundary"],
             "same_year_rule": "同届抄袭方向必须同时引用结构指纹/AST 相似热点 evidence 与 git 提交时间线 evidence；缺任一类只能写方向不确定。",
+            "source_commit_rule": "主 Base、次级来源和外部模块必须定位目标作品中的最早可见引入 commit，核对 parent diff、文件/行数跳变与后续适配提交；若代码已存在于初始提交，只能报告历史上界，不得当作原创时间。",
             "context_policy": "只读 Base/来源/同届方向/时间线/外部依赖相关 evidence；不写模块实现细节。",
             "output_contract": "base_decision",
         },
@@ -312,8 +299,10 @@ def _role_task_files(work: dict, evidence_map: dict) -> list[dict]:
             "role": "cheat-detector",
             "work": {"work_id": work.get("work_id", ""), "display_name": work.get("display_name", "")},
             "evidence_ids": agents.get("cheat-detector", []),
+            "module_review_inputs": ["modules/build-config.md", "modules/process-management.md", "modules/user-abi-compat.md", "modules/kernel-services.md"],
             "conclusion_domains": ["cheat_risk", "prompt_injection"],
-            "context_policy": "只读 runner、测试、prompt surface 相关 evidence 和路径 hint。",
+            "context_policy": "结合构建、进程执行、用户 ABI 和关机路径建立正常执行基线，再只读可疑 runner、测试特判和 prompt surface evidence；正常 runner/argv 不构成风险。",
+            "source_commit_rule": "每个异常必须定位目标作品中的首次出现 commit，再与 Base/上游对比，区分选手新增、修改适配、未修改继承和来源不明。",
             "output_contract": "finding_set:cheat",
         },
         {
@@ -325,52 +314,6 @@ def _role_task_files(work: dict, evidence_map: dict) -> list[dict]:
             "output_contract": "assembled_report",
         },
     ]
-
-
-def _write_fingerprint_cache(repo: Path, commit: str, work_id: str, display_name: str, cache_root: str | Path) -> Path:
-    cache_base = Path(cache_root)
-    if not cache_base.is_absolute():
-        cache_base = ROOT / cache_base
-    cache_dir = cache_base / work_id / commit[:12]
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    raw = git_text(repo, "ls-tree", "-r", commit).splitlines()
-    records = []
-    structural_units = []
-    for line in raw:
-        parts = line.split(None, 3)
-        if len(parts) != 4:
-            continue
-        mode, kind, blob, path = parts
-        if Path(path).suffix in SOURCE_SUFFIXES:
-            records.append({"mode": mode, "kind": kind, "blob": blob, "path": path})
-            structural_units.extend(_structural_units(repo, commit, path, blob))
-    (cache_dir / "fingerprint_manifest.json").write_text(
-        json.dumps(
-            {
-                "schema": "review_case.fingerprint_manifest.v1",
-                "work_id": work_id,
-                "display_name": display_name,
-                "commit": commit,
-                "source_file_count": len(records),
-                "structural_unit_count": len(structural_units),
-            },
-            ensure_ascii=False,
-            indent=2,
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-    (cache_dir / "target_blob.json").write_text(json.dumps({"schema": "review_case.blob_fingerprint.v1", "commit": commit, "files": records}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    (cache_dir / "target_ast.json").write_text(
-        json.dumps(
-            {"schema": "review_case.structural_fingerprint.v1", "commit": commit, "units": structural_units},
-            ensure_ascii=False,
-            indent=2,
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-    return cache_dir
 
 
 def _classify_path(rel: str) -> str:
@@ -387,57 +330,3 @@ def _classify_path(rel: str) -> str:
     if suffix in SOURCE_SUFFIXES or Path(rel).name in {"Makefile", "makefile", "Kconfig"}:
         return "student_core"
     return "unknown"
-
-
-def _structural_units(repo: Path, commit: str, path: str, blob: str) -> list[dict[str, object]]:
-    try:
-        text = git_text(repo, "show", f"{commit}:{path}")
-    except Exception:
-        return []
-    suffix = Path(path).suffix
-    units: list[dict[str, object]] = []
-    for line_no, line in enumerate(text.splitlines(), start=1):
-        symbol = _extract_symbol(line, suffix)
-        if not symbol:
-            continue
-        units.append(
-            {
-                "path": path,
-                "symbol": symbol["name"],
-                "kind": symbol["kind"],
-                "line": line_no,
-                "blob": blob,
-                "shape": _line_shape(line),
-            }
-        )
-    return units
-
-
-def _extract_symbol(line: str, suffix: str) -> dict[str, str] | None:
-    stripped = line.strip()
-    if suffix == ".rs":
-        match = re.match(r"(?:pub\s+)?(?:async\s+)?fn\s+([A-Za-z_][A-Za-z0-9_]*)\b", stripped)
-        if match:
-            return {"kind": "function", "name": match.group(1)}
-        match = re.match(r"(?:pub\s+)?(?:struct|enum|trait|impl)\s+([A-Za-z_][A-Za-z0-9_]*)\b", stripped)
-        if match:
-            return {"kind": "type", "name": match.group(1)}
-    if suffix in {".c", ".h", ".cpp", ".cc", ".hpp"}:
-        match = re.match(r"(?:static\s+|inline\s+|extern\s+)*[A-Za-z_][A-Za-z0-9_\s\*]*\s+([A-Za-z_][A-Za-z0-9_]*)\s*\([^;]*\)\s*\{?", stripped)
-        if match and match.group(1) not in {"if", "for", "while", "switch", "return"}:
-            return {"kind": "function", "name": match.group(1)}
-        match = re.match(r"(?:typedef\s+)?(?:struct|enum)\s+([A-Za-z_][A-Za-z0-9_]*)\b", stripped)
-        if match:
-            return {"kind": "type", "name": match.group(1)}
-    if suffix in {".S", ".s"}:
-        match = re.match(r"([A-Za-z_.$][A-Za-z0-9_.$]*):$", stripped)
-        if match:
-            return {"kind": "label", "name": match.group(1)}
-    return None
-
-
-def _line_shape(line: str) -> str:
-    compact = re.sub(r"[A-Za-z_][A-Za-z0-9_]*", "ID", line.strip())
-    compact = re.sub(r"\d+", "N", compact)
-    compact = re.sub(r"\s+", " ", compact)
-    return compact[:160]

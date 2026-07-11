@@ -27,7 +27,7 @@ const demoReport: ReviewReportData = {
   ],
   modules: [
     {
-      module_id: "memory-vm",
+      module_id: "memory-management",
       title: "内存、虚拟内存与页缓存",
       status: "implemented",
       originality: "adapted_major",
@@ -48,7 +48,7 @@ const demoReport: ReviewReportData = {
       locator: "L12-L198",
       title: "页缓存路径",
       excerpt: "handle_page_fault -> page_cache_get",
-      supports: ["module:memory-vm"],
+      supports: ["module:memory-management", "node:page-table"],
       confidence: "strong",
       verified: true
     }
@@ -57,16 +57,17 @@ const demoReport: ReviewReportData = {
     markdown_claims: {
       claims: [
         { claim_id: "section:base", kind: "section", title: "Base 与来源关系", evidence_ids: ["E001"] },
-        { claim_id: "module:memory-vm", kind: "module", title: "内存、虚拟内存与页缓存", evidence_ids: ["E001"] }
+        { claim_id: "module:memory-management", kind: "module", title: "内存管理", evidence_ids: ["E001"] }
       ],
-      evidence_to_claims: { E001: ["section:base", "module:memory-vm"] }
+      evidence_to_claims: { E001: ["section:base", "module:memory-management"] }
     },
     evidence_map: {
-      schema: "review_case.evidence_map.v1",
+      schema: "review_case.evidence_map.v2",
       evidence_map: [],
       domains: { work_amount: ["E001"], module_implementation: ["E001"] },
-      agents: { "module-memory-vm": ["E001"] },
-      modules: { "memory-vm": ["E001"] }
+      agents: { "module-memory-management": ["E001"] },
+      modules: { "memory-management": ["E001"] },
+      nodes: { "page-table": ["E001"] }
     }
   },
   optional_sections: { cheat: false, ai: false, prompt_injection: false }

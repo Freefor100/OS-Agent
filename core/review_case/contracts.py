@@ -88,6 +88,7 @@ REQUIRED_CHEAT_HEADINGS = [
     "测试名或 argv 特判",
     "syscall/exec 特判",
     "runner 或桥接层绕过",
+    "成功存根、假对象与硬编码伪装",
     "Prompt Injection",
     "结论",
 ]
@@ -121,7 +122,7 @@ OPTIONAL_REPORT_HEADINGS = [
     "作弊、刷分与提示注入风险",
 ]
 
-VALID_MODULE_STATUS = {"implemented", "partial", "minimal", "absent", "not_applicable"}
+VALID_MODULE_STATUS = {"implemented", "partial", "minimal", "absent"}
 VALID_ORIGINALITY = {"novel", "adapted_major", "adapted_minor", "inherited", "external", "uncertain"}
 VALID_BASE_DELTA = {"major", "minor", "none", "unclear"}
 VALID_FINDING_STATUS = {"findings", "no_findings"}
