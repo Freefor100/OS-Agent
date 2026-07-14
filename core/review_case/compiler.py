@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 from .evidence import load_evidence
-from .evidence_map import write_evidence_map
-from .parser import EVIDENCE_REF_RE, parse_markdown, split_h2_sections
-from .taxonomy import REQUIRED_MODULES
+from .parser import EVIDENCE_REF_RE, parse_markdown, slugify, split_h2_sections
+from .taxonomy import MODULES
 from .validators import validate_case_dir
 
 
@@ -17,19 +17,22 @@ def compile_report(case_dir: str | Path) -> Path:
     site_dir = root / "site"
     site_dir.mkdir(parents=True, exist_ok=True)
     identity = parse_markdown(root / "identity.md")
+    base_doc = parse_markdown(root / "base.md")
     report_doc = parse_markdown(root / "report.md")
-    evidence, _ = load_evidence(root / "evidence.jsonl")
+    evidence = load_evidence(root / "evidence.jsonl")
     modules = []
-    module_paths = list((root / "modules").glob("*.md"))
-    module_order = {module_id: index for index, module_id in enumerate(REQUIRED_MODULES)}
-    module_paths.sort(key=lambda path: module_order.get(path.stem, len(module_order)))
+    module_docs = []
+    module_paths = sorted((root / "modules").glob("*.md"))
     for path in module_paths:
         doc = parse_markdown(path)
         module_id = str(doc.frontmatter.get("module_id", ""))
         modules.append(
             {
                 "module_id": module_id,
-                "title": REQUIRED_MODULES[module_id].title if module_id in REQUIRED_MODULES else str(doc.frontmatter.get("module_title", module_id)),
+                "title": str(
+                    doc.frontmatter.get("module_title")
+                    or (MODULES[module_id].title if module_id in MODULES else module_id)
+                ),
                 "status": doc.frontmatter.get("status", ""),
                 "originality": doc.frontmatter.get("originality", ""),
                 "base_delta": doc.frontmatter.get("base_delta", ""),
@@ -38,14 +41,24 @@ def compile_report(case_dir: str | Path) -> Path:
                 "evidence_ids": sorted(set(doc.evidence_refs)),
             }
         )
+        module_docs.append((doc, modules[-1]))
     sections = [
-        {**section, "evidence_ids": sorted(set(EVIDENCE_REF_RE.findall(section["markdown"])))} for section in split_h2_sections(report_doc.body)
+        {**section, "evidence_ids": sorted(set(EVIDENCE_REF_RE.findall(section["markdown"])))}
+        for section in split_h2_sections(report_doc.body)
     ]
-    evidence_map = _load_evidence_map(root)
     optional = _optional_sections(root)
+    references = _build_references(sections, module_docs)
+    public_evidence = []
+    for evidence_id in sorted(references, key=lambda value: int(value[1:])):
+        card = evidence[evidence_id].as_dict()
+        raw_ref = card.pop("raw_ref", None)
+        if raw_ref and card["kind"] in {"fingerprint_comparison", "search_result"}:
+            card["source"] = {**card["source"], "path": ""}
+        card["references"] = references[evidence_id]
+        public_evidence.append(card)
     report_data = {
         "generated_by": "review_case_report_data_compiler",
-        "schema": "report_data.v1",
+        "schema": "report_data.v2",
         "identity": {
             "work_id": identity.frontmatter.get("work_id", ""),
             "display_name": identity.frontmatter.get("display_name", ""),
@@ -53,62 +66,139 @@ def compile_report(case_dir: str | Path) -> Path:
             "team": identity.frontmatter.get("team", ""),
             "work_name": identity.frontmatter.get("work_name", ""),
         },
+        "base": {
+            "status": base_doc.frontmatter.get("status", ""),
+            "display_name": base_doc.frontmatter.get("selected_base_display_name", ""),
+            "commit": base_doc.frontmatter.get("selected_base_commit", ""),
+            "target_introduction_commit": base_doc.frontmatter.get("target_introduction_commit", ""),
+            "direction": base_doc.frontmatter.get("direction", ""),
+            "confidence": base_doc.frontmatter.get("confidence", ""),
+        },
         "sections": sections,
         "modules": modules,
-        "evidence": [card.as_dict() for card in evidence.values()],
-        "evidence_graph": {
-            "markdown_claims": _markdown_claims(sections, modules),
-            "evidence_map": evidence_map,
-        },
+        "evidence": public_evidence,
         "optional_sections": optional,
     }
     out = site_dir / "report_data.json"
     out.write_text(json.dumps(report_data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    (site_dir / "evidence.jsonl").write_text(
+        "".join(json.dumps(card, ensure_ascii=False, sort_keys=True) + "\n" for card in public_evidence),
+        encoding="utf-8",
+    )
+    _write_tags(root, identity, modules, optional)
     return out
 
 
+def _build_references(sections: list[dict[str, Any]], module_docs: list[tuple[Any, dict]]) -> dict[str, list[dict]]:
+    references: dict[str, list[dict]] = {}
+    seen: dict[str, set[tuple[str, str, str]]] = {}
+
+    def add(evidence_id: str, *, document: str, section: str, label: str, view: str, anchor: str) -> None:
+        key = (document, section, anchor)
+        if key in seen.setdefault(evidence_id, set()):
+            return
+        seen[evidence_id].add(key)
+        references.setdefault(evidence_id, []).append(
+            {
+                "document": document,
+                "section": section,
+                "label": label,
+                "view": view,
+                "anchor": anchor,
+            }
+        )
+
+    for section in sections:
+        for evidence_id in section["evidence_ids"]:
+            add(
+                evidence_id,
+                document="report.md",
+                section=section["title"],
+                label=section["title"],
+                view=_view_for_report_section(section["title"]),
+                anchor=section["id"],
+            )
+
+    for doc, module in module_docs:
+        captured: set[str] = set()
+        for heading in doc.headings:
+            heading_refs = set(EVIDENCE_REF_RE.findall(heading.body))
+            captured.update(heading_refs)
+            for evidence_id in heading_refs:
+                add(
+                    evidence_id,
+                    document=f"modules/{doc.path.name}",
+                    section=heading.title,
+                    label=module["title"],
+                    view="modules",
+                    anchor=f"module-{slugify(module['module_id'])}",
+                )
+        for evidence_id in set(doc.evidence_refs) - captured:
+            add(
+                evidence_id,
+                document=f"modules/{doc.path.name}",
+                section=module["title"],
+                label=module["title"],
+                view="modules",
+                anchor=f"module-{slugify(module['module_id'])}",
+            )
+    return references
+
+
+def _view_for_report_section(title: str) -> str:
+    if title in {"整体结论", "重点结论"}:
+        return "overview"
+    if title in {"真实工作量分层", "Base、其他来源与同届传播关系"}:
+        return "lineage"
+    if title == "内核架构图":
+        return "architecture"
+    if title in {"文档声明审查", "开发历史与 AI 使用", "测评异常与提示注入风险"}:
+        return "risk"
+    if title == "模块实现细节及 Base 差异":
+        return "modules"
+    return "evidence"
+
+
+def _write_tags(root: Path, identity, modules: list[dict], optional: dict[str, bool]) -> None:
+    base_path = root / "base.md"
+    base = parse_markdown(base_path) if base_path.exists() else None
+    summary = {"novel": 0, "adapted": 0, "inherited": 0, "external": 0, "uncertain": 0, "absent": 0}
+    for module in modules:
+        if module["status"] == "absent":
+            summary["absent"] += 1
+            continue
+        originality = str(module["originality"])
+        if originality.startswith("adapted"):
+            summary["adapted"] += 1
+        elif originality in summary:
+            summary[originality] += 1
+        else:
+            summary["uncertain"] += 1
+    risk_tags = [key for key, visible in optional.items() if visible]
+    payload = {
+        "work_id": identity.frontmatter.get("work_id", ""),
+        "display_name": identity.frontmatter.get("display_name", ""),
+        "school": identity.frontmatter.get("school", ""),
+        "team": identity.frontmatter.get("team", ""),
+        "work_name": identity.frontmatter.get("work_name", ""),
+        "base": {
+            "display_name": base.frontmatter.get("selected_base_display_name", "") if base else "",
+            "relation": base.frontmatter.get("direction", "") if base else "",
+            "confidence": base.frontmatter.get("confidence", "") if base else "",
+            "status": base.frontmatter.get("status", "") if base else "",
+        },
+        "risk_tags": risk_tags,
+        "module_summary": summary,
+        "public_paths": {"markdown": "report.md", "html": "site/report.html"},
+    }
+    (root / "tags.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
 def _optional_sections(root: Path) -> dict[str, bool]:
-    out = {"cheat": False, "ai": False, "prompt_injection": False}
-    for name, key in [("cheat.md", "cheat"), ("history-ai.md", "ai")]:
+    out = {"doc_claim": False, "cheat": False, "ai": False}
+    for name, key in [("doc-claims.md", "doc_claim"), ("cheat.md", "cheat"), ("history-ai.md", "ai")]:
         path = root / "findings" / name
         if path.exists():
             doc = parse_markdown(path)
             out[key] = doc.frontmatter.get("status") == "findings" and str(doc.frontmatter.get("public", "true")).lower() != "false"
-    if out["cheat"]:
-        cheat = parse_markdown(root / "findings" / "cheat.md")
-        out["prompt_injection"] = "Prompt Injection" in cheat.body
     return out
-
-
-def _markdown_claims(sections: list[dict], modules: list[dict]) -> dict[str, object]:
-    claims = []
-    for section in sections:
-        claims.append(
-            {
-                "claim_id": f"section:{section['id']}",
-                "kind": "section",
-                "title": section["title"],
-                "evidence_ids": section.get("evidence_ids", []),
-            }
-        )
-    for module in modules:
-        claims.append(
-            {
-                "claim_id": f"module:{module['module_id']}",
-                "kind": "module",
-                "title": module["title"],
-                "evidence_ids": module.get("evidence_ids", []),
-            }
-        )
-    evidence_to_claims: dict[str, list[str]] = {}
-    for claim in claims:
-        for evidence_id in claim["evidence_ids"]:
-            evidence_to_claims.setdefault(evidence_id, []).append(claim["claim_id"])
-    return {"claims": claims, "evidence_to_claims": evidence_to_claims}
-
-
-def _load_evidence_map(root: Path) -> dict:
-    path = root / "case_state" / "evidence_map.json"
-    if not path.exists():
-        write_evidence_map(root)
-    return json.loads(path.read_text(encoding="utf-8"))

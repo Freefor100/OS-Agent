@@ -106,24 +106,31 @@ REQUIRED_HISTORY_AI_HEADINGS = [
     "结论",
 ]
 
+REQUIRED_CONTRADICTION_HEADINGS = [
+    "冲突清单",
+    "仲裁结果",
+    "待补事实",
+]
+
 REQUIRED_REPORT_HEADINGS = [
     "整体结论",
     "重点结论",
-    "Base 与来源关系",
-    "真实工作量账本",
+    "真实工作量分层",
+    "Base、其他来源与同届传播关系",
     "内核架构图",
-    "模块实现与 Base 差异",
+    "模块实现细节及 Base 差异",
     "证据索引",
 ]
 
 OPTIONAL_REPORT_HEADINGS = [
     "文档声明审查",
     "开发历史与 AI 使用",
-    "作弊、刷分与提示注入风险",
+    "测评异常与提示注入风险",
 ]
 
 VALID_MODULE_STATUS = {"implemented", "partial", "minimal", "absent"}
 VALID_ORIGINALITY = {"novel", "adapted_major", "adapted_minor", "inherited", "external", "uncertain"}
 VALID_BASE_DELTA = {"major", "minor", "none", "unclear"}
+VALID_BASE_CONFIDENCE = {"high", "medium", "low"}
 VALID_FINDING_STATUS = {"findings", "no_findings"}
 VALID_CONTRADICTION_STATUS = {"none", "unresolved", "resolved"}

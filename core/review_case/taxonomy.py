@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Iterable
 
 from .contracts import ValidationReport
 
@@ -308,75 +307,3 @@ def scan_deleted_features(text: str) -> list[str]:
     lowered = re.sub(r"[\s_/]+", "-", text.lower())
     labels = DELETED_NODES | {"virtualization"}
     return sorted(label for label in labels if label in lowered)
-
-
-def make_task_files(
-    work: dict,
-    base: dict | None = None,
-    evidence_ids: Iterable[str] = (),
-    base_context_evidence_ids: Iterable[str] = (),
-    module_evidence: dict[str, list[str]] | None = None,
-    module_doc_claim_evidence: dict[str, list[str]] | None = None,
-    node_evidence: dict[str, list[str]] | None = None,
-) -> list[dict]:
-    base = base or {}
-    fallback_evidence = list(evidence_ids)
-    base_context = list(base_context_evidence_ids)
-    module_evidence = module_evidence or {}
-    module_doc_claim_evidence = module_doc_claim_evidence or {}
-    node_evidence = node_evidence or {}
-    packets: list[dict] = []
-    for module in MODULES.values():
-        module_specific = module_evidence.get(module.module_id, fallback_evidence)
-        relevant = list(dict.fromkeys([*base_context, *module_specific]))
-        nodes = [node.as_dict(node_evidence.get(node.node_id, [])) for node in module.nodes]
-        packets.append(
-            {
-                "task_id": f"module-{module.module_id}",
-                "work": {"work_id": work.get("work_id", ""), "display_name": work.get("display_name", "")},
-                "base": {
-                    "work_id": base.get("work_id", ""),
-                    "display_name": base.get("display_name", ""),
-                    "commit": base.get("commit", ""),
-                    "target_introduction_commit": base.get("target_introduction_commit", ""),
-                    "target_introduction_kind": base.get("target_introduction_kind", ""),
-                    "direction": base.get("direction", ""),
-                    "confidence": base.get("confidence", ""),
-                },
-                "module_id": module.module_id,
-                "module_title": module.title,
-                "architecture_role": module.architecture_role,
-                "nodes": nodes,
-                "base_context_evidence_ids": base_context,
-                "relevant_evidence_ids": relevant,
-                "module_doc_claim_evidence_ids": module_doc_claim_evidence.get(module.module_id, []),
-                "required_contract": "module_review",
-                "provenance_rule": "对 inherited/external/adapted 结论，在任务 evidence 包含 Git 历史时引用最早可见引入 commit 和后续适配 commit；没有历史 evidence 时写来源或引入时间不确定，不得推测。",
-                "coverage_table": {
-                    "columns": ["功能节点", "目标状态", "Base 状态", "差异归类", "计入工作量", "实现入口", "核心状态/不变量", "关键路径/失败边界", "证据"],
-                    "status_values": sorted(VALID_POINT_STATUS),
-                    "delta_values": sorted(VALID_DELTA_CLASS),
-                    "effort_values": sorted(VALID_EFFORT_LEVEL),
-                    "result_rule": "没有实现的节点写 absent；不得推断平台测评结果。",
-                },
-                "deep_description": {
-                    "select_present_nodes": "2-4 个最能体现技术深度、工作量或 Base 差异的已实现节点",
-                    "required_dimensions": ["机制闭环", "关键状态与不变量", "失败与回滚", "并发与所有权", "适用配置与缺失分支", "相对 Base 的实质变化"],
-                },
-                "forbidden_claims": [
-                    "没有 evidence 不得声称原创、抄袭、继承、通过测例或重大改写。",
-                    "不得描述已删除的模块或节点。",
-                    "正文不得使用机器 repo id、裸 fork 数字或旧 clone 名。",
-                    "模块 Agent 不得自行决定同届抄袭方向。",
-                    "不得把测试 payload、第三方库体量或作者自述当作内核实现量。",
-                ],
-                "quality_gate": {
-                    "requires_every_node_row": True,
-                    "requires_entry_state_path_for_present_node": True,
-                    "requires_node_source_evidence": True,
-                    "requires_node_base_delta_evidence_when_comparable": True,
-                    "exclude_scope_categories": ["framework_base", "third_party", "test_payload", "generated"],
-                },
-            }
-        )
-    return packets

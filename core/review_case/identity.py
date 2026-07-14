@@ -103,7 +103,8 @@ def init_case(work: WorkIdentity, output_root: str | Path = "output") -> Path:
     report.raise_for_errors()
     case_dir = (ROOT / output_root / work.work_id).resolve()
     meta_dir = case_dir / "case_state"
-    meta_dir.mkdir(parents=True, exist_ok=True)
+    for directory in [meta_dir / "facts", case_dir / "modules", case_dir / "findings", case_dir / "issues", case_dir / "site"]:
+        directory.mkdir(parents=True, exist_ok=True)
     commit = git_text(work.repo_path, "rev-parse", work.review_branch)
     tree = git_text(work.repo_path, "rev-parse", f"{commit}^{{tree}}")
     branch = git_text(work.repo_path, "rev-parse", "--abbrev-ref", "HEAD")
@@ -121,4 +122,19 @@ def init_case(work: WorkIdentity, output_root: str | Path = "output") -> Path:
     (meta_dir / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     (meta_dir / "repo_snapshot.json").write_text(json.dumps(manifest["repo"], ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     (meta_dir / "works.snapshot.yaml").write_text(yaml.safe_dump([work.as_dict()], allow_unicode=True, sort_keys=False), encoding="utf-8")
+    identity_frontmatter = yaml.safe_dump(
+        {
+            "contract": "identity",
+            "work_id": work.work_id,
+            "school": work.school,
+            "team": work.team,
+            "work_name": work.work_name,
+            "display_name": work.display_name,
+            "machine_repo": work.machine_repo,
+        },
+        allow_unicode=True,
+        sort_keys=False,
+    ).strip()
+    identity = ["---", identity_frontmatter, "---", "", f"# {work.display_name}", ""]
+    (case_dir / "identity.md").write_text("\n".join(identity), encoding="utf-8")
     return case_dir

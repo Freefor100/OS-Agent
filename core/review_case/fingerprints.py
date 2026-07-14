@@ -15,7 +15,8 @@ from tools.code_atlas.ts_loader import TSLoader, lang_for_path
 CODE_LANGS = {"c", "cpp", "rust"}
 BLOB_SUFFIXES = {".c", ".h", ".cc", ".cpp", ".hpp", ".cxx", ".rs", ".S", ".s", ".ld", ".lds", ".toml", ".mk"}
 ASM_MIN_TOKENS = 12
-SCHEMA_VERSION = "review_case.fingerprint.v2"
+SCHEMA_VERSION = "review_case.fingerprint.v1"
+BLOB_SCHEMA_VERSION = "review_case.blob_fingerprint.v3"
 
 
 def write_fingerprint_cache(
@@ -24,11 +25,13 @@ def write_fingerprint_cache(
     work_id: str,
     display_name: str,
     cache_root: str | Path,
+    *,
+    include_ast: bool = True,
 ) -> Path:
     cache_base = Path(cache_root)
     if not cache_base.is_absolute():
         cache_base = Path.cwd() / cache_base
-    cache_dir = cache_base / work_id / commit[:12]
+    cache_dir = cache_base / work_id / commit
     cache_dir.mkdir(parents=True, exist_ok=True)
 
     entries = [
@@ -36,40 +39,66 @@ def write_fingerprint_cache(
         for entry in list_tree(str(repo), commit)
         if entry.kind == "blob" and Path(entry.path).suffix in BLOB_SUFFIXES
     ]
-    blobs = [
+    occurrences = [
         {"mode": entry.mode, "kind": entry.kind, "blob": entry.object_id, "path": entry.path}
         for entry in entries
     ]
     blob_by_path = {entry.path: entry.object_id for entry in entries}
-    units, parser_warnings = _extract_units(repo, commit, blob_by_path)
+    ast_path = cache_dir / "ast.json"
+    units: list[dict[str, Any]] = []
+    parser_warnings: list[str] = []
+    if include_ast:
+        units, parser_warnings = _extract_units(repo, commit, blob_by_path)
+        _write_json(
+            ast_path,
+            {
+                "schema": "review_case.structural_fingerprint.v2",
+                "commit": commit,
+                "algorithm": "tree-sitter function AST shape plus normalized assembly label blocks",
+                "units": units,
+            },
+        )
+    elif ast_path.exists():
+        existing_ast = json.loads(ast_path.read_text(encoding="utf-8"))
+        units = list(existing_ast.get("units", []))
 
     _write_json(
-        cache_dir / "fingerprint_manifest.json",
+        cache_dir / "manifest.json",
         {
             "schema": SCHEMA_VERSION,
             "work_id": work_id,
             "display_name": display_name,
             "commit": commit,
-            "source_file_count": len(blobs),
+            "source_file_count": len(occurrences),
             "structural_unit_count": len(units),
+            "components": {"blob": True, "ast": ast_path.exists()},
             "ast_shape_version": algorithm_version(),
             "parser_warnings": parser_warnings,
         },
     )
     _write_json(
-        cache_dir / "target_blob.json",
-        {"schema": "review_case.blob_fingerprint.v2", "commit": commit, "files": blobs},
-    )
-    _write_json(
-        cache_dir / "target_ast.json",
-        {
-            "schema": "review_case.structural_fingerprint.v2",
-            "commit": commit,
-            "algorithm": "tree-sitter function AST shape plus normalized assembly label blocks",
-            "units": units,
-        },
+        cache_dir / "blob.json",
+        {"schema": BLOB_SCHEMA_VERSION, "commit": commit, "occurrences": occurrences},
     )
     return cache_dir
+
+
+def write_blob_fingerprint_cache(
+    repo: Path,
+    commit: str,
+    work_id: str,
+    display_name: str,
+    cache_root: str | Path,
+) -> Path:
+    """Cache one historical commit's blob occurrences without building AST."""
+    return write_fingerprint_cache(
+        repo,
+        commit,
+        work_id,
+        display_name,
+        cache_root,
+        include_ast=False,
+    )
 
 
 def _extract_units(repo: Path, commit: str, blob_by_path: dict[str, str]) -> tuple[list[dict[str, Any]], list[str]]:
@@ -201,4 +230,7 @@ def _stable_id(*parts: str) -> str:
 
 
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp = path.with_name(f".{path.name}.tmp")
+    temp.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    temp.replace(path)

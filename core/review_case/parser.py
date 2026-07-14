@@ -7,7 +7,7 @@ from typing import Any
 
 import yaml
 
-EVIDENCE_REF_RE = re.compile(r"\[@(E\d{3})\]")
+EVIDENCE_REF_RE = re.compile(r"\[@(E\d{3,})\]")
 HEADING_RE = re.compile(r"^(#{1,6})\s+(.+?)\s*$")
 INLINE_CODE_RE = re.compile(r"`([^`]+)`")
 PATH_RE = re.compile(r"(?<![\w.-])(?:[\w.-]+/)+(?:[\w.-]+)(?:\.[A-Za-z0-9_+-]+)?")

@@ -1,16 +1,34 @@
+export type EvidenceSource = {
+  work_id: string;
+  display_name: string;
+  commit?: string;
+  path?: string;
+  locator?: string;
+  object_hash?: string;
+  line_start?: number;
+  line_end?: number;
+  page?: number;
+  paragraph?: number;
+  format?: string;
+};
+
+export type EvidenceReference = {
+  document: string;
+  section: string;
+  label: string;
+  view: "overview" | "lineage" | "architecture" | "risk" | "modules" | "evidence" | string;
+  anchor: string;
+};
+
 export type EvidenceCard = {
   evidence_id: string;
-  kind: string;
-  owner: string;
-  display_owner: string;
-  canonical_path: string;
-  commit: string;
-  locator: string;
+  kind: "source_span" | "document_span" | "git_commit" | "fingerprint_comparison" | "search_result" | string;
   title: string;
+  source: EvidenceSource;
   excerpt: string;
-  supports: string[];
-  confidence: "strong" | "medium" | "weak" | string;
-  verified: boolean;
+  facts: Array<{ label: string; value: unknown }>;
+  table?: { columns: string[]; rows: unknown[][] };
+  references: EvidenceReference[];
 };
 
 export type ReportSection = {
@@ -41,32 +59,21 @@ export type ReviewReportData = {
     team: string;
     work_name: string;
   };
+  base: {
+    status: "accepted" | "no_reliable_base" | string;
+    display_name: string;
+    commit: string;
+    target_introduction_commit: string;
+    direction: string;
+    confidence: string;
+  };
   sections: ReportSection[];
   modules: ModuleReview[];
   evidence: EvidenceCard[];
-  evidence_graph?: {
-    markdown_claims: {
-      claims: Array<{
-        claim_id: string;
-        kind: string;
-        title: string;
-        evidence_ids: string[];
-      }>;
-      evidence_to_claims: Record<string, string[]>;
-    };
-    evidence_map: {
-      schema: string;
-      evidence_map: Array<Record<string, unknown>>;
-      domains: Record<string, string[]>;
-      agents: Record<string, string[]>;
-      modules: Record<string, string[]>;
-      nodes: Record<string, string[]>;
-    };
-  };
   optional_sections: {
+    doc_claim: boolean;
     cheat: boolean;
     ai: boolean;
-    prompt_injection: boolean;
   };
 };
 

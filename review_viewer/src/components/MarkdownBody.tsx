@@ -1,72 +1,86 @@
-import type { ReactNode } from "react";
+import { useEffect, useId, useRef } from "react";
+import { Code2, FileText, GitCommitHorizontal, GitCompareArrows, Search } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import mermaid from "mermaid";
+import type { EvidenceCard } from "../types";
 
 type Props = {
   markdown: string;
+  evidenceById: Map<string, EvidenceCard>;
   onSelectEvidence: (id: string) => void;
 };
 
-export function MarkdownBody({ markdown, onSelectEvidence }: Props) {
-  const blocks = markdown.split(/\n{2,}/);
+export function EvidenceChip({ evidence, id, onSelect }: { evidence?: EvidenceCard; id: string; onSelect: (id: string) => void }) {
+  const Icon = evidenceIcon(evidence?.kind);
+  return (
+    <button className={`evidence-chip evidence-kind-${evidence?.kind ?? "unknown"}`} onClick={() => onSelect(id)} title={evidence?.title ?? id}>
+      <Icon size={12} aria-hidden="true" /><span>{id}</span>
+    </button>
+  );
+}
+
+export function MarkdownBody({ markdown, evidenceById, onSelectEvidence }: Props) {
+  const linked = markdown.replace(/\[@(E\d{3,})\]/g, "[@$1](#evidence-$1)");
   return (
     <div className="markdown-body">
-      {blocks.map((block, index) => renderBlock(block.trim(), index, onSelectEvidence))}
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        urlTransform={(url) => url}
+        components={{
+          a: ({ href, children }) => {
+            const match = /^#evidence-(E\d{3,})$/.exec(href ?? "");
+            if (match) {
+              return <EvidenceChip evidence={evidenceById.get(match[1])} id={match[1]} onSelect={onSelectEvidence} />;
+            }
+            return <a href={href}>{children}</a>;
+          },
+          code: ({ className, children }) => {
+            const language = /language-(\w+)/.exec(className ?? "")?.[1];
+            if (language === "mermaid") return <Mermaid source={String(children).trim()} />;
+            return <code className={className}>{children}</code>;
+          }
+        }}
+      >
+        {linked}
+      </ReactMarkdown>
     </div>
   );
 }
 
-function renderBlock(block: string, key: number, onSelectEvidence: (id: string) => void): ReactNode {
-  if (!block) return null;
-  const fence = /^```([A-Za-z0-9_-]*)\n([\s\S]*)\n```$/.exec(block);
-  if (fence) {
-    return (
-      <pre key={key} className={fence[1] === "mermaid" ? "mermaid-pre" : "code-pre"}>
-        {fence[2]}
-      </pre>
-    );
-  }
-  const heading = /^(#{1,4})\s+(.+)$/.exec(block);
-  if (heading) {
-    const level = heading[1].length;
-    const text = heading[2];
-    if (level === 2) return <h2 key={key}>{text}</h2>;
-    if (level === 3) return <h3 key={key}>{text}</h3>;
-    return <h4 key={key}>{text}</h4>;
-  }
-  if (block.startsWith("- ")) {
-    return (
-      <ul key={key}>
-        {block.split("\n").map((line) => (
-          <li key={line}>{renderInline(line.replace(/^- /, ""), onSelectEvidence)}</li>
-        ))}
-      </ul>
-    );
-  }
-  if (block.includes("\n|") || block.startsWith("|")) {
-    return <pre key={key} className="table-pre">{block}</pre>;
-  }
-  return <p key={key}>{renderInline(block, onSelectEvidence)}</p>;
+function evidenceIcon(kind?: string) {
+  if (kind === "source_span") return Code2;
+  if (kind === "document_span") return FileText;
+  if (kind === "git_commit") return GitCommitHorizontal;
+  if (kind === "fingerprint_comparison") return GitCompareArrows;
+  return Search;
 }
 
-function renderInline(text: string, onSelectEvidence: (id: string) => void): ReactNode[] {
-  const out: ReactNode[] = [];
-  const regex = /(\[@E\d{3}\]|`[^`]+`)/g;
-  let last = 0;
-  let match: RegExpExecArray | null;
-  while ((match = regex.exec(text))) {
-    if (match.index > last) out.push(text.slice(last, match.index));
-    const token = match[0];
-    if (token.startsWith("[@")) {
-      const id = token.slice(2, -1);
-      out.push(
-        <button className="evidence-chip" key={`${id}-${match.index}`} onClick={() => onSelectEvidence(id)}>
-          @{id}
-        </button>
-      );
-    } else {
-      out.push(<code key={`${token}-${match.index}`}>{token.slice(1, -1)}</code>);
-    }
-    last = regex.lastIndex;
-  }
-  if (last < text.length) out.push(text.slice(last));
-  return out;
+function Mermaid({ source }: { source: string }) {
+  const host = useRef<HTMLSpanElement>(null);
+  const id = useId().replace(/:/g, "");
+  useEffect(() => {
+    let active = true;
+    mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: "strict",
+      theme: "base",
+      themeVariables: {
+        primaryColor: "#e7f2f1",
+        primaryBorderColor: "#00747c",
+        primaryTextColor: "#172125",
+        lineColor: "#53656b",
+        secondaryColor: "#fff3dc",
+        tertiaryColor: "#f3f5f4",
+        fontFamily: '"Noto Sans SC", "Microsoft YaHei", sans-serif'
+      }
+    });
+    mermaid.render(`kernel-map-${id}`, source).then(({ svg }) => {
+      if (active && host.current) host.current.innerHTML = svg;
+    }).catch(() => {
+      if (active && host.current) host.current.textContent = source;
+    });
+    return () => { active = false; };
+  }, [id, source]);
+  return <span className="mermaid-canvas" ref={host} aria-label="内核架构图" />;
 }
