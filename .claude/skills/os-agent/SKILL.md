@@ -6,13 +6,13 @@ disable-model-invocation: true
 
 # OS-Agent 主 Agent
 
-启动本 Skill 的 Claude Code 会话就是主 Agent。你运行事实脚本、选择当前问题所需材料，并直接用 Claude Code 的 Agent/Task 能力调用 `.claude/agents/` 中的角色；不得用 Python 生成任务文件，也不得亲自代写 Base、模块、finding 或最终报告。
+启动本 Skill 的 Claude Code 会话就是主 Agent。你运行事实脚本、选择当前问题所需材料，并直接用 Claude Code 的 Agent 能力调用 `.claude/agents/` 中的角色；不得用 Python 生成任务文件，也不得亲自代写 Base、模块、finding 或最终报告。
 
 事实脚本统一从仓库根目录用 `python scripts/review.py ...` 调用，并先确认 `which python` 与安装依赖时使用的是同一解释器。当前开发机应为 `/home/leo/miniconda3/bin/python`；若导入依赖失败，停止当前阶段并提示人工执行 README 中的安装命令，不得临时换用 `python3` 继续生成不完整事实。
 
 ## 每次调用的输入
 
-在 sub-agent 调用 prompt 中直接给出五项：`case_dir`、唯一输出路径、本次问题、允许读取的事实/源码范围、相关 evidence ID。材料不足时可由 sub-agent 用 `review.py evidence ...` 固定它已经定位的事实，也可返回 `NEED_FACTS` 让主 Agent 补充跨仓检索；不要把整仓、全部证据和所有历史一次塞给同一角色。任何 Agent 都不得手改 `evidence.jsonl`、自行编号或转写摘录。
+在 sub-agent 调用 prompt 中直接给出五项，字段名固定为：`case_dir`、`output_path`、`question`、`allowed_materials`、`related_evidence`。`case_dir` 和 `output_path` 必须是绝对路径，`output_path` 必须位于 `case_dir` 内并指向该角色唯一拥有的产物。sub-agent 只能写入 `output_path`，不得依赖当前工作目录，也不得把角色 prompt 中的 `modules/*.md`、`base.md` 等 case 内相对名称写到仓库根目录。材料不足时可由 sub-agent 用 `review.py evidence ... --case-dir <绝对 case_dir>` 固定它已经定位的事实，也可返回 `NEED_FACTS` 让主 Agent 补充跨仓检索；不要把整仓、全部证据和所有历史一次塞给同一角色。任何 Agent 都不得手改 `evidence.jsonl`、自行编号或转写摘录。
 
 ## 状态与触发
 
@@ -23,7 +23,7 @@ disable-model-invocation: true
 5. **声明与风险**：模块完成后调用 `doc-claim-reviewer` 汇总声明；建立真实执行基线后调用 `cheat-detector`。没有 finding 也保留内部 `no_findings` 片段，最终报告不展示。
 6. **冲突确认**：Base、当前模块和 findings 全部稳定后，无论主 Agent 是否发现冲突，都必须调用一次 `contradiction-arbiter`。该角色审查完语义后运行 `contradiction-check`，将本次审查覆盖的文件摘要写入 `case_state/contradiction-review.json`；`unresolved` 禁止报告整理。
 7. **成稿**：只有当前仲裁摘要有效时才调用 `report-editor`。它是唯一能写 `report.md` 的角色。任何 Base、模块、finding、evidence 或仲裁文件变化都会使摘要失效，主 Agent 必须重新调用仲裁角色，再重新调用 report-editor。
-8. **发布**：每个 sub-agent 必须先写入自己的 Markdown，再按角色 prompt 运行对应自检；只有命令退出码为 0 才能返回 `SUCCESS: <path>`。主 Agent 只接受经过该角色自检的成功状态；`NEED_FACTS` 先补事实后重调原角色，`BLOCKED` 按责任角色返工。`report-editor` 运行最终 `check-all`，通过后才算完成。校验器只检查格式、引用和材料版本，不代替 Agent 做语义判断，也不修改 Markdown。
+8. **发布**：每个 sub-agent 必须先写入绝对 `output_path`，再按角色 prompt 使用绝对 `case_dir` 和 `output_path` 运行对应自检；只有命令退出码为 0 才能返回 `SUCCESS: <绝对 output_path>`。主 Agent 只接受经过该角色自检的成功状态；`NEED_FACTS` 先补事实后重调原角色，`BLOCKED` 按责任角色返工。`report-editor` 运行最终 `check-all`，通过后才算完成。校验器只检查格式、引用和材料版本，不代替 Agent 做语义判断，也不修改 Markdown。
 
 ## 关键判断边界
 

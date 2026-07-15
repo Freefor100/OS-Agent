@@ -6,15 +6,20 @@ from pathlib import Path
 from typing import Any
 
 from core.git_source import iter_source_blobs, list_tree
-from tools.code_atlas.asm_tokenize import tokenize_asm
-from tools.code_atlas.ast_shape import algorithm_version, ast_shape_hash
-from tools.code_atlas.extractor import CallEdge, extract_file
-from tools.code_atlas.ts_loader import TSLoader, lang_for_path
+from .structural import (
+    CallEdge,
+    TreeSitterLoader,
+    assembly_shape_units,
+    ast_algorithm_version,
+    ast_shape_hash,
+    extract_file,
+    lang_for_path,
+)
 
 
 CODE_LANGS = {"c", "cpp", "rust"}
 BLOB_SUFFIXES = {".c", ".h", ".cc", ".cpp", ".hpp", ".cxx", ".rs", ".S", ".s", ".ld", ".lds", ".toml", ".mk"}
-ASM_MIN_TOKENS = 12
+ASM_MIN_ITEMS = 12
 SCHEMA_VERSION = "review_case.fingerprint.v1"
 BLOB_SCHEMA_VERSION = "review_case.blob_fingerprint.v3"
 
@@ -54,7 +59,7 @@ def write_fingerprint_cache(
             {
                 "schema": "review_case.structural_fingerprint.v2",
                 "commit": commit,
-                "algorithm": "tree-sitter function AST shape plus normalized assembly label blocks",
+                "algorithm": "tree-sitter function AST shape plus canonical assembly label blocks",
                 "units": units,
             },
         )
@@ -72,7 +77,7 @@ def write_fingerprint_cache(
             "source_file_count": len(occurrences),
             "structural_unit_count": len(units),
             "components": {"blob": True, "ast": ast_path.exists()},
-            "ast_shape_version": algorithm_version(),
+            "ast_shape_version": ast_algorithm_version(),
             "parser_warnings": parser_warnings,
         },
     )
@@ -112,8 +117,8 @@ def _extract_units(repo: Path, commit: str, blob_by_path: dict[str, str]) -> tup
     for blob in iter_source_blobs(str(repo), commit):
         path = blob.path.replace("\\", "/")
         if blob.suffix in {".S", ".s"}:
-            for label, tokens in tokenize_asm(blob.data.decode("utf-8", errors="ignore")):
-                if len(tokens) < ASM_MIN_TOKENS:
+            for label, items in assembly_shape_units(blob.data.decode("utf-8", errors="ignore")):
+                if len(items) < ASM_MIN_ITEMS:
                     continue
                 units.append(
                     {
@@ -124,7 +129,7 @@ def _extract_units(repo: Path, commit: str, blob_by_path: dict[str, str]) -> tup
                         "lang": "asm",
                         "line": 0,
                         "end_line": 0,
-                        "shape": hashlib.sha256(" ".join(tokens).encode()).hexdigest(),
+                        "shape": hashlib.sha256(" ".join(items).encode()).hexdigest(),
                         "blob": blob.object_id,
                         "outgoing_names": [],
                         "incoming_names": [],
@@ -136,14 +141,13 @@ def _extract_units(repo: Path, commit: str, blob_by_path: dict[str, str]) -> tup
         lang = lang_for_path(path)
         if lang not in CODE_LANGS:
             continue
-        parser = TSLoader.parser(lang)
+        parser = TreeSitterLoader.parser(lang)
         if parser is None:
             warnings.append(f"parser unavailable: {lang}:{path}")
             continue
         try:
             tree = parser.parse(blob.data)
-            extraction, _ = extract_file(
-                abs_path=path,
+            extraction = extract_file(
                 rel_path=path,
                 lang=lang,
                 code_bytes=blob.data,

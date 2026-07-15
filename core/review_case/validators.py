@@ -30,6 +30,7 @@ MACHINE_RE = re.compile(r"\bT20\d{10,}-\d+\b")
 BARE_SUFFIX_RE = re.compile(r"(?<![A-Za-z0-9])\d{2,4}\s*(?:作品|队伍|仓库|报告)")
 GIT_COMMIT_RE = re.compile(r"^[0-9a-fA-F]{7,40}$")
 MERMAID_RE = re.compile(r"```mermaid\s*\n(?P<body>[\s\S]*?)\n```", re.IGNORECASE)
+MODULE_NODE_HEADING_RE = re.compile(r"^(?P<node_id>[a-z][a-z0-9-]*)[：:]\s*.+$")
 
 
 def validate_case_dir(case_dir: str | Path) -> ValidationReport:
@@ -143,6 +144,8 @@ def validate_document_structure(doc: MarkdownDocument) -> ValidationReport:
         module_id = str(doc.frontmatter.get("module_id", ""))
         if module_id not in MODULES:
             report.add("taxonomy.unknown_module", f"unknown module_id: {module_id}", doc.path)
+        else:
+            _validate_module_node_ids(report, doc, module_id)
         return report
     if contract == "finding_set":
         _require_frontmatter_fields(report, doc, ["finding_type", "status", "public"])
@@ -173,6 +176,21 @@ def validate_document_structure(doc: MarkdownDocument) -> ValidationReport:
         return report
     report.add("structure.unknown_contract", f"unknown contract: {contract}", doc.path)
     return report
+
+
+def _validate_module_node_ids(report: ValidationReport, doc: MarkdownDocument, module_id: str) -> None:
+    allowed = {node.node_id for node in MODULES[module_id].nodes}
+    for heading in doc.headings:
+        if heading.level != 3:
+            continue
+        match = MODULE_NODE_HEADING_RE.fullmatch(heading.title)
+        if match and match.group("node_id") not in allowed:
+            report.add(
+                "taxonomy.unknown_node",
+                f"unknown node_id for {module_id}: {match.group('node_id')}",
+                doc.path,
+                heading.title,
+            )
 
 
 def validate_output_path(doc: MarkdownDocument, root: Path) -> ValidationReport:
