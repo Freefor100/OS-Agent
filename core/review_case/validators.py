@@ -218,10 +218,22 @@ def validate_output_path(doc: MarkdownDocument, root: Path) -> ValidationReport:
         "findings/history-ai.md": "history_ai",
         "findings/cheat.md": "cheat",
     }
+    canonical_paths = {
+        "identity": {"identity.md"},
+        "base_decision": {"base.md"},
+        "final_report": {"report.md"},
+        "contradiction_set": {"issues/contradictions.md"},
+        "finding_set": set(finding_types),
+    }
+    if contract in canonical_paths and relative not in canonical_paths[contract]:
+        report.add("structure.invalid_output_path", f"contract {contract} cannot be written to {relative}", doc.path)
     expected_finding = finding_types.get(relative)
     if expected_finding and doc.frontmatter.get("finding_type") != expected_finding:
         report.add("structure.finding_path_mismatch", f"{relative} requires finding_type: {expected_finding}", doc.path)
-    if relative.startswith("modules/") and relative.endswith(".md"):
+    module_path = Path(relative)
+    if contract == "module_review" and (module_path.parent.as_posix() != "modules" or module_path.suffix != ".md"):
+        report.add("structure.invalid_output_path", "module_review must be written directly under modules/", doc.path)
+    if module_path.parent.as_posix() == "modules" and module_path.suffix == ".md":
         expected_module = Path(relative).stem
         if contract != "module_review":
             report.add("structure.contract_path_mismatch", "module files require contract: module_review", doc.path)
@@ -409,7 +421,7 @@ def validate_optional_sections(root: Path) -> ValidationReport:
     mapping = {
         "doc-claims.md": "文档声明审查",
         "history-ai.md": "开发历史与 AI 使用",
-        "cheat.md": "测评异常与提示注入风险",
+        "cheat.md": "测评定向与结果真实性",
     }
     for filename, heading in mapping.items():
         path = root / "findings" / filename
@@ -492,6 +504,8 @@ def _validate_public_flag(report: ValidationReport, doc: MarkdownDocument) -> No
     status = str(doc.frontmatter.get("status", ""))
     if status == "no_findings" and value:
         report.add("structure.invalid_public", "no_findings requires public: false", doc.path)
+    if status == "findings" and not value:
+        report.add("structure.invalid_public", "findings requires public: true", doc.path)
 
 
 def _require_heading_order(report: ValidationReport, doc: MarkdownDocument, headings: list[str]) -> None:

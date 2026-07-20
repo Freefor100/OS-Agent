@@ -152,7 +152,7 @@ def _view_for_report_section(title: str) -> str:
         return "lineage"
     if title == "内核架构图":
         return "architecture"
-    if title in {"文档声明审查", "开发历史与 AI 使用", "测评异常与提示注入风险"}:
+    if title in {"文档声明审查", "开发历史与 AI 使用", "测评定向与结果真实性"}:
         return "risk"
     if title == "模块实现细节及 Base 差异":
         return "modules"

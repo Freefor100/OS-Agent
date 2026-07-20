@@ -20,7 +20,7 @@ disable-model-invocation: true
 2. **来源待定**：直接调用 `base-lineage-reviewer`。它可要求主 Agent 补跑 `search-history-blobs`、Git 历史命令和明确 commit 对的 `compare-commits`；少量 commit 对才用 `--ast`。
 3. **来源已定**：`base.md` 为 `accepted` 或 `no_reliable_base` 后，主 Agent 根据作品实际代码选择并行的 `module-*` 角色，同时可调用 `history-ai-reviewer`。不得由程序固定枚举模块或创建占位产物。
 4. **联动复核**：模块片段出现 `## 需联动结论`，或新事实改变已接受结论时，主 Agent 按语义重新调用 Base、历史、文档或风险角色。旧产物由原责任角色重写。
-5. **声明与风险**：模块完成后调用 `doc-claim-reviewer` 汇总声明；建立真实执行基线后调用 `cheat-detector`。没有 finding 也保留内部 `no_findings` 片段，最终报告不展示。
+5. **声明与风险**：模块完成后调用 `doc-claim-reviewer` 汇总目标计划、功能声明、来源披露和复现说明；建立真实执行基线并具备 Base/上游归属和相关历史后调用 `cheat-detector`。文档和历史角色有可靠评价材料时可以公开正面、中性或负面结论；作弊角色没有风险 finding 时保留内部 `no_findings` 片段，最终报告不展示。
 6. **冲突确认**：Base、当前模块和 findings 全部稳定后，无论主 Agent 是否发现冲突，都必须调用一次 `contradiction-arbiter`。该角色审查完语义后运行 `contradiction-check`，将本次审查覆盖的文件摘要写入 `case_state/contradiction-review.json`；`unresolved` 禁止报告整理。
 7. **成稿**：只有当前仲裁摘要有效时才调用 `report-editor`。它是唯一能写 `report.md` 的角色。任何 Base、模块、finding、evidence 或仲裁文件变化都会使摘要失效，主 Agent 必须重新调用仲裁角色，再重新调用 report-editor。
 8. **发布**：每个 sub-agent 必须先写入绝对 `output_path`，再按角色 prompt 使用绝对 `case_dir` 和 `output_path` 运行对应自检；只有命令退出码为 0 才能返回 `SUCCESS: <绝对 output_path>`。主 Agent 只接受经过该角色自检的成功状态；`NEED_FACTS` 先补事实后重调原角色，`BLOCKED` 按责任角色返工。`report-editor` 运行最终 `check-all`，通过后才算完成。校验器只检查格式、引用和材料版本，不代替 Agent 做语义判断，也不修改 Markdown。
@@ -39,9 +39,9 @@ disable-model-invocation: true
 
 - Base、具体来源 commit、共同 Base、同届方向：`base-lineage-reviewer`
 - 模块机制、Base 差异、工作量和模块内文档声明：对应 `module-*`
-- Git 开发过程、批量导入、AI 使用及声明：`history-ai-reviewer`
-- 模块声明复核的统一汇总：`doc-claim-reviewer`
-- 预录输出、合成 TPASS、测试特判、成功存根、假对象、硬编码伪装和提示注入：`cheat-detector`
+- Git 持续开发、批量导入、贡献记录、AI 使用披露及人工验证：`history-ai-reviewer`
+- 开发计划、模块声明、来源依赖、AI 披露和复现说明的统一汇总：`doc-claim-reviewer`
+- 测试结果造假、测例定向、非通用实现、成功存根、假对象和硬编码伪装：`cheat-detector`
 - 相反结论：`contradiction-arbiter`
 - 唯一正式报告：`report-editor`
 

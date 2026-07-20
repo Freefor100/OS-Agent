@@ -84,25 +84,26 @@ REQUIRED_MODULE_HEADINGS = [
 ]
 
 REQUIRED_CHEAT_HEADINGS = [
-    "测试输出伪造",
-    "测试名或 argv 特判",
-    "syscall/exec 特判",
-    "runner 或桥接层绕过",
-    "成功存根、假对象与硬编码伪装",
-    "Prompt Injection",
+    "测试结果造假",
+    "测例特征识别与输入硬编码",
+    "非通用实现、语义与安全边界绕过",
+    "需评委复核的实现",
     "结论",
 ]
 
 REQUIRED_DOC_CLAIM_HEADINGS = [
-    "声明与代码一致",
-    "声明夸大或不实",
-    "待补证声明",
+    "目标计划与开发过程",
+    "架构与功能声明复核",
+    "来源依赖与 AI 披露",
+    "复现说明与待补材料",
+    "结论",
 ]
 
 REQUIRED_HISTORY_AI_HEADINGS = [
-    "提交时间线",
-    "AI 使用证据",
-    "批量导入与生成痕迹",
+    "提交与持续演进",
+    "AI 使用披露",
+    "生成内容与人工修改验证",
+    "开发记录与贡献可追溯性",
     "结论",
 ]
 
@@ -125,7 +126,7 @@ REQUIRED_REPORT_HEADINGS = [
 OPTIONAL_REPORT_HEADINGS = [
     "文档声明审查",
     "开发历史与 AI 使用",
-    "测评异常与提示注入风险",
+    "测评定向与结果真实性",
 ]
 
 VALID_MODULE_STATUS = {"implemented", "partial", "minimal", "absent"}

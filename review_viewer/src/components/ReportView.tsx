@@ -12,7 +12,7 @@ const VIEW_DEFS: Array<{ id: ViewId; label: string; titles: string[]; icon: type
   { id: "overview", label: "总览", titles: ["整体结论", "重点结论"], icon: FileSearch },
   { id: "lineage", label: "来源与工作量", titles: ["真实工作量分层", "Base、其他来源与同届传播关系"], icon: GitCompareArrows },
   { id: "architecture", label: "内核架构", titles: ["内核架构图"], icon: Network },
-  { id: "risk", label: "声明与风险", titles: ["文档声明审查", "开发历史与 AI 使用", "测评异常与提示注入风险"], icon: ShieldAlert },
+  { id: "risk", label: "声明与风险", titles: ["文档声明审查", "开发历史与 AI 使用", "测评定向与结果真实性"], icon: ShieldAlert },
   { id: "modules", label: "模块实现", titles: ["模块实现细节及 Base 差异"], icon: Boxes },
   { id: "evidence", label: "证据索引", titles: ["证据索引"], icon: Database }
 ];
