@@ -1,6 +1,7 @@
 export type EvidenceSource = {
   work_id: string;
   display_name: string;
+  ref?: string;
   commit?: string;
   path?: string;
   locator?: string;
@@ -51,7 +52,7 @@ export type ModuleReview = {
 
 export type ReviewReportData = {
   generated_by: string;
-  schema: string;
+  schema: "report_data.v3";
   identity: {
     work_id: string;
     display_name: string;
@@ -62,8 +63,11 @@ export type ReviewReportData = {
   base: {
     status: "accepted" | "no_reliable_base" | string;
     display_name: string;
-    commit: string;
+    target_review_ref: string;
+    target_review_commit: string;
     target_introduction_commit: string;
+    source_ref: string;
+    source_commit: string;
     direction: string;
     confidence: string;
   };
@@ -85,6 +89,8 @@ export type IndexItem = {
   work_name: string;
   base?: {
     display_name: string;
+    ref?: string;
+    commit?: string;
     relation: string;
     confidence: string;
   };

@@ -14,7 +14,7 @@ export function EvidenceDrawer({ evidence, total, onClose, onNavigate }: Props) 
   const copyLocator = () => {
     if (!evidence) return;
     const source = evidence.source;
-    navigator.clipboard?.writeText([source.path, source.locator, source.commit, source.object_hash].filter(Boolean).join(" "));
+    navigator.clipboard?.writeText([source.path, source.locator, source.ref, source.commit, source.object_hash].filter(Boolean).join(" "));
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1200);
   };
@@ -41,7 +41,8 @@ function EvidenceContent({ evidence, onNavigate }: { evidence: EvidenceCard; onN
       <dt>来源</dt><dd>{source.display_name}</dd>
       {source.path && <><dt>路径</dt><dd><code>{source.path}</code></dd></>}
       {source.locator && <><dt>位置</dt><dd>{source.locator}</dd></>}
-      {source.commit && <><dt>Commit</dt><dd><code>{source.commit}</code></dd></>}
+      {source.ref && <><dt>分支 / Ref</dt><dd><code>{source.ref}</code></dd></>}
+      {source.commit && <><dt>提交</dt><dd><code>{source.commit}</code></dd></>}
       {source.object_hash && <><dt>对象</dt><dd><code>{source.object_hash}</code></dd></>}
     </dl>
 
@@ -86,7 +87,7 @@ function kindLabel(kind: string) {
   return ({
     source_span: "源码",
     document_span: "文档",
-    git_commit: "Git Commit",
+    git_commit: "Git 提交",
     fingerprint_comparison: "指纹比较",
     search_result: "检索结果"
   } as Record<string, string>)[kind] ?? kind;

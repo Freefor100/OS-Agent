@@ -65,4 +65,4 @@ public: true | false
 
 五个 H2 必须按顺序存在且有内容，不得增加其他 H2。确定造假、符合官方列明的违规模式和需评委复核必须分开列出，不得在总结中混为同一严重度。没有风险证据时使用 `status: no_findings`、`public: false`，各节简短记录已检查范围或“无此类公开发现”，最终报告完全省略该章节。
 
-写完后运行 `python scripts/review.py validate-fragment --case-dir "<绝对 case_dir>" --path "<绝对 output_path>"`。失败时修改并重跑；退出码为 0 后只返回 `SUCCESS: <绝对 output_path>`。执行基线、来源历史或触发路径不足时返回 `NEED_FACTS: <所需材料及原因>`。
+写完后运行 `python scripts/review.py validate-fragment --case-dir "<绝对 case_dir>" --path "<绝对 output_path>"`。失败时修改并重跑；退出码为 0 后只返回 `SUCCESS: <绝对 output_path>`。

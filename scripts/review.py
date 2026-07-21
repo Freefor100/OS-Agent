@@ -129,9 +129,15 @@ def cmd_compare_commits(args: argparse.Namespace) -> int:
             args.left_commit,
             args.right_work,
             args.right_commit,
+            left_ref=args.left_ref,
+            right_ref=args.right_ref,
             works_path=args.works,
             cache_root=args.cache_root,
             include_ast=args.ast,
+            left_include_prefixes=args.left_include_prefix,
+            right_include_prefixes=args.right_include_prefix,
+            left_exclude_prefixes=args.left_exclude_prefix,
+            right_exclude_prefixes=args.right_exclude_prefix,
             output_path=args.output,
         )
     )
@@ -304,12 +310,18 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=cmd_search_head_candidates)
     p = sub.add_parser("compare-commits")
     p.add_argument("--left-work", required=True)
+    p.add_argument("--left-ref", required=True)
     p.add_argument("--left-commit", required=True)
     p.add_argument("--right-work", required=True)
+    p.add_argument("--right-ref", required=True)
     p.add_argument("--right-commit", required=True)
     p.add_argument("--works", default="config/works.yaml")
     p.add_argument("--cache-root", default="fp_cache")
     p.add_argument("--ast", action="store_true", help="build AST only for this selected commit pair")
+    p.add_argument("--left-include-prefix", action="append", help="repeatable target-side path prefix to include")
+    p.add_argument("--right-include-prefix", action="append", help="repeatable Base-side path prefix to include")
+    p.add_argument("--left-exclude-prefix", action="append", help="repeatable target-side path prefix to exclude")
+    p.add_argument("--right-exclude-prefix", action="append", help="repeatable Base-side path prefix to exclude")
     p.add_argument("--output")
     p.set_defaults(func=cmd_compare_commits)
     p = sub.add_parser("search-history-blobs")

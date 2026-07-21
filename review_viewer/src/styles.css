@@ -68,7 +68,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 .source-rail {
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) 100px minmax(260px, 1.2fr) 100px minmax(160px, .65fr);
+  grid-template-columns: minmax(220px, 1fr) minmax(170px, .65fr) minmax(260px, 1.2fr) 100px minmax(160px, .65fr);
   align-items: stretch;
   min-height: 104px;
   border-bottom: 1px solid var(--line-strong);
@@ -78,13 +78,14 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .rail-node > span, .section-code { color: var(--teal); font: 700 11px/1.2 "IBM Plex Mono", Consolas, monospace; }
 .rail-node strong { max-width: 100%; margin: 5px 0 3px; font-size: 15px; line-height: 1.35; overflow-wrap: anywhere; word-break: break-all; }
 .rail-node small { color: var(--muted); overflow-wrap: anywhere; }
+.rail-introduction-mobile { display: none; }
 .rail-base { border-top-color: var(--amber); }
 .rail-target { border-top-color: var(--teal); background: #f7fbfa; }
 .rail-delta { border-top-color: var(--green); }
-.rail-link { position: relative; display: grid; place-items: center; color: var(--muted); font-size: 10px; }
+.rail-link { position: relative; min-width: 0; display: grid; place-items: center; color: var(--muted); font-size: 10px; text-align: center; overflow-wrap: anywhere; }
 .rail-link i { position: absolute; left: 0; right: 0; top: 56%; height: 1px; background: var(--line-strong); }
 .rail-link i::after { content: ""; position: absolute; right: 0; top: -4px; width: 7px; height: 7px; border-top: 1px solid var(--line-strong); border-right: 1px solid var(--line-strong); transform: rotate(45deg); }
-.rail-link span { position: relative; z-index: 1; padding: 0 6px; background: var(--surface); }
+.rail-link span { position: relative; z-index: 1; max-width: 100%; padding: 0 6px; background: var(--surface); }
 
 .report-layout { display: grid; grid-template-columns: 218px minmax(0, 1fr) 350px; min-height: calc(100vh - 174px); }
 .view-nav { position: sticky; top: 0; height: 100vh; padding: 24px 14px; overflow: auto; border-right: 1px solid var(--line); background: #e8ecea; }
@@ -242,6 +243,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .rail-node { min-height: 78px; padding: 12px 18px; border-top: 0; border-left: 4px solid transparent; }
   .rail-base { border-left-color: var(--amber); }.rail-target { border-left-color: var(--teal); }.rail-delta { border-left-color: var(--green); }
   .rail-link { display: none; }
+  .rail-introduction-mobile { display: block; margin-top: 4px; color: var(--teal); }
   .report-layout { display: block; }
   .view-nav { position: sticky; z-index: 20; top: 0; width: 100%; height: auto; display: flex; gap: 4px; padding: 8px; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--line); }
   .view-nav { scrollbar-width: none; }

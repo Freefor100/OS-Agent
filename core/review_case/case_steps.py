@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import re
+import subprocess
 from pathlib import Path
 
 from .contracts import ValidationReport
@@ -77,6 +79,8 @@ def build_fingerprint(case_dir: str | Path) -> Path:
         "schema": "review_case.fp_manifest.v1",
         "work_id": manifest["work"]["work_id"],
         "display_name": manifest["work"].get("display_name", ""),
+        "year": manifest["work"].get("year", 0),
+        "review_ref": manifest["repo"].get("review_branch", ""),
         "commit": commit,
         "cache_dir": str(cache_dir.relative_to(ROOT) if cache_dir.is_relative_to(ROOT) else cache_dir),
         "blob": str((cache_dir / "blob.json").relative_to(ROOT) if (cache_dir / "blob.json").is_relative_to(ROOT) else cache_dir / "blob.json"),
@@ -119,7 +123,7 @@ def search_head_candidates(
     cache_base = Path(cache_root)
     if not cache_base.is_absolute():
         cache_base = ROOT / cache_base
-    candidate_caches: list[Path] = []
+    candidate_caches: list[dict[str, object]] = []
     missing: list[str] = []
     for work in load_works(works_path):
         validate_work_identity(work).raise_for_errors()
@@ -129,7 +133,13 @@ def search_head_candidates(
         if not all(path.is_file() for path in required):
             missing.append(work.work_id)
             continue
-        candidate_caches.append(cache_dir)
+        candidate_caches.append(
+            {
+                "cache_dir": cache_dir,
+                "year": work.year,
+                "review_ref": work.review_branch,
+            }
+        )
     if missing:
         sample = ", ".join(missing[:8])
         suffix = " ..." if len(missing) > 8 else ""
@@ -147,9 +157,15 @@ def compare_commits(
     right_work_id: str,
     right_commit: str,
     *,
+    left_ref: str,
+    right_ref: str,
     works_path: str | Path = "config/works.yaml",
     cache_root: str | Path = "fp_cache",
     include_ast: bool = False,
+    left_include_prefixes: list[str] | None = None,
+    right_include_prefixes: list[str] | None = None,
+    left_exclude_prefixes: list[str] | None = None,
+    right_exclude_prefixes: list[str] | None = None,
     output_path: str | Path | None = None,
 ) -> Path:
     """Build and compare two explicit commit snapshots without judging lineage."""
@@ -167,6 +183,8 @@ def compare_commits(
 
     left_locked = git_text(left.repo_path, "rev-parse", f"{left_commit}^{{commit}}")
     right_locked = git_text(right.repo_path, "rev-parse", f"{right_commit}^{{commit}}")
+    left_ref_commit = _validate_commit_reachable(left.repo_path, left_ref, left_locked, "left")
+    right_ref_commit = _validate_commit_reachable(right.repo_path, right_ref, right_locked, "right")
     cache_base = Path(cache_root)
     if not cache_base.is_absolute():
         cache_base = ROOT / cache_base
@@ -176,12 +194,34 @@ def compare_commits(
     if output_path is None:
         pair_dir = cache_base / "comparisons" / f"{_safe_name(left.work_id)}--{_safe_name(right.work_id)}"
         suffix = "ast" if include_ast else "blob"
-        out = pair_dir / f"{left_locked[:12]}--{right_locked[:12]}-{suffix}.json"
+        scope_payload = {
+            "left_include": sorted(set(left_include_prefixes or [])),
+            "right_include": sorted(set(right_include_prefixes or [])),
+            "left_exclude": sorted(set(left_exclude_prefixes or [])),
+            "right_exclude": sorted(set(right_exclude_prefixes or [])),
+        }
+        scope_digest = hashlib.sha256(
+            json.dumps(scope_payload, ensure_ascii=False, sort_keys=True).encode("utf-8")
+        ).hexdigest()[:10]
+        out = pair_dir / f"{left_locked[:12]}--{right_locked[:12]}-{suffix}-{scope_digest}.json"
     else:
         out = Path(output_path)
         if not out.is_absolute():
             out = ROOT / out
-    return compare_fingerprint_caches(left_cache, right_cache, out, include_ast=include_ast)
+    return compare_fingerprint_caches(
+        left_cache,
+        right_cache,
+        out,
+        include_ast=include_ast,
+        left_ref=left_ref,
+        left_ref_commit=left_ref_commit,
+        right_ref=right_ref,
+        right_ref_commit=right_ref_commit,
+        left_include_prefixes=left_include_prefixes or [],
+        right_include_prefixes=right_include_prefixes or [],
+        left_exclude_prefixes=left_exclude_prefixes or [],
+        right_exclude_prefixes=right_exclude_prefixes or [],
+    )
 
 
 def search_history_blobs(
@@ -217,7 +257,8 @@ def search_history_blobs(
                 "display_name": work.display_name,
                 "year": work.year,
                 "repo_path": str(work.repo_path),
-                "history_head": git_text(work.repo_path, "rev-parse", work.review_branch),
+                "review_ref": work.review_branch,
+                "review_commit": git_text(work.repo_path, "rev-parse", work.review_branch),
             }
         )
     if output_path is None:
@@ -233,6 +274,24 @@ def search_history_blobs(
         top_k=top_k,
         target_prefixes=target_prefixes or [],
     )
+
+
+def _validate_commit_reachable(repo: Path, ref: str, commit: str, side: str) -> str:
+    ref = ref.strip()
+    if not ref:
+        raise ValueError(f"{side} ref is required")
+    ref_commit = git_text(repo, "rev-parse", f"{ref}^{{commit}}")
+    result = subprocess.run(
+        ["git", "-C", str(repo), "merge-base", "--is-ancestor", commit, ref_commit],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    if result.returncode == 1:
+        raise ValueError(f"{side} commit {commit} is not reachable from ref {ref}")
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr.strip() or f"cannot verify {side} ref {ref}")
+    return ref_commit
 
 
 def build_evidence(case_dir: str | Path) -> Path:

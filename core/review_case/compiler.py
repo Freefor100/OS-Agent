@@ -58,7 +58,7 @@ def compile_report(case_dir: str | Path) -> Path:
         public_evidence.append(card)
     report_data = {
         "generated_by": "review_case_report_data_compiler",
-        "schema": "report_data.v2",
+        "schema": "report_data.v3",
         "identity": {
             "work_id": identity.frontmatter.get("work_id", ""),
             "display_name": identity.frontmatter.get("display_name", ""),
@@ -69,8 +69,11 @@ def compile_report(case_dir: str | Path) -> Path:
         "base": {
             "status": base_doc.frontmatter.get("status", ""),
             "display_name": base_doc.frontmatter.get("selected_base_display_name", ""),
-            "commit": base_doc.frontmatter.get("selected_base_commit", ""),
+            "target_review_ref": base_doc.frontmatter.get("target_review_ref", ""),
+            "target_review_commit": base_doc.frontmatter.get("target_review_commit", ""),
             "target_introduction_commit": base_doc.frontmatter.get("target_introduction_commit", ""),
+            "source_ref": base_doc.frontmatter.get("selected_base_ref", ""),
+            "source_commit": base_doc.frontmatter.get("selected_base_commit", ""),
             "direction": base_doc.frontmatter.get("direction", ""),
             "confidence": base_doc.frontmatter.get("confidence", ""),
         },
@@ -183,6 +186,8 @@ def _write_tags(root: Path, identity, modules: list[dict], optional: dict[str, b
         "work_name": identity.frontmatter.get("work_name", ""),
         "base": {
             "display_name": base.frontmatter.get("selected_base_display_name", "") if base else "",
+            "ref": base.frontmatter.get("selected_base_ref", "") if base else "",
+            "commit": base.frontmatter.get("selected_base_commit", "") if base else "",
             "relation": base.frontmatter.get("direction", "") if base else "",
             "confidence": base.frontmatter.get("confidence", "") if base else "",
             "status": base.frontmatter.get("status", "") if base else "",

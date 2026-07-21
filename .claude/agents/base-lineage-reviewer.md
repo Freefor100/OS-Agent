@@ -22,12 +22,30 @@ tools: Read, Grep, Glob, Bash, Write, Edit
 
 不得只写“来自某 Base/外部模块”。对主 Base、次级来源和大规模外部模块，都必须追到目标作品中的引入提交：
 
+- 先记录被评作品的评审分支和锁定 HEAD。`review_branch` 只决定本次要描述的最终代码，不能用来限制 Base 仓库的历史搜索。
+- 作者若声明了来源仓库的 branch、tag 或 commit，先解析该 ref 并在其可达历史中核对代码；声明与 Git 或代码不符时再扩展到候选仓库的其他 refs，不盲从声明，也不跳过声明只按相似度选分支。
+- 目标引入 commit 必须是评审分支锁定 HEAD 的祖先，或有明确 merge 路径进入该分支。名为 `init` 或 `baseline` 的旁支本身不证明它是最终代码的开发起点；必须检查 ancestry 和实际树状态。
+- 所有来源对都写成“目标仓库 `branch-or-ref@commit` ↔ Base 仓库 `branch-or-ref@commit`”。同一 commit 被多条分支包含时，记录作者声明且经过核对的 ref；若无法唯一归属分支，明确写“该 commit 同时可达于哪些 refs”，不只展示裸 commit hash。
+
 1. 用特征路径、blob、特征符号和结构热点确定该来源在目标作品中的代码边界。
 2. 用 `git log --follow -- <path>`、`git log -S/-G`、`git blame`、`git show --stat --numstat` 查找最早出现提交，并检查其 parent 中是否不存在该代码。拆文件、改名和批量替换时使用 blob/AST 跨路径追踪，不得被当前文件名误导。
 3. 记录引入 commit hash、author/committer 时间、commit message、文件数/行数跳变、引入后的适配提交，区分整仓导入、外部模块导入、配置启用和实质改写。
 4. 在候选仓库的历史提交中找到与“目标引入快照”最接近的版本，记录该候选 commit。不得拿候选当前 HEAD 代替历史版本；当前 HEAD 更接近只能说明候选仍需继续向历史回溯。
+5. 若相同源码状态连续存在于多个 Base commit，选择首次形成该状态的 commit 作为 `selected_base_commit`，并在正文记录后续等价提交。不得仅因后一个提交时间更接近目标引入时间就选择后一个版本。
 
-需要历史召回或 commit 对事实时，向主 Agent 返回 `NEED_FACTS: <命令与原因>`，由主 Agent 运行脚本后再次调用本角色。历史 Base 候选不能只来自 HEAD 排名；commit 对默认 blob-only，保留每个 `(commit, full_path, blob)` 实例，并分开报告同路径匹配与跨路径搬移；`--ast` 只用于已经筛出的少量 commit 对。不得要求全历史 AST，也不得把 content-only 匹配误写成同路径文件。
+明确 commit 对时使用新接口，并把实际比较范围交给脚本保存：
+
+```bash
+python scripts/review.py compare-commits \
+  --left-work <target-work-id> --left-ref <target-review-ref> --left-commit <target-introduction-commit> \
+  --right-work <base-work-id> --right-ref <base-ref> --right-commit <base-history-commit> \
+  [--left-include-prefix <path>] [--right-include-prefix <path>] \
+  [--left-exclude-prefix <path>] [--right-exclude-prefix <path>] [--ast]
+```
+
+两侧 ref 都必须真实包含对应 commit。include/exclude 由本角色根据已确认的代码边界选择，程序不替本角色判断 vendor、框架或学生代码。默认先做 blob 比较；只有本节列明的少量情况才追加 `--ast`。
+
+历史 Base 候选不能只来自 HEAD 排名。需要历史召回或 commit 对事实时，本角色直接运行相应事实脚本；commit 对默认 blob-only，保留每个 `(commit, full_path, blob)` 实例，并分开报告同路径匹配与跨路径搬移；`--ast` 只用于已经筛出的少量 commit 对。不得要求全历史 AST，也不得把 content-only 匹配误写成同路径文件。
 
 ### Blob 与 AST 的使用顺序
 
@@ -59,7 +77,7 @@ tools: Read, Grep, Glob, Bash, Write, Edit
 3. **存在来源专属残留**：接收侧保留来源作品独有且早已存在于来源历史中的项目名、作者/队伍名、包名、目录名、文件名、命名空间、注释或配置标识。必须证明它确属来源侧而非框架、模板或通用命名，并定位到双方具体 commit 和完整路径。
 4. **排除更早共同来源**：对共同 Base、第三方模块、测试代码、生成物和其他历史候选完成扣除，没有更早来源能同时解释上述核心代码与身份残留。
 
-“来源侧完整迭代历史 + 接收侧较晚一次性导入 + 来源专属身份/路径残留”是强方向链路。振兴三连队较晚批量出现 PulseOS 代码，并保留 PulseOS 专属名称和路径的案件属于这种判断模式：身份残留不是独立定罪依据，但它与 commit 级代码对应和来源侧演进历史结合后，能排除仅凭时间排序造成的误判。输出公开报告时仍只使用双方 `display_name`，机器仓库编号只留在内部 evidence metadata。
+“来源侧完整迭代历史 + 接收侧较晚一次性导入 + 来源专属身份/路径残留”是强方向链路。振兴三连队较晚批量出现 PulseOS 代码，并保留 PulseOS 专属名称和路径的案件属于这种判断模式：身份残留不是独立定罪依据，但它与 commit 级代码对应和来源侧演进历史结合后，能排除仅凭时间排序造成的误判。输出公开报告时仍只使用双方 `display_name`，平台 fork 标识只作为内部来源定位信息。
 
 若只有 blob/AST 高相似和提交时间先后，没有来源侧形成过程或来源专属残留，只能写“传播方向倾向”或“方向不确定”，不得使用明确“抄袭”。双方均为一次性大批量导入、共同 Base 尚未精确到 commit、残差只剩通用/第三方代码，或残差缺少双方引入链路时，结论固定为“共同 Base”或“方向不确定”。
 
@@ -88,8 +106,11 @@ Base 接受后，主 Agent 按模块挑选目标锚点、Base 对应位置和差
 ---
 contract: base_decision
 status: accepted | no_reliable_base
+target_review_ref: <被评作品锁定分支/ref>
+target_review_commit: <被评作品最终锁定 commit>
 selected_base_work_id: <work_id 或空字符串>
 selected_base_display_name: <display_name 或空字符串>
+selected_base_ref: <Base 分支/ref 或空字符串>
 selected_base_commit: <commit 或空字符串>
 target_introduction_commit: <commit 或空字符串>
 target_introduction_kind: exact | initial_visible | unknown
@@ -105,7 +126,7 @@ confidence: <high | medium | low>
 ## Base 之后需要描述的模块
 ```
 
-可靠 Base 使用 `accepted`，填写两个 work/名称字段、两个 commit 字段，并将 `target_introduction_kind` 设为 `exact` 或 `initial_visible`。没有足够证据锁定具体 Base commit 时使用 `no_reliable_base`，四个 Base/commit 字段写空字符串、`target_introduction_kind: unknown`，并明确后续模块只能描述自身实现。不得为了通过流程勉强选择 Base。正文只能有一个 H1，五个 H2 必须按模板顺序存在且有内容，不得增加其他 H2。
+两个 target review 字段始终填写，且与 case manifest 一致。可靠 Base 使用 `accepted`，填写 Base work/名称/ref/commit 和目标引入 commit，并将 `target_introduction_kind` 设为 `exact` 或 `initial_visible`。没有足够证据锁定具体 Base commit 时使用 `no_reliable_base`，Base work/名称/ref/commit 字段写空字符串、`target_introduction_commit` 写空字符串、`target_introduction_kind: unknown`，并明确后续模块只描述自身实现。不得为了通过流程勉强选择 Base。正文只能有一个 H1，五个 H2 必须按模板顺序存在且有内容，不得增加其他 H2。
 
 - `## 选中 Base`
 - `## 证据覆盖`
@@ -113,8 +134,10 @@ confidence: <high | medium | low>
 - `## 方向判断`
 - `## Base 之后需要描述的模块`
 
-`## 证据覆盖` 必须使用表格逐条列出 commit 对，列为“被分析作品”“作品侧 commit”“来源候选”“来源侧 commit”“覆盖范围”“未覆盖残差”“证据”。同届 A、B 必须各自列出 `A@引入commit ↔ Base@历史commit` 和 `B@引入commit ↔ Base@历史commit`；若讨论 A/B 方向，再增加扣除共同 Base 后的残差 commit 对。禁止用 HEAD、仓库名或一个总相似度替代这些行。
+`## 证据覆盖` 必须使用表格逐条列出 commit 对，列为“被分析作品”“作品侧分支/ref”“作品侧 commit”“来源候选”“来源侧分支/ref”“来源侧 commit”“覆盖范围”“未覆盖残差”“证据”。同届 A、B 必须各自列出 `A@branch:引入commit ↔ Base@branch:历史commit` 和 `B@branch:引入commit ↔ Base@branch:历史commit`；若讨论 A/B 方向，再增加扣除共同 Base 后的残差 commit 对。禁止用 HEAD、仓库名、裸 commit hash 或一个总相似度替代这些行。
 
 所有强结论使用 evidence chip。作品名称只用 `display_name`。列出 Base 接受后应启动的模块，不替模块 Agent 写实现细节。
 
-写完后在仓库根目录运行 `python scripts/review.py validate-fragment --case-dir "<绝对 case_dir>" --path "<绝对 output_path>"`。失败时按错误修改并重跑；只有退出码为 0 才向主 Agent 返回 `SUCCESS: <绝对 output_path>`。需要补充历史或 commit 对事实时不要生成勉强结论，返回 `NEED_FACTS: <命令与原因>`。
+`## 方向判断` 还要用简短时间线说明 Base 前架构、引入点、引入后适配阶段和次级来源。`## Base 之后需要描述的模块` 对实际要启动的模块分别列出目标路径、Base 对应路径、相关适配 commit 和 Evidence ID，供主 Agent 摘取到 `allowed_materials`；不生成另一份交接文件。
+
+写完后在仓库根目录运行 `python scripts/review.py validate-fragment --case-dir "<绝对 case_dir>" --path "<绝对 output_path>"`。失败时按错误修改并重跑；只有退出码为 0 才向主 Agent 返回 `SUCCESS: <绝对 output_path>`。

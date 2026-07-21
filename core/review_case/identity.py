@@ -21,7 +21,6 @@ class WorkIdentity:
     team: str
     work_name: str
     display_name: str
-    machine_repo: str
     canonical_dir: str
     review_branch: str
     urls: dict[str, str]
@@ -55,7 +54,6 @@ def load_works(path: str | Path = "config/works.yaml") -> list[WorkIdentity]:
                 team=str(item.get("team", "")).strip(),
                 work_name=str(item.get("work_name", "")).strip(),
                 display_name=str(item.get("display_name", "")).strip(),
-                machine_repo=str(item.get("machine_repo", "")).strip(),
                 canonical_dir=str(item.get("canonical_dir", "")).strip(),
                 review_branch=str(item.get("review_branch", "")).strip() or "main",
                 urls={str(k): str(v or "") for k, v in urls.items()},
@@ -76,13 +74,10 @@ def validate_work_identity(work: WorkIdentity) -> ValidationReport:
         "work_name": work.work_name,
         "display_name": work.display_name,
         "canonical_dir": work.canonical_dir,
-        "machine_repo": work.machine_repo,
     }
     for field, value in required.items():
         if not value:
             report.add("identity.missing_field", f"work identity missing {field}")
-    if work.machine_repo and work.machine_repo in work.display_name:
-        report.add("identity.machine_name_in_display", "display_name must not contain machine_repo")
     if work.repo_path.exists():
         if not (work.repo_path / ".git").exists():
             report.add("identity.not_git_repo", "canonical_dir exists but is not a git repo", work.repo_path)
@@ -130,7 +125,6 @@ def init_case(work: WorkIdentity, output_root: str | Path = "output") -> Path:
             "team": work.team,
             "work_name": work.work_name,
             "display_name": work.display_name,
-            "machine_repo": work.machine_repo,
         },
         allow_unicode=True,
         sort_keys=False,

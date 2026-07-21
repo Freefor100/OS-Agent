@@ -510,23 +510,37 @@ def capture_commit(
 
 
 def _comparison_summary(data: dict[str, Any]) -> tuple[dict[str, Any], str, list[dict[str, Any]], dict[str, Any]]:
-    if data.get("schema") != "review_case.commit_pair.v1":
-        raise EvidenceError("comparison 目前只接受 compare-commits 生成的 commit_pair.v1")
+    if data.get("schema") != "review_case.commit_pair.v2":
+        raise EvidenceError("comparison 只接受 compare-commits 生成的 commit_pair.v2")
     left = data.get("left", {})
     right = data.get("right", {})
     blob = data.get("blob_overlap", {})
     ast = data.get("ast_overlap") or {}
+    path_filters = data.get("path_filters", {})
+    left_version = _comparison_version(left)
+    right_version = _comparison_version(right)
     source = {
         "work_id": f"{left.get('work_id', '')} ↔ {right.get('work_id', '')}",
         "display_name": f"{left.get('display_name', left.get('work_id', '左侧'))} ↔ "
         f"{right.get('display_name', right.get('work_id', '右侧'))}",
+        "ref": f"{left.get('ref', '')} ↔ {right.get('ref', '')}",
         "commit": f"{left.get('commit', '')} ↔ {right.get('commit', '')}",
         "path": "",
         "locator": "commit pair",
         "object_hash": "",
     }
     facts = [
+        {"label": "左侧作品", "value": left.get("display_name", left.get("work_id", ""))},
+        {"label": "右侧作品", "value": right.get("display_name", right.get("work_id", ""))},
+        {"label": "左侧版本", "value": left_version},
+        {"label": "右侧版本", "value": right_version},
+        {"label": "左侧比较范围", "value": _comparison_scope(path_filters.get("left", {}))},
+        {"label": "右侧比较范围", "value": _comparison_scope(path_filters.get("right", {}))},
+        {"label": "左侧实例总数", "value": blob.get("content_instances", {}).get("target_total_instances", 0)},
+        {"label": "右侧实例总数", "value": blob.get("content_instances", {}).get("candidate_total_instances", 0)},
         {"label": "相同内容实例", "value": blob.get("content_instances", {}).get("shared_instances", 0)},
+        {"label": "左侧包含率", "value": blob.get("content_instances", {}).get("target_containment", 0)},
+        {"label": "右侧包含率", "value": blob.get("content_instances", {}).get("candidate_containment", 0)},
         {"label": "同路径实例", "value": blob.get("path_aligned_instances", {}).get("shared_instances", 0)},
         {"label": "跨路径实例", "value": blob.get("relocated_instances", 0)},
         {"label": "共享唯一 Blob", "value": blob.get("shared_unique_blobs", 0)},
@@ -561,12 +575,29 @@ def _comparison_summary(data: dict[str, Any]) -> tuple[dict[str, Any], str, list
             ]
         )
     excerpt = (
-        f"比较 {left.get('commit', '')[:12]} 与 {right.get('commit', '')[:12]}："
+        f"比较 {left_version} 与 {right_version}："
         f"相同内容实例 {blob.get('content_instances', {}).get('shared_instances', 0)}，"
         f"同路径 {blob.get('path_aligned_instances', {}).get('shared_instances', 0)}，"
         f"跨路径 {blob.get('relocated_instances', 0)}。"
     )
     return source, excerpt, facts, {"columns": ["匹配类型", "左侧", "右侧", "指纹"], "rows": rows}
+
+
+def _comparison_version(side: dict[str, Any]) -> str:
+    ref = str(side.get("ref", ""))
+    commit = str(side.get("commit", ""))
+    return f"{ref}@{commit[:12]}" if ref else commit[:12]
+
+
+def _comparison_scope(scope: dict[str, Any]) -> str:
+    includes = [str(value) for value in scope.get("include_prefixes", [])]
+    excludes = [str(value) for value in scope.get("exclude_prefixes", [])]
+    parts = []
+    if includes:
+        parts.append("包含 " + ", ".join(includes))
+    if excludes:
+        parts.append("排除 " + ", ".join(excludes))
+    return "；".join(parts) if parts else "全部指纹路径"
 
 
 def capture_comparison(case_dir: Path, *, title: str, fact_file: Path) -> str:

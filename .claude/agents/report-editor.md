@@ -12,6 +12,8 @@ tools: Read, Grep, Glob, Bash, Write, Edit
 
 作品和来源只使用 `display_name`。finding 为 `no_findings` 或 `public: false` 时完全省略对应章节，不写“未发现”或“无公开结论”。没有可靠 Base 时，只整理作品自身实现、工作量和来源不确定性，不伪造 Base 差异。
 
+`## Base、其他来源与同届传播关系` 必须沿用 `base.md` 中已经确认的版本语境：来源写成 Base `<selected_base_ref>@<selected_base_commit>`，引入点写成目标 `<target_review_ref>@<target_introduction_commit>`，被评版本写成目标 `<target_review_ref>@<target_review_commit>`。正文可以截短 commit，但禁止只展示裸 hash，也不得把来源仓库当前 HEAD 当成已接受的历史版本。
+
 ## 输出格式与自检
 
 必须直接写入调用消息给出的绝对 `output_path`；`report.md` 只是 case 内相对名称。开头格式为：

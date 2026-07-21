@@ -26,7 +26,7 @@ from .evidence import EvidenceCard, EvidenceError, load_evidence
 from .parser import MarkdownDocument, parse_markdown
 from .taxonomy import MODULES, validate_taxonomy
 
-MACHINE_RE = re.compile(r"\bT20\d{10,}-\d+\b")
+PLATFORM_FORK_RE = re.compile(r"\bT20\d{10,}-\d+\b")
 BARE_SUFFIX_RE = re.compile(r"(?<![A-Za-z0-9])\d{2,4}\s*(?:作品|队伍|仓库|报告)")
 GIT_COMMIT_RE = re.compile(r"^[0-9a-fA-F]{7,40}$")
 MERMAID_RE = re.compile(r"```mermaid\s*\n(?P<body>[\s\S]*?)\n```", re.IGNORECASE)
@@ -47,8 +47,10 @@ def validate_case_dir(case_dir: str | Path) -> ValidationReport:
     for doc in docs:
         report.extend(validate_document_structure(doc))
         report.extend(validate_output_path(doc, root))
-        report.extend(validate_identity_text(doc, root))
+        report.extend(validate_identity_text(doc))
         report.extend(validate_evidence_refs(doc, evidence))
+        if doc.frontmatter.get("contract") == "base_decision":
+            report.extend(validate_base_target_lock(doc, root))
     report.extend(validate_report_identity(docs))
     report.extend(validate_contradictions(root))
     report.extend(validate_optional_sections(root))
@@ -73,8 +75,32 @@ def validate_fragment(case_dir: str | Path, path: str | Path) -> ValidationRepor
         return report
     report.extend(validate_document_structure(doc))
     report.extend(validate_output_path(doc, root))
-    report.extend(validate_identity_text(doc, root))
+    report.extend(validate_identity_text(doc))
     report.extend(validate_evidence_refs(doc, evidence))
+    if doc.frontmatter.get("contract") == "base_decision":
+        report.extend(validate_base_target_lock(doc, root))
+    return report
+
+
+def validate_base_target_lock(doc: MarkdownDocument, root: Path) -> ValidationReport:
+    report = ValidationReport()
+    manifest_path = root / "case_state" / "manifest.json"
+    if not manifest_path.exists():
+        report.add("base.manifest_missing", "case manifest is required to validate target review version", manifest_path)
+        return report
+    try:
+        repo = json.loads(manifest_path.read_text(encoding="utf-8")).get("repo", {})
+    except (json.JSONDecodeError, OSError) as exc:
+        report.add("base.manifest_invalid", str(exc), manifest_path)
+        return report
+    expected_ref = str(repo.get("review_branch", "")).strip()
+    expected_commit = str(repo.get("commit", "")).strip()
+    actual_ref = str(doc.frontmatter.get("target_review_ref", "")).strip()
+    actual_commit = str(doc.frontmatter.get("target_review_commit", "")).strip()
+    if actual_ref != expected_ref:
+        report.add("base.target_ref_mismatch", f"target_review_ref must match locked review branch {expected_ref!r}", doc.path)
+    if actual_commit != expected_commit:
+        report.add("base.target_commit_mismatch", "target_review_commit must match the locked case commit", doc.path)
     return report
 
 
@@ -108,8 +134,11 @@ def validate_document_structure(doc: MarkdownDocument) -> ValidationReport:
             doc,
             [
                 "status",
+                "target_review_ref",
+                "target_review_commit",
                 "selected_base_work_id",
                 "selected_base_display_name",
+                "selected_base_ref",
                 "selected_base_commit",
                 "target_introduction_commit",
                 "target_introduction_kind",
@@ -125,10 +154,25 @@ def validate_document_structure(doc: MarkdownDocument) -> ValidationReport:
             report.add("structure.invalid_enum", "base status must be accepted or no_reliable_base", doc.path)
         if status == "accepted":
             _validate_base_commits(report, doc)
-            _require_nonempty_frontmatter(report, doc, ["selected_base_work_id", "selected_base_display_name"])
+            _require_nonempty_frontmatter(
+                report,
+                doc,
+                ["target_review_ref", "target_review_commit", "selected_base_work_id", "selected_base_display_name", "selected_base_ref"],
+            )
         elif status == "no_reliable_base":
+            _validate_target_review_commit(report, doc)
+            _require_nonempty_frontmatter(report, doc, ["target_review_ref", "target_review_commit"])
             if str(doc.frontmatter.get("target_introduction_kind", "")) != "unknown":
                 report.add("base.introduction_kind", "no_reliable_base requires target_introduction_kind: unknown", doc.path)
+            for field in (
+                "selected_base_work_id",
+                "selected_base_display_name",
+                "selected_base_ref",
+                "selected_base_commit",
+                "target_introduction_commit",
+            ):
+                if str(doc.frontmatter.get(field, "")).strip():
+                    report.add("base.unexpected_value", f"no_reliable_base requires empty {field}", doc.path)
         _require_nonempty_frontmatter(report, doc, ["direction", "confidence"])
         _require_enum(report, doc, "confidence", VALID_BASE_CONFIDENCE)
         return report
@@ -242,25 +286,17 @@ def validate_output_path(doc: MarkdownDocument, root: Path) -> ValidationReport:
     return report
 
 
-def validate_identity_text(doc: MarkdownDocument, root: Path) -> ValidationReport:
+def validate_identity_text(doc: MarkdownDocument) -> ValidationReport:
     report = ValidationReport()
     if doc.frontmatter.get("contract") == "identity":
         return report
-    forbidden: set[str] = set()
-    manifest = root / "case_state" / "manifest.json"
-    if manifest.exists():
-        try:
-            work = json.loads(manifest.read_text(encoding="utf-8")).get("work", {})
-            if work.get("machine_repo"):
-                forbidden.add(str(work["machine_repo"]))
-        except (json.JSONDecodeError, OSError):
-            pass
-    match = MACHINE_RE.search(doc.body)
+    match = PLATFORM_FORK_RE.search(doc.body)
     if match:
-        report.add("identity.machine_name_leak", f"machine repo id leaks into public markdown: {match.group(0)}", doc.path)
-    for value in forbidden:
-        if value and value in doc.body:
-            report.add("identity.machine_name_leak", f"machine repo id leaks into public markdown: {value}", doc.path)
+        report.add(
+            "identity.platform_fork_leak",
+            f"platform fork id leaks into public markdown: {match.group(0)}",
+            doc.path,
+        )
     bare = BARE_SUFFIX_RE.search(doc.body)
     if bare:
         report.add("identity.bare_suffix_name", f"numeric fork suffix used as prose name: {bare.group(0)}", doc.path)
@@ -354,7 +390,7 @@ def contradiction_check(case_dir: str | Path) -> Path:
         raise AssertionError("unreachable")
     report.extend(validate_document_structure(doc))
     report.extend(validate_output_path(doc, root))
-    report.extend(validate_identity_text(doc, root))
+    report.extend(validate_identity_text(doc))
     report.extend(validate_evidence_refs(doc, evidence))
     if doc.frontmatter.get("status") == "unresolved":
         report.add("contradiction.unresolved", "仍有未解决矛盾，不能确认仲裁结果", path)
@@ -537,13 +573,19 @@ def _require_enum(report: ValidationReport, doc: MarkdownDocument, field: str, a
 
 
 def _validate_base_commits(report: ValidationReport, doc: MarkdownDocument) -> None:
-    for field in ("selected_base_commit", "target_introduction_commit"):
+    for field in ("target_review_commit", "selected_base_commit", "target_introduction_commit"):
         value = str(doc.frontmatter.get(field, "")).strip()
         if not GIT_COMMIT_RE.fullmatch(value):
             report.add("base.commit_missing", f"{field} must be a git commit hash when Base is accepted", doc.path)
     kind = str(doc.frontmatter.get("target_introduction_kind", "")).strip()
     if kind not in {"exact", "initial_visible"}:
         report.add("base.introduction_kind", "target_introduction_kind must be exact or initial_visible", doc.path)
+
+
+def _validate_target_review_commit(report: ValidationReport, doc: MarkdownDocument) -> None:
+    value = str(doc.frontmatter.get("target_review_commit", "")).strip()
+    if not GIT_COMMIT_RE.fullmatch(value):
+        report.add("base.commit_missing", "target_review_commit must be a git commit hash", doc.path)
 
 
 def _validate_report_structure(report: ValidationReport, doc: MarkdownDocument) -> None:

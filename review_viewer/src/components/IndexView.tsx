@@ -25,8 +25,25 @@ export function IndexView({ index, onOpenReport }: Props) {
       <label className="toggle"><input type="checkbox" checked={riskOnly} onChange={(event) => setRiskOnly(event.target.checked)} /><span>只看公开风险</span></label>
       <span className="result-count">{filtered.length} / {index.length}</span>
     </section>
-    <section className="index-table-wrap"><table className="index-table"><thead><tr><th>作品</th><th>Base / 来源关系</th><th>工作量账本</th><th>公开风险</th><th><span className="sr-only">操作</span></th></tr></thead><tbody>{filtered.map((item) => <tr key={item.work_id}><td><strong>{item.display_name}</strong><small>{item.school} · {item.team}</small></td><td><span>{item.base?.display_name || "无可靠 Base"}</span><small>{[item.base?.relation, item.base?.confidence].filter(Boolean).join(" · ")}</small></td><td><LedgerMini values={item.module_summary} /></td><td><RiskBadges tags={item.risk_tags || []} /></td><td><button className="open-report" onClick={() => onOpenReport(item)}>打开报告<ArrowUpRight size={16} /></button></td></tr>)}</tbody></table>{!filtered.length && <div className="empty-result">没有符合当前筛选条件的报告。</div>}</section>
+    <section className="index-table-wrap">
+      <table className="index-table">
+        <thead><tr><th>作品</th><th>Base / 来源关系</th><th>工作量账本</th><th>公开风险</th><th><span className="sr-only">操作</span></th></tr></thead>
+        <tbody>{filtered.map((item) => <tr key={item.work_id}>
+          <td><strong>{item.display_name}</strong><small>{item.school} · {item.team}</small></td>
+          <td><span>{item.base?.display_name || "无可靠 Base"}</span><small>{baseMeta(item)}</small></td>
+          <td><LedgerMini values={item.module_summary} /></td>
+          <td><RiskBadges tags={item.risk_tags || []} /></td>
+          <td><button className="open-report" onClick={() => onOpenReport(item)}>打开报告<ArrowUpRight size={16} /></button></td>
+        </tr>)}</tbody>
+      </table>
+      {!filtered.length && <div className="empty-result">没有符合当前筛选条件的报告。</div>}
+    </section>
   </main>;
+}
+
+function baseMeta(item: IndexItem) {
+  const version = [item.base?.ref, item.base?.commit?.slice(0, 10)].filter(Boolean).join("@");
+  return [version, item.base?.relation, item.base?.confidence].filter(Boolean).join(" · ");
 }
 
 function LedgerMini({ values }: { values: Record<string, number> }) {

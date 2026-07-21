@@ -9,7 +9,7 @@ from typing import Any, Hashable, Iterable
 
 def search_fingerprint_cache(
     target_manifest_path: Path,
-    candidate_caches: Iterable[Path],
+    candidate_caches: Iterable[dict[str, Any]],
     output_path: Path,
     *,
     top_k: int = 30,
@@ -20,7 +20,8 @@ def search_fingerprint_cache(
     target_cache = _resolve_cache_path(str(target_manifest["cache_dir"]), target_manifest_path)
     target_blobs, target_units = _fingerprints(target_cache, include_ast=True)
     rows: list[dict[str, Any]] = []
-    for candidate_cache in candidate_caches:
+    for candidate in candidate_caches:
+        candidate_cache = Path(str(candidate["cache_dir"]))
         manifest_path = candidate_cache / "manifest.json"
         if not manifest_path.is_file():
             continue
@@ -36,6 +37,9 @@ def search_fingerprint_cache(
             {
                 "work_id": item.get("work_id", ""),
                 "display_name": item.get("display_name", ""),
+                "year": candidate.get("year", 0),
+                "review_ref": candidate.get("review_ref", ""),
+                "review_commit": item.get("commit", ""),
                 "commit": item.get("commit", ""),
                 "blob_overlap": blob,
                 "ast_overlap": ast,
@@ -49,6 +53,8 @@ def search_fingerprint_cache(
         "schema": "review_case.search_candidates.v3",
         "target_work_id": target_work_id,
         "target_display_name": target_manifest.get("display_name", ""),
+        "target_year": target_manifest.get("year", 0),
+        "target_review_ref": target_manifest.get("review_ref", ""),
         "target_commit": target_manifest.get("commit", ""),
         "score_notice": "HEAD candidate recall only. Scores do not decide Base, originality, plagiarism, or direction.",
         "identity_notice": "Blob and AST matches preserve occurrence counts and full paths; content-only matches are reported separately from path-aligned matches.",
@@ -65,17 +71,44 @@ def compare_fingerprint_caches(
     output_path: Path,
     *,
     include_ast: bool = False,
+    left_ref: str,
+    left_ref_commit: str,
+    right_ref: str,
+    right_ref_commit: str,
+    left_include_prefixes: Iterable[str] = (),
+    right_include_prefixes: Iterable[str] = (),
+    left_exclude_prefixes: Iterable[str] = (),
+    right_exclude_prefixes: Iterable[str] = (),
 ) -> Path:
     """Compare two selected commit snapshots and emit facts, not a judgment."""
     left_manifest = _load(left_cache / "manifest.json")
     right_manifest = _load(right_cache / "manifest.json")
     left_blobs, left_units = _fingerprints(left_cache, include_ast=include_ast)
     right_blobs, right_units = _fingerprints(right_cache, include_ast=include_ast)
+    left_scope = _path_scope(left_include_prefixes, left_exclude_prefixes)
+    right_scope = _path_scope(right_include_prefixes, right_exclude_prefixes)
+    left_blobs = _filter_paths(left_blobs, left_scope)
+    right_blobs = _filter_paths(right_blobs, right_scope)
+    left_units = _filter_paths(left_units, left_scope)
+    right_units = _filter_paths(right_units, right_scope)
     payload = {
-        "schema": "review_case.commit_pair.v1",
+        "schema": "review_case.commit_pair.v2",
         "notice": "Commit-pair fingerprint facts only. The Base reviewer must combine these facts with Git parent diffs, common-source subtraction, and repository history.",
-        "left": _snapshot_identity(left_manifest),
-        "right": _snapshot_identity(right_manifest),
+        "left": {
+            **_snapshot_identity(left_manifest),
+            "ref": left_ref,
+            "ref_commit": left_ref_commit,
+            "compared_blob_instances": len(left_blobs),
+            "compared_ast_units": len(left_units),
+        },
+        "right": {
+            **_snapshot_identity(right_manifest),
+            "ref": right_ref,
+            "ref_commit": right_ref_commit,
+            "compared_blob_instances": len(right_blobs),
+            "compared_ast_units": len(right_units),
+        },
+        "path_filters": {"left": left_scope, "right": right_scope},
         "blob_overlap": _blob_overlap(left_blobs, right_blobs, include_occurrences=True),
         "ast_overlap": _ast_overlap(left_units, right_units) if include_ast else None,
     }
@@ -113,7 +146,8 @@ def search_historical_blob_objects(
                 "work_id": candidate.get("work_id", ""),
                 "display_name": candidate.get("display_name", ""),
                 "year": candidate.get("year", 0),
-                "history_head": candidate.get("history_head", ""),
+                "review_ref": candidate.get("review_ref", ""),
+                "review_commit": candidate.get("review_commit", ""),
                 "shared_unique_blobs": len(present),
                 "target_shared_instances": shared_instances,
                 "target_total_instances": sum(target_counts.values()),
@@ -136,7 +170,7 @@ def search_historical_blob_objects(
         "schema": "review_case.history_blob_candidates.v1",
         "target": _snapshot_identity(target_manifest),
         "target_prefixes": list(prefixes),
-        "notice": "Repository recall from reachable Git blob objects only. Presence does not identify the source commit or prove lineage.",
+        "notice": "Repository recall scans objects reachable from all refs. Configured review_ref is shown only as a representative HEAD and does not limit history search. Presence does not identify the source commit or prove lineage.",
         "next_step": "For shortlisted repositories, use git log --all --find-object=<blob> to locate historical windows, then compare explicit commit pairs.",
         "candidates": rows[:top_k],
     }
@@ -155,6 +189,27 @@ def _fingerprints(cache_dir: Path, *, include_ast: bool) -> tuple[list[dict[str,
         if row.get("blob") and row.get("path")
     ]
     return blobs, list(ast_doc.get("units", []))
+
+
+def _path_scope(include_prefixes: Iterable[str], exclude_prefixes: Iterable[str]) -> dict[str, list[str]]:
+    return {
+        "include_prefixes": sorted({_clean_prefix(value) for value in include_prefixes if _clean_prefix(value)}),
+        "exclude_prefixes": sorted({_clean_prefix(value) for value in exclude_prefixes if _clean_prefix(value)}),
+    }
+
+
+def _filter_paths(rows: list[dict[str, Any]], scope: dict[str, list[str]]) -> list[dict[str, Any]]:
+    includes = tuple(scope["include_prefixes"])
+    excludes = tuple(scope["exclude_prefixes"])
+    selected = []
+    for row in rows:
+        path = str(row.get("path", ""))
+        if includes and not _under_prefix(path, includes):
+            continue
+        if excludes and _under_prefix(path, excludes):
+            continue
+        selected.append(row)
+    return selected
 
 
 def _blob_overlap(

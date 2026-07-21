@@ -42,12 +42,12 @@ export function ReportView({ report, onBack }: Props) {
         </div>
       </header>
 
-      <div className="source-rail" aria-label="Base 到目标作品的来源轨迹">
-        <div className="rail-node rail-base"><span>BASE</span><strong>{report.base.status === "accepted" ? report.base.display_name : "无可靠 Base"}</strong><small>{shortCommit(report.base.commit) || report.base.status}</small></div>
-        <div className="rail-link"><span>引入 / 适配</span><i /></div>
-        <div className="rail-node rail-target"><span>TARGET</span><strong>{report.identity.display_name}</strong><small>{report.identity.school} · {report.identity.team}</small></div>
+      <div className="source-rail" aria-label="来源基线到被评作品的关系">
+        <div className="rail-node rail-base"><span>来源基线</span><strong>{report.base.status === "accepted" ? report.base.display_name : "无可靠 Base"}</strong><small>{versionLabel(report.base.source_ref, report.base.source_commit) || report.base.status}</small></div>
+        <div className="rail-link"><span>{introductionLabel(report)}</span><i /></div>
+        <div className="rail-node rail-target"><span>被评版本</span><strong>{report.identity.display_name}</strong><small>{versionLabel(report.base.target_review_ref, report.base.target_review_commit)}</small><small className="rail-introduction-mobile">{introductionLabel(report)}</small></div>
         <div className="rail-link"><span>代码增量</span><i /></div>
-        <div className="rail-node rail-delta"><span>REVIEW</span><strong>{report.modules.length} 个模块</strong><small>{report.base.direction || "自身实现分析"}</small></div>
+        <div className="rail-node rail-delta"><span>分析结果</span><strong>{report.modules.length} 个模块</strong><small>{report.base.direction || "自身实现分析"}</small></div>
       </div>
 
       <div className="report-layout">
@@ -97,6 +97,11 @@ function ModuleFragments({ modules, evidenceById, onEvidence }: { modules: Modul
 }
 
 function shortCommit(value: string) { return value ? value.slice(0, 10) : ""; }
+function versionLabel(ref: string, commit: string) { return [ref, shortCommit(commit)].filter(Boolean).join(" · "); }
+function introductionLabel(report: ReviewReportData) {
+  if (!report.base.target_introduction_commit) return "自身实现";
+  return `在 ${report.base.target_review_ref}@${shortCommit(report.base.target_introduction_commit)} 引入与适配`;
+}
 function statusLabel(value: string) { return ({ implemented: "已实现", partial: "部分实现", minimal: "最小实现", absent: "未实现" } as Record<string, string>)[value] ?? value; }
 function originalityLabel(value: string) { return ({ novel: "独立新增", adapted_major: "主要改写", adapted_minor: "局部适配", inherited: "继承", external: "外部模块", uncertain: "不确定" } as Record<string, string>)[value] ?? value; }
 function deltaLabel(value: string) { return ({ major: "重大变化", minor: "局部变化", none: "无实质变化", unclear: "无法比较" } as Record<string, string>)[value] ?? value; }

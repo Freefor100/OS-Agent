@@ -42,4 +42,4 @@ public: true | false
 
 五个 H2 必须按顺序存在且有内容，不得增加其他 H2；细分内容使用 H3 或列表。有可靠文档和模块/历史材料可形成正面、中性或负面评价时，使用 `status: findings`、`public: true`。只有没有可评文档或无法形成任何公开评价时才使用 `status: no_findings`、`public: false`，并在各节简短记录已检查范围和材料限制。
 
-写完后运行 `python scripts/review.py validate-fragment --case-dir "<绝对 case_dir>" --path "<绝对 output_path>"`。失败时修改并重跑；退出码为 0 后只返回 `SUCCESS: <绝对 output_path>`。缺少模块复核、历史结论或文档 evidence 时返回 `NEED_FACTS: <所需材料及原因>`。
+写完后运行 `python scripts/review.py validate-fragment --case-dir "<绝对 case_dir>" --path "<绝对 output_path>"`。失败时修改并重跑；退出码为 0 后只返回 `SUCCESS: <绝对 output_path>`。
