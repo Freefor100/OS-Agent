@@ -12,6 +12,7 @@ tools: Read, Grep, Glob, Bash, Write, Edit
 
 - 文档 Base 声明和路径清单都只是线索。主骨架归属以扣除已确认外部范围后的代码指纹、目录/类型/调用结构和历史证据为准。
 - Base 只解释主骨架，不代表全部来源。多来源作品选一个主 Base；其他框架或外部模块分别记录为原样引入、适配修改或来源不确定。
+- HEAD 候选中的 `repository_type`、`reference_kind` 和 `module_ids` 只用于识别候选身份和安排阅读，不是来源证据。`reference_kind: kernel` 或 `framework` 可以成为主 Base；`component` 只能作为次级模块来源，不得填写为 `selected_base_work_id`。对 component 必须核对实际代码边界和引入 commit，再交给其 `module_ids` 对应的模块 Agent；配置标签与源码不符时以源码和 Git 历史为准。
 - 选中的 Base 必须是具体仓库和锁定 commit。检索候选、比赛历史作品、底层组件框架和直接前身不能混为一项；若 rationale 承认工程 Base 是另一个仓库，禁止仍把相似度最高候选填成 primary Base。
 - ArceOS/StarryOS 等多层血缘要分别说明底层框架、直接前身和外部 crates；自研或新开源小 OS 只按实际证据记录，不归入预设家族。
 - blob 相同用于识别逐字节复制、fork 和路径搬移；AST/结构指纹用于识别改名、拆合文件、包名替换、虚假注释和格式变化。blob 低而结构相似高时必须复核，不能因路径变化判为原创。两者在 HEAD 上的相似度只是候选信号，不是 Base 或抄袭结论。
@@ -138,6 +139,6 @@ confidence: <high | medium | low>
 
 所有强结论使用 evidence chip。作品名称只用 `display_name`。列出 Base 接受后应启动的模块，不替模块 Agent 写实现细节。
 
-`## 方向判断` 还要用简短时间线说明 Base 前架构、引入点、引入后适配阶段和次级来源。`## Base 之后需要描述的模块` 对实际要启动的模块分别列出目标路径、Base 对应路径、相关适配 commit 和 Evidence ID，供主 Agent 摘取到 `allowed_materials`；不生成另一份交接文件。
+`## 方向判断` 还要用简短时间线说明 Base 前架构、引入点、引入后适配阶段和次级来源。`## Base 之后需要描述的模块` 对实际要启动的模块分别列出目标路径、Base 对应路径、相关适配 commit 和 Evidence ID；若存在 component 来源，同时列出其 work ID、ref、历史 commit、目标引入 commit 和代码边界，供主 Agent 摘取到对应模块的 `allowed_materials`；不生成另一份交接文件。
 
 写完后在仓库根目录运行 `python scripts/review.py validate-fragment --case-dir "<绝对 case_dir>" --path "<绝对 output_path>"`。失败时按错误修改并重跑；只有退出码为 0 才向主 Agent 返回 `SUCCESS: <绝对 output_path>`。

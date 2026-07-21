@@ -17,7 +17,7 @@ disable-model-invocation: true
 ## 状态与触发
 
 1. **准备**：校验身份并 `init`，锁定当前被分析作品的 `review_branch@HEAD`，再运行 `inventory`、`fingerprint`、`search-head-candidates`、`build-evidence`。`review_branch` 只决定当前目标版本；历史作品作为 Base 时搜索相关全部 refs。HEAD 指纹只召回线索；缓存直接位于 `fp_cache/<work>/<commit>/`，没有索引文件。
-2. **来源待定**：直接调用 `base-lineage-reviewer`。它可要求主 Agent 补跑 `search-history-blobs`、Git 历史命令和明确 commit 对的 `compare-commits`；少量 commit 对才用 `--ast`。
+2. **来源待定**：直接调用 `base-lineage-reviewer`。该角色运行 `search-history-blobs`、Git 历史命令和明确 commit 对的 `compare-commits`；少量 commit 对才用 `--ast`。候选中的 `repository_type/reference_kind/module_ids` 只用于身份说明和角色路由：完整内核或框架可作为主 Base，component 只交给对应模块 Agent 复核其引入与适配。
 3. **来源已定**：`base.md` 为 `accepted` 或 `no_reliable_base` 后，主 Agent 先准备静态阅读目录，再选择并行的 `module-*` 与 `history-ai-reviewer`。目标仓库检出 `target_review_commit`，Base 仓库检出 `selected_base_commit`；工作区有修改、同仓需要两个版本或多 case 冲突时，在 `case_state/read/` 使用 detached worktree，不得 stash、reset 或覆盖人工内容。检出后不再切换，sub-agent 使用 `Read`、`Grep`、`Glob` 阅读两个目录。不得由程序固定枚举模块或创建占位产物。
 4. **联动复核**：模块片段出现 `## 需联动结论`，或新事实改变已接受结论时，主 Agent 按语义重新调用 Base、历史、文档或风险角色。旧产物由原责任角色重写。
 5. **声明与风险**：模块完成后调用 `doc-claim-reviewer` 汇总目标计划、功能声明、来源披露和复现说明；建立真实执行基线并具备 Base/上游归属和相关历史后调用 `cheat-detector`。文档和历史角色有可靠评价材料时可以公开正面、中性或负面结论；作弊角色没有风险 finding 时保留内部 `no_findings` 片段，最终报告不展示。

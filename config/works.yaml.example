@@ -1,6 +1,7 @@
 # Copy to config/works.yaml and maintain manually.
 # Do not use fork suffixes as work names.
 - work_id: 2026-pku-shulijichu-demo
+  repository_type: competition
   year: 2026
   school: 北京大学
   team: 数理基础队
@@ -12,3 +13,33 @@
     prelim: https://gitlab.eduxiji.net/example/T2026100019911468-282
     final: ""
     source: ""
+
+# 开源参考仓库。完整内核和框架可以成为主 Base 候选。
+- work_id: github-example-reference-os
+  repository_type: reference
+  reference_kind: kernel
+  module_ids: []
+  year: 0
+  school: 开源社区
+  team: example-org
+  work_name: ReferenceOS
+  display_name: 开源参考 example-org《ReferenceOS》
+  canonical_dir: repos/github/example-org/ReferenceOS
+  review_branch: main
+  urls:
+    source: https://github.com/example-org/ReferenceOS
+
+# 真正只实现某个子系统的仓库使用 component；module_ids 直接采用 Taxonomy 模块 ID。
+- work_id: github-example-ext4-component
+  repository_type: reference
+  reference_kind: component
+  module_ids: [file-system]
+  year: 0
+  school: 开源社区
+  team: example-org
+  work_name: Ext4Component
+  display_name: 开源参考 example-org《Ext4Component》
+  canonical_dir: repos/github/example-org/Ext4Component
+  review_branch: main
+  urls:
+    source: https://github.com/example-org/Ext4Component

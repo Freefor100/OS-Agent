@@ -24,6 +24,9 @@ class WorkIdentity:
     canonical_dir: str
     review_branch: str
     urls: dict[str, str]
+    repository_type: str
+    reference_kind: str
+    module_ids: list[str]
 
     @property
     def repo_path(self) -> Path:
@@ -57,6 +60,9 @@ def load_works(path: str | Path = "config/works.yaml") -> list[WorkIdentity]:
                 canonical_dir=str(item.get("canonical_dir", "")).strip(),
                 review_branch=str(item.get("review_branch", "")).strip() or "main",
                 urls={str(k): str(v or "") for k, v in urls.items()},
+                repository_type=str(item.get("repository_type", "competition")).strip() or "competition",
+                reference_kind=str(item.get("reference_kind", "")).strip(),
+                module_ids=[str(value).strip() for value in item.get("module_ids", []) if str(value).strip()],
             )
         )
     return works
@@ -78,6 +84,22 @@ def validate_work_identity(work: WorkIdentity) -> ValidationReport:
     for field, value in required.items():
         if not value:
             report.add("identity.missing_field", f"work identity missing {field}")
+    if work.repository_type not in {"competition", "reference"}:
+        report.add("identity.repository_type", f"unknown repository_type: {work.repository_type}")
+    if work.repository_type == "competition" and (work.reference_kind or work.module_ids):
+        report.add("identity.reference_metadata", "competition entries cannot declare reference_kind or module_ids")
+    if work.repository_type == "reference":
+        if work.reference_kind not in {"kernel", "framework", "component"}:
+            report.add("identity.reference_kind", f"unknown reference_kind: {work.reference_kind}")
+        if work.reference_kind == "component" and not work.module_ids:
+            report.add("identity.reference_modules", "component references require module_ids")
+        if work.reference_kind != "component" and work.module_ids:
+            report.add("identity.reference_modules", "module_ids are only valid for component references")
+        from .taxonomy import MODULES
+
+        for module_id in work.module_ids:
+            if module_id not in MODULES:
+                report.add("identity.reference_module", f"unknown module_id: {module_id}")
     if work.repo_path.exists():
         if not (work.repo_path / ".git").exists():
             report.add("identity.not_git_repo", "canonical_dir exists but is not a git repo", work.repo_path)

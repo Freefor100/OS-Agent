@@ -8,8 +8,9 @@ from pathlib import Path
 
 from .contracts import ValidationReport
 from .fingerprint_search import compare_fingerprint_caches, search_fingerprint_cache, search_historical_blob_objects
-from .fingerprints import write_blob_fingerprint_cache, write_fingerprint_cache
+from .fingerprints import BLOB_SCHEMA_VERSION, SCHEMA_VERSION, write_blob_fingerprint_cache, write_fingerprint_cache
 from .identity import ROOT, find_work, git_text, init_case, load_works, validate_work_identity
+from .structural import ast_algorithm_version
 
 def init_by_work_id(work_id: str, works_path: str = "config/works.yaml", output_root: str = "output") -> Path:
     work = find_work(work_id, works_path)
@@ -68,18 +69,24 @@ def build_fingerprint(case_dir: str | Path) -> Path:
     if not repo.is_absolute():
         repo = ROOT / repo
     commit = manifest["repo"]["commit"]
-    cache_dir = write_fingerprint_cache(
-        repo=repo,
-        commit=commit,
-        work_id=str(manifest["work"]["work_id"]),
-        display_name=str(manifest["work"].get("display_name", "")),
-        cache_root=ROOT / "fp_cache",
-    )
+    work_id = str(manifest["work"]["work_id"])
+    cache_dir = ROOT / "fp_cache" / work_id / commit
+    if not _complete_head_fingerprint(cache_dir, work_id, commit):
+        cache_dir = write_fingerprint_cache(
+            repo=repo,
+            commit=commit,
+            work_id=work_id,
+            display_name=str(manifest["work"].get("display_name", "")),
+            cache_root=ROOT / "fp_cache",
+        )
     fp_manifest = {
         "schema": "review_case.fp_manifest.v1",
         "work_id": manifest["work"]["work_id"],
         "display_name": manifest["work"].get("display_name", ""),
         "year": manifest["work"].get("year", 0),
+        "repository_type": manifest["work"].get("repository_type", "competition"),
+        "reference_kind": manifest["work"].get("reference_kind", ""),
+        "module_ids": manifest["work"].get("module_ids", []),
         "review_ref": manifest["repo"].get("review_branch", ""),
         "commit": commit,
         "cache_dir": str(cache_dir.relative_to(ROOT) if cache_dir.is_relative_to(ROOT) else cache_dir),
@@ -89,6 +96,27 @@ def build_fingerprint(case_dir: str | Path) -> Path:
     out = root / "case_state" / "facts" / "fingerprint.json"
     _write_json_atomic(out, fp_manifest)
     return out
+
+
+def _complete_head_fingerprint(cache_dir: Path, work_id: str, commit: str) -> bool:
+    try:
+        fingerprint = json.loads((cache_dir / "manifest.json").read_text(encoding="utf-8"))
+        blob = json.loads((cache_dir / "blob.json").read_text(encoding="utf-8"))
+        ast = json.loads((cache_dir / "ast.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    return (
+        fingerprint.get("schema") == SCHEMA_VERSION
+        and fingerprint.get("work_id") == work_id
+        and fingerprint.get("commit") == commit
+        and fingerprint.get("components", {}).get("blob") is True
+        and fingerprint.get("components", {}).get("ast") is True
+        and fingerprint.get("ast_shape_version") == ast_algorithm_version()
+        and blob.get("schema") == BLOB_SCHEMA_VERSION
+        and blob.get("commit") == commit
+        and ast.get("schema") == "review_case.structural_fingerprint.v2"
+        and ast.get("commit") == commit
+    )
 
 
 def build_fingerprint_cache(works_path: str | Path = "config/works.yaml", cache_root: str | Path = "fp_cache", work_ids: list[str] | None = None) -> Path:
@@ -137,6 +165,9 @@ def search_head_candidates(
             {
                 "cache_dir": cache_dir,
                 "year": work.year,
+                "repository_type": work.repository_type,
+                "reference_kind": work.reference_kind,
+                "module_ids": work.module_ids,
                 "review_ref": work.review_branch,
             }
         )
@@ -256,6 +287,9 @@ def search_history_blobs(
                 "work_id": work.work_id,
                 "display_name": work.display_name,
                 "year": work.year,
+                "repository_type": work.repository_type,
+                "reference_kind": work.reference_kind,
+                "module_ids": work.module_ids,
                 "repo_path": str(work.repo_path),
                 "review_ref": work.review_branch,
                 "review_commit": git_text(work.repo_path, "rev-parse", work.review_branch),

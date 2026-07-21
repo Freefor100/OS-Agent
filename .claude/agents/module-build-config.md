@@ -22,6 +22,8 @@ tools: Read, Grep, Glob, Bash, Write, Edit
 
 主 Agent 会在 `allowed_materials` 中给出已准备好的 `target_tree`、`target_review_ref`、`target_review_commit`，以及 Base 可靠时的 `base_tree`、`selected_base_ref`、`selected_base_commit`、`target_introduction_commit` 和 `base.md` 中本模块的交接内容。优先使用 `Read`、`Grep`、`Glob` 直接阅读这些静态目录；不得运行 `git checkout`、`git switch`、`git reset` 或改变仓库状态。Git 只用于查看与本模块相关的引入后提交历史。已接受 Base 时不重新选择 Base；没有可靠 Base 时不制造差异。
 
+若交接内容列出 `reference_kind: component` 的次级来源，只阅读 `module_ids` 包含本模块的仓库，并核对目标侧引入边界。外部实现本身不计为选手工作量；重点说明目标作品的配置、接口胶水、平台适配、语义修改和后续维护。
+
 逐个节点先判断代码是否真实可达，区分完整实现、部分闭合、接口壳、配置未启用、外部实现和不存在；再找到实际入口与真实调用者，沿控制流、数据流或状态变化追到用户可见结果或下游模块。只读取闭合关键链路需要的文件，确认失败、回滚、释放和并发边界后再固定少量关键 Evidence，不要先把整仓、Base 和全部证据装入上下文。
 
 所有节点的 `### <node_id>：<中文标题>` 只放在 `## 实现内容` 下。已实现或部分实现的节点使用自然段讲清触发者与入口、核心对象及前后状态、关键函数和跨模块接口、正常结果、适用的失败/清理/并发边界，以及实现在哪一步结束；不得把这些要求原样输出成检查清单或表格，也不得停留在符号罗列。`implemented` 要闭合主要执行链，`partial` 先写已闭合部分再指出断点，`minimal` 说明只有哪些接口或局部状态。外部或继承实现只展开作品的接入、配置、适配和真实调用，不复述第三方内部源码。确认不存在的节点一行写 `absent`，不补背景知识、不虚构设计。
